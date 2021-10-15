@@ -359,8 +359,8 @@ const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 const SyncSession::State& SyncSession::State::waiting_for_access_token = WaitingForAccessToken();
 
-void SyncSession::handle_bad_auth(std::shared_ptr<SyncUser> user, std::error_code error_code,
-                                  std::string context_message)
+void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
+                                  const std::string& context_message)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
     {
@@ -372,7 +372,7 @@ void SyncSession::handle_bad_auth(std::shared_ptr<SyncUser> user, std::error_cod
     }
     if (m_config.error_handler) {
         auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication, context_message, true);
-        m_config.error_handler(shared_from_this(), user_facing_error);
+        m_config.error_handler(shared_from_this(), std::move(user_facing_error));
     }
 }
 

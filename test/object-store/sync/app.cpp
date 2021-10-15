@@ -2034,50 +2034,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!user->is_logged_in());
         };
 
-        /* This test can be used to manually check the behaviour of an expired refresh token
-                SECTION("Manually expire refresh token") {
-                    TestSyncManager sync_manager(app_config, {});
-                    auto app = sync_manager.app();
-                    auto creds = create_user_and_log_in(sync_manager.app());
-                    SyncTestFile config(app, partition, schema);
-                    auto user = app->current_user();
-                    REQUIRE(user);
-                    REQUIRE(app_session.admin_api.verify_access_token(user->access_token(),
-           app_session.server_app_id));
-                    // Set a bad access token to force request a new one on the next sync session.
-                    user->update_access_token(encode_fake_jwt("fake_access_token"));
-                    REQUIRE(!app_session.admin_api.verify_access_token(user->access_token(),
-           app_session.server_app_id)); std::atomic<bool> sync_error_handler_called{false};
-                    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-                        sync_error_handler_called.store(true);
-                        REQUIRE(error.message == "Unable to refresh the user access token.");
-                        REQUIRE(error.error_code ==
-           sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                    };
-                    REQUIRE(user->is_logged_in());
-                    REQUIRE(!sync_error_handler_called.load());
-                    std::cout << "advance the system time > 60 days and press a key to continue..." << std::endl;
-                    char c;
-                    std::cin >> c;
-                    auto r = Realm::get_shared_realm(config);
-                    auto session = user->session_for_on_disk_path(config.path);
-                    timed_wait_for([&] {
-                        return sync_error_handler_called.load();
-                    }, std::chrono::seconds(30));
-                    // the failed refresh logs out the user
-                    REQUIRE(!user->is_logged_in());
-                    // logging in now works properly
-                    log_in(app, creds);
-                    // still referencing the same user
-                    REQUIRE(user == app->current_user());
-                    REQUIRE(user->is_logged_in());
-                    {
-                        // check that there are no errors initiating a session now by making sure upload/download
-           succeeds auto r = Realm::get_shared_realm(config); Results dogs = get_dogs(r);
-                    }
-                }
-         */
-
         SECTION("Disabled user results in a sync error") {
             TestSyncManager sync_manager(app_config, {});
             auto app = sync_manager.app();
