@@ -694,7 +694,7 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t* a
     (*app)->sync_manager()->wait_for_sessions_to_terminate();
 }
 
-RLM_API char* realm_аpp_sync_client_get_default_file_path_for_realm(const realm_app_t* app,
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t* app,
                                                                     const realm_sync_config_t* config,
                                                                     const char* custom_filename) noexcept
 {
