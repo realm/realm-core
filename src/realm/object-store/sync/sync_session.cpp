@@ -359,6 +359,23 @@ const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 const SyncSession::State& SyncSession::State::waiting_for_access_token = WaitingForAccessToken();
 
+void SyncSession::handle_bad_auth(std::shared_ptr<SyncUser> user, std::error_code error_code,
+                                  std::string context_message)
+{
+    // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
+    {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        cancel_pending_waits(lock, error_code);
+    }
+    if (user) {
+        user->log_out();
+    }
+    if (m_config.error_handler) {
+        auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication, context_message, true);
+        m_config.error_handler(shared_from_this(), user_facing_error);
+    }
+}
+
 std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
 {
     return [session](util::Optional<app::AppError> error) {
@@ -368,40 +385,27 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
         }
-        else if (session_user->refresh_token_is_expired()) { // user is expired
-            std::unique_lock<std::mutex> lock(session->m_state_mutex);
-            session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
-            if (session->m_config.error_handler) {
-                session->m_config.error_handler(session, SyncError(realm::sync::ProtocolError::bad_authentication,
-                                                                   "expired refresh token", true));
-            }
-        }
         else if (error) {
             if (error->error_code == app::make_client_error_code(app::ClientErrorCode::app_deallocated)) {
-                return;
+                return; // this response came in after the app shut down, ignore it
+            }
+            else if (error->error_code.category() == app::client_error_category()) {
+                // any other client errors other than app_deallocated are considered fatal because
+                // there was a problem locally before even sending the request to the server
+                // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in
+                session->handle_bad_auth(session_user, error->error_code, error->message);
             }
             else if (error->http_status_code &&
                      (*error->http_status_code == 401 || *error->http_status_code == 403)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
-                // retry. This can be because an admin has revoked this user's sessions or the user has been disabled.
-                // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
-                std::unique_lock<std::mutex> lock(session->m_state_mutex);
-                session->cancel_pending_waits(lock, error->error_code);
-                if (session_user && session_user->is_logged_in()) {
-                    session_user->log_out();
-                }
-                if (session->m_config.error_handler) {
-                    auto user_facing_error = SyncError(realm::sync::ProtocolError::bad_authentication,
-                                                       "Unable to refresh the user access token.", true);
-                    session->m_config.error_handler(session, user_facing_error);
-                }
+                // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
+                // or the refresh token has expired according to the server's clock.
+                session->handle_bad_auth(session_user, error->error_code, "Unable to refresh the user access token.");
             }
             else {
                 // 10 seconds is arbitrary, but it is to not swamp the server
                 std::this_thread::sleep_for(std::chrono::seconds(10));
-                if (session_user) {
-                    session_user->refresh_custom_data(handle_refresh(session));
-                }
+                session_user->refresh_custom_data(handle_refresh(session));
             }
         }
         else {
@@ -539,15 +543,8 @@ void SyncSession::handle_error(SyncError error)
                 // represent actual errors.
                 return;
             case SimplifiedProtocolError::BadAuthentication: {
-                std::shared_ptr<SyncUser> user_to_invalidate;
                 next_state = NextStateAfterError::none;
-                {
-                    std::unique_lock<std::mutex> lock(m_state_mutex);
-                    user_to_invalidate = user();
-                    cancel_pending_waits(lock, error.error_code);
-                }
-                if (user_to_invalidate)
-                    user_to_invalidate->invalidate();
+                handle_bad_auth(user(), error.error_code, "Sync protocol error: bad authentication");
                 break;
             }
             case SimplifiedProtocolError::PermissionDenied: {
