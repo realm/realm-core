@@ -99,8 +99,7 @@ auto ClientReplication::get_next_local_changeset(version_type current_version, v
 
 
 void ClientReplication::set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
-                                                     SaltedVersion server_version,
-                                                     BinaryData uploadable_changeset)
+                                                     SaltedVersion server_version, BinaryData uploadable_changeset)
 {
     ensure_updated(current_version); // Throws
     prepare_for_write();             // Throws
