@@ -38,6 +38,8 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
     if (!m_session)
         return;
 
+    m_session->revive_if_needed();
+
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     m_session->wait_for_download_completion([callback, self, this](std::error_code ec) {
         {

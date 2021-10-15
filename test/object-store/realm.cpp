@@ -627,6 +627,62 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         REQUIRE(called);
     }
 
+    SECTION("progress notifiers of a task are cancelled if the task is cancelled") {
+        bool progress_notifier1_called = false;
+        bool task1_completed = false;
+        bool progress_notifier2_called = false;
+        bool task2_completed = false;
+        {
+            auto realm = Realm::get_shared_realm(config2);
+            realm->begin_transaction();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+
+        std::shared_ptr<AsyncOpenTask> task = Realm::get_synchronized_realm(config);
+        std::shared_ptr<AsyncOpenTask> task2 = Realm::get_synchronized_realm(config);
+        REQUIRE(task);
+        REQUIRE(task2);
+        auto realm = Realm::get_shared_realm(config);
+        realm->begin_transaction(); // block sync from writing until we cancel
+        task->register_download_progress_notifier([&](uint64_t, uint64_t) {
+            std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!task1_completed);
+            progress_notifier1_called = true;
+        });
+        task2->register_download_progress_notifier([&](uint64_t, uint64_t) {
+            std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!task2_completed);
+            progress_notifier2_called = true;
+        });
+        task->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+            REQUIRE(!err);
+            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            REQUIRE(realm);
+            std::lock_guard<std::mutex> guard(mutex);
+            task1_completed = true;
+        });
+        task->cancel();
+        task2->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+            REQUIRE(!err);
+            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            REQUIRE(realm);
+            std::lock_guard<std::mutex> guard(mutex);
+            task2_completed = true;
+        });
+        realm->cancel_transaction(); // unblock sync
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard<std::mutex> guard(mutex);
+            return task2_completed;
+        });
+        std::lock_guard<std::mutex> guard(mutex);
+        REQUIRE(!progress_notifier1_called);
+        REQUIRE(!task1_completed);
+        REQUIRE(progress_notifier2_called);
+        REQUIRE(task2_completed);
+    }
+
     SECTION("downloads latest state for Realms which already exist locally") {
         wait_for_upload(*Realm::get_shared_realm(config));
 
