@@ -13,12 +13,9 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
-#include <realm/sync/noinst/client_impl_base.hpp>
-#include <realm/sync/config.hpp>
-#include <realm/sync/protocol.hpp>
+#include <realm/sync/client_base.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 class Client {
 public:
@@ -818,7 +815,6 @@ inline void Session::async_wait_for_download_completion(WaitOperCompletionHandle
     async_wait_for(upload_completion, download_completion, std::move(handler)); // Throws
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_CLIENT_HPP

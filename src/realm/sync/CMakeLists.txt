@@ -35,6 +35,7 @@ set(SYNC_INSTALL_HEADERS
     changeset_parser.hpp
     changeset.hpp
     client.hpp
+    client_base.hpp
     history.hpp
     instruction_applier.hpp
     instruction_replication.hpp
