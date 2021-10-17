@@ -4117,8 +4117,13 @@ TEST(Query_SortLinkChains)
                                               .get_linked_object(t1_link_col)
                                               .get_linked_object(t2_link_col)
                                               .get<util::Optional<int64_t>>(t3_int_col);
-        CHECK(!last || current.value() >= last.value());
-        last = current.value();
+        if (last) {
+            CHECK(current);
+            CHECK(current.value() >= last.value());
+        }
+        if (current) {
+            last = current.value();
+        }
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor({{t1_link_col, t2_link_col, t3_int_col}}, {false}));
