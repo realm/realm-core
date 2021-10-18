@@ -501,29 +501,29 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm->read_transaction_version() == frozen2->read_transaction_version());
         REQUIRE(frozen2->read_transaction_version() > frozen1->read_transaction_version());
     }
-    
+
     SECTION("frozen realm should have the same schema as originating realm") {
         auto full_schema = Schema{
             {"object1", {{"value", PropertyType::Int}}},
             {"object2", {{"value", PropertyType::Int}}},
         };
-        
+
         auto subset_schema = Schema{
             {"object1", {{"value", PropertyType::Int}}},
         };
-        
+
         config.schema = full_schema;
-        
+
         auto realm = Realm::get_shared_realm(config);
         realm->close();
-        
+
         config.schema = subset_schema;
-        
+
         realm = Realm::get_shared_realm(config);
         realm->read_group();
         auto frozen_realm = realm->freeze();
         auto frozen_schema = frozen_realm->schema();
-        
+
         REQUIRE(full_schema != subset_schema);
         REQUIRE(realm->schema() == subset_schema);
         REQUIRE(frozen_schema == subset_schema);
