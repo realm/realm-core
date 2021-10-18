@@ -295,7 +295,7 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    static ClientImpl::Session::Config make_session_impl_config(SyncTransactReporter&, Session::Config&);
+    static ClientImpl::Session::Config make_session_impl_config(Session::Config&);
 
     void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
                      std::string multiplex_ident);
@@ -650,6 +650,11 @@ DB& SessionImpl::get_db() const noexcept
     return *m_wrapper.m_db;
 }
 
+SyncTransactReporter* SessionImpl::get_transact_reporter() noexcept
+{
+    return &m_wrapper;
+}
+
 ClientReplication& SessionImpl::access_realm()
 {
     return m_wrapper.get_history();
@@ -733,7 +738,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_simulate_integration_error{config.simulate_integration_error}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
-    , m_session_impl_config{make_session_impl_config(*this, config)}
+    , m_session_impl_config{make_session_impl_config(config)}
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
@@ -1115,11 +1120,9 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
         m_sync_transact_handler(old_version, new_version); // Throws
 }
 
-auto SessionWrapper::make_session_impl_config(SyncTransactReporter& transact_reporter, Session::Config& config)
-    -> ClientImpl::Session::Config
+auto SessionWrapper::make_session_impl_config(Session::Config& config) -> ClientImpl::Session::Config
 {
     ClientImpl::Session::Config config_2;
-    config_2.sync_transact_reporter = &transact_reporter;
     config_2.disable_upload = config.disable_upload;
     config_2.disable_empty_upload = config.disable_empty_upload;
     return config_2;

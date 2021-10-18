@@ -849,6 +849,7 @@ private:
 
     const std::string& get_realm_path() const noexcept;
     DB& get_db() const noexcept;
+    SyncTransactReporter* get_transact_reporter() noexcept;
 
     /// The implementation need only ensure that the returned reference stays valid
     /// until the next invocation of access_realm() on one of the session
@@ -945,7 +946,6 @@ private:
 private:
     Connection& m_conn;
     const session_ident_type m_ident;
-    SyncTransactReporter* const m_sync_transact_reporter;
     const bool m_disable_upload;
     const bool m_disable_empty_upload;
 
@@ -1144,10 +1144,8 @@ private:
 
 
 /// See Client::Session for the meaning of the individual properties
-/// (other than `sync_transact_reporter`).
 class ClientImpl::Session::Config {
 public:
-    SyncTransactReporter* sync_transact_reporter = nullptr;
     bool disable_upload = false;
     bool disable_empty_upload = false;
 };
@@ -1414,7 +1412,6 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}
     , m_ident{ident}
-    , m_sync_transact_reporter{config.sync_transact_reporter}
     , m_disable_upload{config.disable_upload}
     , m_disable_empty_upload{config.disable_empty_upload}
     , m_wrapper{wrapper}

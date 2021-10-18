@@ -1690,7 +1690,7 @@ bool Session::integrate_changesets(ClientReplication& history, const SyncProgres
     std::size_t num_changesets = received_changesets.size();
     bool success = history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets,
                                                        version_info, error, logger,
-                                                       m_sync_transact_reporter); // Throws
+                                                       get_transact_reporter()); // Throws
     if (REALM_LIKELY(success)) {
         if (num_changesets == 1) {
             logger.debug("1 remote changeset integrated, producing client version %1",
@@ -2229,9 +2229,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         m_upload_progress = m_progress.upload;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
-        if (m_sync_transact_reporter) {
-            m_sync_transact_reporter->report_sync_transact(client_reset_old_version, client_reset_new_version);
-        }
+        get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
         return true;
     };
     // if a client reset happens, it will take care of setting the file ident
