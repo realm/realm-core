@@ -337,13 +337,6 @@ typedef void (*realm_scheduler_set_notify_callback_func_t)(void* userdata, void*
                                                            realm_free_userdata_func_t, realm_scheduler_notify_func_t);
 typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(void* userdata);
 
-/* Sync types */
-typedef void (*realm_sync_upload_completion_func_t)(void* userdata, realm_async_error_t*);
-typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_async_error_t*);
-typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, int, int);
-typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, int, int);
-typedef void (*realm_sync_progress_func_t)(void* userdata, size_t transferred, size_t total);
-
 /**
  * Get the VersionID of the current transaction.
  *
@@ -2378,6 +2371,38 @@ RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, co
                                               const realm_app_error_t*),
                                      void* userdata, realm_free_userdata_func_t);
 
+/**
+ * Instruct this app's sync client to immediately reconnect.
+ * Useful when the device has been offline and then receives a network reachability update.
+ *
+ * The sync client will always attempt to reconnect eventually, this is just a hint.
+ */
+RLM_API void realm_app_sync_client_reconnect(realm_app_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Get whether there are any active sync sessions for this app.
+ */
+RLM_API bool realm_app_sync_client_has_sessions(const realm_app_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Wait until the sync client has terminated all sessions and released all realm files
+ * it had open.
+ *
+ * WARNING: this is a blocking wait.
+ */
+RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Get the default realm file path based on the user and partition value in the config.
+ *
+ * @param custom_filename custom name for the realm file itself. Can be null,
+ *                        in which case a default name based on the config will be used.
+ *
+ * Return value must be manually released with realm_free().
+ */
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
+                                                                    const char* custom_filename) RLM_API_NOEXCEPT;
+
 RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
@@ -2441,7 +2466,341 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
 RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
 /* Sync */
+typedef enum realm_sync_client_metadata_mode {
+    RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
+    RLM_SYNC_CLIENT_METADATA_MODE_ENCRYPTED,
+    RLM_SYNC_CLIENT_METADATA_MODE_DISABLED,
+} realm_sync_client_metadata_mode_e;
 
-RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void);
+typedef enum realm_sync_client_reconnect_mode {
+    RLM_SYNC_CLIENT_RECONNECT_MODE_NORMAL,
+    RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING,
+} realm_sync_client_reconnect_mode_e;
+
+typedef enum realm_sync_session_resync_mode {
+    RLM_SYNC_SESSION_RESYNC_MODE_MANUAL,
+    RLM_SYNC_SESSION_RESYNC_MODE_SEAMLESS_LOSS,
+} realm_sync_session_resync_mode_e;
+
+typedef enum realm_sync_session_stop_policy {
+    RLM_SYNC_SESSION_STOP_POLICY_IMMEDIATELY,
+    RLM_SYNC_SESSION_STOP_POLICY_LIVE_INDEFINITELY,
+    RLM_SYNC_SESSION_STOP_POLICY_AFTER_CHANGES_UPLOADED,
+} realm_sync_session_stop_policy_e;
+
+typedef enum realm_sync_session_state {
+    RLM_SYNC_SESSION_STATE_ACTIVE,
+    RLM_SYNC_SESSION_STATE_DYING,
+    RLM_SYNC_SESSION_STATE_INACTIVE,
+    RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN,
+} realm_sync_session_state_e;
+
+typedef enum realm_sync_connection_state {
+    RLM_SYNC_CONNECTION_STATE_DISCONNECTED,
+    RLM_SYNC_CONNECTION_STATE_CONNECTING,
+    RLM_SYNC_CONNECTION_STATE_CONNECTED,
+} realm_sync_connection_state_e;
+
+typedef enum realm_sync_progress_direction {
+    RLM_SYNC_PROGRESS_DIRECTION_UPLOAD,
+    RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD,
+} realm_sync_progress_direction_e;
+
+/**
+ * Possible error categories realm_sync_error_code_t can fall in.
+ */
+typedef enum realm_sync_error_category {
+    RLM_SYNC_ERROR_CATEGORY_CLIENT,
+    RLM_SYNC_ERROR_CATEGORY_CONNECTION,
+    RLM_SYNC_ERROR_CATEGORY_SESSION,
+
+    /**
+     * System error - POSIX errno, Win32 HRESULT, etc.
+     */
+    RLM_SYNC_ERROR_CATEGORY_SYSTEM,
+
+    /**
+     * Unknown source of error.
+     */
+    RLM_SYNC_ERROR_CATEGORY_UNKNOWN,
+} realm_sync_error_category_e;
+
+typedef enum realm_sync_errno_client {
+    RLM_SYNC_ERR_CLIENT_CONNECTION_CLOSED = 100,
+    RLM_SYNC_ERR_CLIENT_UNKNOWN_MESSAGE = 101,
+    RLM_SYNC_ERR_CLIENT_BAD_SYNTAX = 102,
+    RLM_SYNC_ERR_CLIENT_LIMITS_EXCEEDED = 103,
+    RLM_SYNC_ERR_CLIENT_BAD_SESSION_IDENT = 104,
+    RLM_SYNC_ERR_CLIENT_BAD_MESSAGE_ORDER = 105,
+    RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT = 106,
+    RLM_SYNC_ERR_CLIENT_BAD_PROGRESS = 107,
+    RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_HEADER_SYNTAX = 108,
+    RLM_SYNC_ERR_CLIENT_BAD_CHANGESET_SIZE = 109,
+    RLM_SYNC_ERR_CLIENT_BAD_ORIGIN_FILE_IDENT = 110,
+    RLM_SYNC_ERR_CLIENT_BAD_SERVER_VERSION = 111,
+    RLM_SYNC_ERR_CLIENT_BAD_CHANGESET = 112,
+    RLM_SYNC_ERR_CLIENT_BAD_REQUEST_IDENT = 113,
+    RLM_SYNC_ERR_CLIENT_BAD_ERROR_CODE = 114,
+    RLM_SYNC_ERR_CLIENT_BAD_COMPRESSION = 115,
+    RLM_SYNC_ERR_CLIENT_BAD_CLIENT_VERSION = 116,
+    RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED = 117,
+    RLM_SYNC_ERR_CLIENT_PONG_TIMEOUT = 118,
+    RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT_SALT = 119,
+    RLM_SYNC_ERR_CLIENT_BAD_FILE_IDENT = 120,
+    RLM_SYNC_ERR_CLIENT_CONNECT_TIMEOUT = 121,
+    RLM_SYNC_ERR_CLIENT_BAD_TIMESTAMP = 122,
+    RLM_SYNC_ERR_CLIENT_BAD_PROTOCOL_FROM_SERVER = 123,
+    RLM_SYNC_ERR_CLIENT_CLIENT_TOO_OLD_FOR_SERVER = 124,
+    RLM_SYNC_ERR_CLIENT_CLIENT_TOO_NEW_FOR_SERVER = 125,
+    RLM_SYNC_ERR_CLIENT_PROTOCOL_MISMATCH = 126,
+    RLM_SYNC_ERR_CLIENT_BAD_STATE_MESSAGE = 127,
+    RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE = 128,
+    RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED = 131,
+} realm_sync_errno_client_e;
+
+typedef enum realm_sync_errno_connection {
+    RLM_SYNC_ERR_CONNECTION_CONNECTION_CLOSED = 100,
+    RLM_SYNC_ERR_CONNECTION_OTHER_ERROR = 101,
+    RLM_SYNC_ERR_CONNECTION_UNKNOWN_MESSAGE = 102,
+    RLM_SYNC_ERR_CONNECTION_BAD_SYNTAX = 103,
+    RLM_SYNC_ERR_CONNECTION_LIMITS_EXCEEDED = 104,
+    RLM_SYNC_ERR_CONNECTION_WRONG_PROTOCOL_VERSION = 105,
+    RLM_SYNC_ERR_CONNECTION_BAD_SESSION_IDENT = 106,
+    RLM_SYNC_ERR_CONNECTION_REUSE_OF_SESSION_IDENT = 107,
+    RLM_SYNC_ERR_CONNECTION_BOUND_IN_OTHER_SESSION = 108,
+    RLM_SYNC_ERR_CONNECTION_BAD_MESSAGE_ORDER = 109,
+    RLM_SYNC_ERR_CONNECTION_BAD_DECOMPRESSION = 110,
+    RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_HEADER_SYNTAX = 111,
+    RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE = 112,
+    RLM_SYNC_ERR_CONNECTION_BAD_CHANGESETS = 113,
+} realm_sync_errno_connection_e;
+
+typedef enum realm_sync_errno_session {
+    RLM_SYNC_ERR_SESSION_SESSION_CLOSED = 200,
+    RLM_SYNC_ERR_SESSION_OTHER_SESSION_ERROR = 201,
+    RLM_SYNC_ERR_SESSION_TOKEN_EXPIRED = 202,
+    RLM_SYNC_ERR_SESSION_BAD_AUTHENTICATION = 203,
+    RLM_SYNC_ERR_SESSION_ILLEGAL_REALM_PATH = 204,
+    RLM_SYNC_ERR_SESSION_NO_SUCH_REALM = 205,
+    RLM_SYNC_ERR_SESSION_PERMISSION_DENIED = 206,
+    RLM_SYNC_ERR_SESSION_BAD_SERVER_FILE_IDENT = 207,
+    RLM_SYNC_ERR_SESSION_BAD_CLIENT_FILE_IDENT = 208,
+    RLM_SYNC_ERR_SESSION_BAD_SERVER_VERSION = 209,
+    RLM_SYNC_ERR_SESSION_BAD_CLIENT_VERSION = 210,
+    RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES = 211,
+    RLM_SYNC_ERR_SESSION_BAD_CHANGESET = 212,
+    RLM_SYNC_ERR_SESSION_SUPERSEDED = 213,
+    RLM_SYNC_ERR_SESSION_DISABLED_SESSION = 213,
+    RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED = 214,
+    RLM_SYNC_ERR_SESSION_UNSUPPORTED_SESSION_FEATURE = 215,
+    RLM_SYNC_ERR_SESSION_BAD_ORIGIN_FILE_IDENT = 216,
+    RLM_SYNC_ERR_SESSION_BAD_CLIENT_FILE = 217,
+    RLM_SYNC_ERR_SESSION_SERVER_FILE_DELETED = 218,
+    RLM_SYNC_ERR_SESSION_CLIENT_FILE_BLACKLISTED = 219,
+    RLM_SYNC_ERR_SESSION_USER_BLACKLISTED = 220,
+    RLM_SYNC_ERR_SESSION_TRANSACT_BEFORE_UPLOAD = 221,
+    RLM_SYNC_ERR_SESSION_CLIENT_FILE_EXPIRED = 222,
+    RLM_SYNC_ERR_SESSION_USER_MISMATCH = 223,
+    RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS = 224,
+    RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE = 225,
+} realm_sync_errno_session_e;
+
+typedef struct realm_sync_session realm_sync_session_t;
+typedef struct realm_async_open_task realm_async_open_task_t;
+
+// This type should never be returned from a function.
+// It's only meant as an asynchronous callback argument.
+// Pointers to this struct and its pointer members are only valid inside the scope
+// of the callback they were passed to.
+typedef struct realm_sync_error_code {
+    realm_sync_error_category_e category;
+    int value;
+    const char* message;
+} realm_sync_error_code_t;
+
+typedef struct realm_sync_error_user_info {
+    const char* key;
+    const char* value;
+} realm_sync_error_user_info_t;
+
+// This type should never be returned from a function.
+// It's only meant as an asynchronous callback argument.
+// Pointers to this struct and its pointer members are only valid inside the scope
+// of the callback they were passed to.
+typedef struct realm_sync_error {
+    realm_sync_error_code_t error_code;
+    const char* detailed_message;
+    bool is_fatal;
+    bool is_unrecognized_by_client;
+
+    realm_sync_error_user_info_t* user_info_map;
+    size_t user_info_length;
+} realm_sync_error_t;
+
+typedef void (*realm_sync_upload_completion_func_t)(void* userdata, realm_sync_error_code_t*);
+typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_sync_error_code_t*);
+typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, realm_sync_connection_state_e old_state,
+                                                           realm_sync_connection_state_e new_state);
+typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, realm_sync_session_state_e old_state,
+                                                        realm_sync_session_state_e new_state);
+typedef void (*realm_sync_progress_func_t)(void* userdata, uint64_t transferred_bytes, uint64_t total_bytes);
+typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_session_t*, const realm_sync_error_t);
+typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
+                                             const char* pem_data, size_t pem_size, int preverify_ok, int depth);
+
+/**
+ * Callback function invoked by the async open task once the realm is open and fully synchronized.
+ *
+ * This callback is invoked on the sync client's worker thread.
+ *
+ * @param realm Downloaded realm instance, or null if an error occurred.
+ *              Move to the thread you want to use it on and
+ *              thaw with @a realm_from_thread_safe_reference().
+ * @param error Null, if the operation complete successfully.
+ */
+typedef void (*realm_async_open_task_completion_func_t)(void* userdata, realm_thread_safe_reference_t* realm,
+                                                        const realm_async_error_t* error);
+
+RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
+                                                        realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t*,
+                                                                  const uint8_t[64]) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_reset_metadata_on_error(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t*, realm_log_func_t, void* userdata,
+                                                       realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t*, realm_log_level_e) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
+                                                         realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_multiplex_sessions(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_user_agent_binding_info(realm_sync_client_config_t*,
+                                                                  const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_user_agent_application_info(realm_sync_client_config_t*,
+                                                                      const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_connect_timeout(realm_sync_client_config_t*, uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_connection_linger_time(realm_sync_client_config_t*,
+                                                                 uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_ping_keepalive_period(realm_sync_client_config_t*,
+                                                                uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_pong_keepalive_timeout(realm_sync_client_config_t*,
+                                                                 uint64_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client_config_t*,
+                                                               uint64_t) RLM_API_NOEXCEPT;
+
+RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const char* partition_value) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*,
+                                                       realm_sync_session_stop_policy_e) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, realm_sync_error_handler_func_t,
+                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
+                                                       void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_cancel_waits_on_nonfatal_error(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_authorization_header_name(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, const char* name,
+                                                      const char* value) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
+                                               realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
+
+/**
+ * Create a task that will open a realm with the specific configuration
+ * and also download all changes from the sync server.
+ *
+ * Use @a realm_async_open_task_start() to start the download process.
+ */
+RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t*) RLM_API_NOEXCEPT;
+RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_open_task_completion_func_t,
+                                         void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
+RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
+    realm_async_open_task_t*, realm_sync_progress_func_t, void* userdata,
+    realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t*,
+                                                                         uint64_t token) RLM_API_NOEXCEPT;
+
+/**
+ * Get the sync session for a specific realm.
+ *
+ * This function will not fail if the realm wasn't open with a sync configuration in place,
+ * but just return NULL;
+ *
+ * @return A non-null pointer if a session exists.
+ */
+RLM_API realm_sync_session_t* realm_sync_session_get(const realm_t*) RLM_API_NOEXCEPT;
+
+RLM_API realm_sync_session_state_e realm_sync_session_get_state(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+RLM_API realm_sync_connection_state_e realm_sync_session_get_connection_state(const realm_sync_session_t*)
+    RLM_API_NOEXCEPT;
+
+RLM_API realm_user_t* realm_sync_session_get_user(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+RLM_API const char* realm_sync_session_get_partition_value(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Get the filesystem path of the realm file backing this session.
+ */
+RLM_API const char* realm_sync_session_get_file_path(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Ask the session to pause synchronization.
+ *
+ * No-op if the session is already inactive.
+ */
+RLM_API void realm_sync_session_pause(realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Ask the session to resume synchronization.
+ *
+ * No-op if the session is already active.
+ */
+RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Register a callback that will be invoked every time the session's connection state changes.
+ *
+ * @return A token value that can be used to unregiser the callback.
+ */
+RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
+    realm_sync_session_t*, realm_sync_connection_state_changed_func_t, void* userdata,
+    realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t*,
+                                                                            uint64_t token) RLM_API_NOEXCEPT;
+
+/**
+ * Register a callback that will be invoked every time the session reports progress.
+ *
+ * @param is_streaming If true, then the notifier will be called forever, and will
+ *                     always contain the most up-to-date number of downloadable or uploadable bytes.
+ *                     Otherwise, the number of downloaded or uploaded bytes will always be reported
+ *                     relative to the number of downloadable or uploadable bytes at the point in time
+ *                     when the notifier was registered.
+ * @return A token value that can be used to unregiser the notifier.
+ */
+RLM_API uint64_t realm_sync_session_register_progress_notifier(
+    realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
+    void* userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t*, uint64_t token) RLM_API_NOEXCEPT;
+
+/**
+ * Register a callback that will be invoked when all pending downloads have completed.
+ */
+RLM_API void
+realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_sync_download_completion_func_t,
+                                                void* userdata,
+                                                realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+/**
+ * Register a callback that will be invoked when all pending uploads have completed.
+ */
+RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*, realm_sync_upload_completion_func_t,
+                                                           void* userdata,
+                                                           realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
 
 #endif // REALM_H

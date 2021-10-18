@@ -681,6 +681,30 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
     });
 }
 
+RLM_API void realm_app_sync_client_reconnect(realm_app_t* app) noexcept
+{
+    (*app)->sync_manager()->reconnect();
+}
+
+RLM_API bool realm_app_sync_client_has_sessions(const realm_app_t* app) noexcept
+{
+    return (*app)->sync_manager()->has_existing_sessions();
+}
+
+RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t* app) noexcept
+{
+    (*app)->sync_manager()->wait_for_sessions_to_terminate();
+}
+
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t* app,
+                                                                    const realm_sync_config_t* config,
+                                                                    const char* custom_filename) noexcept
+{
+    util::Optional<std::string> filename = custom_filename ? util::some<std::string>(custom_filename) : util::none;
+    std::string file_path = (*app)->sync_manager()->path_for_realm(*config, std::move(filename));
+    return duplicate_string(file_path);
+}
+
 RLM_API const char* realm_user_get_identity(const realm_user_t* user) noexcept
 {
     return (*user)->identity().c_str();

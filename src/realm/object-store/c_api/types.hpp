@@ -236,6 +236,12 @@ struct shared_realm : realm::c_api::WrapC, realm::SharedRealm {
             : realm::ThreadSafeReference(rlm)
         {
         }
+
+        thread_safe_reference(realm::ThreadSafeReference&& other)
+            : realm::ThreadSafeReference(std::move(other))
+        {
+            REALM_ASSERT(this->is<realm::SharedRealm>());
+        }
     };
 
     realm_thread_safe_reference_t* get_thread_safe_reference() const final
@@ -432,6 +438,10 @@ struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
     using SyncClientConfig::SyncClientConfig;
 };
 
+struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
+    using SyncConfig::SyncConfig;
+};
+
 struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
     realm_app(realm::app::SharedApp app)
         : realm::app::SharedApp{std::move(app)}
@@ -473,6 +483,46 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSession> {
+    realm_sync_session(std::shared_ptr<realm::SyncSession> session)
+        : std::shared_ptr<realm::SyncSession>{std::move(session)}
+    {
+    }
+
+    realm_sync_session* clone() const override
+    {
+        return new realm_sync_session{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_session*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {
+    realm_async_open_task(std::shared_ptr<realm::AsyncOpenTask> task)
+        : std::shared_ptr<realm::AsyncOpenTask>{std::move(task)}
+    {
+    }
+
+    realm_async_open_task* clone() const override
+    {
+        return new realm_async_open_task{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_async_open_task*>(&other)) {
             return get() == ptr->get();
         }
         return false;
