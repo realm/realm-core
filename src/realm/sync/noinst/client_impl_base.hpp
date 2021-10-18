@@ -635,8 +635,6 @@ private:
 /// occur on the event loop thread of the associated client object.
 class ClientImpl::Session {
 public:
-    class Config;
-
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
     using IntegrationError = ClientReplication::IntegrationError;
 
@@ -818,7 +816,7 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(SessionWrapper&, ClientImpl::Connection&, Config);
+    Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
 
 private:
@@ -946,8 +944,6 @@ private:
 private:
     Connection& m_conn;
     const session_ident_type m_ident;
-    const bool m_disable_upload;
-    const bool m_disable_empty_upload;
 
     // The states only transition in one direction, from left to right.
     // The transition to Active happens very soon after construction, as soon as
@@ -1083,7 +1079,7 @@ private:
 
     static std::string make_logger_prefix(session_ident_type);
 
-    Session(SessionWrapper& wrapper, Connection&, session_ident_type, Config&&);
+    Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1134,14 +1130,6 @@ private:
     void check_for_download_completion();
 
     friend class Connection;
-};
-
-
-/// See Client::Session for the meaning of the individual properties
-class ClientImpl::Session::Config {
-public:
-    bool disable_upload = false;
-    bool disable_empty_upload = false;
 };
 
 
@@ -1388,18 +1376,15 @@ inline void ClientImpl::Session::new_access_token_available()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, Config config)
-    : Session{wrapper, conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
+    : Session{wrapper, conn, conn.get_client().get_next_session_ident()} // Throws
 {
 }
 
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
-                                    Config&& config)
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}
     , m_ident{ident}
-    , m_disable_upload{config.disable_upload}
-    , m_disable_empty_upload{config.disable_empty_upload}
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)

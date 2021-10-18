@@ -318,18 +318,6 @@ public:
 
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
 
-        /// Set to true to disable the upload process for this session. This
-        /// includes the sending of empty UPLOAD messages.
-        ///
-        /// This feature exists exclusively for testing purposes at this time.
-        bool disable_upload = false;
-
-        /// Set to true to disable sending of empty UPLOAD messages for this
-        /// session.
-        ///
-        /// This feature exists exclusively for testing purposes at this time.
-        bool disable_empty_upload = false;
-
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
         ///

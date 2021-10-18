@@ -1964,9 +1964,6 @@ void Session::send_upload_message()
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_upload_target_version > m_upload_progress.client_version);
 
-    if (REALM_UNLIKELY(m_disable_upload))
-        return;
-
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
@@ -1978,8 +1975,6 @@ void Session::send_upload_message()
                                        locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
-        if (REALM_UNLIKELY(m_disable_empty_upload))
-            return;
         // Nothing more to upload right now
         if (m_upload_completion_notification_requested)
             check_for_upload_completion(); // Throws
