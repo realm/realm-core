@@ -119,12 +119,6 @@ void ClientProtocol::make_mark_message(OutputBuffer& out, session_ident_type ses
     REALM_ASSERT(!out.fail());
 }
 
-void ClientProtocol::make_alloc_message(OutputBuffer& out, session_ident_type session_ident)
-{
-    out << "alloc " << session_ident << "\n"; // Throws
-    REALM_ASSERT(!out.fail());
-}
-
 
 void ClientProtocol::make_ping(OutputBuffer& out, milliseconds_type timestamp, milliseconds_type rtt)
 {

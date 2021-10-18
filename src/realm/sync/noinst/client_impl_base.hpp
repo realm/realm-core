@@ -498,7 +498,6 @@ private:
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
-    void receive_alloc_message(session_ident_type, file_ident_type file_ident);
     void receive_unbound_message(session_ident_type);
     void handle_protocol_error(ClientProtocol::Error);
 
@@ -646,7 +645,6 @@ public:
     ClientImpl& get_client() noexcept;
     Connection& get_connection() noexcept;
     session_ident_type get_ident() const noexcept;
-    SyncProgress get_sync_progress() const noexcept;
 
     /// Inform this client about new changesets in the history.
     ///
@@ -744,25 +742,6 @@ public:
     /// It is an error to call this function before activation of the session,
     /// or after initiation of deactivation.
     void request_download_completion_notification();
-
-    /// \brief Make this client request a new file identifier from the server
-    /// for a subordinate client.
-    ///
-    /// The application is allowed to request additional file identifiers while
-    /// it is waiting to receive others.
-    ///
-    /// The requested file identifiers will be passed back to the application as
-    /// they become available. This happens through the virtual callback
-    /// function on_subtier_file_ident(), which the application will need to
-    /// override. on_subtier_file_ident() will be called once for each requested
-    /// identifier as it becomes available.
-    ///
-    /// The callback function is guaranteed to not be called until after
-    /// request_subtier_file_ident() returns (no callback reentrance).
-    ///
-    /// It is an error to call this function before activation of the session,
-    /// or after initiation of deactivation.
-    void request_subtier_file_ident();
 
     /// \brief Announce that a new access token is available.
     ///
@@ -944,16 +923,6 @@ private:
     /// The default implementation does nothing.
     void on_download_completion();
 
-    /// By returning true, this function indicates to the session that the
-    /// received file identifier is valid. If the identfier is invald, this
-    /// function should return false.
-    ///
-    /// For more, see request_subtier_file_ident().
-    ///
-    /// The default implementation returns false, so it must be overridden if
-    /// request_subtier_file_ident() is ever called.
-    bool on_subtier_file_ident(file_ident_type);
-
     //@{
     /// These are called as the state of the session changes between
     /// "suspended" and "resumed". The initial state is
@@ -1014,7 +983,6 @@ private:
     bool m_enlisted_to_send;
     bool m_bind_message_sent;                   // Sending of BIND message has been initiated
     bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
-    bool m_alloc_message_sent;                  // See send_alloc_message()
     bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
     bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
     bool m_error_message_received;              // Session specific ERROR message received
@@ -1118,8 +1086,6 @@ private:
     // the detection of download completion.
     request_ident_type m_last_triggering_download_mark = 0;
 
-    std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
-
     SessionWrapper& m_wrapper;
 
     static std::string make_logger_prefix(session_ident_type);
@@ -1161,7 +1127,6 @@ private:
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
-    std::error_code receive_alloc_message(file_ident_type file_ident);
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(int error_code, StringData message, bool try_again);
 
@@ -1385,11 +1350,6 @@ inline auto ClientImpl::Session::get_ident() const noexcept -> session_ident_typ
     return m_ident;
 }
 
-inline auto ClientImpl::Session::get_sync_progress() const noexcept -> SyncProgress
-{
-    return m_progress;
-}
-
 inline void ClientImpl::Session::recognize_sync_version(version_type version)
 {
     // Life cycle state must be Active
@@ -1429,24 +1389,6 @@ inline void ClientImpl::Session::request_download_completion_notification()
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
     if (m_ident_message_sent && !m_error_message_received)
         ensure_enlisted_to_send(); // Throws
-}
-
-inline void ClientImpl::Session::request_subtier_file_ident()
-{
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
-
-    bool was_zero = (m_num_outstanding_subtier_allocations == 0);
-    ++m_num_outstanding_subtier_allocations;
-
-    // Since the deactivation process has not been initiated, the UNBIND message
-    // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (was_zero && m_ident_message_sent && !m_error_message_received) {
-        if (!m_alloc_message_sent)
-            ensure_enlisted_to_send(); // Throws
-    }
 }
 
 inline void ClientImpl::Session::new_access_token_available()
@@ -1605,7 +1547,6 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
     m_ident_message_sent = false;
-    m_alloc_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;
     m_error_message_received = false;

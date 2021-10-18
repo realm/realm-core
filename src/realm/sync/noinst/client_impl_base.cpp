@@ -1570,22 +1570,6 @@ void Connection::receive_mark_message(session_ident_type session_ident, request_
 }
 
 
-void Connection::receive_alloc_message(session_ident_type session_ident, file_ident_type file_ident)
-{
-    Session* sess = get_session(session_ident);
-    if (REALM_UNLIKELY(!sess)) {
-        logger.error("Bad session identifier in ALLOC message, session_ident = %1",
-                     session_ident);                                 // Throws
-        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
-        return;
-    }
-
-    std::error_code ec = sess->receive_alloc_message(file_ident); // Throws
-    if (ec)
-        close_due_to_protocol_error(ec); // Throws
-}
-
-
 void Connection::receive_unbound_message(session_ident_type session_ident)
 {
     Session* sess = get_session(session_ident);
@@ -1759,12 +1743,6 @@ Session::~Session()
 }
 
 
-bool Session::on_subtier_file_ident(file_ident_type)
-{
-    return false; // By default, do not accept the received file identifier.
-}
-
-
 std::string Session::make_logger_prefix(session_ident_type ident)
 {
     std::ostringstream out;
@@ -1921,9 +1899,6 @@ void Session::send_message()
             send_ident_message(); // Throws
         return;
     }
-
-    if (!m_alloc_message_sent && m_num_outstanding_subtier_allocations > 0)
-        return send_alloc_message(); // Throws
 
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
@@ -2123,28 +2098,6 @@ void Session::send_mark_message()
     m_conn.initiate_write_message(out, this);                      // Throws
 
     m_last_download_mark_sent = request_ident;
-
-    // Other messages may be waiting to be sent
-    enlist_to_send(); // Throws
-}
-
-
-void Session::send_alloc_message()
-{
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_ident_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(!m_alloc_message_sent);
-
-    logger.debug("Sending: ALLOC"); // Throws
-
-    ClientProtocol& protocol = m_conn.get_client_protocol();
-    OutputBuffer& out = m_conn.get_output_buffer();
-    session_ident_type session_ident = get_ident();
-    protocol.make_alloc_message(out, session_ident); // Throws
-    m_conn.initiate_write_message(out, this);        // Throws
-
-    m_alloc_message_sent = true;
 
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
@@ -2404,42 +2357,6 @@ std::error_code Session::receive_mark_message(request_ident_type request_ident)
     check_for_download_completion(); // Throws
 
     return std::error_code{}; // Success
-}
-
-
-std::error_code Session::receive_alloc_message(file_ident_type file_ident)
-{
-    logger.debug("Received: ALLOC(file_ident=%1)", file_ident); // Throws
-
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
-    if (m_deactivation_initiated)
-        return std::error_code{}; // Success
-
-    bool legal_at_this_time = (m_alloc_message_sent && !m_error_message_received && !m_unbound_message_received);
-    if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        return ClientError::bad_message_order;
-    }
-    if (REALM_UNLIKELY(file_ident < 1)) {
-        logger.error("Bad file identifier in ALLOC message");
-        return ClientError::bad_file_ident;
-    }
-
-    REALM_ASSERT(have_client_file_ident());
-    REALM_ASSERT(m_ident_message_sent);
-    REALM_ASSERT(m_num_outstanding_subtier_allocations > 0);
-    if (REALM_UNLIKELY(!on_subtier_file_ident(file_ident))) { // Throws
-        logger.error("Bad file identifier in ALLOC message");
-        return ClientError::bad_file_ident;
-    }
-    m_alloc_message_sent = false;
-    --m_num_outstanding_subtier_allocations;
-    // Ready to send the next ALLOC request message
-    if (m_num_outstanding_subtier_allocations > 0)
-        ensure_enlisted_to_send(); // Throws
-    return std::error_code{};      // Success
 }
 
 
