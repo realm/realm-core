@@ -49,7 +49,7 @@ void check_common(test_util::unit_test::TestContext& test_context, util::Logger&
         uint_fast64_t uploadable_bytes_2;
         uint_fast64_t snapshot_version;
         ClientReplication::get_upload_download_bytes(sg_2.get(), downloaded_bytes_2, downloadable_bytes,
-                                                    uploaded_bytes, uploadable_bytes_2, snapshot_version);
+                                                     uploaded_bytes, uploadable_bytes_2, snapshot_version);
         CHECK_EQUAL(downloaded_bytes_2, downloaded_bytes);
         CHECK_EQUAL(downloadable_bytes, 0);
         CHECK_EQUAL(uploaded_bytes, 0);

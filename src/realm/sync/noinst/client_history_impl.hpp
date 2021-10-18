@@ -238,14 +238,12 @@ public:
     void set_reciprocal_transform(version_type, BinaryData) override final;
 
 public: // Stuff in this section is only used by CLI tools.
-
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
     /// of local origin. This should only be used for testing and defaults to calling
     /// generate_changeset_timestamp().
     void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
 
 public: // Stuff in this section is only used by tests.
-
     struct LocalChangeset {
         version_type version;
         ChunkedBinaryData changeset;

@@ -1918,7 +1918,7 @@ void Session::send_bind_message()
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
     protocol.make_bind_message(protocol_version, out, session_ident, path, signed_access_token,
-                               need_client_file_ident, is_subserver); // Throws
+                               need_client_file_ident, is_subserver);   // Throws
     m_conn.initiate_write_message(out, this);                           // Throws
 
     m_bind_message_sent = true;
