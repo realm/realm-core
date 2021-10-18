@@ -290,7 +290,6 @@ public:
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.
     bool access_token_refresh_required() const REQUIRES(!m_mutex);
-    bool refresh_token_is_expired() const REQUIRES(!m_mutex);
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);

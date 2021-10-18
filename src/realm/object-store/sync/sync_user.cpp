@@ -523,13 +523,6 @@ bool SyncUser::access_token_refresh_required() const
     return do_is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
 }
 
-bool SyncUser::refresh_token_is_expired() const
-{
-    using namespace std::chrono;
-    util::CheckedLockGuard guard(m_mutex);
-    return m_refresh_token.expires_at < duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-}
-
 } // namespace realm
 
 namespace std {

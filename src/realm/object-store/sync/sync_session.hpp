@@ -330,6 +330,8 @@ private:
 
     void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message);
     void handle_error(SyncError);
+    void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
+                         const std::string& context_message);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);

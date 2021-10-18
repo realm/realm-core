@@ -1880,12 +1880,28 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
-    SECTION("Expired Access Token is Refreshed") {
+    class HookedTransport : public SynchronousTestTransport {
+    public:
+        void send_request_to_server(const Request request,
+                                    std::function<void(const Response)> completion_block) override
+        {
+            if (hook) {
+                if (util::Optional<Response> response = hook(request)) {
+                    completion_block(*response);
+                    return;
+                }
+            }
+            SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
+        }
+        std::function<util::Optional<Response>(const Request)> hook;
+    };
+    SECTION("Expired Tokens") {
         sync::AccessToken token;
         {
             TestSyncManager sync_manager(app_config, {});
             auto app = sync_manager.app();
             create_user_and_log_in(app);
+            std::shared_ptr<SyncUser> user = app->current_user();
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
 
@@ -1894,7 +1910,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             REQUIRE(get_dogs(r).size() == 1);
             sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
-            sync::AccessToken::parse(app->current_user()->access_token(), token, error_state, nullptr);
+            sync::AccessToken::parse(user->access_token(), token, error_state, nullptr);
             REQUIRE(error_state == sync::AccessToken::ParseError::none);
             REQUIRE(token.timestamp);
             REQUIRE(token.expires);
@@ -1905,47 +1921,30 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(token.expired(now));
         }
 
-        {
-            std::function<void()> hook;
-            class MyTestTransport : public SynchronousTestTransport {
-            public:
-                MyTestTransport(std::function<void()>* hook)
-                    : hook(hook)
-                {
-                }
+        auto transport = std::make_shared<HookedTransport>();
+        app_config.transport = transport;
 
-                void send_request_to_server(const Request request,
-                                            std::function<void(const Response)> completion_block) override
-                {
-                    if (*hook) {
-                        (*hook)();
-                    }
-                    SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
-                }
+        TestSyncManager sync_manager(app_config, {});
+        auto app = sync_manager.app();
+        auto creds = create_user_and_log_in(app);
+        std::shared_ptr<SyncUser> user = app->current_user();
+        REQUIRE(user);
+        REQUIRE(!user->access_token_refresh_required());
+        // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+        user->update_access_token(encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+        REQUIRE(user->access_token_refresh_required());
 
-            private:
-                std::function<void()>* hook;
-            };
-            app_config.transport = std::make_shared<MyTestTransport>(&hook);
-
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            create_user_and_log_in(app);
-            REQUIRE(!app->current_user()->access_token_refresh_required());
-            // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
-            app->current_user()->update_access_token(
-                encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
-            REQUIRE(app->current_user()->access_token_refresh_required());
-
+        SECTION("Expired Access Token is Refreshed") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             std::vector<SyncSession::PublicState> seen_states;
-            hook = [&] {
+            transport->hook = [&](const Request) -> util::Optional<Response> {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto session : user->all_sessions()) {
                     seen_states.push_back(session->state());
                 }
+                return util::none; // send all requests through http
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -1955,6 +1954,35 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
+        }
+
+        SECTION("User is logged out if the refresh request is denied") {
+            REQUIRE(user->is_logged_in());
+            transport->hook = [&](const Request request) -> util::Optional<Response> {
+                auto user = app->current_user();
+                REQUIRE(user);
+                // simulate the server denying the refresh
+                if (request.url.find("/session") != std::string::npos) {
+                    Response faked;
+                    faked.http_status_code = 401;
+                    faked.body = "fake: refresh token could not be refreshed";
+                    return util::make_optional<Response>(std::move(faked));
+                }
+                return util::none;
+            };
+            SyncTestFile config(app, partition, schema);
+            std::atomic<bool> sync_error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                sync_error_handler_called.store(true);
+                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.message == "Unable to refresh the user access token.");
+            };
+            auto r = Realm::get_shared_realm(config);
+            timed_wait_for([&] {
+                return sync_error_handler_called.load();
+            });
+            // the failed refresh logs out the user
+            REQUIRE(!user->is_logged_in());
         }
     }
 
