@@ -1919,16 +1919,17 @@ void Session::send_bind_message()
     const std::string& path = get_virt_path();
     const std::string& signed_access_token = get_signed_access_token();
     bool need_client_file_ident = !have_client_file_ident();
+    const bool is_subserver = false;
 
     logger.debug("Sending: BIND(path='%1', signed_user_token_size=%2, "
                  "need_client_file_ident=%3, is_subserver=%4)",
-                 path, signed_access_token.size(), int(need_client_file_ident), int(m_is_subserver)); // Throws
+                 path, signed_access_token.size(), int(need_client_file_ident), int(is_subserver)); // Throws
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
     protocol.make_bind_message(protocol_version, out, session_ident, path, signed_access_token,
-                               need_client_file_ident, m_is_subserver); // Throws
+                               need_client_file_ident, is_subserver); // Throws
     m_conn.initiate_write_message(out, this);                           // Throws
 
     m_bind_message_sent = true;

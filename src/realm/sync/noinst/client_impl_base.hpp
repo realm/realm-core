@@ -948,7 +948,6 @@ private:
     SyncTransactReporter* const m_sync_transact_reporter;
     const bool m_disable_upload;
     const bool m_disable_empty_upload;
-    const bool m_is_subserver;
 
     // Session life cycle state:
     //
@@ -1151,7 +1150,6 @@ public:
     SyncTransactReporter* sync_transact_reporter = nullptr;
     bool disable_upload = false;
     bool disable_empty_upload = false;
-    bool is_subserver = false;
 };
 
 
@@ -1419,7 +1417,6 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     , m_sync_transact_reporter{config.sync_transact_reporter}
     , m_disable_upload{config.disable_upload}
     , m_disable_empty_upload{config.disable_empty_upload}
-    , m_is_subserver{config.is_subserver}
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
