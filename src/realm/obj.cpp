@@ -1771,6 +1771,17 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     return *this;
 }
 
+#define INSTANTIATE_OBJ_SET(T) template Obj& Obj::set<T>(ColKey, T, bool)
+INSTANTIATE_OBJ_SET(bool);
+INSTANTIATE_OBJ_SET(StringData);
+INSTANTIATE_OBJ_SET(float);
+INSTANTIATE_OBJ_SET(double);
+INSTANTIATE_OBJ_SET(Decimal128);
+INSTANTIATE_OBJ_SET(Timestamp);
+INSTANTIATE_OBJ_SET(BinaryData);
+INSTANTIATE_OBJ_SET(ObjectId);
+INSTANTIATE_OBJ_SET(UUID);
+
 void Obj::set_int(ColKey col_key, int64_t value)
 {
     update_if_needed();
