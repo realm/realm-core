@@ -949,19 +949,13 @@ private:
     const bool m_disable_upload;
     const bool m_disable_empty_upload;
 
-    // Session life cycle state:
-    //
-    //   State          m_deactivation_initiated  m_active_or_deactivating
-    //   -----------------------------------------------------------------
-    //   Unactivated    false                     false
-    //   Active         false                     TRUE
-    //   Deactivating   TRUE                      TRUE
-    //   Deactivated    TRUE                      false
-    //
+    // The states only transition in one direction, from left to right.
+    // The transition to Active happens very soon after construction, as soon as
+    // it is registered with the Connection.
     // The transition from Deactivating to Deactivated state happens when the
     // unbinding process completes (unbind_process_complete()).
-    bool m_deactivation_initiated = false;
-    bool m_active_or_deactivating = false;
+    enum State { Unactivated, Active, Deactivating, Deactivated };
+    State m_state = Unactivated;
 
     bool m_suspended = false;
 
@@ -1233,7 +1227,7 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 {
     for (auto& p : m_sessions) {
         Session& sess = *p.second;
-        if (!sess.m_deactivation_initiated)
+        if (sess.m_state == Session::Active)
             handler(sess); // Throws
     }
 }
@@ -1348,9 +1342,7 @@ inline auto ClientImpl::Session::get_ident() const noexcept -> session_ident_typ
 
 inline void ClientImpl::Session::recognize_sync_version(version_type version)
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     bool resume_upload = do_recognize_sync_version(version);
     if (REALM_LIKELY(resume_upload)) {
@@ -1364,9 +1356,7 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
 
 inline void ClientImpl::Session::request_upload_completion_notification()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     m_upload_completion_notification_requested = true;
     check_for_upload_completion(); // Throws
@@ -1374,9 +1364,7 @@ inline void ClientImpl::Session::request_upload_completion_notification()
 
 inline void ClientImpl::Session::request_download_completion_notification()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     ++m_target_download_mark;
 
@@ -1389,9 +1377,7 @@ inline void ClientImpl::Session::request_download_completion_notification()
 
 inline void ClientImpl::Session::new_access_token_available()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     m_access_token_sent = false;
 
@@ -1442,10 +1428,7 @@ inline bool ClientImpl::Session::unbind_process_complete() const noexcept
 
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 {
-    // This function must only be called for sessions in the Active state.
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_active_or_deactivating);
-
+    REALM_ASSERT(m_state == Active);
 
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
@@ -1468,13 +1451,12 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 // deactivated upon return.
 inline void ClientImpl::Session::connection_lost()
 {
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
     // If the deactivation process has been initiated, it can now be immediately
     // completed.
-    if (m_deactivation_initiated) {
-        // Life cycle state is Deactivating
+    if (m_state == Deactivating) {
         complete_deactivation(); // Throws
-        // Life cycle state is now Deactivated
+        REALM_ASSERT(m_state == Deactivated);
         return;
     }
     reset_protocol_state();
@@ -1488,8 +1470,7 @@ inline void ClientImpl::Session::message_sent()
     // has received a message sent by the server in reposnse to the message that
     // the client has just finished sending.
 
-    // Session life cycle state is Active or Deactivating
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_sent_2);
@@ -1505,7 +1486,7 @@ inline void ClientImpl::Session::message_sent()
         if (m_error_message_received || m_unbound_message_received) {
             // If the deactivation process has been initiated, it can now be
             // immediately completed.
-            if (m_deactivation_initiated) {
+            if (m_state == Deactivating) {
                 // Life cycle state is Deactivating
                 complete_deactivation(); // Throws
                 // Life cycle state is now Deactivated
@@ -1523,8 +1504,7 @@ inline void ClientImpl::Session::message_sent()
 inline void ClientImpl::Session::initiate_rebind()
 {
     // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     REALM_ASSERT(!m_suspended);
     REALM_ASSERT(!m_enlisted_to_send);
@@ -1581,7 +1561,7 @@ inline void ClientImpl::Session::ensure_enlisted_to_send()
 // longer be completed by send_message().
 inline void ClientImpl::Session::enlist_to_send()
 {
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(!m_enlisted_to_send);
     m_enlisted_to_send = true;

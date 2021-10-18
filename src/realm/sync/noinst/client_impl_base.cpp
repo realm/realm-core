@@ -238,7 +238,7 @@ void Connection::initiate_session_deactivation(Session* sess)
             m_on_idle.trigger();
     }
     sess->initiate_deactivation(); // Throws
-    if (!sess->m_active_or_deactivating) {
+    if (sess->m_state == Session::Deactivated) {
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = sess->m_ident;
         m_sessions.erase(ident);
@@ -1115,7 +1115,7 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 void Connection::handle_write_message()
 {
     m_sending_session->message_sent(); // Throws
-    if (!m_sending_session->m_active_or_deactivating) {
+    if (m_sending_session->m_state == Session::Deactivated) {
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = m_sending_session->m_ident;
         m_sessions.erase(ident);
@@ -1145,7 +1145,7 @@ void Connection::send_next_message()
         m_sessions_enlisted_to_send.pop_front();
         sess.send_message(); // Throws
 
-        if (!sess.m_active_or_deactivating) {
+        if (sess.m_state == Session::Deactivated) {
             // Session is now deactivated, so remove and destroy it.
             session_ident_type ident = sess.m_ident;
             m_sessions.erase(ident);
@@ -1403,7 +1403,7 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
             auto j = i++;
             Session& sess = *j->second;
             sess.connection_lost(); // Throws
-            if (!sess.m_active_or_deactivating)
+            if (sess.m_state == Session::Unactivated || sess.m_state == Session::Deactivated)
                 m_sessions.erase(j);
         }
     }
@@ -1496,7 +1496,7 @@ void Connection::receive_error_message(int error_code, StringData message, bool 
             return;
         }
 
-        if (!sess->m_active_or_deactivating) {
+        if (sess->m_state == Session::Deactivated) {
             // Session is now deactivated, so remove and destroy it.
             session_ident_type ident = sess->m_ident;
             m_sessions.erase(ident);
@@ -1586,7 +1586,7 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
         return;
     }
 
-    if (!sess->m_active_or_deactivating) {
+    if (sess->m_state == Session::Deactivated) {
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = sess->m_ident;
         m_sessions.erase(ident);
@@ -1657,9 +1657,7 @@ auto Connection::determine_connection_termination_reason(std::error_code ec) noe
 
 void Session::cancel_resumption_delay()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     if (!m_suspended)
         return;
@@ -1708,9 +1706,7 @@ bool Session::integrate_changesets(ClientReplication& history, const SyncProgres
 void Session::on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
                                        IntegrationError error)
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     if (REALM_LIKELY(success)) {
         REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
@@ -1739,7 +1735,7 @@ void Session::on_changesets_integrated(bool success, version_type client_version
 
 Session::~Session()
 {
-    //    REALM_ASSERT(!m_active_or_deactivating);
+    //    REALM_ASSERT(m_state == Unactivated || m_state == Deactivated);
 }
 
 
@@ -1754,9 +1750,7 @@ std::string Session::make_logger_prefix(session_ident_type ident)
 
 void Session::activate()
 {
-    // Session life cycle state must be Unactivated
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(!m_active_or_deactivating);
+    REALM_ASSERT(m_state == Unactivated);
 
     logger.debug("Activating"); // Throws
 
@@ -1803,8 +1797,7 @@ void Session::activate()
                  m_progress.download.last_integrated_client_version); // Throws
 
     reset_protocol_state();
-    m_active_or_deactivating = true;
-    // Life cycle state is now Active
+    m_state = Active;
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1815,14 +1808,11 @@ void Session::activate()
 // deactivated upon return.
 void Session::initiate_deactivation()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active);
 
     logger.debug("Initiating deactivation"); // Throws
 
-    m_deactivation_initiated = true;
-    // Life cycle state is now Deactivating
+    m_state = Deactivating;
 
     if (!m_suspended)
         m_conn.one_less_active_unsuspended_session(); // Throws
@@ -1851,7 +1841,7 @@ void Session::initiate_deactivation()
 
 void Session::complete_deactivation()
 {
-    m_active_or_deactivating = false;
+    m_state = Deactivated;
 
     logger.debug("Deactivation completed"); // Throws
 }
@@ -1864,11 +1854,10 @@ void Session::complete_deactivation()
 // deactivated upon return.
 void Session::send_message()
 {
-    // Session life cycle state must be Active or Deactivating
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
-    if (m_deactivation_initiated || m_error_message_received) {
+    if (m_state == Deactivating || m_error_message_received) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
@@ -1913,7 +1902,7 @@ void Session::send_message()
 
 void Session::send_bind_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     session_ident_type session_ident = m_ident;
     const std::string& path = get_virt_path();
@@ -1944,7 +1933,7 @@ void Session::send_bind_message()
 
 void Session::send_ident_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(have_client_file_ident());
@@ -1970,7 +1959,7 @@ void Session::send_ident_message()
 
 void Session::send_upload_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_upload_target_version > m_upload_progress.client_version);
@@ -2084,7 +2073,7 @@ void Session::send_upload_message()
 
 void Session::send_mark_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_target_download_mark > m_last_download_mark_sent);
@@ -2107,7 +2096,7 @@ void Session::send_mark_message()
 
 void Session::send_refresh_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(!m_access_token_sent);
@@ -2137,7 +2126,7 @@ void Session::send_refresh_message()
 
 void Session::send_unbind_message()
 {
-    REALM_ASSERT(m_deactivation_initiated || m_error_message_received);
+    REALM_ASSERT(m_state == Deactivating || m_error_message_received);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
 
@@ -2161,7 +2150,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
     // longer.
-    if (m_deactivation_initiated)
+    if (m_state != Active)
         return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_bind_message_sent && !have_client_file_ident() && !m_error_message_received &&
@@ -2269,7 +2258,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
     // longer.
-    if (m_deactivation_initiated)
+    if (m_state != Active)
         return;
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
@@ -2336,7 +2325,7 @@ std::error_code Session::receive_mark_message(request_ident_type request_ident)
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
     // longer.
-    if (m_deactivation_initiated)
+    if (m_state != Active)
         return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
@@ -2374,8 +2363,7 @@ std::error_code Session::receive_unbound_message()
     // The fact that the UNBIND message has been sent, but an ERROR message has
     // not been received, implies that the deactivation process must have been
     // initiated, so this session must be in the Deactivating state.
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(m_deactivation_initiated);
+    REALM_ASSERT(m_state == Deactivating);
 
     m_unbound_message_received = true;
 
@@ -2415,7 +2403,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
     }
 
     REALM_ASSERT(!m_suspended);
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
 
     logger.debug("Suspended"); // Throws
 
@@ -2428,7 +2416,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
         // has not been received, implies that the deactivation process must
         // have been initiated, so this session must be in the Deactivating
         // state.
-        REALM_ASSERT(m_deactivation_initiated);
+        REALM_ASSERT(m_state == Deactivating);
 
         // The deactivation process completes when the unbinding process
         // completes.
@@ -2439,8 +2427,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
 
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
-    if (!m_deactivation_initiated) {
-        // Life cycle state is Active
+    if (m_state == Active) {
         m_conn.one_less_active_unsuspended_session(); // Throws
         std::error_code ec = make_error_code(error_code_2);
         bool is_fatal = !try_again;
@@ -2529,7 +2516,7 @@ bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progr
 
 void Session::check_for_upload_completion()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_upload_completion_notification_requested);
 
     // during an ongoing client reset operation, we never upload anything
