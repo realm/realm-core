@@ -892,9 +892,8 @@ SharedRealm Realm::freeze()
     auto config = m_config;
     auto version = read_transaction_version();
     config.scheduler = util::Scheduler::make_frozen(version);
-    auto frozen_realm = Realm::get_frozen_realm(std::move(config), version);
-    frozen_realm->set_schema(frozen_realm->m_schema, m_schema);
-    return frozen_realm;
+    config.schema = m_schema;
+    return Realm::get_frozen_realm(std::move(config), version);
 }
 
 void Realm::close()
