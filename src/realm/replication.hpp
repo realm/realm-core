@@ -208,7 +208,7 @@ public:
     /// initiation of commit operation). In that case, the caller may assume that the
     /// returned memory reference stays valid for the remainder of the transaction (up
     /// until initiation of the commit operation).
-    virtual BinaryData get_uncommitted_changes() const noexcept final;
+    BinaryData get_uncommitted_changes() const noexcept;
 
     /// CAUTION: These values are stored in Realm files, so value reassignment
     /// is not allowed.
