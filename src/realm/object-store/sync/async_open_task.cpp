@@ -38,6 +38,8 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
     if (!m_session)
         return;
 
+    m_session->revive_if_needed();
+
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     m_session->wait_for_download_completion([callback, self, this](std::error_code ec) {
         {
@@ -53,7 +55,6 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
         // Release our references to the coordinator after calling the callback
         auto coordinator = std::move(m_coordinator);
-        m_coordinator = nullptr;
 
         if (ec)
             return callback({}, std::make_exception_ptr(std::system_error(ec)));
@@ -71,15 +72,27 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
 void AsyncOpenTask::cancel()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_session) {
+    std::shared_ptr<SyncSession> session;
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_session)
+            return;
+
         for (auto token : m_registered_callbacks) {
             m_session->unregister_progress_notifier(token);
         }
-        // Does a better way exists for canceling the download?
-        m_session->log_out();
-        m_session = nullptr;
+
+        session = std::move(m_session);
         m_coordinator = nullptr;
+    }
+
+    // We need to release the mutex before we log the session out as that will invoke the
+    // wait_for_download_completion callback which will also attempt to acquire the mutex
+    // thus deadlocking.
+    if (session) {
+        // Does a better way exists for canceling the download?
+        session->log_out();
     }
 }
 
