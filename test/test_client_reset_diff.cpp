@@ -414,7 +414,7 @@ TEST(ClientResetDiff_2)
             uint_fast64_t downloadable_bytes;
             uint_fast64_t uploaded_bytes;
             uint_fast64_t snapshot_version;
-            ClientReplication::get_upload_download_bytes(sg_1.get(), downloaded_bytes, downloadable_bytes_2,
+            ClientReplication::get_upload_download_bytes(sg_1.get(), downloaded_bytes_2, downloadable_bytes,
                                                          uploaded_bytes, uploadable_bytes, snapshot_version);
             CHECK_EQUAL(downloaded_bytes_2, downloaded_bytes);
             CHECK_EQUAL(downloadable_bytes, 0);
