@@ -838,5 +838,5 @@ let package = Package(
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ]),
     ],
-    cxxLanguageStandard: .cxx1z
+    cxxLanguageStandard: .cxx20
 )
