@@ -45,7 +45,6 @@
 #include <realm/version.hpp>
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/sync/noinst/file_descriptors.hpp>
 #include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
@@ -1293,11 +1292,6 @@ private:
 
     void initiate_allocation_metrics_wait();
     void handle_allocation_metrics_wait();
-
-    void log_lsof();
-    // period is in seconds.
-    void periodic_log_lsof(uint_fast64_t period);
-    Optional<util::network::DeadlineTimer> m_log_lsof_timer;
 
     void do_stop_sync_and_wait_for_backup_completion(std::function<void(bool did_complete)> completion_handler,
                                                      milliseconds_type timeout);
@@ -5101,17 +5095,7 @@ void ServerImpl::start()
         logger.info("Number of client file blacklists: %1 (%2 client files in total)",
                     m_config.client_file_blacklists.size(), n); // Throws
     }
-    if (m_config.log_lsof_period > 0) {
-        logger.info("lsof output will be logged every %1 seconds",
-                    m_config.log_lsof_period); // Throws
-    }
     logger.debug("Authorization header name: %1", m_config.authorization_header_name); // Throws
-
-#ifdef REALM_LSOF_OUTPUT
-    for (size_t i = 0; i < sizeof(m_reserved_files) / sizeof(m_reserved_files[0]); ++i) {
-        m_reserved_files[i].reset(new util::File("/dev/null"));
-    }
-#endif
 
     m_transformer = make_transformer(); // Throws
 
@@ -5132,8 +5116,6 @@ void ServerImpl::start()
 
     initiate_allocation_metrics_wait(); // Throws
 
-    if (m_config.log_lsof_period > 0)
-        periodic_log_lsof(m_config.log_lsof_period); // Throws
 
     if (!m_config.disable_history_compaction) {
         if (m_config.history_ttl.count() == 0)
@@ -5351,12 +5333,10 @@ void ServerImpl::handle_accept(std::error_code ec)
         if (ec != util::error::connection_aborted) {
             REALM_ASSERT(ec != util::error::operation_aborted);
 
-            // We close the reserved files to get a few extra file descriptors to perform lsof.
+            // We close the reserved files to get a few extra file descriptors.
             for (size_t i = 0; i < sizeof(m_reserved_files) / sizeof(m_reserved_files[0]); ++i) {
                 m_reserved_files[i].reset();
             }
-            std::string lsof_output = _impl::get_lsof_output();
-            logger.error("lsof output for current process: \n%1", lsof_output);
 
             // FIXME: There are probably errors that need to be treated
             // specially, and not cause the server to "crash".
@@ -5519,28 +5499,6 @@ void ServerImpl::do_close_connections()
         SyncConnection& conn = *entry.second;
         conn.initiate_soft_close(); // Throws
     }
-}
-
-
-void ServerImpl::log_lsof()
-{
-    std::string lsof_output = _impl::get_lsof_output();                // Throws
-    logger.info("lsof output for current process: \n%1", lsof_output); // Throws
-}
-
-
-void ServerImpl::periodic_log_lsof(uint_fast64_t period)
-{
-    auto handler = [this, period](std::error_code ec) {
-        if (ec != util::error::operation_aborted) {
-            log_lsof();                      // Throws
-            this->periodic_log_lsof(period); // Throws
-        }
-    };
-
-    if (!m_log_lsof_timer)
-        m_log_lsof_timer.emplace(get_service());
-    m_log_lsof_timer->async_wait(std::chrono::seconds(period), std::move(handler)); // Throws
 }
 
 

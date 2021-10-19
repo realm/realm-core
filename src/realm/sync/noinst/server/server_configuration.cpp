@@ -51,7 +51,6 @@ void parse_arguments(int argc, char* argv[], Configuration& configuration)
         {"ssl-private-key",                      required_argument, nullptr, 'K'},
         {"listen-backlog",                       required_argument, nullptr, 'b'},
         {"tcp-no-delay",                         no_argument,       nullptr, 'D'},
-        {"log-lsof-period",                      required_argument, nullptr, 'f'},
         {"history-ttl",                          required_argument, nullptr, 'H'},
         {"compaction-interval",                  required_argument, nullptr, 'I'},
         {"history-compaction-ignore-clients",    no_argument,       nullptr, 'q'},
@@ -228,20 +227,6 @@ void parse_arguments(int argc, char* argv[], Configuration& configuration)
             case 'D':
                 configuration.tcp_no_delay = true;
                 break;
-            case 'f': {
-                std::istringstream in(optarg);
-                in.unsetf(std::ios_base::skipws);
-                uint_fast64_t v = 0;
-                in >> v;
-                if (in && in.eof()) {
-                    configuration.log_lsof_period = v;
-                }
-                else {
-                    std::cerr << "Error: Invalid log lsof period`" << optarg << "'.\n\n";
-                    show_help(argv[0]);
-                    std::exit(EXIT_FAILURE);
-                }
-            } break;
             case 'H': {
                 std::istringstream in(optarg);
                 in.unsetf(std::ios_base::skipws);
@@ -691,8 +676,6 @@ void show_help(const std::string& program_name)
         "                                 up waiting to be accepted by this server.\n"
         "  -D, --tcp-no-delay             Disables the Nagle algorithm on all sockets accepted\n"
         "                                 by this server.\n"
-        "  -f, --log-lsof-period NUM      The period in seconds of lsof output logging for\n"
-        "                                 the server process.\n"
         "  -H, --history-ttl SECONDS      The time in seconds that clients can be offline\n"
         "                                 before having to perform a reset. Default is\n"
         "                                 forever (never reset).\n"

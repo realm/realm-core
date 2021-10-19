@@ -7,7 +7,6 @@ set(SYNC_SOURCES
     noinst/client_reset_operation.cpp
     noinst/compact_changesets.cpp
     noinst/compression.cpp
-    noinst/file_descriptors.cpp
     noinst/protocol_codec.cpp
     changeset_encoder.cpp
     changeset_parser.cpp

@@ -213,11 +213,6 @@ public:
         /// sure to research the subject before you enable this option.
         bool tcp_no_delay = false;
 
-        /// The sync server will log the output of the lsof command for its own
-        /// process periodically with period 'log_lsof_period' seconds. A value
-        /// of zero for log_lsof_period, which is default, denotes no logging.
-        std::uint_fast64_t log_lsof_period = 0;
-
         /// Unless disabled, the server will periodically run log compaction on
         /// history that it knows that no currently known client relies on for
         /// operational transformation. Only clients seen within `history_ttl`
