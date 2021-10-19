@@ -142,6 +142,10 @@ struct Base {
     {
         return std::is_arithmetic<T>::value;
     }
+    static bool can_sort()
+    {
+        return true;
+    }
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
@@ -253,6 +257,10 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     static std::vector<BinaryData> values()
     {
         return {BinaryData("c", 1), BinaryData("a", 1), BinaryData("b", 1)};
+    }
+    static bool can_sort()
+    {
+        return false;
     }
 };
 
