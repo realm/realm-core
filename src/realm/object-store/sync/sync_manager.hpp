@@ -225,6 +225,7 @@ public:
         std::lock_guard<std::mutex> lock(m_mutex);
         return m_app;
     }
+    bool can_claim_sync_agent();
 
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;

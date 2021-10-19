@@ -58,7 +58,7 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
 // This class manages how Synced Realms are stored on the filesystem.
 class SyncFileManager {
 public:
-    SyncFileManager(const std::string& base_path, const std::string& app_id);
+    SyncFileManager(const std::string& base_path, const std::string& app_id, std::string&& metadata_ext);
 
     /// Return the user directory for a given user, creating it if it does not already exist.
     std::string user_directory(const std::string& identity) const;
@@ -111,6 +111,7 @@ public:
     }
 
 private:
+    const std::string m_metadata_ext;
     // Denotes the base path for the mongodb-realm app associated with this sync manager.
     // Expected to be `base_path` + "mongodb-realm/" + `app_id` + "/".
     const std::string m_base_path;

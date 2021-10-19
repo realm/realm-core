@@ -1326,9 +1326,10 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
 
     m_alloc.set_read_only(true);
     auto fs_path = path.substr(0, path.find_last_of("/"));
-    auto process_lock_path = util::file_path_by_appending_component(fs_path,
-                                                                    "process.lock");
+    const auto process_lock_path = util::file_path_by_appending_component(fs_path,
+                                                                          "process.lock");
     m_sync_agent_lock = util::File(process_lock_path, util::File::Mode::mode_Write);
+    m_sync_agent_lock.set_fifo_path(fs_path, "process.fifo");
 }
 
 void DB::open(BinaryData buffer, bool take_ownership)

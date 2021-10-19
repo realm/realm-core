@@ -35,9 +35,10 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception_ptr)> callback)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (!m_session)
+    if (!m_session) {
+        callback(m_coordinator->get_unbound_realm(), nullptr);
         return;
-
+    }
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
     m_session->wait_for_download_completion([callback, self, this](std::error_code ec) {
         {

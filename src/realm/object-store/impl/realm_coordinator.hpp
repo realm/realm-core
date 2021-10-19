@@ -269,7 +269,7 @@ private:
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);
 
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&) REQUIRES(m_notifier_mutex);
-    bool m_is_suspended;
+    bool m_is_suspended = false;
 };
 
 void translate_file_exception(StringData path, bool immutable = false);

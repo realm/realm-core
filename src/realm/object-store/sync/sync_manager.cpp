@@ -67,15 +67,25 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
     std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);
-
+        bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
         // Set up the file manager.
         if (m_file_manager) {
             // Changing the base path for tests requires calling reset_for_testing()
             // first, and otherwise isn't supported
             REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
-        }
-        else {
-            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app->config().app_id);
+        } else {
+            std::string metadata_ext;
+            if (app->config().shared_path && encrypt) {
+#ifdef _WIN32
+                uint64_t pid = GetCurrentProcessId();
+#else
+                uint64_t pid = getpid();
+#endif
+                metadata_ext = util::format("%1", pid);
+            }
+            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path,
+                                                               app->config().app_id,
+                                                               std::move(metadata_ext));
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
@@ -86,9 +96,9 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
             return;
         }
 
-        bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
         try {
-            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
+            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
+                                                                       encrypt,
                                                                        m_config.custom_encryption_key);
         }
         catch (RealmFileException const&) {
@@ -688,6 +698,17 @@ void SyncManager::resume()
     }
 
     m_suspended_paths.clear();
+}
+
+bool SyncManager::can_claim_sync_agent() {
+    if (!has_existing_sessions()) {
+        return false;
+    }
+
+    for (auto& [k,v] : m_sessions) {
+        auto coordinator = RealmCoordinator::get_coordinator(v->m_db->get_path());
+        return coordinator->m_db->can_claim_sync_agent();
+    }
 }
 
 void SyncManager::suspend()

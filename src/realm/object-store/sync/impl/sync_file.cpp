@@ -231,10 +231,12 @@ static std::string validate_and_clean_path(const std::string& path)
 
 } // namespace util
 
-SyncFileManager::SyncFileManager(const std::string& base_path, const std::string& app_id)
+SyncFileManager::SyncFileManager(const std::string& base_path, const std::string& app_id,
+                                 std::string&& metadata_ext)
     : m_base_path(util::file_path_by_appending_component(base_path, c_sync_directory, util::FilePathType::Directory))
     , m_app_path(util::file_path_by_appending_component(m_base_path, util::validate_and_clean_path(app_id),
                                                         util::FilePathType::Directory))
+    , m_metadata_ext(std::move(metadata_ext))
 {
     util::try_make_dir(m_base_path);
     util::try_make_dir(m_app_path);
@@ -404,7 +406,6 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity, c
             }
         }
     }
-
     return preferred_path;
 }
 
@@ -412,6 +413,13 @@ std::string SyncFileManager::metadata_path() const
 {
     auto dir_path = file_path_by_appending_component(get_utility_directory(), c_metadata_directory,
                                                      util::FilePathType::Directory);
+    util::try_make_dir(dir_path);
+    // if we have a path extension (likely due to a shared app group).
+    // append it to the base metadata path
+    if (!m_metadata_ext.empty()) {
+        dir_path = file_path_by_appending_component(dir_path, m_metadata_ext,
+                                                    util::FilePathType::Directory);
+    }
     util::try_make_dir(dir_path);
     return util::file_path_by_appending_component(dir_path, c_metadata_realm);
 }
