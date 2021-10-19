@@ -701,12 +701,12 @@ void SyncManager::resume()
 }
 
 bool SyncManager::can_claim_sync_agent() {
-    if (!has_existing_sessions()) {
+    if (has_existing_sessions() || m_suspended_paths.empty()) {
         return false;
     }
 
-    for (auto& [k,v] : m_sessions) {
-        auto coordinator = RealmCoordinator::get_coordinator(v->m_db->get_path());
+    for (auto& v: m_suspended_paths) {
+        auto coordinator = RealmCoordinator::get_coordinator(v);
         return coordinator->m_db->can_claim_sync_agent();
     }
 }

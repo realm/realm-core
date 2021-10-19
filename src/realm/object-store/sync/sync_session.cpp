@@ -810,6 +810,9 @@ void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State&
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
 {
+    if (m_state == &State::dying) {
+        return;
+    }
     m_progress_notifier.set_local_version(version);
 
     std::unique_lock<std::mutex> lock(m_state_mutex);

@@ -810,9 +810,12 @@ void RealmCoordinator::on_change()
 
 #if REALM_ENABLE_SYNC
     // Invoke realm sync if another process has notified for a change
-    if (m_sync_session) {
+    if (const auto session = m_sync_session.get()) {
+        if (session->state() == SyncSession::PublicState::Dying) {
+            return;
+        }
         auto version = m_db->get_version_of_latest_snapshot();
-        SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
+        SyncSession::Internal::nonsync_transact_notify(*session, version);
     }
 #endif
 }
