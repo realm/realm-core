@@ -35,6 +35,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <thread>
 
 #include <realm/util/features.h>
 #include <realm/util/platform_info.hpp>
@@ -444,6 +445,11 @@ bool run_tests(util::Logger* logger)
                 throw std::runtime_error("Bad number of threads");
             if (config.num_threads > 1)
                 std::cout << "Number of test threads: " << config.num_threads << "\n\n";
+        }
+        else {
+            config.num_threads = std::thread::hardware_concurrency();
+            std::cout << "Number of test threads: " << config.num_threads << " (default)\n";
+            std::cout << "(Use UNITTEST_THREADS=1 to serialize testing) \n\n";
         }
     }
 

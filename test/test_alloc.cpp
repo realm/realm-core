@@ -315,7 +315,7 @@ TEST(Alloc_Fuzzy)
     }
 }
 
-TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
+NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enabled())
 {
     GROUP_TEST_PATH(path);
 
