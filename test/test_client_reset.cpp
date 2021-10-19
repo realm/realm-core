@@ -38,7 +38,7 @@ TEST(ClientReset_NoLocalChanges)
         fixture.start();
         real_path_1 = fixture.map_virtual_to_real_path(server_path);
 
-        DBRef sg = DB::create(make_client_replication(path_1));
+        DBRef sg = DB::create(make_client_replication(), path_1);
         Session session = fixture.make_bound_session(sg, server_path);
 
         WriteTransaction wt{sg};
@@ -66,7 +66,7 @@ TEST(ClientReset_NoLocalChanges)
         fixture.start();
         real_path_1 = fixture.map_virtual_to_real_path(server_path);
 
-        DBRef sg = DB::create(make_client_replication(path_1));
+        DBRef sg = DB::create(make_client_replication(), path_1);
         Session session = fixture.make_bound_session(sg, server_path);
 
         WriteTransaction wt{sg};
@@ -82,7 +82,7 @@ TEST(ClientReset_NoLocalChanges)
 
     // Check the content in path_2.
     {
-        DBRef sg = DB::create(make_client_replication(path_2));
+        DBRef sg = DB::create(make_client_replication(), path_2);
         ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         ConstTableRef table = group.get_table("class_table");
@@ -124,12 +124,12 @@ TEST(ClientReset_NoLocalChanges)
             fixture.bind_session(session_fresh, server_path);
             session_fresh.wait_for_download_complete_or_client_stopped();
         }
-        DBRef sg_fresh = DB::create(make_client_replication(path_fresh));
+        DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
 
         // The session that performs client reset.
         // The Realm will be opened by a user while the reset takes place.
         {
-            DBRef sg = DB::create(make_client_replication(path_2));
+            DBRef sg = DB::create(make_client_replication(), path_2);
             ReadTransaction rt{sg};
             const Group& group = rt.get_group();
             ConstTableRef table = group.get_table("class_table");
@@ -162,7 +162,7 @@ TEST(ClientReset_NoLocalChanges)
 
     // Check the content in path_2. There should only be one row now.
     {
-        DBRef sg = DB::create(make_client_replication(path_2));
+        DBRef sg = DB::create(make_client_replication(), path_2);
         ReadTransaction rt{sg};
         const Group& group = rt.get_group();
         ConstTableRef table = group.get_table("class_table");
@@ -189,7 +189,7 @@ TEST(ClientReset_InitialLocalChanges)
 
     // First we make a changeset and upload it
     {
-        DBRef sg = DB::create(make_client_replication(path_1));
+        DBRef sg = DB::create(make_client_replication(), path_1);
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int");
@@ -200,7 +200,7 @@ TEST(ClientReset_InitialLocalChanges)
 
     // The local changes.
     {
-        DBRef sg = DB::create(make_client_replication(path_2));
+        DBRef sg = DB::create(make_client_replication(), path_2);
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_group().add_table_with_primary_key("class_table", type_Int, "int");
@@ -215,7 +215,7 @@ TEST(ClientReset_InitialLocalChanges)
         fixture.bind_session(session_fresh, server_path);
         session_fresh.wait_for_download_complete_or_client_stopped();
     }
-    DBRef sg_fresh = DB::create(make_client_replication(path_fresh));
+    DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
 
     // Start a client reset. There is no need for a reset, but we can do it.
     Session::Config session_config_2;
@@ -234,8 +234,8 @@ TEST(ClientReset_InitialLocalChanges)
 
     // Check the content in path_2. There should be two rows now.
     {
-        DBRef sg_1 = DB::create(make_client_replication(path_1));
-        DBRef sg_2 = DB::create(make_client_replication(path_2));
+        DBRef sg_1 = DB::create(make_client_replication(), path_1);
+        DBRef sg_2 = DB::create(make_client_replication(), path_2);
 
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
@@ -253,7 +253,7 @@ TEST(ClientReset_InitialLocalChanges)
 
     // Make more changes in path_1.
     {
-        DBRef sg = DB::create(make_client_replication(path_1));
+        DBRef sg = DB::create(make_client_replication(), path_1);
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
@@ -262,7 +262,7 @@ TEST(ClientReset_InitialLocalChanges)
     }
     // Make more changes in path_2.
     {
-        DBRef sg = DB::create(make_client_replication(path_2));
+        DBRef sg = DB::create(make_client_replication(), path_2);
 
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
@@ -275,8 +275,8 @@ TEST(ClientReset_InitialLocalChanges)
     session_2.wait_for_download_complete_or_client_stopped();
 
     {
-        DBRef sg_1 = DB::create(make_client_replication(path_1));
-        DBRef sg_2 = DB::create(make_client_replication(path_2));
+        DBRef sg_1 = DB::create(make_client_replication(), path_1);
+        DBRef sg_2 = DB::create(make_client_replication(), path_2);
 
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
@@ -296,7 +296,7 @@ TEST(ClientReset_LocalChangesWhenOffline)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    DBRef sg = DB::create(make_client_replication(path_1));
+    DBRef sg = DB::create(make_client_replication(), path_1);
 
     // First we make a changeset and upload it
     {
@@ -316,7 +316,7 @@ TEST(ClientReset_LocalChangesWhenOffline)
         session_1.wait_for_download_complete_or_client_stopped();
     }
 
-    DBRef sg_2 = DB::create(make_client_replication(path_2));
+    DBRef sg_2 = DB::create(make_client_replication(), path_2);
     Session session_2 = fixture.make_session(sg_2);
     fixture.bind_session(session_2, server_path);
     session_2.wait_for_upload_complete_or_client_stopped();
@@ -403,13 +403,13 @@ TEST(ClientReset_ThreeClients)
         real_path_1 = fixture.map_virtual_to_real_path(server_path);
 
         {
-            DBRef sg = DB::create(make_client_replication(path_1));
+            DBRef sg = DB::create(make_client_replication(), path_1);
             WriteTransaction wt{sg};
             create_schema(wt);
             wt.commit();
         }
         {
-            DBRef sg = DB::create(make_client_replication(path_2));
+            DBRef sg = DB::create(make_client_replication(), path_2);
             WriteTransaction wt{sg};
             create_schema(wt);
 
@@ -448,8 +448,8 @@ TEST(ClientReset_ThreeClients)
         ClientServerFixture fixture(dir_1, test_context);
         fixture.start();
 
-        DBRef db_1 = DB::create(make_client_replication(path_1));
-        DBRef db_2 = DB::create(make_client_replication(path_2));
+        DBRef db_1 = DB::create(make_client_replication(), path_1);
+        DBRef db_2 = DB::create(make_client_replication(), path_2);
 
         {
             WriteTransaction wt{db_1};
@@ -493,7 +493,7 @@ TEST(ClientReset_ThreeClients)
 
         // The two clients add changes.
         {
-            DBRef sg = DB::create(make_client_replication(path_1));
+            DBRef sg = DB::create(make_client_replication(), path_1);
             WriteTransaction wt{sg};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
@@ -512,7 +512,7 @@ TEST(ClientReset_ThreeClients)
             wt.commit();
         }
         {
-            DBRef sg = DB::create(make_client_replication(path_2));
+            DBRef sg = DB::create(make_client_replication(), path_2);
             WriteTransaction wt{sg};
             TableRef table_0 = wt.get_table("class_table_0");
             CHECK(table_0);
@@ -559,14 +559,14 @@ TEST(ClientReset_ThreeClients)
             fixture.bind_session(session4, server_path);
             session4.wait_for_download_complete_or_client_stopped();
         }
-        DBRef sg_fresh1 = DB::create(make_client_replication(path_fresh1));
+        DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
 
         {
             Session session4 = fixture.make_session(path_fresh2);
             fixture.bind_session(session4, server_path);
             session4.wait_for_download_complete_or_client_stopped();
         }
-        DBRef sg_fresh2 = DB::create(make_client_replication(path_fresh2));
+        DBRef sg_fresh2 = DB::create(make_client_replication(), path_fresh2);
 
         // Perform client resets on the two clients.
         {
@@ -595,7 +595,7 @@ TEST(ClientReset_ThreeClients)
 
         // More local changes
         {
-            DBRef sg = DB::create(make_client_replication(path_1));
+            DBRef sg = DB::create(make_client_replication(), path_1);
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
@@ -603,7 +603,7 @@ TEST(ClientReset_ThreeClients)
             wt.commit();
         }
         {
-            DBRef sg = DB::create(make_client_replication(path_2));
+            DBRef sg = DB::create(make_client_replication(), path_2);
             WriteTransaction wt{sg};
             TableRef table = wt.get_table("class_table_0");
             CHECK(table);
@@ -636,9 +636,9 @@ TEST(ClientReset_ThreeClients)
 
     // Check convergence
     {
-        DBRef sg_1 = DB::create(make_client_replication(path_1));
-        DBRef sg_2 = DB::create(make_client_replication(path_2));
-        DBRef sg_3 = DB::create(make_client_replication(path_3));
+        DBRef sg_1 = DB::create(make_client_replication(), path_1);
+        DBRef sg_2 = DB::create(make_client_replication(), path_2);
+        DBRef sg_3 = DB::create(make_client_replication(), path_3);
 
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
@@ -663,7 +663,7 @@ TEST(ClientReset_DoNotRecoverSchema)
 
     // Insert data into path_1/server_path_1 and upload it.
     {
-        DBRef sg = DB::create(make_client_replication(path_1));
+        DBRef sg = DB::create(make_client_replication(), path_1);
         WriteTransaction wt{sg};
         std::string table_name = "class_table1";
         TableRef table = wt.get_group().add_table_with_primary_key(table_name, type_Int, "int_pk");
@@ -674,7 +674,7 @@ TEST(ClientReset_DoNotRecoverSchema)
     }
     // Insert a different table into path_2/server_path_2
     {
-        DBRef sg = DB::create(make_client_replication(path_2));
+        DBRef sg = DB::create(make_client_replication(), path_2);
         WriteTransaction wt{sg};
         std::string table_name = "class_table2";
         TableRef table = wt.get_group().add_table_with_primary_key(table_name, type_String, "string_pk");
@@ -691,7 +691,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         fixture.bind_session(session_fresh, server_path_2);
         session_fresh.wait_for_download_complete_or_client_stopped();
     }
-    DBRef sg_fresh1 = DB::create(make_client_replication(path_fresh1));
+    DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
 
     // Perform client reset for path_1 against server_path_2.
     // This attempts to remove the added class and this destructive
@@ -719,8 +719,8 @@ TEST(ClientReset_DoNotRecoverSchema)
     }
 
     {
-        DBRef sg_1 = DB::create(make_client_replication(path_1));
-        DBRef sg_2 = DB::create(make_client_replication(path_2));
+        DBRef sg_1 = DB::create(make_client_replication(), path_1);
+        DBRef sg_2 = DB::create(make_client_replication(), path_2);
 
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
@@ -749,7 +749,7 @@ TEST(ClientReset_PinnedVersion)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    DBRef sg = DB::create(make_client_replication(path_1));
+    DBRef sg = DB::create(make_client_replication(), path_1);
 
     // Create and upload the initial version
     {

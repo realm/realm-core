@@ -114,8 +114,9 @@ public:
     // calling DB::close(), but after that no new association can be established. To reopen the
     // file (or another file), a new DB object is needed.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
-    static DBRef create(Replication& repl, const DBOptions options = DBOptions());
-    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions options = DBOptions());
+    static DBRef create(Replication& repl, const std::string& file, const DBOptions options = DBOptions());
+    static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
+                        const DBOptions options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
@@ -496,7 +497,7 @@ private:
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the DB.
-    void open(Replication&, const DBOptions options = DBOptions());
+    void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
 
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);

@@ -227,7 +227,7 @@ public:
 
     static constexpr bool is_direct_client(ClientType) noexcept;
 
-    ServerHistory(const std::string& realm_path, Context&, CompactionControl&);
+    ServerHistory(Context&, CompactionControl&);
 
     /// Get the current Realm version and server version.
     ///
@@ -873,10 +873,8 @@ inline ServerHistory::IntegratableChangeset::IntegratableChangeset(file_ident_ty
 {
 }
 
-inline ServerHistory::ServerHistory(const std::string& realm_path, Context& context,
-                                    CompactionControl& compaction_control)
-    : sync::SyncReplication{realm_path} // Throws
-    , m_context{context}
+inline ServerHistory::ServerHistory(Context& context, CompactionControl& compaction_control)
+    : m_context{context}
     , m_compaction_control{compaction_control}
 {
     m_enable_compaction =

@@ -27,7 +27,7 @@
 
 namespace realm {
 
-std::unique_ptr<Replication> make_in_realm_history(const std::string& realm_path);
+std::unique_ptr<Replication> make_in_realm_history();
 
 } // namespace realm
 

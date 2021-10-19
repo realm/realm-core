@@ -29,7 +29,6 @@ namespace sync {
 
 class SyncReplication : public Replication {
 public:
-    explicit SyncReplication(const std::string& realm_path);
     void set_short_circuit(bool) noexcept;
     bool is_short_circuited() const noexcept;
 

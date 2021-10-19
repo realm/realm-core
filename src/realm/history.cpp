@@ -209,11 +209,6 @@ class InRealmHistoryImpl : public Replication {
 public:
     using version_type = Replication::version_type;
 
-    InRealmHistoryImpl(std::string realm_path)
-        : Replication(realm_path)
-    {
-    }
-
     void initialize(DB& db) override
     {
         Replication::initialize(db); // Throws
@@ -275,9 +270,9 @@ private:
 
 namespace realm {
 
-std::unique_ptr<Replication> make_in_realm_history(const std::string& realm_path)
+std::unique_ptr<Replication> make_in_realm_history()
 {
-    return std::unique_ptr<InRealmHistoryImpl>(new InRealmHistoryImpl(realm_path)); // Throws
+    return std::unique_ptr<InRealmHistoryImpl>(new InRealmHistoryImpl()); // Throws
 }
 
 } // namespace realm

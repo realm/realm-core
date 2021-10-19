@@ -137,7 +137,7 @@ _impl::History* ClientReplication::_get_history_write()
 // Overriding member function in realm::Replication
 std::unique_ptr<_impl::History> ClientReplication::_create_history_read()
 {
-    auto hist_impl = std::make_unique<ClientReplication>(get_database_path());
+    auto hist_impl = std::make_unique<ClientReplication>();
     hist_impl->initialize(*m_db); // Throws
     // Transfer ownership with pointer to private base class
     return std::unique_ptr<_impl::History>{hist_impl.release()};

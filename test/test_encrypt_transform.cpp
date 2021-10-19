@@ -136,8 +136,8 @@ TEST_IF(EncryptTransform_ServerHistory, false)
     std::string partial_server_path;
 
     {
-        auto reference_sg = DB::create(make_client_replication(reference_path));
-        auto partial_sg = DB::create(make_client_replication(partial_path));
+        auto reference_sg = DB::create(make_client_replication(), reference_path);
+        auto partial_sg = DB::create(make_client_replication(), partial_path);
 
         ClientServerFixture::Config server_config;
         server_config.server_encryption_key = encryption_key1;
@@ -255,9 +255,9 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         options.encryption_key = encryption_key2;
         ServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory server_history{partial_server_path, context, compaction_control};
+        _impl::ServerHistory server_history{context, compaction_control};
 
-        auto server_partial_sg = DB::create(server_history, options);
+        auto server_partial_sg = DB::create(server_history, partial_server_path, options);
         {
             ReadTransaction rt{server_partial_sg};
             ConstTableRef persons = rt.get_table("class_persons");
@@ -276,9 +276,9 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         options.encryption_key = encryption_key2;
         ServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory server_history{reference_server_path, context, compaction_control};
+        _impl::ServerHistory server_history{context, compaction_control};
 
-        auto server_reference_sg = DB::create(server_history, options);
+        auto server_reference_sg = DB::create(server_history, reference_server_path, options);
         {
             ReadTransaction rt{server_reference_sg};
             ConstTableRef persons = rt.get_table("class_persons");

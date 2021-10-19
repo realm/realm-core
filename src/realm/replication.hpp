@@ -343,7 +343,7 @@ public:
     }
 
 protected:
-    Replication(const std::string& database_file);
+    Replication() = default;
 
 
     //@{
@@ -397,7 +397,8 @@ private:
 
     DB* m_db = nullptr;
 
-    _impl::TransactLogEncoder m_encoder;
+    _impl::TransactLogBufferStream m_stream;
+    _impl::TransactLogEncoder m_encoder{m_stream};
     mutable const Table* m_selected_table = nullptr;
     mutable CollectionId m_selected_list;
 
@@ -409,9 +410,6 @@ private:
     void do_select_collection(const CollectionBase&);
 
     void do_set(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant = _impl::instr_Set);
-
-    const std::string m_database_file;
-    _impl::TransactLogBufferStream m_stream;
 
     size_t transact_log_size();
 };
@@ -426,12 +424,6 @@ public:
 
 
 // Implementation:
-
-inline Replication::Replication(const std::string& database_file)
-    : m_encoder(m_stream)
-    , m_database_file(database_file)
-{
-}
 
 inline void Replication::initiate_transact(Group& group, version_type current_version, bool history_updated)
 {

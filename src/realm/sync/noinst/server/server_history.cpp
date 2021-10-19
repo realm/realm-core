@@ -1785,10 +1785,9 @@ _impl::History* ServerHistory::_get_history_write()
 std::unique_ptr<_impl::History> ServerHistory::_create_history_read()
 {
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    auto server_hist = std::make_unique<ServerHistory>(get_database_path(), m_context, compaction_control); // Throws
+    auto server_hist = std::make_unique<ServerHistory>(m_context, compaction_control);                      // Throws
     server_hist->initialize(*m_db);                                                                         // Throws
     return std::unique_ptr<_impl::History>(server_hist.release());
-    ;
 }
 
 

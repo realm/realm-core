@@ -268,8 +268,8 @@ int main(int argc, const char** argv)
     }
 
     realm::DBOptions db_opts(encryption_key.empty() ? nullptr : encryption_key.c_str());
-    realm::sync::ClientReplication history{realm_path};
-    auto local_db = realm::DB::create(history, db_opts);
+    realm::sync::ClientReplication history{};
+    auto local_db = realm::DB::create(history, realm_path, db_opts);
 
     auto input_contents = load_file(input_arg.as<std::string>());
     HeaderLineParser msg(input_contents);

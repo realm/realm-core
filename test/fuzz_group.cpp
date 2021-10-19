@@ -277,9 +277,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         *log << "SHARED_GROUP_TEST_PATH(path);\n";
 
         *log << "const char* key = " << printable_key << ";\n";
-        *log << "std::unique_ptr<Replication> hist(make_in_realm_history(path));\n";
+        *log << "std::unique_ptr<Replication> hist(make_in_realm_history());\n";
 
-        *log << "DBRef db = DB::create(*hist, DBOptions(key));\n";
+        *log << "DBRef db = DB::create(*hist, path, DBOptions(key));\n";
         *log << "auto wt = db->start_write();\n";
         *log << "auto rt = db->start_read();\n";
         *log << "std::vector<TableView> table_views;\n";
@@ -287,10 +287,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         *log << "\n";
     }
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
 
     DBOptions options(encryption_key);
-    DBRef db = DB::create(*hist, options);
+    DBRef db = DB::create(*hist, path, options);
     auto wt = db->start_write();
     auto rt = db->start_read();
     std::vector<TableView> table_views;
@@ -663,9 +663,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 rt = nullptr;
                 db->close();
                 if (log) {
-                    *log << "db = DB::create(*hist, DBOptions(key));\n";
+                    *log << "db = DB::create(*hist, path, DBOptions(key));\n";
                 }
-                db = DB::create(*hist, DBOptions(encryption_key));
+                db = DB::create(*hist, path, DBOptions(encryption_key));
                 if (log) {
                     *log << "wt = db_w->start_write();\n";
                     *log << "rt = db->start_read();\n";

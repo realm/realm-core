@@ -63,11 +63,6 @@ public:
 
 } // anonymous namespace
 
-std::string Replication::get_database_path() const
-{
-    return m_database_file;
-}
-
 void Replication::initialize(DB&)
 {
     // Nothing needs to be done here

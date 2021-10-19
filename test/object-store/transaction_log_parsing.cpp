@@ -239,8 +239,8 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     });
     r->read_group();
 
-    auto history = make_in_realm_history(config.path);
-    auto db = DB::create(*history, config.options());
+    auto history = make_in_realm_history();
+    auto db = DB::create(*history, config.path, config.options());
 
     SECTION("adding a table is allowed") {
         auto wt = db->start_write();
@@ -1602,8 +1602,8 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListO
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto history = make_in_realm_history(config.path);
-        auto db = DB::create(*history, config.options());
+        auto history = make_in_realm_history();
+        auto db = DB::create(*history, config.path, config.options());
         auto rt = db->start_read();
 
         r->begin_transaction();
@@ -1846,8 +1846,8 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto history = make_in_realm_history(config.path);
-        auto db = DB::create(*history, config.options());
+        auto history = make_in_realm_history();
+        auto db = DB::create(*history, config.path, config.options());
         auto rt = db->start_read();
 
         r->begin_transaction();

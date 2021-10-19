@@ -46,7 +46,7 @@ TEST(AsyncOpen_NonExistingRealm)
     session.wait_for_download_complete_or_client_stopped();
 
     {
-        DBRef sg = DB::create(make_client_replication(path));
+        DBRef sg = DB::create(make_client_replication(), path);
         ReadTransaction rt(sg);
         CHECK(rt.get_group().is_empty());
     }
@@ -69,8 +69,8 @@ TEST(AsyncOpen_DisableStateRealms)
     ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
 
-    std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
+    std::unique_ptr<ClientReplication> history_1 = make_client_replication();
+    DBRef sg_1 = DB::create(*history_1, path_1);
 
     {
         WriteTransaction wt{sg_1};
@@ -105,8 +105,8 @@ TEST(AsyncOpen_DisableStateRealms)
     CHECK_EQUAL(state_downloadable, 0);
 
     {
-        std::unique_ptr<ClientReplication> history_2 = make_client_replication(path_2);
-        DBRef sg_2 = DB::create(*history_2);
+        std::unique_ptr<ClientReplication> history_2 = make_client_replication();
+        DBRef sg_2 = DB::create(*history_2, path_2);
         ReadTransaction rt_1(sg_1);
         ReadTransaction rt_2(sg_2);
         CHECK(compare_groups(rt_1, rt_2, logger));
@@ -125,8 +125,8 @@ TEST(AsyncOpen_StateRealmManagement)
     ClientServerFixture fixture(dir, test_context);
     fixture.start();
 
-    std::unique_ptr<ClientReplication> history_1 = make_client_replication(path_1);
-    DBRef sg_1 = DB::create(*history_1);
+    std::unique_ptr<ClientReplication> history_1 = make_client_replication();
+    DBRef sg_1 = DB::create(*history_1, path_1);
     Session session_1 = fixture.make_session(path_1);
     fixture.bind_session(session_1, server_path);
 

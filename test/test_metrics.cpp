@@ -76,10 +76,10 @@ using namespace realm::util;
 TEST(Metrics_HasNoReportsWhenDisabled)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = false;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     CHECK(!sg->get_metrics());
     auto wt = sg->start_write();
     auto table = wt->add_table("table");
@@ -99,10 +99,10 @@ TEST(Metrics_HasNoReportsWhenDisabled)
 TEST(Metrics_HasReportsWhenEnabled)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     CHECK(sg->get_metrics());
     auto wt = sg->start_write();
     auto table = wt->add_table("table");
@@ -125,10 +125,10 @@ TEST(Metrics_HasReportsWhenEnabled)
 TEST(Metrics_QueryTypes)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     CHECK(sg->get_metrics());
     auto wt = sg->start_write();
     auto table = wt->add_table("table");
@@ -258,10 +258,10 @@ void populate(DBRef sg)
 TEST(Metrics_QueryEqual)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     populate(sg);
 
     std::string person_table_name = "person";
@@ -343,10 +343,10 @@ TEST(Metrics_QueryEqual)
 TEST(Metrics_QueryOrAndNot)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     populate(sg);
 
     std::string person_table_name = "person";
@@ -485,10 +485,10 @@ TEST(Metrics_QueryOrAndNot)
 TEST(Metrics_LinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     populate(sg);
 
     std::string person_table_name = "person";
@@ -552,10 +552,10 @@ TEST(Metrics_LinkQueries)
 TEST(Metrics_LinkListQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     populate(sg);
 
     std::string person_table_name = "person";
@@ -636,10 +636,10 @@ TEST(Metrics_LinkListQueries)
 TEST(Metrics_SubQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
 
     auto wt = sg->start_write();
 
@@ -724,10 +724,10 @@ TEST(Metrics_TransactionTimings)
 {
     ColKey col;
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     CHECK(sg->get_metrics());
     {
         auto wt = sg->start_write();
@@ -804,10 +804,10 @@ TEST(Metrics_TransactionTimings)
 TEST(Metrics_TransactionData)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     populate(sg);
 
     {
@@ -841,10 +841,10 @@ TEST(Metrics_TransactionData)
 TEST(Metrics_TransactionVersions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     populate(sg);
     const size_t num_writes_while_pinned = 10;
     TableKey tk0;
@@ -865,8 +865,8 @@ TEST(Metrics_TransactionVersions)
         wt->commit();
     }
     {
-        std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-        DBRef sg2 = DB::create(*hist2, options);
+        std::unique_ptr<Replication> hist2(make_in_realm_history());
+        DBRef sg2 = DB::create(*hist2, path, options);
 
         // Pin this version. Note that since this read transaction is against a different shared group
         // it doesn't get tracked in the transaction metrics of the original shared group.
@@ -901,11 +901,11 @@ TEST(Metrics_TransactionVersions)
 TEST(Metrics_MaxNumTransactionsIsNotExceeded)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    auto sg = DB::create(*hist, options);
+    auto sg = DB::create(*hist, path, options);
     populate(sg); // 1
     {
         ReadTransaction rt(sg); // 2
@@ -943,11 +943,11 @@ TEST(Metrics_MaxNumTransactionsIsNotExceeded)
 TEST(Metrics_MaxNumQueriesIsNotExceeded)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    auto sg = DB::create(*hist, options);
+    auto sg = DB::create(*hist, path, options);
 
     {
         auto tr = sg->start_write();
@@ -1005,11 +1005,11 @@ public:
 NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(nullptr);
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    auto sg = DB::create(*hist, options);
+    auto sg = DB::create(*hist, path, options);
 
     {
         auto tr = sg->start_write();
@@ -1052,11 +1052,11 @@ NONCONCURRENT_TEST(Metrics_NumDecryptedPagesWithoutEncryption)
 NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key(true));
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    auto sg = DB::create(*hist, options);
+    auto sg = DB::create(*hist, path, options);
 
     {
         auto tr = sg->start_write();
@@ -1096,11 +1096,11 @@ NONCONCURRENT_TEST_IF(Metrics_NumDecryptedPagesWithEncryption, REALM_ENABLE_ENCR
 TEST(Metrics_MemoryChecks)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(nullptr);
     options.enable_metrics = true;
     options.metrics_buffer_size = 10;
-    auto sg = DB::create(*hist, options);
+    auto sg = DB::create(*hist, path, options);
     populate(sg);
 
     {
@@ -1125,10 +1125,10 @@ TEST(Metrics_MemoryChecks)
 TEST(Metrics_APIAvailability)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     DBOptions options(crypt_key());
     options.enable_metrics = true;
-    DBRef sg = DB::create(*hist, options);
+    DBRef sg = DB::create(*hist, path, options);
     CHECK(!sg->get_metrics());
     {
         auto tr = sg->start_write();

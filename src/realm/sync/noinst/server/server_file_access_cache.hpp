@@ -256,8 +256,8 @@ inline void ServerFileAccessCache::Slot::do_close() noexcept
 }
 
 inline ServerFileAccessCache::File::File(const Slot& slot)
-    : history{slot.realm_path, slot.m_cache.m_history_context, slot.m_compaction_control} // Throws
-    , shared_group{DB::create(history, slot.make_shared_group_options())}                 // Throws
+    : history{slot.m_cache.m_history_context, slot.m_compaction_control}                   // Throws
+    , shared_group{DB::create(history, slot.realm_path, slot.make_shared_group_options())} // Throws
 {
     if (slot.m_claim_sync_agent) {
         shared_group->claim_sync_agent();

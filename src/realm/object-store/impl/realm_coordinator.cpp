@@ -484,13 +484,13 @@ void RealmCoordinator::open_db()
         std::unique_ptr<Replication> history;
         if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            history = sync::make_client_replication(m_config.path);
+            history = sync::make_client_replication();
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
         }
         else if (!m_config.immutable()) {
-            history = make_in_realm_history(m_config.path);
+            history = make_in_realm_history();
         }
 
         DBOptions options;
@@ -505,7 +505,7 @@ void RealmCoordinator::open_db()
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
-            m_db = DB::create(std::move(history), options);
+            m_db = DB::create(std::move(history), m_config.path, options);
         }
         else {
             m_db = DB::create(m_config.path, true, options);

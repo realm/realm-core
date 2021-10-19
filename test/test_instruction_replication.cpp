@@ -26,10 +26,10 @@ struct Fixture {
         : test_context(test_context)
         , path_1(realm::test_util::get_test_path(test_context.get_test_name(), ".path_1.realm"))
         , path_2(realm::test_util::get_test_path(test_context.get_test_name(), ".path_2.realm"))
-        , history_1(make_client_replication(path_1))
-        , history_2(make_client_replication(path_2))
-        , sg_1(DB::create(*history_1))
-        , sg_2(DB::create(*history_2))
+        , history_1(make_client_replication())
+        , history_2(make_client_replication())
+        , sg_1(DB::create(*history_1, path_1))
+        , sg_2(DB::create(*history_2, path_2))
     {
         // This is to ensure that peer IDs in Object IDs are populated.
         bool fix_up_object_ids = true;

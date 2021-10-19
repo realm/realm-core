@@ -233,10 +233,9 @@ public:
 
     std::map<TableKey, std::unordered_map<GlobalKey, ObjKey>> m_optimistic_object_id_collisions;
 
-    ShortCircuitHistory(const std::string& database_file, file_ident_type local_file_ident,
+    ShortCircuitHistory(file_ident_type local_file_ident,
                         TestDirNameGenerator* changeset_dump_dir_gen)
-        : SyncReplication(database_file)                    // Throws
-        , m_write_history(std::make_unique<History>(*this)) // Throws
+        : m_write_history(std::make_unique<History>(*this)) // Throws
         , m_local_file_ident(local_file_ident)
         , m_transformer(std::make_unique<TransformerImpl>(changeset_dump_dir_gen)) // Throws
         , m_incoming_changeset(nullptr, util::STLDeleter<char[]>{util::DefaultAllocator::get_default()})
@@ -664,8 +663,8 @@ private:
         : local_file_ident(file_ident)
         , path_guard(test_path) // Throws
         , logger(l)
-        , history(test_path, file_ident, changeset_dump_dir_gen) // Throws
-        , shared_group(DB::create(history))                      // Throws
+        , history(file_ident, changeset_dump_dir_gen)  // Throws
+        , shared_group(DB::create(history, test_path)) // Throws
     {
     }
 

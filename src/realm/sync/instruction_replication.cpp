@@ -6,11 +6,6 @@
 namespace realm {
 namespace sync {
 
-SyncReplication::SyncReplication(const std::string& realm_path)
-    : Replication(realm_path)
-{
-}
-
 void SyncReplication::reset()
 {
     m_encoder.reset();

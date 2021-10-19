@@ -1115,9 +1115,9 @@ public:
         return file;
     }
 
-    std::unique_ptr<ServerHistory> make_history_for_path(std::string path, CompactionControl& cc)
+    std::unique_ptr<ServerHistory> make_history_for_path(CompactionControl& cc)
     {
-        return std::make_unique<ServerHistory>(path, *this, cc);
+        return std::make_unique<ServerHistory>(*this, cc);
     }
 
     util::bind_ptr<ServerFile> get_file(const std::string& virt_path) noexcept
@@ -4498,9 +4498,9 @@ ServerHistory& ServerFile::get_client_file_history(WorkerState& state, std::uniq
     if (state.use_file_cache)
         return worker_access().history; // Throws
     const std::string& path = m_worker_file.realm_path;
-    hist_ptr = m_server.make_history_for_path(path, *this);        // Throws
+    hist_ptr = m_server.make_history_for_path(*this);              // Throws
     DBOptions options = m_worker_file.make_shared_group_options(); // Throws
-    sg_ptr = DB::create(*hist_ptr, options);                       // Throws
+    sg_ptr = DB::create(*hist_ptr, path, options);                 // Throws
     sg_ptr->claim_sync_agent();                                    // Throws
     return *hist_ptr;                                              // Throws
 }

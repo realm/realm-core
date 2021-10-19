@@ -92,7 +92,7 @@ private:
 
 #define TEST_CLIENT_DB(name)                                                                                         \
     SHARED_GROUP_TEST_PATH(name##_path);                                                                             \
-    auto name = DB::create(make_client_replication(name##_path));
+    auto name = DB::create(make_client_replication(), name##_path);
 
 template <typename Function>
 void write_transaction_notifying_session(DBRef db, Session& session, Function&& function)
@@ -1727,7 +1727,7 @@ TEST(Sync_Randomized)
         std::string suffix = util::format(".client_%1.realm", i);
         std::string test_path = get_test_path(test_context.get_test_name(), suffix);
         client_path_guards[i].reset(new DBTestPathGuard(test_path));
-        client_shared_groups[i] = DB::create(make_client_replication(test_path));
+        client_shared_groups[i] = DB::create(make_client_replication(), test_path);
     }
 
     std::unique_ptr<Session> sessions[num_clients];
@@ -2313,12 +2313,12 @@ TEST(Sync_HttpApiCompact)
     fixture.start();
 
     Session session_1 = fixture.make_bound_session(db_1, "/db_1");
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    auto db_1 = DB::create(*history_1);
+    std::unique_ptr<Replication> history_1 = make_client_replication();
+    auto db_1 = DB::create(*history_1, path_1);
 
     Session session_2 = fixture.make_bound_session(db_2, "/db_2");
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    auto db_2 = DB::create(*history_2);
+    std::unique_ptr<Replication> history_2 = make_client_replication();
+    auto db_2 = DB::create(*history_2, path_2);
 
     auto create_schema = [](Session& sess, DBRef db) {
         WriteTransaction wt(db);
@@ -2384,7 +2384,7 @@ TEST(Sync_HttpApiCompact)
         Session session = fixture.make_bound_session(db, server_path);
         session.wait_for_download_complete_or_client_stopped();
 
-        auto db = DB::create(make_client_replication(path));
+        auto db = DB::create(make_client_replication(), path);
         ReadTransaction rt_1(db);
         ReadTransaction rt_2(db_external);
         CHECK(compare_groups(rt_1, rt_2));
@@ -2917,7 +2917,7 @@ TEST(Sync_MultipleServers)
     auto run = [&](int server_index, int realm_index, int file_index) {
         try {
             std::string path = get_file_path(server_index, realm_index, file_index);
-            DBRef db = DB::create(make_client_replication(path));
+            DBRef db = DB::create(make_client_replication(), path);
             {
                 WriteTransaction wt(db);
                 TableRef table = wt.add_table("class_table");
@@ -2958,7 +2958,7 @@ TEST(Sync_MultipleServers)
         try {
             int client_index = 0;
             std::string path = get_file_path(server_index, realm_index, file_index);
-            DBRef db = DB::create(make_client_replication(path));
+            DBRef db = DB::create(make_client_replication(), path);
             std::string server_path = "/" + std::to_string(realm_index);
             Session session = fixture.make_session(client_index, db);
             fixture.bind_session(session, server_index, server_path);
@@ -3021,8 +3021,8 @@ TEST(Sync_MultipleServers)
             REALM_ASSERT(num_files_per_realm > 0);
             int file_index_0 = 0;
             std::string path_0 = get_file_path(int(i), int(j), file_index_0);
-            std::unique_ptr<Replication> history_0 = make_client_replication(path_0);
-            DBRef db_0 = DB::create(*history_0);
+            std::unique_ptr<Replication> history_0 = make_client_replication();
+            DBRef db_0 = DB::create(*history_0, path_0);
             ReadTransaction rt_0(db_0);
             {
                 ConstTableRef table = rt_0.get_table("class_table");
@@ -3043,7 +3043,7 @@ TEST(Sync_MultipleServers)
             }
             for (int k = 1; k < num_files_per_realm; ++k) {
                 std::string path = get_file_path(int(i), int(j), k);
-                DBRef db = DB::create(make_client_replication(path));
+                DBRef db = DB::create(make_client_replication(), path);
                 ReadTransaction rt(db);
                 CHECK(compare_groups(rt_0, rt));
             }
@@ -3317,7 +3317,7 @@ TEST(Sync_LargeUploadDownloadPerformance)
     for (int i = 0; i < number_of_download_clients; ++i) {
         std::string path = get_test_path(test_context.get_test_name(), std::to_string(i));
         shared_group_test_path_guards.emplace_back(path);
-        dbs.push_back(DB::create(make_client_replication(path)));
+        dbs.push_back(DB::create(make_client_replication(), path));
         sessions.push_back(fixture.make_bound_session(dbs.back()));
     }
 
@@ -5735,8 +5735,8 @@ TEST(Sync_DownloadLogCompactionClassUnderScorePrefix)
         // Verify the migrated server file
         TestServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history{target_server_path, context, compaction_control};
-        SharedGroup db{history};
+        _impl::ServerHistory history{context, compaction_control};
+        SharedGroup db{history, target_server_path};
         ReadTransaction rt{db};
         rt.get_group().verify();
     }
@@ -5946,8 +5946,8 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
         std::string server_path = fixture.map_virtual_to_real_path("/test");
         TestServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history{server_path, context, compaction_control};
-        DBRef db = DB::create(history);
+        _impl::ServerHistory history{context, compaction_control};
+        DBRef db = DB::create(history, server_path);
         {
             ReadTransaction rt{db};
             rt.get_group().verify();
@@ -5975,8 +5975,8 @@ TEST(Sync_ServerSideModify_Randomize)
     std::string server_path = fixture.map_virtual_to_real_path("/test");
     TestServerHistoryContext context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history_1{server_path, context, compaction_control};
-    DBRef db_1 = DB::create(history_1);
+    _impl::ServerHistory history_1{context, compaction_control};
+    DBRef db_1 = DB::create(history_1, server_path);
 
     auto server_side_program = [num_server_side_transacts, &db_1, &fixture, &session] {
         Random random(random_int<unsigned long>()); // Seed from slow global generator
@@ -6421,8 +6421,8 @@ TEST_IF(Sync_Issue2104, false)
 
     issue2104::ServerHistoryContext history_context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history{realm_path_copy, history_context, compaction_control};
-    DBRef db = DB::create(history);
+    _impl::ServerHistory history{history_context, compaction_control};
+    DBRef db = DB::create(history, realm_path_copy);
 
     VersionInfo version_info;
     bool backup_whole_realm;
@@ -7437,8 +7437,8 @@ TEST(Sync_Set)
 TEST(Sync_DanglingLinksCountInPriorSize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    ClientReplication history{path};
-    auto local_db = realm::DB::create(history);
+    ClientReplication history;
+    auto local_db = realm::DB::create(history, path);
     auto& logger = test_context.logger;
 
     history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);

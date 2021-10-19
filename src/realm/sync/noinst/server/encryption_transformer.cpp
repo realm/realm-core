@@ -98,8 +98,8 @@ void do_transform(const std::string& file_name, const char* read_key, const char
             break;
         }
         case Replication::hist_InRealm: {
-            std::unique_ptr<Replication> hist(make_in_realm_history(file_name));
-            auto sg = DB::create(*hist, DBOptions(read_key));
+            std::unique_ptr<Replication> hist(make_in_realm_history());
+            auto sg = DB::create(*hist, file_name, DBOptions(read_key));
             success = sg->compact(bump_version_number, write_key);
             break;
         }
@@ -107,16 +107,16 @@ void do_transform(const std::string& file_name, const char* read_key, const char
             throw std::runtime_error("Could not transform Realm file with history type 'OutOfRealm' for " +
                                      file_name);
         case Replication::hist_SyncClient: {
-            std::unique_ptr<Replication> reference_history = realm::sync::make_client_replication(file_name);
-            auto sg = DB::create(*reference_history, DBOptions(read_key));
+            std::unique_ptr<Replication> reference_history = realm::sync::make_client_replication();
+            auto sg = DB::create(*reference_history, file_name, DBOptions(read_key));
             success = sg->compact(bump_version_number, write_key);
             break;
         }
         case Replication::hist_SyncServer: {
             ServerHistoryContextImpl context;
             _impl::ServerHistory::DummyCompactionControl compaction_control;
-            _impl::ServerHistory history{file_name, context, compaction_control};
-            auto sg = DB::create(history, DBOptions(read_key));
+            _impl::ServerHistory history{context, compaction_control};
+            auto sg = DB::create(history, file_name, DBOptions(read_key));
             success = sg->compact(bump_version_number, write_key);
             break;
         }
