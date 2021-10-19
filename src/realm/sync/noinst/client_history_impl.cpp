@@ -26,34 +26,6 @@ void ClientReplication::set_client_file_ident_in_wt(version_type current_version
 }
 
 
-auto ClientReplication::get_next_local_changeset(version_type current_version, version_type begin_version) const
-    -> util::Optional<LocalChangeset>
-{
-    ensure_updated(current_version); // Throws
-
-    if (!m_arrays)
-        return none;
-    REALM_ASSERT(begin_version >= 1);
-    version_type end_version = m_sync_history_base_version + sync_history_size();
-    if (begin_version < m_sync_history_base_version)
-        begin_version = m_sync_history_base_version;
-
-    for (version_type version = begin_version; version < end_version; ++version) {
-        std::size_t ndx = std::size_t(version - m_sync_history_base_version);
-        std::int_fast64_t origin_file_ident = m_arrays->origin_file_idents.get(ndx);
-        bool not_from_server = (origin_file_ident == 0);
-        if (not_from_server) {
-            LocalChangeset local_changeset;
-            local_changeset.version = version;
-            ChunkedBinaryData changeset(m_arrays->changesets, ndx);
-            local_changeset.changeset = changeset;
-            return local_changeset;
-        }
-    }
-    return none;
-}
-
-
 void ClientReplication::set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                                      SaltedVersion server_version, BinaryData uploadable_changeset)
 {
