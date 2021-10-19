@@ -906,7 +906,7 @@ public:
     }
     Session make_session(std::string const& path, Session::Config&& config = {})
     {
-        auto db = DB::create(make_client_replication(path));
+        auto db = DB::create(make_client_replication(), path);
         return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
     }
 
@@ -1023,7 +1023,7 @@ private:
 inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
                                   const std::string& virt_path, Config config)
     : m_self_ref{std::make_shared<SelfRef>(this)}                            // Throws
-    , m_db{DB::create(make_client_replication(real_path))}                   // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                 // Throws
     , m_session{client_server_fixture.make_session(m_db, std::move(config))} // Throws
 {
     if (config.error_handler)
@@ -1035,7 +1035,7 @@ inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, co
 inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture, int client_index, int server_index,
                                   const std::string& real_path, const std::string& virt_path, Config config)
     : m_self_ref{std::make_shared<SelfRef>(this)}                                          // Throws
-    , m_db{DB::create(make_client_replication(real_path))}                                 // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                               // Throws
     , m_session{client_server_fixture.make_session(client_index, m_db, std::move(config))} // Throws
 {
     if (config.error_handler)

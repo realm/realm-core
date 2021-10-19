@@ -44,8 +44,8 @@ TEST_IF(ClientResetQueryBased_1, false)
 
         // Create the data and upload it to the reference Realm.
         {
-            std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
-            DBRef sg = DB::create(*history);
+            std::unique_ptr<ClientReplication> history = make_client_replication();
+            DBRef sg = DB::create(*history, path_1);
             Session session = fixture.make_session(path_1);
             fixture.bind_session(session, ref_path);
 
@@ -61,8 +61,8 @@ TEST_IF(ClientResetQueryBased_1, false)
 
         // Create a partial client and add a query.
         {
-            std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
-            DBRef sg = DB::create(*history);
+            std::unique_ptr<ClientReplication> history = make_client_replication();
+            DBRef sg = DB::create(*history, path_2);
             Session session = fixture.make_session(path_2);
             fixture.bind_session(session, partial_path);
 
@@ -130,8 +130,8 @@ TEST_IF(ClientResetQueryBased_1, false)
     //        fixture.start();
     //        real_path_1 = fixture.map_virtual_to_real_path(server_path);
     //
-    //        std::unique_ptr<ClientReplication> history = make_client_replication(path_1);
-    //        DBRef sg = DB::create(*history);
+    //        std::unique_ptr<ClientReplication> history = make_client_replication();
+    //        DBRef sg = DB::create(*history, path_1);
     //        Session session = fixture.make_session(path_1);
     //        fixture.bind_session(session, server_path);
     //
@@ -151,8 +151,8 @@ TEST_IF(ClientResetQueryBased_1, false)
     //
     //    // Check the content in path_2.
     //    {
-    //        std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
-    //        DBRef sg = DB::create(*history);
+    //        std::unique_ptr<ClientReplication> history = make_client_replication();
+    //        DBRef sg = DB::create(*history, path_2);
     //        ReadTransaction rt {sg};
     //        const Group& group = rt.get_group();
     //        ConstTableRef table = group.get_table("class_table");
@@ -189,8 +189,8 @@ TEST_IF(ClientResetQueryBased_1, false)
     //        // The session that performs client reset.
     //        // The Realm will be opened by a user while the reset takes place.
     //        {
-    //            std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
-    //            DBRef sg = DB::create(*history);
+    //            std::unique_ptr<ClientReplication> history = make_client_replication();
+    //            DBRef sg = DB::create(*history, path_2);
     //            ReadTransaction rt {sg};
     //            const Group& group = rt.get_group();
     //            ConstTableRef table = group.get_table("class_table");
@@ -210,8 +210,8 @@ TEST_IF(ClientResetQueryBased_1, false)
     //
     //    // Check the content in path_2. There should only be one row now.
     //    {
-    //        std::unique_ptr<ClientReplication> history = make_client_replication(path_2);
-    //        DBRef sg = DB::create(*history);
+    //        std::unique_ptr<ClientReplication> history = make_client_replication();
+    //        DBRef sg = DB::create(*history, path_2);
     //        ReadTransaction rt {sg};
     //        const Group& group = rt.get_group();
     //        ConstTableRef table = group.get_table("class_table");

@@ -72,8 +72,6 @@ public:
 
     enum class IntegrationError { bad_origin_file_ident, bad_changeset };
 
-    ClientReplication(const std::string& realm_path);
-
     /// set_client_reset_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The shared group associated with
     /// this history object must be in a write transaction when this function
@@ -404,11 +402,6 @@ private:
 
 // Implementation
 
-inline ClientReplication::ClientReplication(const std::string& realm_path)
-    : SyncReplication{realm_path}
-{
-}
-
 // Clamp the beginning of the specified upload skippable version range to the
 // beginning of the synchronization history.
 //
@@ -455,7 +448,7 @@ inline auto ClientReplication::get_transformer() -> Transformer&
 ///
 /// The intended role for such an object is as a plugin for new
 /// realm::DB objects.
-std::unique_ptr<ClientReplication> make_client_replication(const std::string& realm_path);
+std::unique_ptr<ClientReplication> make_client_replication();
 
 } // namespace sync
 } // namespace realm

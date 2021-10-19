@@ -289,8 +289,8 @@ TEST(Dictionary_Clear)
 TEST(Dictionary_Transaction)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     ObjKey k0, k2;
     ColKey col_dict;
     auto cmp = [this](Mixed x, Mixed y) {
@@ -352,8 +352,8 @@ TEST(Dictionary_Transaction)
 TEST(Dictionary_Aggregate)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     auto tr = db->start_write();
     auto foo = tr->add_table("foo");
     auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries");
@@ -657,8 +657,8 @@ NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)
     ModelDict model;
     auto mask = Dictionary::set_hash_mask(0xFFFF);
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     auto tr = db->start_write();
     ColKey col_dict;
     Dictionary dict;
@@ -713,8 +713,8 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
 {
     mask = Dictionary::set_hash_mask(mask);
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
 
     {
         auto tr = db->start_write();

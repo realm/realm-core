@@ -191,8 +191,8 @@ TEST(BPlusTree_Fuzz)
 TEST(BPlusTree_FuzzBinary)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     const size_t iters = 2000;
     std::vector<std::string> ref_arr;
 

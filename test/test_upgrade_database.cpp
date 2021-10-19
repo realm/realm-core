@@ -236,8 +236,8 @@ TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     {
         File::copy(path, temp_copy);
 
-        std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
-        DB sg(*hist);
+        std::unique_ptr<Replication> hist = make_in_realm_history();
+        DB sg(*hist, temp_copy);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");
 
@@ -696,8 +696,8 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 
     {
         File::copy(path, temp_path);
-        std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
-        DB sg(*hist);
+        std::unique_ptr<Replication> hist = make_in_realm_history();
+        DB sg(*hist, temp_path);
         using sgf = _impl::SharedGroupFriend;
         CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
     }
@@ -713,8 +713,8 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
             CHECK_EQUAL(9, sgf::get_file_format_version(sg));
         }
         {
-            std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
-            DB sg(*hist);
+            std::unique_ptr<Replication> hist = make_in_realm_history();
+            DB sg(*hist, temp_path);
             using sgf = _impl::SharedGroupFriend;
             CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
         }
@@ -1088,8 +1088,8 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
-        auto hist = make_in_realm_history(temp_copy);
-        DBRef sg = DB::create(*hist);
+        auto hist = make_in_realm_history();
+        DBRef sg = DB::create(*hist, temp_copy);
 
         auto rt = sg->start_read();
         CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
@@ -1131,8 +1131,8 @@ TEST_IF(Upgrade_Database_7_8, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
-        auto hist = make_in_realm_history(temp_copy);
-        DBRef sg = DB::create(*hist);
+        auto hist = make_in_realm_history();
+        DBRef sg = DB::create(*hist, temp_copy);
 
         auto rt = sg->start_read();
         CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
@@ -1175,8 +1175,8 @@ TEST_IF(Upgrade_Database_8_9, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
         File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
-        auto hist = make_in_realm_history(temp_copy);
-        DBRef sg = DB::create(*hist);
+        auto hist = make_in_realm_history();
+        DBRef sg = DB::create(*hist, temp_copy);
 
         auto rt = sg->start_read();
         CHECK_EQUAL(rt->get_history_schema_version(), hist->get_history_schema_version());
@@ -1216,8 +1216,8 @@ TEST(Upgrade_Database_6_10)
 
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
-    DBRef sg = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef sg = DB::create(*hist, temp_copy);
     ReadTransaction rt(sg);
     auto t = rt.get_table("table");
     CHECK(t);
@@ -1258,8 +1258,8 @@ TEST(Upgrade_Database_9_10_with_pk_table)
 
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
-    auto sg = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    auto sg = DB::create(*hist, temp_copy);
     ReadTransaction rt(sg);
     rt.get_group().verify();
     CHECK_EQUAL(rt.get_group().size(), 4);
@@ -1307,7 +1307,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
 
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
+    auto hist = make_in_realm_history();
 
     int iter = 2;
     while (iter) {
@@ -1316,7 +1316,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         while (max_try--) {
             try {
                 // Constructing this SharedGroup will trigger an upgrade first time around
-                sg = DB::create(*hist);
+                sg = DB::create(*hist, temp_copy);
                 break;
             }
             catch (...) {
@@ -1480,7 +1480,7 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
         --iter;
     }
     if (REALM_MAX_BPNODE_SIZE == 1000) {
-        auto sg = DB::create(*hist);
+        auto sg = DB::create(*hist, temp_copy);
         if (generate_json) {
             std::ofstream expect("expect_test_upgrade_database_9_to_10.json");
             sg->start_read()->to_json(expect, 0);
@@ -1642,8 +1642,8 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
-    auto sg = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    auto sg = DB::create(*hist, temp_copy);
     auto rt = sg->start_read();
 
     auto t = rt->get_table("table");
@@ -1688,10 +1688,10 @@ TEST_TYPES(Upgrade_Database_11, std::true_type, std::false_type)
 
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
+    auto hist = make_in_realm_history();
     DBOptions options;
     options.is_immutable = TEST_TYPE::value;
-    auto sg = DB::create(*hist, options);
+    auto sg = DB::create(*hist, temp_copy, options);
     auto rt = sg->start_read();
 
     auto foo = rt->get_table("foo");
@@ -1756,8 +1756,8 @@ TEST_IF(Upgrade_Database_20, REALM_MAX_BPNODE_SIZE == 1000)
 
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
-    auto sg = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    auto sg = DB::create(*hist, temp_copy);
     auto wt = sg->start_write();
 
     auto foo = wt->get_table("foo");
@@ -1829,12 +1829,12 @@ TEST_IF(Upgrade_Database_20, REALM_MAX_BPNODE_SIZE == 1000)
 TEST(Upgrade_progress)
 {
     SHARED_GROUP_TEST_PATH(temp_copy);
-    auto hist = make_in_realm_history(temp_copy);
+    auto hist = make_in_realm_history();
 
     for (int i = 1; i <= 7; i++) {
         auto fn = test_util::get_test_resource_path() + "test_upgrade_progress_" + util::to_string(i) + ".realm";
         File::copy(fn, temp_copy);
-        DB::create(*hist)->start_read()->verify();
+        DB::create(*hist, temp_copy)->start_read()->verify();
     }
 }
 
@@ -1846,8 +1846,8 @@ TEST(Upgrade_FixColumnKeys)
     auto fn = test_util::get_test_resource_path() + "test_upgrade_colkey_error.realm";
     File::copy(fn, temp_copy);
 
-    auto hist = make_in_realm_history(temp_copy);
-    DB::create(*hist)->start_read()->verify();
+    auto hist = make_in_realm_history();
+    DB::create(*hist, temp_copy)->start_read()->verify();
 }
 
 NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
@@ -1863,8 +1863,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
         DBOptions options;
         options.accepted_versions = {200};
         options.to_be_deleted = {};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->add_table("MyTable");
         table->add_column(type_String, "names");
@@ -1877,8 +1877,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
         DBOptions options;
         options.accepted_versions = {201, 200};
         options.to_be_deleted = {};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         auto col = table->get_column_key("names");
@@ -1893,8 +1893,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
         DBOptions options;
         options.accepted_versions = {200};
         options.to_be_deleted = {};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         auto col = table->get_column_key("names");
@@ -1910,8 +1910,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBtoAtoC)
         DBOptions options;
         options.accepted_versions = {202, 200};
         options.to_be_deleted = {{201, 0}};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         CHECK(table->size() == 1);
@@ -1938,8 +1938,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
         DBOptions options;
         options.accepted_versions = {200};
         options.to_be_deleted = {};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->add_table("MyTable");
         table->add_column(type_String, "names");
@@ -1952,8 +1952,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
         DBOptions options;
         options.accepted_versions = {201, 200};
         options.to_be_deleted = {};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         auto col = table->get_column_key("names");
@@ -1968,8 +1968,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
         DBOptions options;
         options.accepted_versions = {202, 201, 200};
         options.to_be_deleted = {};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
     }
     CHECK(File::exists(prefix + "v200.backup.realm"));
@@ -1984,8 +1984,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
         DBOptions options;
         options.accepted_versions = {203, 200};
         options.to_be_deleted = {{201, 2}};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
         auto tr = db->start_write();
         auto table = tr->get_table("MyTable");
         CHECK(table->size() == 0);
@@ -2002,8 +2002,8 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
         DBOptions options;
         options.accepted_versions = {203, 200};
         options.to_be_deleted = {{201, 1}};
-        auto hist = make_in_realm_history(path);
-        auto db = DB::create(*hist, options);
+        auto hist = make_in_realm_history();
+        auto db = DB::create(*hist, path, options);
     }
     CHECK(File::exists(prefix + "v200.backup.realm"));
     CHECK(!File::exists(prefix + "v201.backup.realm"));
@@ -2012,24 +2012,5 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     File::try_remove(prefix + "v200.backup.realm");
     _impl::GroupFriend::fake_target_file_format({});
 }
-
-/*
-TEST(Upgrade_bug)
-{
-    // ReplSyncClient repl_sync_client("/home/joergen/default.realm", 10, 16);
-    auto hist = make_in_realm_history("/home/joergen/default.realm");
-    auto db = DB::create(*hist);
-    auto rt = db->start_read();
-    rt->verify();
-    for (TableKey&& k : rt->get_table_keys()) {
-        auto table = rt->get_table(k);
-        std::cout << table->get_name() << std::endl;
-        if (auto col = table->get_primary_key_column()) {
-            StringData column_name = table->get_column_name(col);
-            std::cout << "   pk: " << column_name << std::endl;
-        }
-    }
-}
-*/
 
 #endif // TEST_GROUP

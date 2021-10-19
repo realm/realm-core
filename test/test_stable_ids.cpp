@@ -16,9 +16,9 @@ using namespace realm::sync;
 namespace {
 
 struct MakeClientHistory {
-    static std::unique_ptr<ClientReplication> make_history(const std::string& realm_path)
+    static std::unique_ptr<ClientReplication> make_history()
     {
-        return realm::sync::make_client_replication(realm_path);
+        return realm::sync::make_client_replication();
     }
 
     static file_ident_type get_client_file_ident(ClientReplication& history)
@@ -46,15 +46,15 @@ struct MakeServerHistory {
                               public _impl::ServerHistory::DummyCompactionControl,
                               public _impl::ServerHistory {
     public:
-        explicit WrapServerHistory(const std::string& realm_path)
-            : _impl::ServerHistory{realm_path, *this, *this}
+        WrapServerHistory()
+            : _impl::ServerHistory{*this, *this}
         {
         }
     };
 
-    static std::unique_ptr<_impl::ServerHistory> make_history(const std::string& realm_path)
+    static std::unique_ptr<_impl::ServerHistory> make_history()
     {
-        return std::make_unique<WrapServerHistory>(realm_path);
+        return std::make_unique<WrapServerHistory>();
     }
 
     static _impl::ServerHistory::file_ident_type get_client_file_ident(_impl::ServerHistory&)
@@ -70,8 +70,8 @@ struct MakeServerHistory {
 TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, MakeServerHistory)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = TEST_TYPE::make_history(test_dir);
-    DBRef sg = DB::create(*history);
+    auto history = TEST_TYPE::make_history();
+    DBRef sg = DB::create(*history, test_dir);
 
     {
         WriteTransaction wt{sg};
@@ -98,9 +98,9 @@ TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, 
 TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, MakeServerHistory)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = TEST_TYPE::make_history(test_dir);
+    auto history = TEST_TYPE::make_history();
 
-    DBRef sg = DB::create(*history);
+    DBRef sg = DB::create(*history, test_dir);
 
     auto client_file_ident = TEST_TYPE::get_client_file_ident(*history);
 
@@ -169,9 +169,9 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
 TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = make_client_replication(test_dir);
+    auto history = make_client_replication();
 
-    DBRef sg = DB::create(*history);
+    DBRef sg = DB::create(*history, test_dir);
 
     ColKey link_col;
     {
@@ -224,8 +224,8 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
     // Replay the transaction to see that the instructions were modified.
     {
         SHARED_GROUP_TEST_PATH(test_dir_2);
-        auto history_2 = make_client_replication(test_dir_2);
-        DBRef sg_2 = DB::create(*history_2);
+        auto history_2 = make_client_replication();
+        DBRef sg_2 = DB::create(*history_2, test_dir_2);
 
         WriteTransaction wt{sg_2};
         InstructionApplier applier{wt};
@@ -253,8 +253,8 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
 {
     SHARED_GROUP_TEST_PATH(test_dir);
     {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
+        auto history = TEST_TYPE::make_history();
+        DBRef sg = DB::create(*history, test_dir);
         WriteTransaction wt{sg};
         TableRef t0 = wt.get_or_add_table("class_t0");
         t0->create_object();
@@ -263,8 +263,8 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
         wt.commit();
     }
     {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
+        auto history = TEST_TYPE::make_history();
+        DBRef sg = DB::create(*history, test_dir);
         WriteTransaction wt{sg};
         TableRef t0 = wt.get_or_add_table("class_t0");
         t0->create_object();
@@ -285,8 +285,8 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
     SHARED_GROUP_TEST_PATH(test_dir);
 
     {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
+        auto history = TEST_TYPE::make_history();
+        DBRef sg = DB::create(*history, test_dir);
         {
             WriteTransaction wt{sg};
             TableRef t0 = wt.get_group().add_table_with_primary_key("class_t0", type_String, "pk");
@@ -317,8 +317,8 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
 
     // Check that locally allocated IDs are properly persisted
     {
-        auto history_2 = TEST_TYPE::make_history(test_dir);
-        DBRef sg_2 = DB::create(*history_2);
+        auto history_2 = TEST_TYPE::make_history();
+        DBRef sg_2 = DB::create(*history_2, test_dir);
         WriteTransaction wt{sg_2};
         TableRef t0 = wt.get_table("class_t0");
 

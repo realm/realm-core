@@ -3113,8 +3113,8 @@ TEST(Query_StrIndex)
 TEST(Query_StrIndexUpdating)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    auto sg = DB::create(*hist, path, DBOptions(crypt_key()));
     auto group = sg->start_write();
 
     auto t = group->add_table("table");
@@ -4748,8 +4748,8 @@ TEST(Query_DistinctAndSort)
 TEST(Query_SortDistinctOrderThroughHandover)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
 
     TableRef t1 = g->add_table("t1");
@@ -4867,8 +4867,8 @@ TEST(Query_SortDistinctOrderThroughHandover)
 
 TEST(Query_CompoundDescriptors) {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
 
     TableRef t1 = g->add_table("t1");

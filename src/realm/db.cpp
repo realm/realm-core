@@ -1341,7 +1341,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-void DB::open(Replication& repl, const DBOptions options)
+void DB::open(Replication& repl, const std::string& file, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -1357,7 +1357,6 @@ void DB::open(Replication& repl, const DBOptions options)
     // on the DB. This will prevent the DB from calling the replication object when it closes.
     repl.register_db(this);
 
-    std::string file = repl.get_database_path();
     bool no_create = false;
     bool is_backend = false;
     do_open(file, no_create, is_backend, options); // Throws
@@ -2831,19 +2830,19 @@ DBRef DB::create(const std::string& file, bool no_create, const DBOptions option
     return retval;
 }
 
-DBRef DB::create(Replication& repl, const DBOptions options)
+DBRef DB::create(Replication& repl, const std::string& file, const DBOptions options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
-    retval->open(repl, options);
+    retval->open(repl, file, options);
     return retval;
 }
 
-DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions options)
+DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions options)
 {
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);
     retval->m_history = std::move(repl);
-    retval->open(*retval->m_history, options);
+    retval->open(*retval->m_history, file, options);
     return retval;
 }
 

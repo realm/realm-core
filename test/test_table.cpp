@@ -3453,8 +3453,8 @@ TEST(Table_object_sequential)
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
 
@@ -3606,8 +3606,8 @@ TEST(Table_object_seq_rnd)
     std::vector<int64_t> key_values;
     std::set<int64_t> key_set;
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     ColKey c0;
     {
         std::cout << "Establishing scenario seq ins/rnd erase " << std::endl;
@@ -3719,8 +3719,8 @@ TEST(Table_object_random)
     int num_runs = 1;
 #endif
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     ColKey c0;
     ColKey c1;
     std::vector<int64_t> key_values;
@@ -4545,8 +4545,8 @@ TEST(Table_search_index_fuzzer)
     // Obj::set() will be automatically be called with set<RemoveOptional<T>>()
 
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    auto db = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    auto db = DB::create(*hist, path);
     Tester<bool, false>::run(db, type_Bool);
     Tester<Optional<bool>, true>::run(db, type_Bool);
 
@@ -4836,8 +4836,8 @@ TEST(List_Ops)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     test_lists<int64_t>(test_context, sg, type_Int);
     test_lists<StringData>(test_context, sg, type_String);
@@ -4965,8 +4965,8 @@ TEST(List_AggOps)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     test_lists_numeric_agg<int64_t>(test_context, sg, type_Int);
     test_lists_numeric_agg<float>(test_context, sg, type_Float);
@@ -4982,8 +4982,8 @@ TEST(List_AggOps)
 TEST(List_DecimalMinMax)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     auto t = sg->start_write();
     auto table = t->add_table("the_table");
     auto col = table->add_column_list(type_Decimal, "the column");
@@ -5081,8 +5081,8 @@ TEST(Table_Ops)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     test_tables<int64_t>(test_context, sg, type_Int);
     test_tables<StringData>(test_context, sg, type_String);
@@ -5201,8 +5201,8 @@ TEST(Table_Column_DynamicConversions)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     test_dynamic_conversion_combi<int64_t>(test_context, sg, type_Int);
     test_dynamic_conversion_combi<float>(test_context, sg, type_Float);
@@ -5234,8 +5234,8 @@ TEST(Table_Column_Conversions)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     test_column_conversion<int64_t, Optional<int64_t>>(test_context, sg, type_Int);
     test_column_conversion<float, Optional<float>>(test_context, sg, type_Float);
@@ -5261,8 +5261,8 @@ TEST(Table_ChangePKNullability)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto wt = sg->start_write();
     auto table = wt->add_table_with_primary_key("foo", type_String, "id", false);
@@ -5290,8 +5290,8 @@ TEST(Table_ChangePKNullability)
 TEST(Table_MultipleObjs) {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_table("my_table");
@@ -5369,8 +5369,8 @@ TEST(Table_EmbeddedObjects)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("mytable");
@@ -5389,8 +5389,8 @@ TEST(Table_EmbeddedObjectCreateAndDestroy)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     {
         auto tr = sg->start_write();
@@ -5442,8 +5442,8 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
@@ -5484,8 +5484,8 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
@@ -5542,8 +5542,8 @@ TEST(Table_EmbeddedObjectNotifications)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
@@ -5599,8 +5599,8 @@ TEST(Table_EmbeddedObjectTableClearNotifications)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
@@ -5656,8 +5656,8 @@ TEST(Table_EmbeddedObjectPath)
 
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto tr = sg->start_write();
     auto table = tr->add_embedded_table("myEmbeddedStuff");
@@ -5791,8 +5791,8 @@ TEST(Table_SortEncrypted)
     SHARED_GROUP_TEST_PATH(path);
     Random random(random_int<unsigned long>());
 
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist, DBOptions(crypt_key(true)));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path, DBOptions(crypt_key(true)));
 
     auto wt = sg->start_write();
     auto foos = wt->add_table("foo");
@@ -5833,8 +5833,8 @@ TEST(Table_RebuildTable)
 TEST(Table_ListOfPrimitivesTransaction)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef db = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef db = DB::create(*hist, path);
 
     auto tr = db->start_write();
     TableRef t = tr->add_table("table");

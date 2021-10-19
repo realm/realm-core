@@ -77,12 +77,12 @@ struct SyncClientVacuumFile : Vacuum::VacuumFile {
     SyncClientVacuumFile(util::Logger& logger, const Vacuum::Options& options, const std::string& path)
         : VacuumFile(logger, options, path)
     {
-        auto client_history = sync::make_client_replication(path);
+        auto client_history = sync::make_client_replication();
         DBOptions sg_options;
         sg_options.allow_file_format_upgrade = !options.no_file_upgrade;
         if (options.encryption_key)
             sg_options.encryption_key = options.encryption_key->data();
-        m_sg = DB::create(std::move(client_history), sg_options);
+        m_sg = DB::create(std::move(client_history), path, sg_options);
     }
 
     std::string get_type_description() const override
@@ -149,13 +149,13 @@ struct SyncServerVacuumFile : Vacuum::VacuumFile, _impl::ServerHistory::DummyCom
         : VacuumFile(logger, options, path)
         , m_context{!options.no_log_compaction, options.ignore_clients, options.server_history_ttl}
     {
-        auto server_history = std::make_unique<ServerHistory>(path, m_context, *this);
+        auto server_history = std::make_unique<ServerHistory>(m_context, *this);
         m_server_history = server_history.get();
         DBOptions sg_options;
         sg_options.allow_file_format_upgrade = !options.no_file_upgrade;
         if (options.encryption_key)
             sg_options.encryption_key = options.encryption_key->data();
-        m_sg = DB::create(std::move(server_history), sg_options);
+        m_sg = DB::create(std::move(server_history), path, sg_options);
         m_sg->claim_sync_agent();
     }
 

@@ -54,10 +54,10 @@ TEST(Sync_Multiserver_Replicate)
 
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    std::unique_ptr<Replication> history_1 = make_client_replication();
+    std::unique_ptr<Replication> history_2 = make_client_replication();
+    DBRef sg_1 = DB::create(*history_1, path_1);
+    DBRef sg_2 = DB::create(*history_2, path_2);
 
     int num_transacts = 1000;
     {
@@ -117,10 +117,10 @@ TEST(Sync_Multiserver_Merge)
 
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    std::unique_ptr<Replication> history_1 = make_client_replication(path_1);
-    std::unique_ptr<Replication> history_2 = make_client_replication(path_2);
-    DBRef sg_1 = DB::create(*history_1);
-    DBRef sg_2 = DB::create(*history_2);
+    std::unique_ptr<Replication> history_1 = make_client_replication();
+    std::unique_ptr<Replication> history_2 = make_client_replication();
+    DBRef sg_1 = DB::create(*history_1, path_1);
+    DBRef sg_2 = DB::create(*history_2, path_2);
 
     auto create_schema = [](DBRef sg) {
         WriteTransaction wt{sg};
@@ -215,8 +215,8 @@ TEST(Sync_Multiserver_MultipleClientsPer2ndtierServer)
             out.imbue(std::locale::classic());
             out << i << "_" << j << ".realm";
             std::string path = util::File::resolve(out.str(), dir_2);
-            histories[i][j] = make_client_replication(path);
-            shared_groups[i][j] = DB::create(*histories[i][j]);
+            histories[i][j] = make_client_replication();
+            shared_groups[i][j] = DB::create(*histories[i][j], path);
             int client_ndx = i * num_clients_per_2ndtier_server + j;
             int server_ndx = 1 + i;
             sessions[i][j] = fixture.make_bound_session(client_ndx, path, server_ndx, "/test");
@@ -297,8 +297,8 @@ TEST(Sync_Multiserver_MultipleClientsPer2ndtierServer)
     std::string path_1 = fixture.map_virtual_to_real_path(0, "/test");
     ServerHistoryContext context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history_1{path_1, context, compaction_control};
-    DBRef sg_1 = DB::create(history_1);
+    _impl::ServerHistory history_1{context, compaction_control};
+    DBRef sg_1 = DB::create(history_1, path_1);
     ReadTransaction rt_1{sg_1};
     for (int i = 0; i < num_2ndtier_servers; ++i) {
         for (int j = 0; j < num_clients_per_2ndtier_server; ++j) {
@@ -334,8 +334,8 @@ TEST(Sync_Multiserver_ManyTiers)
             out.imbue(std::locale::classic());
             out << i << "_" << j << ".realm";
             std::string path = util::File::resolve(out.str(), dir_2);
-            histories[i][j] = make_client_replication(path);
-            shared_groups[i][j] = DB::create(*histories[i][j]);
+            histories[i][j] = make_client_replication();
+            shared_groups[i][j] = DB::create(*histories[i][j], path);
             int client_ndx = i * num_clients_per_tier + j;
             int server_ndx = i;
             sessions[i][j] = fixture.make_bound_session(client_ndx, path, server_ndx, "/test");
@@ -416,8 +416,8 @@ TEST(Sync_Multiserver_ManyTiers)
     std::string path_1 = fixture.map_virtual_to_real_path(0, "/test");
     ServerHistoryContext context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history_1{path_1, context, compaction_control};
-    DBRef sg_1 = DB::create(history_1);
+    _impl::ServerHistory history_1{context, compaction_control};
+    DBRef sg_1 = DB::create(history_1, path_1);
     ReadTransaction rt_1{sg_1};
     for (int i = 0; i < num_tiers; ++i) {
         for (int j = 0; j < num_clients_per_tier; ++j) {
@@ -453,8 +453,8 @@ TEST(Sync_Multiserver_PartialSync)
             out.imbue(std::locale::classic());
             out << i << "_" << j << ".realm";
             std::string path = util::File::resolve(out.str(), dir_2);
-            histories[i][j] = make_client_replication(path);
-            shared_groups[i][j] = DB::create(*histories[i][j]);
+            histories[i][j] = make_client_replication();
+            shared_groups[i][j] = DB::create(*histories[i][j], path);
             int client_ndx = i * num_clients_per_tier + j;
             int server_ndx = i;
             out.str(std::string{});
@@ -552,8 +552,8 @@ TEST(Sync_Multiserver_PartialSync)
     std::string path_1 = fixture.map_virtual_to_real_path(0, "/test");
     ServerHistoryContext context;
     _impl::ServerHistory::DummyCompactionControl compaction_control;
-    _impl::ServerHistory history_1{path_1, context, compaction_control};
-    DBRef sg_1 = DB::create(history_1);
+    _impl::ServerHistory history_1{context, compaction_control};
+    DBRef sg_1 = DB::create(history_1, path_1);
     ReadTransaction rt_1{sg_1};
     for (int i = 0; i < num_tiers; ++i) {
         for (int j = 0; j < num_clients_per_tier; ++j) {
@@ -621,15 +621,15 @@ TEST(Sync_Multiserver_ServerSideModify)
     Session sessions[n_1][n_2];
     for (int i = 0; i < num_tiers; ++i) {
         std::string server_path = fixture.map_virtual_to_real_path(i, "/test");
-        server_histories[i] = std::make_unique<_impl::ServerHistory>(server_path, context, compaction_control);
-        server_shared_groups[i] = DB::create(*server_histories[i]);
+        server_histories[i] = std::make_unique<_impl::ServerHistory>(context, compaction_control);
+        server_shared_groups[i] = DB::create(*server_histories[i], server_path);
         for (int j = 0; j < num_clients_per_tier; ++j) {
             std::ostringstream out;
             out.imbue(std::locale::classic());
             out << i << "_" << j << ".realm";
             std::string path = util::File::resolve(out.str(), dir_2);
-            client_histories[i][j] = make_client_replication(path);
-            client_shared_groups[i][j] = DB::create(*client_histories[i][j]);
+            client_histories[i][j] = make_client_replication();
+            client_shared_groups[i][j] = DB::create(*client_histories[i][j], path);
             int client_ndx = i * num_clients_per_tier + j;
             int server_ndx = i;
             sessions[i][j] = fixture.make_bound_session(client_ndx, path, server_ndx, "/test");

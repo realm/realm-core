@@ -1351,8 +1351,8 @@ TEST(TableView_SortOverMultiLink)
 TEST(TableView_IsInSync)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto repl = make_in_realm_history(path);
-    DBRef db_ref = DB::create(*repl, DBOptions(DBOptions::Durability::MemOnly));
+    auto repl = make_in_realm_history();
+    DBRef db_ref = DB::create(*repl, path, DBOptions(DBOptions::Durability::MemOnly));
 
     auto tr = db_ref->start_write();
     Table& table = *tr->add_table("source");

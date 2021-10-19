@@ -46,8 +46,8 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
     SHARED_GROUP_TEST_PATH(path);
     {
         // enable sync
-        std::unique_ptr<Replication> hist = make_client_replication(path);
-        DBRef sg = DB::create(*hist);
+        std::unique_ptr<Replication> hist = make_client_replication();
+        DBRef sg = DB::create(*hist, path);
         {
             WriteTransaction wt(sg);
             wt.add_table("class_table");
@@ -56,8 +56,8 @@ TEST(LangBindHelper_SyncCannotBeChanged_1)
     }
     {
         // try to access the database with sync disabled
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        CHECK_THROW(DB::create(*hist), IncompatibleHistories);
+        std::unique_ptr<Replication> hist(make_in_realm_history());
+        CHECK_THROW(DB::create(*hist, path), IncompatibleHistories);
     }
 }
 
@@ -66,8 +66,8 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
     SHARED_GROUP_TEST_PATH(path);
     {
         // enable sync
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist);
+        std::unique_ptr<Replication> hist(make_in_realm_history());
+        DBRef sg = DB::create(*hist, path);
         {
             WriteTransaction wt(sg);
             wt.add_table("class_table");
@@ -76,7 +76,7 @@ TEST(LangBindHelper_SyncCannotBeChanged_2)
     }
     {
         // try to access the database with sync enabled
-        std::unique_ptr<Replication> hist = make_client_replication(path);
-        CHECK_THROW(DB::create(*hist), IncompatibleHistories);
+        std::unique_ptr<Replication> hist = make_client_replication();
+        CHECK_THROW(DB::create(*hist, path), IncompatibleHistories);
     }
 }

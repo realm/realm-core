@@ -34,8 +34,8 @@ void print_tables(const Group& group)
 
 void inspect_client_realm(const std::string& path)
 {
-    auto history = sync::make_client_replication(path);
-    auto sg = DB::create(*history);
+    auto history = sync::make_client_replication();
+    auto sg = DB::create(*history, path);
     ReadTransaction rt{sg};
     const Group& group = rt.get_group();
 

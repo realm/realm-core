@@ -96,11 +96,11 @@ int main(int argc, char const* argv[])
     catch (const realm::FileFormatUpgradeRequired&) {
         // In realm history
         // Last chance - this one must succeed
-        auto hist = realm::make_in_realm_history(path);
+        auto hist = realm::make_in_realm_history();
         realm::DBOptions options;
         options.allow_file_format_upgrade = true;
 
-        auto db = realm::DB::create(*hist, options);
+        auto db = realm::DB::create(*hist, path, options);
 
         std::cerr << "File upgraded to latest version: " << path << std::endl;
 

@@ -2787,8 +2787,8 @@ TEST(Parser_SortAndDistinct)
 TEST(Parser_Limit)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    auto sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto wt = sg->start_write();
     TableRef people = wt->add_table("person");
@@ -5019,8 +5019,8 @@ void worker(test_util::unit_test::TestContext& test_context, TransactionRef froz
 TEST(Parser_Threads)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef db = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef db = DB::create(*hist, path);
     TransactionRef frozen;
 
     {

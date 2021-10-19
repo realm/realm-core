@@ -225,8 +225,8 @@ TEST_IF(Transactions_LargeUpgrade, TEST_DURATION > 0)
 TEST(Transactions_StateChanges)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef db = DB::create(*hist_w);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
     TransactionRef writer = db->start_write();
     TableRef tr = writer->add_table("hygge");
     auto col = tr->add_column(type_Int, "hejsa");
@@ -341,8 +341,8 @@ void verifier_thread_advance(TestContext& test_context, int limit, DBRef db, Tab
 TEST(Transactions_Threaded)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef db = DB::create(*hist_w);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
     TableKey tk;
     {
         auto wt = db->start_write();
@@ -378,8 +378,8 @@ TEST(Transactions_Threaded)
 TEST(Transactions_ThreadedAdvanceRead)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef db = DB::create(*hist_w);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
     TableKey tk;
     {
         auto wt = db->start_write();
@@ -448,8 +448,8 @@ TEST(Transactions_ListOfBinary)
 TEST(Transactions_RollbackCreateObject)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
     TransactionRef tr = sg_w->start_write();
 
     auto tk = tr->add_table("t0")->get_key();
@@ -475,8 +475,8 @@ TEST(Transactions_RollbackCreateObject)
 TEST(Transactions_ObjectLifetime)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
     TransactionRef tr = sg_w->start_write();
 
     auto table = tr->add_table("t0");
@@ -490,8 +490,8 @@ TEST(Transactions_ObjectLifetime)
 TEST(Transactions_Continuous_ParallelWrites)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path);
     TransactionRef t = sg->start_write();
     auto _table = t->add_table("t0");
     TableKey table_key = _table->get_key();
@@ -518,8 +518,8 @@ TEST(Transactions_Continuous_ParallelWrites)
 TEST(Transactions_Continuous_SerialWrites)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef sg = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef sg = DB::create(*hist, path);
 
     TableKey table_key;
     {
@@ -552,8 +552,8 @@ TEST(Transactions_Continuous_SerialWrites)
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    auto sg_w = DB::create(*hist_w);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    auto sg_w = DB::create(*hist_w, path);
     auto g = sg_w->start_write();
     auto t = g->add_table("t1");
     auto col = t->add_column(type_String, "t1_col0_string");
@@ -733,17 +733,17 @@ ONLY(LangBindHelper_EncryptionGiga)
 {
     //realm::util::set_page_reclaim_governor(&example_governor);
     std::string path1 = "dont_try_this_at_home1.realm";
-    std::unique_ptr<Replication> hist_w1(make_in_realm_history(path1));
+    std::unique_ptr<Replication> hist_w1(make_in_realm_history());
 
     std::cout << "Opening..." << path1 << std::endl;
-    SharedGroup sg_w1(*hist_w1, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w1(*hist_w1, path1, SharedGroupOptions(crypt_key()));
     preparations(sg_w1);
 
     std::string path2 = "dont_try_this_at_home2.realm";
-    std::unique_ptr<Replication> hist_w2(make_in_realm_history(path2));
+    std::unique_ptr<Replication> hist_w2(make_in_realm_history());
 
     std::cout << "Opening..." << path2 << std::endl;
-    SharedGroup sg_w2(*hist_w2, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w2(*hist_w2, path2, SharedGroupOptions(crypt_key()));
     preparations(sg_w2);
     for (int r = 0; r < 4; ++r) {
         growth_phase(sg_w1);

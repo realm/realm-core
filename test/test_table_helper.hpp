@@ -34,11 +34,6 @@ public:
 
 class MyTrivialReplication : public Replication {
 public:
-    MyTrivialReplication(const std::string& path)
-        : Replication(path)
-    {
-    }
-
     HistoryType get_history_type() const noexcept override
     {
         return hist_None;
@@ -102,9 +97,8 @@ protected:
 
 class ReplSyncClient : public MyTrivialReplication {
 public:
-    ReplSyncClient(const std::string& path, int history_schema_version, uint64_t file_ident = 0)
-        : MyTrivialReplication(path)
-        , m_history_schema_version(history_schema_version)
+    ReplSyncClient(int history_schema_version, uint64_t file_ident = 0)
+        : m_history_schema_version(history_schema_version)
         , m_file_ident(file_ident)
     {
     }
