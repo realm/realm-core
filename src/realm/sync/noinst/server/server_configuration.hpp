@@ -50,7 +50,6 @@ struct Configuration {
     bool is_subtier_server = false;
     std::string upstream_url;
     std::string upstream_access_token;
-    std::uint_fast64_t log_lsof_period = 0;
     util::Optional<std::array<char, 64>> encryption_key;
     std::size_t max_upload_backlog = 0;
     bool disable_sync_to_disk = false;
