@@ -221,28 +221,12 @@ public:
         m_history.initialize(&alloc); // Throws
     }
 
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
-
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         m_history.ensure_updated(orig_version);
         BinaryData changeset(data, size);
         version_type new_version = m_history.add_changeset(changeset); // Throws
         return new_version;
-    }
-
-    void finalize_changeset() noexcept override
-    {
-        // Since the history is in the Realm, the added changeset is
-        // automatically finalized as part of the commit operation.
     }
 
     HistoryType get_history_type() const noexcept override

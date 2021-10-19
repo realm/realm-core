@@ -37,6 +37,7 @@
 
 #include "util/test_path.hpp"
 #include "util/compare_groups.hpp"
+#include "util/unit_test.hpp"
 
 #include <fstream>
 #include <numeric>
@@ -80,16 +81,6 @@ public:
     version_type integrate_remote_changesets(file_ident_type remote_file_ident, DB&,
                                              const Transformer::RemoteChangeset* incoming_changesets,
                                              std::size_t num_changesets, util::Logger* replay_logger);
-
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
 
     version_type prepare_changeset(const char* data, std::size_t size, version_type orig_version) override
     {

@@ -216,7 +216,6 @@ private:
     const bool m_simulate_integration_error;
     const Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SyncConfig::SSLVerifyCallback> m_ssl_verify_callback;
-    const ClientImpl::Session::Config m_session_impl_config;
 
     // This one is different from null when, and only when the session wrapper
     // is in ClientImpl::m_abandoned_session_wrappers.
@@ -294,8 +293,6 @@ private:
     std::int_fast64_t m_target_upload_mark = 0, m_target_download_mark = 0;
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
-
-    static ClientImpl::Session::Config make_session_impl_config(SyncTransactReporter&, Session::Config&);
 
     void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
                      std::string multiplex_ident);
@@ -650,6 +647,11 @@ DB& SessionImpl::get_db() const noexcept
     return *m_wrapper.m_db;
 }
 
+SyncTransactReporter* SessionImpl::get_transact_reporter() noexcept
+{
+    return &m_wrapper;
+}
+
 ClientReplication& SessionImpl::access_realm()
 {
     return m_wrapper.get_history();
@@ -733,7 +735,6 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_simulate_integration_error{config.simulate_integration_error}
     , m_ssl_trust_certificate_path{std::move(config.ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(config.ssl_verify_callback)}
-    , m_session_impl_config{make_session_impl_config(*this, config)}
     , m_http_request_path_prefix{std::move(config.service_identifier)}
     , m_virt_path{std::move(config.realm_identifier)}
     , m_signed_access_token{std::move(config.signed_user_token)}
@@ -1029,8 +1030,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         // FIXME: This only makes sense when each session uses a separate connection.
         conn.update_connect_info(m_http_request_path_prefix, m_virt_path,
                                  m_signed_access_token); // Throws
-        std::unique_ptr<SessionImpl> sess_2 =
-            std::make_unique<SessionImpl>(*this, conn, m_session_impl_config); // Throws
+        std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
         SessionImpl& sess = *sess_2;
         sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path);       // Throws
         conn.activate_session(std::move(sess_2));                                        // Throws
@@ -1114,17 +1114,6 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
     if (m_sync_transact_handler)
         m_sync_transact_handler(old_version, new_version); // Throws
 }
-
-auto SessionWrapper::make_session_impl_config(SyncTransactReporter& transact_reporter, Session::Config& config)
-    -> ClientImpl::Session::Config
-{
-    ClientImpl::Session::Config config_2;
-    config_2.sync_transact_reporter = &transact_reporter;
-    config_2.disable_upload = config.disable_upload;
-    config_2.disable_empty_upload = config.disable_empty_upload;
-    return config_2;
-}
-
 
 void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port,
                                  std::string multiplex_ident)
@@ -1296,8 +1285,7 @@ void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
         // FIXME: This only makes sense when each session uses a separate connection.
         new_conn.update_connect_info(m_http_request_path_prefix, m_virt_path,
                                      m_signed_access_token); // Throws
-        std::unique_ptr<SessionImpl> new_sess_2 =
-            std::make_unique<SessionImpl>(*this, new_conn, m_session_impl_config); // Throws
+        std::unique_ptr<SessionImpl> new_sess_2 = std::make_unique<SessionImpl>(*this, new_conn); // Throws
         SessionImpl& new_sess = *new_sess_2;
         new_sess.logger.detail("Rebinding '%1' to '%2'", m_db->get_path(),
                                m_virt_path);              // Throws

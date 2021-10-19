@@ -41,38 +41,36 @@ public:
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;
 
-    void initialize(DB&) override;
-
-    void add_class(TableKey tk, StringData table_name, bool is_embedded) override;
+    void add_class(TableKey tk, StringData table_name, bool is_embedded) final;
     void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
-                                    bool nullable) override;
-    void create_object(const Table*, GlobalKey) override;
-    void create_object_with_primary_key(const Table*, ObjKey, Mixed) override;
-    void prepare_erase_class(TableKey tk) override;
-    void erase_class(TableKey table_key, size_t num_tables) override;
-    void rename_class(TableKey table_key, StringData new_name) override;
-    void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table) override;
-    void erase_column(const Table*, ColKey col_key) override;
-    void rename_column(const Table*, ColKey col_key, StringData name) override;
+                                    bool nullable) final;
+    void create_object(const Table*, GlobalKey) final;
+    void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
+    void prepare_erase_class(TableKey tk) final;
+    void erase_class(TableKey table_key, size_t num_tables) final;
+    void rename_class(TableKey table_key, StringData new_name) final;
+    void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table) final;
+    void erase_column(const Table*, ColKey col_key) final;
+    void rename_column(const Table*, ColKey col_key, StringData name) final;
 
-    void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value) override;
-    void set(const Table*, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant) override;
+    void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value) final;
+    void set(const Table*, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant) final;
 
-    void list_set(const CollectionBase& list, size_t list_ndx, Mixed value) override;
-    void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value) override;
-    void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx) override;
-    void list_erase(const CollectionBase&, size_t link_ndx) override;
-    void list_clear(const CollectionBase&) override;
+    void list_set(const CollectionBase& list, size_t list_ndx, Mixed value) final;
+    void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value) final;
+    void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx) final;
+    void list_erase(const CollectionBase&, size_t link_ndx) final;
+    void list_clear(const CollectionBase&) final;
 
-    void set_insert(const CollectionBase& list, size_t list_ndx, Mixed value) override;
-    void set_erase(const CollectionBase& list, size_t list_ndx, Mixed value) override;
-    void set_clear(const CollectionBase& list) override;
+    void set_insert(const CollectionBase& list, size_t list_ndx, Mixed value) final;
+    void set_erase(const CollectionBase& list, size_t list_ndx, Mixed value) final;
+    void set_clear(const CollectionBase& list) final;
 
-    void dictionary_insert(const CollectionBase&, size_t ndx, Mixed key, Mixed val) override;
-    void dictionary_set(const CollectionBase&, size_t ndx, Mixed key, Mixed val) override;
-    void dictionary_erase(const CollectionBase&, size_t ndx, Mixed key) override;
+    void dictionary_insert(const CollectionBase&, size_t ndx, Mixed key, Mixed val) final;
+    void dictionary_set(const CollectionBase&, size_t ndx, Mixed key, Mixed val) final;
+    void dictionary_erase(const CollectionBase&, size_t ndx, Mixed key) final;
 
-    void remove_object(const Table*, ObjKey) override;
+    void remove_object(const Table*, ObjKey) final;
 
     //@{
 
@@ -83,16 +81,9 @@ public:
     /// (reactor pattern) to be explicitly notified about the implicit
     /// nullifications.
 
-    void nullify_link(const Table*, ColKey col_key, ObjKey key) override;
-    void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx) override;
+    void nullify_link(const Table*, ColKey col_key, ObjKey key) final;
+    void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx) final;
     //@}
-
-    template <class T>
-    void emit(T instruction);
-
-    // Returns true and populates m_last_table_name if instructions for the
-    // table should be emitted.
-    bool select_table(const Table&);
 
 protected:
     // Replication interface:
@@ -102,10 +93,16 @@ private:
     bool m_short_circuit = false;
 
     ChangesetEncoder m_encoder;
-    DB* m_db = nullptr;
     Transaction* m_transaction;
 
     TableKey m_table_being_erased;
+
+    template <class T>
+    void emit(T instruction);
+
+    // Returns true and populates m_last_table_name if instructions for the
+    // table should be emitted.
+    bool select_table(const Table&);
 
     REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
 

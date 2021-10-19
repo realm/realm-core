@@ -498,7 +498,6 @@ private:
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
-    void receive_alloc_message(session_ident_type, file_ident_type file_ident);
     void receive_unbound_message(session_ident_type);
     void handle_protocol_error(ClientProtocol::Error);
 
@@ -636,8 +635,6 @@ private:
 /// occur on the event loop thread of the associated client object.
 class ClientImpl::Session {
 public:
-    class Config;
-
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
     using IntegrationError = ClientReplication::IntegrationError;
 
@@ -646,7 +643,6 @@ public:
     ClientImpl& get_client() noexcept;
     Connection& get_connection() noexcept;
     session_ident_type get_ident() const noexcept;
-    SyncProgress get_sync_progress() const noexcept;
 
     /// Inform this client about new changesets in the history.
     ///
@@ -745,25 +741,6 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
-    /// \brief Make this client request a new file identifier from the server
-    /// for a subordinate client.
-    ///
-    /// The application is allowed to request additional file identifiers while
-    /// it is waiting to receive others.
-    ///
-    /// The requested file identifiers will be passed back to the application as
-    /// they become available. This happens through the virtual callback
-    /// function on_subtier_file_ident(), which the application will need to
-    /// override. on_subtier_file_ident() will be called once for each requested
-    /// identifier as it becomes available.
-    ///
-    /// The callback function is guaranteed to not be called until after
-    /// request_subtier_file_ident() returns (no callback reentrance).
-    ///
-    /// It is an error to call this function before activation of the session,
-    /// or after initiation of deactivation.
-    void request_subtier_file_ident();
-
     /// \brief Announce that a new access token is available.
     ///
     /// By calling this function, the application announces to the session
@@ -839,7 +816,7 @@ public:
     /// The specified transaction reporter (via the config object) is guaranteed
     /// to not be called before activation, and also not after initiation of
     /// deactivation.
-    Session(SessionWrapper&, ClientImpl::Connection&, Config);
+    Session(SessionWrapper&, ClientImpl::Connection&);
     ~Session();
 
 private:
@@ -870,6 +847,7 @@ private:
 
     const std::string& get_realm_path() const noexcept;
     DB& get_db() const noexcept;
+    SyncTransactReporter* get_transact_reporter() noexcept;
 
     /// The implementation need only ensure that the returned reference stays valid
     /// until the next invocation of access_realm() on one of the session
@@ -944,16 +922,6 @@ private:
     /// The default implementation does nothing.
     void on_download_completion();
 
-    /// By returning true, this function indicates to the session that the
-    /// received file identifier is valid. If the identfier is invald, this
-    /// function should return false.
-    ///
-    /// For more, see request_subtier_file_ident().
-    ///
-    /// The default implementation returns false, so it must be overridden if
-    /// request_subtier_file_ident() is ever called.
-    bool on_subtier_file_ident(file_ident_type);
-
     //@{
     /// These are called as the state of the session changes between
     /// "suspended" and "resumed". The initial state is
@@ -976,24 +944,14 @@ private:
 private:
     Connection& m_conn;
     const session_ident_type m_ident;
-    SyncTransactReporter* const m_sync_transact_reporter;
-    const bool m_disable_upload;
-    const bool m_disable_empty_upload;
-    const bool m_is_subserver;
 
-    // Session life cycle state:
-    //
-    //   State          m_deactivation_initiated  m_active_or_deactivating
-    //   -----------------------------------------------------------------
-    //   Unactivated    false                     false
-    //   Active         false                     TRUE
-    //   Deactivating   TRUE                      TRUE
-    //   Deactivated    TRUE                      false
-    //
+    // The states only transition in one direction, from left to right.
+    // The transition to Active happens very soon after construction, as soon as
+    // it is registered with the Connection.
     // The transition from Deactivating to Deactivated state happens when the
     // unbinding process completes (unbind_process_complete()).
-    bool m_deactivation_initiated = false;
-    bool m_active_or_deactivating = false;
+    enum State { Unactivated, Active, Deactivating, Deactivated };
+    State m_state = Unactivated;
 
     bool m_suspended = false;
 
@@ -1014,7 +972,6 @@ private:
     bool m_enlisted_to_send;
     bool m_bind_message_sent;                   // Sending of BIND message has been initiated
     bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
-    bool m_alloc_message_sent;                  // See send_alloc_message()
     bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
     bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
     bool m_error_message_received;              // Session specific ERROR message received
@@ -1118,13 +1075,11 @@ private:
     // the detection of download completion.
     request_ident_type m_last_triggering_download_mark = 0;
 
-    std::int_fast32_t m_num_outstanding_subtier_allocations = 0;
-
     SessionWrapper& m_wrapper;
 
     static std::string make_logger_prefix(session_ident_type);
 
-    Session(SessionWrapper& wrapper, Connection&, session_ident_type, Config&&);
+    Session(SessionWrapper& wrapper, Connection&, session_ident_type);
 
     bool do_recognize_sync_version(version_type) noexcept;
 
@@ -1161,7 +1116,6 @@ private:
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
-    std::error_code receive_alloc_message(file_ident_type file_ident);
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(int error_code, StringData message, bool try_again);
 
@@ -1176,17 +1130,6 @@ private:
     void check_for_download_completion();
 
     friend class Connection;
-};
-
-
-/// See Client::Session for the meaning of the individual properties
-/// (other than `sync_transact_reporter`).
-class ClientImpl::Session::Config {
-public:
-    SyncTransactReporter* sync_transact_reporter = nullptr;
-    bool disable_upload = false;
-    bool disable_empty_upload = false;
-    bool is_subserver = false;
 };
 
 
@@ -1272,7 +1215,7 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 {
     for (auto& p : m_sessions) {
         Session& sess = *p.second;
-        if (!sess.m_deactivation_initiated)
+        if (sess.m_state == Session::Active)
             handler(sess); // Throws
     }
 }
@@ -1385,16 +1328,9 @@ inline auto ClientImpl::Session::get_ident() const noexcept -> session_ident_typ
     return m_ident;
 }
 
-inline auto ClientImpl::Session::get_sync_progress() const noexcept -> SyncProgress
-{
-    return m_progress;
-}
-
 inline void ClientImpl::Session::recognize_sync_version(version_type version)
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     bool resume_upload = do_recognize_sync_version(version);
     if (REALM_LIKELY(resume_upload)) {
@@ -1408,9 +1344,7 @@ inline void ClientImpl::Session::recognize_sync_version(version_type version)
 
 inline void ClientImpl::Session::request_upload_completion_notification()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     m_upload_completion_notification_requested = true;
     check_for_upload_completion(); // Throws
@@ -1418,9 +1352,7 @@ inline void ClientImpl::Session::request_upload_completion_notification()
 
 inline void ClientImpl::Session::request_download_completion_notification()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     ++m_target_download_mark;
 
@@ -1431,29 +1363,9 @@ inline void ClientImpl::Session::request_download_completion_notification()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline void ClientImpl::Session::request_subtier_file_ident()
-{
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
-
-    bool was_zero = (m_num_outstanding_subtier_allocations == 0);
-    ++m_num_outstanding_subtier_allocations;
-
-    // Since the deactivation process has not been initiated, the UNBIND message
-    // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (was_zero && m_ident_message_sent && !m_error_message_received) {
-        if (!m_alloc_message_sent)
-            ensure_enlisted_to_send(); // Throws
-    }
-}
-
 inline void ClientImpl::Session::new_access_token_available()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     m_access_token_sent = false;
 
@@ -1464,20 +1376,15 @@ inline void ClientImpl::Session::new_access_token_available()
         ensure_enlisted_to_send(); // Throws
 }
 
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, Config config)
-    : Session{wrapper, conn, conn.get_client().get_next_session_ident(), std::move(config)} // Throws
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn)
+    : Session{wrapper, conn, conn.get_client().get_next_session_ident()} // Throws
 {
 }
 
-inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident,
-                                    Config&& config)
+inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, session_ident_type ident)
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}
     , m_ident{ident}
-    , m_sync_transact_reporter{config.sync_transact_reporter}
-    , m_disable_upload{config.disable_upload}
-    , m_disable_empty_upload{config.disable_empty_upload}
-    , m_is_subserver{config.is_subserver}
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
@@ -1506,10 +1413,7 @@ inline bool ClientImpl::Session::unbind_process_complete() const noexcept
 
 inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 {
-    // This function must only be called for sessions in the Active state.
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_active_or_deactivating);
-
+    REALM_ASSERT(m_state == Active);
 
     if (!fast_reconnect && !get_client().m_disable_upload_activation_delay) {
         // Disallow immediate activation of the upload process, even if download
@@ -1532,13 +1436,12 @@ inline void ClientImpl::Session::connection_established(bool fast_reconnect)
 // deactivated upon return.
 inline void ClientImpl::Session::connection_lost()
 {
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
     // If the deactivation process has been initiated, it can now be immediately
     // completed.
-    if (m_deactivation_initiated) {
-        // Life cycle state is Deactivating
+    if (m_state == Deactivating) {
         complete_deactivation(); // Throws
-        // Life cycle state is now Deactivated
+        REALM_ASSERT(m_state == Deactivated);
         return;
     }
     reset_protocol_state();
@@ -1552,8 +1455,7 @@ inline void ClientImpl::Session::message_sent()
     // has received a message sent by the server in reposnse to the message that
     // the client has just finished sending.
 
-    // Session life cycle state is Active or Deactivating
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
 
     // No message will be sent after the UNBIND message
     REALM_ASSERT(!m_unbind_message_sent_2);
@@ -1569,7 +1471,7 @@ inline void ClientImpl::Session::message_sent()
         if (m_error_message_received || m_unbound_message_received) {
             // If the deactivation process has been initiated, it can now be
             // immediately completed.
-            if (m_deactivation_initiated) {
+            if (m_state == Deactivating) {
                 // Life cycle state is Deactivating
                 complete_deactivation(); // Throws
                 // Life cycle state is now Deactivated
@@ -1587,8 +1489,7 @@ inline void ClientImpl::Session::message_sent()
 inline void ClientImpl::Session::initiate_rebind()
 {
     // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     REALM_ASSERT(!m_suspended);
     REALM_ASSERT(!m_enlisted_to_send);
@@ -1605,7 +1506,6 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
     m_ident_message_sent = false;
-    m_alloc_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;
     m_error_message_received = false;
@@ -1646,7 +1546,7 @@ inline void ClientImpl::Session::ensure_enlisted_to_send()
 // longer be completed by send_message().
 inline void ClientImpl::Session::enlist_to_send()
 {
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(!m_enlisted_to_send);
     m_enlisted_to_send = true;

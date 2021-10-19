@@ -200,8 +200,6 @@ public:
 
     void make_mark_message(OutputBuffer&, session_ident_type session_ident, request_ident_type request_ident);
 
-    void make_alloc_message(OutputBuffer&, session_ident_type session_ident);
-
     void make_ping(OutputBuffer&, milliseconds_type timestamp, milliseconds_type rtt);
 
     std::string compressed_hex_dump(BinaryData blob);
@@ -280,12 +278,6 @@ public:
                 auto request_ident = msg.read_next<request_ident_type>('\n');
 
                 connection.receive_mark_message(session_ident, request_ident); // Throws
-            }
-            else if (message_type == "alloc") {
-                auto session_ident = msg.read_next<session_ident_type>();
-                auto file_ident = msg.read_next<file_ident_type>('\n');
-
-                connection.receive_alloc_message(session_ident, file_ident); // Throws
             }
             else if (message_type == "ident") {
                 session_ident_type session_ident = msg.read_next<session_ident_type>();
@@ -679,11 +671,6 @@ public:
                 connection.receive_ident_message(session_ident, client_file_ident, client_file_ident_salt,
                                                  scan_server_version, scan_client_version, latest_server_version,
                                                  latest_server_version_salt); // Throws
-            }
-            else if (message_type == "alloc") {
-                auto session_ident = msg.read_next<session_ident_type>('\n');
-
-                connection.receive_alloc_message(session_ident); // Throws
             }
             else if (message_type == "unbind") {
                 auto session_ident = msg.read_next<session_ident_type>('\n');

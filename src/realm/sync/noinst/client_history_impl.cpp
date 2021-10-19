@@ -14,50 +14,6 @@
 
 namespace realm::sync {
 
-void ClientReplication::set_initial_state_realm_history_numbers(version_type current_version,
-                                                                SaltedVersion server_version)
-{
-    REALM_ASSERT(current_version == s_initial_version + 1);
-    ensure_updated(current_version); // Throws
-    prepare_for_write();             // Throws
-
-    version_type client_version = m_sync_history_base_version + sync_history_size();
-    REALM_ASSERT(client_version == current_version); // For now
-    DownloadCursor download_progress = {server_version.version, 0};
-
-    Array& root = m_arrays->root;
-    root.set(s_progress_download_server_version_iip,
-             RefOrTagged::make_tagged(download_progress.server_version)); // Throws
-    root.set(s_progress_download_client_version_iip,
-             RefOrTagged::make_tagged(download_progress.last_integrated_client_version)); // Throws
-    root.set(s_progress_latest_server_version_iip,
-             RefOrTagged::make_tagged(server_version.version)); // Throws
-    root.set(s_progress_latest_server_version_salt_iip,
-             RefOrTagged::make_tagged(server_version.salt)); // Throws
-
-    m_progress_download = download_progress;
-}
-
-
-void ClientReplication::make_final_async_open_adjustements(SaltedFileIdent client_file_ident,
-                                                           std::uint_fast64_t downloaded_bytes)
-{
-    auto wt = m_db->start_write(); // Throws
-    version_type local_version = wt->get_version();
-    ensure_updated(local_version); // Throws
-    prepare_for_write();           // Throws
-
-    REALM_ASSERT(m_group->get_sync_file_id() == 0);
-
-    Array& root = m_arrays->root;
-    m_group->set_sync_file_id(client_file_ident.ident);                                       // Throws
-    root.set(s_client_file_ident_salt_iip, RefOrTagged::make_tagged(client_file_ident.salt)); // Throws
-    root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes));    // Throws
-
-    wt->commit(); // Throws
-}
-
-
 void ClientReplication::set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident)
 {
     ensure_updated(current_version); // Throws
@@ -156,20 +112,6 @@ void ClientReplication::initialize(DB& sg)
 
 
 // Overriding member function in realm::Replication
-void ClientReplication::initiate_session(version_type)
-{
-    // No-op
-}
-
-
-// Overriding member function in realm::Replication
-void ClientReplication::terminate_session() noexcept
-{
-    // No-op
-}
-
-
-// Overriding member function in realm::Replication
 auto ClientReplication::get_history_type() const noexcept -> HistoryType
 {
     return hist_SyncClient;
@@ -227,12 +169,6 @@ std::unique_ptr<_impl::History> ClientReplication::_create_history_read()
     hist_impl->initialize(*m_db); // Throws
     // Transfer ownership with pointer to private base class
     return std::unique_ptr<_impl::History>{hist_impl.release()};
-}
-
-// Overriding member function in realm::Replication
-void ClientReplication::do_initiate_transact(Group& group, version_type version, bool history_updated)
-{
-    SyncReplication::do_initiate_transact(group, version, history_updated);
 }
 
 // Overriding member function in realm::Replication
@@ -579,17 +515,6 @@ bool ClientReplication::integrate_server_changesets(const SyncProgress& progress
 }
 
 
-// Overriding member function in realm::ClientHistory
-void ClientReplication::get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes,
-                                                  std::uint_fast64_t& downloadable_bytes,
-                                                  std::uint_fast64_t& uploaded_bytes,
-                                                  std::uint_fast64_t& uploadable_bytes,
-                                                  std::uint_fast64_t& snapshot_version)
-{
-    get_upload_download_bytes(m_db, downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
-                              snapshot_version);
-}
-
 void ClientReplication::get_upload_download_bytes(DB* db, std::uint_fast64_t& downloaded_bytes,
                                                   std::uint_fast64_t& downloadable_bytes,
                                                   std::uint_fast64_t& uploaded_bytes,
@@ -614,27 +539,6 @@ void ClientReplication::get_upload_download_bytes(DB* db, std::uint_fast64_t& do
         uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
         uploaded_bytes = root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int();
     }
-}
-
-// Overriding member function in realm::sync::ClientHistory
-auto ClientReplication::get_upload_anchor_of_current_transact(const Transaction& tr) const -> UploadCursor
-{
-    REALM_ASSERT(tr.get_transact_stage() != DB::transact_Ready);
-    version_type current_version = tr.get_version();
-    ensure_updated(current_version); // Throws
-    UploadCursor upload_anchor;
-    upload_anchor.client_version = current_version;
-    upload_anchor.last_integrated_server_version = m_progress_download.server_version;
-    return upload_anchor;
-}
-
-// Overriding member function in realm::sync::ClientHistory
-util::StringView ClientReplication::get_sync_changeset_of_current_transact(const Transaction& tr) const noexcept
-{
-    REALM_ASSERT(tr.get_transact_stage() == DB::transact_Writing);
-    const ChangesetEncoder& encoder = get_instruction_encoder();
-    const ChangesetEncoder::Buffer& buffer = encoder.buffer();
-    return {buffer.data(), buffer.size()};
 }
 
 // Overriding member function in realm::sync::TransformHistory
@@ -1217,12 +1121,6 @@ void ClientReplication::set_oldest_bound_version(version_type version)
         m_version_of_oldest_bound_snapshot = version;
         trim_ct_history(); // Throws
     }
-}
-
-// Overriding member function in realm::_impl::History
-BinaryData ClientReplication::get_uncommitted_changes() const noexcept
-{
-    return Replication::get_uncommitted_changes();
 }
 
 // Overriding member function in realm::_impl::History

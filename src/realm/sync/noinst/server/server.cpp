@@ -1620,8 +1620,6 @@ public:
 
     void receive_mark_message(session_ident_type, request_ident_type);
 
-    void receive_alloc_message(session_ident_type);
-
     void receive_refresh_message(session_ident_type, std::string signed_user_token);
 
     void receive_unbind_message(session_ident_type);
@@ -3455,34 +3453,6 @@ public:
         m_download_completion_request = request_ident;
 
         ensure_enlisted_to_send();
-        return true;
-    }
-
-    bool receive_alloc_message(ProtocolError& error)
-    {
-        // Protocol state must be WaitForUnbind
-        REALM_ASSERT(!m_send_ident_message);
-        REALM_ASSERT(ident_message_received());
-        REALM_ASSERT(!unbind_message_received());
-        REALM_ASSERT(!error_occurred());
-        REALM_ASSERT(!m_error_message_sent);
-
-        // Only one outstanding ALLOC request allowed at a time.
-        REALM_ASSERT(!relayed_alloc_request_in_progress());
-
-        logger.debug("Received: ALLOC"); // Throws
-
-        if (expired()) {
-            logger.detail("Received ALLOC message while session token had expired"); // Throws
-            metrics().increment("authentication.failed");                            // Throws
-            error = ProtocolError::token_expired;
-            return false;
-        }
-
-        ServerFile& file = *m_server_file;
-        file_ident_type proxy_file = m_client_file_ident;
-        ClientType client_type = ClientType::indirect;
-        m_file_ident_request = file.request_file_ident(*this, proxy_file, client_type); // Throws
         return true;
     }
 
@@ -5887,42 +5857,6 @@ void SyncConnection::receive_mark_message(session_ident_type session_ident, requ
     bool success = sess.receive_mark_message(request_ident, error); // Throws
     if (REALM_UNLIKELY(!success))                                   // Throws
         protocol_error(error, &sess);                               // Throws
-}
-
-
-void SyncConnection::receive_alloc_message(session_ident_type session_ident)
-{
-    auto i = m_sessions.find(session_ident);
-    if (REALM_UNLIKELY(i == m_sessions.end())) {
-        bad_session_ident("ALLOC", session_ident);
-        return;
-    }
-    Session& sess = *i->second;
-    if (REALM_UNLIKELY(sess.unbind_message_received())) {
-        message_after_unbind("ALLOC", session_ident); // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.error_occurred())) {
-        // Protocol state is SendError or WaitForUnbindErr. In these states, all
-        // messages, other than UNBIND, must be ignored.
-        return;
-    }
-    if (REALM_UNLIKELY(!sess.ident_message_received())) {
-        message_before_ident("ALLOC", session_ident); // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.relayed_alloc_request_in_progress())) {
-        logger.error("Received ALLOC message before response to previously received ALLOC message "
-                     "was sent");                         // Throws
-        protocol_error(ProtocolError::bad_message_order); // Throws
-        metrics().increment("protocol.violated");         // Throws
-        return;
-    }
-
-    ProtocolError error;
-    bool success = sess.receive_alloc_message(error); // Throws
-    if (REALM_UNLIKELY(!success))                     // Throws
-        protocol_error(error, &sess);                 // Throws
 }
 
 

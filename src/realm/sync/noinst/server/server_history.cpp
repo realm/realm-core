@@ -1732,20 +1732,6 @@ void ServerHistory::initialize(DB& sg)
 
 
 // Overriding member in Replication
-void ServerHistory::initiate_session(version_type)
-{
-    // No-op
-}
-
-
-// Overriding member in Replication
-void ServerHistory::terminate_session() noexcept
-{
-    // No-op
-}
-
-
-// Overriding member in Replication
 auto ServerHistory::get_history_type() const noexcept -> HistoryType
 {
     return hist_SyncServer;
@@ -1835,10 +1821,6 @@ auto ServerHistory::prepare_changeset(const char* data, std::size_t size, versio
 }
 
 
-// Overriding member in Replication
-void ServerHistory::finalize_changeset() noexcept {}
-
-
 // Overriding member in _impl::History
 void ServerHistory::update_from_parent(version_type realm_version)
 {
@@ -1872,13 +1854,6 @@ void ServerHistory::set_oldest_bound_version(version_type realm_version)
         m_version_of_oldest_bound_snapshot = realm_version;
         trim_cont_transact_history(); // Throws
     }
-}
-
-
-// Overriding member in Replication
-BinaryData ServerHistory::get_uncommitted_changes() const noexcept
-{
-    return Replication::get_uncommitted_changes();
 }
 
 

@@ -72,39 +72,7 @@ public:
 
     enum class IntegrationError { bad_origin_file_ident, bad_changeset };
 
-    struct LocalChangeset {
-        version_type version;
-        ChunkedBinaryData changeset;
-    };
-
     ClientReplication(const std::string& realm_path);
-
-    /// set_client_file_ident_and_downloaded_bytes() sets the salted client
-    /// file ident and downloaded_bytes. The function is used when a state
-    /// Realm has been downloaded from the server. The function creates a write
-    /// transaction.
-    void make_final_async_open_adjustements(SaltedFileIdent client_file_ident, uint_fast64_t downloaded_bytes);
-
-    /// set_initial_state_realm_history_numbers() sets the history numbers for a
-    /// new state Realm. The function is used when the server creates a new
-    /// State Realm.
-    ///
-    /// The history object must be in a write transaction before this function
-    /// is called.
-    void set_initial_state_realm_history_numbers(version_type local_version, SaltedVersion server_version);
-
-    // virtual void set_client_file_ident_in_wt() sets the client file ident.
-    // The history must be in a write transaction with version 'current_version'.
-    void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
-
-    // get_next_local_changeset returns the first changeset with version
-    // greater than or equal to 'begin_version'. 'begin_version' must be at
-    // least 1.
-    //
-    // The history must be in a transaction when this function is called.
-    // The return value is none if there are no such local changesets.
-    util::Optional<LocalChangeset> get_next_local_changeset(version_type current_version,
-                                                            version_type begin_version) const;
 
     /// set_client_reset_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The shared group associated with
@@ -112,11 +80,6 @@ public:
     /// is called.
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                       SaltedVersion server_version, BinaryData uploadable_changeset);
-
-    /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
-    /// of local origin. This should only be used for testing and defaults to calling
-    /// generate_changeset_timestamp().
-    void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
 
     /// Get the version of the latest snapshot of the associated Realm, as well
     /// as the client file identifier and the synchronization progress as they
@@ -252,40 +215,14 @@ public:
                                      VersionInfo& new_version, IntegrationError& integration_error, util::Logger&,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
-    /// Get the persisted upload/download progress in bytes.
-    void get_upload_download_bytes(std::uint_fast64_t& downloaded_bytes, std::uint_fast64_t& downloadable_bytes,
-                                   std::uint_fast64_t& uploaded_bytes, std::uint_fast64_t& uploadable_bytes,
-                                   std::uint_fast64_t& snapshot_version);
-
-    /// Return an upload cursor as it would be when the uploading process
-    /// reaches the snapshot to which the current transaction is bound.
-    ///
-    /// **CAUTION:** Must be called only while a transaction (read or write) is
-    /// in progress via the SharedGroup object associated with this history
-    /// object.
-    UploadCursor get_upload_anchor_of_current_transact(const Transaction&) const;
-
-    /// Return the synchronization changeset of the current transaction as it
-    /// would be if that transaction was committed at this time.
-    ///
-    /// The returned memory reference may be invalidated by subsequent
-    /// operations on the Realm state.
-    ///
-    /// **CAUTION:** Must be called only while a write transaction is in
-    /// progress via the SharedGroup object associated with this history object.
-    util::StringView get_sync_changeset_of_current_transact(const Transaction&) const noexcept;
-
     // Overriding member functions in realm::Replication
     void initialize(DB& sg) override final;
-    void initiate_session(version_type) override final;
-    void terminate_session() noexcept override final;
     HistoryType get_history_type() const noexcept override final;
     int get_history_schema_version() const noexcept override final;
     bool is_upgradable_history_schema(int) const noexcept override final;
     void upgrade_history_schema(int) override final;
     History* _get_history_write() override;
     std::unique_ptr<History> _create_history_read() override;
-    void do_initiate_transact(Group& group, version_type version, bool history_updated) override final;
 
     // Overriding member functions in realm::Replication
     version_type prepare_changeset(const char*, size_t, version_type) override final;
@@ -299,6 +236,31 @@ public:
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override final;
     ChunkedBinaryData get_reciprocal_transform(version_type) const override final;
     void set_reciprocal_transform(version_type, BinaryData) override final;
+
+public: // Stuff in this section is only used by CLI tools.
+    /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
+    /// of local origin. This should only be used for testing and defaults to calling
+    /// generate_changeset_timestamp().
+    void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
+
+public: // Stuff in this section is only used by tests.
+    struct LocalChangeset {
+        version_type version;
+        ChunkedBinaryData changeset;
+    };
+
+    // virtual void set_client_file_ident_in_wt() sets the client file ident.
+    // The history must be in a write transaction with version 'current_version'.
+    void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
+
+    // get_next_local_changeset returns the first changeset with version
+    // greater than or equal to 'begin_version'. 'begin_version' must be at
+    // least 1.
+    //
+    // The history must be in a transaction when this function is called.
+    // The return value is none if there are no such local changesets.
+    util::Optional<LocalChangeset> get_next_local_changeset(version_type current_version,
+                                                            version_type begin_version) const;
 
 private:
     static constexpr version_type s_initial_version = 1;
@@ -449,7 +411,6 @@ private:
     void update_from_parent(version_type current_version) override final;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override final;
     void set_oldest_bound_version(version_type) override final;
-    BinaryData get_uncommitted_changes() const noexcept override final;
     void verify() const override final;
     bool no_pending_local_changes(version_type version) const final;
 };
