@@ -244,23 +244,9 @@ public: // Stuff in this section is only used by CLI tools.
     void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
 
 public: // Stuff in this section is only used by tests.
-    struct LocalChangeset {
-        version_type version;
-        ChunkedBinaryData changeset;
-    };
-
     // virtual void set_client_file_ident_in_wt() sets the client file ident.
     // The history must be in a write transaction with version 'current_version'.
     void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
-
-    // get_next_local_changeset returns the first changeset with version
-    // greater than or equal to 'begin_version'. 'begin_version' must be at
-    // least 1.
-    //
-    // The history must be in a transaction when this function is called.
-    // The return value is none if there are no such local changesets.
-    util::Optional<LocalChangeset> get_next_local_changeset(version_type current_version,
-                                                            version_type begin_version) const;
 
 private:
     static constexpr version_type s_initial_version = 1;
