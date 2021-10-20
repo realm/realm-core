@@ -636,6 +636,20 @@ private:
         cookie_deleted = 0xdead,
     };
 
+    // This is only used for debugging checks, so relaxed operations are fine.
+    class AtomicLifeCycleCookie {
+    public:
+        void operator=(LifeCycleCookie cookie) {
+            m_storage.store(cookie, std::memory_order_relaxed);
+        }
+        operator LifeCycleCookie() const {
+            return m_storage.load(std::memory_order_relaxed);
+        }
+
+    private:
+        std::atomic<LifeCycleCookie> m_storage = {};
+    };
+
     mutable WrappedAllocator m_alloc;
     Array m_top;
     void update_allocator_wrapper(bool writable)
@@ -789,7 +803,7 @@ private:
     std::vector<size_t> m_leaf_ndx2spec_ndx;
     bool m_is_embedded = false;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
-    LifeCycleCookie m_cookie;
+    AtomicLifeCycleCookie m_cookie;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;
