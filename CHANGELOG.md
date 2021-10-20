@@ -1,12 +1,12 @@
-# NEXT RELEASE
+# 11.5.0 Release notes
 
 ### Enhancements
 * Add a "seamless loss" mode to client reset where local changes are overwritten by the server's state without having to handle the reset manually. ([#4809](https://github.com/realm/realm-core/pull/4809))
-* Added methods to freeze and thaw realms, objects, results and lists.
-* Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance.
+* Added methods to freeze and thaw realms, objects, results and lists. ([#4658](https://github.com/realm/realm-core/pull/4658))
+* Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance. ([#4925](https://github.com/realm/realm-core/pull/4925))
 * Added `realm_object_get_or_create_with_primary_key` to C-API. ([#4595](https://github.com/realm/realm-core/issues/4595))
-* Added notification callbacks for realm changed and schema changed events to the C API.
-* Added the `GenericNetworkTransport` API to C API.
+* Added notification callbacks for realm changed and schema changed events to the C API. ([#4940](https://github.com/realm/realm-core/pull/4940))
+* Added the `GenericNetworkTransport` API to C API ([#4942](https://github.com/realm/realm-core/pull/4942)).
 * Added the `App` functionality (except access to Atlas collections) to the C API. ([#4951](https://github.com/realm/realm-core/pull/4951))
 
 ### Fixed
@@ -28,14 +28,14 @@
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
-* Several typedefs in `realm/object-store/sync/sync_session.hpp` were renamed:
+* Several typedefs in `realm/object-store/sync/sync_session.hpp` were renamed ([#4924](https://github.com/realm/realm-core/pull/4924)):
   * `realm::SyncSession::SyncSessionStateCallback` -> `realm::SyncSession::StateChangeCallback`
   * `realm::SyncSession::ConnectionStateCallback` -> `realm::SyncSession::ConnectionStateChangeCallback`
   * `realm::SyncSessionTransactCallback` -> `realm::SyncSession::TransactionCallback`
   * `realm::SyncProgressNotifierCallback` -> `realm::SyncSession::ProgressNotifierCallback`
   * `realm::SyncSession::NotifierType` -> `realm::SyncSession::ProgressDirection`
-* `realm::SyncClientConfig::logger_factory` was changed to a `std::function` that returns logger instances. The abstract class `SyncLoggerFactory` was removed.
-* C-API function `realm_object_create_with_primary_key` will now fail if an object already exists with given primary key.
+* `realm::SyncClientConfig::logger_factory` was changed to a `std::function` that returns logger instances. The abstract class `SyncLoggerFactory` was removed. ([#4926](https://github.com/realm/realm-core/pull/4926))
+* C-API function `realm_object_create_with_primary_key` will now fail if an object already exists with given primary key. ([#4936](https://github.com/realm/realm-core/pull/4936))
 
 -----------
 
