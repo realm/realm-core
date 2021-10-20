@@ -112,7 +112,8 @@ public:
     // Create a DB and associate it with a file. DB Objects can only be associated with one file,
     // the association determined on creation of the DB Object. The association can be broken by
     // calling DB::close(), but after that no new association can be established. To reopen the
-    // file (or another file), a new DB object is needed.
+    // file (or another file), a new DB object is needed. The specified Replication instance, if
+    // any, must remain in existence for as long as the DB.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     static DBRef create(Replication& repl, const std::string& file, const DBOptions options = DBOptions());
     static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
@@ -494,9 +495,6 @@ private:
     /// how to migrate from.
     void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     void open(BinaryData, bool take_ownership = true);
-
-    /// Open this group in replication mode. The specified Replication instance
-    /// must remain in existence for as long as the DB.
     void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
 
 
