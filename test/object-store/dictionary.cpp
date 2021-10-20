@@ -824,9 +824,15 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     SECTION("snapshot") {
         SECTION("keys") {
             auto new_keys = keys_as_results.snapshot();
+            REQUIRE(new_keys.size() == keys.size());
+            dict.remove_all();
+            REQUIRE(new_keys.size() == 0);
         }
         SECTION("values") {
             auto new_values = values_as_results.snapshot();
+            REQUIRE(new_values.size() == values.size());
+            dict.remove_all();
+            REQUIRE(new_values.size() == 0);
         }
     }
 }
