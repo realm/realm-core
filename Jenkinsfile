@@ -875,8 +875,6 @@ def recordTests(tag, String reportName = "unit-test-report.xml") {
 def environment() {
     return [
         "UNITTEST_SHUFFLE=1",
-        "UNITTEST_RANDOM_SEED=random",
-        "UNITTEST_THREADS=1",
         "UNITTEST_XML=1"
         ]
 }

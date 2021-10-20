@@ -232,23 +232,20 @@ void fix_async_daemon_path()
 void set_random_seed()
 {
     // Select random seed for the random generator that some of our unit tests are using
-    unit_test_random_seed = 1234567;
     const char* str = getenv("UNITTEST_RANDOM_SEED");
-    if (str && strlen(str) != 0) {
-        if (strcmp(str, "random") == 0) {
-            unit_test_random_seed = produce_nondeterministic_random_seed();
-        }
-        else {
-            std::istringstream in(str);
-            in.imbue(std::locale::classic());
-            in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
-            in >> unit_test_random_seed;
-            bool bad = !in || in.get() != std::char_traits<char>::eof();
-            if (bad)
-                throw std::runtime_error("Bad random seed");
-        }
-        random_seed(unit_test_random_seed);
+    if (str && strlen(str) != 0 && strcmp(str, "random") != 0) {
+        std::istringstream in(str);
+        in.imbue(std::locale::classic());
+        in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
+        in >> unit_test_random_seed;
+        bool bad = !in || in.get() != std::char_traits<char>::eof();
+        if (bad)
+            throw std::runtime_error("Bad random seed");
     }
+    else {
+        unit_test_random_seed = produce_nondeterministic_random_seed();
+    }
+    random_seed(unit_test_random_seed);
 }
 
 class AggressiveGovernor : public util::PageReclaimGovernor {
@@ -323,7 +320,7 @@ void display_build_config()
               << "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
               << "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
               << "\n"
-              << "Unit test random seed:                      " << unit_test_random_seed << "\n"
+              << "UNITTEST_RANDOM_SEED:                       " << unit_test_random_seed << "\n"
               << std::endl;
 }
 
@@ -470,7 +467,7 @@ bool run_tests(util::Logger* logger)
     // Shuffle
     {
         const char* str = getenv("UNITTEST_SHUFFLE");
-        if (str && strlen(str) != 0)
+        if (config.num_threads > 1 || (str && strlen(str) != 0))
             config.shuffle = true;
     }
 
