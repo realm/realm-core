@@ -55,7 +55,7 @@ Query::Query(ConstTableRef table, LinkCollectionPtr&& list_ptr)
 {
     m_view = m_source_collection.get();
     REALM_ASSERT_DEBUG(m_view);
-    REALM_ASSERT_DEBUG(list_ptr->get_target_table() == m_table);
+    REALM_ASSERT_DEBUG(m_view->get_target_table() == m_table);
     create();
 }
 
