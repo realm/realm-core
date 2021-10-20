@@ -44,7 +44,7 @@ class Logger;
 /// class to the DB constructor.
 class Replication {
 public:
-    virtual ~Replication();
+    virtual ~Replication() = default;
 
     // Formerly Replication:
     virtual void add_class(TableKey table_key, StringData table_name, bool is_embedded);
@@ -336,12 +336,6 @@ public:
     /// returns \ref hist_None.
     virtual std::unique_ptr<_impl::History> _create_history_read() = 0;
 
-    // This may only be called be the DB class to register itself.
-    void register_db(DB* owner)
-    {
-        m_db = owner;
-    }
-
 protected:
     Replication() = default;
 
@@ -394,8 +388,6 @@ private:
             return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
         }
     };
-
-    DB* m_db = nullptr;
 
     _impl::TransactLogBufferStream m_stream;
     _impl::TransactLogEncoder m_encoder{m_stream};

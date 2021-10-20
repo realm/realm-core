@@ -1352,11 +1352,6 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions option
 
     set_replication(&repl);
 
-    // Register the DB using this replication object. If the replication object is
-    // deleted before the DB object, the replication object should call set_replication(nullptr)
-    // on the DB. This will prevent the DB from calling the replication object when it closes.
-    repl.register_db(this);
-
     bool no_create = false;
     bool is_backend = false;
     do_open(file, no_create, is_backend, options); // Throws
@@ -1542,10 +1537,6 @@ size_t DB::get_allocated_size() const
 DB::~DB() noexcept
 {
     close();
-
-    if (m_replication) {
-        m_replication->register_db(nullptr);
-    }
 }
 
 void DB::release_all_read_locks() noexcept
@@ -2876,12 +2867,4 @@ void DB::release_sync_agent()
     REALM_ASSERT(info->sync_agent_present);
     info->sync_agent_present = 0;
     m_is_sync_agent = false;
-}
-
-// HACK: Somewhat misplaced, but we have no replication.cpp
-Replication::~Replication()
-{
-    if (m_db) {
-        m_db->set_replication(nullptr);
-    }
 }
