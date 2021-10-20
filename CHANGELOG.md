@@ -7,6 +7,7 @@
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Calling `remove_all_target_rows()` on a newly constructed `LnkSet` dereferenced a null pointer (since v11.5.0).
 * Mutating a Set via one accessor and then calling `remove_all_target_rows()` on a different accessor for the same Set could potentially result in a stale version of the Set being used (since v11.0.0).
+* A snapshot on a collection of primitives would assert on the next operation. ([#4971](https://github.com/realm/realm-core/issues/4971), since v11.5.0)
  
 ### Breaking changes
 * None.

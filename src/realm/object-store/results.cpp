@@ -1174,6 +1174,10 @@ Results Results::snapshot() &&
         case Mode::Query:
         case Mode::TableView:
             ensure_up_to_date(EvaluateMode::Snapshot);
+            if (do_get_type() != PropertyType::Object) {
+                // Snapshot of a collection of primitive values is meaningless and ignored.
+                return std::move(*this);
+            }
             m_notifier.reset();
             m_update_policy = UpdatePolicy::Never;
             return std::move(*this);
