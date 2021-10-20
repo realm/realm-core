@@ -639,10 +639,12 @@ private:
     // This is only used for debugging checks, so relaxed operations are fine.
     class AtomicLifeCycleCookie {
     public:
-        void operator=(LifeCycleCookie cookie) {
+        void operator=(LifeCycleCookie cookie)
+        {
             m_storage.store(cookie, std::memory_order_relaxed);
         }
-        operator LifeCycleCookie() const {
+        operator LifeCycleCookie() const
+        {
             return m_storage.load(std::memory_order_relaxed);
         }
 
