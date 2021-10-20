@@ -1175,7 +1175,9 @@ Results Results::snapshot() &&
         case Mode::TableView:
             ensure_up_to_date(EvaluateMode::Snapshot);
             m_notifier.reset();
-            m_update_policy = UpdatePolicy::Never;
+            if (do_get_type() == PropertyType::Object) {
+                m_update_policy = UpdatePolicy::Never;
+            }
             return std::move(*this);
     }
     REALM_COMPILER_HINT_UNREACHABLE();

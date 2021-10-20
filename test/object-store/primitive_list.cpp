@@ -568,6 +568,15 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
         REQUIRE(results2 == values);
     }
 
+    SECTION("snapshot") {
+        auto snapshot = results.snapshot();
+        REQUIRE(snapshot.size() == results.size());
+        REQUIRE(snapshot.get<T>(0) == results.get<T>(0));
+        list.remove_all();
+        // Snapshotting only actually works for collections of objects
+        REQUIRE(snapshot.size() == 0);
+    }
+
     SECTION("notifications") {
         r->commit_transaction();
 
