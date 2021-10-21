@@ -956,18 +956,21 @@ void Query::aggregate(QueryStateBase& st, ColKey column_key, size_t* resultcount
 
         if (!m_view) {
             auto pn = root_node();
-            auto node = pn->m_children[find_best_node(pn)];
+            auto best = find_best_node(pn);
+            auto node = pn->m_children[best];
             if (node->has_search_index()) {
-                node->index_based_aggregate(size_t(-1), [&](const Obj& obj) -> bool {
-                    if (eval_object(obj)) {
+                auto keys = node->index_based_keys();
+                // The node having the search index can be removed from the query as we know that
+                // all the objects will match this condition
+                pn->m_children[best] = pn->m_children.back();
+                pn->m_children.pop_back();
+                for (auto key : keys) {
+                    auto obj = m_table->get_object(key);
+                    if (pn->m_children.empty() || eval_object(obj)) {
                         st.m_key_offset = obj.get_key().value;
                         st.match(realm::npos, obj.get<T>(column_key));
-                        return true;
                     }
-                    else {
-                        return false;
-                    }
-                });
+                }
             }
             else {
                 // no index, traverse cluster tree
@@ -1477,26 +1480,36 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
         }
         else {
             auto pn = root_node();
-            auto node = pn->m_children[find_best_node(pn)];
+            auto best = find_best_node(pn);
+            auto node = pn->m_children[best];
             if (node->has_search_index()) {
                 // translate begin/end limiters into corresponding keys
                 auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
                 auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
                 KeyColumn& refs = ret.m_key_values;
-                node->index_based_aggregate(limit, [&](const Obj& obj) -> bool {
-                    auto key = obj.get_key();
+
+                // The node having the search index can be removed from the query as we know that
+                // all the objects will match this condition
+                pn->m_children[best] = pn->m_children.back();
+                pn->m_children.pop_back();
+
+                auto keys = node->index_based_keys();
+                for (auto key : keys) {
                     if (begin_key && key < begin_key)
-                        return false;
+                        continue;
                     if (end_key && !(key < end_key))
-                        return false;
-                    if (eval_object(obj)) {
+                        continue;
+                    if (pn->m_children.empty()) {
+                        // No more conditions - just add key
                         refs.add(key);
-                        return true;
                     }
                     else {
-                        return false;
+                        auto obj = m_table->get_object(key);
+                        if (eval_object(obj)) {
+                            refs.add(key);
+                        }
                     }
-                });
+                }
                 return;
             }
             // no index on best node (and likely no index at all), descend B+-tree
@@ -1572,17 +1585,29 @@ size_t Query::do_count(size_t limit) const
     else {
         size_t counter = 0;
         auto pn = root_node();
-        auto node = pn->m_children[find_best_node(pn)];
+        auto best = find_best_node(pn);
+        auto node = pn->m_children[best];
         if (node->has_search_index()) {
-            node->index_based_aggregate(limit, [&](const Obj& obj) -> bool {
-                if (eval_object(obj)) {
-                    ++counter;
-                    return true;
+            auto keys = node->index_based_keys();
+            if (pn->m_children.size() > 1) {
+                // The node having the search index can be removed from the query as we know that
+                // all the objects will match this condition
+                pn->m_children[best] = pn->m_children.back();
+                pn->m_children.pop_back();
+                for (auto key : keys) {
+                    auto obj = m_table->get_object(key);
+                    if (eval_object(obj)) {
+                        ++counter;
+                        if (counter == limit)
+                            break;
+                    }
                 }
-                else {
-                    return false;
-                }
-            });
+            }
+            else {
+                // The node having the search index is the only node
+                auto sz = keys.size();
+                counter = std::min(limit, sz);
+            }
             return counter;
         }
         // no index, descend down the B+-tree instead
