@@ -803,9 +803,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
                 db_local.get_path(), client_file_ident.ident, client_file_ident.salt,
                 (db_remote ? db_remote->get_path() : "<none>"));
 
-    auto& history_local = static_cast<ClientReplication&>(*db_local.get_replication());
-
     auto wt_local = db_local.start_write();
+    auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     wt_local->get_history()->ensure_updated(current_version_local);
@@ -813,22 +812,22 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     sync::SaltedVersion fresh_server_version = {0, 0};
 
     if (db_remote) { // seamless_loss mode
-        auto& history_remote = static_cast<ClientReplication&>(*db_remote->get_replication());
         auto wt_remote = db_remote->start_write();
+        auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
         sync::version_type current_version_remote = wt_remote->get_version();
-        history_local.set_client_file_ident_in_wt(current_version_local, client_file_ident);
-        history_remote.set_client_file_ident_in_wt(current_version_remote, client_file_ident);
+        history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
+        history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
 
         sync::version_type remote_version;
         SaltedFileIdent remote_ident;
         SyncProgress remote_progress;
-        history_remote.get_status(remote_version, remote_ident, remote_progress);
+        history_remote->get_status(remote_version, remote_ident, remote_progress);
         fresh_server_version = remote_progress.latest_server_version;
 
         transfer_group(*wt_remote, *wt_local, logger);
     }
-    history_local.set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
-                                               recovered_changeset);
+    history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
+                                                recovered_changeset);
 
     // Finally, the local Realm is committed.
     wt_local->commit_and_continue_as_read();

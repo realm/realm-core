@@ -23,7 +23,7 @@ using namespace realm::util;
 
 // clang-format off
 using SessionImpl                     = ClientImpl::Session;
-using SyncTransactReporter            = ClientReplication::SyncTransactReporter;
+using SyncTransactReporter            = ClientHistory::SyncTransactReporter;
 using SyncTransactCallback            = Session::SyncTransactCallback;
 using ProgressHandler                 = Session::ProgressHandler;
 using WaitOperCompletionHandler       = Session::WaitOperCompletionHandler;
@@ -170,7 +170,7 @@ public:
     SessionWrapper(ClientImpl&, DBRef db, Session::Config);
     ~SessionWrapper() noexcept;
 
-    ClientReplication& get_history() noexcept;
+    ClientReplication& get_replication() noexcept;
     ClientImpl& get_client() noexcept;
 
     void set_sync_transact_handler(std::function<SyncTransactCallback>);
@@ -204,7 +204,7 @@ public:
 private:
     ClientImpl& m_client;
     DBRef m_db;
-    Replication* m_history;
+    Replication* m_replication;
 
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
@@ -654,7 +654,7 @@ SyncTransactReporter* SessionImpl::get_transact_reporter() noexcept
 
 ClientReplication& SessionImpl::access_realm()
 {
-    return m_wrapper.get_history();
+    return m_wrapper.get_replication();
 }
 
 util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
@@ -672,8 +672,8 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         IntegrationError error = {};
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
-            ClientReplication& history = access_realm(); // Throws
-            success = integrate_changesets(history, m_progress, downloadable_bytes, changesets, version_info,
+            ClientReplication& repl = access_realm(); // Throws
+            success = integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
                                            error); // Throws
             client_version = version_info.realm_version;
         }
@@ -724,7 +724,7 @@ void SessionImpl::on_resumed()
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
-    , m_history(m_db->get_replication())
+    , m_replication(m_db->get_replication())
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -753,9 +753,9 @@ SessionWrapper::~SessionWrapper() noexcept
 }
 
 
-inline ClientReplication& SessionWrapper::get_history() noexcept
+inline ClientReplication& SessionWrapper::get_replication() noexcept
 {
-    return static_cast<ClientReplication&>(*m_history);
+    return static_cast<ClientReplication&>(*m_replication);
 }
 
 
@@ -1223,8 +1223,8 @@ void SessionWrapper::report_progress()
     std::uint_fast64_t uploaded_bytes = 0;
     std::uint_fast64_t uploadable_bytes = 0;
     std::uint_fast64_t snapshot_version = 0;
-    ClientReplication::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes, uploaded_bytes,
-                                                 uploadable_bytes, snapshot_version);
+    ClientHistory::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes, uploaded_bytes,
+                                             uploadable_bytes, snapshot_version);
 
     // In protocol versions 25 and earlier, downloadable_bytes was the total
     // size of the history. From protocol version 26, downloadable_bytes

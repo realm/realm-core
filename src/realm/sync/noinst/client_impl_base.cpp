@@ -30,7 +30,7 @@ using namespace realm::sync;
 // clang-format off
 using Connection      = ClientImpl::Connection;
 using Session         = ClientImpl::Session;
-using UploadChangeset = ClientReplication::UploadChangeset;
+using UploadChangeset = ClientHistory::UploadChangeset;
 
 // These are a work-around for a bug in MSVC. It cannot find in-class types
 // mentioned in signature of out-of-line member function definitions.
@@ -1675,11 +1675,12 @@ void Session::cancel_resumption_delay()
 }
 
 
-bool Session::integrate_changesets(ClientReplication& history, const SyncProgress& progress,
+bool Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
                                    IntegrationError& error)
 {
+    auto& history = repl.get_history();
     if (received_changesets.empty()) {
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return true;
@@ -1779,8 +1780,8 @@ void Session::activate()
         }
 
         if (!m_client_reset_operation) {
-            const ClientReplication& history = access_realm();                             // Throws
-            history.get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
+            const ClientReplication& repl = access_realm();                                           // Throws
+            repl.get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1967,12 +1968,12 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    const ClientReplication& history = access_realm(); // Throws
+    const ClientReplication& repl = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
-    history.find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
-                                       locked_server_version); // Throws
+    repl.get_history().find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
+                                                  locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
         // Nothing more to upload right now
@@ -2174,7 +2175,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     // access before the client reset (if applicable) because
     // the reset can take a while and the sync session might have died
     // by the time the reset finishes.
-    ClientReplication& history = access_realm(); // Throws
+    ClientReplication& repl = access_realm(); // Throws
 
     auto client_reset_if_needed = [&]() -> bool {
         if (!m_client_reset_operation) {
@@ -2197,7 +2198,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
-        history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+        repl.get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
         REALM_ASSERT_EX(m_client_file_ident.ident == client_file_ident.ident, m_client_file_ident.ident,
                         client_file_ident.ident);
         REALM_ASSERT_EX(m_client_file_ident.salt == client_file_ident.salt, m_client_file_ident.salt,
@@ -2228,7 +2229,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     }
     if (!did_client_reset) {
         constexpr bool fix_up_object_ids = true;
-        history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+        repl.get_history().set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
         this->m_progress.download.last_integrated_client_version = 0;
         this->m_progress.upload.client_version = 0;
     }

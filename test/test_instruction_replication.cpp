@@ -33,7 +33,7 @@ struct Fixture {
     {
         // This is to ensure that peer IDs in Object IDs are populated.
         bool fix_up_object_ids = true;
-        history_1->set_client_file_ident({1, 123}, fix_up_object_ids);
+        history_1->get_history().set_client_file_ident({1, 123}, fix_up_object_ids);
     }
 
     void replay_transactions()

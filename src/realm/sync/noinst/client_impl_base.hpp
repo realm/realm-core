@@ -636,7 +636,7 @@ private:
 class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    using IntegrationError = ClientReplication::IntegrationError;
+    using IntegrationError = ClientHistory::IntegrationError;
 
     util::PrefixLogger logger;
 
@@ -820,7 +820,7 @@ public:
     ~Session();
 
 private:
-    using SyncTransactReporter = ClientReplication::SyncTransactReporter;
+    using SyncTransactReporter = ClientHistory::SyncTransactReporter;
 
 
     /// Fetch a reference to the remote virtual path of the Realm associated
