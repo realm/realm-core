@@ -104,22 +104,23 @@ These are the available variables:
 
  - If you set `UNITTEST_SHUFFLE` to a non-empty value, the tests will be
    executed in a random order. This requires, of course, that all executed tests
-   are independant of each other. Note that unless you also set
-   `UNITTEST_RANDOM_SEED=random`, you will get the same random order in each
-   sucessive run.
+   are independent of each other. This is the default when testing with more
+   than one thread, since the testing is non-deterministic anyway.
 
- - You may set `UNITTEST_RANDOM_SEED` to `random` or to some unsigned integer
-   (at least 32 bits will be accepted). If you specify `random`, the global
-   pseudorandom number generator will be seeded with a nondeterministic value
-   (one that generally will be different in each sucessive run). If you specify
+ - You may set `UNITTEST_RANDOM_SEED` to some unsigned integer
+   (at least 32 bits will be accepted). If you specify `random`, or don't
+   specify a value for this environment variable, the global
+   pseudorandom number generator will be seeded with a non-deterministic value
+   (one that generally will be different in each successive run). If you specify
    an integer, it will be seeded with that integer.
 
  - Set `UNITTEST_REPEAT` to the number of times you want to execute the tests
    selected by the filter. It defaults to 1.
 
  - Set `UNITTEST_THREADS` to the number of test threads to use. The default
-   is 1. Using more than one thread requires that all executed tests are
-   thread-safe and independant of each other.
+   is to use the number of cores. Using more than one thread requires that
+   all executed tests are thread-safe and independent of each other or are
+   tagged with `NONCONCURRENT_TEST`.
 
  - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic removal
    of test files.

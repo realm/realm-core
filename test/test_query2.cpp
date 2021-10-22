@@ -23,6 +23,7 @@
 #include <initializer_list>
 #include <limits>
 #include <vector>
+#include <chrono>
 
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
@@ -5131,6 +5132,58 @@ TEST(Query_IntIndexed)
     CHECK_EQUAL(q.count(), 10);
     auto tv = q.find_all();
     CHECK_EQUAL(tv.size(), 10);
+}
+
+TEST(Query_IntIndexedRandom)
+{
+    Random random(random_int<int>());
+
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+    auto col_val = table->add_column(type_Int, "val");
+
+    for (int i = 0; i < 100000; i++) {
+        table->create_object().set(col_id, random.draw_int_max(20)).set(col_val, random.draw_int_max(100));
+    }
+
+    for (const char* str : {"id == 1", "id == 1 and val > 50"}) {
+        table->remove_search_index(col_id);
+        Query q = table->query(str);
+        auto before = std::chrono::steady_clock().now();
+        size_t c1 = q.count();
+        auto after = std::chrono::steady_clock().now();
+        auto count_without_index = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+        before = std::chrono::steady_clock().now();
+        auto tv1 = q.find_all();
+        after = std::chrono::steady_clock().now();
+        auto find_all_without_index = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+
+        table->add_search_index(col_id);
+        before = std::chrono::steady_clock().now();
+        size_t c2 = q.count();
+        after = std::chrono::steady_clock().now();
+        auto count_with_index = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+        CHECK_EQUAL(c1, c2);
+        before = std::chrono::steady_clock().now();
+        auto tv2 = q.find_all();
+        after = std::chrono::steady_clock().now();
+        auto find_all_with_index = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+        CHECK_EQUAL(tv1.size(), tv2.size());
+        CHECK_EQUAL(tv1.size(), c1);
+
+        /*
+        std::cout << "Query: " << str << std::endl;
+        std::cout << "count without index: " << count_without_index << " us" << std::endl;
+        std::cout << "find all without index: " << find_all_without_index << " us" << std::endl;
+        std::cout << "count with index: " << count_with_index << " us" << std::endl;
+        std::cout << "find all with index: " << find_all_with_index << " us" << std::endl;
+         */
+        static_cast<void>(count_without_index);
+        static_cast<void>(find_all_without_index);
+        static_cast<void>(count_with_index);
+        static_cast<void>(find_all_with_index);
+    }
 }
 
 TEST(Query_IntFindInNextLeaf)

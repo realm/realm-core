@@ -736,8 +736,6 @@ public:
     /// mapped file.
     Map() noexcept;
 
-    ~Map() noexcept;
-
     // Disable copying. Copying an opened Map will create a scenario
     // where the same memory will be mapped once but unmapped twice.
     Map(const Map&) = delete;
@@ -1163,11 +1161,6 @@ inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size
 
 template <class T>
 inline File::Map<T>::Map() noexcept
-{
-}
-
-template <class T>
-inline File::Map<T>::~Map() noexcept
 {
 }
 
