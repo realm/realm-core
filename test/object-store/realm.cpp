@@ -622,6 +622,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&] {
+            std::lock_guard<std::mutex> lock(mutex);
             return called.load();
         });
         std::lock_guard<std::mutex> lock(mutex);
@@ -751,7 +752,12 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SECTION("can async open while waiting for a token refresh") {
         SyncTestFile config(init_sync_manager.app(), "realm");
         auto valid_token = config.sync_config->user->access_token();
-        config.sync_config->user->update_access_token(std::move(invalid_token));
+        config.sync_config->user->update_access_token(std::move(invalid_token), {{}});
+
+        init_sync_manager.network_callback = [&](app::Request) {
+            auto body = nlohmann::json({{"access_token", valid_token}}).dump();
+            return app::Response{200, 0, {}, body};
+        };
 
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
@@ -762,9 +768,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             called = true;
         });
 
-        auto body = nlohmann::json({{"access_token", valid_token}}).dump();
-        init_sync_manager.network_callback(app::Response{200, 0, {}, body});
         util::EventLoop::main().run_until([&] {
+            std::lock_guard<std::mutex> lock(mutex);
             return called.load();
         });
         std::lock_guard<std::mutex> lock(mutex);
@@ -772,15 +777,19 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     }
 
     SECTION("cancels download and reports an error on auth error") {
+        std::atomic<bool> got_error{false};
         SyncTestFile config(init_sync_manager.app(), "realm");
         config.sync_config->user->update_refresh_token(std::string(invalid_token));
-        config.sync_config->user->update_access_token(std::move(invalid_token));
+        config.sync_config->user->update_access_token(std::move(invalid_token), {{}});
 
-        bool got_error = false;
         config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
+            std::lock_guard<std::mutex> lock(mutex);
             got_error = true;
         };
         std::atomic<bool> called{false};
+        init_sync_manager.network_callback = [&](app::Request) {
+            return app::Response{403};
+        };
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
@@ -788,7 +797,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             REQUIRE(!ref);
             called = true;
         });
-        init_sync_manager.network_callback(app::Response{403});
         util::EventLoop::main().run_until([&] {
             return called.load();
         });

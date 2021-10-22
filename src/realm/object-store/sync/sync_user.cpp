@@ -59,8 +59,9 @@ static std::vector<std::string> split_token(const std::string& jwt)
     return parts;
 }
 
-RealmJWT::RealmJWT(const std::string& token)
+RealmJWT::RealmJWT(const std::string& token, std::chrono::steady_clock::time_point creation)
     : token(token)
+    , m_local_creation_time(creation)
 {
     auto parts = split_token(this->token);
 
@@ -73,6 +74,12 @@ RealmJWT::RealmJWT(const std::string& token)
     if (json.find("user_data") != json.end()) {
         this->user_data = static_cast<bson::BsonDocument>(json["user_data"]);
     }
+}
+
+std::chrono::milliseconds RealmJWT::elapsed_time_since_local_creation() const
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+                                                                 m_local_creation_time);
 }
 
 SyncUserIdentity::SyncUserIdentity(const std::string& id, const std::string& provider_type)
@@ -90,8 +97,8 @@ SyncUser::SyncUser(std::string refresh_token, const std::string identity, const 
     : m_state(state)
     , m_provider_type(provider_type)
     , m_identity(std::move(identity))
-    , m_refresh_token(RealmJWT(std::move(refresh_token)))
-    , m_access_token(RealmJWT(std::move(access_token)))
+    , m_refresh_token(RealmJWT(std::move(refresh_token), {}))
+    , m_access_token(RealmJWT(std::move(access_token), {}))
     , m_device_id(device_id)
     , m_sync_manager(sync_manager)
 {
@@ -258,20 +265,23 @@ void SyncUser::update_refresh_token(std::string&& token)
     emit_change_to_subscribers(*this);
 }
 
-void SyncUser::update_access_token(std::string&& token)
+void SyncUser::update_access_token(std::string&& token,
+                                   util::Optional<std::chrono::steady_clock::time_point> creation_time)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
+        std::chrono::steady_clock::time_point creation =
+            creation_time ? *creation_time : std::chrono::steady_clock::now();
         util::CheckedLockGuard lock(m_mutex);
         switch (m_state) {
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_access_token = RealmJWT(std::move(token));
+                m_access_token = RealmJWT(std::move(token), creation);
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_access_token = RealmJWT(std::move(token));
+                m_access_token = RealmJWT(std::move(token), creation);
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -514,13 +524,20 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
     }
 }
 
-bool SyncUser::access_token_refresh_required() const
+bool SyncUser::access_token_is_expired() const
 {
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
-    util::CheckedLockGuard lock(m_mutex);
     auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
-    return do_is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
+    auto min_precheck_duration = 15min;
+    return !m_access_token.token.empty() && m_access_token.expires_at < static_cast<int64_t>(threshold) &&
+           m_access_token.elapsed_time_since_local_creation() > min_precheck_duration;
+}
+
+bool SyncUser::access_token_refresh_required() const
+{
+    util::CheckedLockGuard lock(m_mutex);
+    return do_is_logged_in() && access_token_is_expired();
 }
 
 } // namespace realm

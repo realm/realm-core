@@ -212,19 +212,21 @@ struct TestSyncManager {
 
     // Capture the token refresh callback so that we can invoke it later with
     // the desired result
-    std::function<void(realm::app::Response)> network_callback;
+    std::function<realm::app::Response(realm::app::Request)> network_callback;
     struct Transport : realm::app::GenericNetworkTransport {
-        Transport(std::function<void(realm::app::Response)>* network_callback)
+        Transport(std::function<realm::app::Response(realm::app::Request)>* network_callback)
             : network_callback(network_callback)
         {
         }
 
-        void send_request_to_server(realm::app::Request, std::function<void(realm::app::Response)> completion_block)
+        void send_request_to_server(realm::app::Request request,
+                                    std::function<void(realm::app::Response)> completion_block)
         {
-            *network_callback = completion_block;
+            auto response = (*network_callback)(request);
+            completion_block(response);
         }
 
-        std::function<void(realm::app::Response)>* network_callback;
+        std::function<realm::app::Response(realm::app::Request)>* network_callback;
     };
     std::shared_ptr<realm::app::GenericNetworkTransport> transport = std::make_shared<Transport>(&network_callback);
 

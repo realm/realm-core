@@ -5,8 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fixed an infinite loop when the client device time is incorrect by more than 30 minutes as compared to the server time. ([#4941](https://github.com/realm/realm-core/issues/4941), since v10)
+
 ### Breaking changes
 * None.
 

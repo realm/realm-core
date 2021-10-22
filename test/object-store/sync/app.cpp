@@ -1791,6 +1791,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto session = config.sync_config->user->sync_manager()->get_existing_session(config.path);
         std::atomic<bool> called{false};
         session->wait_for_upload_completion([&](std::error_code err) {
+            if (err != std::error_code{}) {
+                std::cout << "unexpected error: " << err.message() << std::endl;
+            }
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
@@ -1885,15 +1888,19 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         void send_request_to_server(const Request request,
                                     std::function<void(const Response)> completion_block) override
         {
-            if (hook) {
-                if (util::Optional<Response> response = hook(request)) {
-                    completion_block(*response);
-                    return;
-                }
+            if (request_hook) {
+                request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
+            SynchronousTestTransport::send_request_to_server(request, [&](const Response response) {
+                Response copy = response;
+                if (response_hook) {
+                    response_hook(request, copy);
+                }
+                completion_block(copy);
+            });
         }
-        std::function<util::Optional<Response>(const Request)> hook;
+        std::function<void(const Request, Response&)> response_hook;
+        std::function<void(const Request)> request_hook;
     };
     SECTION("Expired Tokens") {
         sync::AccessToken token;
@@ -1931,20 +1938,38 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         REQUIRE(user);
         REQUIRE(!user->access_token_refresh_required());
         // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
-        user->update_access_token(encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+        user->update_access_token(encode_fake_jwt("fake_access_token", token.expires, token.timestamp), {{}});
+        // although the expiry is past, no refresh is required since we just updated it
+        // this will attempt to use it and let the server tell us if it is invalid or not
         REQUIRE(user->access_token_refresh_required());
+
+        SECTION("User created from persisted tokens will trigger refresh based on expiry time the first time") {
+            auto provider_type = user->provider_type();
+            auto device_id = user->device_id();
+            auto expired_access_token = encode_fake_jwt("fake_access_token", token.expires, token.timestamp);
+            auto fake_user = app->sync_manager()->get_user(random_string(10), encode_fake_jwt("fake_refresh_token"),
+                                                           expired_access_token, provider_type, device_id);
+            // when creating a user from stored tokens, the expiry time is checked
+            REQUIRE(fake_user->access_token_refresh_required());
+            fake_user->update_access_token(std::string(expired_access_token));
+            // if the token has a recent update, the client side expiry precheck is not triggerd
+            REQUIRE(!fake_user->access_token_refresh_required());
+            fake_user->update_access_token(std::string(expired_access_token), {{/*epoch*/}});
+            // after the token has received an update with the token creation time outside of
+            // the last 15 minutes, the client side expiry precheck is triggerd
+            REQUIRE(fake_user->access_token_refresh_required());
+        }
 
         SECTION("Expired Access Token is Refreshed") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             std::vector<SyncSession::PublicState> seen_states;
-            transport->hook = [&](const Request) -> util::Optional<Response> {
+            transport->request_hook = [&](const Request) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto session : user->all_sessions()) {
                     seen_states.push_back(session->state());
                 }
-                return util::none; // send all requests through http
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -1958,17 +1983,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
-            transport->hook = [&](const Request request) -> util::Optional<Response> {
+            transport->response_hook = [&](const Request request, Response& response) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
                 if (request.url.find("/session") != std::string::npos) {
-                    Response faked;
-                    faked.http_status_code = 401;
-                    faked.body = "fake: refresh token could not be refreshed";
-                    return util::make_optional<Response>(std::move(faked));
+                    response.http_status_code = 401;
+                    response.body = "fake: refresh token could not be refreshed";
                 }
-                return util::none;
             };
             SyncTestFile config(app, partition, schema);
             std::atomic<bool> sync_error_handler_called{false};
@@ -1983,6 +2005,36 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
             // the failed refresh logs out the user
             REQUIRE(!user->is_logged_in());
+        }
+
+        SECTION("If the server responds with an expired access token don't loop infinitely") {
+            REQUIRE(user->is_logged_in());
+            using namespace std::chrono;
+            time_point<steady_clock> start = steady_clock::now();
+            std::atomic<bool> did_set_valid_token{false};
+            transport->response_hook = [&](const Request request, Response& response) {
+                // simulate the server denying the refresh for any requests in the first 3 seconds
+                if (request.url.find("/session") != std::string::npos) {
+                    if (steady_clock::now() - start < 3s) {
+                        response.body =
+                            nlohmann::json{{"access_token",
+                                            encode_fake_jwt("fake_access_token", token.expires, token.timestamp)}}
+                                .dump();
+                    }
+                    else {
+                        did_set_valid_token.store(true);
+                    }
+                }
+            };
+            SyncTestFile config(app, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            create_one_dog(r);
+            timed_wait_for(
+                [&] {
+                    return did_set_valid_token.load();
+                },
+                10s);
+            REQUIRE(user->is_logged_in());
         }
     }
 

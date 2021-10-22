@@ -62,13 +62,19 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
-    explicit RealmJWT(const std::string& token);
+    std::chrono::milliseconds elapsed_time_since_local_creation() const;
+
+    explicit RealmJWT(const std::string& token,
+                      std::chrono::steady_clock::time_point creation = std::chrono::steady_clock::now());
     RealmJWT() = default;
 
     bool operator==(const RealmJWT& other) const
     {
         return token == other.token;
     }
+
+private:
+    std::chrono::time_point<std::chrono::steady_clock> m_local_creation_time = {}; // = epoch
 };
 
 struct SyncUserProfile {
@@ -226,7 +232,9 @@ public:
 
     // Update the user's access token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_access_token(std::string&& token) REQUIRES(!m_mutex);
+    void update_access_token(std::string&& token,
+                             util::Optional<std::chrono::steady_clock::time_point> creation_time = util::none)
+        REQUIRES(!m_mutex);
 
     // Update the user's profile.
     void update_user_profile(const SyncUserProfile& profile) REQUIRES(!m_mutex);
@@ -309,6 +317,7 @@ private:
     static std::mutex s_binding_context_factory_mutex;
 
     bool do_is_logged_in() const REQUIRES(m_mutex);
+    bool access_token_is_expired() const REQUIRES(m_mutex);
 
     State m_state GUARDED_BY(m_mutex);
 

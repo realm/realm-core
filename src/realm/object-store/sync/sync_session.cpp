@@ -321,7 +321,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     void access_token_updated(std::unique_lock<std::mutex>& lock, SyncSession& session,
                               std::string signed_access_token) const override
     {
-        // We don't expect there to be a session at this point, but if there is refresh the token there.
+        // We don't expect there to be a session at this point, but if there is, refresh it's token.
         // If not, the latest token will be seeded from SyncUser::access_token() on session creation.
         if (session.m_session) {
             session.m_session->refresh(signed_access_token);
