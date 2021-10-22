@@ -493,6 +493,8 @@ TEST_CASE("object") {
             Object object_target(r, obj_target);
             object_target.set_column_value("value 1", 201);
             object_target.set_column_value("value 2", 202);
+            Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
+            Object object_origin2(r, obj_origin2);
 
             Obj obj_origin = table_origin->create_object_with_primary_key(100);
             Object object_origin(r, obj_origin);
@@ -812,6 +814,16 @@ TEST_CASE("object") {
                     write([&] {
                         Obj obj_origin2 = table_origin->create_object_with_primary_key(300);
                         Object object_origin2(r, obj_origin2);
+                        object_origin2.set_property_value(d, "link", util::Any(object_target));
+                    });
+                    REQUIRE_INDICES(change.modifications, 0);
+                    REQUIRE(change.columns.size() == 1);
+                    REQUIRE_INDICES(change.columns[col_target_backlink.value], 0);
+                }
+
+                SECTION("TBD - createing the object before setting") {
+                    auto token_with_backlink = require_change(object_target, key_path_array_target_backlink);
+                    write([&] {
                         object_origin2.set_property_value(d, "link", util::Any(object_target));
                     });
                     REQUIRE_INDICES(change.modifications, 0);
