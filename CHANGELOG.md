@@ -1,21 +1,14 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 11.5.1 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Calling `remove_all_target_rows()` on a newly constructed `LnkSet` dereferenced a null pointer (since v11.5.0).
-* Mutating a Set via one accessor and then calling `remove_all_target_rows()` on a different accessor for the same Set could potentially result in a stale version of the Set being used (since v11.0.0).
+* Calling `remove_all_target_rows()` on a newly constructed `LnkSet` dereferenced a null pointer ([#4972](https://github.com/realm/realm-core/pull/4972), since v11.5.0).
+* Mutating a Set via one accessor and then calling `remove_all_target_rows()` on a different accessor for the same Set could potentially result in a stale version of the Set being used ([#4972](https://github.com/realm/realm-core/pull/4972), since v11.0.0).
 * Restore support for calling snapshot() on non-Object collections ([#4971](https://github.com/realm/realm-core/issues/4971), since 11.5.0)
  
-### Breaking changes
-* None.
-
 -----------
 
 ### Internals
-* None.
+* Stopped running RaspberryPi testing in CI ([#4967](https://github.com/realm/realm-core/issues/4967)
 
 ----------------------------------------------
 
