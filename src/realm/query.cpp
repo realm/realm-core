@@ -59,7 +59,7 @@ Query::Query(ConstTableRef table, LinkCollectionPtr&& list_ptr)
     create();
 }
 
-Query::Query(ConstTableRef table, ConstTableView* tv)
+Query::Query(ConstTableRef table, TableView* tv)
     : m_table(table.cast_away_const())
     , m_view(tv)
     , m_source_table_view(tv)
@@ -67,7 +67,7 @@ Query::Query(ConstTableRef table, ConstTableView* tv)
     create();
 }
 
-Query::Query(ConstTableRef table, std::unique_ptr<ConstTableView> tv)
+Query::Query(ConstTableRef table, std::unique_ptr<TableView> tv)
     : m_table(table.cast_away_const())
     , m_view(tv.get())
     , m_source_table_view(tv.get())
@@ -1424,7 +1424,7 @@ ObjKey Query::find()
     }
 }
 
-void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit) const
+void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) const
 {
     if (limit == 0)
         return;

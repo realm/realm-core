@@ -158,41 +158,46 @@ namespace realm {
 ///
 /// A ConstTableView has both copy and move semantics. See TableView
 /// for more on this.
-class ConstTableView : public ObjList {
+class TableView : public ObjList {
 public:
     /// Construct null view (no memory allocated).
-    ConstTableView()
+    TableView()
     {
     }
 
 
     /// Construct empty view, ready for addition of row indices.
-    ConstTableView(ConstTableRef parent);
-    ConstTableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t limit);
-    ConstTableView(ConstTableRef parent, ColKey column, const Obj& obj);
-    ConstTableView(ConstTableRef parent, LnkLstPtr link_list);
-    ConstTableView(ConstTableRef parent, LnkSetPtr link_list);
+    TableView(ConstTableRef parent);
+    TableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t limit);
+    TableView(ConstTableRef parent, ColKey column, const Obj& obj);
+    TableView(ConstTableRef parent, LnkLstPtr link_list);
+    TableView(ConstTableRef parent, LnkSetPtr link_list);
 
     /// Copy constructor.
-    ConstTableView(const ConstTableView&);
+    TableView(const TableView&);
 
     /// Move constructor.
-    ConstTableView(ConstTableView&&) noexcept;
+    TableView(TableView&&) noexcept;
 
-    ConstTableView& operator=(const ConstTableView&);
-    ConstTableView& operator=(ConstTableView&&) noexcept;
+    TableView& operator=(const TableView&);
+    TableView& operator=(TableView&&) noexcept;
 
-    ConstTableView(ConstTableView& source, Transaction* tr, PayloadPolicy mode);
+    TableView(TableView& source, Transaction* tr, PayloadPolicy mode);
 
-    ~ConstTableView()
+    ~TableView()
     {
     }
 
-    TableRef get_target_table() const override
+    TableRef get_parent() noexcept
     {
         return m_table.cast_away_const();
     }
-    size_t size() const override
+
+    TableRef get_target_table() const final
+    {
+        return m_table.cast_away_const();
+    }
+    size_t size() const final
     {
         return m_key_values.size();
     }
@@ -207,19 +212,27 @@ public:
         return bool(m_table);
     }
 
-    ObjKey get_key(size_t ndx) const override
+    ObjKey get_key(size_t ndx) const final
     {
         return m_key_values.get(ndx);
     }
 
-    bool is_obj_valid(size_t ndx) const noexcept override
+    bool is_obj_valid(size_t ndx) const noexcept final
     {
         return m_table->is_valid(get_key(ndx));
     }
 
-    Obj get_object(size_t ndx) const override
+    Obj get(size_t row_ndx) const
     {
-        return m_table.cast_away_const()->get_object(get_key(ndx));
+        REALM_ASSERT(row_ndx < size());
+        ObjKey key(m_key_values.get(row_ndx));
+        REALM_ASSERT(key);
+        return m_table->get_object(key);
+    }
+
+    Obj get_object(size_t ndx) const final
+    {
+        return get(ndx);
     }
 
     // Get the query used to create this TableView
@@ -230,27 +243,29 @@ public:
         return m_query;
     }
 
+    void clear();
+
     // Change the TableView to be backed by another query
     // only works if the TableView is already backed by a query, and both
     // queries points to the same Table
     void update_query(const Query& q);
 
-    std::unique_ptr<ConstTableView> clone() const
+    std::unique_ptr<TableView> clone() const
     {
-        return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
+        return std::unique_ptr<TableView>(new TableView(*this));
     }
 
     LinkCollectionPtr clone_obj_list() const final
     {
-        return std::unique_ptr<ConstTableView>(new ConstTableView(*this));
+        return std::unique_ptr<TableView>(new TableView(*this));
     }
 
     // import_copy_of() machinery entry points based on dynamic type. These methods:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
-    std::unique_ptr<ConstTableView> clone_for_handover(Transaction* tr, PayloadPolicy mode)
+    std::unique_ptr<TableView> clone_for_handover(Transaction* tr, PayloadPolicy mode)
     {
-        std::unique_ptr<ConstTableView> retval(new ConstTableView(*this, tr, mode));
+        std::unique_ptr<TableView> retval(new TableView(*this, tr, mode));
         return retval;
     }
     template <Action action, typename T, typename R>
@@ -309,7 +324,7 @@ public:
     // is generated from another view (not a table), updates may cause
     // that view to be outdated, AND as the generated view depends upon
     // it, it too will become outdated.
-    bool is_in_sync() const override;
+    bool is_in_sync() const final;
 
     // A TableView is frozen if it is a) obtained from a query against a frozen table
     // and b) is synchronized (is_in_sync())
@@ -328,7 +343,7 @@ public:
     // "live" or "reactive" views are implemented by calling sync_if_needed()
     // before any of the other access-methods whenever the view may have become
     // outdated.
-    void sync_if_needed() const override;
+    void sync_if_needed() const final;
     // Return the version of the source it was created from.
     TableVersions get_dependency_versions() const
     {
@@ -386,7 +401,7 @@ protected:
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
 
-    void get_dependencies(TableVersions&) const override;
+    void get_dependencies(TableVersions&) const final;
 
     void do_sync();
     void do_sort(const DescriptorOrdering&);
@@ -448,72 +463,6 @@ private:
     friend class Query;
     friend class DB;
     friend class ObjList;
-};
-
-enum class RemoveMode { ordered, unordered };
-
-
-/// A TableView gives read and write access to the parent table.
-///
-/// A 'const TableView' cannot be changed (e.g. sorted), nor can the
-/// parent table be modified through it.
-///
-/// A TableView is both copyable and movable.
-class TableView : public ConstTableView {
-public:
-    using ConstTableView::ConstTableView;
-
-    TableView() = default;
-
-    TableRef get_parent() noexcept
-    {
-        return m_table.cast_away_const();
-    }
-
-    // Rows
-    Obj get(size_t row_ndx);
-    Obj front();
-    Obj back();
-    Obj operator[](size_t row_ndx);
-
-    /// \defgroup table_view_removes
-    //@{
-    /// \brief Remove the specified row (or rows) from the underlying table.
-    ///
-    /// remove() removes the specified row from the underlying table,
-    /// remove_last() removes the last row in the table view from the underlying
-    /// table, and clear removes all the rows in the table view from the
-    /// underlying table.
-    ///
-    /// When rows are removed from the underlying table, they will by necessity
-    /// also be removed from the table view. The order of the remaining rows in
-    /// the the table view will be maintained.
-    ///
-    /// \param row_ndx The index within this table view of the row to be removed.
-    void remove(size_t row_ndx);
-    void remove_last();
-    void clear();
-    //@}
-
-    std::unique_ptr<TableView> clone() const
-    {
-        return std::unique_ptr<TableView>(new TableView(*this));
-    }
-
-    std::unique_ptr<TableView> clone_for_handover(Transaction* tr, PayloadPolicy policy)
-    {
-        std::unique_ptr<TableView> retval(new TableView(*this, tr, policy));
-        return retval;
-    }
-
-private:
-    TableView(TableRef parent);
-    TableView(TableRef parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(TableRef parent, LnkLstPtr);
-
-    friend class ConstTableView;
-    friend class Table;
-    friend class Query;
     friend class LnkLst;
 };
 
@@ -521,7 +470,7 @@ private:
 // ================================================================================================
 // ConstTableView Implementation:
 
-inline ConstTableView::ConstTableView(ConstTableRef parent)
+inline TableView::TableView(ConstTableRef parent)
     : m_table(parent) // Throws
 {
     m_key_values.create();
@@ -530,7 +479,7 @@ inline ConstTableView::ConstTableView(ConstTableRef parent)
     }
 }
 
-inline ConstTableView::ConstTableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t lim)
+inline TableView::TableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t lim)
     : m_table(parent)
     , m_query(query)
     , m_start(start)
@@ -540,7 +489,7 @@ inline ConstTableView::ConstTableView(ConstTableRef parent, Query& query, size_t
     m_key_values.create();
 }
 
-inline ConstTableView::ConstTableView(ConstTableRef src_table, ColKey src_column_key, const Obj& obj)
+inline TableView::TableView(ConstTableRef src_table, ColKey src_column_key, const Obj& obj)
     : m_table(src_table) // Throws
     , m_source_column_key(src_column_key)
     , m_linked_obj_key(obj.get_key())
@@ -553,7 +502,7 @@ inline ConstTableView::ConstTableView(ConstTableRef src_table, ColKey src_column
     }
 }
 
-inline ConstTableView::ConstTableView(ConstTableRef parent, LnkLstPtr link_list)
+inline TableView::TableView(ConstTableRef parent, LnkLstPtr link_list)
     : m_table(parent) // Throws
     , m_linklist_source(std::move(link_list))
 {
@@ -564,7 +513,7 @@ inline ConstTableView::ConstTableView(ConstTableRef parent, LnkLstPtr link_list)
     }
 }
 
-inline ConstTableView::ConstTableView(ConstTableRef parent, LnkSetPtr link_set)
+inline TableView::TableView(ConstTableRef parent, LnkSetPtr link_set)
     : m_table(parent) // Throws
     , m_linkset_source(std::move(link_set))
 {
@@ -575,7 +524,7 @@ inline ConstTableView::ConstTableView(ConstTableRef parent, LnkSetPtr link_set)
     }
 }
 
-inline ConstTableView::ConstTableView(const ConstTableView& tv)
+inline TableView::TableView(const TableView& tv)
     : m_table(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
@@ -593,7 +542,7 @@ inline ConstTableView::ConstTableView(const ConstTableView& tv)
     m_limit_count = tv.m_limit_count;
 }
 
-inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
+inline TableView::TableView(TableView&& tv) noexcept
     : m_table(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
@@ -613,7 +562,7 @@ inline ConstTableView::ConstTableView(ConstTableView&& tv) noexcept
     m_limit_count = tv.m_limit_count;
 }
 
-inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
+inline TableView& TableView::operator=(TableView&& tv) noexcept
 {
     m_table = std::move(tv.m_table);
 
@@ -634,7 +583,7 @@ inline ConstTableView& ConstTableView::operator=(ConstTableView&& tv) noexcept
     return *this;
 }
 
-inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
+inline TableView& TableView::operator=(const TableView& tv)
 {
     if (this == &tv)
         return *this;
@@ -692,9 +641,9 @@ inline ConstTableView& ConstTableView::operator=(const ConstTableView& tv)
 //-------------------------- TableView, ConstTableView implementation:
 
 template <class T>
-ConstTableView ObjList::find_all(ColKey column_key, T value) const
+TableView ObjList::find_all(ColKey column_key, T value) const
 {
-    ConstTableView tv(get_target_table());
+    TableView tv(get_target_table());
     auto& keys = tv.m_key_values;
     for_each([column_key, value, &keys](const Obj& o) {
         if (o.get<T>(column_key) == value) {
@@ -705,51 +654,6 @@ ConstTableView ObjList::find_all(ColKey column_key, T value) const
     return tv;
 }
 
-inline void TableView::remove_last()
-{
-    if (!is_empty())
-        remove(size() - 1);
-}
-
-inline TableView::TableView(TableRef parent)
-    : ConstTableView(parent)
-{
-}
-
-inline TableView::TableView(TableRef parent, Query& query, size_t start, size_t end, size_t lim)
-    : ConstTableView(parent, query, start, end, lim)
-{
-}
-
-inline TableView::TableView(TableRef parent, LnkLstPtr link_list)
-    : ConstTableView(parent, std::move(link_list))
-{
-}
-
-// Rows
-inline Obj TableView::get(size_t row_ndx)
-{
-    REALM_ASSERT_ROW(row_ndx);
-    ObjKey key(m_key_values.get(row_ndx));
-    REALM_ASSERT(key != realm::null_key);
-    return get_parent()->get_object(key);
-}
-
-inline Obj TableView::front()
-{
-    return get(0);
-}
-
-inline Obj TableView::back()
-{
-    size_t last_row_ndx = size() - 1;
-    return get(last_row_ndx);
-}
-
-inline Obj TableView::operator[](size_t row_ndx)
-{
-    return get(row_ndx);
-}
 
 } // namespace realm
 

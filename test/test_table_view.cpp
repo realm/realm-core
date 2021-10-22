@@ -286,7 +286,7 @@ TEST(TableView_IsAttached)
     v[0].set<Int>(c0, 11);
     CHECK_EQUAL(true, v.is_attached());
     CHECK_EQUAL(true, v2.is_attached());
-    v.remove_last();
+    v.clear();
     CHECK_EQUAL(true, v.is_attached());
     CHECK_EQUAL(true, v2.is_attached());
 }
@@ -856,57 +856,6 @@ TEST(TableView_SortNullString)
     CHECK_NOT(tv[3].get<String>(col).is_null());
 }
 
-TEST(TableView_Delete)
-{
-    Table table;
-    auto col = table.add_column(type_Int, "first");
-
-    auto k0 = table.create_object().set(col, 1).get_key();
-    table.create_object().set(col, 2);
-    table.create_object().set(col, 1);
-    table.create_object().set(col, 3);
-    auto k4 = table.create_object().set(col, 1).get_key();
-
-    TableView v = table.find_all_int(col, 1);
-    CHECK_EQUAL(3, v.size()); // k0, k2, k4
-
-    v.remove(1); // k0, k4
-    CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(k0, v.get_key(0));
-    CHECK_EQUAL(k4, v.get_key(1));
-
-    CHECK_EQUAL(4, table.size());
-    auto it = table.begin();
-    CHECK_EQUAL(1, it->get<int64_t>(col));
-    ++it;
-    CHECK_EQUAL(2, it->get<int64_t>(col));
-    ++it;
-    CHECK_EQUAL(3, it->get<int64_t>(col));
-    ++it;
-    CHECK_EQUAL(1, it->get<int64_t>(col));
-
-    v.remove(0); // k4
-    CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(k4, v.get_key(0));
-
-    CHECK_EQUAL(3, table.size());
-    it = table.begin();
-    CHECK_EQUAL(2, it->get<int64_t>(col));
-    ++it;
-    CHECK_EQUAL(3, it->get<int64_t>(col));
-    ++it;
-    CHECK_EQUAL(1, it->get<int64_t>(col));
-
-    v.remove(0);
-    CHECK_EQUAL(0, v.size());
-
-    CHECK_EQUAL(2, table.size());
-    it = table.begin();
-    CHECK_EQUAL(2, it->get<int64_t>(col));
-    ++it;
-    CHECK_EQUAL(3, it->get<int64_t>(col));
-}
-
 TEST(TableView_Clear)
 {
     Table table;
@@ -1370,8 +1319,8 @@ TEST(TableView_IsInSync)
     CHECK_NOT_EQUAL(src_v.version, initial_v.version);
 
     TableView tv = table.where().find_all();
-    ConstTableView ctv0 = ConstTableView(tv, initial_tr.get(), PayloadPolicy::Copy);
-    ConstTableView ctv1 = ConstTableView(tv, tr.get(), PayloadPolicy::Copy);
+    TableView ctv0 = TableView(tv, initial_tr.get(), PayloadPolicy::Copy);
+    TableView ctv1 = TableView(tv, tr.get(), PayloadPolicy::Copy);
 
     CHECK_NOT(ctv0.is_in_sync());
     CHECK(ctv1.is_in_sync());
@@ -1408,7 +1357,7 @@ struct DistinctDirect {
 
     StringData get_string(const TableView& tv, ColKey col, size_t row) const
     {
-        return tv.ConstTableView::get_object(row).get<String>(col);
+        return tv.TableView::get_object(row).get<String>(col);
     }
 
     TableView find_all() const
@@ -1444,12 +1393,12 @@ struct DistinctOverLink {
 
     ObjKey get_key(const TableView& tv, size_t ndx) const
     {
-        return tv.ConstTableView::get_object(ndx).get<ObjKey>(m_col_link);
+        return tv.TableView::get_object(ndx).get<ObjKey>(m_col_link);
     }
 
     StringData get_string(const TableView& tv, ColKey col, size_t ndx) const
     {
-        return tv.ConstTableView::get_object(ndx).get_linked_object(m_col_link).get<String>(col);
+        return tv.TableView::get_object(ndx).get_linked_object(m_col_link).get<String>(col);
     }
 
     TableView find_all() const
@@ -2981,9 +2930,9 @@ TEST(TableView_UpdateQuery)
     CHECK_EQUAL(3, v[1].get<Int>(col));
 }
 
-class TestTableView : public ConstTableView {
+class TestTableView : public TableView {
 public:
-    using ConstTableView::ConstTableView;
+    using TableView::TableView;
 
     KeyColumn& get_keys()
     {
