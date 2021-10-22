@@ -352,7 +352,7 @@ private:
 
     std::function<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
 
-    void initialize(DB& db)
+    void initialize(DB& db) noexcept
     {
         REALM_ASSERT(!m_db);
         m_db = &db;
@@ -419,9 +419,9 @@ public:
     }
     std::unique_ptr<_impl::History> _create_history_read() override
     {
-        auto hist = new ClientHistory(this);
+        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(this));
         hist->initialize(*m_history.m_db);
-        return std::unique_ptr<_impl::History>(hist);
+        return hist;
     }
 
     // Overriding member functions in realm::Replication

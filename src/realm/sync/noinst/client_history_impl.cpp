@@ -568,16 +568,15 @@ void ClientHistory::prepare_for_write()
 }
 
 
-Replication::version_type ClientHistory::add_changeset(BinaryData changeset, BinaryData sync_changeset)
+Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, BinaryData sync_changeset)
 {
     // FIXME: BinaryColumn::set() currently interprets BinaryData(0,0) as
     // null. It should probably be changed such that BinaryData(0,0) is always
     // interpreted as the empty string. For the purpose of setting null values,
     // BinaryColumn::set() should accept values of type Optional<BinaryData>().
-    if (changeset.is_null())
-        changeset = BinaryData("", 0);
-    m_arrays->ct_history.add(changeset); // Throws
-
+    if (ct_changeset.is_null())
+        ct_changeset = BinaryData("", 0);
+    m_arrays->ct_history.add(ct_changeset); // Throws
 
     HistoryEntry entry;
 
