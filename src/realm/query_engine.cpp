@@ -25,6 +25,8 @@
 
 namespace realm {
 
+std::vector<ObjKey> ParentNode::s_dummy_keys;
+
 ParentNode::ParentNode(const ParentNode& from)
     : m_child(from.m_child ? from.m_child->clone() : nullptr)
     , m_condition_column_key(from.m_condition_column_key)
@@ -236,16 +238,6 @@ size_t MixedNode<Equal>::find_first_local(size_t start, size_t end)
     }
 
     return not_found;
-}
-
-void MixedNode<Equal>::index_based_aggregate(size_t limit, Evaluator evaluator)
-{
-    for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
-        auto obj = m_table->get_object(m_index_matches[t]);
-        if (evaluator(obj)) {
-            --limit;
-        }
-    }
 }
 
 void StringNodeEqualBase::init(bool will_query_ranges)
