@@ -405,7 +405,7 @@ private:
     // this includes: LnkLst, LnkSet, and DictionaryLinkValues. It cannot be a list of primitives because
     // it is used to populate a query through a collection of objects and there are asserts for this.
     LinkCollectionPtr m_source_collection;         // collections are owned by the query.
-    TableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
+    TableView* m_source_table_view = nullptr;      // table views are not refcounted, and not owned by the query.
     std::unique_ptr<TableView> m_owned_source_table_view; // <--- except when indicated here
     std::shared_ptr<DescriptorOrdering> m_ordering;
 };

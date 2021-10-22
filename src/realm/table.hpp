@@ -409,7 +409,6 @@ public:
     ObjKey find_first_uuid(ColKey col_key, UUID value) const;
 
     //    TableView find_all_link(Key target_key);
-    //    ConstTableView find_all_link(Key target_key) const;
     TableView find_all_int(ColKey col_key, int64_t value);
     TableView find_all_int(ColKey col_key, int64_t value) const;
     TableView find_all_bool(ColKey col_key, bool value);

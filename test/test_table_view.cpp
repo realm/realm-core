@@ -606,50 +606,6 @@ TEST(TableView_SyncAfterCopy)
     CHECK_EQUAL(2, v2.size());
 }
 
-TEST(TableView_FindAll)
-{
-    Table table;
-    auto col = table.add_column(type_Int, "first");
-
-    table.create_object().set_all(3);
-    auto k1 = table.create_object().set_all(3).get_key();
-    auto k2 = table.create_object().set_all(3).get_key();
-
-    TableView v = table.find_all_int(col, 3);
-    CHECK_EQUAL(3, v.size());
-    v[0].set(col, 5);
-    v[1].set(col, 4); // match
-    v[2].set(col, 4); // match
-
-    // todo, add creation to wrapper function in table.h
-    auto v2 = v.find_all<Int>(col, 4);
-    CHECK_EQUAL(2, v2.size());
-    CHECK_EQUAL(k1, v2.get_key(0));
-    CHECK_EQUAL(k2, v2.get_key(1));
-}
-
-
-TEST(TableView_FindAllString)
-{
-    Table table;
-    auto col = table.add_column(type_String, "1");
-
-    table.create_object().set_all("a").get_key();
-    auto k1 = table.create_object().set_all("a").get_key();
-    auto k2 = table.create_object().set_all("a").get_key();
-
-    TableView v = table.find_all_string(col, "a");
-    v[0].set<String>(col, "foo");
-    v[1].set<String>(col, "bar"); // match
-    v[2].set<String>(col, "bar"); // match
-
-    // todo, add creation to wrapper function in table.h
-    auto v2 = v.find_all(col, StringData("bar"));
-    CHECK_EQUAL(k1, v2.get_key(0));
-    CHECK_EQUAL(k2, v2.get_key(1));
-}
-
-
 NONCONCURRENT_TEST(TableView_StringSort)
 {
     // WARNING: Do not use the C++11 method (set_string_compare_method(1)) on Windows 8.1 because it has a bug that
@@ -903,26 +859,6 @@ TEST(TableView_Imperative_Clear)
     CHECK_EQUAL(1, t.size());
 }
 
-// exposes a bug in stacked tableview:
-// view V1 selects a subset of rows from Table T1
-// View V2 selects rows from  view V1
-// Then, some rows in V2 can be found, that are not in V1
-TEST(TableView_Stacked)
-{
-    Table t;
-    auto col_int0 = t.add_column(type_Int, "i1");
-    auto col_int1 = t.add_column(type_Int, "i2");
-    auto col_str = t.add_column(type_String, "S1");
-    t.create_object().set_all(1, 2, "A");
-    t.create_object().set_all(2, 2, "B");
-
-    TableView tv = t.find_all_int(col_int0, 2);
-    auto tv2 = tv.find_all<Int>(col_int1, 2);
-    CHECK_EQUAL(1, tv2.size());             // evaluates tv2.size to 1 which is expected
-    CHECK_EQUAL("B", tv2[0].get<String>(col_str)); // evalates get_string(2,0) to "A" which is not expected
-}
-
-
 TEST(TableView_ClearNone)
 {
     Table table;
@@ -933,30 +869,6 @@ TEST(TableView_ClearNone)
 
     v.clear();
 }
-
-TEST(TableView_FindAllStacked)
-{
-    Table table;
-    auto col_int0 = table.add_column(type_Int, "1");
-    auto col_int1 = table.add_column(type_Int, "2");
-
-    table.create_object().set_all( 0, 1);
-    auto k = table.create_object().set_all(0, 2).get_key();
-    table.create_object().set_all( 0, 3);
-    table.create_object().set_all( 1, 1);
-    table.create_object().set_all( 1, 2);
-    table.create_object().set_all( 1, 3);
-
-    TableView v = table.find_all_int(col_int0, 0);
-    CHECK_EQUAL(3, v.size());
-
-    auto v2 = v.find_all<Int>(col_int1, 2);
-    CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(0, v2[0].get<Int>(col_int0));
-    CHECK_EQUAL(2, v2[0].get<Int>(col_int1));
-    CHECK_EQUAL(k, v2.get_key(0));
-}
-
 
 TEST(TableView_MultiColSort)
 {

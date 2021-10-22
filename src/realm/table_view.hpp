@@ -147,31 +147,17 @@ namespace realm {
 // However, these are problems that you should expect, since the activity is spread over multiple
 // transactions.
 
-
-/// A ConstTableView gives read access to the parent table, but no
-/// write access. The view itself, though, can be changed, for
-/// example, it can be sorted.
-///
-/// Note that methods are declared 'const' if, and only if they leave
-/// the view unmodified, and this is irrespective of whether they
-/// modify the parent table.
-///
-/// A ConstTableView has both copy and move semantics. See TableView
-/// for more on this.
 class TableView : public ObjList {
 public:
     /// Construct null view (no memory allocated).
-    TableView()
-    {
-    }
+    TableView() {}
 
 
     /// Construct empty view, ready for addition of row indices.
     TableView(ConstTableRef parent);
     TableView(ConstTableRef parent, Query& query, size_t start, size_t end, size_t limit);
     TableView(ConstTableRef parent, ColKey column, const Obj& obj);
-    TableView(ConstTableRef parent, LnkLstPtr link_list);
-    TableView(ConstTableRef parent, LnkSetPtr link_list);
+    TableView(ConstTableRef parent, LinkCollectionPtr collection);
 
     /// Copy constructor.
     TableView(const TableView&);
@@ -184,9 +170,7 @@ public:
 
     TableView(TableView& source, Transaction* tr, PayloadPolicy mode);
 
-    ~TableView()
-    {
-    }
+    ~TableView() {}
 
     TableRef get_parent() noexcept
     {
@@ -413,10 +397,8 @@ protected:
     ObjKey m_linked_obj_key;
     ConstTableRef m_linked_table;
 
-    // If this TableView was created from a LnkLst, then this reference points to it. Otherwise it's 0
-    mutable LnkLstPtr m_linklist_source;
-    // If this TableView was created from a LnkSet, then this reference points to it. Otherwise it's 0
-    mutable LnkSetPtr m_linkset_source;
+    // If this TableView was created from an Object Collection, then this reference points to it. Otherwise it's 0
+    mutable LinkCollectionPtr m_collection_source;
 
     // Stores the ordering criteria of applied sort and distinct operations.
     DescriptorOrdering m_descriptor_ordering;
@@ -468,7 +450,7 @@ private:
 
 
 // ================================================================================================
-// ConstTableView Implementation:
+// TableView Implementation:
 
 inline TableView::TableView(ConstTableRef parent)
     : m_table(parent) // Throws
@@ -502,22 +484,11 @@ inline TableView::TableView(ConstTableRef src_table, ColKey src_column_key, cons
     }
 }
 
-inline TableView::TableView(ConstTableRef parent, LnkLstPtr link_list)
+inline TableView::TableView(ConstTableRef parent, LinkCollectionPtr collection)
     : m_table(parent) // Throws
-    , m_linklist_source(std::move(link_list))
+    , m_collection_source(std::move(collection))
 {
-    REALM_ASSERT(m_linklist_source);
-    m_key_values.create();
-    if (m_table) {
-        m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
-    }
-}
-
-inline TableView::TableView(ConstTableRef parent, LnkSetPtr link_set)
-    : m_table(parent) // Throws
-    , m_linkset_source(std::move(link_set))
-{
-    REALM_ASSERT(m_linkset_source);
+    REALM_ASSERT(m_collection_source);
     m_key_values.create();
     if (m_table) {
         m_last_seen_versions.emplace_back(m_table->get_key(), m_table->get_content_version());
@@ -529,8 +500,7 @@ inline TableView::TableView(const TableView& tv)
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
-    , m_linklist_source(tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{})
-    , m_linkset_source(tv.m_linkset_source ? tv.m_linkset_source->clone_linkset() : LnkSetPtr{})
+    , m_collection_source(tv.m_collection_source ? tv.m_collection_source->clone_obj_list() : LinkCollectionPtr{})
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
@@ -547,8 +517,7 @@ inline TableView::TableView(TableView&& tv) noexcept
     , m_source_column_key(tv.m_source_column_key)
     , m_linked_obj_key(tv.m_linked_obj_key)
     , m_linked_table(tv.m_linked_table)
-    , m_linklist_source(std::move(tv.m_linklist_source))
-    , m_linkset_source(std::move(tv.m_linkset_source))
+    , m_collection_source(std::move(tv.m_collection_source))
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
     , m_start(tv.m_start)
@@ -576,8 +545,7 @@ inline TableView& TableView::operator=(TableView&& tv) noexcept
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
-    m_linklist_source = std::move(tv.m_linklist_source);
-    m_linkset_source = std::move(tv.m_linkset_source);
+    m_collection_source = std::move(tv.m_collection_source);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
 
     return *this;
@@ -599,61 +567,11 @@ inline TableView& TableView::operator=(const TableView& tv)
     m_source_column_key = tv.m_source_column_key;
     m_linked_obj_key = tv.m_linked_obj_key;
     m_linked_table = tv.m_linked_table;
-    m_linklist_source = tv.m_linklist_source ? tv.m_linklist_source->clone_linklist() : LnkLstPtr{};
-    m_linkset_source = tv.m_linkset_source ? tv.m_linkset_source->clone_linkset() : LnkSetPtr{};
+    m_collection_source = tv.m_collection_source ? tv.m_collection_source->clone_obj_list() : LinkCollectionPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
 
     return *this;
 }
-
-#define REALM_ASSERT_COLUMN(column_key)                                                                              \
-    m_table.check();                                                                                                 \
-    REALM_ASSERT(m_table->colkey2ndx(column_key))
-
-#define REALM_ASSERT_ROW(row_ndx)                                                                                    \
-    m_table.check();                                                                                                 \
-    REALM_ASSERT(row_ndx < m_key_values.size())
-
-#define REALM_ASSERT_COLUMN_AND_TYPE(column_key, column_type)                                                        \
-    REALM_ASSERT_COLUMN(column_key);                                                                                 \
-    REALM_DIAG_PUSH();                                                                                               \
-    REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE();                                                                        \
-    REALM_ASSERT(m_table->get_column_type(column_key) == column_type);                                               \
-    REALM_DIAG_POP()
-
-#define REALM_ASSERT_INDEX(column_key, row_ndx)                                                                      \
-    REALM_ASSERT_COLUMN(column_key);                                                                                 \
-    REALM_ASSERT(row_ndx < m_key_values.size())
-
-#define REALM_ASSERT_INDEX_AND_TYPE(column_key, row_ndx, column_type)                                                \
-    REALM_ASSERT_COLUMN_AND_TYPE(column_key, column_type);                                                           \
-    REALM_ASSERT(row_ndx < m_key_values.size())
-
-#define REALM_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_key, row_ndx)                                              \
-    REALM_ASSERT_COLUMN(column_key);                                                                                 \
-    REALM_DIAG_PUSH();                                                                                               \
-    REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE();                                                                        \
-    REALM_ASSERT(m_table->get_column_type(column_key) == type_Table ||                                               \
-                 (m_table->get_column_type(column_key) == type_Mixed));                                              \
-    REALM_DIAG_POP();                                                                                                \
-    REALM_ASSERT(row_ndx < m_key_values.size())
-
-//-------------------------- TableView, ConstTableView implementation:
-
-template <class T>
-TableView ObjList::find_all(ColKey column_key, T value) const
-{
-    TableView tv(get_target_table());
-    auto& keys = tv.m_key_values;
-    for_each([column_key, value, &keys](const Obj& o) {
-        if (o.get<T>(column_key) == value) {
-            keys.add(o.get_key());
-        }
-        return false;
-    });
-    return tv;
-}
-
 
 } // namespace realm
 

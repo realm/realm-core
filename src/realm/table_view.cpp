@@ -74,8 +74,7 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy mode)
     else
         m_last_seen_versions.clear();
     m_table = tr->import_copy_of(src.m_table);
-    m_linklist_source = tr->import_copy_of(src.m_linklist_source);
-    m_linkset_source = tr->import_copy_of(src.m_linkset_source);
+    m_collection_source = tr->import_copy_of(src.m_collection_source);
     if (src.m_source_column_key) {
         m_linked_table = tr->import_copy_of(src.m_linked_table);
     }
@@ -428,11 +427,8 @@ void TableView::to_json(std::ostream& out, size_t link_depth) const
 
 bool TableView::depends_on_deleted_object() const
 {
-    if (m_linklist_source && !m_linklist_source->is_attached()) {
-        return true;
-    }
-    if (m_linkset_source && !m_linkset_source->is_attached()) {
-        return true;
+    if (m_collection_source) {
+        return !m_collection_source->get_owning_obj().is_valid();
     }
 
     if (m_source_column_key && !(m_linked_table && m_linked_table->is_valid(m_linked_obj_key))) {
@@ -446,21 +442,7 @@ bool TableView::depends_on_deleted_object() const
 
 void TableView::get_dependencies(TableVersions& ret) const
 {
-    if (m_linklist_source) {
-        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        if (m_linklist_source->is_attached()) {
-            Table& table = *m_linklist_source->get_target_table();
-            ret.emplace_back(table.get_key(), table.get_content_version());
-        }
-    }
-    else if (m_linkset_source) {
-        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
-        if (m_linkset_source->is_attached()) {
-            Table& table = *m_linkset_source->get_target_table();
-            ret.emplace_back(table.get_key(), table.get_content_version());
-        }
-    }
-    else if (m_source_column_key) {
+    if (m_source_column_key) {
         // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
         if (m_linked_table) {
             ret.emplace_back(m_linked_table->get_key(), m_linked_table->get_content_version());
@@ -470,7 +452,7 @@ void TableView::get_dependencies(TableVersions& ret) const
         m_query.get_outside_versions(ret);
     }
     else {
-        // This TableView was created by Table::get_distinct_view()
+        // This TableView was created by Table::get_distinct_view() or get_sorted_view() on collections
         ret.emplace_back(m_table->get_key(), m_table->get_content_version());
     }
 
@@ -583,17 +565,12 @@ void TableView::do_sync()
     // Here we sync with the respective source.
     m_last_seen_versions.clear();
 
-    if (m_linklist_source) {
+    if (m_collection_source) {
         m_key_values.clear();
-        std::for_each(m_linklist_source->begin(), m_linklist_source->end(), [this](ObjKey key) {
-            m_key_values.add(key);
-        });
-    }
-    else if (m_linkset_source) {
-        m_key_values.clear();
-        std::for_each(m_linkset_source->begin(), m_linkset_source->end(), [this](ObjKey key) {
-            m_key_values.add(key);
-        });
+        auto sz = m_collection_source->size();
+        for (size_t i = 0; i < sz; i++) {
+            m_key_values.add(m_collection_source->get_key(i));
+        }
     }
     else if (m_source_column_key) {
         m_key_values.clear();
@@ -683,10 +660,7 @@ bool TableView::is_in_table_order() const
     if (!m_table) {
         return false;
     }
-    else if (m_linklist_source) {
-        return false;
-    }
-    else if (m_linkset_source) {
+    else if (m_collection_source) {
         return false;
     }
     else if (m_source_column_key) {
