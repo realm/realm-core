@@ -65,6 +65,7 @@
 * App can now use bundled realm without getting "progress error" from server.
 * Refactored the wire protocol message parsing to not use std::istream or goto's for flow control.
 * Stopped running RaspberryPi testing in CI ([#4967](https://github.com/realm/realm-core/issues/4967)
+* Unit tests now run in parallel by default.
 
 ----------------------------------------------
 

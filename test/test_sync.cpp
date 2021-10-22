@@ -6893,8 +6893,8 @@ String sequence_next()
     return String(str);
 }
 
-TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int>, util::Optional<ObjectId>,
-           util::Optional<UUID>)
+NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util::Optional<Int>,
+                         util::Optional<ObjectId>, util::Optional<UUID>)
 {
     using underlying_type = typename util::RemoveOptional<TEST_TYPE>::type;
     constexpr bool is_optional = !std::is_same_v<underlying_type, TEST_TYPE>;

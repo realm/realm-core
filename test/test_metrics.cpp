@@ -720,7 +720,7 @@ TEST(Metrics_SubQueries)
     CHECK_EQUAL(str_equal_description, "\"Str_0\" == strings");
 }
 
-TEST(Metrics_TransactionTimings)
+NONCONCURRENT_TEST(Metrics_TransactionTimings)
 {
     ColKey col;
     SHARED_GROUP_TEST_PATH(path);
