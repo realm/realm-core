@@ -764,23 +764,13 @@ constexpr auto parser_comp = [](const std::pair<std::string_view, FancyParser>& 
 
 Bson dom_obj_to_bson(const Json& json)
 {
-    if (json.size() == 1) {
+    if (json.size() == 1 || json.size() == 2) {
         const auto& [key, value] = json.items().begin();
         if (key[0] == '$') {
             auto it = std::lower_bound(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers),
                                        std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
             if (it != std::end(bson_fancy_parsers) && it->first == key) {
                 return it->second(value);
-            }
-        }
-    }
-    else if (json.size() == 2) {
-        const auto& [key, value] = json.items().begin();
-        if (key[0] == '$') {
-            auto it = std::lower_bound(std::begin(bson_fancy_parsers), std::end(bson_fancy_parsers),
-                                       std::pair<std::string_view, FancyParser>(key, nullptr), parser_comp);
-            if (it != std::end(bson_fancy_parsers) && it->first == key) {
-                return it->second(json);
             }
         }
     }
