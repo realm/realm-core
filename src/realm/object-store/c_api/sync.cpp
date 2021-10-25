@@ -50,10 +50,10 @@ static_assert(realm_sync_session_stop_policy_e(SyncSessionStopPolicy::LiveIndefi
 static_assert(realm_sync_session_stop_policy_e(SyncSessionStopPolicy::AfterChangesUploaded) ==
               RLM_SYNC_SESSION_STOP_POLICY_AFTER_CHANGES_UPLOADED);
 
-static_assert(realm_sync_session_state_e(SyncSession::PublicState::Active) == RLM_SYNC_SESSION_STATE_ACTIVE);
-static_assert(realm_sync_session_state_e(SyncSession::PublicState::Dying) == RLM_SYNC_SESSION_STATE_DYING);
-static_assert(realm_sync_session_state_e(SyncSession::PublicState::Inactive) == RLM_SYNC_SESSION_STATE_INACTIVE);
-static_assert(realm_sync_session_state_e(SyncSession::PublicState::WaitingForAccessToken) ==
+static_assert(realm_sync_session_state_e(SyncSession::State::Active) == RLM_SYNC_SESSION_STATE_ACTIVE);
+static_assert(realm_sync_session_state_e(SyncSession::State::Dying) == RLM_SYNC_SESSION_STATE_DYING);
+static_assert(realm_sync_session_state_e(SyncSession::State::Inactive) == RLM_SYNC_SESSION_STATE_INACTIVE);
+static_assert(realm_sync_session_state_e(SyncSession::State::WaitingForAccessToken) ==
               RLM_SYNC_SESSION_STATE_WAITING_FOR_ACCESS_TOKEN);
 
 static_assert(realm_sync_connection_state_e(SyncSession::ConnectionState::Disconnected) ==

@@ -1937,7 +1937,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         SECTION("Expired Access Token is Refreshed") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
-            std::vector<SyncSession::PublicState> seen_states;
+            std::vector<SyncSession::State> seen_states;
             transport->hook = [&](const Request) -> util::Optional<Response> {
                 auto user = app->current_user();
                 REQUIRE(user);
@@ -1948,8 +1948,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
-            REQUIRE(std::find(begin(seen_states), end(seen_states),
-                              SyncSession::PublicState::WaitingForAccessToken) != end(seen_states));
+            REQUIRE(std::find(begin(seen_states), end(seen_states), SyncSession::State::WaitingForAccessToken) !=
+                    end(seen_states));
             Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");

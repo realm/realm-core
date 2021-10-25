@@ -35,23 +35,14 @@ class DB;
 class SyncManager;
 class SyncUser;
 
-namespace _impl {
-class RealmCoordinator;
-struct SyncClient;
-
-namespace sync_session_states {
-struct Active;
-struct Dying;
-struct Inactive;
-struct WaitingForAccessToken;
-} // namespace sync_session_states
-} // namespace _impl
-
 namespace sync {
 class Session;
 }
 
 namespace _impl {
+class RealmCoordinator;
+struct SyncClient;
+
 class SyncProgressNotifier {
 public:
     enum class NotifierType { upload, download };
@@ -108,7 +99,7 @@ private:
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
-    enum class PublicState {
+    enum class State {
         Active,
         Dying,
         Inactive,
@@ -121,14 +112,14 @@ public:
         Connected,
     };
 
-    using StateChangeCallback = void(PublicState old_state, PublicState new_state);
+    using StateChangeCallback = void(State old_state, State new_state);
     using ConnectionStateChangeCallback = void(ConnectionState old_state, ConnectionState new_state);
     using TransactionCallback = void(VersionID old_version, VersionID new_version);
     using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
     using ProgressDirection = _impl::SyncProgressNotifier::NotifierType;
 
     ~SyncSession();
-    PublicState state() const;
+    State state() const;
     ConnectionState connection_state() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
@@ -280,12 +271,6 @@ private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
     using CompletionCallbacks = std::map<int64_t, std::pair<ProgressDirection, std::function<void(std::error_code)>>>;
 
-    struct State;
-    friend struct _impl::sync_session_states::Active;
-    friend struct _impl::sync_session_states::Dying;
-    friend struct _impl::sync_session_states::Inactive;
-    friend struct _impl::sync_session_states::WaitingForAccessToken;
-
     class ConnectionChangeNotifier {
     public:
         uint64_t add_callback(std::function<ConnectionStateChangeCallback> callback);
@@ -341,15 +326,17 @@ private:
     void set_sync_transact_callback(std::function<TransactionCallback>);
     void nonsync_transact_notify(VersionID::version_type);
 
-    PublicState get_public_state() const;
-    // static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
-    void advance_state(std::unique_lock<std::mutex>& lock, const State&);
-
     void create_sync_session();
     void do_create_sync_session();
-    void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
     void detach_from_sync_manager();
+    void close(std::unique_lock<std::mutex>&);
+
+    void become_active(std::unique_lock<std::mutex>&);
+    void become_dying(std::unique_lock<std::mutex>&);
+    void become_inactive(std::unique_lock<std::mutex>&);
+    void become_waiting_for_access_token(std::unique_lock<std::mutex>&);
+
 
     void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
                                  ProgressDirection direction);
@@ -358,7 +345,7 @@ private:
 
     mutable std::mutex m_state_mutex;
 
-    const State* m_state = nullptr;
+    State m_state = State::Inactive;
 
     // The underlying state of the connection. Even when sharing connections, the underlying session
     // will always start out as disconnected and then immediately transition to the correct state when calling
