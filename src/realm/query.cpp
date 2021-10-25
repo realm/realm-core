@@ -1495,6 +1495,8 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
 
                 auto keys = node->index_based_keys();
                 for (auto key : keys) {
+                    if (limit == 0)
+                        break;
                     if (begin_key && key < begin_key)
                         continue;
                     if (end_key && !(key < end_key))
@@ -1502,11 +1504,13 @@ void Query::find_all(ConstTableView& ret, size_t begin, size_t end, size_t limit
                     if (pn->m_children.empty()) {
                         // No more conditions - just add key
                         refs.add(key);
+                        limit--;
                     }
                     else {
                         auto obj = m_table->get_object(key);
                         if (eval_object(obj)) {
                             refs.add(key);
+                            limit--;
                         }
                     }
                 }
