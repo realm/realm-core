@@ -297,12 +297,12 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
         session->wait_for_download_completion([&](std::error_code ec) {
             REQUIRE(ec == util::error::operation_aborted);
             REQUIRE(session->config().client_validate_ssl);
-            REQUIRE(session->state() == SyncSession::PublicState::Inactive);
+            REQUIRE(session->state() == SyncSession::State::Inactive);
 
             wait_called = true;
             session->revive_if_needed();
 
-            REQUIRE(session->state() != SyncSession::PublicState::Inactive);
+            REQUIRE(session->state() != SyncSession::State::Inactive);
         });
 
         auto config = session->config();
@@ -367,7 +367,7 @@ TEST_CASE("sync: error handling", "[sync]") {
                                 "Something bad happened", false};
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
-        REQUIRE(session->state() == SyncSession::PublicState::Inactive);
+        REQUIRE(session->state() == SyncSession::State::Inactive);
         std::time_t just_after_raw = std::time(nullptr);
         auto just_before = util::localtime(just_before_raw);
         auto just_after = util::localtime(just_after_raw);
@@ -462,7 +462,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         // Now close the session, causing the state to transition to Dying.
         // (it should remain stuck there until we start the server)
         session->close();
-        REQUIRE(session->state() == SyncSession::PublicState::Dying);
+        REQUIRE(session->state() == SyncSession::State::Dying);
 
         SECTION("transitions to Inactive once the server is started") {
             server.start();
@@ -477,7 +477,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
                 auto realm = Realm::get_shared_realm(config);
                 session2 = user->sync_manager()->get_existing_session(config.path);
             }
-            REQUIRE(session->state() == SyncSession::PublicState::Active);
+            REQUIRE(session->state() == SyncSession::State::Active);
             REQUIRE(session2 == session);
         }
 
@@ -495,14 +495,14 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
             SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
-            REQUIRE(session->state() == SyncSession::PublicState::Dying);
+            REQUIRE(session->state() == SyncSession::State::Dying);
             CHECK(!error_handler_invoked);
         }
     }
 
     SECTION("can change to Immediately after opening the session") {
         auto session = create_session(SyncSessionStopPolicy::AfterChangesUploaded);
-        REQUIRE(session->state() == SyncSession::PublicState::Active);
+        REQUIRE(session->state() == SyncSession::State::Active);
 
         auto config = session->config();
         config.stop_policy = SyncSessionStopPolicy::Immediately;
