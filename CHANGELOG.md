@@ -5,8 +5,8 @@
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* The Swift package could not be imported in Xcode 12.5 (since v11.5.0).
+
 ### Breaking changes
 * None.
 
