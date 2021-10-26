@@ -24,7 +24,7 @@ var cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_STRING", to: "\"\(versionStr)\"")
 ]
 
-#if swift(>=5.4)
+#if swift(>=5.5)
 cxxSettings.append(.define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])))
 #else
 cxxSettings.append(.define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])))
