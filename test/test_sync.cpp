@@ -5483,9 +5483,8 @@ TEST(Sync_UploadLogCompactionEnabled)
     fixture.bind_session(session_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](uint_fast64_t, uint_fast64_t,
-                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
-                                uint_fast64_t, uint_fast64_t) {
+    auto progress_handler = [&](uint_fast64_t, uint_fast64_t, uint_fast64_t uploaded_bytes,
+                                uint_fast64_t uploadable_bytes, uint_fast64_t, uint_fast64_t) {
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
     };
@@ -5538,9 +5537,8 @@ TEST(Sync_UploadLogCompactionDisabled)
     Session session_1 = fixture.make_bound_session(db_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](std::uint_fast64_t, std::uint_fast64_t,
-                                std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
-                                std::uint_fast64_t, std::uint_fast64_t) {
+    auto progress_handler = [&](std::uint_fast64_t, std::uint_fast64_t, std::uint_fast64_t uploaded_bytes,
+                                std::uint_fast64_t uploadable_bytes, std::uint_fast64_t, std::uint_fast64_t) {
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
     };
