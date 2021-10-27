@@ -1156,7 +1156,7 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
-    is_expired = !is_streaming && (transferred >= transferrable || (is_download && current_progress.downloadable == 0));
+    is_expired = !is_streaming && transferred >= transferrable;
     return [=, notifier = notifier] {
         notifier(transferred, transferrable);
     };
