@@ -199,9 +199,6 @@ public:
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name = none) const
         REQUIRES(!m_file_system_mutex);
 
-    // Get the unique identifier of this client.
-    std::string client_uuid() const;
-
     // Reset the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
     // calling this method.
@@ -293,9 +290,6 @@ private:
     // Internal method returning `true` if the SyncManager still contains sessions not yet fully closed.
     // Callers of this method should hold the `m_session_mutex` themselves.
     bool do_has_existing_sessions() REQUIRES(m_session_mutex);
-
-    // The unique identifier of this client.
-    util::Optional<std::string> m_client_uuid;
 
     std::string m_sync_route GUARDED_BY(m_mutex);
 
