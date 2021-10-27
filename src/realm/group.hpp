@@ -861,6 +861,8 @@ private:
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
+
+    void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>
     void set_history_parent(Accessor& history_root) noexcept;

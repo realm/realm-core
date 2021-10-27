@@ -62,7 +62,7 @@ public:
                      _impl::Instruction variant = _impl::instr_Set);
 
     virtual void list_set(const CollectionBase& list, size_t list_ndx, Mixed value);
-    virtual void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value);
+    virtual void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value, size_t prior_size);
     virtual void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx);
     virtual void list_erase(const CollectionBase&, size_t link_ndx);
     virtual void list_clear(const CollectionBase&);
@@ -527,7 +527,7 @@ inline void Replication::list_set(const CollectionBase& list, size_t list_ndx, M
     m_encoder.list_set(list_ndx); // Throws
 }
 
-inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed)
+inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed, size_t)
 {
     select_collection(list);         // Throws
     m_encoder.list_insert(list_ndx); // Throws

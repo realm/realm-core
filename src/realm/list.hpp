@@ -850,13 +850,14 @@ void Lst<T>::insert(size_t ndx, T value)
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
-    if (ndx > size())
+    auto sz = size();
+    if (ndx > sz)
         throw std::out_of_range("Index out of range");
 
     ensure_created();
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->list_insert(*this, ndx, value);
+        repl->list_insert(*this, ndx, value, sz);
     }
     do_insert(ndx, value);
     bump_content_version();

@@ -34,6 +34,7 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/replication.hpp>
 #include <realm/set.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/features.h>
@@ -1355,6 +1356,98 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions option
     bool no_create = false;
     bool is_backend = false;
     do_open(file, no_create, is_backend, options); // Throws
+}
+
+void DB::create_new_history(Replication& repl)
+{
+    Replication* old_repl = get_replication();
+    try {
+        repl.initialize(*this);
+        set_replication(&repl);
+
+        auto tr = start_write();
+        tr->clear_history();
+        std::vector<TableKey> table_keys;
+        for (auto tk : tr->get_table_keys()) {
+            if (tr->table_is_public(tk))
+                table_keys.push_back(tk);
+        }
+        // Create tables
+        for (auto tk : table_keys) {
+            auto table = tr->get_table(tk);
+            auto table_name = table->get_name();
+            auto pk_col = table->get_primary_key_column();
+            if (!pk_col)
+                throw std::runtime_error(
+                    util::format("Class '%1' must have a primary key", Group::table_name_to_class_name(table_name)));
+            auto pk_name = table->get_column_name(pk_col);
+            if (pk_name != "_id")
+                throw std::runtime_error(
+                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
+                                 Group::table_name_to_class_name(table_name), pk_name));
+            repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
+                                            pk_col.is_nullable());
+        }
+        // Create columns
+        for (auto tk : table_keys) {
+            auto table = tr->get_table(tk);
+            auto pk_col = table->get_primary_key_column();
+            auto cols = table->get_column_keys();
+            for (auto col : cols) {
+                if (col == pk_col)
+                    continue;
+                repl.insert_column(table.unchecked_ptr(), col, DataType(col.get_type()), table->get_column_name(col),
+                                   table->get_opposite_table(col).unchecked_ptr());
+            }
+        }
+        // Now the schema should be in place - create the objects
+        for (auto tk : table_keys) {
+            auto table = tr->get_table(tk);
+            auto pk_col = table->get_primary_key_column();
+            auto cols = table->get_column_keys();
+            for (auto o : *table) {
+                auto obj_key = o.get_key();
+                repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, o.get_any(pk_col));
+                for (auto col : cols) {
+                    if (col.is_list()) {
+                        auto list = o.get_listbase_ptr(col);
+                        auto sz = list->size();
+                        for (size_t n = 0; n < sz; n++) {
+                            repl.list_insert(*list, n, list->get_any(n), n);
+                        }
+                    }
+                    else if (col.is_set()) {
+                        auto set = o.get_setbase_ptr(col);
+                        auto sz = set->size();
+                        for (size_t n = 0; n < sz; n++) {
+                            repl.set_insert(*set, n, set->get_any(n));
+                        }
+                    }
+                    else if (col.is_dictionary()) {
+                        auto dict = o.get_dictionary(col);
+                        size_t n = 0;
+                        for (auto [key, value] : dict) {
+                            repl.dictionary_insert(dict, n++, key, value);
+                        }
+                    }
+                    else {
+                        repl.set(table.unchecked_ptr(), col, obj_key, o.get_any(col));
+                    }
+                }
+            }
+        }
+        tr->commit();
+    }
+    catch (...) {
+        set_replication(old_repl);
+        throw;
+    }
+}
+
+void DB::create_new_history(std::unique_ptr<Replication> repl)
+{
+    create_new_history(*repl);
+    m_history = std::move(repl);
 }
 
 

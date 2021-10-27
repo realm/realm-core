@@ -162,6 +162,9 @@ public:
         m_replication = repl;
     }
 
+    void create_new_history(Replication& repl);
+    void create_new_history(std::unique_ptr<Replication> repl);
+
     const std::string& get_path() const noexcept
     {
         return m_db_path;
