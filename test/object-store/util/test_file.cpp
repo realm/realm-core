@@ -138,12 +138,12 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, std::string partition, realm::Schema _schema)
+SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson partition, realm::Schema _schema)
 {
     if (!user)
         throw std::runtime_error("Must provide `user` for SyncTestFile");
 
-    sync_config = std::make_shared<realm::SyncConfig>(user, bson::Bson(partition));
+    sync_config = std::make_shared<realm::SyncConfig>(user, partition);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
