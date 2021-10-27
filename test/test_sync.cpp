@@ -103,11 +103,16 @@ void write_transaction_notifying_session(DBRef db, Session& session, Function&& 
     session.nonsync_transact_notify(new_version);
 }
 
-ClientReplication& get_history(DBRef db)
+ClientReplication& get_replication(DBRef db)
 {
-    auto history = dynamic_cast<ClientReplication*>(db->get_replication());
-    REALM_ASSERT(history);
-    return *history;
+    auto repl = dynamic_cast<ClientReplication*>(db->get_replication());
+    REALM_ASSERT(repl);
+    return *repl;
+}
+
+ClientHistory& get_history(DBRef db)
+{
+    return get_replication(db).get_history();
 }
 
 
@@ -6152,7 +6157,7 @@ TEST(Sync_BadChangeset)
             TableRef table = wt.add_table("class_Foo");
             table->add_column(type_Int, "i");
             table->create_object().set_all(123);
-            const ChangesetEncoder::Buffer& buffer = get_history(db).get_instruction_encoder().buffer();
+            const ChangesetEncoder::Buffer& buffer = get_replication(db).get_instruction_encoder().buffer();
             char bad_instruction = 0x3e;
             const_cast<ChangesetEncoder::Buffer&>(buffer).append(&bad_instruction, 1);
             wt.commit();
@@ -7437,16 +7442,16 @@ TEST(Sync_Set)
 TEST(Sync_DanglingLinksCountInPriorSize)
 {
     SHARED_GROUP_TEST_PATH(path);
-    ClientReplication history;
-    auto local_db = realm::DB::create(history, path);
+    ClientReplication repl;
+    auto local_db = realm::DB::create(repl, path);
     auto& logger = test_context.logger;
-
+    auto& history = repl.get_history();
     history.set_client_file_ident(sync::SaltedFileIdent{1, 123456}, true);
 
     version_type last_version, last_version_observed = 0;
     auto dump_uploadable = [&] {
         UploadCursor upload_cursor{last_version_observed, 0};
-        std::vector<sync::ClientReplication::UploadChangeset> changesets_to_upload;
+        std::vector<sync::ClientHistory::UploadChangeset> changesets_to_upload;
         version_type locked_server_version = 0;
         history.find_uploadable_changesets(upload_cursor, last_version, changesets_to_upload, locked_server_version);
         CHECK_EQUAL(changesets_to_upload.size(), static_cast<size_t>(1));
@@ -7483,7 +7488,7 @@ TEST(Sync_DanglingLinksCountInPriorSize)
 
     {
         // Simulate removing the object via the sync client so we get a dangling link
-        TempShortCircuitReplication disable_repl(history);
+        TempShortCircuitReplication disable_repl(repl);
         auto wt = local_db->start_write();
         auto target_table = wt->get_table(target_table_key);
         auto obj = target_table->get_object_with_primary_key(std::string{"target2"});

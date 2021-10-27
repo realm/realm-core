@@ -20,15 +20,6 @@ struct MakeClientHistory {
     {
         return realm::sync::make_client_replication();
     }
-
-    static file_ident_type get_client_file_ident(ClientReplication& history)
-    {
-        version_type current_client_version;
-        SaltedFileIdent client_file_ident;
-        SyncProgress progress;
-        history.get_status(current_client_version, client_file_ident, progress);
-        return client_file_ident.ident;
-    }
 };
 
 struct MakeServerHistory {
@@ -55,12 +46,6 @@ struct MakeServerHistory {
     static std::unique_ptr<_impl::ServerHistory> make_history()
     {
         return std::make_unique<WrapServerHistory>();
-    }
-
-    static _impl::ServerHistory::file_ident_type get_client_file_ident(_impl::ServerHistory&)
-    {
-        // For un-migrated Realms, the server's client file ident is always 1.
-        return 1;
     }
 };
 
@@ -102,7 +87,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
 
     DBRef sg = DB::create(*history, test_dir);
 
-    auto client_file_ident = TEST_TYPE::get_client_file_ident(*history);
+    auto client_file_ident = sg->start_read()->get_sync_file_id();
 
     // Tables without primary keys:
     {
@@ -169,9 +154,9 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
 TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = make_client_replication();
+    auto repl = make_client_replication();
 
-    DBRef sg = DB::create(*history, test_dir);
+    DBRef sg = DB::create(*repl, test_dir);
 
     ColKey link_col;
     {
@@ -191,13 +176,14 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
     }
 
     bool fix_up_object_ids = true;
-    history->set_client_file_ident({1, 123}, fix_up_object_ids);
+    auto& history = repl->get_history();
+    history.set_client_file_ident({1, 123}, fix_up_object_ids);
 
     // Save the changeset to replay later
     UploadCursor upload_cursor{0, 0};
-    std::vector<ClientReplication::UploadChangeset> changesets;
+    std::vector<ClientHistory::UploadChangeset> changesets;
     version_type locked_server_version; // Dummy
-    history->find_uploadable_changesets(upload_cursor, 2, changesets, locked_server_version);
+    history.find_uploadable_changesets(upload_cursor, 2, changesets, locked_server_version);
     CHECK_GREATER_EQUAL(changesets.size(), 1);
     auto& changeset = changesets[0].changeset;
     ChunkedBinaryInputStream stream{changeset};

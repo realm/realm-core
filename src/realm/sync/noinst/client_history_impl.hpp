@@ -9,6 +9,7 @@
 namespace realm {
 namespace sync {
 
+class ClientReplication;
 // As new schema versions come into existence, describe them here.
 //
 //  0  Initial version
@@ -47,7 +48,7 @@ constexpr int get_client_history_schema_version() noexcept
     return 11;
 }
 
-class ClientReplication final : public SyncReplication, private _impl::History, public TransformHistory {
+class ClientHistory final : public _impl::History, public TransformHistory {
 public:
     using version_type = sync::version_type;
     using RemoteChangeset = Transformer::RemoteChangeset;
@@ -213,20 +214,6 @@ public:
                                      VersionInfo& new_version, IntegrationError& integration_error, util::Logger&,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
-    // Overriding member functions in realm::Replication
-    void initialize(DB& sg) override final;
-    HistoryType get_history_type() const noexcept override final;
-    int get_history_schema_version() const noexcept override final;
-    bool is_upgradable_history_schema(int) const noexcept override final;
-    void upgrade_history_schema(int) override final;
-    History* _get_history_write() override;
-    std::unique_ptr<History> _create_history_read() override;
-
-    // Overriding member functions in realm::Replication
-    version_type prepare_changeset(const char*, size_t, version_type) override final;
-    void finalize_changeset() noexcept override final;
-
-
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
 
@@ -247,8 +234,15 @@ public: // Stuff in this section is only used by tests.
     void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
 
 private:
+    friend class ClientReplication;
     static constexpr version_type s_initial_version = 1;
 
+    ClientHistory(ClientReplication* owner)
+        : m_replication(owner)
+    {
+    }
+
+    ClientReplication* m_replication;
     DB* m_db = nullptr;
 
     // FIXME: All history objects belonging to a particular client object
@@ -261,7 +255,7 @@ private:
     /// m_ct_history.size()` is equal to the version that is associated with the
     /// currently bound snapshot, but after add_ct_history_entry() is called, it
     /// is equal to that plus one.
-    mutable version_type m_ct_history_base_version;
+    mutable version_type m_ct_history_base_version = 0;
 
     /// Version on which the first changeset in the synchronization history is
     /// based, or if that history is empty, the version on which the next
@@ -269,7 +263,7 @@ private:
     /// `m_sync_history_base_version + m_sync_history_size` is equal to the
     /// version, that is associated with the currently bound snapshot, but after
     /// add_sync_history_entry() is called, it is equal to that plus one.
-    mutable version_type m_sync_history_base_version;
+    mutable version_type m_sync_history_base_version = 0;
 
     using IntegerBpTree = BPlusTree<int64_t>;
     struct Arrays {
@@ -358,6 +352,12 @@ private:
 
     std::function<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
 
+    void initialize(DB& db) noexcept
+    {
+        REALM_ASSERT(!m_db);
+        m_db = &db;
+    }
+
     static version_type find_sync_history_entry(Arrays& arrays, version_type base_version, version_type begin_version,
                                                 version_type end_version, HistoryEntry& entry,
                                                 version_type& last_integrated_server_version) noexcept;
@@ -368,7 +368,7 @@ private:
                                                   version_type end_version) const noexcept;
 
     void prepare_for_write();
-    void add_ct_history_entry(BinaryData changeset);
+    Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(HistoryEntry);
     void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes);
     void trim_ct_history();
@@ -399,6 +399,49 @@ private:
     bool no_pending_local_changes(version_type version) const final;
 };
 
+class ClientReplication final : public SyncReplication {
+public:
+    ClientReplication()
+        : m_history(this)
+    {
+    }
+
+    // Overriding member functions in realm::Replication
+    void initialize(DB& sg) override final;
+    HistoryType get_history_type() const noexcept override final;
+    int get_history_schema_version() const noexcept override final;
+    bool is_upgradable_history_schema(int) const noexcept override final;
+    void upgrade_history_schema(int) override final;
+
+    _impl::History* _get_history_write() override
+    {
+        return &m_history;
+    }
+    std::unique_ptr<_impl::History> _create_history_read() override
+    {
+        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(this));
+        hist->initialize(*m_history.m_db);
+        return hist;
+    }
+
+    // Overriding member functions in realm::Replication
+    version_type prepare_changeset(const char*, size_t, version_type) override final;
+    void finalize_changeset() noexcept override final;
+
+    ClientHistory& get_history()
+    {
+        return m_history;
+    }
+
+    const ClientHistory& get_history() const
+    {
+        return m_history;
+    }
+
+private:
+    ClientHistory m_history;
+};
+
 
 // Implementation
 
@@ -424,7 +467,7 @@ private:
 //
 // See trim_sync_history() for further details, and in particular, for a
 // definition of *upload skippable*.
-inline void ClientReplication::clamp_sync_version_range(version_type& begin, version_type& end) const noexcept
+inline void ClientHistory::clamp_sync_version_range(version_type& begin, version_type& end) const noexcept
 {
     REALM_ASSERT(begin <= end);
     REALM_ASSERT(m_progress_download.last_integrated_client_version <= begin);
@@ -435,7 +478,7 @@ inline void ClientReplication::clamp_sync_version_range(version_type& begin, ver
     }
 }
 
-inline auto ClientReplication::get_transformer() -> Transformer&
+inline auto ClientHistory::get_transformer() -> Transformer&
 {
     if (!m_transformer)
         m_transformer = make_transformer(); // Throws
