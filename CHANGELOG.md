@@ -5,6 +5,7 @@
 
 ### Fixed
 * SyncManager had some inconsistent locking which could result in data races and/or deadlocks, mostly in ways that would never be hit outside of tests doing very strange things (since v10.0.0).
+* Reduce the peak memory usage of changeset uploading by eliminating an extra copy of each changeset which was held in memory.
 
 ### Breaking changes
 * None.

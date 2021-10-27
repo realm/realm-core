@@ -2023,24 +2023,26 @@ void Session::send_upload_message()
         }
 
         if (!get_client().m_disable_upload_compaction) {
-            // Upload compaction only takes place within single changesets to
-            // avoid another client seeing inconsistent snapshots.
-            ChunkedBinaryInputStream stream{uc.changeset};
-            Changeset changeset;
-            parse_changeset(stream, changeset); // Throws
-            // FIXME: What is the point of setting these? How can compaction care about them?
-            changeset.version = uc.progress.client_version;
-            changeset.last_integrated_remote_version = uc.progress.last_integrated_server_version;
-            changeset.origin_timestamp = uc.origin_timestamp;
-            changeset.origin_file_ident = uc.origin_file_ident;
+            ChangesetEncoder::Buffer encode_buffer;
 
-            compact_changesets(&changeset, 1);
+            {
+                // Upload compaction only takes place within single changesets to
+                // avoid another client seeing inconsistent snapshots.
+                ChunkedBinaryInputStream stream{uc.changeset};
+                Changeset changeset;
+                parse_changeset(stream, changeset); // Throws
+                // FIXME: What is the point of setting these? How can compaction care about them?
+                changeset.version = uc.progress.client_version;
+                changeset.last_integrated_remote_version = uc.progress.last_integrated_server_version;
+                changeset.origin_timestamp = uc.origin_timestamp;
+                changeset.origin_file_ident = uc.origin_file_ident;
 
-            util::AppendBuffer<char> encode_buffer;
-            encode_changeset(changeset, encode_buffer);
+                compact_changesets(&changeset, 1);
+                encode_changeset(changeset, encode_buffer);
 
-            logger.debug("Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
-                         encode_buffer.size()); // Throws
+                logger.debug("Upload compaction: original size = %1, compacted size = %2", uc.changeset.size(),
+                             encode_buffer.size()); // Throws
+            }
 
             upload_message_builder.add_changeset(
                 uc.progress.client_version, uc.progress.last_integrated_server_version, uc.origin_timestamp,

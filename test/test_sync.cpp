@@ -5904,8 +5904,6 @@ TEST(Sync_ClientErrorHandler)
 }
 
 
-#ifndef REALM_PLATFORM_WIN32
-
 TEST(Sync_VerifyServerHistoryAfterLargeUpload)
 {
     TEST_DIR(server_dir);
@@ -5946,8 +5944,6 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
         }
     }
 }
-
-#endif // REALM_PLATFORM_WIN32
 
 
 TEST(Sync_ServerSideModify_Randomize)
