@@ -198,7 +198,7 @@ functions:
               cd $SDK_HOME
               mkdir .android
               touch .android/repositories.cfg
-              export JAVA_HOME="/opt/java/jdk8"
+              # export JAVA_HOME="/opt/java/jdk8"
               export ANDROID_HOME=$SDK_HOME
               export ANDROID_SDK_ROOT=$SDK_HOME
               export ANDROID_SDK_HOME=$SDK_HOME
