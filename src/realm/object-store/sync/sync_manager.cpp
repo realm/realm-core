@@ -44,14 +44,12 @@ SyncClientTimeouts::SyncClientTimeouts()
 void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
                             const SyncClientConfig& config)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_app = app;
-        m_sync_route = sync_route;
-        m_config = std::move(config);
-        if (m_sync_client)
-            return;
-    }
+    util::CheckedLockGuard lock(m_mutex);
+    m_app = app;
+    m_sync_route = sync_route;
+    m_config = std::move(config);
+    if (m_sync_client)
+        return;
 
     struct UserCreationData {
         std::string identity;
@@ -65,7 +63,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
 
     std::vector<UserCreationData> users_to_add;
     {
-        std::lock_guard<std::mutex> lock(m_file_system_mutex);
+        util::CheckedLockGuard lock(m_file_system_mutex);
 
         // Set up the file manager.
         if (m_file_manager) {
@@ -152,7 +150,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
         }
     }
     {
-        std::lock_guard<std::mutex> lock(m_user_mutex);
+        util::CheckedLockGuard lock(m_user_mutex);
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
             auto& provider_type = user_data.provider_type;
@@ -167,6 +165,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
 
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 {
+    util::CheckedLockGuard lock(m_file_system_mutex);
     if (!m_metadata_manager) {
         return false;
     }
@@ -208,13 +207,15 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 
 void SyncManager::reset_for_testing()
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    m_metadata_manager = nullptr;
-    m_client_uuid = util::none;
+    {
+        util::CheckedLockGuard lock(m_file_system_mutex);
+        m_metadata_manager = nullptr;
+        m_client_uuid = util::none;
+    }
 
     {
         // Destroy all the users.
-        std::lock_guard<std::mutex> lock(m_user_mutex);
+        util::CheckedLockGuard lock(m_user_mutex);
         for (auto& user : m_users) {
             user->detach_from_sync_manager();
         }
@@ -222,14 +223,14 @@ void SyncManager::reset_for_testing()
         m_current_user = nullptr;
     }
     {
-        std::lock_guard<std::mutex> lock(m_mutex);
+        util::CheckedLockGuard lock(m_mutex);
 
         // Stop the client. This will abort any uploads that inactive sessions are waiting for.
         if (m_sync_client)
             m_sync_client->stop();
 
         {
-            std::lock_guard<std::mutex> lock(m_session_mutex);
+            util::CheckedLockGuard lock(m_session_mutex);
             // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
             // prior to calling `reset_for_testing`.
             bool no_sessions = !do_has_existing_sessions();
@@ -252,20 +253,23 @@ void SyncManager::reset_for_testing()
         m_sync_route = "";
     }
 
-    if (m_file_manager)
-        util::try_remove_dir_recursive(m_file_manager->base_path());
-    m_file_manager = nullptr;
+    {
+        util::CheckedLockGuard lock(m_file_system_mutex);
+        if (m_file_manager)
+            util::try_remove_dir_recursive(m_file_manager->base_path());
+        m_file_manager = nullptr;
+    }
 }
 
 void SyncManager::set_log_level(util::Logger::Level level) noexcept
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     m_config.log_level = level;
 }
 
 void SyncManager::set_logger_factory(SyncClientConfig::LoggerFactory factory) noexcept
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     m_config.logger_factory = std::move(factory);
 }
 
@@ -282,19 +286,19 @@ std::unique_ptr<util::Logger> SyncManager::make_logger() const
 
 void SyncManager::set_user_agent(std::string user_agent)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     m_config.user_agent_application_info = std::move(user_agent);
 }
 
 void SyncManager::set_timeouts(SyncClientTimeouts timeouts)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     m_config.timeouts = timeouts;
 }
 
 void SyncManager::reconnect() const
 {
-    std::lock_guard<std::mutex> lock(m_session_mutex);
+    util::CheckedLockGuard lock(m_session_mutex);
     for (auto& it : m_sessions) {
         it.second->handle_reconnect();
     }
@@ -302,13 +306,13 @@ void SyncManager::reconnect() const
 
 util::Logger::Level SyncManager::log_level() const noexcept
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     return m_config.log_level;
 }
 
 bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    util::CheckedLockGuard lock(m_file_system_mutex);
     if (!m_metadata_manager) {
         return false;
     }
@@ -320,7 +324,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
                                                 std::string access_token, const std::string provider_type,
                                                 std::string device_id)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(), m_users.end(), [user_id, provider_type](const auto& user) {
         return user->identity() == user_id && user->provider_type() == provider_type &&
                user->state() != SyncUser::State::Removed;
@@ -331,8 +335,12 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
             std::make_shared<SyncUser>(std::move(refresh_token), user_id, provider_type, std::move(access_token),
                                        SyncUser::State::LoggedIn, device_id, this);
         m_users.emplace(m_users.begin(), new_user);
-        if (!m_metadata_manager)
-            m_current_user = new_user;
+        {
+            util::CheckedLockGuard lock(m_file_system_mutex);
+            // m_current_user is normally set very indirectly via the metadata manger
+            if (!m_metadata_manager)
+                m_current_user = new_user;
+        }
         return new_user;
     }
     else { // LoggedOut => LoggedIn
@@ -345,7 +353,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
     m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
                                  [](auto& user) {
                                      bool should_remove = (user->state() == SyncUser::State::Removed);
@@ -369,11 +377,11 @@ std::shared_ptr<SyncUser> SyncManager::get_user_for_identity(std::string const& 
 
 std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
 
     if (m_current_user)
         return m_current_user;
-    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
+    util::CheckedLockGuard fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)
         return nullptr;
 
@@ -383,7 +391,7 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 
 void SyncManager::log_out_user(const std::string& user_id)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
 
     // Move this user to the end of the vector
     if (m_users.size() > 1) {
@@ -395,6 +403,7 @@ void SyncManager::log_out_user(const std::string& user_id)
             std::rotate(it, it + 1, m_users.end());
     }
 
+    util::CheckedLockGuard fs_lock(m_file_system_mutex);
     bool was_active = (m_current_user && m_current_user->identity() == user_id) ||
                       (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user_id);
     if (!was_active)
@@ -410,7 +419,6 @@ void SyncManager::log_out_user(const std::string& user_id)
         }
     }
 
-    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
     if (m_metadata_manager)
         m_metadata_manager->set_current_user_identity("");
     m_current_user = nullptr;
@@ -418,23 +426,23 @@ void SyncManager::log_out_user(const std::string& user_id)
 
 void SyncManager::set_current_user(const std::string& user_id)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
 
     m_current_user = get_user_for_identity(user_id);
-    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
+    util::CheckedLockGuard fs_lock(m_file_system_mutex);
     if (m_metadata_manager)
         m_metadata_manager->set_current_user_identity(user_id);
 }
 
 void SyncManager::remove_user(const std::string& user_id)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
     auto user = get_user_for_identity(user_id);
     if (!user)
         return;
     user->set_state(SyncUser::State::Removed);
 
-    std::lock_guard<std::mutex> fs_lock(m_file_system_mutex);
+    util::CheckedLockGuard fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)
         return;
 
@@ -449,9 +457,9 @@ void SyncManager::remove_user(const std::string& user_id)
 SyncManager::~SyncManager()
 {
     // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
-    // session->shutdown_and_wait() will modify th m_sessions map.
+    // session->shutdown_and_wait() will modify the m_sessions map.
     auto current_sessions = [&] {
-        std::lock_guard<std::mutex> lk(m_session_mutex);
+        util::CheckedLockGuard lk(m_session_mutex);
         std::vector<std::shared_ptr<SyncSession>> current_sessions;
         std::transform(m_sessions.begin(), m_sessions.end(), std::back_inserter(current_sessions),
                        [](const auto& session_kv) {
@@ -467,7 +475,7 @@ SyncManager::~SyncManager()
     // At this point we should have drained all the sessions.
 #ifdef REALM_DEBUG
     {
-        std::lock_guard<std::mutex> lk(m_session_mutex);
+        util::CheckedLockGuard lk(m_session_mutex);
         REALM_ASSERT(m_sessions.empty());
     }
 #endif
@@ -483,7 +491,7 @@ SyncManager::~SyncManager()
 
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    util::CheckedLockGuard lock(m_user_mutex);
     auto user = get_user_for_identity(user_id);
     return user && user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
@@ -531,14 +539,14 @@ static std::string string_from_partition(const std::string& partition)
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& realm_file_name) const
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    util::CheckedLockGuard lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     return m_file_manager->realm_file_path(user.identity(), user.local_identity(), realm_file_name);
 }
 
 std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name) const
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    util::CheckedLockGuard lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     REALM_ASSERT(config.user);
 
@@ -562,14 +570,14 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    util::CheckedLockGuard lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     return m_file_manager->recovery_directory_path(custom_dir_name);
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std::string& path) const
 {
-    std::lock_guard<std::mutex> lock(m_session_mutex);
+    util::CheckedLockGuard lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
         if (auto external_reference = session->existing_external_reference())
             return external_reference;
@@ -579,14 +587,13 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std:
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_session_locked(const std::string& path) const
 {
-    REALM_ASSERT(!m_session_mutex.try_lock());
     auto it = m_sessions.find(path);
     return it == m_sessions.end() ? nullptr : it->second;
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path) const
 {
-    std::lock_guard<std::mutex> lock(m_session_mutex);
+    util::CheckedLockGuard lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path))
         return session->external_reference();
 
@@ -598,7 +605,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, co
     auto& client = get_sync_client(); // Throws
     auto path = db->get_path();
 
-    std::unique_lock<std::mutex> lock(m_session_mutex);
+    util::CheckedUniqueLock lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
         sync_config.user->register_session(session);
         return session->external_reference();
@@ -622,7 +629,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(std::shared_ptr<DB> db, co
 
 bool SyncManager::has_existing_sessions()
 {
-    std::lock_guard<std::mutex> lock(m_session_mutex);
+    util::CheckedLockGuard lock(m_session_mutex);
     return do_has_existing_sessions();
 }
 
@@ -641,7 +648,7 @@ void SyncManager::wait_for_sessions_to_terminate()
 
 void SyncManager::unregister_session(const std::string& path)
 {
-    std::unique_lock<std::mutex> lock(m_session_mutex);
+    util::CheckedUniqueLock lock(m_session_mutex);
     auto it = m_sessions.find(path);
     if (it == m_sessions.end()) {
         // There was a race to unregister and there's nothing left to do here.
@@ -671,7 +678,7 @@ void SyncManager::unregister_session(const std::string& path)
 
 void SyncManager::enable_session_multiplexing()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     if (m_config.multiplex_sessions)
         return; // Already enabled, we can ignore
 
@@ -683,7 +690,7 @@ void SyncManager::enable_session_multiplexing()
 
 SyncClient& SyncManager::get_sync_client() const
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    util::CheckedLockGuard lock(m_mutex);
     if (!m_sync_client)
         m_sync_client = create_sync_client(); // Throws
     return *m_sync_client;
@@ -691,7 +698,6 @@ SyncClient& SyncManager::get_sync_client() const
 
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
-    REALM_ASSERT(!m_mutex.try_lock());
     return std::make_unique<SyncClient>(make_logger(), m_config, weak_from_this());
 }
 
@@ -703,7 +709,7 @@ std::string SyncManager::client_uuid() const
 
 util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    util::CheckedLockGuard lock(m_file_system_mutex);
     if (!m_metadata_manager) {
         return util::none;
     }
