@@ -576,7 +576,6 @@ private:
 
     void async_begin_write(std::function<void()> fn);
     void async_end_write();
-    void async_end_write(std::function<void()> fn);
     void async_sync_to_disk(std::function<void()> fn);
 
     friend class Transaction;
@@ -731,30 +730,24 @@ public:
         }
     }
 
-    // Request that write lock is released on helper thread and wait for it to happen
-    void release_write_lock()
-    {
-        std::unique_lock<std::mutex> lck(mtx);
-        if (m_async_stage == AsyncState::HasLock) {
-            get_db()->async_end_write([this]() {
-                std::unique_lock<std::mutex> lck(mtx);
-                m_async_stage = AsyncState::Idle;
-                cv.notify_one();
-            });
-            cv.wait(lck);
-        }
-    }
-
     bool wait_for_sync()
     {
+        bool did_wait = false;
         std::unique_lock<std::mutex> lck(mtx);
         if (m_async_stage == Transaction::AsyncState::Syncing) {
             waiting_for_sync = true;
             cv.wait(lck);
             waiting_for_sync = false;
-            return true;
+            did_wait = true;
         }
-        return false;
+        if (m_commit_exception)
+            throw m_commit_exception;
+        return did_wait;
+    }
+
+    std::exception_ptr get_commit_exception()
+    {
+        return m_commit_exception;
     }
 
 private:
@@ -789,6 +782,7 @@ private:
     AsyncState m_async_stage = AsyncState::Idle;
     bool waiting_for_write_lock = false;
     bool waiting_for_sync = false;
+    std::exception_ptr m_commit_exception;
 
     friend class DB;
     friend class DisableReplication;

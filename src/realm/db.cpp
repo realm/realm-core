@@ -1707,13 +1707,6 @@ public:
         m_changed.notify_one();
     }
 
-    void end_write(std::function<void()> fn)
-    {
-        std::unique_lock lg(m_mutex);
-        m_pending_mx_release_cb.emplace(std::move(fn));
-        m_changed.notify_one();
-    }
-
     void sync_to_disk(std::function<void()> fn)
     {
         std::unique_lock lg(m_mutex);
@@ -1729,7 +1722,6 @@ private:
     std::condition_variable m_changed;
     std::deque<std::function<void()>> m_pending_writes;
     util::Optional<std::function<void()>> m_pending_sync;
-    util::Optional<std::function<void()>> m_pending_mx_release_cb;
     bool m_pending_mx_release = false;
     bool m_running = false;
     bool m_has_write_mutex = false;
@@ -1757,16 +1749,6 @@ void DB::AsyncCommitHelper::main()
             else if (m_pending_mx_release) {
                 m_db->do_end_write();
                 m_pending_mx_release = false;
-                m_has_write_mutex = false;
-                continue;
-            }
-            else if (m_pending_mx_release_cb) {
-                m_db->do_end_write();
-                std::function<void()> cb = m_pending_mx_release_cb.value();
-                m_pending_mx_release_cb.reset();
-                lg.unlock();
-                cb();
-                lg.lock();
                 m_has_write_mutex = false;
                 continue;
             }
@@ -1803,11 +1785,6 @@ void DB::async_begin_write(std::function<void()> fn)
 void DB::async_end_write()
 {
     m_commit_helper->end_write();
-}
-
-void DB::async_end_write(std::function<void()> fn)
-{
-    m_commit_helper->end_write(fn);
 }
 
 void DB::async_sync_to_disk(std::function<void()> fn)
@@ -3107,21 +3084,27 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
     std::unique_lock<std::mutex> lck(mtx);
     REALM_ASSERT(m_async_stage == AsyncState::HasCommits);
     m_async_stage = AsyncState::Syncing;
+    m_commit_exception = std::exception_ptr();
     // get a callback on the helper thread, in which to sync to disk
-    get_db()->async_sync_to_disk([&, when_synchronized]() {
+    get_db()->async_sync_to_disk([&, when_synchronized]() noexcept {
         // sync to disk:
-        DB::ReadLockInfo read_lock;
-        db->grab_read_lock(read_lock, VersionID());
-        GroupWriter out(*this);
-        out.commit(read_lock.m_top_ref);
-        // we must release the write mutex before the callback, because the callback
-        // is allowed to re-request it.
-        db->release_read_lock(read_lock);
-        if (m_oldest_version_not_persisted) {
-            db->release_read_lock(*m_oldest_version_not_persisted);
-            m_oldest_version_not_persisted.reset();
+        try {
+            DB::ReadLockInfo read_lock;
+            db->grab_read_lock(read_lock, VersionID());
+            GroupWriter out(*this);
+            out.commit(read_lock.m_top_ref); // Throws
+            // we must release the write mutex before the callback, because the callback
+            // is allowed to re-request it.
+            db->release_read_lock(read_lock);
+            if (m_oldest_version_not_persisted) {
+                db->release_read_lock(*m_oldest_version_not_persisted);
+                m_oldest_version_not_persisted.reset();
+            }
+            db->do_end_write();
         }
-        db->do_end_write();
+        catch (...) {
+            m_commit_exception = std::current_exception();
+        }
 
         std::unique_lock<std::mutex> lck(mtx);
         m_async_stage = AsyncState::Idle;

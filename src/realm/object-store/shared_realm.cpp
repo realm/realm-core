@@ -635,6 +635,11 @@ void Realm::run_async_completions_on_proper_thread()
 void Realm::call_completion_callbacks()
 {
     m_is_running_async_commit_completions = true;
+    if (m_transaction) {
+        if (auto error = m_transaction->get_commit_exception())
+            throw error;
+    }
+
     for (auto cb : m_async_commit_q) {
         cb();
     }
@@ -867,7 +872,8 @@ void Realm::commit_transaction()
         prev_version = transaction().get_version_of_current_transaction();
     }
 
-    m_coordinator->commit_write(*this, false);
+    constexpr bool commit_to_disk = false;
+    m_coordinator->commit_write(*this, commit_to_disk);
     cache_new_schema();
     m_transaction->async_request_sync_to_storage();
     m_transaction->wait_for_sync();

@@ -16,7 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <iostream>
 #include <catch2/catch.hpp>
 
 #include "util/event_loop.hpp"
@@ -927,7 +926,7 @@ TEST_CASE("SharedRealm: async_writes") {
             auto col = table->get_column_key("value");
             table->create_object().set(col, 45);
             done = true;
-            realm->async_commit_transaction([&]() {});
+            realm->async_commit_transaction();
         });
         realm->async_begin_transaction([&]() {
             auto table = realm->read_group().get_table("class_object");
@@ -988,6 +987,7 @@ TEST_CASE("SharedRealm: async_writes") {
             return persisted;
         });
         REQUIRE(table->size() == 2);
+        REQUIRE(!table->find_first_int(col, 90));
     }
     SECTION("object change information") {
         realm->begin_transaction();
@@ -1182,7 +1182,7 @@ TEST_CASE("SharedRealm: notifications") {
 
     SECTION("notifications created in async transaction are sent asynchronously") {
         realm->async_begin_transaction([&] {
-            realm->async_commit_transaction([] {});
+            realm->async_commit_transaction();
         });
         REQUIRE(change_count == 0);
         util::EventLoop::main().run_until([&] {
