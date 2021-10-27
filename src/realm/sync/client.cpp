@@ -1226,27 +1226,17 @@ void SessionWrapper::report_progress()
     ClientReplication::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes, uploaded_bytes,
                                                  uploadable_bytes, snapshot_version);
 
-    // In protocol versions 25 and earlier, downloadable_bytes was the total
-    // size of the history. From protocol version 26, downloadable_bytes
-    // represent the non-downloaded bytes on the server. Since the user supplied
-    // progress handler interprets downloadable_bytes as the total size of
-    // downloadable bytes, this number must be calculated.  We could change the
-    // meaning of downloadable_bytes for the progress handler, but that would be
-    // a breaking change. Note that protocol version 25 (and earlier) is no
-    // longer supported by clients.
-    std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
-
     m_sess->logger.debug("Progress handler called, downloaded = %1, "
                          "downloadable(total) = %2, uploaded = %3, "
                          "uploadable = %4, reliable_download_progress = %5, "
                          "snapshot version = %6",
-                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
+                         downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
                          m_reliable_download_progress, snapshot_version);
 
-    // FIXME: Why is this boolean status communicated to the application as
-    // a 64-bit integer? Also, the name `progress_version` is confusing.
-    std::uint_fast64_t progress_version = (m_reliable_download_progress ? 1 : 0);
-    m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, progress_version,
+    // Ignore progress messages from before we first receive a DOWNLOAD message.
+    // FIXME: This could be a bool instead of std::uint_fast64_t
+    std::uint_fast64_t download_version = (m_reliable_download_progress ? 1 : 0);
+    m_progress_handler(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes, download_version,
                        snapshot_version);
 }
 

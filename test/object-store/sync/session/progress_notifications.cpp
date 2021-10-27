@@ -331,7 +331,7 @@ TEST_CASE("progress notification", "[sync]") {
             // Prime the progress updater
             current_transferred = 60;
             current_transferrable = 501;
-            const uint64_t original_transferrable = current_transferrable;
+            uint64_t original_transferrable = current_transferrable;
             progress.update(current_transferred, current_transferrable, 21, 26, 1, 1);
 
             progress.register_callback(
@@ -346,6 +346,7 @@ TEST_CASE("progress notification", "[sync]") {
 
             // Now manually call the notifier handler a few times.
             callback_was_called = false;
+            original_transferrable = current_transferred + current_transferrable;
             current_transferred = 66;
             current_transferrable = 582;
             progress.update(current_transferred, current_transferrable, 25, 26, 1, 1);
@@ -393,7 +394,7 @@ TEST_CASE("progress notification", "[sync]") {
             // Next we get a DOWNLOAD message telling us there's more to download
             progress.update(current_transferred, current_transferrable, 0, 0, 1, 1);
             REQUIRE(callback_was_called);
-            REQUIRE(current_transferrable == transferrable);
+            REQUIRE(transferrable == (current_transferred + current_transferrable));
             REQUIRE(current_transferred == transferred);
 
             current_transferred = 200;
@@ -413,7 +414,7 @@ TEST_CASE("progress notification", "[sync]") {
                 NotifierType::download, false);
 
             REQUIRE(callback_was_called);
-            REQUIRE(current_transferrable == transferrable);
+            REQUIRE(transferrable == (current_transferred + current_transferrable));
             REQUIRE(current_transferred == transferred);
         }
 
@@ -461,7 +462,7 @@ TEST_CASE("progress notification", "[sync]") {
             uint64_t current_downloaded = 68;
             uint64_t current_downloadable = 182;
             const uint64_t original_uploadable = current_uploadable;
-            const uint64_t original_downloadable = current_downloadable;
+            uint64_t original_downloadable = current_downloadable;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
 
             progress.register_callback(
@@ -489,6 +490,7 @@ TEST_CASE("progress notification", "[sync]") {
             // Now manually call the notifier handler a few times.
             callback_was_called = false;
             callback_was_called_2 = false;
+            original_downloadable = current_downloaded + current_downloadable;
             current_uploaded = 36;
             current_uploadable = 310;
             current_downloaded = 171;
@@ -522,12 +524,12 @@ TEST_CASE("progress notification", "[sync]") {
             current_uploaded = 218;
             current_uploadable = 310;
             current_downloaded = 182;
-            current_downloadable = 196;
+            current_downloadable = 0;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called);
             CHECK(callback_was_called_2);
             CHECK(downloaded == current_downloaded);
-            CHECK(downloadable == original_downloadable);
+            CHECK(downloadable == 0);
 
             // Fourth callback, last one for the download notifier
             callback_was_called_2 = false;
@@ -544,9 +546,9 @@ TEST_CASE("progress notification", "[sync]") {
             // Prime the progress updater
             uint64_t current_uploaded = 16;
             uint64_t current_uploadable = 201;
-            uint64_t current_downloaded = 68;
-            uint64_t current_downloadable = 182;
-            const uint64_t original_downloadable = current_downloadable;
+            uint64_t current_downloaded = 0;
+            uint64_t current_downloadable = 250;
+            uint64_t original_downloadable = current_downloadable;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
 
             progress.register_callback(
@@ -559,11 +561,12 @@ TEST_CASE("progress notification", "[sync]") {
             REQUIRE(callback_was_called);
 
             // Now manually call the notifier handler a few times.
+            original_downloadable = current_downloaded + current_downloadable;
             callback_was_called = false;
             current_uploaded = 36;
             current_uploadable = 310;
             current_downloaded = 171;
-            current_downloadable = 185;
+            current_downloadable = 79;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
@@ -573,7 +576,7 @@ TEST_CASE("progress notification", "[sync]") {
             bool callback_was_called_2 = false;
             uint64_t downloaded = 0;
             uint64_t downloadable = 0;
-            const uint64_t original_downloadable_2 = current_downloadable;
+            uint64_t original_downloadable_2 = current_downloadable;
             progress.register_callback(
                 [&](auto xferred, auto xferable) {
                     downloaded = xferred;
@@ -585,41 +588,32 @@ TEST_CASE("progress notification", "[sync]") {
             REQUIRE(callback_was_called_2);
 
             // Second callback, last one for first notifier
+            original_downloadable_2 = current_downloaded + current_downloadable;
             callback_was_called = false;
             callback_was_called_2 = false;
             current_uploaded = 36;
             current_uploadable = 310;
-            current_downloaded = 182;
-            current_downloadable = 190;
+            current_downloaded = 250;
+            current_downloadable = 50;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(callback_was_called);
             CHECK(transferred == current_downloaded);
-            CHECK(transferrable == original_downloadable);
+            CHECK(transferrable == 250);
             CHECK(callback_was_called_2);
             CHECK(downloaded == current_downloaded);
-            CHECK(downloadable == original_downloadable_2);
+            CHECK(downloadable == 250);
 
             // Third callback, last one for second notifier
             callback_was_called = false;
             callback_was_called_2 = false;
             current_uploaded = 36;
             current_uploadable = 310;
-            current_downloaded = 189;
-            current_downloadable = 250;
+            current_downloaded = 250;
+            current_downloadable = 0;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called);
-            CHECK(callback_was_called_2);
-            CHECK(downloaded == current_downloaded);
-            CHECK(downloadable == original_downloadable_2);
-
-            // Fourth callback
-            callback_was_called_2 = false;
-            current_uploaded = 36;
-            current_uploadable = 310;
-            current_downloaded = 201;
-            current_downloadable = 289;
-            progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called_2);
+            CHECK(downloaded == current_downloaded);
         }
     }
 }
