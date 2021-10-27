@@ -2022,6 +2022,7 @@ void Session::send_upload_message()
 #endif
         }
 
+#if 0 // Upload log compaction is currently not implemented
         if (!get_client().m_disable_upload_compaction) {
             ChangesetEncoder::Buffer encode_buffer;
 
@@ -2048,7 +2049,9 @@ void Session::send_upload_message()
                 uc.progress.client_version, uc.progress.last_integrated_server_version, uc.origin_timestamp,
                 uc.origin_file_ident, BinaryData{encode_buffer.data(), encode_buffer.size()}); // Throws
         }
-        else {
+        else
+#endif
+        {
             upload_message_builder.add_changeset(uc.progress.client_version,
                                                  uc.progress.last_integrated_server_version, uc.origin_timestamp,
                                                  uc.origin_file_ident,
