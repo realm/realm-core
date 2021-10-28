@@ -1522,6 +1522,112 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"origin",
+         {{valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target",
+         {{valid_pk_name, PropertyType::String, Property::IsPrimary{true}},
+          {"value", PropertyType::Int},
+          {"name", PropertyType::String}}},
+        {"other_origin",
+         {{valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
+        {"other_target",
+         {{valid_pk_name, PropertyType::UUID, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
+    };
+
+    /*             Create local realm             */
+    TestFile local_config;
+    local_config.cache = true;
+    local_config.schema_version = 1;
+    local_config.schema = schema;
+    {
+        auto r = Realm::get_shared_realm(local_config);
+        auto origin = r->read_group().get_table("class_origin");
+        auto target = r->read_group().get_table("class_target");
+        auto other_origin = r->read_group().get_table("class_other_origin");
+        auto other_target = r->read_group().get_table("class_other_target");
+
+        r->begin_transaction();
+        auto o = target->create_object_with_primary_key("Foo").set("name", "Egon");
+        origin->create_object_with_primary_key(47).set("link", o.get_key());
+        other_target->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
+        other_origin->create_object_with_primary_key(ObjectId::gen());
+        r->commit_transaction();
+    }
+
+    auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
+    auto app_session = create_app(server_app_config);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    auto partition = random_string(100);
+
+    auto email_1 = std::string("donald_duck@example.com");
+    auto email_2 = std::string("mickey_mouse@example.com");
+    auto password = std::string{"password"};
+    auto creds_1 = app::AppCredentials::username_password(email_1, password);
+
+    {
+        TestSyncManager sync_manager(app_config, {});
+        auto app = sync_manager.app();
+        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
+            email_1, password, [&](Optional<app::AppError> error) {
+                REQUIRE_FALSE(error);
+            });
+        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
+            email_2, password, [&](Optional<app::AppError> error) {
+                REQUIRE_FALSE(error);
+            });
+        auto user = log_in(app, creds_1);
+        SyncTestFile config(app, partition, schema);
+        std::cout << app->sync_manager()->path_for_realm(*config.sync_config) << std::endl;
+        auto r = Realm::get_shared_realm(config);
+        auto origin = r->read_group().get_table("class_origin");
+        auto target = r->read_group().get_table("class_target");
+        auto other_origin = r->read_group().get_table("class_other_origin");
+        auto other_target = r->read_group().get_table("class_other_target");
+
+        r->begin_transaction();
+        auto o = target->create_object_with_primary_key("Baa").set("name", "Børge");
+        origin->create_object_with_primary_key(47).set("link", o.get_key());
+        other_target->create_object_with_primary_key(UUID("01234567-89ab-cdef-edcb-a98765432101"));
+        other_origin->create_object_with_primary_key(ObjectId::gen());
+        r->commit_transaction();
+        CHECK(!wait_for_upload(*r));
+        CHECK(!wait_for_download(*r));
+        advance_and_notify(*r);
+        // r->read_group().to_json(std::cout);
+    }
+
+    {
+        auto creds_2 = app::AppCredentials::username_password(email_2, password);
+        TestSyncManager sync_manager_2(app_config, {});
+        auto app = sync_manager_2.app();
+        auto user_2 = log_in(app, creds_2);
+
+        local_config.sync_config = std::make_shared<SyncConfig>(user_2, bson::Bson(partition));
+        auto new_location = app->sync_manager()->path_for_realm(*local_config.sync_config);
+        std::cout << new_location << std::endl;
+        util::File::copy(local_config.path, new_location);
+        local_config.path = new_location;
+        auto realm = Realm::get_shared_realm(local_config);
+
+        CHECK(!wait_for_download(*realm));
+        advance_and_notify(*realm);
+        Group& g = realm->read_group();
+        // g.to_json(std::cout);
+        REQUIRE(g.get_table("class_origin")->size() == 1);
+        REQUIRE(g.get_table("class_target") == 2);
+        REQUIRE(g.get_table("class_other_origin") == 2);
+        REQUIRE(g.get_table("class_other_target") == 2);
+    }
+}
+
 TEST_CASE("app: set new embedded object", "[sync][app]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";

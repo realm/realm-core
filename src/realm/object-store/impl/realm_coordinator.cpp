@@ -476,6 +476,7 @@ void RealmCoordinator::open_db()
 #endif
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
+    DBOptions options;
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
@@ -493,7 +494,6 @@ void RealmCoordinator::open_db()
             history = make_in_realm_history();
         }
 
-        DBOptions options;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
 
@@ -527,7 +527,9 @@ void RealmCoordinator::open_db()
     }
 #if REALM_ENABLE_SYNC
     catch (IncompatibleHistories const&) {
-        translate_file_exception(m_config.path, m_config.immutable()); // Throws
+        REALM_ASSERT_RELEASE(server_synchronization_mode);
+        m_db = DB::create(make_in_realm_history(), m_config.path, options);
+        m_db->create_new_history(sync::make_client_replication());
     }
 #endif // REALM_ENABLE_SYNC
     catch (...) {
