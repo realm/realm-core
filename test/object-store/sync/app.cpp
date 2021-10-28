@@ -121,37 +121,28 @@ app::AppError failed_log_in(std::shared_ptr<App> app,
     return *err;
 }
 
-static std::string HMAC_SHA256(std::string_view key, std::string_view data) {
+static std::string HMAC_SHA256(std::string_view key, std::string_view data)
+{
 #if REALM_PLATFORM_APPLE
     std::string ret;
     ret.resize(CC_SHA256_DIGEST_LENGTH);
-    CCHmac(kCCHmacAlgSHA256,
-           key.data(),
-           key.size(),
-           data.data(),
-           data.size(),
+    CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), data.data(), data.size(),
            reinterpret_cast<uint8_t*>(const_cast<char*>(ret.data())));
     return ret;
 #endif
 }
 
 
-std::string create_jwt(const std::string appId) {
-    nlohmann::json header = {
-        {"alg", "HS256"},
-        {"typ", "JWT"}
-    };
-    nlohmann::json payload = {
-        {"aud", appId},
-        {"sub", "someUserId"},
-        {"exp", 1661896476}
-    };
+std::string create_jwt(const std::string appId)
+{
+    nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
+    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1661896476}};
 
     payload["user_data"]["name"] = "Foo Bar";
     payload["user_data"]["occupation"] = "firefighter";
 
     payload["my_metadata"]["name"] = "Bar Foo";
-    payload["my_metadata"]["occupation"] = "stonk analyst";
+    payload["my_metadata"]["occupation"] = "stock analyst";
 
     std::string headerStr = header.dump();
     std::string payloadStr = payload.dump();
@@ -181,9 +172,10 @@ std::string create_jwt(const std::string appId) {
     util::base64_encode(mac.data(), mac.length(), signature_buffer.data(), signature_buffer.size());
 
     std::string encodedSignatureStr = signature_buffer.str();
-    encodedSignatureStr.erase(remove(encodedSignatureStr.begin(), encodedSignatureStr.end(), '='), encodedSignatureStr.end());
-    std::replace( encodedSignatureStr.begin(), encodedSignatureStr.end(), '+', '-');
-    std::replace( encodedSignatureStr.begin(), encodedSignatureStr.end(), '/', '_');
+    encodedSignatureStr.erase(remove(encodedSignatureStr.begin(), encodedSignatureStr.end(), '='),
+                              encodedSignatureStr.end());
+    std::replace(encodedSignatureStr.begin(), encodedSignatureStr.end(), '+', '-');
+    std::replace(encodedSignatureStr.begin(), encodedSignatureStr.end(), '/', '_');
 
     return jwtPayload + "." + encodedSignatureStr;
 }

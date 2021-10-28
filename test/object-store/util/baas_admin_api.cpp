@@ -695,23 +695,21 @@ AppCreateConfig default_app_config(const std::string& base_url)
         true,
     };
 
-    return AppCreateConfig{
-        "test",
-        base_url,
-        "unique_user@domain.com",
-        "password",
-        "mongodb://localhost:26000",
-        db_name,
-        std::move(default_schema),
-        std::move(partition_key),
-        true,
-        std::move(funcs),
-        std::move(user_pass_config),
-        std::string{"authFunc"},
-        true,
-        true,
-        true
-    };
+    return AppCreateConfig{"test",
+                           base_url,
+                           "unique_user@domain.com",
+                           "password",
+                           "mongodb://localhost:26000",
+                           db_name,
+                           std::move(default_schema),
+                           std::move(partition_key),
+                           true,
+                           std::move(funcs),
+                           std::move(user_pass_config),
+                           std::string{"authFunc"},
+                           true,
+                           true,
+                           true};
 }
 
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
@@ -816,37 +814,20 @@ AppSession create_app(const AppCreateConfig& config)
     secrets.post_json({{"name", "customTokenKey"}, {"value", "My_very_confidential_secretttttt"}});
 
     if (config.enable_custom_token_auth) {
-        auth_providers.post_json({
-            {"type", "custom-token"},
-            {"config",
-                {
-                    {"audience", nlohmann::json::array()},
-                    {"signingAlgorithm", "HS256"},
-                    {"useJWKURI", false},
-                }},
-            {"secret_config",
-                {{"signingKeys", nlohmann::json::array({"customTokenKey"})}}
-            },
-            {"disabled", false},
-            {"metadata_fields", {
-                {
-                    {"required", false},
-                    {"name", "user_data.name"},
-                    {"field_name", "name"}
-                },
-                {
-                    {"required", true},
-                    {"name", "user_data.occupation"},
-                    {"field_name", "occupation"}
-                },
-                {
-                    {"required", true},
-                    {"name", "my_metadata.name"},
-                    {"field_name", "anotherName"}
-                }
-            }}
-
-        });
+        auth_providers.post_json(
+            {{"type", "custom-token"},
+             {"config",
+              {
+                  {"audience", nlohmann::json::array()},
+                  {"signingAlgorithm", "HS256"},
+                  {"useJWKURI", false},
+              }},
+             {"secret_config", {{"signingKeys", nlohmann::json::array({"customTokenKey"})}}},
+             {"disabled", false},
+             {"metadata_fields",
+              {{{"required", false}, {"name", "user_data.name"}, {"field_name", "name"}},
+               {{"required", true}, {"name", "user_data.occupation"}, {"field_name", "occupation"}},
+               {{"required", true}, {"name", "my_metadata.name"}, {"field_name", "anotherName"}}}}});
     }
 
     auto services = app["services"];
