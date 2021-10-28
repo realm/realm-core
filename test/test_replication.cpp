@@ -69,19 +69,19 @@ using unit_test::TestContext;
 TEST(Replication_HistorySchemaVersionNormal)
 {
     SHARED_GROUP_TEST_PATH(path);
-    ReplSyncClient repl(path, 1);
-    DBRef sg_1 = DB::create(repl);
+    ReplSyncClient repl(1);
+    DBRef sg_1 = DB::create(repl, path);
     // it should be possible to have two open shared groups on the same thread
     // without any read/write transactions in between
-    DBRef sg_2 = DB::create(repl);
+    DBRef sg_2 = DB::create(repl, path);
 }
 
 TEST(Replication_HistorySchemaVersionDuringWT)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    ReplSyncClient repl(path, 1);
-    DBRef sg_1 = DB::create(repl);
+    ReplSyncClient repl(1);
+    DBRef sg_1 = DB::create(repl, path);
     {
         // Do an empty commit to force the file format version to be established.
         WriteTransaction wt(sg_1);
@@ -93,7 +93,7 @@ TEST(Replication_HistorySchemaVersionDuringWT)
 
     // It should be possible to open a second db at the same path
     // while a WriteTransaction is active via another SharedGroup.
-    DBRef sg_2 = DB::create(repl);
+    DBRef sg_2 = DB::create(repl, path);
     wt->commit();
 
     auto rt = sg_2->start_read();
@@ -108,8 +108,8 @@ TEST(Replication_GroupWriteWithoutHistory)
     SHARED_GROUP_TEST_PATH(out1);
     SHARED_GROUP_TEST_PATH(out2);
 
-    ReplSyncClient repl(path, 1);
-    DBRef sg_1 = DB::create(repl);
+    ReplSyncClient repl(1);
+    DBRef sg_1 = DB::create(repl, path);
     {
         WriteTransaction wt(sg_1);
         auto table = wt.add_table("Table");
@@ -139,8 +139,8 @@ TEST(Replication_GroupWriteWithoutHistory)
 
     {
         // Open with history
-        ReplSyncClient repl2(out2, 1);
-        DBRef sg_2 = DB::create(repl2);
+        ReplSyncClient repl2(1);
+        DBRef sg_2 = DB::create(repl2, out2);
         ReadTransaction rt(sg_2);
         rt.get_group().verify();
     }
@@ -151,8 +151,8 @@ TEST(Replication_HistorySchemaVersionUpgrade)
     SHARED_GROUP_TEST_PATH(path);
 
     {
-        ReplSyncClient repl(path, 1);
-        DBRef sg = DB::create(repl);
+        ReplSyncClient repl(1);
+        DBRef sg = DB::create(repl, path);
         {
             // Do an empty commit to force the file format version to be established.
             WriteTransaction wt(sg);
@@ -160,14 +160,14 @@ TEST(Replication_HistorySchemaVersionUpgrade)
         }
     }
 
-    ReplSyncClient repl(path, 2);
-    DBRef sg_1 = DB::create(repl); // This will be the session initiator
+    ReplSyncClient repl(2);
+    DBRef sg_1 = DB::create(repl, path); // This will be the session initiator
     CHECK(repl.is_upgraded());
     WriteTransaction wt(sg_1);
     // When this one is opened, the file should have been upgraded
     // If this was not the case we would have triggered another upgrade
     // and the test would hang
-    DBRef sg_2 = DB::create(repl);
+    DBRef sg_2 = DB::create(repl, path);
 }
 
 TEST(Replication_WriteWithoutHistory)
@@ -175,8 +175,8 @@ TEST(Replication_WriteWithoutHistory)
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
 
-    ReplSyncClient repl(path_1, 1);
-    DBRef sg = DB::create(repl);
+    ReplSyncClient repl(1);
+    DBRef sg = DB::create(repl, path_1);
     {
         // Do an empty commit to force the file format version to be established.
         WriteTransaction wt(sg);

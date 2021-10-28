@@ -35,32 +35,20 @@ class DB;
 class SyncManager;
 class SyncUser;
 
-namespace _impl {
-class RealmCoordinator;
-struct SyncClient;
-
-namespace sync_session_states {
-struct Active;
-struct Dying;
-struct Inactive;
-struct WaitingForAccessToken;
-} // namespace sync_session_states
-} // namespace _impl
-
 namespace sync {
 class Session;
 }
 
-using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
-using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
-
 namespace _impl {
+class RealmCoordinator;
+struct SyncClient;
+
 class SyncProgressNotifier {
 public:
     enum class NotifierType { upload, download };
+    using ProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
 
-    uint64_t register_callback(std::function<SyncProgressNotifierCallback>, NotifierType direction,
-                               bool is_streaming);
+    uint64_t register_callback(std::function<ProgressNotifierCallback>, NotifierType direction, bool is_streaming);
     void unregister_callback(uint64_t);
 
     void set_local_version(uint64_t);
@@ -82,7 +70,7 @@ private:
     // A PODS encapsulating some information for progress notifier callbacks a binding
     // can register upon this session.
     struct NotifierPackage {
-        std::function<SyncProgressNotifierCallback> notifier;
+        std::function<ProgressNotifierCallback> notifier;
         util::Optional<uint64_t> captured_transferrable;
         uint64_t snapshot_version;
         bool is_streaming;
@@ -111,7 +99,7 @@ private:
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
-    enum class PublicState {
+    enum class State {
         Active,
         Dying,
         Inactive,
@@ -124,11 +112,14 @@ public:
         Connected,
     };
 
-    using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
-    using ConnectionStateCallback = void(ConnectionState old_state, ConnectionState new_state);
+    using StateChangeCallback = void(State old_state, State new_state);
+    using ConnectionStateChangeCallback = void(ConnectionState old_state, ConnectionState new_state);
+    using TransactionCallback = void(VersionID old_version, VersionID new_version);
+    using ProgressNotifierCallback = _impl::SyncProgressNotifier::ProgressNotifierCallback;
+    using ProgressDirection = _impl::SyncProgressNotifier::NotifierType;
 
     ~SyncSession();
-    PublicState state() const;
+    State state() const;
     ConnectionState connection_state() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
@@ -143,7 +134,6 @@ public:
     // Works the same way as `wait_for_upload_completion()`.
     void wait_for_download_completion(std::function<void(std::error_code)> callback);
 
-    using NotifierType = _impl::SyncProgressNotifier::NotifierType;
     // Register a notifier that updates the app regarding progress.
     //
     // If `m_current_progress` is populated when this method is called, the notifier
@@ -162,7 +152,8 @@ public:
     //
     // Note that bindings should dispatch the callback onto a separate thread or queue
     // in order to avoid blocking the sync client.
-    uint64_t register_progress_notifier(std::function<SyncProgressNotifierCallback>, NotifierType, bool is_streaming);
+    uint64_t register_progress_notifier(std::function<ProgressNotifierCallback>, ProgressDirection,
+                                        bool is_streaming);
 
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
@@ -170,7 +161,7 @@ public:
 
     // Registers a callback that is invoked when the the underlying sync session changes
     // its connection state
-    uint64_t register_connection_change_callback(std::function<ConnectionStateCallback>);
+    uint64_t register_connection_change_callback(std::function<ConnectionStateChangeCallback>);
 
     // Unregisters a previously registered callback. If the token is invalid,
     // this method does nothing
@@ -248,8 +239,7 @@ public:
     class Internal {
         friend class _impl::RealmCoordinator;
 
-        static void set_sync_transact_callback(SyncSession& session,
-                                               std::function<SyncSessionTransactCallback> callback)
+        static void set_sync_transact_callback(SyncSession& session, std::function<TransactionCallback> callback)
         {
             session.set_sync_transact_callback(std::move(callback));
         }
@@ -279,24 +269,17 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
-    using CompletionCallbacks =
-        std::map<int64_t, std::pair<_impl::SyncProgressNotifier::NotifierType, std::function<void(std::error_code)>>>;
-
-    struct State;
-    friend struct _impl::sync_session_states::Active;
-    friend struct _impl::sync_session_states::Dying;
-    friend struct _impl::sync_session_states::Inactive;
-    friend struct _impl::sync_session_states::WaitingForAccessToken;
+    using CompletionCallbacks = std::map<int64_t, std::pair<ProgressDirection, std::function<void(std::error_code)>>>;
 
     class ConnectionChangeNotifier {
     public:
-        uint64_t add_callback(std::function<ConnectionStateCallback> callback);
+        uint64_t add_callback(std::function<ConnectionStateChangeCallback> callback);
         void remove_callback(uint64_t token);
         void invoke_callbacks(ConnectionState old_state, ConnectionState new_state);
 
     private:
         struct Callback {
-            std::function<ConnectionStateCallback> fn;
+            std::function<ConnectionStateChangeCallback> fn;
             uint64_t token;
         };
 
@@ -330,34 +313,39 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
 
+    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message);
     void handle_error(SyncError);
+    void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
+                         const std::string& context_message);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
-    void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
+    void set_sync_transact_callback(std::function<TransactionCallback>);
     void nonsync_transact_notify(VersionID::version_type);
-
-    PublicState get_public_state() const;
-    // static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
-    void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
     void do_create_sync_session();
-    void unregister(std::unique_lock<std::mutex>& lock);
     void did_drop_external_reference();
     void detach_from_sync_manager();
+    void close(std::unique_lock<std::mutex>&);
+
+    void become_active(std::unique_lock<std::mutex>&);
+    void become_dying(std::unique_lock<std::mutex>&);
+    void become_inactive(std::unique_lock<std::mutex>&);
+    void become_waiting_for_access_token(std::unique_lock<std::mutex>&);
+
 
     void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
-                                 _impl::SyncProgressNotifier::NotifierType direction);
+                                 ProgressDirection direction);
 
-    std::function<SyncSessionTransactCallback> m_sync_transact_callback;
+    std::function<TransactionCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;
 
-    const State* m_state = nullptr;
+    State m_state = State::Inactive;
 
     // The underlying state of the connection. Even when sharing connections, the underlying session
     // will always start out as disconnected and then immediately transition to the correct state when calling
@@ -368,6 +356,7 @@ private:
     SyncConfig m_config;
     std::shared_ptr<DB> m_db;
     bool m_force_client_reset = false;
+    DBRef m_client_reset_fresh_copy;
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager = nullptr;
 

@@ -252,8 +252,8 @@ TEST(Query_TableInitialization)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    auto repl = make_in_realm_history(path);
-    DBRef sg = DB::create(*repl, DBOptions(DBOptions::Durability::MemOnly));
+    auto repl = make_in_realm_history();
+    DBRef sg = DB::create(*repl, path, DBOptions(DBOptions::Durability::MemOnly));
     auto wt = sg->start_write();
 
     DB::VersionID initial_version, extra_col_version;

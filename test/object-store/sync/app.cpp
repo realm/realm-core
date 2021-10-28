@@ -22,21 +22,26 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
 #include "collection_fixtures.hpp"
+#include "sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
 
 #include <external/json/json.hpp>
-#include <realm/sync/access_token.hpp>
+#include <external/mpark/variant.hpp>
+#include <realm/sync/noinst/server/access_token.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/websocket.hpp>
 
@@ -183,111 +188,10 @@ std::string create_jwt(const std::string appId) {
     return jwtPayload + "." + encodedSignatureStr;
 }
 
-template <typename Transport>
-const std::shared_ptr<GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 } // namespace
 
-
-// temporarily disable these tests for now,
-// but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
-#ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 0
-#endif
 
 #if REALM_ENABLE_AUTH_TESTS
-namespace {
-// This will create a new test app in the baas server at base_url to be used in tests throughout
-// tis file.
-AppSession get_runtime_app_session(std::string base_url)
-{
-    static const AppSession cached_app_session = [&] {
-        auto cached_app_session = create_app(default_app_config(base_url));
-        std::cout << "found app_id: " << cached_app_session.client_app_id << " in stitch config" << std::endl;
-        return cached_app_session;
-    }();
-    return cached_app_session;
-}
-
-class SynchronousTestTransport : public GenericNetworkTransport {
-public:
-    void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
-    {
-        completion_block(do_http_request(request));
-    }
-};
-
-#ifdef REALM_MONGODB_ENDPOINT
-std::string get_base_url()
-{
-    // allows configuration with or without quotes
-    std::string base_url = REALM_QUOTE(REALM_MONGODB_ENDPOINT);
-    if (base_url.size() > 0 && base_url[0] == '"') {
-        base_url.erase(0, 1);
-    }
-    if (base_url.size() > 0 && base_url[base_url.size() - 1] == '"') {
-        base_url.erase(base_url.size() - 1);
-    }
-    return base_url;
-}
-#endif
-
-struct AutoVerifiedEmailCredentials : AppCredentials {
-    AutoVerifiedEmailCredentials()
-    {
-        // emails with this prefix will pass through the baas app due to the register function
-        email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        password = random_string(10);
-        static_cast<AppCredentials&>(*this) = AppCredentials::username_password(email, password);
-    }
-    std::string email;
-    std::string password;
-};
-
-void timed_wait_for(std::function<bool()> condition,
-                    std::chrono::milliseconds max_ms = std::chrono::milliseconds(2000))
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    util::EventLoop::main().run_until([&] {
-        REQUIRE(std::chrono::steady_clock::now() - wait_start < max_ms);
-        return condition();
-    });
-}
-
-app::AppCredentials create_user_and_log_in(SharedApp app)
-{
-    REQUIRE(app);
-    AutoVerifiedEmailCredentials creds;
-    auto client = app->provider_client<App::UsernamePasswordProviderClient>();
-    client.register_email(creds.email, creds.password, [&](Optional<app::AppError> error) {
-        REQUIRE_FALSE(error);
-    });
-    log_in(app, creds);
-    return std::move(creds);
-}
-
-template <typename Factory>
-App::Config get_config(Factory factory, const AppSession& app_session)
-{
-    return {app_session.client_app_id,
-            factory,
-            app_session.admin_api.base_url(),
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
-}
-
-// Get an App config suitable for integration testing against BaaS
-App::Config get_integration_config()
-{
-    std::string base_url = get_base_url();
-    REQUIRE(!base_url.empty());
-    auto app_session = get_runtime_app_session(base_url);
-    return get_config(instance_of<SynchronousTestTransport>, app_session);
-}
-} // namespace
 
 // MARK: - Login with Credentials Tests
 
@@ -2047,12 +1951,28 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
-    SECTION("Expired Access Token is Refreshed") {
+    class HookedTransport : public SynchronousTestTransport {
+    public:
+        void send_request_to_server(const Request request,
+                                    std::function<void(const Response)> completion_block) override
+        {
+            if (hook) {
+                if (util::Optional<Response> response = hook(request)) {
+                    completion_block(*response);
+                    return;
+                }
+            }
+            SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
+        }
+        std::function<util::Optional<Response>(const Request)> hook;
+    };
+    SECTION("Expired Tokens") {
         sync::AccessToken token;
         {
             TestSyncManager sync_manager(app_config, {});
             auto app = sync_manager.app();
             create_user_and_log_in(app);
+            std::shared_ptr<SyncUser> user = app->current_user();
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
 
@@ -2061,7 +1981,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             REQUIRE(get_dogs(r).size() == 1);
             sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
-            sync::AccessToken::parse(app->current_user()->access_token(), token, error_state, nullptr);
+            sync::AccessToken::parse(user->access_token(), token, error_state, nullptr);
             REQUIRE(error_state == sync::AccessToken::ParseError::none);
             REQUIRE(token.timestamp);
             REQUIRE(token.expires);
@@ -2072,56 +1992,68 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(token.expired(now));
         }
 
-        {
-            std::function<void()> hook;
-            class MyTestTransport : public SynchronousTestTransport {
-            public:
-                MyTestTransport(std::function<void()>* hook)
-                    : hook(hook)
-                {
-                }
+        auto transport = std::make_shared<HookedTransport>();
+        app_config.transport = transport;
 
-                void send_request_to_server(const Request request,
-                                            std::function<void(const Response)> completion_block) override
-                {
-                    if (*hook) {
-                        (*hook)();
-                    }
-                    SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
-                }
+        TestSyncManager sync_manager(app_config, {});
+        auto app = sync_manager.app();
+        auto creds = create_user_and_log_in(app);
+        std::shared_ptr<SyncUser> user = app->current_user();
+        REQUIRE(user);
+        REQUIRE(!user->access_token_refresh_required());
+        // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+        user->update_access_token(encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+        REQUIRE(user->access_token_refresh_required());
 
-            private:
-                std::function<void()>* hook;
-            };
-            app_config.transport = std::make_shared<MyTestTransport>(&hook);
-
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            create_user_and_log_in(app);
-            REQUIRE(!app->current_user()->access_token_refresh_required());
-            // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
-            app->current_user()->update_access_token(
-                encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
-            REQUIRE(app->current_user()->access_token_refresh_required());
-
+        SECTION("Expired Access Token is Refreshed") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
-            std::vector<SyncSession::PublicState> seen_states;
-            hook = [&] {
+            std::vector<SyncSession::State> seen_states;
+            transport->hook = [&](const Request) -> util::Optional<Response> {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto session : user->all_sessions()) {
                     seen_states.push_back(session->state());
                 }
+                return util::none; // send all requests through http
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
-            REQUIRE(std::find(begin(seen_states), end(seen_states),
-                              SyncSession::PublicState::WaitingForAccessToken) != end(seen_states));
+            REQUIRE(std::find(begin(seen_states), end(seen_states), SyncSession::State::WaitingForAccessToken) !=
+                    end(seen_states));
             Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
             REQUIRE(dogs.get(0).get<String>("name") == "fido");
+        }
+
+        SECTION("User is logged out if the refresh request is denied") {
+            REQUIRE(user->is_logged_in());
+            transport->hook = [&](const Request request) -> util::Optional<Response> {
+                auto user = app->current_user();
+                REQUIRE(user);
+                // simulate the server denying the refresh
+                if (request.url.find("/session") != std::string::npos) {
+                    Response faked;
+                    faked.http_status_code = 401;
+                    faked.body = "fake: refresh token could not be refreshed";
+                    return util::make_optional<Response>(std::move(faked));
+                }
+                return util::none;
+            };
+            SyncTestFile config(app, partition, schema);
+            std::atomic<bool> sync_error_handler_called{false};
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                sync_error_handler_called.store(true);
+                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.message == "Unable to refresh the user access token.");
+            };
+            auto r = Realm::get_shared_realm(config);
+            timed_wait_for([&] {
+                return sync_error_handler_called.load();
+            });
+            // the failed refresh logs out the user
+            REQUIRE(!user->is_logged_in());
         }
     }
 
@@ -2239,6 +2171,80 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             {
                 // check that there are no errors initiating a new sync session by making sure upload/download
                 // succeeds
+                auto r = Realm::get_shared_realm(config);
+                Results dogs = get_dogs(r);
+            }
+        }
+
+        SECTION("Revoked refresh token on an anonymous user results in a sync error") {
+            TestSyncManager sync_manager(app_config, {});
+            auto app = sync_manager.app();
+            auto anon_user = log_in(app);
+            REQUIRE(app->current_user() == anon_user);
+            SyncTestFile config(app, partition, schema);
+            REQUIRE(app_session.admin_api.verify_access_token(anon_user->access_token(), app_session.server_app_id));
+            app_session.admin_api.revoke_user_sessions(anon_user->identity(), app_session.server_app_id);
+            // revoking a user session only affects the refresh token, so the access token should still continue to
+            // work.
+            REQUIRE(app_session.admin_api.verify_access_token(anon_user->access_token(), app_session.server_app_id));
+
+            verify_error_on_sync_with_invalid_refresh_token(anon_user, config);
+
+            // the user has been logged out, and current user is reset
+            REQUIRE(!app->current_user());
+            REQUIRE(!anon_user->is_logged_in());
+            REQUIRE(anon_user->state() == SyncUser::State::Removed);
+
+            // new requests for an access token do not work for anon users
+            anon_user->refresh_custom_data([&](util::Optional<AppError> error) {
+                REQUIRE(error);
+                REQUIRE(error->message ==
+                        util::format("Cannot initiate a refresh on user '%1' because the user has been removed",
+                                     anon_user->identity()));
+            });
+
+            REQUIRE_THROWS_MATCHES(
+                Realm::get_shared_realm(config), std::logic_error,
+                Catch::Message(
+                    util::format("Cannot start a sync session for user '%1' because this user has been removed.",
+                                 anon_user->identity())));
+        }
+
+        SECTION("Opening a Realm with a removed email user results produces an exception") {
+            TestSyncManager sync_manager(app_config, {});
+            auto app = sync_manager.app();
+            auto creds = create_user_and_log_in(app);
+            auto email_user = app->current_user();
+            const std::string user_ident = email_user->identity();
+            REQUIRE(email_user);
+            SyncTestFile config(app, partition, schema);
+            REQUIRE(email_user->is_logged_in());
+            {
+                // sync works on a valid user
+                auto r = Realm::get_shared_realm(config);
+                Results dogs = get_dogs(r);
+            }
+            app->sync_manager()->remove_user(user_ident);
+            REQUIRE_FALSE(email_user->is_logged_in());
+            REQUIRE(email_user->state() == SyncUser::State::Removed);
+
+            // should not be able to open a sync'd Realm with an invalid user
+            REQUIRE_THROWS_MATCHES(
+                Realm::get_shared_realm(config), std::logic_error,
+                Catch::Message(util::format(
+                    "Cannot start a sync session for user '%1' because this user has been removed.", user_ident)));
+
+            std::shared_ptr<SyncUser> new_user_instance = log_in(app, creds);
+            // the previous instance is still invalid
+            REQUIRE_FALSE(email_user->is_logged_in());
+            REQUIRE(email_user->state() == SyncUser::State::Removed);
+            // but the new instance will work and has the same server issued ident
+            REQUIRE(new_user_instance);
+            REQUIRE(new_user_instance->is_logged_in());
+            REQUIRE(new_user_instance->identity() == user_ident);
+            {
+                // sync works again if the same user is logged back in
+                config.sync_config->user = new_user_instance;
                 auto r = Realm::get_shared_realm(config);
                 Results dogs = get_dogs(r);
             }
@@ -2406,18 +2412,6 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
         auto custom_data = *user->custom_data();
         CHECK(custom_data["name"] == "Not Foo Bar");
         CHECK(metadata["name"] == "Foo Bar");
-    }
-}
-
-void timed_sleeping_wait_for(std::function<bool()> condition,
-                             std::chrono::milliseconds max_ms = std::chrono::seconds(30))
-{
-    const auto wait_start = std::chrono::steady_clock::now();
-    while (!condition()) {
-        if (std::chrono::steady_clock::now() - wait_start > max_ms) {
-            throw std::runtime_error(util::format("timed_sleeping_wait_for exceeded %1 ms", max_ms.count()));
-        }
-        millisleep(1);
     }
 }
 

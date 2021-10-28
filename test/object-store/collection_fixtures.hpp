@@ -142,6 +142,10 @@ struct Base {
     {
         return std::is_arithmetic<T>::value;
     }
+    static bool can_sort()
+    {
+        return true;
+    }
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
@@ -253,6 +257,10 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     static std::vector<BinaryData> values()
     {
         return {BinaryData("c", 1), BinaryData("a", 1), BinaryData("b", 1)};
+    }
+    static bool can_sort()
+    {
+        return false;
     }
 };
 
@@ -480,6 +488,7 @@ struct LinkedCollectionBase {
     {
         return true; // only dictionaries are false
     }
+    virtual void reset_test_state() {}
 
     std::string m_prop_name;
     std::string m_dest_name;
@@ -767,6 +776,10 @@ struct DictionaryOfObjects : public LinkedCollectionBase {
     {
         return false;
     }
+    void reset_test_state() override
+    {
+        key_counter = 0;
+    }
     size_t key_counter = 0;
     constexpr static bool allows_storing_nulls = true;
 };
@@ -834,6 +847,10 @@ struct DictionaryOfMixedLinks : public LinkedCollectionBase {
     bool will_erase_removed_object_links() override
     {
         return false;
+    }
+    void reset_test_state() override
+    {
+        key_counter = 0;
     }
     size_t key_counter = 0;
     constexpr static bool allows_storing_nulls = true;

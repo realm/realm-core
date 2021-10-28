@@ -507,7 +507,11 @@ void TableView::remove(size_t row_ndx)
     m_table.check();
     REALM_ASSERT(row_ndx < m_key_values.size());
 
-    bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
+    // If distinct is applied then removing an object may leave us out of sync
+    // if there's another object with the same value in the distinct column
+    // as the removed object
+    bool sync_to_keep =
+        m_last_seen_versions == get_dependency_versions() && !m_descriptor_ordering.will_apply_distinct();
 
     ObjKey key = get_key(row_ndx);
 
@@ -521,10 +525,6 @@ void TableView::remove(size_t row_ndx)
     // not in sync to start with:
     if (sync_to_keep)
         m_last_seen_versions = get_dependency_versions();
-
-    // Adjustment of row indexes greater than the removed index is done by
-    // adj_row_acc_move_over or adj_row_acc_erase_row as sideeffect of the actual
-    // update of the table, so we don't need to do it here (it has already been done)
 }
 
 
@@ -532,7 +532,11 @@ void TableView::clear()
 {
     m_table.check();
 
-    bool sync_to_keep = m_last_seen_versions == get_dependency_versions();
+    // If distinct is applied then removing an object may leave us out of sync
+    // if there's another object with the same value in the distinct column
+    // as the removed object
+    bool sync_to_keep =
+        m_last_seen_versions == get_dependency_versions() && !m_descriptor_ordering.will_apply_distinct();
 
     _impl::TableFriend::batch_erase_rows(*get_parent(), m_key_values); // Throws
 

@@ -280,7 +280,7 @@ public:
     // Get object based on primary key
     Obj get_object_with_primary_key(Mixed pk) const;
     // Get primary key based on ObjKey
-    Mixed get_primary_key(ObjKey key);
+    Mixed get_primary_key(ObjKey key) const;
     // Get logical index for object. This function is not very efficient
     size_t get_object_ndx(ObjKey key) const noexcept
     {
@@ -636,6 +636,22 @@ private:
         cookie_deleted = 0xdead,
     };
 
+    // This is only used for debugging checks, so relaxed operations are fine.
+    class AtomicLifeCycleCookie {
+    public:
+        void operator=(LifeCycleCookie cookie)
+        {
+            m_storage.store(cookie, std::memory_order_relaxed);
+        }
+        operator LifeCycleCookie() const
+        {
+            return m_storage.load(std::memory_order_relaxed);
+        }
+
+    private:
+        std::atomic<LifeCycleCookie> m_storage = {};
+    };
+
     mutable WrappedAllocator m_alloc;
     Array m_top;
     void update_allocator_wrapper(bool writable)
@@ -789,7 +805,7 @@ private:
     std::vector<size_t> m_leaf_ndx2spec_ndx;
     bool m_is_embedded = false;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
-    LifeCycleCookie m_cookie;
+    AtomicLifeCycleCookie m_cookie;
 
     static constexpr int top_position_for_spec = 0;
     static constexpr int top_position_for_columns = 1;

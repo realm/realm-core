@@ -36,10 +36,9 @@ namespace realm {
  */
 class ObjectChangeSet {
 public:
-    using ColKeyType = decltype(realm::ColKey::value);
-    using ObjectKeyType = decltype(realm::ObjKey::value);
-    using ObjectSet = std::unordered_set<ObjectKeyType>;
-    using ObjectMapToColumnSet = std::unordered_map<ObjectKeyType, std::unordered_set<ColKeyType>>;
+    using ObjectSet = std::unordered_set<ObjKey>;
+    using ColumnSet = std::unordered_set<ColKey>;
+    using ObjectMapToColumnSet = std::unordered_map<ObjKey, ColumnSet>;
 
     ObjectChangeSet() = default;
     ObjectChangeSet(ObjectChangeSet const&) = default;
@@ -47,30 +46,30 @@ public:
     ObjectChangeSet& operator=(ObjectChangeSet const&) = default;
     ObjectChangeSet& operator=(ObjectChangeSet&&) = default;
 
-    void insertions_add(ObjectKeyType obj);
-    void modifications_add(ObjectKeyType obj, ColKeyType col);
-    void deletions_add(ObjectKeyType obj);
+    void insertions_add(ObjKey obj);
+    void modifications_add(ObjKey obj, ColKey col);
+    void deletions_add(ObjKey obj);
 
-    bool insertions_remove(ObjectKeyType obj);
-    bool modifications_remove(ObjectKeyType obj);
-    bool deletions_remove(ObjectKeyType obj);
+    bool insertions_remove(ObjKey obj);
+    bool modifications_remove(ObjKey obj);
+    bool deletions_remove(ObjKey obj);
 
-    bool insertions_contains(ObjectKeyType obj) const;
+    bool insertions_contains(ObjKey obj) const;
     /**
      * Checks if a given object was modified. If the optional filter is provided only those colums
      * will be looked at.
      *
-     * @param obj The `ObjectKeyType` that should be checked for changes.
+     * @param obj The `ObjKey` that should be checked for changes.
      * @param filtered_col_keys Optional collection of `ColKey` the check will be restricted to.
      *
      * @return True if `obj` is contained in `m_modifications` and `filtered_col_keys` contains
      *         at least one changed column. False otherwise.
      */
-    bool modifications_contains(ObjectKeyType obj, const std::vector<ColKey>& filtered_col_keys) const;
-    bool deletions_contains(ObjectKeyType obj) const;
+    bool modifications_contains(ObjKey obj, const std::vector<ColKey>& filtered_col_keys) const;
+    bool deletions_contains(ObjKey obj) const;
     // if the specified object has not been modified, returns nullptr
     // if the object has been modified, returns a pointer to the ObjectSet
-    const ObjectSet* get_columns_modified(ObjectKeyType obj) const;
+    const ColumnSet* get_columns_modified(ObjKey obj) const;
 
     bool insertions_empty() const noexcept
     {

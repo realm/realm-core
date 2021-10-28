@@ -42,6 +42,7 @@ class Table;
 class ThreadSafeReference;
 class Transaction;
 struct SyncConfig;
+class SyncSession;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -270,6 +271,8 @@ public:
     // using the `AsyncOpenTask` returned. Note that the download doesn't actually
     // start until you call `AsyncOpenTask::start(callback)`
     static std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
+
+    std::shared_ptr<SyncSession> sync_session() const;
 #endif
     // Returns a frozen Realm for the given Realm. This Realm can be accessed from any thread.
     static SharedRealm get_frozen_realm(Config config, VersionID version);
@@ -307,6 +310,12 @@ public:
     bool is_in_transaction() const noexcept;
 
     // Returns a frozen copy for the current version of this Realm
+    // If called from within a write transaction, the returned Realm will
+    // reflect the state at the beginning of the write transaction. Any
+    // accumulated state changes will not be part of it. To obtain a frozen
+    // transaction reflecting a current write transaction, you need to first
+    // commit the write and then freeze.
+    // possible better name: freeze_at_transaction_start ?
     SharedRealm freeze();
 
     // Returns `true` if the Realm is frozen, `false` otherwise.

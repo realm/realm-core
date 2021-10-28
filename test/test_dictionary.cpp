@@ -289,9 +289,9 @@ TEST(Dictionary_Clear)
 TEST(Dictionary_Transaction)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
-    ObjKey k0;
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
+    ObjKey k0, k2;
     ColKey col_dict;
     auto cmp = [this](Mixed x, Mixed y) {
         CHECK_EQUAL(x, y);
@@ -303,13 +303,17 @@ TEST(Dictionary_Transaction)
         auto foo = wt.add_table("foo");
         col_dict = foo->add_column_dictionary(type_Mixed, "dictionaries");
 
+        Obj obj0 = foo->create_object();
         Obj obj1 = foo->create_object();
         Obj obj2 = foo->create_object();
-        Dictionary dict = obj1.get_dictionary(col_dict);
-        k0 = obj1.get_key();
+        k0 = obj0.get_key();
+        k2 = obj2.get_key();
+        Dictionary dict = obj0.get_dictionary(col_dict);
         dict.insert("Hello", 9);
         dict.insert("Goodbye", "cruel world");
 
+        dict = obj1.get_dictionary(col_dict);
+        dict.insert("Link", obj2.get_link());
         wt.commit();
     }
     rt->advance_read();
@@ -325,7 +329,7 @@ TEST(Dictionary_Transaction)
         auto foo = wt.get_table("foo");
         Dictionary d = foo->get_object(k0).get_dictionary(col_dict);
         d.insert("Good morning", "sunshine");
-
+        foo->remove_object(k2); // Nullifies link in obj1.dictionaries["Link"]
         wt.commit();
     }
     rt->advance_read();
@@ -348,13 +352,14 @@ TEST(Dictionary_Transaction)
 TEST(Dictionary_Aggregate)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     auto tr = db->start_write();
     auto foo = tr->add_table("foo");
     auto col_dict = foo->add_column_dictionary(type_Int, "dictionaries");
 
     Obj obj1 = foo->create_object();
+    Obj obj2 = foo->create_object();
     Dictionary dict = obj1.get_dictionary(col_dict);
     std::vector<int64_t> random_idx(100);
     std::iota(random_idx.begin(), random_idx.end(), 0);
@@ -393,6 +398,12 @@ TEST(Dictionary_Aggregate)
     CHECK(avg);
     CHECK_EQUAL(cnt, 100);
     CHECK_EQUAL(avg->get_double(), double(50 * 99) / 100);
+
+    dict = obj2.get_dictionary(col_dict);
+    max = dict.max(&ndx);
+    CHECK(max);
+    CHECK(max->is_null());
+    CHECK_EQUAL(ndx, realm::npos);
 }
 
 TEST(Dictionary_Performance)
@@ -646,8 +657,8 @@ NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)
     ModelDict model;
     auto mask = Dictionary::set_hash_mask(0xFFFF);
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     auto tr = db->start_write();
     ColKey col_dict;
     Dictionary dict;
@@ -702,8 +713,8 @@ static void do_Dictionary_HashCollisionTransaction(realm::test_util::unit_test::
 {
     mask = Dictionary::set_hash_mask(mask);
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
 
     {
         auto tr = db->start_write();

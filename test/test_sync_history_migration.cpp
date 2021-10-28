@@ -5,7 +5,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "test.hpp"
 #include "util/compare_groups.hpp"
@@ -82,7 +82,7 @@ TEST_IF(Sync_HistoryMigration, false)
     if (bootstrapped) {
         auto i = std::max_element(client_schema_versions.begin(), client_schema_versions.end());
         latest_client_schema_version = *i;
-        REALM_ASSERT(latest_client_schema_version <= _impl::get_client_history_schema_version());
+        REALM_ASSERT(latest_client_schema_version <= sync::get_client_history_schema_version());
     }
 
     int latest_server_schema_version = -1;
@@ -97,7 +97,7 @@ TEST_IF(Sync_HistoryMigration, false)
     // for an easy way to produce the missing files).
     if (CHECK(bootstrapped)) {
         // FIXME: produce new files
-        // CHECK_EQUAL(_impl::get_client_history_schema_version(), latest_client_schema_version);
+        // CHECK_EQUAL(sync::get_client_history_schema_version(), latest_client_schema_version);
         // CHECK_EQUAL(_impl::get_server_history_schema_version(), latest_server_schema_version);
     }
 
@@ -106,9 +106,9 @@ TEST_IF(Sync_HistoryMigration, false)
     // CAUTION: This cannot be changed without also purging all the accumulated
     // test files.
     auto reference_initialize = [&](const std::string& client_path) {
-        DBRef sg = DB::create(sync::make_client_replication(client_path));
+        DBRef sg = DB::create(sync::make_client_replication(), client_path);
         WriteTransaction wt{sg};
-        TableRef table = sync::create_table_with_primary_key(wt, "class_Table", type_String, "label");
+        TableRef table = wt.get_group().add_table_with_primary_key("class_Table", type_String, "label");
         ColKey col_key = table->add_column(type_Int, "value");
         table->create_object_with_primary_key("Banach").set(col_key, 88);
         table->create_object_with_primary_key("Hausdorff").set(col_key, 99);
@@ -117,7 +117,7 @@ TEST_IF(Sync_HistoryMigration, false)
     };
 
     auto modify = [&](const std::string& client_path, StringData label, int old_value, int new_value) {
-        DBRef sg = DB::create(sync::make_client_replication(client_path));
+        DBRef sg = DB::create(sync::make_client_replication(), client_path);
         WriteTransaction wt{sg};
         Group& group = wt.get_group();
         TableRef table = group.get_table("class_Table");
@@ -187,31 +187,31 @@ TEST_IF(Sync_HistoryMigration, false)
     };
 
     auto verify_client_file = [&](const std::string& client_path) {
-        DBRef sg = DB::create(sync::make_client_replication(client_path));
+        DBRef sg = DB::create(sync::make_client_replication(), client_path);
         ReadTransaction rt{sg};
         rt.get_group().verify();
     };
 
     auto verify_server_file = [&](const std::string& server_path) {
-        _impl::ServerHistory history{server_path, server_history_context, compaction_control};
-        DBRef sg = DB::create(history);
+        _impl::ServerHistory history{server_history_context, compaction_control};
+        DBRef sg = DB::create(history, server_path);
         ReadTransaction rt{sg};
         rt.get_group().verify();
     };
 
     auto compare_client_files = [&](const std::string& client_path_1, const std::string& client_path_2) {
-        DBRef sg_1 = DB::create(sync::make_client_replication(client_path_1));
-        DBRef sg_2 = DB::create(sync::make_client_replication(client_path_2));
+        DBRef sg_1 = DB::create(sync::make_client_replication(), client_path_1);
+        DBRef sg_2 = DB::create(sync::make_client_replication(), client_path_2);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
         return compare_groups(rt_1, rt_2, test_context.logger);
     };
 
     auto compare_client_and_server_files = [&](const std::string& client_path, const std::string& server_path) {
-        auto history_1 = sync::make_client_replication(client_path);
-        _impl::ServerHistory history_2{server_path, server_history_context, compaction_control};
-        DBRef sg_1 = DB::create(*history_1);
-        DBRef sg_2 = DB::create(history_2);
+        auto history_1 = sync::make_client_replication();
+        _impl::ServerHistory history_2{server_history_context, compaction_control};
+        DBRef sg_1 = DB::create(*history_1, client_path);
+        DBRef sg_2 = DB::create(history_2, server_path);
         ReadTransaction rt_1{sg_1};
         ReadTransaction rt_2{sg_2};
         return compare_groups(rt_1, rt_2, test_context.logger);
@@ -300,7 +300,7 @@ TEST_IF(Sync_HistoryMigration, false)
         get_history_info(client_path, history_type, history_schema_version);
         REALM_ASSERT(history_type == Replication::hist_SyncClient);
         if (bootstrapped) {
-            if (latest_client_schema_version == _impl::get_client_history_schema_version())
+            if (latest_client_schema_version == sync::get_client_history_schema_version())
                 return; // Latest file is current
         }
         stash_file(client_path, "client", history_schema_version);
@@ -331,7 +331,7 @@ TEST_IF(Sync_HistoryMigration, false)
     auto synchronize = [&](const std::string& client_path, const std::string& server_dir) {
         fixtures::ClientServerFixture fixture{server_dir, test_context};
         fixture.start();
-        auto db = DB::create(sync::make_client_replication(client_path));
+        auto db = DB::create(sync::make_client_replication(), client_path);
         sync::Session session = fixture.make_bound_session(db, virtual_path);
         session.wait_for_upload_complete_or_client_stopped();
         session.wait_for_download_complete_or_client_stopped();

@@ -17,7 +17,6 @@
 #include <realm/replication.hpp>
 #include <realm/list.hpp>
 #include <realm/sync/transform.hpp>
-#include <realm/sync/object.hpp>
 
 #include "test.hpp"
 #include "util/quote.hpp"
@@ -69,9 +68,9 @@ TEST(Array_Example)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto create_schema = [](WriteTransaction& tr) {
-        TableRef foobar = sync::create_table(tr, "class_foobar");
+        TableRef foobar = tr.add_table("class_foobar");
         foobar->add_column(type_Int, "foo");
-        sync::add_array_column(*foobar, type_Int, "bar");
+        foobar->add_column_list(type_Int, "bar");
     };
 
     client_1->create_schema(create_schema);

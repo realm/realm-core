@@ -38,8 +38,8 @@ TEST(Unresolved_Basic)
     CHECK_NOT(k.get_unresolved());
 
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
     ColKey col_price;
     ColKey col_owns;
     ColKey col_has;
@@ -594,8 +594,8 @@ TEST(Unresolved_Recursive)
 TEST(Links_ManyObjects)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
 
     auto tr = db->start_write();
     TableRef table = tr->add_table_with_primary_key("table", type_Int, "id");

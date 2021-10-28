@@ -214,8 +214,7 @@ private:
                     std::cerr << "type_Int";
                 std::cerr << ", \"pk\");\n";
             }
-            sync::create_table_with_primary_key(*client.group, table_name, is_string_pk ? type_String : type_Int,
-                                                "pk");
+            client.group->add_table_with_primary_key(table_name, is_string_pk ? type_String : type_Int, "pk");
         }
         else {
             if (m_trace) {
@@ -224,7 +223,7 @@ private:
                              "group, \""
                           << table_name << "\");\n";
             }
-            sync::create_table(*client.group, table_name);
+            client.group->add_table(table_name);
         }
     }
 
@@ -239,7 +238,7 @@ private:
                          "group, \""
                       << table->get_name() << "\");\n";
         }
-        sync::erase_table(*client.group, table->get_name());
+        client.group->remove_table(table->get_name());
     }
 
     void clear_group(Peer& client)

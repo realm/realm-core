@@ -127,7 +127,7 @@ DeepChangeChecker::DeepChangeChecker(TransactionChangeInfo const& info, Table co
     , m_root_table(root_table)
     , m_key_path_array(key_path_array)
     , m_root_object_changes([&] {
-        auto it = info.tables.find(root_table.get_key().value);
+        auto it = info.tables.find(root_table.get_key());
         return it != info.tables.end() ? &it->second : nullptr;
     }())
     , m_related_tables(related_tables)
@@ -163,9 +163,9 @@ bool DeepChangeChecker::do_check_mixed_for_link(Group& group, TableRef& cached_l
 
     if (!cached_linked_table || cached_linked_table->get_key() != link.get_table_key()) {
         cached_linked_table = group.get_table(link.get_table_key());
-        REALM_ASSERT_EX(cached_linked_table, link.get_table_key().value);
+        REALM_ASSERT_EX(cached_linked_table, link.get_table_key());
     }
-    return check_row(*cached_linked_table, link.get_obj_key().value, filtered_columns, depth + 1);
+    return check_row(*cached_linked_table, link.get_obj_key(), filtered_columns, depth + 1);
 }
 
 template <typename T>
@@ -183,7 +183,7 @@ bool DeepChangeChecker::check_collection(ref_type ref, const Obj& obj, ColKey co
         auto target = obj.get_table()->get_link_target(col);
         for (size_t i = 0; i < size; ++i) {
             auto key = bp.get(i);
-            if (key && !key.is_unresolved() && check_row(*target, key.value, filtered_columns, depth + 1)) {
+            if (key && !key.is_unresolved() && check_row(*target, key, filtered_columns, depth + 1)) {
                 return true;
             }
         }
@@ -286,15 +286,15 @@ bool DeepChangeChecker::check_outgoing_links(Table const& table, ObjKey obj_key,
 
         if (!dst_key) // do not descend into a null or unresolved link
             return false;
-        return check_row(*dst_table, dst_key.value, filtered_columns, depth + 1);
+        return check_row(*dst_table, dst_key, filtered_columns, depth + 1);
     };
 
     // Check the `links` of all `m_related_tables` and return true if any of them has a `linked_object_changed`.
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);
 }
 
-bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
-                                  const std::vector<ColKey>& filtered_columns, size_t depth)
+bool DeepChangeChecker::check_row(Table const& table, ObjKey object_key, const std::vector<ColKey>& filtered_columns,
+                                  size_t depth)
 {
     REALM_ASSERT(!ObjKey(object_key).is_unresolved());
 
@@ -304,7 +304,7 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
     // looking at the root object because that check is done more efficiently
     // in operator() before calling this.
     if (depth > 0) {
-        auto it = m_info.tables.find(table_key.value);
+        auto it = m_info.tables.find(table_key);
         if (it != m_info.tables.end() && it->second.modifications_contains(object_key, filtered_columns))
             return true;
     }
@@ -322,7 +322,7 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
 
     // We may have already performed deep checking on this object and discovered
     // that it is not possible to reach a modified object from it.
-    auto& not_modified = m_not_modified[table_key.value];
+    auto& not_modified = m_not_modified[table_key];
     auto it = not_modified.find(object_key);
     if (it != not_modified.end())
         return false;
@@ -335,7 +335,7 @@ bool DeepChangeChecker::check_row(Table const& table, ObjKeyType object_key,
     return ret;
 }
 
-bool DeepChangeChecker::operator()(ObjKeyType key)
+bool DeepChangeChecker::operator()(ObjKey key)
 {
     // First check if the root object was modified. We could skip this and do
     // it in check_row(), but this skips a few lookups.
@@ -364,13 +364,13 @@ CollectionKeyPathChangeChecker::CollectionKeyPathChangeChecker(TransactionChange
 {
 }
 
-bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
+bool CollectionKeyPathChangeChecker::operator()(ObjKey object_key)
 {
-    std::vector<int64_t> changed_columns;
+    std::vector<ColKey> changed_columns;
 
     // In production code it shouldn't be possible for a notifier to call this on
     // an invalidated object, but we do have tests for it just in case.
-    if (ObjKey(object_key).is_unresolved()) {
+    if (object_key.is_unresolved()) {
         return false;
     }
 
@@ -381,11 +381,11 @@ bool CollectionKeyPathChangeChecker::operator()(ObjKeyType object_key)
     return changed_columns.size() > 0;
 }
 
-void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& changed_columns,
+void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<ColKey>& changed_columns,
                                                           const KeyPath& key_path, size_t depth, const Table& table,
-                                                          const ObjKeyType& object_key_value)
+                                                          const ObjKey& object_key)
 {
-    REALM_ASSERT(!ObjKey(object_key_value).is_unresolved());
+    REALM_ASSERT(!object_key.is_unresolved());
 
     if (depth >= key_path.size()) {
         // We've reached the end of the key path.
@@ -396,10 +396,10 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         auto last_key_path_element = key_path[key_path.size() - 1];
         auto last_column_key = last_key_path_element.second;
         if (last_column_key.get_type() == col_type_BackLink) {
-            auto iterator = m_info.tables.find(table.get_key().value);
+            auto iterator = m_info.tables.find(table.get_key());
             if (iterator != m_info.tables.end() && !iterator->second.insertions_empty()) {
-                auto root_column_key = key_path[0].second;
-                changed_columns.push_back(root_column_key.value);
+                ColKey root_column_key = key_path[0].second;
+                changed_columns.push_back(root_column_key);
             }
         }
 
@@ -409,15 +409,15 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
     auto [table_key, column_key] = key_path.at(depth);
 
     // Check for a change on the current depth level.
-    auto iterator = m_info.tables.find(table_key.value);
-    if (iterator != m_info.tables.end() && (iterator->second.modifications_contains(object_key_value, {column_key}) ||
-                                            iterator->second.insertions_contains(object_key_value))) {
+    auto iterator = m_info.tables.find(table_key);
+    if (iterator != m_info.tables.end() && (iterator->second.modifications_contains(object_key, {column_key}) ||
+                                            iterator->second.insertions_contains(object_key))) {
         // If an object linked to the root object was changed we only mark the
         // property of the root objects as changed.
         // This is also the reason why we can return right after doing so because we would only mark the same root
         // property again in case we find another change deeper down the same path.
         auto root_column_key = key_path[0].second;
-        changed_columns.push_back(root_column_key.value);
+        changed_columns.push_back(root_column_key);
         return;
     }
 
@@ -437,12 +437,12 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             auto target_table_key = mixed_object.get_link().get_table_key();
             Group* group = table.get_parent_group();
             auto target_table = group->get_table(target_table_key);
-            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, object_key.value);
+            find_changed_columns(changed_columns, key_path, depth + 1, *target_table, object_key);
         }
     };
 
     // Advance one level deeper into the key path.
-    auto object = table.get_object(ObjKey(object_key_value));
+    auto object = table.get_object(object_key);
     if (column_key.is_list()) {
         if (column_type == col_type_Mixed) {
             auto list = object.get_list<Mixed>(column_key);
@@ -457,7 +457,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             auto target_table = table.get_link_target(column_key);
             for (size_t i = 0; i < list.size(); i++) {
                 auto target_object = list.get(i);
-                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object);
             }
         }
     }
@@ -473,7 +473,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             auto set = object.get_linkset(column_key);
             auto target_table = table.get_link_target(column_key);
             for (auto& target_object : set) {
-                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+                find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object);
             }
         }
     }
@@ -494,7 +494,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
             return;
         }
         auto target_table = table.get_link_target(column_key);
-        find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object.value);
+        find_changed_columns(changed_columns, key_path, depth + 1, *target_table, target_object);
     }
     else if (column_type == col_type_BackLink) {
         // A backlink can have multiple origin objects. We need to iterate over all of them.
@@ -503,7 +503,7 @@ void CollectionKeyPathChangeChecker::find_changed_columns(std::vector<int64_t>& 
         size_t backlink_count = object.get_backlink_count(*origin_table, origin_column_key);
         for (size_t i = 0; i < backlink_count; i++) {
             auto origin_object = object.get_backlink(*origin_table, origin_column_key, i);
-            find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object.value);
+            find_changed_columns(changed_columns, key_path, depth + 1, *origin_table, origin_object);
         }
     }
     else {
@@ -519,9 +519,9 @@ ObjectKeyPathChangeChecker::ObjectKeyPathChangeChecker(TransactionChangeInfo con
 {
 }
 
-std::vector<int64_t> ObjectKeyPathChangeChecker::operator()(ObjKeyType object_key)
+std::vector<ColKey> ObjectKeyPathChangeChecker::operator()(ObjKey object_key)
 {
-    std::vector<int64_t> changed_columns;
+    std::vector<ColKey> changed_columns;
 
     for (auto& key_path : m_key_path_array) {
         find_changed_columns(changed_columns, key_path, 0, m_root_table, object_key);

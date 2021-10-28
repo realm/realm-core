@@ -431,8 +431,8 @@ TEST(Shared_CompactingOnTheFly)
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg = DB::create(*hist, DBOptions(crypt_key()));
+        std::unique_ptr<Replication> hist(make_in_realm_history());
+        DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
         // Create table entries
         std::vector<ColKey> cols; // unsafe to hold colkeys across transaction! FIXME: should be reported
         {
@@ -475,8 +475,8 @@ TEST(Shared_CompactingOnTheFly)
         writer_thread.join();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg2 = DB::create(*hist, DBOptions(crypt_key()));
+        std::unique_ptr<Replication> hist(make_in_realm_history());
+        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
         {
             WriteTransaction wt(sg2);
             wt.commit();
@@ -490,8 +490,8 @@ TEST(Shared_CompactingOnTheFly)
         rt2.get_group().verify();
     }
     {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        DBRef sg2 = DB::create(*hist, DBOptions(crypt_key()));
+        std::unique_ptr<Replication> hist(make_in_realm_history());
+        DBRef sg2 = DB::create(*hist, path, DBOptions(crypt_key()));
         ReadTransaction rt2(sg2);
         auto table = rt2.get_table("test");
         CHECK(table);
@@ -3831,8 +3831,8 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
         SHARED_GROUP_TEST_PATH(temp_copy);
         File::copy(path, temp_copy);
         // Use history as we will now have to upgrade file
-        std::unique_ptr<Replication> hist_w(make_in_realm_history(temp_copy));
-        auto db = DB::create(*hist_w, DBOptions(crypt_key(true)));
+        std::unique_ptr<Replication> hist_w(make_in_realm_history());
+        auto db = DB::create(*hist_w, temp_copy, DBOptions(crypt_key(true)));
         auto rt = db->start_read();
         ConstTableRef table = rt->get_table("table");
         auto o1 = *table->begin();
@@ -3849,8 +3849,8 @@ TEST_IF(Shared_DecryptExisting, REALM_ENABLE_ENCRYPTION)
 TEST(Shared_RollbackFirstTransaction)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef db = DB::create(*hist_w);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
     auto wt = db->start_write();
 
     wt->add_table("table");
@@ -3860,11 +3860,11 @@ TEST(Shared_RollbackFirstTransaction)
 TEST(Shared_SimpleTransaction)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_r(make_in_realm_history());
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
 
     {
-        DBRef db_w = DB::create(*hist_w);
+        DBRef db_w = DB::create(*hist_w, path);
         auto wt = db_w->start_write();
         wt->verify();
         wt->commit();
@@ -3873,7 +3873,7 @@ TEST(Shared_SimpleTransaction)
         wt->verify();
         wt->commit();
     }
-    DBRef db_r = DB::create(*hist_r);
+    DBRef db_r = DB::create(*hist_r, path);
     {
         auto rt = db_r->start_read();
         rt->verify();
@@ -3887,8 +3887,8 @@ TEST(Shared_OpenAfterClose)
     // ----------------------------------------------------------------------
     SHARED_GROUP_TEST_PATH(path);
     const char* key = nullptr;
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef db_w = DB::create(*hist_w, DBOptions(key));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db_w = DB::create(*hist_w, path, DBOptions(key));
     auto wt = db_w->start_write();
 
     wt = nullptr;
@@ -3933,8 +3933,8 @@ TEST(Shared_GenerateObjectIdAfterRollback)
     // REALM_MAX_BPNODE_SIZE is 1000
     // ----------------------------------------------------------------------
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef db_w = DB::create(*hist_w);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db_w = DB::create(*hist_w, path);
 
     auto wt = db_w->start_write();
 
@@ -4001,10 +4001,10 @@ TEST_IF(Shared_MoreVersionsInUse, REALM_ENABLE_ENCRYPTION)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
     ColKey col;
     {
-        DBRef db = DB::create(*hist, DBOptions(key));
+        DBRef db = DB::create(*hist, path, DBOptions(key));
         {
             auto wt = db->start_write();
             auto t = wt->add_table("Table_0");
@@ -4024,7 +4024,7 @@ TEST_IF(Shared_MoreVersionsInUse, REALM_ENABLE_ENCRYPTION)
         }
     }
     {
-        DBRef db = DB::create(*hist, DBOptions(key));
+        DBRef db = DB::create(*hist, path, DBOptions(key));
 
         // rt will now hold onto version 12
         auto rt = db->start_read();
@@ -4054,8 +4054,8 @@ TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
     // Cluster as the origin object.
     SHARED_GROUP_TEST_PATH(path);
     const char* key = "1234567890123456789012345678901123456789012345678901234567890123";
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef db = DB::create(*hist, DBOptions(key));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef db = DB::create(*hist, path, DBOptions(key));
     std::vector<ObjKey> keys;
     {
         auto wt = db->start_write();
@@ -4247,8 +4247,8 @@ TEST(Shared_ManyColumns)
     // was not updated in the parent.
 
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path);
 
     auto tr = db->start_write();
 
@@ -4290,8 +4290,8 @@ TEST(Shared_MultipleDBInstances)
 {
     SHARED_GROUP_TEST_PATH(path);
     {
-        auto hist = make_in_realm_history(path);
-        DBRef db = DB::create(*hist);
+        auto hist = make_in_realm_history();
+        DBRef db = DB::create(*hist, path);
         auto tr = db->start_write();
         auto t = tr->add_table("foo");
         t->create_object();
@@ -4299,10 +4299,10 @@ TEST(Shared_MultipleDBInstances)
         tr->commit();
     }
 
-    auto hist1 = make_in_realm_history(path);
-    DBRef db1 = DB::create(*hist1);
-    auto hist2 = make_in_realm_history(path);
-    DBRef db2 = DB::create(*hist2);
+    auto hist1 = make_in_realm_history();
+    DBRef db1 = DB::create(*hist1, path);
+    auto hist2 = make_in_realm_history();
+    DBRef db2 = DB::create(*hist2, path);
 
     auto tr = db1->start_write();
     tr->commit();
@@ -4329,8 +4329,8 @@ TEST(Shared_WriteCopy)
     SHARED_GROUP_TEST_PATH(path3);
 
     {
-        auto hist = make_in_realm_history(path1);
-        DBRef db = DB::create(*hist);
+        auto hist = make_in_realm_history();
+        DBRef db = DB::create(*hist, path1);
         auto tr = db->start_write();
         auto t = tr->add_table("foo");
         t->create_object();
@@ -4342,12 +4342,12 @@ TEST(Shared_WriteCopy)
         db->write_copy(path2.c_str(), {}, true);        // Overwrite allowed
     }
     {
-        auto hist = make_in_realm_history(path2);
-        DBRef db = DB::create(*hist);
+        auto hist = make_in_realm_history();
+        DBRef db = DB::create(*hist, path2);
         db->write_copy(path3.c_str());
     }
-    auto hist = make_in_realm_history(path3);
-    DBRef db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    DBRef db = DB::create(*hist, path3);
     CHECK_EQUAL(db->start_read()->get_table("foo")->size(), 1);
 }
 

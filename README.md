@@ -19,8 +19,11 @@ How to build Realm Core is described [here](how-to-build.md).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details!
 
-This project adheres to the [Contributor Covenant Code of Conduct](https://realm.io/conduct).
-By participating, you are expected to uphold this code. Please report unacceptable behavior to [info@realm.io](mailto:info@realm.io).
+## Code of Conduct
+
+This project adheres to the [MongoDB Code of Conduct](https://www.mongodb.com/community-code-of-conduct).
+By participating, you are expected to uphold this code. Please report
+unacceptable behavior to [community-conduct@mongodb.com](mailto:community-conduct@mongodb.com).
 
 ## License
 

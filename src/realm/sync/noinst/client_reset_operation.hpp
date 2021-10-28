@@ -1,12 +1,28 @@
+/*************************************************************************
+ *
+ * Copyright 2021 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #ifndef REALM_NOINST_CLIENT_RESET_OPERATION_HPP
 #define REALM_NOINST_CLIENT_RESET_OPERATION_HPP
 
-#include <realm/binary_data.hpp>
+#include <realm/db.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/optional.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/util/aes_cryptor.hpp>
 
 namespace realm::_impl {
 
@@ -14,43 +30,37 @@ namespace realm::_impl {
 // state Realm download.
 class ClientResetOperation {
 public:
-    util::Logger& logger;
+    using CallbackBeforeType = util::UniqueFunction<void(TransactionRef, TransactionRef)>;
+    using CallbackAfterType = util::UniqueFunction<void(TransactionRef)>;
 
-    ClientResetOperation(util::Logger& logger, DB& db, const std::string& metadata_dir);
+    ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
+                         CallbackBeforeType notify_before, CallbackAfterType notify_after);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
     // will be inserted in the Realm after download.
-    bool finalize(sync::SaltedFileIdent salted_file_ident);
+    bool finalize(sync::SaltedFileIdent salted_file_ident); // throws
 
-    sync::version_type get_server_version() const noexcept;
-    sync::salt_type get_server_version_salt() const noexcept;
+    static std::string get_fresh_path_for(const std::string& realm_path);
 
     realm::VersionID get_client_reset_old_version() const noexcept;
     realm::VersionID get_client_reset_new_version() const noexcept;
 
 private:
+    void clean_up_state() noexcept;
+
+    util::Logger& m_logger;
     DB& m_db;
-    const std::string m_metadata_dir;
-
+    DBRef m_db_fresh;
+    bool m_seamless_loss;
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};
-    sync::SaltedVersion m_server_version = {0, 0};
-
     realm::VersionID m_client_reset_old_version;
     realm::VersionID m_client_reset_new_version;
+    CallbackBeforeType m_notify_before;
+    CallbackAfterType m_notify_after;
 };
 
 // Implementation
-
-inline sync::version_type ClientResetOperation::get_server_version() const noexcept
-{
-    return m_server_version.version;
-}
-
-inline sync::salt_type ClientResetOperation::get_server_version_salt() const noexcept
-{
-    return m_server_version.salt;
-}
 
 inline realm::VersionID ClientResetOperation::get_client_reset_old_version() const noexcept
 {

@@ -1,10 +1,9 @@
 #include "test.hpp"
 
-#include <realm/sync/encrypt/encryption_transformer.hpp>
+#include <realm/sync/noinst/server/encryption_transformer.hpp>
 #include <realm/util/file.hpp>
 #include <realm/db.hpp>
-#include <realm/sync/object.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
 
 #include "sync_fixtures.hpp"
 
@@ -18,7 +17,7 @@ const size_t num_rows = 100;
 void populate(DBRef& sg)
 {
     WriteTransaction wt{sg};
-    TableRef t = create_table(wt, "table");
+    TableRef t = wt.add_table("table");
     t->add_column(type_String, "str_col");
     t->add_column(type_Int, "int_col");
     for (size_t i = 0; i < num_rows; ++i) {
@@ -137,8 +136,8 @@ TEST_IF(EncryptTransform_ServerHistory, false)
     std::string partial_server_path;
 
     {
-        auto reference_sg = DB::create(make_client_replication(reference_path));
-        auto partial_sg = DB::create(make_client_replication(partial_path));
+        auto reference_sg = DB::create(make_client_replication(), reference_path);
+        auto partial_sg = DB::create(make_client_replication(), partial_path);
 
         ClientServerFixture::Config server_config;
         server_config.server_encryption_key = encryption_key1;
@@ -152,7 +151,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         ObjKey obj_key;
         {
             WriteTransaction wt{reference_sg};
-            TableRef persons = create_table(wt, "class_persons");
+            TableRef persons = wt.add_table("class_persons");
             col_ndx_person_name = persons->add_column(type_String, "name");
             col_ndx_person_age = persons->add_column(type_Int, "age");
             persons->create_object().set_all("Adam", 28);
@@ -256,9 +255,9 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         options.encryption_key = encryption_key2;
         ServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory server_history{partial_server_path, context, compaction_control};
+        _impl::ServerHistory server_history{context, compaction_control};
 
-        auto server_partial_sg = DB::create(server_history, options);
+        auto server_partial_sg = DB::create(server_history, partial_server_path, options);
         {
             ReadTransaction rt{server_partial_sg};
             ConstTableRef persons = rt.get_table("class_persons");
@@ -277,9 +276,9 @@ TEST_IF(EncryptTransform_ServerHistory, false)
         options.encryption_key = encryption_key2;
         ServerHistoryContext context;
         _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory server_history{reference_server_path, context, compaction_control};
+        _impl::ServerHistory server_history{context, compaction_control};
 
-        auto server_reference_sg = DB::create(server_history, options);
+        auto server_reference_sg = DB::create(server_history, reference_server_path, options);
         {
             ReadTransaction rt{server_reference_sg};
             ConstTableRef persons = rt.get_table("class_persons");

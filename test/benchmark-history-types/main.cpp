@@ -35,10 +35,10 @@ using namespace realm::test_util;
 
 namespace {
 
-std::unique_ptr<Replication> make_history(std::string path)
+std::unique_ptr<Replication> make_history()
 {
-    return make_client_history(path);
-    //    return make_in_realm_history(path);
+    return make_client_history();
+    //    return make_in_realm_history();
 }
 
 
@@ -53,11 +53,11 @@ public:
         std::string path = "/tmp/benchmark-history-types.realm";
         util::File::try_remove(path);
 
-        reader_history = make_history(path);
-        reader_shared_group.reset(new DB(*reader_history));
+        reader_history = make_history();
+        reader_shared_group.reset(new DB(*reader_history, path));
 
-        writer_history = make_history(path);
-        writer_shared_group.reset(new DB(*writer_history));
+        writer_history = make_history();
+        writer_shared_group.reset(new DB(*writer_history, path));
 
         WriteTransaction wt(*writer_shared_group);
         TableRef table = wt.add_table("table");
@@ -119,12 +119,12 @@ public:
         reader_shared_groups.reset(new std::unique_ptr<DB>[ num_readers ]);
 
         for (int i = 0; i < num_readers; ++i) {
-            reader_histories[i] = make_history(path);
-            reader_shared_groups[i].reset(new DB(*reader_histories[i]));
+            reader_histories[i] = make_history();
+            reader_shared_groups[i].reset(new DB(*reader_histories[i], path));
         }
 
-        writer_history = make_history(path);
-        writer_shared_group.reset(new DB(*writer_history));
+        writer_history = make_history();
+        writer_shared_group.reset(new DB(*writer_history, path));
 
         WriteTransaction wt(*writer_shared_group);
         TableRef table = wt.add_table("table");

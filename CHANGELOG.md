@@ -4,16 +4,81 @@
 * None.
 
 ### Fixed
-* Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
-* Using "sort", "distinct", or "limit" as field name in query expression would cause an "Invalid predicate" error ([#7545](https://github.com/realm/realm-java/issues/7545) since v10.1.2)
+* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* The Swift package could not be imported in Xcode 12.5 (since v11.5.0).
 
 ### Breaking changes
-* `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
+* None.
 
 -----------
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 11.5.1 Release notes
+
+### Fixed
+* Calling `remove_all_target_rows()` on a newly constructed `LnkSet` dereferenced a null pointer ([#4972](https://github.com/realm/realm-core/pull/4972), since v11.5.0).
+* Mutating a Set via one accessor and then calling `remove_all_target_rows()` on a different accessor for the same Set could potentially result in a stale version of the Set being used ([#4972](https://github.com/realm/realm-core/pull/4972), since v11.0.0).
+* Restore support for calling snapshot() on non-Object collections ([#4971](https://github.com/realm/realm-core/issues/4971), since 11.5.0)
+ 
+-----------
+
+### Internals
+* Stopped running RaspberryPi testing in CI ([#4967](https://github.com/realm/realm-core/issues/4967)
+
+----------------------------------------------
+
+# 11.5.0 Release notes
+
+### Enhancements
+* Add a "seamless loss" mode to client reset where local changes are overwritten by the server's state without having to handle the reset manually. ([#4809](https://github.com/realm/realm-core/pull/4809))
+* Added methods to freeze and thaw realms, objects, results and lists. ([#4658](https://github.com/realm/realm-core/pull/4658))
+* Added `Realm::sync_session()` getter as a convenient way to get the sync session for a realm instance. ([#4925](https://github.com/realm/realm-core/pull/4925))
+* Added `realm_object_get_or_create_with_primary_key` to C-API. ([#4595](https://github.com/realm/realm-core/issues/4595))
+* Added notification callbacks for realm changed and schema changed events to the C API. ([#4940](https://github.com/realm/realm-core/pull/4940))
+* Added the `GenericNetworkTransport` API to C API ([#4942](https://github.com/realm/realm-core/pull/4942)).
+* Added the `App` functionality (except access to Atlas collections) to the C API. ([#4951](https://github.com/realm/realm-core/pull/4951))
+
+### Fixed
+* Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
+* Using "sort", "distinct", or "limit" as field name in query expression would cause an "Invalid predicate" error ([#7545](https://github.com/realm/realm-java/issues/7545) since v10.1.2)
+* Crash when quering with 'Not()' followed by empty group. ([#4168](https://github.com/realm/realm-core/issues/4168) since v1.0.0)
+* Change Apple/Linux temp dir created with `util::make_temp_dir()` to default to the environment's TMPDIR if available. Make `TestFile` clean up the directories it creates when finished. ([#4921](https://github.com/realm/realm-core/issues/4921))
+* Fixed a rare assertion failure or deadlock when a sync session is racing to close at the same time that external reference to the Realm is being released. ([#4931](https://github.com/realm/realm-core/issues/4931))
+* Fixed an assertion failure when opening a sync Realm with a user who had been removed. Instead an exception will be thrown. ([#4937](https://github.com/realm/realm-core/issues/4937), since v10)
+* Fixed a rare segfault which could trigger if a user was being logged out while the access token refresh response comes in. ([#4944](https://github.com/realm/realm-core/issues/4944), since v10)
+* Fixed a bug where progress notifiers continue to be called after the download of a synced realm is complete. ([#4919](https://github.com/realm/realm-core/issues/4919))
+* Fixed an issue where the release process was only publishing armeabi-v7a Android binaries. ([#4952](https://github.com/realm/realm-core/pull/4952), since v10.6.0)
+* Allow for EPERM to be returned from fallocate(). This improves support for running on Linux environments with interesting filesystems, like AWS Lambda. Thanks to [@ztane](https://github.com/ztane) for reporting and suggesting a fix. ([#4957](https://github.com/realm/realm-core/issues/4957))
+* Fixed an issue where the Mac Catalyst target was excluded from the `REALM_HAVE_SECURE_TRANSPORT` macro in the Swift Package. This caused `'SSL/TLS protocol not supported'` to be thrown as an exception if Realm Sync is used. ([#7474](https://github.com/realm/realm-cocoa/issues/7474))
+* Fixed a user being left in the logged in state when the user's refresh token expires. ([#4882](https://github.com/realm/realm-core/issues/4882), since v10)
+* Calling `size()` on a Results newly constructed via `.as_results().distinct()` on a Collection would give the size of the Collection rather than the distinct count. ([Cocoa #7481](https://github.com/realm/realm-cocoa/issues/7481), since v11.0.0).
+* Calling `clear()` on a Results newly constructed via `.as_results().distinct()` on a Collection would delete all objects in the Collection rather than just the distinct objects in the Results (since v11.0.0).
+* Calling `clear()` on a Results constructed via `.as_results().distinct()` on a Collection after calling `get()` or `size()` would not re-evaluate the distinct until after the next mutation to the table occurred.
+* Sync progress notifiers would not trigger when the downloadable bytes size would equal 0.
+
+### Breaking changes
+* `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
+* Several typedefs in `realm/object-store/sync/sync_session.hpp` were renamed ([#4924](https://github.com/realm/realm-core/pull/4924)):
+  * `realm::SyncSession::SyncSessionStateCallback` -> `realm::SyncSession::StateChangeCallback`
+  * `realm::SyncSession::ConnectionStateCallback` -> `realm::SyncSession::ConnectionStateChangeCallback`
+  * `realm::SyncSessionTransactCallback` -> `realm::SyncSession::TransactionCallback`
+  * `realm::SyncProgressNotifierCallback` -> `realm::SyncSession::ProgressNotifierCallback`
+  * `realm::SyncSession::NotifierType` -> `realm::SyncSession::ProgressDirection`
+* `realm::SyncClientConfig::logger_factory` was changed to a `std::function` that returns logger instances. The abstract class `SyncLoggerFactory` was removed. ([#4926](https://github.com/realm/realm-core/pull/4926))
+* C-API function `realm_object_create_with_primary_key` will now fail if an object already exists with given primary key. ([#4936](https://github.com/realm/realm-core/pull/4936))
+
+-----------
+
+### Internals
+* Cleaned out some old server tools and add the remaining ones to the default build.
+* App can now use bundled realm without getting "progress error" from server.
+* Refactored the wire protocol message parsing to not use std::istream or goto's for flow control.
+* Stopped running RaspberryPi testing in CI ([#4967](https://github.com/realm/realm-core/issues/4967)
+* Unit tests now run in parallel by default.
 
 ----------------------------------------------
 

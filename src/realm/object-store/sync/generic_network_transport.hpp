@@ -16,7 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-
 #ifndef REALM_GENERIC_NETWORK_TRANSPORT_HPP
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
@@ -30,8 +29,6 @@
 #include <string>
 #include <system_error>
 #include <vector>
-
-#include <external/json/json.hpp>
 
 namespace realm {
 namespace app {
@@ -156,15 +153,6 @@ struct AppError {
 };
 
 std::ostream& operator<<(std::ostream& os, AppError error);
-
-template <typename T>
-T value_from_json(const nlohmann::json& data, const std::string& key)
-{
-    if (auto it = data.find(key); it != data.end()) {
-        return it->get<T>();
-    }
-    throw AppError(make_error_code(JSONErrorCode::missing_json_key), key);
-}
 
 /**
  * An HTTP method type.

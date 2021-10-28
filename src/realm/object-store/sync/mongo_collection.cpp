@@ -17,6 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/sync/mongo_collection.hpp>
+
+#include <realm/object-store/sync/app_service_client.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/util/uri.hpp>
 
 namespace realm {
@@ -592,14 +595,14 @@ void WatchStream::feed_sse(ServerSentEvent sse)
             // fallthrough to same handling as for non-document value.
         }
         m_state = HAVE_ERROR;
-        m_error.emplace(app::make_error_code(JSONErrorCode::bad_bson_parse),
-                        "server returned malformed event: " + std::string(sse.data));
+        m_error = std::make_unique<AppError>(app::make_error_code(JSONErrorCode::bad_bson_parse),
+                                             "server returned malformed event: " + std::string(sse.data));
     }
     else if (sse.eventType == "error") {
         m_state = HAVE_ERROR;
 
         // default error message if we have issues parsing the reply.
-        m_error.emplace(app::make_error_code(ServiceErrorCode::unknown), std::string(sse.data));
+        m_error = std::make_unique<AppError>(app::make_error_code(ServiceErrorCode::unknown), std::string(sse.data));
         try {
             auto parsed = bson::parse(sse.data);
             if (parsed.type() != bson::Bson::Type::Document)
@@ -611,7 +614,7 @@ void WatchStream::feed_sse(ServerSentEvent sse)
                 return;
             if (msg.type() != bson::Bson::Type::String)
                 return;
-            m_error.emplace(
+            m_error = std::make_unique<AppError>(
                 app::make_error_code(app::service_error_code_from_string(code.operator const std::string&())),
                 msg.operator const std::string&());
         }

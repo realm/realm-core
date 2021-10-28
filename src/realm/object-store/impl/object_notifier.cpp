@@ -43,7 +43,7 @@ bool ObjectNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     REALM_ASSERT(m_table);
 
     m_info = &info;
-    info.tables[m_table_key.value];
+    info.tables[m_table_key];
 
     // When adding or removing a callback the related tables can change due to the way we calculate related tables
     // when key path filters are set hence we need to recalculate every time the callbacks are changed.
@@ -61,8 +61,8 @@ void ObjectNotifier::run()
         return;
     REALM_ASSERT(m_table);
 
-    auto it = m_info->tables.find(m_table_key.value);
-    if (it != m_info->tables.end() && it->second.deletions_contains(m_obj_key.value)) {
+    auto it = m_info->tables.find(m_table_key);
+    if (it != m_info->tables.end() && it->second.deletions_contains(m_obj_key)) {
         // The object was deleted in this set of changes, so report that and
         // release all of our resources so that we don't do anything further.
         m_change.deletions.add(0);
@@ -76,12 +76,12 @@ void ObjectNotifier::run()
         // If any callback has a key path filter we will check all related tables and if any of them was changed we
         // mark the this object as changed.
         auto object_change_checker = get_object_modification_checker(*m_info, m_table);
-        std::vector<int64_t> changed_columns = object_change_checker(m_obj_key.value);
+        std::vector<ColKey> changed_columns = object_change_checker(m_obj_key);
 
         if (changed_columns.size() > 0) {
             m_change.modifications.add(0);
             for (auto changed_column : changed_columns) {
-                m_change.columns[changed_column].add(0);
+                m_change.columns[changed_column.value].add(0);
             }
         }
         if (all_callbacks_filtered()) {
@@ -96,13 +96,13 @@ void ObjectNotifier::run()
 
     const auto& change = it->second;
 
-    auto column_modifications = change.get_columns_modified(m_obj_key.value);
+    auto column_modifications = change.get_columns_modified(m_obj_key);
     if (!column_modifications)
         return;
 
     // Finally we add all changes to `m_change` which is later used to notify about the changed columns.
     m_change.modifications.add(0);
     for (auto col : *column_modifications) {
-        m_change.columns[col].add(0);
+        m_change.columns[col.value].add(0);
     }
 }

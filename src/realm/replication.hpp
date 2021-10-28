@@ -42,8 +42,58 @@ class Logger;
 
 /// Replication is enabled by passing an instance of an implementation of this
 /// class to the DB constructor.
-class Replication : public _impl::TransactLogConvenientEncoder {
+class Replication {
 public:
+    virtual ~Replication() = default;
+
+    // Formerly Replication:
+    virtual void add_class(TableKey table_key, StringData table_name, bool is_embedded);
+    virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
+                                            bool nullable);
+    virtual void prepare_erase_class(TableKey table_key);
+    virtual void erase_class(TableKey table_key, size_t num_tables);
+    virtual void rename_class(TableKey table_key, StringData new_name);
+    virtual void insert_column(const Table*, ColKey col_key, DataType type, StringData name, Table* target_table);
+    virtual void erase_column(const Table*, ColKey col_key);
+    virtual void rename_column(const Table*, ColKey col_key, StringData name);
+
+    virtual void add_int(const Table*, ColKey col_key, ObjKey key, int_fast64_t value);
+    virtual void set(const Table*, ColKey col_key, ObjKey key, Mixed value,
+                     _impl::Instruction variant = _impl::instr_Set);
+
+    virtual void list_set(const CollectionBase& list, size_t list_ndx, Mixed value);
+    virtual void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value);
+    virtual void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx);
+    virtual void list_erase(const CollectionBase&, size_t link_ndx);
+    virtual void list_clear(const CollectionBase&);
+
+    virtual void set_insert(const CollectionBase& set, size_t list_ndx, Mixed value);
+    virtual void set_erase(const CollectionBase& set, size_t list_ndx, Mixed value);
+    virtual void set_clear(const CollectionBase& set);
+
+    virtual void dictionary_insert(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
+    virtual void dictionary_set(const CollectionBase& dict, size_t dict_ndx, Mixed key, Mixed value);
+    virtual void dictionary_erase(const CollectionBase& dict, size_t dict_ndx, Mixed key);
+
+    virtual void create_object(const Table*, GlobalKey);
+    virtual void create_object_with_primary_key(const Table*, ObjKey, Mixed);
+    virtual void remove_object(const Table*, ObjKey);
+
+    virtual void typed_link_change(const Table*, ColKey, TableKey);
+
+    //@{
+
+    /// Implicit nullifications due to removal of target row. This is redundant
+    /// information from the point of view of replication, as the removal of the
+    /// target row will reproduce the implicit nullifications in the target
+    /// Realm anyway. The purpose of this instruction is to allow observers
+    /// (reactor pattern) to be explicitly notified about the implicit
+    /// nullifications.
+
+    virtual void nullify_link(const Table*, ColKey col_key, ObjKey key);
+    virtual void link_list_nullify(const Lst<ObjKey>&, size_t link_ndx);
+
+
     // Be sure to keep this type aligned with what is actually used in DB.
     using version_type = _impl::History::version_type;
     using InputStream = _impl::NoCopyInputStream;
@@ -51,35 +101,13 @@ public:
     class Interrupted; // Exception
     class SimpleIndexTranslator;
 
-    virtual std::string get_database_path() const = 0;
+    std::string get_database_path() const;
 
     /// Called during construction of the associated DB object.
     ///
     /// \param db The associated DB object.
-    virtual void initialize(DB& db) = 0;
+    virtual void initialize(DB& db);
 
-
-    /// Called by the associated DB object when a session is
-    /// initiated. A *session* is a sequence of temporally overlapping
-    /// accesses to a specific Realm file, where each access consists of a
-    /// DB object through which the Realm file is open. Session
-    /// initiation occurs during the first opening of the Realm file within such
-    /// a session.
-    ///
-    /// Session initiation fails if this function throws.
-    ///
-    /// \param version The current version of the associated Realm.
-    ///
-    /// The default implementation does nothing.
-    virtual void initiate_session(version_type version) = 0;
-
-    /// Called by the associated DB object when a session is
-    /// terminated. See initiate_session() for the definition of a
-    /// session. Session termination occurs upon closing the Realm through the
-    /// last DB object within the session.
-    ///
-    /// The default implementation does nothing.
-    virtual void terminate_session() noexcept = 0;
 
     /// \defgroup replication_transactions
     //@{
@@ -167,7 +195,6 @@ public:
     /// produced by the transaction.
     version_type prepare_commit(version_type current_version);
     void finalize_commit() noexcept;
-    void abort_transact() noexcept;
 
     //@}
 
@@ -181,29 +208,7 @@ public:
     /// initiation of commit operation). In that case, the caller may assume that the
     /// returned memory reference stays valid for the remainder of the transaction (up
     /// until initiation of the commit operation).
-    virtual BinaryData get_uncommitted_changes() const noexcept = 0;
-
-    /// Interrupt any blocking call to a function in this class. This function
-    /// may be called asyncronously from any thread, but it may not be called
-    /// from a system signal handler.
-    ///
-    /// Some of the public function members of this class may block, but only
-    /// when it it is explicitely stated in the documention for those functions.
-    ///
-    /// FIXME: Currently we do not state blocking behaviour for all the
-    /// functions that can block.
-    ///
-    /// After any function has returned with an interruption indication, the
-    /// only functions that may safely be called are abort_transact() and the
-    /// destructor. If a client, after having received an interruption
-    /// indication, calls abort_transact() and then clear_interrupt(), it may
-    /// resume normal operation through this Replication object.
-    void interrupt() noexcept;
-
-    /// May be called by a client to reset this Replication object after an
-    /// interrupted transaction. It is not an error to call this function in a
-    /// situation where no interruption has occured.
-    void clear_interrupt() noexcept;
+    BinaryData get_uncommitted_changes() const noexcept;
 
     /// CAUTION: These values are stored in Realm files, so value reassignment
     /// is not allowed.
@@ -331,46 +336,74 @@ public:
     /// returns \ref hist_None.
     virtual std::unique_ptr<_impl::History> _create_history_read() = 0;
 
-    ~Replication() override;
-
 protected:
-    DB* m_db = nullptr;
-    Replication(_impl::TransactLogStream& stream);
+    Replication() = default;
 
-    void register_db(DB* owner)
-    {
-        m_db = owner;
-    }
 
     //@{
 
     /// do_initiate_transact() is called by initiate_transact(), and likewise
-    /// for do_prepare_commit), do_finalize_commit(), and do_abort_transact().
+    /// for do_prepare_commit()
     ///
     /// With respect to exception safety, the Replication implementation has two
     /// options: It can prepare to accept the accumulated changeset in
     /// do_prepapre_commit() by allocating all required resources, and delay the
-    /// actual acceptance to do_finalize_commit(), which requires that the final
+    /// actual acceptance to finalize_commit(), which requires that the final
     /// acceptance can be done without any risk of failure. Alternatively, the
     /// Replication implementation can fully accept the changeset in
     /// do_prepapre_commit() (allowing for failure), and then discard that
     /// changeset during the next invocation of do_initiate_transact() if
     /// `current_version` indicates that the previous transaction failed.
 
-    virtual void do_initiate_transact(Group& group, version_type current_version, bool history_updated) = 0;
-    virtual version_type do_prepare_commit(version_type orig_version) = 0;
-    virtual void do_finalize_commit() noexcept = 0;
-    virtual void do_abort_transact() noexcept = 0;
+    virtual void do_initiate_transact(Group& group, version_type current_version, bool history_updated);
 
     //@}
 
 
-    virtual void do_interrupt() noexcept = 0;
+    // Formerly part of TrivialReplication:
+    virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
+    virtual void finalize_changeset() noexcept {}
 
-    virtual void do_clear_interrupt() noexcept = 0;
+private:
+    struct CollectionId {
+        TableKey table_key;
+        ObjKey object_key;
+        ColKey col_id;
 
-    friend class _impl::TransactReverser;
-    friend class DB;
+        CollectionId() = default;
+        CollectionId(const CollectionBase& list)
+            : table_key(list.get_table()->get_key())
+            , object_key(list.get_owner_key())
+            , col_id(list.get_col_key())
+        {
+        }
+        CollectionId(TableKey t, ObjKey k, ColKey c)
+            : table_key(t)
+            , object_key(k)
+            , col_id(c)
+        {
+        }
+        bool operator!=(const CollectionId& other)
+        {
+            return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
+        }
+    };
+
+    _impl::TransactLogBufferStream m_stream;
+    _impl::TransactLogEncoder m_encoder{m_stream};
+    mutable const Table* m_selected_table = nullptr;
+    mutable CollectionId m_selected_list;
+
+    void unselect_all() noexcept;
+    void select_table(const Table*); // unselects link list
+    void select_collection(const CollectionBase&);
+
+    void do_select_table(const Table*);
+    void do_select_collection(const CollectionBase&);
+
+    void do_set(const Table*, ColKey col_key, ObjKey key, _impl::Instruction variant = _impl::instr_Set);
+
+    size_t transact_log_size();
 };
 
 class Replication::Interrupted : public std::exception {
@@ -382,44 +415,7 @@ public:
 };
 
 
-class TrivialReplication : public Replication {
-public:
-    ~TrivialReplication() noexcept {}
-
-    std::string get_database_path() const override;
-
-protected:
-    typedef Replication::version_type version_type;
-
-    TrivialReplication(const std::string& database_file);
-
-    virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
-    virtual void finalize_changeset() noexcept = 0;
-
-    BinaryData get_uncommitted_changes() const noexcept override;
-
-    void initialize(DB&) override;
-    void do_initiate_transact(Group& group, version_type, bool) override;
-    version_type do_prepare_commit(version_type orig_version) override;
-    void do_finalize_commit() noexcept override;
-    void do_abort_transact() noexcept override;
-    void do_interrupt() noexcept override;
-    void do_clear_interrupt() noexcept override;
-
-private:
-    const std::string m_database_file;
-    _impl::TransactLogBufferStream m_stream;
-
-    size_t transact_log_size();
-};
-
-
 // Implementation:
-
-inline Replication::Replication(_impl::TransactLogStream& stream)
-    : _impl::TransactLogConvenientEncoder(stream)
-{
-}
 
 inline void Replication::initiate_transact(Group& group, version_type current_version, bool history_updated)
 {
@@ -427,50 +423,156 @@ inline void Replication::initiate_transact(Group& group, version_type current_ve
         hist->set_group(&group, history_updated);
     }
     do_initiate_transact(group, current_version, history_updated);
-    reset_selection_caches();
-}
-
-inline Replication::version_type Replication::prepare_commit(version_type orig_version)
-{
-    return do_prepare_commit(orig_version);
+    unselect_all();
 }
 
 inline void Replication::finalize_commit() noexcept
 {
-    do_finalize_commit();
+    finalize_changeset();
 }
 
-inline void Replication::abort_transact() noexcept
-{
-    do_abort_transact();
-}
-
-inline void Replication::interrupt() noexcept
-{
-    do_interrupt();
-}
-
-inline void Replication::clear_interrupt() noexcept
-{
-    do_clear_interrupt();
-}
-
-inline TrivialReplication::TrivialReplication(const std::string& database_file)
-    : Replication(m_stream)
-    , m_database_file(database_file)
-{
-}
-
-inline BinaryData TrivialReplication::get_uncommitted_changes() const noexcept
+inline BinaryData Replication::get_uncommitted_changes() const noexcept
 {
     const char* data = m_stream.get_data();
-    size_t size = write_position() - data;
+    size_t size = m_encoder.write_position() - data;
     return BinaryData(data, size);
 }
 
-inline size_t TrivialReplication::transact_log_size()
+inline size_t Replication::transact_log_size()
 {
-    return write_position() - m_stream.get_data();
+    return m_encoder.write_position() - m_stream.get_data();
+}
+
+
+inline void Replication::unselect_all() noexcept
+{
+    m_selected_table = nullptr;
+    m_selected_list = CollectionId();
+}
+
+inline void Replication::select_table(const Table* table)
+{
+    if (table != m_selected_table)
+        do_select_table(table); // Throws
+    m_selected_list = CollectionId();
+}
+
+inline void Replication::select_collection(const CollectionBase& list)
+{
+    if (CollectionId(list) != m_selected_list) {
+        do_select_collection(list); // Throws
+    }
+}
+
+inline void Replication::prepare_erase_class(TableKey) {}
+
+inline void Replication::erase_class(TableKey table_key, size_t)
+{
+    unselect_all();
+    m_encoder.erase_class(table_key); // Throws
+}
+
+inline void Replication::rename_class(TableKey table_key, StringData)
+{
+    unselect_all();
+    m_encoder.rename_class(table_key); // Throws
+}
+
+inline void Replication::insert_column(const Table* t, ColKey col_key, DataType, StringData, Table*)
+{
+    select_table(t);                  // Throws
+    m_encoder.insert_column(col_key); // Throws
+}
+
+inline void Replication::erase_column(const Table* t, ColKey col_key)
+{
+    select_table(t);                 // Throws
+    m_encoder.erase_column(col_key); // Throws
+}
+
+
+inline void Replication::rename_column(const Table* t, ColKey col_key, StringData)
+{
+    select_table(t);                  // Throws
+    m_encoder.rename_column(col_key); // Throws
+}
+
+inline void Replication::do_set(const Table* t, ColKey col_key, ObjKey key, _impl::Instruction variant)
+{
+    if (variant != _impl::Instruction::instr_SetDefault) {
+        select_table(t);                       // Throws
+        m_encoder.modify_object(col_key, key); // Throws
+    }
+}
+
+inline void Replication::set(const Table* t, ColKey col_key, ObjKey key, Mixed, _impl::Instruction variant)
+{
+    do_set(t, col_key, key, variant); // Throws
+}
+
+inline void Replication::add_int(const Table* t, ColKey col_key, ObjKey key, int_fast64_t)
+{
+    do_set(t, col_key, key); // Throws
+}
+
+inline void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key)
+{
+    select_table(t);                       // Throws
+    m_encoder.modify_object(col_key, key); // Throws
+}
+
+inline void Replication::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
+{
+    select_collection(list);      // Throws
+    m_encoder.list_set(list_ndx); // Throws
+}
+
+inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed)
+{
+    select_collection(list);         // Throws
+    m_encoder.list_insert(list_ndx); // Throws
+}
+
+inline void Replication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed)
+{
+    select_collection(set);        // Throws
+    m_encoder.set_insert(set_ndx); // Throws
+}
+
+inline void Replication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed)
+{
+    select_collection(set);       // Throws
+    m_encoder.set_erase(set_ndx); // Throws
+}
+
+inline void Replication::set_clear(const CollectionBase& set)
+{
+    select_collection(set);          // Throws
+    m_encoder.set_clear(set.size()); // Throws
+}
+
+inline void Replication::remove_object(const Table* t, ObjKey key)
+{
+    select_table(t);              // Throws
+    m_encoder.remove_object(key); // Throws
+}
+
+inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
+{
+    select_collection(list);                         // Throws
+    m_encoder.list_move(from_link_ndx, to_link_ndx); // Throws
+}
+
+inline void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
+{
+    select_collection(list);        // Throws
+    m_encoder.list_erase(link_ndx); // Throws
+}
+
+inline void Replication::typed_link_change(const Table* source_table, ColKey col, TableKey dest_table)
+{
+    select_table(source_table);
+    m_encoder.typed_link_change(col, dest_table);
 }
 
 } // namespace realm

@@ -3113,8 +3113,8 @@ TEST(Query_StrIndex)
 TEST(Query_StrIndexUpdating)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    auto sg = DB::create(*hist, path, DBOptions(crypt_key()));
     auto group = sg->start_write();
 
     auto t = group->add_table("table");
@@ -4117,8 +4117,13 @@ TEST(Query_SortLinkChains)
                                               .get_linked_object(t1_link_col)
                                               .get_linked_object(t2_link_col)
                                               .get<util::Optional<int64_t>>(t3_int_col);
-        CHECK(!last || current.value() >= last.value());
-        last = current;
+        if (last) {
+            CHECK(current);
+            CHECK(current.value() >= last.value());
+        }
+        if (current) {
+            last = current.value();
+        }
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor({{t1_link_col, t2_link_col, t3_int_col}}, {false}));
@@ -4743,8 +4748,8 @@ TEST(Query_DistinctAndSort)
 TEST(Query_SortDistinctOrderThroughHandover)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
 
     TableRef t1 = g->add_table("t1");
@@ -4862,8 +4867,8 @@ TEST(Query_SortDistinctOrderThroughHandover)
 
 TEST(Query_CompoundDescriptors) {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    DBRef sg_w = DB::create(*hist_w, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef sg_w = DB::create(*hist_w, path, DBOptions(crypt_key()));
     auto g = sg_w->start_write();
 
     TableRef t1 = g->add_table("t1");
@@ -5698,6 +5703,18 @@ TEST(Query_IntPerformance)
     std::cout << "    time not_equal: " << duration_cast<nanoseconds>(t3 - t2).count() / nb_reps << " ns/rep"
               << std::endl;
     std::cout << "    time sum: " << duration_cast<nanoseconds>(t4 - t3).count() / nb_reps << " ns/rep" << std::endl;
+}
+
+TEST(Query_NotWithEmptyGroup)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col = table->add_column(type_String, "type");
+    table->create_object().set(col, "hello");
+    auto q = table->where().equal(col, "hello").Or().Not().group().end_group();
+    CHECK_EQUAL(q.count(), 1);
+    q = table->where().Not().group().end_group().Or().equal(col, "hello");
+    CHECK_EQUAL(q.count(), 1);
 }
 
 #endif // TEST_QUERY

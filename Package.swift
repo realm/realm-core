@@ -3,12 +3,12 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.4.1"
+let versionStr = "11.5.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
 
-let cxxSettings: [CXXSetting] = [
+var cxxSettings: [CXXSetting] = [
     .headerSearchPath("."),
     .define("REALM_DEBUG", .when(configuration: .debug)),
     .define("REALM_NO_CONFIG"),
@@ -21,44 +21,25 @@ let cxxSettings: [CXXSetting] = [
     .define("REALM_VERSION_MINOR", to: String(versionCompontents[1])),
     .define("REALM_VERSION_PATCH", to: String(versionCompontents[2])),
     .define("REALM_VERSION_EXTRA", to: "\"\(versionExtra)\""),
-    .define("REALM_VERSION_STRING", to: "\"\(versionStr)\""),
-
-    .define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+    .define("REALM_VERSION_STRING", to: "\"\(versionStr)\"")
 ]
 
+#if swift(>=5.5)
+cxxSettings.append(.define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .macCatalyst, .iOS, .tvOS, .watchOS])))
+#else
+cxxSettings.append(.define("REALM_HAVE_SECURE_TRANSPORT", to: "1", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])))
+#endif
+
 let syncServerSources: [String] =  [
-    "realm/sync/access_control.cpp",
-    "realm/sync/access_token.cpp",
-    "realm/sync/crypto_server_apple.mm",
-    "realm/sync/encrypt",
-    "realm/sync/metrics.cpp",
-    "realm/sync/noinst/reopening_file_logger.cpp",
-    "realm/sync/noinst/server_dir.cpp",
-    "realm/sync/noinst/server_file_access_cache.cpp",
-    "realm/sync/noinst/server_history.cpp",
-    "realm/sync/noinst/server_legacy_migration.cpp",
-    "realm/sync/noinst/vacuum.cpp",
-    "realm/sync/server.cpp",
-    "realm/sync/server_configuration.cpp",
+    "realm/sync/noinst/server",
 ]
 
 let syncExcludes: [String] = [
     // Server files
-    "realm/sync/crypto_server_openssl.cpp",
+    "realm/sync/noinst/server/crypto_server_openssl.cpp",
 
     // CLI Tools
-    "realm/sync/apply_to_state_command.cpp",
-    "realm/sync/dump_command.cpp",
-    "realm/sync/encrypt/encryption_transformer_command.cpp",
-    "realm/sync/hist_command.cpp",
-    "realm/sync/inspector",
-    "realm/sync/noinst/vacuum_command.cpp",
-    "realm/sync/print_changeset_command.cpp",
-    "realm/sync/realm_upgrade.cpp",
-    "realm/sync/server_command.cpp",
-    "realm/sync/server_index_command.cpp",
-    "realm/sync/stat_command.cpp",
-    "realm/sync/verify_server_file_command.cpp",
+    "realm/sync/tools",
 ]
 
 let notSyncServerSources: [String] = [
@@ -114,7 +95,6 @@ let notSyncServerSources: [String] = [
     "realm/spec.cpp",
     "realm/status.cpp",
     "realm/string_data.cpp",
-    "realm/sync/auth.cpp",
     "realm/sync/changeset.cpp",
     "realm/sync/changeset_encoder.cpp",
     "realm/sync/changeset_parser.cpp",
@@ -131,10 +111,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/client_reset_operation.cpp",
     "realm/sync/noinst/compact_changesets.cpp",
     "realm/sync/noinst/compression.cpp",
-    "realm/sync/noinst/file_descriptors.cpp",
-    "realm/sync/noinst/object_id_history_state.cpp",
     "realm/sync/noinst/protocol_codec.cpp",
-    "realm/sync/object.cpp",
     "realm/sync/object_id.cpp",
     "realm/sync/protocol.cpp",
     "realm/sync/transform.cpp",
@@ -542,52 +519,48 @@ let headers: [String] = [
     "realm/status.hpp",
     "realm/status_with.hpp",
     "realm/string_data.hpp",
-    "realm/sync/access_control.hpp",
-    "realm/sync/access_token.hpp",
-    "realm/sync/auth.hpp",
     "realm/sync/changeset.hpp",
     "realm/sync/changeset_encoder.hpp",
     "realm/sync/changeset_parser.hpp",
     "realm/sync/client.hpp",
-    "realm/sync/clock.hpp",
+    "realm/sync/client_base.hpp",
     "realm/sync/config.hpp",
-    "realm/sync/crypto_server.hpp",
-    "realm/sync/encrypt/encryption_transformer.hpp",
-    "realm/sync/encrypt/fingerprint.hpp",
     "realm/sync/history.hpp",
     "realm/sync/impl/clamped_hex_dump.hpp",
     "realm/sync/impl/clock.hpp",
-    "realm/sync/inspector/util.hpp",
     "realm/sync/instruction_applier.hpp",
     "realm/sync/instruction_replication.hpp",
     "realm/sync/instructions.hpp",
-    "realm/sync/metrics.hpp",
     "realm/sync/noinst/changeset_index.hpp",
     "realm/sync/noinst/client_history_impl.hpp",
     "realm/sync/noinst/client_impl_base.hpp",
     "realm/sync/noinst/client_reset.hpp",
     "realm/sync/noinst/client_reset_operation.hpp",
-    "realm/sync/noinst/command_line_util.hpp",
+    "realm/sync/noinst/server/command_line_util.hpp",
     "realm/sync/noinst/compact_changesets.hpp",
     "realm/sync/noinst/compression.hpp",
-    "realm/sync/noinst/file_descriptors.hpp",
     "realm/sync/noinst/integer_codec.hpp",
-    "realm/sync/noinst/object_id_history_state.hpp",
     "realm/sync/noinst/protocol_codec.hpp",
-    "realm/sync/noinst/reopening_file_logger.hpp",
     "realm/sync/noinst/root_certs.hpp",
-    "realm/sync/noinst/server_dir.hpp",
-    "realm/sync/noinst/server_file_access_cache.hpp",
-    "realm/sync/noinst/server_history.hpp",
-    "realm/sync/noinst/server_impl_base.hpp",
-    "realm/sync/noinst/server_legacy_migration.hpp",
-    "realm/sync/noinst/vacuum.hpp",
-    "realm/sync/object.hpp",
+    "realm/sync/noinst/server/access_control.hpp",
+    "realm/sync/noinst/server/access_token.hpp",
+    "realm/sync/noinst/server/clock.hpp",
+    "realm/sync/noinst/server/crypto_server.hpp",
+    "realm/sync/noinst/server/encrypt_fingerprint.hpp",
+    "realm/sync/noinst/server/encryption_transformer.hpp",
+    "realm/sync/noinst/server/metrics.hpp",
+    "realm/sync/noinst/server/permissions.hpp",
+    "realm/sync/noinst/server/reopening_file_logger.hpp",
+    "realm/sync/noinst/server/server.hpp",
+    "realm/sync/noinst/server/server_configuration.hpp",
+    "realm/sync/noinst/server/server_dir.hpp",
+    "realm/sync/noinst/server/server_file_access_cache.hpp",
+    "realm/sync/noinst/server/server_history.hpp",
+    "realm/sync/noinst/server/server_impl_base.hpp",
+    "realm/sync/noinst/server/server_legacy_migration.hpp",
+    "realm/sync/noinst/server/vacuum.hpp",
     "realm/sync/object_id.hpp",
-    "realm/sync/permissions.hpp",
     "realm/sync/protocol.hpp",
-    "realm/sync/server.hpp",
-    "realm/sync/server_configuration.hpp",
     "realm/sync/transform.hpp",
     "realm/table.hpp",
     "realm/table_cluster_tree.hpp",
@@ -777,6 +750,7 @@ let package = Package(
                 "realm/object-store",
                 "realm/parser",
                 "realm/sync/CMakeLists.txt",
+                "realm/sync/noinst/server/CMakeLists.txt",
                 "realm/tools",
                 "realm/util/config.h.in",
                 "realm/version_numbers.hpp.in",
@@ -793,14 +767,13 @@ let package = Package(
             exclude: [
                 "CMakeLists.txt",
                 "conversion.hpp",
+                "logging.hpp",
                 "realm.c",
                 "types.hpp",
                 "util.hpp",
             ],
             publicHeadersPath: ".",
-            cxxSettings: ([
-                .headerSearchPath("external/pegtl/include/tao")
-            ] + cxxSettings) as [CXXSetting]),
+            cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
             name: "RealmFFI",
             dependencies: ["Capi"],

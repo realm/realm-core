@@ -19,20 +19,20 @@
 #ifndef MONGO_CLIENT_HPP
 #define MONGO_CLIENT_HPP
 
-#include <realm/object-store/sync/app_service_client.hpp>
+#include <memory>
 #include <string>
 
 namespace realm {
 class SyncUser;
 
 namespace app {
-
+class AppServiceClient;
 class MongoDatabase;
 
 /// A client responsible for communication with a remote MongoDB database.
 class MongoClient {
 public:
-    ~MongoClient() = default;
+    ~MongoClient();
     MongoClient(const MongoClient&) = default;
     MongoClient(MongoClient&&) = default;
     MongoClient& operator=(const MongoClient&) = default;
@@ -47,7 +47,7 @@ public:
     MongoDatabase db(const std::string& name);
 
 private:
-    friend class realm::SyncUser;
+    friend ::realm::SyncUser;
 
     MongoClient(std::shared_ptr<SyncUser> user, std::shared_ptr<AppServiceClient> service, std::string service_name)
         : m_user(std::move(user))

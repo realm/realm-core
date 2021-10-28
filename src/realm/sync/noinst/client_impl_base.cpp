@@ -6,6 +6,7 @@
 #include <realm/util/random.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/basic_system_errors.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/util/http.hpp>
@@ -24,24 +25,17 @@
 using namespace realm;
 using namespace _impl;
 using namespace realm::util;
+using namespace realm::sync;
 
 // clang-format off
-using Connection      = ClientImplBase::Connection;
-using Session         = ClientImplBase::Session;
-using UploadChangeset = sync::ClientReplicationBase::UploadChangeset;
+using Connection      = ClientImpl::Connection;
+using Session         = ClientImpl::Session;
+using UploadChangeset = ClientHistory::UploadChangeset;
 
 // These are a work-around for a bug in MSVC. It cannot find in-class types
 // mentioned in signature of out-of-line member function definitions.
-using file_ident_type = sync::file_ident_type;
-using version_type = sync::version_type;
-using salt_type = sync::salt_type;
-using session_ident_type = sync::session_ident_type;
-using request_ident_type = sync::request_ident_type;
-using SyncProgress = sync::SyncProgress;
-using ConnectionTerminationReason = ClientImplBase::ConnectionTerminationReason;
-using ProtocolEnvelope            = ClientImplBase::ProtocolEnvelope;
-using OutputBuffer                = ClientImplBase::OutputBuffer;
-using ProtocolError               = ClientImplBase::ProtocolError;
+using ConnectionTerminationReason = ClientImpl::ConnectionTerminationReason;
+using OutputBuffer                = ClientImpl::OutputBuffer;
 using ReceivedChangesets          = ClientProtocol::ReceivedChangesets;
 // clang-format on
 
@@ -53,8 +47,8 @@ util::StderrLogger g_fallback_logger;
 } // unnamed namespace
 
 
-bool ClientImplBase::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
-                                          port_type& port, std::string& path) const
+bool ClientImpl::decompose_server_url(const std::string& url, ProtocolEnvelope& protocol, std::string& address,
+                                      port_type& port, std::string& path) const
 {
     util::Uri uri(url); // Throws
     uri.canonicalize(); // Throws
@@ -105,11 +99,11 @@ bool ClientImplBase::decompose_server_url(const std::string& url, ProtocolEnvelo
 }
 
 
-ClientImplBase::ClientImplBase(Config config)
+ClientImpl::ClientImpl(ClientConfig config)
     : logger{config.logger ? *config.logger : g_fallback_logger}
     , m_reconnect_mode{config.reconnect_mode}
     , m_connect_timeout{config.connect_timeout}
-    , m_connection_linger_time{config.connection_linger_time}
+    , m_connection_linger_time{config.one_connection_per_session ? 0 : config.connection_linger_time}
     , m_ping_keepalive_period{config.ping_keepalive_period}
     , m_pong_keepalive_timeout{config.pong_keepalive_timeout}
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
@@ -122,13 +116,80 @@ ClientImplBase::ClientImplBase(Config config)
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
     , m_client_protocol{}                                 // Throws
+    , m_one_connection_per_session{config.one_connection_per_session}
+    , m_keep_running_timer{get_service()} // Throws
 {
     // FIXME: Would be better if seeding was up to the application.
     util::seed_prng_nondeterministically(m_random); // Throws
+
+    logger.debug("Realm sync client (%1)", REALM_VER_CHUNK); // Throws
+    logger.debug("Supported protocol versions: %1-%2", get_oldest_supported_protocol_version(),
+                 get_current_protocol_version()); // Throws
+    logger.debug("Platform: %1", util::get_platform_info());
+    const char* build_mode;
+#if REALM_DEBUG
+    build_mode = "Debug";
+#else
+    build_mode = "Release";
+#endif
+    logger.debug("Build mode: %1", build_mode);
+    logger.debug("Config param: one_connection_per_session = %1",
+                 config.one_connection_per_session); // Throws
+    logger.debug("Config param: connect_timeout = %1 ms",
+                 config.connect_timeout); // Throws
+    logger.debug("Config param: connection_linger_time = %1 ms",
+                 config.connection_linger_time); // Throws
+    logger.debug("Config param: ping_keepalive_period = %1 ms",
+                 config.ping_keepalive_period); // Throws
+    logger.debug("Config param: pong_keepalive_timeout = %1 ms",
+                 config.pong_keepalive_timeout); // Throws
+    logger.debug("Config param: fast_reconnect_limit = %1 ms",
+                 config.fast_reconnect_limit); // Throws
+    logger.debug("Config param: disable_upload_compaction = %1",
+                 config.disable_upload_compaction); // Throws
+    logger.debug("Config param: tcp_no_delay = %1",
+                 config.tcp_no_delay); // Throws
+    logger.debug("Config param: disable_sync_to_disk = %1",
+                 config.disable_sync_to_disk); // Throws
+    logger.debug("User agent string: '%1'", get_user_agent_string());
+
+    if (config.reconnect_mode != ReconnectMode::normal) {
+        logger.warn("Testing/debugging feature 'nonnormal reconnect mode' enabled - "
+                    "never do this in production!");
+    }
+
+    if (config.dry_run) {
+        logger.warn("Testing/debugging feature 'dry run' enabled - "
+                    "never do this in production!");
+    }
+
+    if (m_one_connection_per_session) {
+        // FIXME: Re-enable this warning when the load balancer is able to handle
+        // multiplexing.
+        //        logger.warn("Testing/debugging feature 'one connection per session' enabled - "
+        //            "never do this in production");
+    }
+
+    if (config.disable_upload_activation_delay) {
+        logger.warn("Testing/debugging feature 'disable_upload_activation_delay' enabled - "
+                    "never do this in production");
+    }
+
+    if (config.disable_sync_to_disk) {
+        logger.warn("Testing/debugging feature 'disable_sync_to_disk' enabled - "
+                    "never do this in production");
+    }
+
+    auto handler = [this] {
+        actualize_and_finalize_session_wrappers(); // Throws
+    };
+    m_actualize_and_finalize = util::network::Trigger{get_service(), std::move(handler)}; // Throws
+
+    start_keep_running_timer(); // Throws
 }
 
 
-std::string ClientImplBase::make_user_agent_string(Config& config)
+std::string ClientImpl::make_user_agent_string(ClientConfig& config)
 {
     std::string platform_info = std::move(config.user_agent_platform_info);
     if (platform_info.empty())
@@ -161,7 +222,7 @@ void Connection::activate_session(std::unique_ptr<Session> sess)
     bool was_inserted = p.second;
     REALM_ASSERT(was_inserted);
     sess_2.activate(); // Throws
-    if (m_state == State::connected) {
+    if (m_state == ConnectionState::connected) {
         bool fast_reconnect = false;
         sess_2.connection_established(fast_reconnect); // Throws
     }
@@ -173,11 +234,11 @@ void Connection::initiate_session_deactivation(Session* sess)
 {
     REALM_ASSERT(&sess->m_conn == this);
     if (REALM_UNLIKELY(--m_num_active_sessions == 0)) {
-        if (m_activated && m_state == State::disconnected)
+        if (m_activated && m_state == ConnectionState::disconnected)
             m_on_idle.trigger();
     }
     sess->initiate_deactivation(); // Throws
-    if (!sess->m_active_or_deactivating) {
+    if (sess->m_state == Session::Deactivated) {
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = sess->m_ident;
         m_sessions.erase(ident);
@@ -204,7 +265,7 @@ void Connection::cancel_reconnect_delay()
         initiate_reconnect_wait(); // Throws
         return;
     }
-    if (m_state != State::disconnected) {
+    if (m_state != ConnectionState::disconnected) {
         // A currently established connection, or an in-progress attempt to
         // establish the connection may be about to fail for a reason that
         // precedes the invocation of Session::cancel_reconnect_delay(). For
@@ -228,66 +289,6 @@ void Connection::cancel_reconnect_delay()
     }
     // Nothing to do in this case. The next reconnect attemp will be made as
     // soon as there are any sessions that are both active and unsuspended.
-}
-
-
-Connection::Connection(ClientImplBase& client, std::string logger_prefix, ProtocolEnvelope protocol,
-                       std::string address, port_type port, bool verify_servers_ssl_certificate,
-                       Optional<std::string> ssl_trust_certificate_path,
-                       std::function<SSLVerifyCallback> ssl_verify_callback,
-                       Optional<SyncConfig::ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
-    : logger{std::move(logger_prefix), client.logger} // Throws
-    , m_client{client}
-    , m_read_ahead_buffer{} // Throws
-    , m_websocket{*this}    // Throws
-    , m_protocol_envelope{protocol}
-    , m_address{std::move(address)}
-    , m_port{port}
-    , m_http_host{util::make_http_host(sync::is_ssl(protocol), m_address, m_port)} // Throws
-    , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
-    , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
-    , m_ssl_verify_callback{std::move(ssl_verify_callback)}
-    , m_proxy_config{std::move(proxy_config)}
-    , m_reconnect_info{reconnect_info}
-{
-    auto handler = [this] {
-        REALM_ASSERT(m_activated);
-        if (m_state == State::disconnected && m_num_active_sessions == 0) {
-            on_idle(); // Throws
-            // Connection object may be destroyed now.
-        }
-    };
-    m_on_idle = util::network::Trigger{client.get_service(), std::move(handler)}; // Throws
-}
-
-
-void Connection::on_connecting()
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::on_connected()
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::on_disconnected(std::error_code, bool, const StringData*)
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::on_idle()
-{
-    // No-op unless overridden.
-}
-
-
-void Connection::set_http_request_headers(HTTPHeaders&)
-{
-    // No-op unless overridden.
 }
 
 
@@ -344,7 +345,7 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
     auto i = headers.find("Sec-WebSocket-Protocol");
     if (i != headers.end()) {
         util::StringView value = i->second;
-        util::StringView prefix = sync::get_websocket_protocol_prefix();
+        util::StringView prefix = get_websocket_protocol_prefix();
         // FIXME: Use std::string_view::begins_with() in C++20.
         bool begins_with =
             (value.size() >= prefix.size() && std::equal(value.data(), value.data() + prefix.size(), prefix.data()));
@@ -356,8 +357,8 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
             int value_2 = 0;
             in >> value_2;
             if (in && in.eof() && value_2 >= 0) {
-                bool good_version = (value_2 >= get_oldest_supported_protocol_version() &&
-                                     value_2 <= sync::get_current_protocol_version());
+                bool good_version =
+                    (value_2 >= get_oldest_supported_protocol_version() && value_2 <= get_current_protocol_version());
                 if (good_version) {
                     logger.detail("Negotiated protocol version: %1", value_2);
                     m_negotiated_protocol_version = value_2;
@@ -661,9 +662,8 @@ void Connection::initiate_reconnect()
 {
     REALM_ASSERT(m_activated);
 
-    on_connecting(); // Throws
-
-    m_state = State::connecting;
+    m_state = ConnectionState::connecting;
+    report_connection_state_change(ConnectionState::connecting, nullptr); // Throws
     m_read_ahead_buffer.clear();
     m_ssl_stream = util::none;
     m_socket = util::none;
@@ -710,7 +710,7 @@ void Connection::handle_connect_wait(std::error_code ec)
         throw std::system_error(ec);
     }
 
-    REALM_ASSERT(m_state == State::connecting);
+    REALM_ASSERT(m_state == ConnectionState::connecting);
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_connect_timeout;
     logger.info("Connect timeout"); // Throws
     std::error_code ec_2 = ClientError::connect_timeout;
@@ -945,9 +945,9 @@ void Connection::initiate_websocket_handshake()
         std::ostringstream out;
         out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
         out.imbue(std::locale::classic());
-        const char* protocol_prefix = sync::get_websocket_protocol_prefix();
+        const char* protocol_prefix = get_websocket_protocol_prefix();
         int min = get_oldest_supported_protocol_version();
-        int max = sync::get_current_protocol_version();
+        int max = get_current_protocol_version();
         REALM_ASSERT(min <= max);
         // List protocol version in descending order to ensure that the server
         // selects the highest possible version.
@@ -963,7 +963,7 @@ void Connection::initiate_websocket_handshake()
     }
 
     HTTPHeaders headers;
-    ClientImplBase& client = get_client();
+    ClientImpl& client = get_client();
     headers["User-Agent"] = client.get_user_agent_string(); // Throws
     set_http_request_headers(headers);                      // Throws
 
@@ -977,7 +977,7 @@ void Connection::handle_connection_established()
     // Cancel connect timeout watchdog
     m_connect_timer = util::none;
 
-    m_state = State::connected;
+    m_state = ConnectionState::connected;
 
     milliseconds_type now = monotonic_clock_now();
     m_pong_wait_started_at = now; // Initially, no time was spent waiting for a PONG message
@@ -995,13 +995,13 @@ void Connection::handle_connection_established()
         sess.connection_established(fast_reconnect); // Throws
     }
 
-    on_connected(); // Throws
+    report_connection_state_change(ConnectionState::connected, nullptr); // Throws
 }
 
 
 void Connection::schedule_urgent_ping()
 {
-    REALM_ASSERT(m_state != State::disconnected);
+    REALM_ASSERT(m_state != ConnectionState::disconnected);
     if (m_ping_delay_in_progress) {
         m_heartbeat_timer = util::none;
         m_ping_delay_in_progress = false;
@@ -1010,7 +1010,7 @@ void Connection::schedule_urgent_ping()
         initiate_ping_delay(now); // Throws
         return;
     }
-    REALM_ASSERT(m_state == State::connecting || m_waiting_for_pong);
+    REALM_ASSERT(m_state == ConnectionState::connecting || m_waiting_for_pong);
     if (!m_send_ping)
         m_minimize_next_ping_delay = true;
 }
@@ -1069,7 +1069,7 @@ void Connection::handle_ping_delay()
 
     initiate_pong_timeout(); // Throws
 
-    if (m_state == State::connected && !m_sending)
+    if (m_state == ConnectionState::connected && !m_sending)
         send_next_message(); // Throws
 }
 
@@ -1103,7 +1103,7 @@ void Connection::handle_pong_timeout()
 
 void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 {
-    auto handler = [=] {
+    auto handler = [this] {
         handle_write_message(); // Throws
     };
     m_websocket.async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
@@ -1115,7 +1115,7 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
 void Connection::handle_write_message()
 {
     m_sending_session->message_sent(); // Throws
-    if (!m_sending_session->m_active_or_deactivating) {
+    if (m_sending_session->m_state == Session::Deactivated) {
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = m_sending_session->m_ident;
         m_sessions.erase(ident);
@@ -1128,7 +1128,7 @@ void Connection::handle_write_message()
 
 void Connection::send_next_message()
 {
-    REALM_ASSERT(m_state == State::connected);
+    REALM_ASSERT(m_state == ConnectionState::connected);
     REALM_ASSERT(!m_sending_session);
     REALM_ASSERT(!m_sending);
     if (m_send_ping) {
@@ -1139,13 +1139,13 @@ void Connection::send_next_message()
         // The state of being connected is not supposed to be able to change
         // across this loop thanks to the "no callback reentrance" guarantee
         // provided by util::Websocket::async_write_text(), and friends.
-        REALM_ASSERT(m_state == State::connected);
+        REALM_ASSERT(m_state == ConnectionState::connected);
 
         Session& sess = *m_sessions_enlisted_to_send.front();
         m_sessions_enlisted_to_send.pop_front();
         sess.send_message(); // Throws
 
-        if (!sess.m_active_or_deactivating) {
+        if (sess.m_state == Session::Deactivated) {
             // Session is now deactivated, so remove and destroy it.
             session_ident_type ident = sess.m_ident;
             m_sessions.erase(ident);
@@ -1204,7 +1204,7 @@ void Connection::handle_message_received(const char* data, std::size_t size)
 {
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
-    get_client_protocol().parse_message_received<Connection>(*this, data, size);
+    get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data, size));
 }
 
 
@@ -1212,7 +1212,7 @@ void Connection::handle_pong_received(const char* data, std::size_t size)
 {
     // parse_pong_received() parses the pong and calls the proper handler on the
     // Connection object (this).
-    get_client_protocol().parse_pong_received<Connection>(*this, data, size);
+    get_client_protocol().parse_pong_received<Connection>(*this, std::string_view(data, size));
 }
 
 
@@ -1250,7 +1250,7 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 
     m_disconnect_delay_in_progress = false;
 
-    REALM_ASSERT(m_state != State::disconnected);
+    REALM_ASSERT(m_state != ConnectionState::disconnected);
     if (m_num_active_unsuspended_sessions == 0) {
         if (m_client.m_connection_linger_time > 0)
             logger.detail("Linger time expired"); // Throws
@@ -1388,7 +1388,7 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
     // Cancel connect timeout watchdog
     m_connect_timer = util::none;
 
-    if (m_state == State::connected) {
+    if (m_state == ConnectionState::connected) {
         m_disconnect_time = monotonic_clock_now();
         m_disconnect_has_occurred = true;
 
@@ -1403,7 +1403,7 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
             auto j = i++;
             Session& sess = *j->second;
             sess.connection_lost(); // Throws
-            if (!sess.m_active_or_deactivating)
+            if (sess.m_state == Session::Unactivated || sess.m_state == Session::Deactivated)
                 m_sessions.erase(j);
         }
     }
@@ -1428,7 +1428,9 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 
-    on_disconnected(ec, is_fatal, custom_message); // Throws
+    std::string detailed_message = (custom_message ? std::string(*custom_message) : ec.message()); // Throws
+    SessionErrorInfo error_info{ec, is_fatal, detailed_message};
+    report_connection_state_change(ConnectionState::disconnected, &error_info); // Throws
     initiate_reconnect_wait();                     // Throws
 }
 
@@ -1494,7 +1496,7 @@ void Connection::receive_error_message(int error_code, StringData message, bool 
             return;
         }
 
-        if (!sess->m_active_or_deactivating) {
+        if (sess->m_state == Session::Deactivated) {
             // Session is now deactivated, so remove and destroy it.
             session_ident_type ident = sess->m_ident;
             m_sessions.erase(ident);
@@ -1505,7 +1507,7 @@ void Connection::receive_error_message(int error_code, StringData message, bool 
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", message, error_code,
                 try_again, session_ident); // Throws
 
-    bool known_error_code = bool(sync::get_protocol_error_message(error_code));
+    bool known_error_code = bool(get_protocol_error_message(error_code));
     if (REALM_LIKELY(known_error_code)) {
         ProtocolError error_code_2 = ProtocolError(error_code);
         if (REALM_LIKELY(!is_session_level_error(error_code_2))) {
@@ -1568,22 +1570,6 @@ void Connection::receive_mark_message(session_ident_type session_ident, request_
 }
 
 
-void Connection::receive_alloc_message(session_ident_type session_ident, file_ident_type file_ident)
-{
-    Session* sess = get_session(session_ident);
-    if (REALM_UNLIKELY(!sess)) {
-        logger.error("Bad session identifier in ALLOC message, session_ident = %1",
-                     session_ident);                                 // Throws
-        close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
-        return;
-    }
-
-    std::error_code ec = sess->receive_alloc_message(file_ident); // Throws
-    if (ec)
-        close_due_to_protocol_error(ec); // Throws
-}
-
-
 void Connection::receive_unbound_message(session_ident_type session_ident)
 {
     Session* sess = get_session(session_ident);
@@ -1600,7 +1586,7 @@ void Connection::receive_unbound_message(session_ident_type session_ident)
         return;
     }
 
-    if (!sess->m_active_or_deactivating) {
+    if (sess->m_state == Session::Deactivated) {
         // Session is now deactivated, so remove and destroy it.
         session_ident_type ident = sess->m_ident;
         m_sessions.erase(ident);
@@ -1649,7 +1635,7 @@ void Connection::handle_protocol_error(ClientProtocol::Error error)
 // state.
 void Connection::enlist_to_send(Session* sess)
 {
-    REALM_ASSERT(m_state == State::connected);
+    REALM_ASSERT(m_state == ConnectionState::connected);
     m_sessions_enlisted_to_send.push_back(sess); // Throws
     if (!m_sending)
         send_next_message(); // Throws
@@ -1671,9 +1657,7 @@ auto Connection::determine_connection_termination_reason(std::error_code ec) noe
 
 void Session::cancel_resumption_delay()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     if (!m_suspended)
         return;
@@ -1691,20 +1675,21 @@ void Session::cancel_resumption_delay()
 }
 
 
-bool Session::integrate_changesets(ClientHistoryBase& history, const SyncProgress& progress,
+bool Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
                                    IntegrationError& error)
 {
+    auto& history = repl.get_history();
     if (received_changesets.empty()) {
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
         return true;
     }
-    const sync::Transformer::RemoteChangeset* changesets = received_changesets.data();
+    const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     bool success = history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets,
                                                        version_info, error, logger,
-                                                       m_sync_transact_reporter); // Throws
+                                                       get_transact_reporter()); // Throws
     if (REALM_LIKELY(success)) {
         if (num_changesets == 1) {
             logger.debug("1 remote changeset integrated, producing client version %1",
@@ -1722,9 +1707,7 @@ bool Session::integrate_changesets(ClientHistoryBase& history, const SyncProgres
 void Session::on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
                                        IntegrationError error)
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     if (REALM_LIKELY(success)) {
         REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
@@ -1753,64 +1736,7 @@ void Session::on_changesets_integrated(bool success, version_type client_version
 
 Session::~Session()
 {
-    //    REALM_ASSERT(!m_active_or_deactivating);
-}
-
-
-void Session::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
-                                            const ReceivedChangesets& received_changesets)
-{
-    bool success;
-    version_type client_version;
-    IntegrationError error = {};
-    if (REALM_LIKELY(!get_client().is_dry_run())) {
-        VersionInfo version_info;
-        ClientHistoryBase& history = access_realm(); // Throws
-        success = integrate_changesets(history, m_progress, downloadable_bytes, received_changesets, version_info,
-                                       error); // Throws
-        client_version = version_info.realm_version;
-    }
-    else {
-        // Fake it for "dry run" mode
-        success = true;
-        client_version = m_last_version_available + 1;
-    }
-    on_changesets_integrated(success, client_version, m_progress.download, error); // Throws
-}
-
-
-const util::Optional<sync::Session::Config::ClientReset>& Session::get_client_reset_config() const noexcept
-{
-    return m_client_reset_config;
-}
-
-void Session::on_upload_completion()
-{
-    // No-op unless overridden.
-}
-
-
-void Session::on_download_completion()
-{
-    // No-op unless overridden.
-}
-
-
-bool Session::on_subtier_file_ident(file_ident_type)
-{
-    return false; // By default, do not accept the received file identifier.
-}
-
-
-void Session::on_suspended(std::error_code, StringData, bool)
-{
-    // No-op unless overridden.
-}
-
-
-void Session::on_resumed()
-{
-    // No-op unless overridden.
+    //    REALM_ASSERT(m_state == Unactivated || m_state == Deactivated);
 }
 
 
@@ -1825,16 +1751,20 @@ std::string Session::make_logger_prefix(session_ident_type ident)
 
 void Session::activate()
 {
-    // Session life cycle state must be Unactivated
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(!m_active_or_deactivating);
+    REALM_ASSERT(m_state == Unactivated);
 
     logger.debug("Activating"); // Throws
 
-    REALM_ASSERT(!m_client_reset_operation);
-
     if (REALM_LIKELY(!get_client().is_dry_run())) {
-        const util::Optional<sync::Session::Config::ClientReset>& client_reset_config = get_client_reset_config();
+        // The reason we need a mutable reference from get_client_reset_config() is because we
+        // don't want the session to keep a strong reference to the client_reset_config->fresh_copy
+        // DB. If it did, then the fresh DB would stay alive for the duration of this sync session
+        // and we want to clean it up once the reset is finished. Additionally, the fresh copy will
+        // be set to a new copy on every reset so there is no reason to keep a reference to it.
+        // The modification to the client reset config happens via std::move(client_reset_config->fresh_copy).
+        // If the client reset config were a `const &` then this std::move would create another strong
+        // reference which we don't want to happen.
+        util::Optional<ClientReset>& client_reset_config = get_client_reset_config();
 
         bool file_exists = util::File::exists(get_realm_path());
 
@@ -1842,20 +1772,16 @@ void Session::activate()
                     "client reset = %3",
                     client_reset_config ? "true" : "false", file_exists ? "true" : "false",
                     (client_reset_config && file_exists) ? "true" : "false"); // Throws
-        if (client_reset_config) {
-            if (!util::File::is_dir(client_reset_config->metadata_dir)) {
-                logger.error("Client reset config requires an existing metadata directory"); // Throws
-                REALM_TERMINATE("No metadata directory");
-            }
-            logger.info("Client reset config, metadata_dir = '%1', ",
-                        client_reset_config->metadata_dir); // Throws
-            m_client_reset_operation.reset(
-                new _impl::ClientResetOperation(logger, get_db(), client_reset_config->metadata_dir)); // Throws
+        if (client_reset_config && !m_client_reset_operation) {
+            m_client_reset_operation = std::make_unique<_impl::ClientResetOperation>(
+                logger, get_db(), std::move(client_reset_config->fresh_copy), client_reset_config->seamless_loss,
+                std::move(client_reset_config->notify_before_client_reset),
+                std::move(client_reset_config->notify_after_client_reset)); // Throws
         }
 
         if (!m_client_reset_operation) {
-            const ClientHistoryBase& history = access_realm();                             // Throws
-            history.get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
+            const ClientReplication& repl = access_realm();                                           // Throws
+            repl.get_history().get_status(m_last_version_available, m_client_file_ident, m_progress); // Throws
         }
     }
     logger.debug("client_file_ident = %1, client_file_ident_salt = %2", m_client_file_ident.ident,
@@ -1872,8 +1798,7 @@ void Session::activate()
                  m_progress.download.last_integrated_client_version); // Throws
 
     reset_protocol_state();
-    m_active_or_deactivating = true;
-    // Life cycle state is now Active
+    m_state = Active;
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1884,14 +1809,11 @@ void Session::activate()
 // deactivated upon return.
 void Session::initiate_deactivation()
 {
-    // Life cycle state must be Active
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active);
 
     logger.debug("Initiating deactivation"); // Throws
 
-    m_deactivation_initiated = true;
-    // Life cycle state is now Deactivating
+    m_state = Deactivating;
 
     if (!m_suspended)
         m_conn.one_less_active_unsuspended_session(); // Throws
@@ -1920,7 +1842,7 @@ void Session::initiate_deactivation()
 
 void Session::complete_deactivation()
 {
-    m_active_or_deactivating = false;
+    m_state = Deactivated;
 
     logger.debug("Deactivation completed"); // Throws
 }
@@ -1933,87 +1855,71 @@ void Session::complete_deactivation()
 // deactivated upon return.
 void Session::send_message()
 {
-    // Session life cycle state must be Active or Deactivating
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
     REALM_ASSERT(m_enlisted_to_send);
     m_enlisted_to_send = false;
-    if (REALM_LIKELY(!m_deactivation_initiated)) {
-        // Session life cycle state is Active
-        if (REALM_LIKELY(!m_error_message_received)) {
-            // Session life cycle state is Active and the unbinding process has
-            // not been initiated
-            REALM_ASSERT(!m_unbind_message_sent);
-            if (REALM_LIKELY(m_bind_message_sent)) {
-                if (REALM_LIKELY(m_access_token_sent)) {
-                    if (REALM_LIKELY(m_ident_message_sent)) {
-                        bool send_alloc = (m_num_outstanding_subtier_allocations > 0 && !m_alloc_message_sent);
-                        if (REALM_LIKELY(!send_alloc)) {
-                            bool send_mark = (m_target_download_mark > m_last_download_mark_sent);
-                            if (REALM_LIKELY(!send_mark)) {
-                                REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
-                                REALM_ASSERT(m_upload_target_version <= m_last_version_available);
-                                bool need_upload = (m_upload_target_version > m_upload_progress.client_version);
-                                if (REALM_LIKELY(!need_upload)) {
-                                    return;
-                                }
-                                if (REALM_LIKELY(m_allow_upload))
-                                    send_upload_message(); // Throws
-                                return;
-                            }
-                            send_mark_message(); // Throws
-                            return;
-                        }
-                        send_alloc_message(); // Throws
-                        return;
-                    }
-                    if (have_client_file_ident()) {
-                        send_ident_message(); // Throws
-                    }
-                    return;
-                }
-                send_refresh_message(); // Throws
-                return;
-            }
-            send_bind_message(); // Throws
-            return;
-        }
-    }
-    else {
+    if (m_state == Deactivating || m_error_message_received) {
         // Deactivation has been initiated. If the UNBIND message has not been
         // sent yet, there is no point in sending it. Instead, we can let the
         // deactivation process complete.
         if (!m_bind_message_sent) {
-            complete_deactivation(); // Throws
+            return complete_deactivation(); // Throws
             // Life cycle state is now Deactivated
-            return;
         }
+
+        // Session life cycle state is Deactivating or the unbinding process has
+        // been initiated by a session specific ERROR message
+        if (!m_unbind_message_sent)
+            send_unbind_message(); // Throws
+        return;
     }
-    // Session life cycle state is Deactivating or the unbinding process has
-    // been initiated by a session specific ERROR message
-    REALM_ASSERT(m_bind_message_sent);
-    if (!m_unbind_message_sent)
-        send_unbind_message(); // Throws
+
+    // Session life cycle state is Active and the unbinding process has
+    // not been initiated
+    REALM_ASSERT(!m_unbind_message_sent);
+
+    if (!m_bind_message_sent)
+        return send_bind_message(); // Throws
+
+    if (!m_access_token_sent)
+        return send_refresh_message(); // Throws
+
+    if (!m_ident_message_sent) {
+        if (have_client_file_ident())
+            send_ident_message(); // Throws
+        return;
+    }
+
+    if (m_target_download_mark > m_last_download_mark_sent)
+        return send_mark_message(); // Throws
+
+    REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
+    REALM_ASSERT(m_upload_target_version <= m_last_version_available);
+    if (m_allow_upload && (m_upload_target_version > m_upload_progress.client_version))
+        send_upload_message(); // Throws
+    return;
 }
 
 
 void Session::send_bind_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
 
     session_ident_type session_ident = m_ident;
     const std::string& path = get_virt_path();
     const std::string& signed_access_token = get_signed_access_token();
     bool need_client_file_ident = !have_client_file_ident();
+    const bool is_subserver = false;
 
     logger.debug("Sending: BIND(path='%1', signed_user_token_size=%2, "
                  "need_client_file_ident=%3, is_subserver=%4)",
-                 path, signed_access_token.size(), int(need_client_file_ident), int(m_is_subserver)); // Throws
+                 path, signed_access_token.size(), int(need_client_file_ident), int(is_subserver)); // Throws
 
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
     protocol.make_bind_message(protocol_version, out, session_ident, path, signed_access_token,
-                               need_client_file_ident, m_is_subserver); // Throws
+                               need_client_file_ident, is_subserver);   // Throws
     m_conn.initiate_write_message(out, this);                           // Throws
 
     m_bind_message_sent = true;
@@ -2028,7 +1934,7 @@ void Session::send_bind_message()
 
 void Session::send_ident_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(have_client_file_ident());
@@ -2054,27 +1960,22 @@ void Session::send_ident_message()
 
 void Session::send_upload_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_upload_target_version > m_upload_progress.client_version);
 
-    if (REALM_UNLIKELY(m_disable_upload))
-        return;
-
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
-    const ClientHistoryBase& history = access_realm(); // Throws
+    const ClientReplication& repl = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
-    history.find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
-                                       locked_server_version); // Throws
+    repl.get_history().find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
+                                                  locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
-        if (REALM_UNLIKELY(m_disable_empty_upload))
-            return;
         // Nothing more to upload right now
         if (m_upload_completion_notification_requested)
             check_for_upload_completion(); // Throws
@@ -2113,8 +2014,8 @@ void Session::send_upload_message()
 
 #if REALM_DEBUG
             ChunkedBinaryInputStream in{changeset_data};
-            sync::Changeset log;
-            sync::parse_changeset(in, log);
+            Changeset log;
+            parse_changeset(in, log);
             std::stringstream ss;
             log.print(ss);
             logger.trace("Changeset (parsed):\n%1", ss.str());
@@ -2125,8 +2026,8 @@ void Session::send_upload_message()
             // Upload compaction only takes place within single changesets to
             // avoid another client seeing inconsistent snapshots.
             ChunkedBinaryInputStream stream{uc.changeset};
-            sync::Changeset changeset;
-            sync::parse_changeset(stream, changeset); // Throws
+            Changeset changeset;
+            parse_changeset(stream, changeset); // Throws
             // FIXME: What is the point of setting these? How can compaction care about them?
             changeset.version = uc.progress.client_version;
             changeset.last_integrated_remote_version = uc.progress.last_integrated_server_version;
@@ -2168,7 +2069,7 @@ void Session::send_upload_message()
 
 void Session::send_mark_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(m_target_download_mark > m_last_download_mark_sent);
@@ -2189,31 +2090,9 @@ void Session::send_mark_message()
 }
 
 
-void Session::send_alloc_message()
-{
-    REALM_ASSERT(!m_deactivation_initiated);
-    REALM_ASSERT(m_ident_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(!m_alloc_message_sent);
-
-    logger.debug("Sending: ALLOC"); // Throws
-
-    ClientProtocol& protocol = m_conn.get_client_protocol();
-    OutputBuffer& out = m_conn.get_output_buffer();
-    session_ident_type session_ident = get_ident();
-    protocol.make_alloc_message(out, session_ident); // Throws
-    m_conn.initiate_write_message(out, this);        // Throws
-
-    m_alloc_message_sent = true;
-
-    // Other messages may be waiting to be sent
-    enlist_to_send(); // Throws
-}
-
-
 void Session::send_refresh_message()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(!m_access_token_sent);
@@ -2243,7 +2122,7 @@ void Session::send_refresh_message()
 
 void Session::send_unbind_message()
 {
-    REALM_ASSERT(m_deactivation_initiated || m_error_message_received);
+    REALM_ASSERT(m_state == Deactivating || m_error_message_received);
     REALM_ASSERT(m_bind_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
 
@@ -2267,7 +2146,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
     // longer.
-    if (m_deactivation_initiated)
+    if (m_state != Active)
         return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_bind_message_sent && !have_client_file_ident() && !m_error_message_received &&
@@ -2293,48 +2172,66 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         return std::error_code{};  // Success
     }
 
+    // access before the client reset (if applicable) because
+    // the reset can take a while and the sync session might have died
+    // by the time the reset finishes.
+    ClientReplication& repl = access_realm(); // Throws
+
     auto client_reset_if_needed = [&]() -> bool {
+        if (!m_client_reset_operation) {
+            return false;
+        }
+
         // ClientResetOperation::finalize() will return true only if the operation actually did
         // a client reset. It may choose not to do a reset if the local Realm does not exist
         // at this point (in that case there is nothing to reset). But in any case, we must
         // clean up m_client_reset_operation at this point as sync should be able to continue from
         // this point forward.
-        auto client_reset_operation = std::move(m_client_reset_operation); // accept ownership to clean up
-
-        if (!client_reset_operation || !client_reset_operation->finalize(client_file_ident)) {
+        auto client_reset_operation = std::move(m_client_reset_operation);
+        if (!client_reset_operation->finalize(client_file_ident)) {
             return false;
         }
-        realm::VersionID client_reset_old_version;
-        realm::VersionID client_reset_new_version;
+        realm::VersionID client_reset_old_version = client_reset_operation->get_client_reset_old_version();
+        realm::VersionID client_reset_new_version = client_reset_operation->get_client_reset_new_version();
 
+        // The fresh Realm has been used to reset the state
         logger.debug("Client reset is completed, path=%1", get_realm_path()); // Throws
 
         SaltedFileIdent client_file_ident;
-        const ClientHistoryBase& history = access_realm();                           // Throws
-        history.get_status(m_last_version_available, client_file_ident, m_progress); // Throws
-        REALM_ASSERT(m_client_file_ident.ident == client_file_ident.ident);
-        REALM_ASSERT(m_client_file_ident.salt == client_file_ident.salt);
-        REALM_ASSERT(m_progress.download.last_integrated_client_version == 0);
-        REALM_ASSERT(m_progress.upload.client_version == 0);
-        REALM_ASSERT(m_progress.upload.last_integrated_server_version == 0);
+        repl.get_history().get_status(m_last_version_available, client_file_ident, m_progress); // Throws
+        REALM_ASSERT_EX(m_client_file_ident.ident == client_file_ident.ident, m_client_file_ident.ident,
+                        client_file_ident.ident);
+        REALM_ASSERT_EX(m_client_file_ident.salt == client_file_ident.salt, m_client_file_ident.salt,
+                        client_file_ident.salt);
+        REALM_ASSERT_EX(m_progress.download.last_integrated_client_version == 0,
+                        m_progress.download.last_integrated_client_version);
+        REALM_ASSERT_EX(m_progress.upload.client_version == 0, m_progress.upload.client_version);
+        REALM_ASSERT_EX(m_progress.upload.last_integrated_server_version == 0,
+                        m_progress.upload.last_integrated_server_version);
         logger.trace("last_version_available  = %1", m_last_version_available); // Throws
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
-        REALM_ASSERT(m_last_version_selected_for_upload == 0);
+        REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
-        client_reset_old_version = client_reset_operation->get_client_reset_old_version();
-        client_reset_new_version = client_reset_operation->get_client_reset_new_version();
-
-        if (m_sync_transact_reporter) {
-            m_sync_transact_reporter->report_sync_transact(client_reset_old_version, client_reset_new_version);
-        }
+        get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);
         return true;
     };
-    if (!client_reset_if_needed()) {
-        ClientHistoryBase& history = access_realm(); // Throws
-        bool fix_up_object_ids = true;
-        history.set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+    // if a client reset happens, it will take care of setting the file ident
+    // and if not, we do it here
+    bool did_client_reset = false;
+    try {
+        did_client_reset = client_reset_if_needed();
+    }
+    catch (const std::exception& e) {
+        logger.error("A fatal error occured during client reset: '%1'", e.what());
+        return make_error_code(sync::ClientError::auto_client_reset_failure);
+    }
+    if (!did_client_reset) {
+        constexpr bool fix_up_object_ids = true;
+        repl.get_history().set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
+        this->m_progress.download.last_integrated_client_version = 0;
+        this->m_progress.upload.client_version = 0;
     }
 
     // Ready to send the IDENT (or REFRESH) message
@@ -2357,7 +2254,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
     // longer.
-    if (m_deactivation_initiated)
+    if (m_state != Active)
         return;
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
@@ -2375,7 +2272,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
 
     version_type server_version = m_progress.download.server_version;
     version_type last_integrated_client_version = m_progress.download.last_integrated_client_version;
-    for (const sync::Transformer::RemoteChangeset& changeset : received_changesets) {
+    for (const Transformer::RemoteChangeset& changeset : received_changesets) {
         // Check that per-changeset server version is strictly increasing.
         bool good_server_version = (changeset.remote_version > server_version &&
                                     changeset.remote_version <= progress.download.server_version);
@@ -2424,7 +2321,7 @@ std::error_code Session::receive_mark_message(request_ident_type request_ident)
     // Ignore the message if the deactivation process has been initiated,
     // because in that case, the associated Realm must not be accessed any
     // longer.
-    if (m_deactivation_initiated)
+    if (m_state != Active)
         return std::error_code{}; // Success
 
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
@@ -2447,42 +2344,6 @@ std::error_code Session::receive_mark_message(request_ident_type request_ident)
 }
 
 
-std::error_code Session::receive_alloc_message(file_ident_type file_ident)
-{
-    logger.debug("Received: ALLOC(file_ident=%1)", file_ident); // Throws
-
-    // Ignore the message if the deactivation process has been initiated,
-    // because in that case, the associated Realm must not be accessed any
-    // longer.
-    if (m_deactivation_initiated)
-        return std::error_code{}; // Success
-
-    bool legal_at_this_time = (m_alloc_message_sent && !m_error_message_received && !m_unbound_message_received);
-    if (REALM_UNLIKELY(!legal_at_this_time)) {
-        logger.error("Illegal message at this time");
-        return ClientError::bad_message_order;
-    }
-    if (REALM_UNLIKELY(file_ident < 1)) {
-        logger.error("Bad file identifier in ALLOC message");
-        return ClientError::bad_file_ident;
-    }
-
-    REALM_ASSERT(have_client_file_ident());
-    REALM_ASSERT(m_ident_message_sent);
-    REALM_ASSERT(m_num_outstanding_subtier_allocations > 0);
-    if (REALM_UNLIKELY(!on_subtier_file_ident(file_ident))) { // Throws
-        logger.error("Bad file identifier in ALLOC message");
-        return ClientError::bad_file_ident;
-    }
-    m_alloc_message_sent = false;
-    --m_num_outstanding_subtier_allocations;
-    // Ready to send the next ALLOC request message
-    if (m_num_outstanding_subtier_allocations > 0)
-        ensure_enlisted_to_send(); // Throws
-    return std::error_code{};      // Success
-}
-
-
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
 std::error_code Session::receive_unbound_message()
@@ -2498,8 +2359,7 @@ std::error_code Session::receive_unbound_message()
     // The fact that the UNBIND message has been sent, but an ERROR message has
     // not been received, implies that the deactivation process must have been
     // initiated, so this session must be in the Deactivating state.
-    REALM_ASSERT(m_active_or_deactivating);
-    REALM_ASSERT(m_deactivation_initiated);
+    REALM_ASSERT(m_state == Deactivating);
 
     m_unbound_message_received = true;
 
@@ -2527,7 +2387,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
         return ClientError::bad_message_order;
     }
 
-    bool known_error_code = bool(sync::get_protocol_error_message(error_code));
+    bool known_error_code = bool(get_protocol_error_message(error_code));
     if (REALM_UNLIKELY(!known_error_code)) {
         logger.error("Unknown error code"); // Throws
         return ClientError::bad_error_code;
@@ -2539,7 +2399,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
     }
 
     REALM_ASSERT(!m_suspended);
-    REALM_ASSERT(m_active_or_deactivating);
+    REALM_ASSERT(m_state == Active || m_state == Deactivating);
 
     logger.debug("Suspended"); // Throws
 
@@ -2552,7 +2412,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
         // has not been received, implies that the deactivation process must
         // have been initiated, so this session must be in the Deactivating
         // state.
-        REALM_ASSERT(m_deactivation_initiated);
+        REALM_ASSERT(m_state == Deactivating);
 
         // The deactivation process completes when the unbinding process
         // completes.
@@ -2563,8 +2423,7 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
 
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
-    if (!m_deactivation_initiated) {
-        // Life cycle state is Active
+    if (m_state == Active) {
         m_conn.one_less_active_unsuspended_session(); // Throws
         std::error_code ec = make_error_code(error_code_2);
         bool is_fatal = !try_again;
@@ -2601,7 +2460,7 @@ void Session::update_progress(const SyncProgress& progress)
 }
 
 
-bool ClientImplBase::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
+bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;
@@ -2653,9 +2512,10 @@ bool ClientImplBase::Session::check_received_sync_progress(const SyncProgress& p
 
 void Session::check_for_upload_completion()
 {
-    REALM_ASSERT(!m_deactivation_initiated);
+    REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_upload_completion_notification_requested);
 
+    // during an ongoing client reset operation, we never upload anything
     if (m_client_reset_operation)
         return;
 

@@ -48,11 +48,11 @@ public:
         iterator operator++(int);
         iterator operator--(int);
 
-        bool operator!=(const typename IndexedMap<T>::iterator& rhs) noexcept
+        bool operator!=(const typename IndexedMap<T>::iterator& rhs) const noexcept
         {
             return !(m_idx == rhs.m_idx);
         }
-        bool operator==(const typename IndexedMap<T>::iterator& rhs) noexcept
+        bool operator==(const typename IndexedMap<T>::iterator& rhs) const noexcept
         {
             return m_idx == rhs.m_idx;
         }

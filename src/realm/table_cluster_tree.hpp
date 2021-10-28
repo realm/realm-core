@@ -72,6 +72,7 @@ private:
 class TableClusterTree::Iterator : public ClusterTree::Iterator {
 public:
     typedef std::forward_iterator_tag iterator_category;
+    typedef std::ptrdiff_t difference_type;
     typedef Obj value_type;
     typedef Obj* pointer;
     typedef Obj& reference;

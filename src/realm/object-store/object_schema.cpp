@@ -342,6 +342,11 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     struct ErrorWriter {
         ObjectSchema const& os;
         std::vector<ObjectSchemaValidationException>& exceptions;
+        ErrorWriter(ObjectSchema const& os, std::vector<ObjectSchemaValidationException>& exceptions)
+            : os(os)
+            , exceptions(exceptions)
+        {
+        }
 
         ErrorWriter& operator=(StringData name)
         {

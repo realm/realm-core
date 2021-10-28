@@ -10,7 +10,7 @@ using namespace realm::util;
 AllocationMetricName test_component("test");
 AllocationMetricName unique_ptr_component("unique_ptr");
 
-TEST(AllocationMetric_Basic)
+NONCONCURRENT_TEST(AllocationMetric_Basic)
 {
     AllocationMetricsContext tenant;
     AllocationMetricsContextScope tenant_scope{tenant};
@@ -40,7 +40,7 @@ TEST(AllocationMetric_Basic)
     CHECK(unknown.get_total_allocated_bytes() >= 1000);
 }
 
-TEST(AllocationMetric_Tenants)
+NONCONCURRENT_TEST(AllocationMetric_Tenants)
 {
     std::vector<std::unique_ptr<AllocationMetricsContext>> tenants;
     tenants.resize(10);

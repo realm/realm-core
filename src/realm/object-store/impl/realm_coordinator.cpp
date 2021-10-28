@@ -35,7 +35,9 @@
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #endif
 
 #include <realm/db.hpp>
@@ -97,6 +99,44 @@ void RealmCoordinator::create_sync_session()
     open_db();
     if (m_sync_session)
         return;
+    m_config.sync_config->get_fresh_realm_for_path =
+        [&](const std::string& path, std::function<void(DBRef, util::Optional<std::string>)> callback) {
+            try {
+                // Get a fully downloaded Realm using the current configuration but changing the
+                // on disk path to the one provided. The current sync session is not affected.
+                REALM_ASSERT(!path.empty());
+                REALM_ASSERT(path != m_config.path);
+                REALM_ASSERT(m_config.sync_config);
+                auto copy_config = m_config;
+                copy_config.path = path;
+                // Do not use seamless loss mode on the fresh Realm. Use manual mode so that
+                // any error during the download is propagated back to the original session.
+                // This prevents a cycle if the fresh copy itself experiences a client reset.
+                copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+                std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
+                REALM_ASSERT(rc);
+                auto task = rc->get_synchronized_realm(copy_config);
+                task->start([callback, path](ThreadSafeReference, std::exception_ptr err) {
+                    try {
+                        if (err) {
+                            std::rethrow_exception(err);
+                        }
+                        else {
+                            std::shared_ptr<RealmCoordinator> rc = RealmCoordinator::get_coordinator(path);
+                            rc->m_sync_session->log_out();
+                            rc->m_sync_session->close();
+                            callback(rc->m_db, util::none);
+                        }
+                    }
+                    catch (const std::exception& e) {
+                        callback(nullptr, util::make_optional<std::string>(e.what()));
+                    }
+                });
+            }
+            catch (const std::exception& e) {
+                callback(nullptr, util::make_optional<std::string>(e.what()));
+            }
+        };
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
@@ -444,13 +484,13 @@ void RealmCoordinator::open_db()
         std::unique_ptr<Replication> history;
         if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            history = sync::make_client_replication(m_config.path);
+            history = sync::make_client_replication();
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
         }
         else if (!m_config.immutable()) {
-            history = make_in_realm_history(m_config.path);
+            history = make_in_realm_history();
         }
 
         DBOptions options;
@@ -465,7 +505,7 @@ void RealmCoordinator::open_db()
             !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
-            m_db = DB::create(std::move(history), options);
+            m_db = DB::create(std::move(history), m_config.path, options);
         }
         else {
             m_db = DB::create(m_config.path, true, options);
@@ -896,7 +936,7 @@ public:
 
         // Copy the list change info if there are multiple LinkViews for the same LinkList
         auto id = [](auto const& list) {
-            return std::tie(list.table_key, list.col_key, list.row_key);
+            return std::tie(list.table_key, list.col_key, list.obj_key);
         };
         for (size_t i = 1; i < m_current->lists.size(); ++i) {
             for (size_t j = i; j > 0; --j) {

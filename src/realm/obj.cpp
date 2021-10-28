@@ -172,7 +172,7 @@ TableRef Obj::get_target_table(ObjLink link) const
 bool Obj::update() const
 {
     // Get a new object from key
-    Obj new_obj = get_tree_top()->get(m_key);
+    Obj new_obj = get_tree_top()->get(m_key); // Throws `KeyNotFound`
 
     bool changes = (m_mem.get_addr() != new_obj.m_mem.get_addr()) || (m_row_ndx != new_obj.m_row_ndx);
     if (changes) {
@@ -192,6 +192,33 @@ inline bool Obj::_update_if_needed() const
         return update();
     }
     return false;
+}
+
+UpdateStatus Obj::update_if_needed_with_status() const
+{
+    if (!m_table) {
+        // Table deleted
+        return UpdateStatus::Detached;
+    }
+
+    auto current_version = get_alloc().get_storage_version();
+    if (current_version != m_storage_version) {
+        ClusterNode::State state = get_tree_top()->try_get(m_key);
+
+        if (!state) {
+            // Object deleted
+            return UpdateStatus::Detached;
+        }
+
+        // Always update versions
+        m_storage_version = current_version;
+        if ((m_mem.get_addr() != state.mem.get_addr()) || (m_row_ndx != state.index)) {
+            m_mem = state.mem;
+            m_row_ndx = state.index;
+            return UpdateStatus::Updated;
+        }
+    }
+    return UpdateStatus::NoChange;
 }
 
 template <class T>
@@ -252,7 +279,7 @@ ObjKey Obj::get_unfiltered_link(ColKey col_key) const
 template <>
 int64_t Obj::_get<int64_t>(ColKey::Idx col_ndx) const
 {
-    // manual inline of is_in_sync():
+    // manual inline of _update_if_needed():
     auto& alloc = _get_alloc();
     auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
@@ -307,7 +334,7 @@ bool Obj::get<bool>(ColKey col_key) const
 template <>
 StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
 {
-    // manual inline of is_in_sync():
+    // manual inline of _update_if_needed():
     auto& alloc = _get_alloc();
     auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
@@ -332,7 +359,7 @@ StringData Obj::_get<StringData>(ColKey::Idx col_ndx) const
 template <>
 BinaryData Obj::_get<BinaryData>(ColKey::Idx col_ndx) const
 {
-    // manual inline of is_in_sync():
+    // manual inline of _update_if_needed():
     auto& alloc = _get_alloc();
     auto current_version = alloc.get_storage_version();
     if (current_version != m_storage_version) {
@@ -1743,6 +1770,17 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
 
     return *this;
 }
+
+#define INSTANTIATE_OBJ_SET(T) template Obj& Obj::set<T>(ColKey, T, bool)
+INSTANTIATE_OBJ_SET(bool);
+INSTANTIATE_OBJ_SET(StringData);
+INSTANTIATE_OBJ_SET(float);
+INSTANTIATE_OBJ_SET(double);
+INSTANTIATE_OBJ_SET(Decimal128);
+INSTANTIATE_OBJ_SET(Timestamp);
+INSTANTIATE_OBJ_SET(BinaryData);
+INSTANTIATE_OBJ_SET(ObjectId);
+INSTANTIATE_OBJ_SET(UUID);
 
 void Obj::set_int(ColKey col_key, int64_t value)
 {

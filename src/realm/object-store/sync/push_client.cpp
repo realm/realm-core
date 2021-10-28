@@ -17,10 +17,17 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/sync/push_client.hpp>
-#include <realm/object-store/sync/app_utils.hpp>
 
-namespace realm {
-namespace app {
+#include <realm/object-store/sync/app_utils.hpp>
+#include <realm/object-store/sync/auth_request_client.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
+#include <realm/object-store/util/bson/bson.hpp>
+
+#include <sstream>
+
+namespace realm::app {
+
+PushClient::~PushClient() = default;
 
 void PushClient::register_device(const std::string& registration_token, std::shared_ptr<SyncUser> sync_user,
                                  std::function<void(util::Optional<AppError>)> completion_block)
@@ -63,5 +70,4 @@ void PushClient::deregister_device(std::shared_ptr<SyncUser> sync_user,
                                                     handler);
 }
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app

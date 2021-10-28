@@ -6,7 +6,7 @@
 
 #include <realm/group.hpp>
 #include <realm/table.hpp>
-#include <realm/sync/object.hpp>
+#include <realm/sync/object_id.hpp>
 #include <realm/list.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/set.hpp>
@@ -173,6 +173,107 @@ struct Column {
         return key_1.is_nullable();
     }
 };
+
+sync::PrimaryKey primary_key_for_row(const Obj& obj)
+{
+    auto table = obj.get_table();
+    ColKey pk_col = table->get_primary_key_column();
+    if (pk_col) {
+        ColumnType pk_type = pk_col.get_type();
+        if (obj.is_null(pk_col)) {
+            return mpark::monostate{};
+        }
+
+        if (pk_type == col_type_Int) {
+            return obj.get<int64_t>(pk_col);
+        }
+
+        if (pk_type == col_type_String) {
+            return obj.get<StringData>(pk_col);
+        }
+
+        if (pk_type == col_type_ObjectId) {
+            return obj.get<ObjectId>(pk_col);
+        }
+
+        if (pk_type == col_type_UUID) {
+            return obj.get<UUID>(pk_col);
+        }
+
+        REALM_TERMINATE("Missing primary key type support");
+    }
+
+    GlobalKey global_key = obj.get_object_id();
+    return global_key;
+}
+
+sync::PrimaryKey primary_key_for_row(const Table& table, ObjKey key)
+{
+    auto obj = table.get_object(key);
+    return primary_key_for_row(obj);
+}
+
+ObjKey row_for_primary_key(const Table& table, sync::PrimaryKey key)
+{
+    ColKey pk_col = table.get_primary_key_column();
+    if (pk_col) {
+        ColumnType pk_type = pk_col.get_type();
+
+        if (auto pk = mpark::get_if<mpark::monostate>(&key)) {
+            static_cast<void>(pk);
+            if (!pk_col.is_nullable()) {
+                REALM_TERMINATE("row_for_primary_key with null on non-nullable primary key column");
+            }
+            return table.find_primary_key({});
+        }
+
+        if (pk_type == col_type_Int) {
+            if (auto pk = mpark::get_if<int64_t>(&key)) {
+                return table.find_primary_key(*pk);
+            }
+            else {
+                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected int)");
+            }
+        }
+
+        if (pk_type == col_type_String) {
+            if (auto pk = mpark::get_if<StringData>(&key)) {
+                return table.find_primary_key(*pk);
+            }
+            else {
+                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected string)");
+            }
+        }
+
+        if (pk_type == col_type_ObjectId) {
+            if (auto pk = mpark::get_if<ObjectId>(&key)) {
+                return table.find_primary_key(*pk);
+            }
+            else {
+                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected ObjectId)");
+            }
+        }
+
+        if (pk_type == col_type_UUID) {
+            if (auto pk = mpark::get_if<UUID>(&key)) {
+                return table.find_primary_key(*pk);
+            }
+            else {
+                REALM_TERMINATE("row_for_primary_key mismatching primary key type (expected UUID)");
+            }
+        }
+
+        REALM_TERMINATE("row_for_primary_key missing primary key type support");
+    }
+
+    if (auto global_key = mpark::get_if<GlobalKey>(&key)) {
+        return table.get_objkey(*global_key);
+    }
+    else {
+        REALM_TERMINATE("row_for_primary_key() with primary key, expected GlobalKey");
+    }
+    return {};
+}
 
 } // unnamed namespace
 
@@ -436,8 +537,8 @@ bool compare_lists(const Column& col, const Obj& obj_1, const Obj& obj_2, util::
                         }
                     }
                     else {
-                        sync::PrimaryKey target_oid_1 = sync::primary_key_for_row(*target_table_1, link_1);
-                        sync::PrimaryKey target_oid_2 = sync::primary_key_for_row(*target_table_2, link_2);
+                        sync::PrimaryKey target_oid_1 = primary_key_for_row(*target_table_1, link_1);
+                        sync::PrimaryKey target_oid_2 = primary_key_for_row(*target_table_2, link_2);
                         if (target_oid_1 != target_oid_2) {
                             logger.error("Value mismatch in column '%1' at index %2 of the link "
                                          "list (%3 vs %4)",
@@ -595,8 +696,8 @@ bool compare_sets(const Column& col, const Obj& obj_1, const Obj& obj_2, util::L
                     }
                 }
                 else {
-                    sync::PrimaryKey target_oid_1 = sync::primary_key_for_row(*target_table_1, link_1);
-                    sync::PrimaryKey target_oid_2 = sync::primary_key_for_row(*target_table_2, link_2);
+                    sync::PrimaryKey target_oid_1 = primary_key_for_row(*target_table_1, link_1);
+                    sync::PrimaryKey target_oid_2 = primary_key_for_row(*target_table_2, link_2);
                     if (target_oid_1 != target_oid_2) {
                         logger.error("Value mismatch in column '%1' at index %2 of the link "
                                      "set (%3 vs %4)",
@@ -831,8 +932,8 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
                         }
                     }
                     else {
-                        sync::PrimaryKey target_oid_1 = sync::primary_key_for_row(*target_table_1, link_1);
-                        sync::PrimaryKey target_oid_2 = sync::primary_key_for_row(*target_table_2, link_2);
+                        sync::PrimaryKey target_oid_1 = primary_key_for_row(*target_table_1, link_1);
+                        sync::PrimaryKey target_oid_2 = primary_key_for_row(*target_table_2, link_2);
                         if (target_oid_1 != target_oid_2) {
                             logger.error("Value mismatch in column '%1' (%2 vs %3)", col.name,
                                          sync::format_pk(target_oid_1), sync::format_pk(target_oid_2));
@@ -854,8 +955,8 @@ bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Colum
 bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& table_2,
                      const std::vector<Column>& columns, util::Logger& logger)
 {
-    ObjKey row_1 = sync::row_for_primary_key(table_1, oid);
-    ObjKey row_2 = sync::row_for_primary_key(table_2, oid);
+    ObjKey row_1 = row_for_primary_key(table_1, oid);
+    ObjKey row_2 = row_for_primary_key(table_2, oid);
 
     // Note: This is ensured by the inventory handling in compare_tables().
     REALM_ASSERT(row_1);
@@ -897,7 +998,7 @@ bool compare_tables(const Table& table_1, const Table& table_2, util::Logger& lo
     using Objects = std::set<sync::PrimaryKey>;
     auto make_inventory = [](const Table& table, Objects& objects) {
         for (const Obj& obj : table) {
-            auto oid = sync::primary_key_for_row(obj);
+            auto oid = primary_key_for_row(obj);
             objects.insert(oid);
         }
     };

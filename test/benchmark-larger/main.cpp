@@ -55,9 +55,9 @@ int main()
         bool test_rw = rw_probes.size() != 0;
         TestPathGuard guard("benchmark-insertion.realm");
         std::string path(guard);
-        auto history = make_in_realm_history(path);
+        auto history = make_in_realm_history();
         DBOptions options;
-        DBRef db = DB::create(*history, options);
+        DBRef db = DB::create(*history, path, options);
         {
             WriteTransaction wt(db);
             auto t = wt.add_table("table");

@@ -37,7 +37,9 @@ public:
     void start(const F& func)
     {
         m_except = false;
-        m_thread.start([=] { Runner<F>::run(func, this); });
+        m_thread.start([func, this] {
+            Runner<F>::run(func, this);
+        });
     }
 
     /// Returns 'true' if thread has thrown an exception. In that case

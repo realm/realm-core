@@ -887,10 +887,10 @@ struct BenchmarkWithIntUIDsRandomOrderSeqAccess : BenchmarkWithIntsTable {
         for (size_t i = 0; i < 100000; ++i) {
 #ifdef REALM_CLUSTER_IF
             auto obj = t->get_object(m_keys[i]);
-            sum += obj.get<Int>(m_col);
+            sum = sum + obj.get<Int>(m_col);
 #else
             auto row = t->find_first_int(m_col, m_keys[i]);
-            sum += t->get_int(m_col, row);
+            sum = sum + t->get_int(m_col, row);
 #endif
         }
     }
@@ -1258,13 +1258,13 @@ struct BenchmarkGetString : BenchmarkWithStrings {
 #ifdef REALM_CLUSTER_IF
         for (auto obj : *table) {
             StringData str = obj.get<String>(m_col);
-            dummy += str[0]; // to avoid over-optimization
+            dummy = dummy + str[0]; // to avoid over-optimization
         }
 #else
         size_t len = table->size();
         for (size_t i = 0; i < len; ++i) {
             StringData str = table->get_string(m_col, i);
-            dummy += str[0]; // to avoid over-optimization
+            dummy = dummy + str[0]; // to avoid over-optimization
         }
 #endif
     }
@@ -1318,13 +1318,13 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
 #ifdef REALM_CLUSTER_IF
         for (auto obj : *table) {
             StringData str = obj.get<String>(m_col);
-            dummy += str[0]; // to avoid over-optimization
+            dummy = dummy + str[0]; // to avoid over-optimization
         }
 #else
         size_t len = table->size();
         for (size_t i = 0; i < len; ++i) {
             StringData str = table->get_string(m_col, i);
-            dummy += str[0]; // to avoid over-optimization
+            dummy = dummy + str[0]; // to avoid over-optimization
         }
 #endif
     }

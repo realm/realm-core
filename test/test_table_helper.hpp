@@ -32,23 +32,8 @@ public:
     }
 };
 
-class MyTrivialReplication : public TrivialReplication {
+class MyTrivialReplication : public Replication {
 public:
-    MyTrivialReplication(const std::string& path)
-        : TrivialReplication(path)
-    {
-    }
-
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
-
     HistoryType get_history_type() const noexcept override
     {
         return hist_None;
@@ -82,7 +67,7 @@ public:
 
     void do_initiate_transact(Group& group, version_type version, bool hist_updated) override
     {
-        TrivialReplication::do_initiate_transact(group, version, hist_updated);
+        Replication::do_initiate_transact(group, version, hist_updated);
         m_group = &group;
     }
 
@@ -112,16 +97,15 @@ protected:
 
 class ReplSyncClient : public MyTrivialReplication {
 public:
-    ReplSyncClient(const std::string& path, int history_schema_version, uint64_t file_ident = 0)
-        : MyTrivialReplication(path)
-        , m_history_schema_version(history_schema_version)
+    ReplSyncClient(int history_schema_version, uint64_t file_ident = 0)
+        : m_history_schema_version(history_schema_version)
         , m_file_ident(file_ident)
     {
     }
 
     void initialize(DB& sg) override
     {
-        TrivialReplication::initialize(sg);
+        Replication::initialize(sg);
     }
 
     version_type prepare_changeset(const char*, size_t, version_type version) override

@@ -205,30 +205,15 @@ void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type vers
 }
 
 
-class InRealmHistoryImpl : public TrivialReplication {
+class InRealmHistoryImpl : public Replication {
 public:
-    using version_type = TrivialReplication::version_type;
-
-    InRealmHistoryImpl(std::string realm_path)
-        : TrivialReplication(realm_path)
-    {
-    }
+    using version_type = Replication::version_type;
 
     void initialize(DB& db) override
     {
-        TrivialReplication::initialize(db); // Throws
+        Replication::initialize(db); // Throws
         Allocator& alloc = db.get_alloc();
         m_history.initialize(&alloc); // Throws
-    }
-
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
     }
 
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
@@ -237,12 +222,6 @@ public:
         BinaryData changeset(data, size);
         version_type new_version = m_history.add_changeset(changeset); // Throws
         return new_version;
-    }
-
-    void finalize_changeset() noexcept override
-    {
-        // Since the history is in the Realm, the added changeset is
-        // automatically finalized as part of the commit operation.
     }
 
     HistoryType get_history_type() const noexcept override
@@ -291,9 +270,9 @@ private:
 
 namespace realm {
 
-std::unique_ptr<Replication> make_in_realm_history(const std::string& realm_path)
+std::unique_ptr<Replication> make_in_realm_history()
 {
-    return std::unique_ptr<InRealmHistoryImpl>(new InRealmHistoryImpl(realm_path)); // Throws
+    return std::unique_ptr<InRealmHistoryImpl>(new InRealmHistoryImpl()); // Throws
 }
 
 } // namespace realm

@@ -95,12 +95,28 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t ta
 RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, realm_class_key_t table_key,
                                                              realm_value_t pk)
 {
+    bool did_create;
+    realm_object_t* object = realm_object_get_or_create_with_primary_key(realm, table_key, pk, &did_create);
+    if (object && !did_create) {
+        delete object;
+        object = wrap_err([&]() {
+            throw DuplicatePrimaryKeyException("Object with this primary key already exists");
+            return nullptr;
+        });
+    }
+    return object;
+}
+
+RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* realm, realm_class_key_t table_key,
+                                                                    realm_value_t pk, bool* did_create)
+{
     return wrap_err([&]() {
         auto& shared_realm = *realm;
         auto tblkey = TableKey(table_key);
         auto table = shared_realm->read_group().get_table(tblkey);
-        // FIXME: Provide did_create?
         auto pkval = from_capi(pk);
+        if (did_create)
+            *did_create = false;
 
         ColKey pkcol = table->get_primary_key_column();
         if (!pkcol) {
@@ -117,7 +133,7 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
             throw WrongPrimaryKeyTypeException{schema.name};
         }
 
-        auto obj = table->create_object_with_primary_key(pkval);
+        auto obj = table->create_object_with_primary_key(pkval, did_create);
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
     });
@@ -155,6 +171,35 @@ RLM_API realm_object_t* _realm_object_from_native_move(void* pobj, size_t n)
 RLM_API const void* _realm_object_get_native_ptr(realm_object_t* obj)
 {
     return static_cast<const Object*>(obj);
+}
+
+RLM_API bool realm_object_resolve_in(const realm_object_t* from_object, const realm_t* target_realm,
+                                     realm_object_t** resolved)
+{
+    return wrap_err([&]() {
+        try {
+            const auto& realm = *target_realm;
+            auto new_obj = from_object->freeze(realm);
+            // clients of the C-API adhere to a different error handling strategy than Core.
+            // Core represents lack of resolution as a new object which is invalid.
+            // But clients of the C-API instead wants NO object to be produced.
+            if (new_obj.is_valid()) {
+                *resolved = new realm_object_t{std::move(new_obj)};
+            }
+            else {
+                *resolved = nullptr;
+            }
+            return true;
+        }
+        catch (NoSuchTable&) {
+            *resolved = nullptr;
+            return true;
+        }
+        catch (KeyNotFound&) {
+            *resolved = nullptr;
+            return true;
+        }
+    });
 }
 
 RLM_API bool realm_object_is_valid(const realm_object_t* obj)
@@ -405,6 +450,39 @@ RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm
         auto list = ltsr->resolve<List>(*realm);
         return new realm_list_t{std::move(list)};
     });
+}
+
+RLM_API bool realm_list_resolve_in(const realm_list_t* from_list, const realm_t* target_realm,
+                                   realm_list_t** resolved)
+{
+    return wrap_err([&]() {
+        try {
+            const auto& realm = *target_realm;
+            auto frozen_list = from_list->freeze(realm);
+            if (frozen_list.is_valid()) {
+                *resolved = new realm_list_t{std::move(frozen_list)};
+            }
+            else {
+                *resolved = nullptr;
+            }
+            return true;
+        }
+        catch (NoSuchTable&) {
+            *resolved = nullptr;
+            return true;
+        }
+        catch (KeyNotFound&) {
+            *resolved = nullptr;
+            return true;
+        }
+    });
+}
+
+RLM_API bool realm_list_is_valid(const realm_list_t* list)
+{
+    if (!list)
+        return false;
+    return list->is_valid();
 }
 
 } // namespace realm::c_api

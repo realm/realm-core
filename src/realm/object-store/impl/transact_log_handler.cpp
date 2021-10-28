@@ -80,9 +80,9 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
 
     tables.reserve(tables_needed.size());
     for (auto& tbl : tables_needed)
-        tables[tbl.value] = {};
+        tables[tbl] = {};
     for (auto& list : m_lists)
-        lists.push_back({list.observer->table_key, list.observer->obj_key, list.col.value, &list.builder});
+        lists.push_back({list.observer->table_key, list.observer->obj_key, list.col, &list.builder});
 }
 
 void KVOAdapter::before(Transaction& sg)
@@ -95,7 +95,7 @@ void KVOAdapter::before(Transaction& sg)
         return;
 
     for (auto& observer : m_observers) {
-        auto it = tables.find(observer.table_key.value);
+        auto it = tables.find(observer.table_key);
         if (it == tables.end())
             continue;
 
@@ -108,7 +108,7 @@ void KVOAdapter::before(Transaction& sg)
         auto column_modifications = table.get_columns_modified(key);
         if (column_modifications) {
             for (auto col : *column_modifications) {
-                observer.changes[col].kind = BindingContext::ColumnInfo::Kind::Set;
+                observer.changes[col.value].kind = BindingContext::ColumnInfo::Kind::Set;
             }
         }
     }
@@ -123,7 +123,7 @@ void KVOAdapter::before(Transaction& sg)
         }
         // If the containing row was deleted then changes will be empty
         if (list.observer->changes.empty()) {
-            REALM_ASSERT_DEBUG(tables[list.observer->table_key.value].deletions_contains(list.observer->obj_key));
+            REALM_ASSERT_DEBUG(tables[list.observer->table_key].deletions_contains(list.observer->obj_key));
             continue;
         }
         // otherwise the column should have been marked as modified
@@ -222,11 +222,11 @@ public:
     }
 
     // Removing or renaming things while a Realm is open is never supported
-    bool erase_group_level_table(TableKey)
+    bool erase_class(TableKey)
     {
         schema_error();
     }
-    bool rename_group_level_table(TableKey)
+    bool rename_class(TableKey)
     {
         schema_error();
     }
@@ -344,7 +344,7 @@ class TransactLogObserver : public TransactLogValidationMixin {
         // the last one
         auto table = current_table();
         for (auto it = m_info.lists.rbegin(), end = m_info.lists.rend(); it != end; ++it) {
-            if (it->table_key == table && it->row_key == obj.value && it->col_key == col.value)
+            if (it->table_key == table && it->obj_key == obj && it->col_key == col)
                 return it->changes;
         }
         return nullptr;
@@ -374,9 +374,9 @@ public:
 
         TableKey table_key = current_table();
         if (m_info.track_all)
-            m_active_table = &m_info.tables[table_key.value];
+            m_active_table = &m_info.tables[table_key];
         else {
-            auto it = m_info.tables.find(table_key.value);
+            auto it = m_info.tables.find(table_key);
             if (it == m_info.tables.end())
                 m_active_table = nullptr;
             else
@@ -481,7 +481,7 @@ public:
     bool create_object(ObjKey key)
     {
         if (m_active_table)
-            m_active_table->insertions_add(key.value);
+            m_active_table->insertions_add(key);
         return true;
     }
 
@@ -489,15 +489,15 @@ public:
     {
         if (!m_active_table)
             return true;
-        if (!m_active_table->insertions_remove(key.value))
-            m_active_table->deletions_add(key.value);
-        m_active_table->modifications_remove(key.value);
+        if (!m_active_table->insertions_remove(key))
+            m_active_table->deletions_add(key);
+        m_active_table->modifications_remove(key);
 
         for (size_t i = 0; i < m_info.lists.size(); ++i) {
             auto& list = m_info.lists[i];
             if (list.table_key != current_table())
                 continue;
-            if (list.row_key == key.value) {
+            if (list.obj_key == key) {
                 if (i + 1 < m_info.lists.size())
                     m_info.lists[i] = std::move(m_info.lists.back());
                 m_info.lists.pop_back();
@@ -511,7 +511,7 @@ public:
     bool modify_object(ColKey col, ObjKey key)
     {
         if (m_active_table)
-            m_active_table->modifications_add(key.value, col.value);
+            m_active_table->modifications_add(key, col);
         return true;
     }
 
