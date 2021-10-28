@@ -1149,14 +1149,17 @@ TEST_CASE("Schema") {
     SECTION("find in attached schema") {
         Group g;
         TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
+        TableRef accented_table = g.add_table_with_primary_key("class_óbject", type_Int, "pk");
         TableRef embedded = g.add_embedded_table("class_embedded");
         ObjectSchema os(g, "table", {});
+        ObjectSchema accented_os(g, "óbject", {});
         REQUIRE(os.table_key == table->get_key());
+        REQUIRE(accented_os.table_key == accented_table->get_key());
         ObjectSchema os1(g, "embedded", {});
         REQUIRE(os1.table_key == embedded->get_key());
         REQUIRE(os1.is_embedded);
 
-        Schema schema = {os, os1};
+        Schema schema = {os, os1, accented_os};
         REQUIRE_NOTHROW(schema.validate());
 
         SECTION("find by name") {
@@ -1164,6 +1167,11 @@ TEST_CASE("Schema") {
             REQUIRE(it != schema.end());
             REQUIRE(it->name == "table");
             REQUIRE(it->table_key == table->get_key());
+
+            it = schema.find("óbject");
+            REQUIRE(it != schema.end());
+            REQUIRE(it->name == "óbject");
+            REQUIRE(it->table_key == accented_table->get_key());
         }
         SECTION("find by name embedded") {
             auto it = schema.find("embedded");

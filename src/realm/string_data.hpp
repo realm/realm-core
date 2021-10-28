@@ -266,6 +266,7 @@ inline bool operator<(const StringData& a, const StringData& b) noexcept
         // equal to empty strings.
         return true;
     }
+    // FIXME: This should be using `std::char_traits<char>::compare(...)` or something similar.
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size, b.m_data, b.m_data + b.m_size);
 }
 
