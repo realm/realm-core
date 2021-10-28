@@ -26,6 +26,25 @@
 #include "realm/table_view.hpp"
 
 namespace realm::sync {
+namespace {
+
+constexpr static std::string_view c_flx_metadata_table("flx_metadata");
+constexpr static std::string_view c_flx_subscription_sets_table("flx_subscription_sets");
+constexpr static std::string_view c_flx_subscriptions_table("flx_subscriptions");
+
+constexpr static std::string_view c_flx_meta_schema_version_field("schema_version");
+constexpr static std::string_view c_flx_sub_sets_state_field("state");
+constexpr static std::string_view c_flx_sub_sets_version_field("version");
+constexpr static std::string_view c_flx_sub_sets_error_str_field("error");
+constexpr static std::string_view c_flx_sub_sets_subscriptions_field("subscriptions");
+
+constexpr static std::string_view c_flx_sub_created_at_field("created_at");
+constexpr static std::string_view c_flx_sub_updated_at_field("updated_at");
+constexpr static std::string_view c_flx_sub_name_field("name");
+constexpr static std::string_view c_flx_sub_object_class_field("object_class");
+constexpr static std::string_view c_flx_sub_query_str_field("query");
+
+} // namespace
 
 Subscription::Subscription(const SubscriptionSet* parent, Obj obj)
     : m_parent(parent)
@@ -303,27 +322,29 @@ SubscriptionStore::SubscriptionStore(DBRef db)
 {
     auto tr = m_db->start_read();
 
-    auto schema_metadata_key = tr->find_table("flx_metadata");
+    auto schema_metadata_key = tr->find_table(c_flx_metadata_table);
     if (!schema_metadata_key) {
         tr->promote_to_write();
-        auto schema_metadata = tr->add_table("flx_metadata");
-        auto version_col = schema_metadata->add_column(type_Int, "schema_version");
-        auto schema_version_obj = schema_metadata->create_object();
-        schema_version_obj.set(version_col, int64_t(1));
 
-        auto sub_sets_table = tr->add_table_with_primary_key("flx_subscriptions", type_Int, "version");
-        auto subs_table = tr->add_embedded_table("flx_subscriptions_subscriptions");
+        auto schema_metadata = tr->add_table(c_flx_metadata_table);
+        auto version_col = schema_metadata->add_column(type_Int, c_flx_meta_schema_version_field);
+        schema_metadata->create_object().set(version_col, int64_t(1));
+
+        auto sub_sets_table =
+            tr->add_table_with_primary_key(c_flx_subscription_sets_table, type_Int, c_flx_sub_sets_version_field);
+        auto subs_table = tr->add_embedded_table(c_flx_subscriptions_table);
         m_sub_keys->table = subs_table->get_key();
-        m_sub_keys->created_at = subs_table->add_column(type_Timestamp, "created_at");
-        m_sub_keys->updated_at = subs_table->add_column(type_Timestamp, "updated_at");
-        m_sub_keys->name = subs_table->add_column(type_String, "name", true);
-        m_sub_keys->object_class_name = subs_table->add_column(type_String, "object_class");
-        m_sub_keys->query_str = subs_table->add_column(type_String, "query");
+        m_sub_keys->created_at = subs_table->add_column(type_Timestamp, c_flx_sub_created_at_field);
+        m_sub_keys->updated_at = subs_table->add_column(type_Timestamp, c_flx_sub_updated_at_field);
+        m_sub_keys->name = subs_table->add_column(type_String, c_flx_sub_name_field, true);
+        m_sub_keys->object_class_name = subs_table->add_column(type_String, c_flx_sub_object_class_field);
+        m_sub_keys->query_str = subs_table->add_column(type_String, c_flx_sub_query_str_field);
 
         m_sub_set_keys->table = sub_sets_table->get_key();
-        m_sub_set_keys->state = sub_sets_table->add_column(type_Int, "state");
-        m_sub_set_keys->error_str = sub_sets_table->add_column(type_String, "error", true);
-        m_sub_set_keys->subscriptions = sub_sets_table->add_column_list(*subs_table, "subscriptions");
+        m_sub_set_keys->state = sub_sets_table->add_column(type_Int, c_flx_sub_sets_state_field);
+        m_sub_set_keys->error_str = sub_sets_table->add_column(type_String, c_flx_sub_sets_error_str_field, true);
+        m_sub_set_keys->subscriptions =
+            sub_sets_table->add_column_list(*subs_table, c_flx_sub_sets_subscriptions_field);
         tr->commit();
     }
     else {
@@ -342,21 +363,19 @@ SubscriptionStore::SubscriptionStore(DBRef db)
         };
 
         auto schema_metadata = tr->get_table(schema_metadata_key);
-        if (schema_metadata->size() != 1) {
-            throw std::runtime_error("Flexible sync schema metadata table cannot be empty");
-        }
         auto version_obj = schema_metadata->get_object(0);
-        auto version =
-            version_obj.get<int64_t>(lookup_and_validate_column(schema_metadata, "schema_version", type_Int));
+        auto version = version_obj.get<int64_t>(
+            lookup_and_validate_column(schema_metadata, c_flx_meta_schema_version_field, type_Int));
         if (version != 1) {
             throw std::runtime_error("Invalid schema version for flexible sync metadata");
         }
 
-        m_sub_set_keys->table = tr->find_table("flx_subscriptions");
+        m_sub_set_keys->table = tr->find_table(c_flx_subscription_sets_table);
         auto sub_sets = tr->get_table(m_sub_set_keys->table);
-        m_sub_set_keys->state = lookup_and_validate_column(sub_sets, "state", type_Int);
-        m_sub_set_keys->error_str = lookup_and_validate_column(sub_sets, "error", type_String);
-        m_sub_set_keys->subscriptions = lookup_and_validate_column(sub_sets, "subscriptions", type_LinkList);
+        m_sub_set_keys->state = lookup_and_validate_column(sub_sets, c_flx_sub_sets_state_field, type_Int);
+        m_sub_set_keys->error_str = lookup_and_validate_column(sub_sets, c_flx_sub_sets_error_str_field, type_String);
+        m_sub_set_keys->subscriptions =
+            lookup_and_validate_column(sub_sets, c_flx_sub_sets_subscriptions_field, type_LinkList);
         if (!m_sub_set_keys->subscriptions) {
             throw std::runtime_error("Flexible Sync metadata missing subscriptions table");
         }
@@ -366,11 +385,11 @@ SubscriptionStore::SubscriptionStore(DBRef db)
             throw std::runtime_error("Flexible Sync subscriptions table should be an embedded object");
         }
         m_sub_keys->table = subs->get_key();
-        m_sub_keys->created_at = lookup_and_validate_column(subs, "created_at", type_Timestamp);
-        m_sub_keys->updated_at = lookup_and_validate_column(subs, "updated_at", type_Timestamp);
-        m_sub_keys->query_str = lookup_and_validate_column(subs, "query", type_String);
-        m_sub_keys->object_class_name = lookup_and_validate_column(subs, "object_class", type_String);
-        m_sub_keys->name = lookup_and_validate_column(subs, "name", type_String);
+        m_sub_keys->created_at = lookup_and_validate_column(subs, c_flx_sub_created_at_field, type_Timestamp);
+        m_sub_keys->updated_at = lookup_and_validate_column(subs, c_flx_sub_updated_at_field, type_Timestamp);
+        m_sub_keys->query_str = lookup_and_validate_column(subs, c_flx_sub_query_str_field, type_String);
+        m_sub_keys->object_class_name = lookup_and_validate_column(subs, c_flx_sub_object_class_field, type_String);
+        m_sub_keys->name = lookup_and_validate_column(subs, c_flx_sub_name_field, type_String);
     }
 }
 
