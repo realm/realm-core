@@ -56,6 +56,9 @@
 
 #if REALM_PLATFORM_APPLE
 #import <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/sha.h>
+#include <openssl/hmac.h>
 #endif
 
 using namespace realm;
@@ -129,9 +132,14 @@ static std::string HMAC_SHA256(std::string_view key, std::string_view data)
     CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), data.data(), data.size(),
            reinterpret_cast<uint8_t*>(const_cast<char*>(ret.data())));
     return ret;
+#else
+    std::array<unsigned char, EVP_MAX_MD_SIZE> hash;
+    unsigned int hashLen;
+    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()), reinterpret_cast<unsigned char const*>(data.data()),
+         static_cast<int>(data.size()), hash.data(), &hashLen);
+    return std::string{reinterpret_cast<char const*>(hash.data()), hashLen};
 #endif
 }
-
 
 std::string create_jwt(const std::string appId)
 {
