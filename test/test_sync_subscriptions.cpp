@@ -99,7 +99,6 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 
     // Create a new subscription set, insert a subscription into it, and mark it as complete.
     {
-
         auto out = store.get_latest().make_mutable_copy();
         auto read_tr = fixture.db->start_read();
         auto&& [it, inserted] = out.insert(query_a, std::string{"a sub"});
@@ -167,7 +166,6 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     Query query_b(read_tr->get_table(fixture.a_table_key));
     query_b.equal(fixture.foo_col, "Realm");
     {
-
         auto out = store.get_latest().make_mutable_copy();
         auto read_tr = fixture.db->start_read();
         auto&& [it, inserted] = out.insert(query_a, std::string{"a sub"});
