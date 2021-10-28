@@ -1,19 +1,13 @@
-# NEXT RELEASE
-
-### Enhancements
-* None.
+# 11.5.2 Release notes
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* The Swift package could not be imported in Xcode 12.5 (since v11.5.0).
-
-### Breaking changes
-* None.
+* The Swift package could not be imported in Xcode 12.5 ([#4997](https://github.com/realm/realm-core/pull/4997), since v11.5.0).
+* Sync progress notifiers would not trigger when the downloadable bytes size would equal 0. ([#4989](https://github.com/realm/realm-core/pull/4989))
 
 -----------
 
 ### Internals
-* None.
+* Unit tests now run in parallel by default.
 
 ----------------------------------------------
 
@@ -58,7 +52,6 @@
 * Calling `size()` on a Results newly constructed via `.as_results().distinct()` on a Collection would give the size of the Collection rather than the distinct count. ([Cocoa #7481](https://github.com/realm/realm-cocoa/issues/7481), since v11.0.0).
 * Calling `clear()` on a Results newly constructed via `.as_results().distinct()` on a Collection would delete all objects in the Collection rather than just the distinct objects in the Results (since v11.0.0).
 * Calling `clear()` on a Results constructed via `.as_results().distinct()` on a Collection after calling `get()` or `size()` would not re-evaluate the distinct until after the next mutation to the table occurred.
-* Sync progress notifiers would not trigger when the downloadable bytes size would equal 0.
 
 ### Breaking changes
 * `App::Config::transport_factory` was replaced with `App::Config::transport`. It should now be an instance of `GenericNetworkTransport` rather than a factory for making instances. This allows the SDK to control which thread constructs the transport layer. ([#4903](https://github.com/realm/realm-core/pull/4903))
@@ -77,8 +70,6 @@
 * Cleaned out some old server tools and add the remaining ones to the default build.
 * App can now use bundled realm without getting "progress error" from server.
 * Refactored the wire protocol message parsing to not use std::istream or goto's for flow control.
-* Stopped running RaspberryPi testing in CI ([#4967](https://github.com/realm/realm-core/issues/4967)
-* Unit tests now run in parallel by default.
 
 ----------------------------------------------
 
