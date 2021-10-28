@@ -576,7 +576,6 @@ TEST_CASE("progress notification", "[sync]") {
             bool callback_was_called_2 = false;
             uint64_t downloaded = 0;
             uint64_t downloadable = 0;
-            uint64_t original_downloadable_2 = current_downloadable;
             progress.register_callback(
                 [&](auto xferred, auto xferable) {
                     downloaded = xferred;
@@ -588,7 +587,6 @@ TEST_CASE("progress notification", "[sync]") {
             REQUIRE(callback_was_called_2);
 
             // Second callback, last one for first notifier
-            original_downloadable_2 = current_downloaded + current_downloadable;
             callback_was_called = false;
             callback_was_called_2 = false;
             current_uploaded = 36;
