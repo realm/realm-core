@@ -15,7 +15,7 @@
 -----------
 
 ### Internals
-* None.
+* ConstTableView and TableView are merged into just TableView. TableView::front(), TableView::back(), TableView::remove() and TableView::remove_last() function are removed as they were not used outside tests.
 
 ----------------------------------------------
 
