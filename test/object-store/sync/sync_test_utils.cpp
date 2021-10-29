@@ -31,6 +31,19 @@
 
 namespace realm {
 
+std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
+{
+    if (!error) {
+        os << "(none)";
+    }
+    else {
+        os << "AppError(error_code=" << error->error_code
+           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
+           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
+    }
+    return os;
+}
+
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
                            const std::string& provider_type)
 {

@@ -13,6 +13,7 @@
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/sync/client_base.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 namespace realm::sync {
 
@@ -706,6 +707,12 @@ public:
     /// This function is fully thread-safe. That is, it may be called by any
     /// thread, and by multiple threads concurrently.
     void cancel_reconnect_delay();
+
+    /// \brief Gets or creates the subscription store for this session.
+    ///
+    /// Calling this will enable FLX sync for this Session if it has not already been enabled.
+    SubscriptionStore* get_flx_subscription_store();
+    bool has_flx_subscription_store() const;
 
 private:
     SessionWrapper* m_impl = nullptr;

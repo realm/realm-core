@@ -32,12 +32,24 @@ void ClientProtocol::make_refresh_message(OutputBuffer& out, session_ident_type 
     REALM_ASSERT(!out.fail());
 }
 
-void ClientProtocol::make_ident_message(OutputBuffer& out, session_ident_type session_ident,
-                                        SaltedFileIdent client_file_ident, const SyncProgress& progress)
+void ClientProtocol::make_pbs_ident_message(OutputBuffer& out, session_ident_type session_ident,
+                                            SaltedFileIdent client_file_ident, const SyncProgress& progress)
 {
     out << "ident " << session_ident << " " << client_file_ident.ident << " " << client_file_ident.salt << " "
         << progress.download.server_version << " " << progress.download.last_integrated_client_version << " "
         << progress.latest_server_version.version << " " << progress.latest_server_version.salt << "\n"; // Throws
+    REALM_ASSERT(!out.fail());
+}
+
+void ClientProtocol::make_flx_ident_message(OutputBuffer& out, session_ident_type session_ident,
+                                            SaltedFileIdent client_file_ident, const SyncProgress& progress,
+                                            std::string_view query_body)
+{
+    out << "ident " << session_ident << " " << client_file_ident.ident << " " << client_file_ident.salt << " "
+        << progress.download.server_version << " " << progress.download.last_integrated_client_version << " "
+        << progress.latest_server_version.version << " " << progress.latest_server_version.salt << " "
+        << query_body.size() << "\n"
+        << query_body; // Throws
     REALM_ASSERT(!out.fail());
 }
 

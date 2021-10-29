@@ -1,18 +1,18 @@
 #include <tuple>
 #include <atomic>
 
-#include <realm/util/value_reset_guard.hpp>
-#include <realm/util/bind_ptr.hpp>
-#include <realm/util/circular_buffer.hpp>
-#include <realm/util/uri.hpp>
-#include <realm/util/thread.hpp>
-#include <realm/util/platform_info.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/client_impl_base.hpp>
-#include <realm/version.hpp>
-#include <realm/version.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/sync/noinst/client_impl_base.hpp>
+#include <realm/sync/subscriptions.hpp>
+#include <realm/util/bind_ptr.hpp>
+#include <realm/util/circular_buffer.hpp>
+#include <realm/util/platform_info.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/util/uri.hpp>
+#include <realm/util/value_reset_guard.hpp>
+#include <realm/version.hpp>
 
 namespace realm {
 namespace sync {
@@ -173,6 +173,9 @@ public:
     ClientReplication& get_replication() noexcept;
     ClientImpl& get_client() noexcept;
 
+    bool has_flx_subscription_store() const;
+    SubscriptionStore* get_or_create_flx_subscription_store();
+
     void set_sync_transact_handler(std::function<SyncTransactCallback>);
     void set_progress_handler(std::function<ProgressHandler>);
     void set_connection_state_change_listener(std::function<ConnectionStateChangeListener>);
@@ -204,6 +207,9 @@ private:
     ClientImpl& m_client;
     DBRef m_db;
     Replication* m_replication;
+
+    mutable std::mutex m_flx_subscription_store_mutex;
+    std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
 
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
@@ -551,13 +557,12 @@ void ClientImpl::actualize_and_finalize_session_wrappers()
 }
 
 
-ClientImpl::Connection& ClientImpl::get_connection(ServerEndpoint endpoint,
-                                                   const std::string& authorization_header_name,
-                                                   const std::map<std::string, std::string>& custom_http_headers,
-                                                   bool verify_servers_ssl_certificate,
-                                                   Optional<std::string> ssl_trust_certificate_path,
-                                                   std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
-                                                   Optional<ProxyConfig> proxy_config, bool& was_created)
+ClientImpl::Connection&
+ClientImpl::get_connection(ServerEndpoint endpoint, const std::string& authorization_header_name,
+                           const std::map<std::string, std::string>& custom_http_headers,
+                           bool verify_servers_ssl_certificate, Optional<std::string> ssl_trust_certificate_path,
+                           std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback,
+                           Optional<ProxyConfig> proxy_config, SyncServerMode sync_mode, bool& was_created)
 {
     ServerSlot& server_slot = m_server_slots[endpoint]; // Throws
 
@@ -574,8 +579,8 @@ ClientImpl::Connection& ClientImpl::get_connection(ServerEndpoint endpoint,
     std::unique_ptr<ClientImpl::Connection> conn_2 = std::make_unique<ClientImpl::Connection>(
         *this, ident, std::move(endpoint), authorization_header_name, custom_http_headers,
         verify_servers_ssl_certificate, std::move(ssl_trust_certificate_path), std::move(ssl_verify_callback),
-        std::move(proxy_config),
-        server_slot.reconnect_info); // Throws
+        std::move(proxy_config), server_slot.reconnect_info,
+        sync_mode); // Throws
     ClientImpl::Connection& conn = *conn_2;
     if (!m_one_connection_per_session) {
         server_slot.connection = std::move(conn_2);
@@ -658,7 +663,7 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
     return m_wrapper.m_client_reset_config;
 }
 
-void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes,
+void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const ReceivedChangesets& changesets)
 {
     bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
@@ -669,8 +674,8 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
             ClientReplication& repl = access_realm(); // Throws
-            success = integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
-                                           error); // Throws
+            success = integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info, error,
+                                           batch_state); // Throws
             client_version = version_info.realm_version;
         }
         else {
@@ -678,14 +683,14 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
             success = true;
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(success, client_version, m_progress.download, error); // Throws
+        on_changesets_integrated(success, client_version, m_progress.download, error, batch_state); // Throws
     }
     else {
         bool success = false;
         version_type client_version = 0;                 // Dummy
         DownloadCursor download_progress = {0, 0};       // Dummy
         IntegrationError error = IntegrationError::bad_changeset;
-        on_changesets_integrated(success, client_version, download_progress, error); // Throws
+        on_changesets_integrated(success, client_version, download_progress, error, batch_state); // Throws
     }
     m_wrapper.on_sync_progress(); // Throws
 }
@@ -757,6 +762,25 @@ inline ClientReplication& SessionWrapper::get_replication() noexcept
 inline ClientImpl& SessionWrapper::get_client() noexcept
 {
     return m_client;
+}
+
+bool SessionWrapper::has_flx_subscription_store() const
+{
+    std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
+    return static_cast<bool>(m_flx_subscription_store);
+}
+
+SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
+{
+    std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
+    if (m_flx_subscription_store) {
+        return m_flx_subscription_store.get();
+    }
+
+    REALM_ASSERT(m_virt_path.empty());
+
+    m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db);
+    return m_flx_subscription_store.get();
 }
 
 
@@ -995,10 +1019,12 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     REALM_ASSERT(!m_sess);
     m_db->claim_sync_agent();
 
+    SyncServerMode sync_mode = has_flx_subscription_store() ? SyncServerMode::FLXRequested : SyncServerMode::PBS;
+
     bool was_created = false;
     ClientImpl::Connection& conn = m_client.get_connection(
         std::move(endpoint), m_authorization_header_name, m_custom_http_headers, m_verify_servers_ssl_certificate,
-        m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config,
+        m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config, sync_mode,
         was_created); // Throws
     try {
         // FIXME: This only makes sense when each session uses a separate connection.
@@ -1226,7 +1252,8 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    bool verify_servers_ssl_certificate,
                                    Optional<std::string> ssl_trust_certificate_path,
                                    std::function<SSLVerifyCallback> ssl_verify_callback,
-                                   Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
+                                   Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info,
+                                   SyncServerMode sync_mode)
     : logger{make_logger_prefix(ident), client.logger} // Throws
     , m_client{client}
     , m_protocol_envelope{std::get<0>(endpoint)}
@@ -1238,6 +1265,7 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}
     , m_proxy_config{std::move(proxy_config)}
     , m_reconnect_info{reconnect_info}
+    , m_sync_mode(sync_mode)
     , m_ident{ident}
     , m_server_endpoint{std::move(endpoint)}
     , m_authorization_header_name{authorization_header_name}
@@ -1465,6 +1493,15 @@ void Session::abandon() noexcept
     SessionWrapper::abandon(std::move(wrapper));
 }
 
+bool Session::has_flx_subscription_store() const
+{
+    return m_impl->has_flx_subscription_store();
+}
+
+SubscriptionStore* Session::get_flx_subscription_store()
+{
+    return m_impl->get_or_create_flx_subscription_store();
+}
 
 const std::error_category& client_error_category() noexcept
 {

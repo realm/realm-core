@@ -137,7 +137,9 @@ static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changeset_header_
               RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_HEADER_SYNTAX);
 static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changeset_size) ==
               RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changesets) == RLM_SYNC_ERR_CONNECTION_BAD_CHANGESETS);
+static_assert(realm_sync_errno_connection_e(ProtocolError::switch_to_flx_sync) ==
+              RLM_SYNC_ERR_CONNECTION_SWITCH_TO_FLX_SYNC);
+static_assert(realm_sync_errno_connection_e(ProtocolError::switch_to_pbs) == RLM_SYNC_ERR_CONNECTION_SWITCH_TO_PBS);
 
 static_assert(realm_sync_errno_session_e(ProtocolError::session_closed) == RLM_SYNC_ERR_SESSION_SESSION_CLOSED);
 static_assert(realm_sync_errno_session_e(ProtocolError::other_session_error) ==
