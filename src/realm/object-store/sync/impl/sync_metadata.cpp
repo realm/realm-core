@@ -182,21 +182,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
         object_schema->persisted_properties[0].column_key, object_schema->persisted_properties[1].column_key,
         object_schema->persisted_properties[2].column_key, object_schema->persisted_properties[3].column_key,
         object_schema->persisted_properties[4].column_key};
-
-    m_client_uuid = [&]() -> std::string {
-        TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_clientMetadata);
-        if (table->is_empty()) {
-            realm->begin_transaction();
-            if (table->is_empty()) {
-                auto uuid = util::uuid_string();
-                table->create_object().set(m_client_schema.idx_uuid, uuid);
-                realm->commit_transaction();
-                return uuid;
-            }
-            realm->cancel_transaction();
-        }
-        return table->begin()->get<String>(m_client_schema.idx_uuid);
-    }();
 }
 
 SyncUserMetadataResults SyncMetadataManager::all_unmarked_users() const

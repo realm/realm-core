@@ -283,7 +283,7 @@ def doCheckInDocker(Map options = [:]) {
                     }
                 }
             }
-            
+
             if (options.enableSync) {
                 // stitch images are auto-published every day to our CI
                 // see https://github.com/realm/ci/tree/master/realm/docker/mongodb-realm
@@ -481,7 +481,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                 buildEnv.inside {
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f \"${cmakeArgs}\"", 
+                        script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion} -f \"${cmakeArgs}\"",
                         name: "android-armeabi-${abi}-${buildType}",
                         filters: warningFilters,
                     )
@@ -569,7 +569,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
         REALM_NO_TESTS: '1',
       ]
     }
-    
+
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
 
     return {
@@ -604,6 +604,19 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                           mkdir %TMP%
                           realm-tests.exe --no-error-exit-code
                           copy unit-test-report.xml ..\\core-results.xml
+                          rmdir /Q /S %TMP%
+                        '''
+                    }
+                }
+                if (arch == 'x86') {
+                  // On 32-bit Windows we run out of address space when running
+                  // the sync tests in parallel
+                  environment << 'UNITTEST_THREADS=1'
+                }
+                withEnv(environment) {
+                    dir("build-dir/test/${buildType}") {
+                        bat '''
+                          mkdir %TMP%
                           realm-sync-tests.exe --no-error-exit-code
                           copy unit-test-report.xml ..\\sync-results.xml
                           rmdir /Q /S %TMP%
@@ -787,7 +800,7 @@ def doBuildMacOsCatalyst(String buildType) {
                         """
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: 'ninja package', 
+                        script: 'ninja package',
                         name: "osx-maccatalyst-${buildType}",
                         filters: warningFilters,
                     )

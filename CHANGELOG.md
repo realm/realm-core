@@ -4,9 +4,9 @@
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* SyncManager had some inconsistent locking which could result in data races and/or deadlocks, mostly in ways that would never be hit outside of tests doing very strange things (since v10.0.0).
+* Reduce the peak memory usage of changeset uploading by eliminating an extra copy of each changeset which was held in memory.
+
 ### Breaking changes
 * None.
 
@@ -14,6 +14,7 @@
 
 ### Internals
 * ConstTableView and TableView are merged into just TableView. TableView::front(), TableView::back(), TableView::remove() and TableView::remove_last() function are removed as they were not used outside tests.
+* The client file UUID has been removed as it was no longer being used for anything.
 
 ----------------------------------------------
 
