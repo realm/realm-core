@@ -977,28 +977,24 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress,
                                                                                bool& is_expired)
 {
-    uint64_t transferrable;
-    if (is_streaming) {
-        transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    }
-    else if (captured_transferrable) {
-        transferrable = *captured_transferrable;
-    }
-    else {
-        if (is_download)
-            captured_transferrable = current_progress.downloadable;
-        else {
-            // If the sync client has not yet processed all of the local
-            // transactions then the uploadable data is incorrect and we should
-            // not invoke the callback
-            if (snapshot_version > current_progress.snapshot_version)
-                return [] {};
-            captured_transferrable = current_progress.uploadable;
-        }
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
+    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    if (!is_streaming) {
+        // If the sync client has not yet processed all of the local
+        // transactions then the uploadable data is incorrect and we should
+        // not invoke the callback
+        if (!is_download && snapshot_version > current_progress.snapshot_version)
+            return [] {};
+
+        // The initial download size we get from the server is an estimate
+        // and it may decrease once compaction is performed, so we need to
+        // lower captured_transferrable when that happens. We never want to raise
+        // it due to new data being added, though.
+        if (!captured_transferrable || *captured_transferrable > transferrable)
+            captured_transferrable = transferrable;
         transferrable = *captured_transferrable;
     }
 
-    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
     is_expired = !is_streaming && transferred >= transferrable;
