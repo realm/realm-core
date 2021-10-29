@@ -760,7 +760,7 @@ int main(int argc, char* argv[])
         std::cout << "  - State size: " << format_byte_size(double(stats.allocated)) << "\n";
     }
     auto quoted = [](StringData str) {
-        util::StringView str_2{str.data(), str.size()};
+        std::string_view str_2{str.data(), str.size()};
         return util::quoted(str_2);
     };
     std::cout << "    - Number of tables: " << num_tables << "\n";

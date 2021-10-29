@@ -344,8 +344,8 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
 {
     auto i = headers.find("Sec-WebSocket-Protocol");
     if (i != headers.end()) {
-        util::StringView value = i->second;
-        util::StringView prefix = get_websocket_protocol_prefix();
+        std::string_view value = i->second;
+        std::string_view prefix = sync::get_websocket_protocol_prefix();
         // FIXME: Use std::string_view::begins_with() in C++20.
         bool begins_with =
             (value.size() >= prefix.size() && std::equal(value.data(), value.data() + prefix.size(), prefix.data()));
@@ -391,7 +391,7 @@ void Connection::websocket_write_error_handler(std::error_code ec)
 
 
 void Connection::websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                                   const util::StringView* body)
+                                                   const std::string_view* body)
 {
     bool is_fatal;
     if (ec == util::websocket::Error::bad_response_3xx_redirection ||
@@ -408,12 +408,12 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const HTT
         is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
         if (body) {
-            util::StringView identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
+            std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
             auto i = body->find(identifier);
-            if (i != util::StringView::npos) {
-                util::StringView rest = body->substr(i + identifier.size());
+            if (i != std::string_view::npos) {
+                std::string_view rest = body->substr(i + identifier.size());
                 // FIXME: Use std::string_view::begins_with() in C++20.
-                auto begins_with = [](util::StringView string, util::StringView prefix) {
+                auto begins_with = [](std::string_view string, std::string_view prefix) {
                     return (string.size() >= prefix.size() &&
                             std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
                 };

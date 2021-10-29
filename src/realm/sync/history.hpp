@@ -4,7 +4,6 @@
 #include <chrono>
 #include <string>
 
-#include <realm/util/string_view.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/instruction_replication.hpp>

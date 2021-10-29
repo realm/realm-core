@@ -639,7 +639,6 @@ let headers: [String] = [
     "realm/util/shared_ptr.hpp",
     "realm/util/signal_blocker.hpp",
     "realm/util/string_buffer.hpp",
-    "realm/util/string_view.hpp",
     "realm/util/substitute.hpp",
     "realm/util/terminate.hpp",
     "realm/util/thread.hpp",

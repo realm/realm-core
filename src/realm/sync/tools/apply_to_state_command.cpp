@@ -11,13 +11,13 @@
 #include "realm/util/cli_args.hpp"
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
-#include "realm/util/string_view.hpp"
 
 #include <external/mpark/variant.hpp>
 
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <type_traits>
 
 namespace {
@@ -205,7 +205,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
     return ret;
 }
 
-void print_usage(StringView program_name)
+void print_usage(std::string_view program_name)
 {
     std::cout << "Synopsis: " << program_name << " -r <PATH-TO-REALM> -i <PATH-TO-MESSAGES> [OPTIONS]"
               << "\n"

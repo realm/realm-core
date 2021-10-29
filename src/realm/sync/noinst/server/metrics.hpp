@@ -42,8 +42,7 @@ class Metrics {
 public:
     /// Increment the counter identified by the specified metrics key.
     ///
-    /// FIXME: Change to take arguments of type util::StringView (or
-    /// std::string_view in C++17).
+    /// FIXME: Change to take arguments of type std::string_view
     virtual void increment(const char* key, int value = 1) = 0;
 
     /// Decrement the counter identified by the specified metrics key.
