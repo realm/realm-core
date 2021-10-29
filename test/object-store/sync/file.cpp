@@ -158,36 +158,6 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     });
     auto manager = SyncFileManager(base_path + "syncmanager/", app_id);
 
-    SECTION("user directory APIs") {
-        const std::string expected = manager_path + identity + "/";
-        SECTION("getting a user directory") {
-            SECTION("that didn't exist before succeeds") {
-                auto actual = manager.user_directory(identity);
-                REQUIRE(actual == expected);
-                REQUIRE_DIR_EXISTS(expected);
-            }
-            SECTION("that already existed succeeds") {
-                auto actual = manager.user_directory(identity);
-                REQUIRE(actual == expected);
-                REQUIRE_DIR_EXISTS(expected);
-            }
-        }
-
-        SECTION("deleting a user directory") {
-            manager.user_directory(identity);
-            REQUIRE_DIR_EXISTS(expected);
-            SECTION("that wasn't yet deleted succeeds") {
-                manager.remove_user_directory(identity);
-                REQUIRE_DIR_DOES_NOT_EXIST(expected);
-            }
-            SECTION("that was already deleted succeeds") {
-                manager.remove_user_directory(identity);
-                // REQUIRE(opendir(expected.c_str()) == NULL); // FIXME: Does not work on Windows
-                REQUIRE_DIR_DOES_NOT_EXIST(expected);
-            }
-        }
-    }
-
     SECTION("Realm path APIs") {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
         auto expected_name = manager_path + "abcdefghi/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
@@ -212,7 +182,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(File::exists(expected_name + ".lock"));
             REQUIRE_DIR_EXISTS(expected_name + ".management");
             // Delete the Realm
-            REQUIRE(manager.remove_realm(identity, relative_path));
+            REQUIRE(manager.remove_realm(identity, local_identity, relative_path));
             // Ensure the files don't exist anymore
             REQUIRE(!File::exists(expected_name));
             REQUIRE(!File::exists(expected_name + ".lock"));
@@ -220,7 +190,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
 
         SECTION("deleting a Realm for an invalid user") {
-            REQUIRE(!manager.remove_realm("invalid_user", relative_path));
+            REQUIRE(!manager.remove_realm("invalid_user", "invalid_ident", relative_path));
         }
 
         SECTION("hashed path is used if it already exists") {
@@ -259,6 +229,9 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(actual == local_id_expected_name_with_suffix);
             REQUIRE(File::exists(local_id_expected_name_with_suffix));
             REQUIRE(!File::exists(traditional_path));
+
+            manager.remove_user_realms(identity, {local_id_expected_name_with_suffix});
+            REQUIRE(!File::exists(local_id_expected_name_with_suffix));
         }
 
         SECTION("legacy sync paths are detected and used") {
@@ -277,6 +250,9 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(actual == old_path);
             REQUIRE(File::exists(old_path));
             REQUIRE(!File::exists(expected_name_with_suffix));
+
+            manager.remove_user_realms(identity, {old_path});
+            REQUIRE(!File::exists(old_path));
         }
 
         SECTION("paths have a fallback hashed location if the preferred path is too long") {
@@ -286,6 +262,9 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(actual.length() < 300);
             REQUIRE(create_dummy_realm(actual));
             REQUIRE(File::exists(actual));
+
+            manager.remove_user_realms(identity, {actual});
+            REQUIRE(!File::exists(actual));
         }
     }
 

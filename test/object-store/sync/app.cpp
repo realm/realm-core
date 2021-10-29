@@ -3850,7 +3850,8 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
             std::cout << error.message << std::endl;
         };
         realm_config.schema_version = 1;
-        realm_config.path = app->sync_manager()->path_for_realm(*cur_user, "default.realm");
+        realm_config.path =
+            app->sync_manager()->path_for_realm(*realm_config.sync_config, std::string("default.realm"));
 
         auto r = Realm::get_shared_realm(std::move(realm_config));
         auto session = cur_user->session_for_on_disk_path(r->config().path);

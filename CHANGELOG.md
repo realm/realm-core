@@ -5,9 +5,8 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* A sync user's Realm was not deleted when the user was removed if the Realm path was too long such that it triggered the fallback hashed name (this is OS dependant but is 300 characters on linux). ([#4187](https://github.com/realm/realm-core/issues/4187), since the introduction of hashed paths in object-store before monorepo, circa early v10 (https://github.com/realm/realm-object-store/pull/1049))
+
 ### Breaking changes
 * None.
 
