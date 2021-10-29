@@ -973,7 +973,7 @@ Query Results::do_get_query() const
             if (m_update_policy == UpdatePolicy::Auto) {
                 m_table_view.sync_if_needed();
             }
-            return Query(m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
+            return Query(m_table, std::unique_ptr<TableView>(new TableView(m_table_view)));
         }
         case Mode::Collection:
             if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
