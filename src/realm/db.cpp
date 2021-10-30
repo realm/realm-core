@@ -1376,17 +1376,22 @@ void DB::create_new_history(Replication& repl)
         for (auto tk : table_keys) {
             auto table = tr->get_table(tk);
             auto table_name = table->get_name();
-            auto pk_col = table->get_primary_key_column();
-            if (!pk_col)
-                throw std::runtime_error(
-                    util::format("Class '%1' must have a primary key", Group::table_name_to_class_name(table_name)));
-            auto pk_name = table->get_column_name(pk_col);
-            if (pk_name != "_id")
-                throw std::runtime_error(
-                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
-                                 Group::table_name_to_class_name(table_name), pk_name));
-            repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
-                                            pk_col.is_nullable());
+            if (table->is_embedded()) {
+                auto pk_col = table->get_primary_key_column();
+                if (!pk_col)
+                    throw std::runtime_error(util::format("Class '%1' must have a primary key",
+                                                          Group::table_name_to_class_name(table_name)));
+                auto pk_name = table->get_column_name(pk_col);
+                if (pk_name != "_id")
+                    throw std::runtime_error(
+                        util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
+                                     Group::table_name_to_class_name(table_name), pk_name));
+                repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
+                                                pk_col.is_nullable());
+            }
+            else {
+                repl.add_class(tk, table_name, true);
+            }
         }
         // Create columns
         for (auto tk : table_keys) {
@@ -1408,6 +1413,7 @@ void DB::create_new_history(Replication& repl)
             for (auto o : *table) {
                 auto obj_key = o.get_key();
                 repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, o.get_any(pk_col));
+                // FIXME: handle embedded objects
                 for (auto col : cols) {
                     if (col.is_list()) {
                         auto list = o.get_listbase_ptr(col);

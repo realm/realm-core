@@ -1567,23 +1567,10 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
     auto partition = random_string(100);
 
-    auto email_1 = std::string("donald_duck@example.com");
-    auto email_2 = std::string("mickey_mouse@example.com");
-    auto password = std::string{"password"};
-    auto creds_1 = app::AppCredentials::username_password(email_1, password);
-
     {
         TestSyncManager sync_manager(app_config, {});
         auto app = sync_manager.app();
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email_1, password, [&](Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-            });
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email_2, password, [&](Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-            });
-        auto user = log_in(app, creds_1);
+        create_user_and_log_in(app);
         SyncTestFile config(app, partition, schema);
         std::cout << app->sync_manager()->path_for_realm(*config.sync_config) << std::endl;
         auto r = Realm::get_shared_realm(config);
@@ -1605,12 +1592,11 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     }
 
     {
-        auto creds_2 = app::AppCredentials::username_password(email_2, password);
         TestSyncManager sync_manager_2(app_config, {});
         auto app = sync_manager_2.app();
-        auto user_2 = log_in(app, creds_2);
+        create_user_and_log_in(app);
 
-        local_config.sync_config = std::make_shared<SyncConfig>(user_2, bson::Bson(partition));
+        local_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), bson::Bson(partition));
         auto new_location = app->sync_manager()->path_for_realm(*local_config.sync_config);
         std::cout << new_location << std::endl;
         util::File::copy(local_config.path, new_location);
@@ -1622,9 +1608,9 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
         Group& g = realm->read_group();
         // g.to_json(std::cout);
         REQUIRE(g.get_table("class_origin")->size() == 1);
-        REQUIRE(g.get_table("class_target") == 2);
-        REQUIRE(g.get_table("class_other_origin") == 2);
-        REQUIRE(g.get_table("class_other_target") == 2);
+        REQUIRE(g.get_table("class_target")->size() == 2);
+        REQUIRE(g.get_table("class_other_origin")->size() == 2);
+        REQUIRE(g.get_table("class_other_target")->size() == 2);
     }
 }
 
