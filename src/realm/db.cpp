@@ -1358,6 +1358,78 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions option
     do_open(file, no_create, is_backend, options); // Throws
 }
 
+namespace {
+
+using ColInfo = std::vector<std::pair<ColKey, Table*>>;
+
+ColInfo get_col_info(Table* table)
+{
+    std::vector<std::pair<ColKey, Table*>> cols;
+    for (auto col : table->get_column_keys()) {
+        Table* embedded_table = nullptr;
+        if (auto target_table = table->get_opposite_table(col)) {
+            if (target_table->is_embedded())
+                embedded_table = target_table.unchecked_ptr();
+        }
+        cols.emplace_back(col, embedded_table);
+    }
+    return cols;
+}
+
+void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInfo& cols)
+{
+    for (auto elem : cols) {
+        auto col = elem.first;
+        if (auto embedded_table = elem.second) {
+            // The column contains links to embedded objects
+            auto cols_2 = get_col_info(embedded_table);
+            if (col.is_collection()) {
+                LinkCollectionPtr list = obj.get_linkcollection_ptr(col);
+                CollectionBase& collection_base = dynamic_cast<CollectionBase&>(*list);
+                auto sz = list->size();
+                for (size_t n = 0; n < sz; n++) {
+                    Obj embedded_obj = list->get_object(n);
+                    repl.list_insert(collection_base, n, embedded_obj.get_key(), n);
+                    generate_properties_for_obj(repl, embedded_obj, cols_2);
+                }
+            }
+            else {
+                ObjKey link = obj.get<ObjKey>(col);
+                auto embedded_obj = embedded_table->get_object(link);
+                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), link);
+                generate_properties_for_obj(repl, embedded_obj, cols_2);
+            }
+            continue;
+        }
+        if (col.is_list()) {
+            auto list = obj.get_listbase_ptr(col);
+            auto sz = list->size();
+            for (size_t n = 0; n < sz; n++) {
+                repl.list_insert(*list, n, list->get_any(n), n);
+            }
+        }
+        else if (col.is_set()) {
+            auto set = obj.get_setbase_ptr(col);
+            auto sz = set->size();
+            for (size_t n = 0; n < sz; n++) {
+                repl.set_insert(*set, n, set->get_any(n));
+            }
+        }
+        else if (col.is_dictionary()) {
+            auto dict = obj.get_dictionary(col);
+            size_t n = 0;
+            for (auto [key, value] : dict) {
+                repl.dictionary_insert(dict, n++, key, value);
+            }
+        }
+        else {
+            repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), obj.get_any(col));
+        }
+    }
+}
+
+} // namespace
+
 void DB::create_new_history(Replication& repl)
 {
     Replication* old_repl = get_replication();
@@ -1376,7 +1448,7 @@ void DB::create_new_history(Replication& repl)
         for (auto tk : table_keys) {
             auto table = tr->get_table(tk);
             auto table_name = table->get_name();
-            if (table->is_embedded()) {
+            if (!table->is_embedded()) {
                 auto pk_col = table->get_primary_key_column();
                 if (!pk_col)
                     throw std::runtime_error(util::format("Class '%1' must have a primary key",
@@ -1405,41 +1477,18 @@ void DB::create_new_history(Replication& repl)
                                    table->get_opposite_table(col).unchecked_ptr());
             }
         }
+        tr->commit_and_continue_writing();
         // Now the schema should be in place - create the objects
         for (auto tk : table_keys) {
             auto table = tr->get_table(tk);
+            if (table->is_embedded())
+                continue;
             auto pk_col = table->get_primary_key_column();
-            auto cols = table->get_column_keys();
+            auto cols = get_col_info(table.unchecked_ptr());
             for (auto o : *table) {
                 auto obj_key = o.get_key();
                 repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, o.get_any(pk_col));
-                // FIXME: handle embedded objects
-                for (auto col : cols) {
-                    if (col.is_list()) {
-                        auto list = o.get_listbase_ptr(col);
-                        auto sz = list->size();
-                        for (size_t n = 0; n < sz; n++) {
-                            repl.list_insert(*list, n, list->get_any(n), n);
-                        }
-                    }
-                    else if (col.is_set()) {
-                        auto set = o.get_setbase_ptr(col);
-                        auto sz = set->size();
-                        for (size_t n = 0; n < sz; n++) {
-                            repl.set_insert(*set, n, set->get_any(n));
-                        }
-                    }
-                    else if (col.is_dictionary()) {
-                        auto dict = o.get_dictionary(col);
-                        size_t n = 0;
-                        for (auto [key, value] : dict) {
-                            repl.dictionary_insert(dict, n++, key, value);
-                        }
-                    }
-                    else {
-                        repl.set(table.unchecked_ptr(), col, obj_key, o.get_any(col));
-                    }
-                }
+                generate_properties_for_obj(repl, o, cols);
             }
         }
         tr->commit();
@@ -2719,6 +2768,10 @@ void Transaction::commit_and_continue_writing()
     db->grab_read_lock(lock_after_commit, version_id);
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
+    if (Replication* repl = db->get_replication()) {
+        bool history_updated = false;
+        repl->initiate_transact(*this, lock_after_commit.m_version, history_updated); // Throws
+    }
 
     bool writable = true;
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws

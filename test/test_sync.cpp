@@ -7545,16 +7545,28 @@ TEST(Sync_UpgradeToClientHistory)
     auto db_2 = DB::create(make_in_realm_history(), db2_path);
     {
         auto tr = db_1->start_write();
+
+        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto col_float = embedded->add_column(type_Float, "float");
+
         auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
         auto col_list = baas->add_column_list(type_Int, "list");
         auto col_set = baas->add_column_set(type_Int, "set");
         auto col_dict = baas->add_column_dictionary(type_Int, "dictionary");
+        auto col_child = baas->add_column(*embedded, "child");
+
         auto foos = tr->add_table_with_primary_key("class_Foo", type_Int, "_id");
         auto col_str = foos->add_column(type_String, "str");
+        auto col_children = foos->add_column_list(*embedded, "children");
+
         auto col_link = baas->add_column(*foos, "link");
 
         auto foo = foos->create_object_with_primary_key(123).set(col_str, "Hello");
+        auto children = foo.get_linklist(col_children);
+        children.create_and_insert_linked_object(0);
         auto baa = baas->create_object_with_primary_key(999).set(col_link, foo.get_key());
+        auto obj = baa.create_and_set_linked_object(col_child);
+        obj.set(col_float, 42.f);
         auto list = baa.get_list<Int>(col_list);
         list.add(1);
         list.add(2);
