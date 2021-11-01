@@ -52,12 +52,6 @@ public:
     // Returns a stringified version of the query associated with this subscription.
     std::string_view query_string() const;
 
-    // Replaces the query/object class of this query with another one.
-    //
-    // If another Subscription exists in the SubscriptionSet containing this subscription with the same
-    // query, then this will throw a std::runtime_error.
-    void update_query(const Query& query_obj);
-
 protected:
     friend class SubscriptionSet;
 
@@ -184,15 +178,10 @@ public:
     const_iterator find(StringData name) const;
     const_iterator find(const Query& query) const;
 
-    // A mutable iterator interface for working with individual subscriptions in when the set is in the
-    // Uncommitted state.
-    iterator begin();
-    iterator end();
-
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
     // this will throw.
-    iterator erase(iterator it);
+    const_iterator erase(const_iterator it);
 
     // Erases all subscriptions in the subscription set.
     void clear();
@@ -204,8 +193,20 @@ public:
     // The Query portion of the subscription is mutable, however the name portion is immutable after the
     // subscription is inserted.
     //
-    // If insert is called twice for the same query, this is a no-op.
-    std::pair<iterator, bool> insert(const Query& query, util::Optional<std::string> name = util::none);
+    // If insert is called twice for the same name, the Query portion and updated_at timestamp for that named
+    // subscription will be updated to match the new Query.
+    std::pair<iterator, bool> insert_or_assign(std::string_view name, const Query& query);
+
+    // Inserts a new subscription into the set if one does not exist already - returns an iterator to the
+    // subscription and a bool that is true if a new subscription was actually created. The SubscriptionSet
+    // must be in the Uncommitted state to call this - otherwise this will throw.
+    //
+    // If insert is called twice for the same query, then the updated_at timestamp for that subscription will
+    // be updated.
+    //
+    // The inserted subscription will have an empty name - to update this Subscription's query, the caller
+    // will have
+    std::pair<iterator, bool> insert_or_assign(const Query& query);
 
     // Updates the state of the transaction and optionally updates its error information.
     //
@@ -223,6 +224,9 @@ public:
 protected:
     friend class SubscriptionStore;
     friend class Subscription;
+
+    std::pair<iterator, bool> insert_or_assign_impl(iterator it, StringData name, StringData object_class_name,
+                                                    StringData query_str);
 
     void insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name, StringData object_class_name,
                          StringData query_str);

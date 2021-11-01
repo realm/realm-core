@@ -79,25 +79,12 @@ std::string_view Subscription::name() const
 
 std::string_view Subscription::object_class_name() const
 {
-    return to_string_view(m_obj.get<std::string_view>(store()->m_sub_keys->object_class_name));
+    return to_string_view(m_obj.get<StringData>(store()->m_sub_keys->object_class_name));
 }
 
 std::string_view Subscription::query_string() const
 {
-    return to_string_view(m_obj.get<std::string_view>(store()->m_sub_keys->query_str));
-}
-
-void Subscription::update_query(const Query& query_obj)
-{
-    if (m_parent->find(query_obj) != m_parent->end()) {
-        throw std::runtime_error("Subscription already exists for this query");
-    }
-
-    const auto table_name = Group::table_name_to_class_name(query_obj.get_table()->get_name());
-    const auto updated_at = std::chrono::system_clock::now();
-    m_obj.set(store()->m_sub_keys->object_class_name, table_name);
-    m_obj.set(store()->m_sub_keys->query_str, query_obj.get_description());
-    m_obj.set(store()->m_sub_keys->updated_at, Timestamp{updated_at});
+    return to_string_view(m_obj.get<StringData>(store()->m_sub_keys->query_str));
 }
 
 SubscriptionSet::iterator::iterator(const SubscriptionSet* parent, LnkLst::iterator it)
@@ -190,17 +177,7 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
     });
 }
 
-SubscriptionSet::iterator SubscriptionSet::begin()
-{
-    return iterator(this, m_sub_list.begin());
-}
-
-SubscriptionSet::iterator SubscriptionSet::end()
-{
-    return iterator(this, m_sub_list.end());
-}
-
-SubscriptionSet::iterator SubscriptionSet::erase(iterator it)
+SubscriptionSet::const_iterator SubscriptionSet::erase(const_iterator it)
 {
     m_sub_list.remove_target_row(it.m_sub_it.index());
     return it;
@@ -230,27 +207,46 @@ Subscription SubscriptionSet::subscription_from_iterator(LnkLst::iterator it) co
     return Subscription(this, m_sub_list.get_object(it.index()));
 }
 
-std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert(const Query& query,
-                                                                   util::Optional<std::string> name)
+std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign_impl(iterator it, StringData name,
+                                                                                  StringData object_class_name,
+                                                                                  StringData query_str)
 {
-    auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
-
-    auto query_str = query.get_description();
-    if (!name) {
-        name = util::format("%1: %2", table_name, query_str);
-    }
-    auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name() == *name) || (sub.query_string() == query_str && sub.object_class_name() == table_name);
-    });
-
+    auto now = Timestamp{std::chrono::system_clock::now()};
     if (it != end()) {
+        it->m_obj.set(m_mgr->m_sub_keys->object_class_name, object_class_name);
+        it->m_obj.set(m_mgr->m_sub_keys->query_str, query_str);
+        it->m_obj.set(m_mgr->m_sub_keys->updated_at, now);
+
         return {it, false};
     }
 
-    auto now = Timestamp{std::chrono::system_clock::now()};
-    insert_sub_impl(now, now, name, table_name, query_str);
+    insert_sub_impl(now, now, name, object_class_name, query_str);
 
     return {iterator(this, LnkLst::iterator(&m_sub_list, m_sub_list.size() - 1)), true};
+}
+
+std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(std::string_view name,
+                                                                             const Query& query)
+{
+    auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
+    auto query_str = query.get_description();
+    auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
+        return (sub.name() == name);
+    });
+
+    return insert_or_assign_impl(it, name, table_name, query_str);
+}
+
+std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(const Query& query)
+{
+    auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
+    auto query_str = query.get_description();
+    auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
+        return (sub.object_class_name() == table_name && sub.query_string() == query_str);
+    });
+
+    std::string_view name;
+    return insert_or_assign_impl(it, name, table_name, query_str);
 }
 
 void SubscriptionSet::update_state(State new_state, util::Optional<std::string> error_str)
@@ -328,8 +324,12 @@ SubscriptionStore::SubscriptionStore(DBRef db)
     auto tr = m_db->start_read();
 
     auto schema_metadata_key = tr->find_table(c_flx_metadata_table);
-    if (!schema_metadata_key) {
+    auto create_schema_if_needed = [&] {
         tr->promote_to_write();
+
+        if (tr->find_table(c_flx_metadata_table)) {
+            return false;
+        }
 
         auto schema_metadata = tr->add_table(c_flx_metadata_table);
         auto version_col = schema_metadata->add_column(type_Int, c_flx_meta_schema_version_field);
@@ -351,8 +351,10 @@ SubscriptionStore::SubscriptionStore(DBRef db)
         m_sub_set_keys->subscriptions =
             sub_sets_table->add_column_list(*subs_table, c_flx_sub_sets_subscriptions_field);
         tr->commit();
-    }
-    else {
+        return true;
+    };
+
+    if (schema_metadata_key || !create_schema_if_needed()) {
         auto lookup_and_validate_column = [&](TableRef& table, StringData col_name, DataType col_type) -> ColKey {
             auto ret = table->get_column_key(col_name);
             if (!ret) {

@@ -52,7 +52,7 @@ TEST(Sync_SubscriptionStoreBasic)
         auto read_tr = fixture.db->start_read();
         Query query_a(read_tr->get_table("class_a"));
         query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
-        auto&& [it, inserted] = out.insert(query_a, std::string{"a sub"});
+        auto&& [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         CHECK_NOT_EQUAL(it, out.end());
         CHECK_EQUAL(it->name(), "a sub");
@@ -101,7 +101,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     {
         auto out = store.get_latest().make_mutable_copy();
         auto read_tr = fixture.db->start_read();
-        auto&& [it, inserted] = out.insert(query_a, std::string{"a sub"});
+        auto&& [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         CHECK_NOT_EQUAL(it, out.end());
 
@@ -114,7 +114,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         auto new_set = store.get_latest().make_mutable_copy();
         CHECK_EQUAL(new_set.version(), 2);
         new_set.clear();
-        new_set.insert(query_b, std::string{"b sub"});
+        new_set.insert_or_assign("b sub", query_b);
         new_set.commit();
     }
 
@@ -168,11 +168,13 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     {
         auto out = store.get_latest().make_mutable_copy();
         auto read_tr = fixture.db->start_read();
-        auto&& [it, inserted] = out.insert(query_a, std::string{"a sub"});
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         CHECK_NOT_EQUAL(it, out.end());
 
-        it->update_query(query_b);
+        std::tie(it, inserted) = out.insert_or_assign("a sub", query_b);
+        CHECK(!inserted);
+        CHECK_NOT_EQUAL(it, out.end());
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_b.get_description());
     }
