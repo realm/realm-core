@@ -519,7 +519,9 @@ bool SyncUser::access_token_refresh_required() const
     using namespace std::chrono;
     constexpr size_t buffer_seconds = 5; // arbitrary
     util::CheckedLockGuard lock(m_mutex);
-    auto threshold = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() - buffer_seconds;
+    const auto now = duration_cast<seconds>(system_clock::now().time_since_epoch()).count() +
+                     m_seconds_to_adjust_time_for_testing.load(std::memory_order_relaxed);
+    const auto threshold = now - buffer_seconds;
     return do_is_logged_in() && m_access_token.expires_at < static_cast<int64_t>(threshold);
 }
 
