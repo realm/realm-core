@@ -44,6 +44,11 @@ constexpr static std::string_view c_flx_sub_name_field("name");
 constexpr static std::string_view c_flx_sub_object_class_field("object_class");
 constexpr static std::string_view c_flx_sub_query_str_field("query");
 
+inline std::string_view to_string_view(StringData in) noexcept
+{
+    return std::string_view(in.data(), in.size());
+}
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionSet* parent, Obj obj)
@@ -67,19 +72,19 @@ Timestamp Subscription::updated_at() const
     return m_obj.get<Timestamp>(store()->m_sub_keys->updated_at);
 }
 
-StringData Subscription::name() const
+std::string_view Subscription::name() const
 {
-    return m_obj.get<StringData>(store()->m_sub_keys->name);
+    return to_string_view(m_obj.get<StringData>(store()->m_sub_keys->name));
 }
 
-StringData Subscription::object_class_name() const
+std::string_view Subscription::object_class_name() const
 {
-    return m_obj.get<StringData>(store()->m_sub_keys->object_class_name);
+    return to_string_view(m_obj.get<std::string_view>(store()->m_sub_keys->object_class_name));
 }
 
-StringData Subscription::query_string() const
+std::string_view Subscription::query_string() const
 {
-    return m_obj.get<StringData>(store()->m_sub_keys->query_str);
+    return to_string_view(m_obj.get<std::string_view>(store()->m_sub_keys->query_str));
 }
 
 void Subscription::update_query(const Query& query_obj)
@@ -424,7 +429,7 @@ const SubscriptionSet SubscriptionStore::get_active() const
         tr->close();
         return get_latest();
     }
-    return SubscriptionSet(this, std::move(tr), res.front());
+    return SubscriptionSet(this, std::move(tr), res.get(0));
 }
 
 SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)

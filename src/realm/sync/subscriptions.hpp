@@ -43,15 +43,14 @@ public:
     // Returns the timestamp of the last time this subscription was updated by calling update_query.
     Timestamp updated_at() const;
 
-    // Returns the name of the subscription that was set when it was created. If no name was set, this
-    // returns a default-constructed std::string_view.
-    StringData name() const;
+    // Returns the name of the subscription that was set when it was created.
+    std::string_view name() const;
 
     // Returns the name of the object class of the query for this subscription.
-    StringData object_class_name() const;
+    std::string_view object_class_name() const;
 
     // Returns a stringified version of the query associated with this subscription.
-    StringData query_string() const;
+    std::string_view query_string() const;
 
     // Replaces the query/object class of this query with another one.
     //
