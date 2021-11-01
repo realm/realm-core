@@ -47,7 +47,8 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueTyp
 }
 
 template <typename ValueType, typename ContextType>
-void Object::set_property_value(ContextType& ctx, const Property& property, ValueType value, CreatePolicy policy) {
+void Object::set_property_value(ContextType& ctx, const Property& property, ValueType value, CreatePolicy policy)
+{
     set_property_value_impl(ctx, property, value, policy, false);
 }
 
