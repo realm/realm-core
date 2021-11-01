@@ -5186,6 +5186,76 @@ TEST(Query_IntIndexedRandom)
     }
 }
 
+// Can be used to evaluate m_dT values
+TEST_IF(Query_RelativePerformance, false)
+{
+    Random random(random_int<int>());
+
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_id = table->add_column(type_Int, "id");
+    auto col_smallstrings = table->add_column(type_String, "smallstrings");
+    auto col_mediumstrings = table->add_column(type_String, "mediumstrings");
+    auto col_largestrings = table->add_column(type_String, "largestrings");
+    auto col_float = table->add_column(type_Float, "float");
+    auto col_double = table->add_column(type_Double, "double");
+    auto col_time = table->add_column(type_Timestamp, "time");
+    auto col_oid = table->add_column(type_ObjectId, "oid");
+    auto col_uuid = table->add_column(type_UUID, "uuid");
+    auto col_decimal = table->add_column(type_Decimal, "decimal");
+    auto col_mixed = table->add_column(type_Mixed, "mixed");
+
+    for (int i = 0; i < 100000; i++) {
+        int64_t id = random.draw_int_max(10000);
+        auto obj = table->create_object();
+        std::string as_string = util::to_string(id);
+        std::string small = std::string("String") + as_string;
+        std::string medium = std::string("String") + as_string + std::string(" medium size");
+        std::string large = std::string("String very large ") + as_string +
+                            std::string(" the quick brown fox jumps over the lazy dog.");
+        obj.set(col_id, id);
+        obj.set(col_smallstrings, small);
+        obj.set(col_mediumstrings, medium);
+        obj.set(col_largestrings, large);
+        obj.set(col_float, float(id));
+        obj.set(col_double, double(id));
+        Timestamp t(id, 0);
+        obj.set(col_time, t);
+        obj.set(col_oid, ObjectId(t, 0, 0));
+        std::string zeroes = "00000000";
+        std::string uuid = zeroes.substr(as_string.size()) + as_string + "-9abc-4def-9012-3456789abcde";
+        obj.set(col_uuid, UUID(uuid));
+        obj.set(col_decimal, Decimal128(id));
+        Mixed mixed(id);
+        if (i % 10 == 0) {
+            mixed = Mixed(small);
+        }
+        obj.set(col_mixed, mixed);
+    }
+
+    auto obj0 = table->get_object(0);
+    std::vector<Mixed> arguments(1);
+
+    arguments[0] = obj0.get_any(col_id);
+    Query q = table->query("id == $0", arguments);
+    auto before = std::chrono::steady_clock().now();
+    q.count();
+    auto after = std::chrono::steady_clock().now();
+    auto reference = std::chrono::duration_cast<std::chrono::microseconds>(after - before).count();
+
+    for (auto col : table->get_column_keys()) {
+        arguments[0] = obj0.get_any(col);
+        std::string name = table->get_column_name(col);
+        q = table->query(name + std::string("== $0"), arguments);
+        before = std::chrono::steady_clock().now();
+        q.count();
+        after = std::chrono::steady_clock().now();
+        std::cout << name << ": "
+                  << double(std::chrono::duration_cast<std::chrono::microseconds>(after - before).count()) / reference
+                  << std::endl;
+    }
+}
+
 TEST(Query_IntFindInNextLeaf)
 {
     Group g;

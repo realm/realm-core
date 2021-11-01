@@ -30,6 +30,7 @@ class Spec;
 class ArrayString : public ArrayPayload {
 public:
     using value_type = StringData;
+    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
 
     explicit ArrayString(Allocator&);
 
@@ -38,6 +39,10 @@ public:
         return nullable ? StringData{} : StringData{""};
     }
 
+    Type get_type() const noexcept
+    {
+        return m_type;
+    }
     // This is only used in the upgrade process
     void set_nullability(bool n)
     {
@@ -128,7 +133,6 @@ private:
         std::aligned_storage<sizeof(ArrayBigBlobs), alignof(ArrayBigBlobs)>::type m_big_blobs;
         std::aligned_storage<sizeof(Array), alignof(Array)>::type m_enum;
     };
-    enum class Type { small_strings, medium_strings, big_strings, enum_strings };
 
     Type m_type = Type::small_strings;
 
