@@ -986,10 +986,10 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
         if (!is_download && snapshot_version > current_progress.snapshot_version)
             return [] {};
 
-        // The initial download size we get from the server is an estimate
-        // and it may decrease once compaction is performed, so we need to
-        // lower captured_transferrable when that happens. We never want to raise
-        // it due to new data being added, though.
+        // The initial download size we get from the server is the uncompacted
+        // size, and so the download may complete before we actually receive
+        // that much data. When that happens, transferrable will drop and we
+        // need to use the new value instead of the captured one.
         if (!captured_transferrable || *captured_transferrable > transferrable)
             captured_transferrable = transferrable;
         transferrable = *captured_transferrable;
