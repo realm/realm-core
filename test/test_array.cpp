@@ -25,7 +25,7 @@
 #include <vector>
 #include <map>
 
-#include <realm/array.hpp>
+#include <realm/array_with_find.hpp>
 #include <realm/array_unsigned.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/query_conditions.hpp>
@@ -71,7 +71,7 @@ namespace {
 
 void has_zero_byte(TestContext& test_context, int64_t value, size_t reps)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
     IntegerColumn r(Allocator::get_default());
     r.create();
@@ -689,7 +689,7 @@ TEST(Array_LowerUpperBound)
 
 TEST(Array_FindAllInt0)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -729,7 +729,7 @@ TEST(Array_FindAllInt0)
 
 TEST(Array_FindAllInt1)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -763,7 +763,7 @@ TEST(Array_FindAllInt1)
 
 TEST(Array_FindAllInt2)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -797,7 +797,7 @@ TEST(Array_FindAllInt2)
 
 TEST(Array_FindAllInt3)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -831,7 +831,7 @@ TEST(Array_FindAllInt3)
 
 TEST(Array_FindAllInt4)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -866,7 +866,7 @@ TEST(Array_FindAllInt4)
 
 TEST(Array_FindAllInt5)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -901,7 +901,7 @@ TEST(Array_FindAllInt5)
 
 TEST(Array_FindAllInt6)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());
@@ -936,7 +936,7 @@ TEST(Array_FindAllInt6)
 
 TEST(Array_FindAllInt7)
 {
-    Array a(Allocator::get_default());
+    ArrayWithFind a(Allocator::get_default());
     a.create(Array::type_Normal);
 
     IntegerColumn r(Allocator::get_default());

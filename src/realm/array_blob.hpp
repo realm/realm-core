@@ -20,6 +20,8 @@
 #define REALM_ARRAY_BLOB_HPP
 
 #include <realm/array.hpp>
+#include <realm/binary_data.hpp>
+#include <realm/string_data.hpp>
 
 namespace realm {
 

@@ -22,6 +22,7 @@
 #include <realm/array.hpp>
 #include <realm/object_id.hpp>
 #include <realm/uuid.hpp>
+#include <realm/mixed.hpp>
 
 namespace realm {
 

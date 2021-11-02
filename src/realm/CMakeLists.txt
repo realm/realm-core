@@ -2,6 +2,7 @@ set(REALM_SOURCES
     # slowest to compile first
     query.cpp
     array.cpp
+    array_with_find.cpp
 
     alloc.cpp
     alloc_slab.cpp
@@ -123,6 +124,7 @@ set(REALM_INSTALL_HEADERS
     array_direct.hpp
     array_fixed_bytes.hpp
     array_integer.hpp
+    array_integer_tpl.hpp
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
