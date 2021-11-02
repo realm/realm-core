@@ -2802,5 +2802,6 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
                                                            void* userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
+RLM_API void realm_sync_manager_reset_for_testing(const realm_app_t*);
 
 #endif // REALM_H

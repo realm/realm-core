@@ -574,4 +574,10 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
         };
     (*session)->wait_for_upload_completion(std::move(cb));
 }
+
+RLM_API void realm_sync_manager_reset_for_testing(const realm_app_t* app)
+{
+    (*app)->sync_manager()->reset_for_testing();
+    app::App::clear_cached_apps();
+}
 } // namespace realm::c_api
