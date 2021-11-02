@@ -10,6 +10,9 @@
 ### Breaking changes
 * None.
 
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
 -----------
 
 ### Internals
