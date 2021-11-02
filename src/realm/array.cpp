@@ -34,7 +34,6 @@
 
 #include <realm/utilities.hpp>
 #include <realm/array.hpp>
-#include <realm/array_basic.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/bplustree.hpp>
@@ -494,17 +493,6 @@ void Array::truncate(size_t new_size)
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
 
-    // FIXME: BasicArray<> currently does not work if the width is set
-    // to zero, so it must override Array::truncate(). In the future
-    // it is expected that BasicArray<> will be improved by allowing
-    // for width to be zero when all the values are known to be zero
-    // (until the first non-zero value is added). The upshot of this
-    // would be that the size of the array in memory would remain tiny
-    // regardless of the number of elements it constains, as long as
-    // all those elements are zero.
-    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
-    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
-
     if (new_size == m_size)
         return;
 
@@ -528,10 +516,6 @@ void Array::truncate_and_destroy_children(size_t new_size)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
-
-    // FIXME: See FIXME in truncate().
-    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
-    REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
     if (new_size == m_size)
         return;
