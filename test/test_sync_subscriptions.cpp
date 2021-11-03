@@ -150,7 +150,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK(active.state() == SubscriptionSet::State::Complete);
 
         // By marking version 2 as complete version 1 will get superceded and removed.
-        CHECK_THROW(store.get_mutable_by_version(1), std::out_of_range);
+        CHECK_THROW(store.get_mutable_by_version(1), KeyNotFound);
     }
 }
 

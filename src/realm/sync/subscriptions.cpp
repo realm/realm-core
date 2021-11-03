@@ -438,12 +438,7 @@ SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
-    auto obj_key = sub_sets->find_primary_key(Mixed{version_id});
-    if (obj_key.is_unresolved()) {
-        throw std::out_of_range("No subscription set exists for specified version");
-    }
-
-    return SubscriptionSet(this, std::move(tr), sub_sets->get_object(obj_key));
+    return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }
 
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
