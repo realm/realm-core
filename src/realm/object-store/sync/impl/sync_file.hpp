@@ -70,14 +70,15 @@ public:
 
     util::Optional<std::string> get_existing_realm_file_path(const std::string& user_identity,
                                                              const std::string& local_user_identity,
-                                                             const std::string& realm_file_name) const;
+                                                             const std::string& realm_file_name,
+                                                             const std::string& partition) const;
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
     std::string realm_file_path(const std::string& user_identity, const std::string& local_user_identity,
-                                const std::string& realm_file_name) const;
+                                const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
     bool remove_realm(const std::string& user_identity, const std::string& local_identity,
-                      const std::string& realm_file_name) const;
+                      const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -135,6 +136,7 @@ private:
     std::string user_directory(const std::string& identity) const;
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& user_identity) const;
+    std::string legacy_hashed_partition_path(const std::string& user_identity, const std::string& partition) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity,
                                        const std::string& realm_file_name) const;
     std::string legacy_local_identity_path(const std::string& local_user_identity,

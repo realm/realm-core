@@ -627,13 +627,8 @@ std::vector<std::string> SyncUserMetadata::realm_file_paths() const
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->refresh();
-    std::vector<std::string> paths_out;
     Set<StringData> paths = m_obj.get_set<StringData>(m_schema.realm_file_paths_col);
-    paths_out.reserve(paths.size());
-    for (auto it = paths.begin(); it != paths.end(); ++it) {
-        paths_out.push_back(*it);
-    }
-    return paths_out;
+    return std::vector<std::string>(paths.begin(), paths.end());
 }
 
 void SyncUserMetadata::add_realm_file_path(const std::string& path)

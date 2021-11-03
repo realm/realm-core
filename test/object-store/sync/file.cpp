@@ -150,119 +150,102 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string identity = "abcdefghi";
     const std::string local_identity = "123456789";
     const std::string app_id = "test_app_id*$#@!%1";
+    const std::string partition = random_string(10);
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
     const std::string manager_path = base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/";
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
-    auto manager = SyncFileManager(base_path + "syncmanager/", app_id);
+    std::string manager_base_path = base_path + "syncmanager/";
+    auto manager = SyncFileManager(manager_base_path, app_id);
 
     SECTION("Realm path APIs") {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
-        auto expected_name = manager_path + "abcdefghi/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-        auto expected_name_with_suffix = expected_name + ".realm";
-
-        auto hashed_file_name = [](const std::string& name) -> std::string {
-            std::array<unsigned char, 32> hash;
-            util::sha256(name.data(), name.size(), hash.data());
-            return util::hex_dump(hash.data(), hash.size(), "");
-        };
+        ExpectedRealmPaths expected_paths(manager_base_path, app_id, identity, local_identity, partition,
+                                          {relative_path});
 
         SECTION("getting a Realm path") {
-            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
-            REQUIRE(expected_name_with_suffix == actual);
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
+            REQUIRE(expected_paths.current_preferred_path == actual);
         }
 
         SECTION("deleting a Realm for a valid user") {
-            manager.realm_file_path(identity, local_identity, relative_path);
+            manager.realm_file_path(identity, local_identity, relative_path, partition);
             // Create the required files
-            REQUIRE(create_dummy_realm(expected_name));
-            REQUIRE(File::exists(expected_name));
-            REQUIRE(File::exists(expected_name + ".lock"));
-            REQUIRE_DIR_EXISTS(expected_name + ".management");
+            REQUIRE(create_dummy_realm(expected_paths.current_preferred_path));
+            REQUIRE(File::exists(expected_paths.current_preferred_path));
+            REQUIRE(File::exists(expected_paths.current_preferred_path + ".lock"));
+            REQUIRE_DIR_EXISTS(expected_paths.current_preferred_path + ".management");
             // Delete the Realm
-            REQUIRE(manager.remove_realm(identity, local_identity, relative_path));
+            REQUIRE(manager.remove_realm(identity, local_identity, relative_path, partition));
             // Ensure the files don't exist anymore
-            REQUIRE(!File::exists(expected_name));
-            REQUIRE(!File::exists(expected_name + ".lock"));
-            REQUIRE_DIR_DOES_NOT_EXIST(expected_name + ".management");
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path + ".lock"));
+            REQUIRE_DIR_DOES_NOT_EXIST(expected_paths.current_preferred_path + ".management");
         }
 
         SECTION("deleting a Realm for an invalid user") {
-            REQUIRE(!manager.remove_realm("invalid_user", "invalid_ident", relative_path));
+            REQUIRE(!manager.remove_realm("invalid_user", "invalid_ident", relative_path, partition));
         }
 
         SECTION("hashed path is used if it already exists") {
-            const std::string traditional_path = expected_name_with_suffix;
-
-            const std::string hashed_path = manager_path + hashed_file_name(expected_name) + ".realm";
             util::try_make_dir(manager_path);
 
-            REQUIRE(!File::exists(hashed_path));
-            REQUIRE(!File::exists(traditional_path));
-            REQUIRE(create_dummy_realm(hashed_path));
-            REQUIRE(File::exists(hashed_path));
-            REQUIRE(!File::exists(traditional_path));
-            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
-            REQUIRE(actual == hashed_path);
-            REQUIRE(File::exists(hashed_path));
-            REQUIRE(!File::exists(traditional_path));
+            REQUIRE(!File::exists(expected_paths.fallback_hashed_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            REQUIRE(create_dummy_realm(expected_paths.fallback_hashed_path));
+            REQUIRE(File::exists(expected_paths.fallback_hashed_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
+            REQUIRE(actual == expected_paths.fallback_hashed_path);
+            REQUIRE(File::exists(expected_paths.fallback_hashed_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            manager.remove_user_realms(identity, {expected_paths.fallback_hashed_path});
+            REQUIRE(!File::exists(expected_paths.fallback_hashed_path));
         }
 
         SECTION("legacy local identity path is detected and used") {
-            const std::string traditional_path = expected_name_with_suffix;
-
-            const std::string local_id_expected_name =
-                manager_path + "123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-            const std::string local_id_expected_name_with_suffix = local_id_expected_name + ".realm";
-
             util::try_make_dir(manager_path);
             util::try_make_dir(manager_path + local_identity);
-            REQUIRE(!File::exists(local_id_expected_name));
-            REQUIRE(!File::exists(traditional_path));
-            REQUIRE(create_dummy_realm(local_id_expected_name_with_suffix));
-            REQUIRE(File::exists(local_id_expected_name_with_suffix));
-            REQUIRE(!File::exists(traditional_path));
+            REQUIRE(!File::exists(expected_paths.legacy_local_id_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            REQUIRE(create_dummy_realm(expected_paths.legacy_local_id_path));
+            REQUIRE(File::exists(expected_paths.legacy_local_id_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
 
-            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
-            REQUIRE(actual == local_id_expected_name_with_suffix);
-            REQUIRE(File::exists(local_id_expected_name_with_suffix));
-            REQUIRE(!File::exists(traditional_path));
-
-            manager.remove_user_realms(identity, {local_id_expected_name_with_suffix});
-            REQUIRE(!File::exists(local_id_expected_name_with_suffix));
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
+            REQUIRE(actual == expected_paths.legacy_local_id_path);
+            REQUIRE(File::exists(expected_paths.legacy_local_id_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            manager.remove_user_realms(identity, {expected_paths.legacy_local_id_path});
+            REQUIRE(!File::exists(expected_paths.legacy_local_id_path));
         }
 
         SECTION("legacy sync paths are detected and used") {
-            const std::string legacy_dir = "realm-object-server/";
-            const std::string old_path = manager_path + legacy_dir + local_identity +
-                                         "/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-
-            REQUIRE(!File::exists(old_path));
-            REQUIRE(!File::exists(expected_name_with_suffix));
-            util::try_make_dir(manager_path + legacy_dir);
-            util::try_make_dir(manager_path + legacy_dir + local_identity);
-            REQUIRE(create_dummy_realm(old_path));
-            REQUIRE(File::exists(old_path));
-            REQUIRE(!File::exists(expected_name_with_suffix));
-            auto actual = manager.realm_file_path(identity, local_identity, relative_path);
-            REQUIRE(actual == old_path);
-            REQUIRE(File::exists(old_path));
-            REQUIRE(!File::exists(expected_name_with_suffix));
-
-            manager.remove_user_realms(identity, {old_path});
-            REQUIRE(!File::exists(old_path));
+            REQUIRE(!File::exists(expected_paths.legacy_sync_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            for (auto& dir : expected_paths.legacy_sync_directories_to_make) {
+                util::try_make_dir(dir);
+            }
+            REQUIRE(create_dummy_realm(expected_paths.legacy_sync_path));
+            REQUIRE(File::exists(expected_paths.legacy_sync_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
+            REQUIRE(actual == expected_paths.legacy_sync_path);
+            REQUIRE(File::exists(expected_paths.legacy_sync_path));
+            REQUIRE(!File::exists(expected_paths.current_preferred_path));
+            manager.remove_user_realms(identity, {expected_paths.legacy_sync_path});
+            REQUIRE(!File::exists(expected_paths.legacy_sync_path));
         }
 
         SECTION("paths have a fallback hashed location if the preferred path is too long") {
             const std::string long_path_name = std::string(300, 'a');
             REQUIRE(long_path_name.length() > 255); // linux name length limit
-            auto actual = manager.realm_file_path(identity, local_identity, long_path_name);
+            auto actual = manager.realm_file_path(identity, local_identity, long_path_name, partition);
             REQUIRE(actual.length() < 300);
             REQUIRE(create_dummy_realm(actual));
             REQUIRE(File::exists(actual));
-
             manager.remove_user_realms(identity, {actual});
             REQUIRE(!File::exists(actual));
         }
