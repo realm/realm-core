@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Adding `Object::set_property_value(ContextType&, const Property&, ValueType, CreatePolicy)` for SDKs which have performed the property lookup.
 
 ### Fixed
 * SyncManager had some inconsistent locking which could result in data races and/or deadlocks, mostly in ways that would never be hit outside of tests doing very strange things (since v10.0.0).
