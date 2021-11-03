@@ -1365,13 +1365,15 @@ using ColInfo = std::vector<std::pair<ColKey, Table*>>;
 ColInfo get_col_info(Table* table)
 {
     std::vector<std::pair<ColKey, Table*>> cols;
-    for (auto col : table->get_column_keys()) {
-        Table* embedded_table = nullptr;
-        if (auto target_table = table->get_opposite_table(col)) {
-            if (target_table->is_embedded())
-                embedded_table = target_table.unchecked_ptr();
+    if (table) {
+        for (auto col : table->get_column_keys()) {
+            Table* embedded_table = nullptr;
+            if (auto target_table = table->get_opposite_table(col)) {
+                if (target_table->is_embedded())
+                    embedded_table = target_table.unchecked_ptr();
+            }
+            cols.emplace_back(col, embedded_table);
         }
-        cols.emplace_back(col, embedded_table);
     }
     return cols;
 }
@@ -1380,32 +1382,23 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
 {
     for (auto elem : cols) {
         auto col = elem.first;
-        if (auto embedded_table = elem.second) {
-            // The column contains links to embedded objects
-            auto cols_2 = get_col_info(embedded_table);
-            if (col.is_collection()) {
-                LinkCollectionPtr list = obj.get_linkcollection_ptr(col);
-                CollectionBase& collection_base = dynamic_cast<CollectionBase&>(*list);
-                auto sz = list->size();
-                for (size_t n = 0; n < sz; n++) {
-                    Obj embedded_obj = list->get_object(n);
-                    repl.list_insert(collection_base, n, embedded_obj.get_key(), n);
-                    generate_properties_for_obj(repl, embedded_obj, cols_2);
-                }
-            }
-            else {
-                ObjKey link = obj.get<ObjKey>(col);
-                auto embedded_obj = embedded_table->get_object(link);
-                repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), link);
-                generate_properties_for_obj(repl, embedded_obj, cols_2);
-            }
-            continue;
-        }
+        auto embedded_table = elem.second;
+        auto cols_2 = get_col_info(embedded_table);
+        auto update_embedded = [&](Mixed val) {
+            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
+            Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
+            generate_properties_for_obj(repl, embedded_obj, cols_2);
+        };
+
         if (col.is_list()) {
             auto list = obj.get_listbase_ptr(col);
             auto sz = list->size();
             for (size_t n = 0; n < sz; n++) {
-                repl.list_insert(*list, n, list->get_any(n), n);
+                auto val = list->get_any(n);
+                repl.list_insert(*list, n, val, n);
+                if (embedded_table) {
+                    update_embedded(val);
+                }
             }
         }
         else if (col.is_set()) {
@@ -1413,6 +1406,7 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
             auto sz = set->size();
             for (size_t n = 0; n < sz; n++) {
                 repl.set_insert(*set, n, set->get_any(n));
+                // Sets cannot have embedded objects
             }
         }
         else if (col.is_dictionary()) {
@@ -1420,10 +1414,17 @@ void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInf
             size_t n = 0;
             for (auto [key, value] : dict) {
                 repl.dictionary_insert(dict, n++, key, value);
+                if (embedded_table) {
+                    update_embedded(value);
+                }
             }
         }
         else {
-            repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), obj.get_any(col));
+            auto val = obj.get_any(col);
+            repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
+            if (embedded_table) {
+                update_embedded(val);
+            }
         }
     }
 }
@@ -1439,13 +1440,16 @@ void DB::create_new_history(Replication& repl)
 
         auto tr = start_write();
         tr->clear_history();
-        std::vector<TableKey> table_keys;
+
+        // We should only create entries for public tables
+        std::vector<TableKey> public_table_keys;
         for (auto tk : tr->get_table_keys()) {
             if (tr->table_is_public(tk))
-                table_keys.push_back(tk);
+                public_table_keys.push_back(tk);
         }
+
         // Create tables
-        for (auto tk : table_keys) {
+        for (auto tk : public_table_keys) {
             auto table = tr->get_table(tk);
             auto table_name = table->get_name();
             if (!table->is_embedded()) {
@@ -1466,7 +1470,7 @@ void DB::create_new_history(Replication& repl)
             }
         }
         // Create columns
-        for (auto tk : table_keys) {
+        for (auto tk : public_table_keys) {
             auto table = tr->get_table(tk);
             auto pk_col = table->get_primary_key_column();
             auto cols = table->get_column_keys();
@@ -1479,7 +1483,7 @@ void DB::create_new_history(Replication& repl)
         }
         tr->commit_and_continue_writing();
         // Now the schema should be in place - create the objects
-        for (auto tk : table_keys) {
+        for (auto tk : public_table_keys) {
             auto table = tr->get_table(tk);
             if (table->is_embedded())
                 continue;

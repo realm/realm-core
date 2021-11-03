@@ -7548,6 +7548,7 @@ TEST(Sync_UpgradeToClientHistory)
 
         auto embedded = tr->add_embedded_table("class_Embedded");
         auto col_float = embedded->add_column(type_Float, "float");
+        auto col_additional = embedded->add_column_dictionary(*embedded, "additional");
 
         auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
         auto col_list = baas->add_column_list(type_Int, "list");
@@ -7567,6 +7568,11 @@ TEST(Sync_UpgradeToClientHistory)
         auto baa = baas->create_object_with_primary_key(999).set(col_link, foo.get_key());
         auto obj = baa.create_and_set_linked_object(col_child);
         obj.set(col_float, 42.f);
+        auto additional = obj.get_dictionary(col_additional);
+        additional.create_and_insert_linked_object("One").set(col_float, 1.f);
+        additional.create_and_insert_linked_object("Two").set(col_float, 2.f);
+        additional.create_and_insert_linked_object("Three").set(col_float, 3.f);
+
         auto list = baa.get_list<Int>(col_list);
         list.add(1);
         list.add(2);
