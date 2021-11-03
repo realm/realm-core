@@ -2334,7 +2334,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
     auto server_app_config = minimal_app_config(base_url, "collections_of_links", schema);
     auto app_session = create_app(server_app_config);
     auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
-    TestSyncManager sync_manager(app_config);
+    TestSyncManager sync_manager({app_config, &app_session});
     auto app = sync_manager.app();
 
     auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
@@ -2463,6 +2463,96 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
         { // expect an empty collection
             REQUIRE(r1_source_objs.size() == 1);
             wait_for_num_outgoing_links_to_equal(r1, r1_source_objs.get(0), expected_coll_size);
+        }
+    }
+}
+
+TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf::String, cf::OID, cf::UUID,
+                   cf::BoxedOptional<cf::Int>, cf::UnboxedOptional<cf::String>, cf::BoxedOptional<cf::OID>,
+                   cf::BoxedOptional<cf::UUID>)
+{
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    const std::string partition_key_col_name = "partition_key_prop";
+    const std::string table_name = "class_partition_test_type";
+    REQUIRE(!base_url.empty());
+    auto partition_property = Property(partition_key_col_name, TestType::property_type());
+    Schema schema = {{Group::table_name_to_class_name(table_name),
+                      {
+                          {valid_pk_name, PropertyType::Int, true},
+                          partition_property,
+                      }}};
+    auto server_app_config = minimal_app_config(base_url, "partition_types_app_name", schema);
+    server_app_config.partition_key = partition_property;
+    auto app_session = create_app(server_app_config);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    TestSyncManager sync_manager({app_config, &app_session});
+    auto app = sync_manager.app();
+
+    auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
+        timed_sleeping_wait_for([&]() -> bool {
+            r->refresh();
+            TableRef dest = r->read_group().get_table(table_name);
+            size_t cur_count = dest->size();
+            return cur_count == count;
+        });
+    };
+    using T = typename TestType::Type;
+    CppContext c;
+    auto create_object = [&](realm::SharedRealm r, int64_t val, util::Any partition) {
+        r->begin_transaction();
+        auto object = Object::create(
+            c, r, Group::table_name_to_class_name(table_name),
+            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {partition_key_col_name, partition}}),
+            CreatePolicy::ForceCreate);
+        r->commit_transaction();
+    };
+
+    auto get_bson = [](T val) -> bson::Bson {
+        if constexpr (std::is_same_v<T, StringData>) {
+            return val.is_null() ? bson::Bson(util::none) : bson::Bson(val);
+        }
+        else if constexpr (TestType::is_optional) {
+            return val ? bson::Bson(*val) : bson::Bson(util::none);
+        }
+        else {
+            return bson::Bson(val);
+        }
+    };
+
+    SECTION("can round trip an object") {
+        auto values = TestType::values();
+        create_user_and_log_in(sync_manager.app());
+        auto user1 = app->current_user();
+        create_user_and_log_in(sync_manager.app());
+        auto user2 = app->current_user();
+        REQUIRE(user1);
+        REQUIRE(user2);
+        REQUIRE(user1 != user2);
+        for (T partition_value : values) {
+            SyncTestFile config1(user1, get_bson(partition_value), schema); // uses the current user created above
+            auto r1 = realm::Realm::get_shared_realm(config1);
+            Results r1_source_objs = realm::Results(r1, r1->read_group().get_table(table_name));
+
+            SyncTestFile config2(user2, get_bson(partition_value), schema); // uses the user created above
+            auto r2 = realm::Realm::get_shared_realm(config2);
+            Results r2_source_objs = realm::Results(r2, r2->read_group().get_table(table_name));
+
+            const int64_t pk_value = random_int();
+            {
+                REQUIRE(r1_source_objs.size() == 0);
+                create_object(r1, pk_value, TestType::to_any(partition_value));
+                REQUIRE(r1_source_objs.size() == 1);
+                REQUIRE(r1_source_objs.get(0).get<T>(partition_key_col_name) == partition_value);
+                REQUIRE(r1_source_objs.get(0).get<Int>(valid_pk_name) == pk_value);
+            }
+            {
+                wait_for_num_objects_to_equal(r2, table_name, 1);
+                REQUIRE(r2_source_objs.size() == 1);
+                REQUIRE(r2_source_objs.size() == 1);
+                REQUIRE(r2_source_objs.get(0).get<T>(partition_key_col_name) == partition_value);
+                REQUIRE(r2_source_objs.get(0).get<Int>(valid_pk_name) == pk_value);
+            }
         }
     }
 }
