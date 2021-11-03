@@ -1,7 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
-* None.
+* Support synthesizing client history on local realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
