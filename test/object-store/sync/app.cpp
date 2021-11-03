@@ -1566,52 +1566,51 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     auto app_session = create_app(server_app_config);
     auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
     auto partition = random_string(100);
+    TestSyncManager sync_manager(app_config, {});
+    auto app = sync_manager.app();
 
-    {
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        create_user_and_log_in(app);
-        SyncTestFile config(app, partition, schema);
-        std::cout << app->sync_manager()->path_for_realm(*config.sync_config) << std::endl;
-        auto r = Realm::get_shared_realm(config);
-        auto origin = r->read_group().get_table("class_origin");
-        auto target = r->read_group().get_table("class_target");
-        auto other_origin = r->read_group().get_table("class_other_origin");
-        auto other_target = r->read_group().get_table("class_other_target");
+    create_user_and_log_in(app);
+    auto user1 = app->current_user();
+    SyncTestFile config(user1, partition, schema);
 
-        r->begin_transaction();
-        auto o = target->create_object_with_primary_key("Baa").set("name", "Børge");
-        origin->create_object_with_primary_key(47).set("link", o.get_key());
-        other_target->create_object_with_primary_key(UUID("01234567-89ab-cdef-edcb-a98765432101"));
-        other_origin->create_object_with_primary_key(ObjectId::gen());
-        r->commit_transaction();
-        CHECK(!wait_for_upload(*r));
-        CHECK(!wait_for_download(*r));
-        advance_and_notify(*r);
-        // r->read_group().to_json(std::cout);
-    }
+    auto r1 = Realm::get_shared_realm(config);
 
-    {
-        TestSyncManager sync_manager_2(app_config, {});
-        auto app = sync_manager_2.app();
-        create_user_and_log_in(app);
+    auto origin = r1->read_group().get_table("class_origin");
+    auto target = r1->read_group().get_table("class_target");
+    auto other_origin = r1->read_group().get_table("class_other_origin");
+    auto other_target = r1->read_group().get_table("class_other_target");
 
-        local_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), bson::Bson(partition));
-        auto new_location = app->sync_manager()->path_for_realm(*local_config.sync_config);
-        std::cout << new_location << std::endl;
-        util::File::copy(local_config.path, new_location);
-        local_config.path = new_location;
-        auto realm = Realm::get_shared_realm(local_config);
+    r1->begin_transaction();
+    auto o = target->create_object_with_primary_key("Baa").set("name", "Børge");
+    origin->create_object_with_primary_key(47).set("link", o.get_key());
+    other_target->create_object_with_primary_key(UUID("01234567-89ab-cdef-edcb-a98765432101"));
+    other_origin->create_object_with_primary_key(ObjectId::gen());
+    r1->commit_transaction();
+    CHECK(!wait_for_upload(*r1));
 
-        CHECK(!wait_for_download(*realm));
-        advance_and_notify(*realm);
-        Group& g = realm->read_group();
-        // g.to_json(std::cout);
-        REQUIRE(g.get_table("class_origin")->size() == 1);
-        REQUIRE(g.get_table("class_target")->size() == 2);
-        REQUIRE(g.get_table("class_other_origin")->size() == 2);
-        REQUIRE(g.get_table("class_other_target")->size() == 2);
-    }
+    create_user_and_log_in(app);
+    auto user2 = app->current_user();
+    REQUIRE(user1 != user2);
+
+    local_config.sync_config = std::make_shared<SyncConfig>(user2, bson::Bson(partition));
+    auto new_location = app->sync_manager()->path_for_realm(*local_config.sync_config);
+    util::File::copy(local_config.path, new_location);
+    local_config.path = new_location;
+
+    auto r2 = Realm::get_shared_realm(local_config);
+
+    CHECK(!wait_for_download(*r2));
+    advance_and_notify(*r2);
+    Group& g = r2->read_group();
+    // g.to_json(std::cout);
+    REQUIRE(g.get_table("class_origin")->size() == 1);
+    REQUIRE(g.get_table("class_target")->size() == 2);
+    REQUIRE(g.get_table("class_other_origin")->size() == 2);
+    REQUIRE(g.get_table("class_other_target")->size() == 2);
+
+    CHECK(!wait_for_download(*r1));
+    advance_and_notify(*r1);
+    // r1->read_group().to_json(std::cout);
 }
 
 TEST_CASE("app: set new embedded object", "[sync][app]") {
