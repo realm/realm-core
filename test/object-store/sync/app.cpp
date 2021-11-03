@@ -1935,10 +1935,18 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 // Prior to the fix for #4941, this callback would be called from an infinite loop, always in the
                 // WaitingForAccessToken state.
                 switch (session->state()) {
-                    case SyncSession::State::Active: puts("state: Active"); break;
-                    case SyncSession::State::Inactive: puts("state: Inactive"); break;
-                    case SyncSession::State::Dying: puts("state: Dying"); break;
-                    case SyncSession::State::WaitingForAccessToken: puts("state: WaitingForAccessToken"); break;
+                    case SyncSession::State::Active:
+                        puts("state: Active");
+                        break;
+                    case SyncSession::State::Inactive:
+                        puts("state: Inactive");
+                        break;
+                    case SyncSession::State::Dying:
+                        puts("state: Dying");
+                        break;
+                    case SyncSession::State::WaitingForAccessToken:
+                        puts("state: WaitingForAccessToken");
+                        break;
                 }
             }
             return util::none; // send all requests through http

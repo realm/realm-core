@@ -300,7 +300,8 @@ public:
     /// @param service_name The name of the cluster
     app::MongoClient mongo_client(const std::string& service_name) REQUIRES(!m_mutex);
 
-    void set_seconds_to_adjust_time_for_testing(int seconds) {
+    void set_seconds_to_adjust_time_for_testing(int seconds)
+    {
         m_seconds_to_adjust_time_for_testing.store(seconds);
     }
 
