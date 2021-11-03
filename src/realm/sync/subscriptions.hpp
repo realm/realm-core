@@ -255,7 +255,7 @@ public:
     const SubscriptionSet get_active() const;
 
     // To be used internally by the sync client. This returns a mutable view of a subscription set by its
-    // version ID. If there is no SubscriptionSet with that version ID, this throws std::out_of_range.
+    // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_mutable_by_version(int64_t version_id);
 
 private:
