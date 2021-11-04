@@ -9,7 +9,6 @@
 #include <unordered_map>
 #include <set>
 
-#include <realm/util/string_view.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/backtrace.hpp>

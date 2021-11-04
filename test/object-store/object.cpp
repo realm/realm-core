@@ -1673,6 +1673,10 @@ TEST_CASE("object") {
         link_table->create_object_with_primary_key(0);
         Object linkobj(r, *r->schema().find("link target"), *link_table->begin());
 
+        auto property = *r->schema().find("all types")->property_for_name("int");
+        obj.set_property_value(d, property, util::Any(INT64_C(6)));
+        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, property)) == 6);
+
         obj.set_property_value(d, "bool", util::Any(true));
         REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
 

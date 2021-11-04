@@ -980,7 +980,7 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
         AllocationMetricNameScope scope{g_log_compaction_metric};
         compact_changesets(changesets.data(), changesets.size());
 
-        util::AppendBuffer<char> encode_buffer;
+        ChangesetEncoder::Buffer encode_buffer;
         for (std::size_t i = 0; i < changesets.size(); ++i) {
             auto& changeset = changesets[i];
             encode_changeset(changeset, encode_buffer); // Throws
@@ -1364,7 +1364,7 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
                            compact_bootstrap_changesets.size()); // Throws
 
 
-        util::AppendBuffer<char> buffer;
+        ChangesetEncoder::Buffer buffer;
         for (std::size_t i = 0; i < num_compactable_changesets_this_iteration; ++i) {
             buffer.clear();
             encode_changeset(compact_bootstrap_changesets[i], buffer);
@@ -1652,7 +1652,7 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
             entry.origin_file_ident = changeset.origin_file_ident;
             entry.remote_version = changeset.version;
 
-            util::AppendBuffer<char> changeset_buffer;
+            ChangesetEncoder::Buffer changeset_buffer;
 
             TempShortCircuitReplication tdr{*this}; // Short-circuit while integrating changes
             InstructionApplier applier{transaction};
@@ -2634,7 +2634,7 @@ void ServerHistory::fixup_state_and_changesets_for_assigned_file_ident(Transacti
             }
         }
 
-        util::AppendBuffer<char> modified;
+        ChangesetEncoder::Buffer modified;
         encode_changeset(log, modified);
         BinaryData result = BinaryData{modified.data(), modified.size()};
         m_acc->sh_changesets.set(i, result);

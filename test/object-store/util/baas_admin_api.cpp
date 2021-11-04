@@ -182,10 +182,11 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& o
     auto& prop_sub_obj = schema_json["properties"];
     if (m_include_prop(m_partition_key) && prop_sub_obj.find(m_partition_key.name) == prop_sub_obj.end()) {
         prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key));
-        if (!m_partition_key.type_is_nullable()) {
+        if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }
     }
+    std::string test = schema_json.dump();
     return {
         {"database", m_mongo_db_name},
         {"collection", obj_schema.name},
@@ -847,7 +848,7 @@ AppSession create_app(const AppCreateConfig& config)
                    {
                        {"key", config.partition_key.name},
                        {"type", property_type_to_bson_type_str(config.partition_key.type)},
-                       {"required", false},
+                       {"required", !is_nullable(config.partition_key.type)},
                        {"permissions",
                         {
                             {"read", true},

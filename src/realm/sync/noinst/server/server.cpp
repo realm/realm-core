@@ -22,7 +22,6 @@
 #include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
 #include <realm/util/value_reset_guard.hpp>
 #include <realm/util/scope_exit.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/memory_stream.hpp>
 #include <realm/util/random.hpp>
@@ -132,16 +131,16 @@ std::string short_token_fmt(const std::string& str, size_t cutoff = 30)
 
 class HttpListHeaderValueParser {
 public:
-    HttpListHeaderValueParser(util::StringView string) noexcept
+    HttpListHeaderValueParser(std::string_view string) noexcept
         : m_string{string}
     {
     }
-    bool next(util::StringView& elem) noexcept
+    bool next(std::string_view& elem) noexcept
     {
         while (m_pos < m_string.size()) {
             size_type i = m_pos;
             size_type j = m_string.find(',', i);
-            if (j != util::StringView::npos) {
+            if (j != std::string_view::npos) {
                 m_pos = j + 1;
             }
             else {
@@ -164,8 +163,8 @@ public:
     }
 
 private:
-    using size_type = util::StringView::size_type;
-    const util::StringView m_string;
+    using size_type = std::string_view::size_type;
+    const std::string_view m_string;
     size_type m_pos = 0;
     static bool is_http_lws(char ch) noexcept
     {
@@ -1532,7 +1531,7 @@ public:
     }
 
     void websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                           const util::StringView*) final override
+                                           const std::string_view*) final override
     {
         // WebSocket class has already logged a message for this error
         close_due_to_error(ec); // Throws
@@ -2016,18 +2015,18 @@ private:
             util::MemoryInputStream in;
             in.imbue(std::locale::classic());
             in.unsetf(std::ios_base::skipws);
-            util::StringView value;
+            std::string_view value;
             if (sec_websocket_protocol)
                 value = *sec_websocket_protocol;
             HttpListHeaderValueParser parser{value};
-            util::StringView elem;
+            std::string_view elem;
             while (parser.next(elem)) {
-                util::StringView prefix = get_websocket_protocol_prefix();
+                std::string_view prefix = get_websocket_protocol_prefix();
                 // FIXME: Use std::string_view::begins_with() in C++20.
                 bool begins_with = (elem.size() >= prefix.size() &&
                                     std::equal(elem.data(), elem.data() + prefix.size(), prefix.data()));
                 if (begins_with) {
-                    auto parse_version = [&](util::StringView str) {
+                    auto parse_version = [&](std::string_view str) {
                         in.set_buffer(str.data(), str.data() + str.size());
                         int version = 0;
                         in >> version;
@@ -2036,9 +2035,9 @@ private:
                         return -1;
                     };
                     int min, max;
-                    util::StringView range = elem.substr(prefix.size());
+                    std::string_view range = elem.substr(prefix.size());
                     auto i = range.find('-');
-                    if (i != util::StringView::npos) {
+                    if (i != std::string_view::npos) {
                         min = parse_version(range.substr(0, i));
                         max = parse_version(range.substr(i + 1));
                     }
@@ -2128,7 +2127,7 @@ private:
                 format_ranges(protocol_version_ranges); // Throws
                 logger.error("Protocol version negotiation failed: %1 "
                              "(client supports: %2)",
-                             elaboration, util::StringView(formatter.data(), formatter.size())); // Throws
+                             elaboration, std::string_view(formatter.data(), formatter.size())); // Throws
                 metrics().increment("protocol.mismatch");                                        // Throws
                 if (extra_metrics_key)
                     metrics().increment(extra_metrics_key); // Throws
@@ -2155,7 +2154,7 @@ private:
                          negotiated_protocol_version); // Throws
             formatter.reset();
             // FIXME: Simplify this when Metrics::increment() is changed to
-            // take a util::StringView argument (no need to add a null byte).
+            // take a std::string_view argument (no need to add a null byte).
             formatter << "protocol.used,"
                          "version="
                       << negotiated_protocol_version << '\0'; // Throws
@@ -2226,7 +2225,7 @@ private:
         m_http_server.async_send_response(*response, std::move(handler));
     }
 
-    void handle_text_response(HTTPStatus http_status, util::StringView body)
+    void handle_text_response(HTTPStatus http_status, std::string_view body)
     {
         std::string body_2 = std::string(body); // Throws
 
@@ -2366,7 +2365,7 @@ private:
         handle_404_not_found(request); // Throws
     }
 
-    void handle_400_bad_request(util::StringView body)
+    void handle_400_bad_request(std::string_view body)
     {
         logger.detail("400 Bad Request");
         handle_text_response(HTTPStatus::BadRequest, body); // Throws
@@ -2379,7 +2378,7 @@ private:
                              "Realm sync server\n\nPage not found\n"); // Throws
     }
 
-    void handle_503_service_unavailable(const HTTPRequest&, util::StringView message)
+    void handle_503_service_unavailable(const HTTPRequest&, std::string_view message)
     {
         logger.debug("503 Service Unavailable");                       // Throws
         handle_text_response(HTTPStatus::ServiceUnavailable, message); // Throws

@@ -779,8 +779,8 @@ private:
         else
             ec = Error::bad_response_unexpected_status_code;
 
-        util::StringView body;
-        util::StringView* body_ptr = nullptr;
+        std::string_view body;
+        std::string_view* body_ptr = nullptr;
         if (response.body) {
             body = *response.body;
             body_ptr = &body;
@@ -796,8 +796,8 @@ private:
                        "HTTP response = \n%1",
                        response);
         std::error_code ec = Error::bad_response_header_protocol_violation;
-        util::StringView body;
-        util::StringView* body_ptr = nullptr;
+        std::string_view body;
+        std::string_view* body_ptr = nullptr;
         if (response.body) {
             body = *response.body;
             body_ptr = &body;

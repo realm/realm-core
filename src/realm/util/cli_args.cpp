@@ -1,4 +1,7 @@
 #include "realm/util/cli_args.hpp"
+#include <string>
+#include <errno.h>
+#include <algorithm>
 
 namespace realm::util {
 
@@ -7,7 +10,7 @@ CliArgumentParser::ParseResult CliArgumentParser::parse(int argc, const char** a
     ParseResult result;
     result.program_name = argv[0];
     for (int i = 1; i < argc; ++i) {
-        StringView cur_arg(argv[i]);
+        std::string_view cur_arg(argv[i]);
 
         auto it = std::find_if(m_flags.begin(), m_flags.end(), [&](const auto& flag) {
             if (cur_arg.size() < 2 || cur_arg.front() != '-') {
@@ -30,11 +33,11 @@ CliArgumentParser::ParseResult CliArgumentParser::parse(int argc, const char** a
 
         CliFlag* arg_holder = *it;
         if (!arg_holder->expects_value()) {
-            arg_holder->assign(StringView{});
+            arg_holder->assign(std::string_view{});
             continue;
         }
 
-        if (auto eq_pos = cur_arg.find_first_of('='); eq_pos != StringView::npos && eq_pos < cur_arg.size()) {
+        if (auto eq_pos = cur_arg.find_first_of('='); eq_pos != std::string_view::npos && eq_pos < cur_arg.size()) {
             arg_holder->assign(cur_arg.substr(eq_pos + 1));
         }
         else {
@@ -42,7 +45,7 @@ CliArgumentParser::ParseResult CliArgumentParser::parse(int argc, const char** a
             if (i == argc) {
                 throw CliParseException("not enough arguments to parse argument with value");
             }
-            arg_holder->assign(StringView(argv[i]));
+            arg_holder->assign(std::string_view(argv[i]));
         }
     }
 
@@ -57,7 +60,7 @@ void CliArgumentParser::add_argument(CliFlag* flag)
 template <>
 std::string CliArgument::as<std::string>() const
 {
-    return static_cast<std::string>(m_value);
+    return std::string{m_value};
 }
 
 template <>
