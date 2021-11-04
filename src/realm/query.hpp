@@ -289,6 +289,11 @@ public:
     int set_threads(unsigned int threadcount);
 #endif
 
+    const ConstTableRef& get_table() const noexcept
+    {
+        return m_table;
+    }
+
     ConstTableRef& get_table()
     {
         return m_table;
