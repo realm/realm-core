@@ -198,36 +198,6 @@ void fix_test_libexec_path(const char* argv_0)
 }
 */
 
-void fix_async_daemon_path()
-{
-// `setenv()` is POSIX. _WIN32 has `_putenv_s()` instead.
-#ifndef _WIN32
-    const char* async_daemon;
-    // When running the unit-tests in Xcode, it runs them
-    // in its own temporary directory. So we have to make sure we
-    // look for the daemon there
-    const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
-    if (xcode_env) {
-#ifdef REALM_DEBUG
-        async_daemon = "realmd-dbg-noinst";
-#else
-        async_daemon = "realmd-noinst";
-#endif
-    }
-    else {
-#ifdef REALM_COVER
-        async_daemon = "../src/realm/realmd-cov-noinst";
-#else
-#ifdef REALM_DEBUG
-        async_daemon = "../src/realm/realmd-dbg-noinst";
-#else
-        async_daemon = "../src/realm/realmd-noinst";
-#endif
-#endif
-    }
-#endif // _WIN32
-}
-
 void set_random_seed()
 {
     // Select random seed for the random generator that some of our unit tests are using
@@ -607,7 +577,6 @@ int test_all(int argc, char* argv[], util::Logger* logger, bool disable_all_sync
 
     fix_max_open_files();
     // fix_test_libexec_path(argv[0]);
-    fix_async_daemon_path();
 
     display_build_config();
 

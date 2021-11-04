@@ -167,17 +167,6 @@ DWORD winfork(std::string unit_test_name)
 
 namespace {
 
-// async deamon does not start when launching unit tests from osx, so async is currently disabled on osx.
-// Also: async requires interprocess communication, which does not work with our current encryption support.
-#if !defined(_WIN32) && !REALM_PLATFORM_APPLE
-#if REALM_ANDROID || defined DISABLE_ASYNC || REALM_ENABLE_ENCRYPTION
-bool allow_async = false;
-#else
-bool allow_async = true;
-#endif
-#endif
-
-
 namespace {
 
 std::vector<ColKey> test_table_add_columns(TableRef t)
