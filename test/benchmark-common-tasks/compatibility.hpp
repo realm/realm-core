@@ -26,8 +26,7 @@ namespace compatibility {
 /// benchmark test.
 enum class RealmDurability {
     Full,
-    MemOnly,
-    Async
+    MemOnly
 };
 
 #ifdef REALM_CLUSTER_IF
