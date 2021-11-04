@@ -124,6 +124,11 @@ app::AppError failed_log_in(std::shared_ptr<App> app,
     return *err;
 }
 
+} // namespace
+
+
+#if REALM_ENABLE_AUTH_TESTS
+
 static std::string HMAC_SHA256(std::string_view key, std::string_view data)
 {
 #if REALM_PLATFORM_APPLE
@@ -187,11 +192,6 @@ std::string create_jwt(const std::string appId)
 
     return jwtPayload + "." + encodedSignatureStr;
 }
-
-} // namespace
-
-
-#if REALM_ENABLE_AUTH_TESTS
 
 // MARK: - Login with Credentials Tests
 
