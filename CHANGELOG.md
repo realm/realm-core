@@ -19,6 +19,7 @@
 ### Internals
 * ConstTableView and TableView are merged into just TableView. TableView::front(), TableView::back(), TableView::remove() and TableView::remove_last() function are removed as they were not used outside tests.
 * The client file UUID has been removed as it was no longer being used for anything.
+* Added type to manage flexible sync subscriptions. [#5005](https://github.com/realm/realm-core/pull/5005)
 
 ----------------------------------------------
 
