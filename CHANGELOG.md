@@ -1,15 +1,11 @@
-# NEXT RELEASE
+# 11.6.0 Release notes
 
 ### Enhancements
 * Adding `Object::set_property_value(ContextType&, const Property&, ValueType, CreatePolicy)` for SDKs which have performed the property lookup.
 
 ### Fixed
-* SyncManager had some inconsistent locking which could result in data races and/or deadlocks, mostly in ways that would never be hit outside of tests doing very strange things (since v10.0.0).
-* Reduce the peak memory usage of changeset uploading by eliminating an extra copy of each changeset which was held in memory.
-* Streaming download notifiers reported incorrect values for transferrable bytes (since 11.5.2).
-
-### Breaking changes
-* None.
+* SyncManager had some inconsistent locking which could result in data races and/or deadlocks, mostly in ways that would never be hit outside of tests doing very strange things ([#4999](https://github.com/realm/realm-core/pull/4999),since v10.0.0).
+* Streaming download notifiers reported incorrect values for transferrable bytes ([#5008](https://github.com/realm/realm-core/pull/5008), since 11.5.2).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -19,6 +15,7 @@
 ### Internals
 * ConstTableView and TableView are merged into just TableView. TableView::front(), TableView::back(), TableView::remove() and TableView::remove_last() function are removed as they were not used outside tests.
 * The client file UUID has been removed as it was no longer being used for anything.
+* Reduce the peak memory usage of changeset uploading by eliminating an extra copy of each changeset which was held in memory.
 
 ----------------------------------------------
 
