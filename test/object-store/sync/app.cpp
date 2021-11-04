@@ -1925,36 +1925,23 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
-        std::vector<SyncSession::State> seen_states;
+        bool seen_waiting_for_access_token = false;
         transport->hook = [&](const Request) -> util::Optional<Response> {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto session : user->all_sessions()) {
-                seen_states.push_back(session->state());
-
                 // Prior to the fix for #4941, this callback would be called from an infinite loop, always in the
                 // WaitingForAccessToken state.
-                switch (session->state()) {
-                    case SyncSession::State::Active:
-                        puts("state: Active");
-                        break;
-                    case SyncSession::State::Inactive:
-                        puts("state: Inactive");
-                        break;
-                    case SyncSession::State::Dying:
-                        puts("state: Dying");
-                        break;
-                    case SyncSession::State::WaitingForAccessToken:
-                        puts("state: WaitingForAccessToken");
-                        break;
+                if (session->state() == SyncSession::State::WaitingForAccessToken) {
+                    REQUIRE(!seen_waiting_for_access_token);
+                    seen_waiting_for_access_token = true;
                 }
             }
             return util::none; // send all requests through http
         };
         SyncTestFile config(app, partition, schema);
         auto r = Realm::get_shared_realm(config);
-        REQUIRE(std::find(begin(seen_states), end(seen_states), SyncSession::State::WaitingForAccessToken) !=
-                end(seen_states));
+        REQUIRE(seen_waiting_for_access_token);
         Results dogs = get_dogs(r);
         REQUIRE(dogs.size() == 1);
         REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
@@ -2002,19 +1989,21 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         SECTION("Expired Access Token is Refreshed") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
-            std::vector<SyncSession::State> seen_states;
+            bool seen_waiting_for_access_token = false;
             transport->hook = [&](const Request) -> util::Optional<Response> {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto session : user->all_sessions()) {
-                    seen_states.push_back(session->state());
+                    if (session->state() == SyncSession::State::WaitingForAccessToken) {
+                        REQUIRE(!seen_waiting_for_access_token);
+                        seen_waiting_for_access_token = true;
+                    }
                 }
                 return util::none; // send all requests through http
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
-            REQUIRE(std::find(begin(seen_states), end(seen_states), SyncSession::State::WaitingForAccessToken) !=
-                    end(seen_states));
+            REQUIRE(seen_waiting_for_access_token);
             Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
