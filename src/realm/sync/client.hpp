@@ -12,14 +12,13 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network.hpp>
 #include <realm/sync/client_base.hpp>
 
 namespace realm::sync {
 
 class Client {
 public:
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = sync::port_type;
 
     using Error = ClientError;
 
@@ -163,7 +162,7 @@ class BadServerUrl; // Exception
 class Session {
 public:
     using ErrorInfo = SessionErrorInfo;
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = sync::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
