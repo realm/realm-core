@@ -22,7 +22,6 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/network.hpp>
 
 #include <functional>
 #include <memory>
@@ -50,6 +49,7 @@ enum class SimplifiedProtocolError {
 };
 
 namespace sync {
+using port_type = std::uint_fast16_t;
 enum class ProtocolError;
 }
 
@@ -126,7 +126,7 @@ enum class SyncSessionStopPolicy {
 
 struct SyncConfig {
     struct ProxyConfig {
-        using port_type = util::network::Endpoint::port_type;
+        using port_type = sync::port_type;
         enum class Type { HTTP, HTTPS } type;
         std::string address;
         port_type port;
