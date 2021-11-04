@@ -225,7 +225,6 @@ void fix_async_daemon_path()
 #endif
 #endif
     }
-    setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32
 }
 

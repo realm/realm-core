@@ -446,15 +446,7 @@ private:
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
-#ifdef REALM_ASYNC_DAEMON
-    util::InterprocessMutex m_balancemutex;
-#endif
     util::InterprocessMutex m_controlmutex;
-#ifdef REALM_ASYNC_DAEMON
-    util::InterprocessCondVar m_room_to_write;
-    util::InterprocessCondVar m_work_to_do;
-    util::InterprocessCondVar m_daemon_becomes_ready;
-#endif
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
