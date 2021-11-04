@@ -1593,10 +1593,6 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     REQUIRE(user1 != user2);
 
     local_config.sync_config = std::make_shared<SyncConfig>(user2, bson::Bson(partition));
-    auto new_location = app->sync_manager()->path_for_realm(*local_config.sync_config);
-    util::File::copy(local_config.path, new_location);
-    local_config.path = new_location;
-
     auto r2 = Realm::get_shared_realm(local_config);
 
     CHECK(!wait_for_download(*r2));

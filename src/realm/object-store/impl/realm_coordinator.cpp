@@ -332,6 +332,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     auto initialization_function = std::move(config.initialization_function);
     auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
+    config.path = m_config.path; // Path may have changed
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
@@ -528,6 +529,15 @@ void RealmCoordinator::open_db()
 #if REALM_ENABLE_SYNC
     catch (IncompatibleHistories const&) {
         REALM_ASSERT_RELEASE(server_synchronization_mode);
+        auto new_location = m_config.sync_config->user->sync_manager()->path_for_realm(*m_config.sync_config);
+        if (new_location != m_config.path) {
+            if (util::File::exists(new_location)) {
+                throw std::runtime_error(
+                    util::format("Conversion to synced realm not possible. File already exists: %1", new_location));
+            }
+            util::File::copy(m_config.path, new_location);
+            m_config.path = new_location;
+        }
         m_db = DB::create(make_in_realm_history(), m_config.path, options);
         m_db->create_new_history(sync::make_client_replication());
     }
