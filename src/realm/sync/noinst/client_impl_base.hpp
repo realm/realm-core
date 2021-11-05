@@ -31,7 +31,7 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, util::network::Endpoint::port_type, std::string>;
+using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, util::network::Endpoint::port_type>;
 
 class SessionWrapper;
 
@@ -306,10 +306,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 class ClientImpl::Connection final : public util::websocket::EZObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
-    using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
-
-    using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
-                                   size_t pem_size, int preverify_ok, int depth);
+    using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImpl::ReconnectInfo;
 
