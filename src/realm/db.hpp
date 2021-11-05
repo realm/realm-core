@@ -489,8 +489,7 @@ private:
     void open(BinaryData, bool take_ownership = true);
     void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
 
-
-    void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
+    void do_open(const std::string& file, bool no_create, const DBOptions options);
 
     Replication* const* get_repl() const noexcept
     {

@@ -625,7 +625,7 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, const DBOptions options)
+void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -1138,8 +1138,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         break;
     }
 
-    static_cast<void>(is_backend);
-
     // Upgrade file format and/or history schema
     try {
         if (stored_hist_schema_version == -1) {
@@ -1179,15 +1177,6 @@ void DB::open(BinaryData buffer, bool take_ownership)
         m_alloc.own_buffer();
 }
 
-void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
-{
-    // Exception safety: Since open() is called from constructors, if it throws,
-    // it must leave the file closed.
-
-    bool is_backend = false;
-    do_open(path, no_create_file, is_backend, options); // Throws
-}
-
 void DB::open(Replication& repl, const std::string& file, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
@@ -1200,8 +1189,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions option
     set_replication(&repl);
 
     bool no_create = false;
-    bool is_backend = false;
-    do_open(file, no_create, is_backend, options); // Throws
+    open(file, no_create, options); // Throws
 }
 
 
