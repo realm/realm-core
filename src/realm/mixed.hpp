@@ -228,6 +228,12 @@ public:
     {
         return compare(other) >= 0;
     }
+
+    Mixed operator+(const Mixed&) const;
+    Mixed operator-(const Mixed&) const;
+    Mixed operator*(const Mixed&) const;
+    Mixed operator/(const Mixed&) const;
+
     size_t hash() const;
     StringData get_index_data(std::array<char, 16>&) const;
     void use_buffer(std::string& buf);

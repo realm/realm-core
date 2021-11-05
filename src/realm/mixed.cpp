@@ -390,10 +390,6 @@ T Mixed::export_to_type() const noexcept
     return T();
 }
 
-template int64_t Mixed::export_to_type<int64_t>() const noexcept;
-template float Mixed::export_to_type<float>() const noexcept;
-template double Mixed::export_to_type<double>() const noexcept;
-
 template <>
 util::Optional<int64_t> Mixed::get<util::Optional<int64_t>>() const noexcept
 {
@@ -448,6 +444,99 @@ util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
     return get<UUID>();
 }
 
+static DataType get_common_type(DataType t1, DataType t2)
+{
+    // FIXME: only a few types supported
+    if (t1 == t2)
+        return t1;
+    if (t1 == type_Decimal || t2 == type_Decimal)
+        return type_Decimal;
+    if (t1 == type_Double || t2 == type_Double)
+        return type_Double;
+    if (t1 == type_Float || t2 == type_Float)
+        return type_Float;
+    return type_Int;
+}
+
+Mixed Mixed::operator+(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() + rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() + rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() + rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() + rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+Mixed Mixed::operator-(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() - rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() - rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() - rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() - rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+Mixed Mixed::operator*(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() * rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() * rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() * rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() * rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+Mixed Mixed::operator/(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() / rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() / rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() / rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() / rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
 
 size_t Mixed::hash() const
 {

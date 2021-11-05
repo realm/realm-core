@@ -168,7 +168,7 @@ TEST(Query_NextGenSyntax)
     Table untyped;
     auto c0 = untyped.add_column(type_Int, "firs1");
     auto c1 = untyped.add_column(type_Float, "second");
-    auto c2 = untyped.add_column(type_Double, "third");
+    untyped.add_column(type_Double, "third");
     auto c3 = untyped.add_column(type_Bool, "third2");
     auto c4 = untyped.add_column(type_String, "fourth");
     ObjKey k0 = untyped.create_object().set_all(20, 19.9f, 3.0, true, "hello").get_key();
@@ -207,7 +207,7 @@ TEST(Query_NextGenSyntax)
     match = (false == untyped.column<bool>(c3)).find();
     CHECK_EQUAL(match, k1);
 
-    match = (20.3 > untyped.column<double>(c2) + 2).find();
+    match = untyped.query("10 + 10.3 > third + 2").find();
     CHECK_EQUAL(match, k0);
 
 
@@ -215,49 +215,49 @@ TEST(Query_NextGenSyntax)
     CHECK_EQUAL(match, realm::null_key);
 
     // Left condition makes first row non-match
-    match = (untyped.column<float>(c1) + 1 > 21 && untyped.column<double>(c2) > 2).find();
+    match = untyped.query("second + 1 > 21 && third > 1 + 1").find();
     CHECK_EQUAL(match, k1);
 
     // Right condition makes first row a non-match
-    match = (untyped.column<float>(c1) > 10 && untyped.column<double>(c2) > 3.5).find();
+    match = untyped.query("second > 10 && third > 1.5 + 1 * 2").find();
     CHECK_EQUAL(match, k1);
 
     // Both make first row match
-    match = (untyped.column<float>(c1) < 20 && untyped.column<double>(c2) > 2).find();
+    match = untyped.query("second < 20 && third > 2").find();
     CHECK_EQUAL(match, k0);
 
     // Both make first row non-match
-    match = (untyped.column<float>(c1) > 20 && untyped.column<double>(c2) > 3.5).find();
+    match = untyped.query("second > 20 && third > 3.5").find();
     CHECK_EQUAL(match, k1);
 
     // Left cond match 0, right match 1
-    match = (untyped.column<float>(c1) < 20 && untyped.column<double>(c2) > 3.5).find();
+    match = untyped.query("second < 20 && third > 3.5").find();
     CHECK_EQUAL(match, realm::null_key);
 
     // Left match 1, right match 0
-    match = (untyped.column<float>(c1) > 20 && untyped.column<double>(c2) < 3.5).find();
+    match = untyped.query("second > 20 && third < 3.5").find();
     CHECK_EQUAL(match, realm::null_key);
 
     // Untyped ||
 
     // Left match 0
-    match = (untyped.column<float>(c1) < 20 || untyped.column<double>(c2) < 3.5).find();
+    match = untyped.query("second < 20 || third < 3.5").find();
     CHECK_EQUAL(match, k0);
 
     // Right match 0
-    match = (untyped.column<float>(c1) > 20 || untyped.column<double>(c2) < 3.5).find();
+    match = untyped.query("second > 20 || third < 3.5").find();
     CHECK_EQUAL(match, k0);
 
     // Left match 1
 
-    match = (untyped.column<float>(c1) > 20 || untyped.column<double>(c2) > 9.5).find();
+    match = untyped.query("second > 20 || third > 9.5").find();
 
     CHECK_EQUAL(match, k1);
 
-    Query q4 = untyped.column<float>(c1) + untyped.column<int64_t>(c0) > 40;
+    Query q4 = untyped.query("second + firs1 > 40");
 
 
-    Query q5 = 20 < untyped.column<float>(c1);
+    Query q5 = untyped.query("20 < second");
 
     match = q4.and_query(q5).find();
     CHECK_EQUAL(match, k1);
@@ -281,36 +281,29 @@ TEST(Query_NextGenSyntax)
     match = q99.find();
     CHECK_EQUAL(match, k0);
 
-
-    Query q8 = 1 > untyped.column<float>(c1) + 5;
+    Query q8 = untyped.query("1 > second + 5");
     match = q8.find();
     CHECK_EQUAL(match, null_key);
 
-    Query q3 = untyped.column<float>(c1) + untyped.column<int64_t>(c0) > 10 + untyped.column<int64_t>(c0);
+    Query q3 = untyped.query("second + firs1 > 10 + firs1");
     match = q3.find();
 
     match = q2.find();
     CHECK_EQUAL(match, k0);
 
-    match = (untyped.column<int64_t>(c0) + untyped.column<float>(c1) > 40).find();
+    match = untyped.query("firs1 + second > 40").find();
     CHECK_EQUAL(match, k1);
 
-    match = (untyped.column<int64_t>(c0) + untyped.column<float>(c1) < 40).find();
+    match = untyped.query("firs1 + second < 40").find();
     CHECK_EQUAL(match, k0);
 
-    match = (untyped.column<float>(c1) <= untyped.column<int64_t>(c0)).find();
+    match = untyped.query("second <= firs1").find();
     CHECK_EQUAL(match, k0);
 
-    match = (untyped.column<int64_t>(c0) + untyped.column<float>(c1) >=
-             untyped.column<int64_t>(c0) + untyped.column<float>(c1))
-                .find();
+    match = untyped.query("firs1 + second >= firs1 + second").find();
     CHECK_EQUAL(match, k0);
 
-    // Untyped, column objects
-    Columns<int64_t> u0 = untyped.column<int64_t>(c0);
-    Columns<float> u1 = untyped.column<float>(c1);
-
-    match = (u0 + u1 > 40).find();
+    match = untyped.query("firs1 + second > 40").find();
     CHECK_EQUAL(match, k1);
 }
 
@@ -784,9 +777,7 @@ TEST(Query_NextGenSyntaxMonkey)
         CHECK_EQUAL(tvpos, tv.size());
 
 
-        // first * 2 > second / 2 + third + 1
-        realm::Query q21 = table.column<int64_t>(col_int0) * 2 >
-                           table.column<int64_t>(col_int1) / 2 + table.column<int64_t>(col_int2) + 1;
+        realm::Query q21 = table.query("first * 2 > second / 2 + third + 1");
         tv = q21.find_all();
         tvpos = 0;
         for (Obj o : table) {
@@ -797,15 +788,8 @@ TEST(Query_NextGenSyntaxMonkey)
         }
         CHECK_EQUAL(tvpos, tv.size());
 
-        // first * 2 > second / 2 + third + 1 + third - third + third - third + third - third + third - third + third
-        // - third
-        realm::Query q22 = table.column<int64_t>(col_int0) * 2 >
-                           table.column<int64_t>(col_int1) / 2 + table.column<int64_t>(col_int2) + 1 +
-                               table.column<int64_t>(col_int2) - table.column<int64_t>(col_int2) +
-                               table.column<int64_t>(col_int2) - table.column<int64_t>(col_int2) +
-                               table.column<int64_t>(col_int2) - table.column<int64_t>(col_int2) +
-                               table.column<int64_t>(col_int2) - table.column<int64_t>(col_int2) +
-                               table.column<int64_t>(col_int2) - table.column<int64_t>(col_int2);
+        realm::Query q22 = table.query("first * 2 > second / 2 + third + 1 + third - third + third - third + third - "
+                                       "third + third - third + third - third");
         tv = q22.find_all();
         tvpos = 0;
         for (Obj o : table) {
@@ -1255,8 +1239,8 @@ TEST(Query_Expressions0)
     Many of them are combined and tested together in equality classes below
     */
     Table table;
-    auto col_int = table.add_column(type_Int, "first1");
-    auto col_float = table.add_column(type_Float, "second1");
+    auto col_int = table.add_column(type_Int, "first");
+    auto col_float = table.add_column(type_Float, "second");
     auto col_double = table.add_column(type_Double, "third");
 
 
@@ -1274,7 +1258,7 @@ TEST(Query_Expressions0)
     **/
 
     // 20 must convert to float
-    match = (second + 0.2f > 20).find();
+    match = table.query("second + 0.2 > 20").find();
     CHECK_EQUAL(match, key0);
 
     match = (first >= 20.0f).find();
@@ -1289,15 +1273,15 @@ TEST(Query_Expressions0)
     CHECK_EQUAL(match, key1);
 
     // 20 and 40 must convert to float
-    match = (second + 20 > 40).find();
+    match = table.query("second + 20 > 40").find();
     CHECK_EQUAL(match, key1);
 
     // first and 40 must convert to float
-    match = (second + first >= 40).find();
+    match = table.query("second + first >= 40").find();
     CHECK_EQUAL(match, key1);
 
     // 20 must convert to float
-    match = (0.2f + second > 20).find();
+    match = table.query("0.2f + second > 20").find();
     CHECK_EQUAL(match, key0);
 
     /**
@@ -1305,22 +1289,22 @@ TEST(Query_Expressions0)
     **/
 
     // Compare, left = Subexpr, right = Value
-    match = (second + first >= 40).find();
+    match = table.query("second + first >= 40").find();
     CHECK_EQUAL(match, key1);
 
-    match = (second + first > 40).find();
+    match = table.query("second + first > 40").find();
     CHECK_EQUAL(match, key1);
 
-    match = (first - second < 0).find();
+    match = table.query("first - second < 0").find();
     CHECK_EQUAL(match, key1);
 
-    match = (second - second == 0).find();
+    match = table.query("second - second == 0").find();
     CHECK_EQUAL(match, key0);
 
-    match = (first - second <= 0).find();
+    match = table.query("first - second <= 0").find();
     CHECK_EQUAL(match, key1);
 
-    match = (first * first != 400).find();
+    match = table.query("first * first != 400").find();
     CHECK_EQUAL(match, null_key);
 
     // Compare, left = Column, right = Value
@@ -1362,22 +1346,22 @@ TEST(Query_Expressions0)
     CHECK_EQUAL(match, key0);
 
     // Compare, left = Subexpr, right = Value
-    match = (40 <= second + first).find();
+    match = table.query("40 <= second + first").find();
     CHECK_EQUAL(match, key1);
 
-    match = (40 < second + first).find();
+    match = table.query("40 < second + first").find();
     CHECK_EQUAL(match, key1);
 
-    match = (0 > first - second).find();
+    match = table.query("0 > first - second").find();
     CHECK_EQUAL(match, key1);
 
-    match = (0 == second - second).find();
+    match = table.query("0 == second - second").find();
     CHECK_EQUAL(match, key0);
 
-    match = (0 >= first - second).find();
+    match = table.query("0 >= first - second").find();
     CHECK_EQUAL(match, key1);
 
-    match = (400 != first * first).find();
+    match = table.query("400 != first * first").find();
     CHECK_EQUAL(match, null_key);
 
     // Col compare Col
@@ -1400,38 +1384,41 @@ TEST(Query_Expressions0)
     CHECK_EQUAL(match, key1);
 
     // Subexpr compare Subexpr
-    match = (second + 0 > first + 0).find();
+    match = table.query("second + 0 > first + 0").find();
     CHECK_EQUAL(match, key1);
 
-    match = (second + 0 >= first + 0).find();
+    match = table.query("second + 0 >= first + 0").find();
     CHECK_EQUAL(match, key1);
 
-    match = (second + 0 == first + 0).find();
+    match = table.query("second + 0 == first + 0").find();
     CHECK_EQUAL(match, null_key);
 
-    match = (second + 0 != second + 0).find();
+    match = table.query("second + 0 != second + 0").find();
     CHECK_EQUAL(match, null_key);
 
-    match = (first + 0 < second + 0).find();
+    match = table.query("first + 0 < second + 0").find();
     CHECK_EQUAL(match, key1);
 
-    match = (first + 0 <= second + 0).find();
+    match = table.query("first + 0 <= second + 0").find();
     CHECK_EQUAL(match, key1);
 
     // Conversions, again
     table.clear();
-    key0 = table.create_object().set_all(20, 3.0f, 3.0).get_key();
+    key0 = table.create_object().set_all(17, 3.0f, 3.0).get_key();
 
-    match = (1 / second == 1 / second).find();
+    match = table.query("1 / second == 1 / second").find();
     CHECK_EQUAL(match, key0);
 
-    match = (1 / third == 1 / third).find();
+    match = table.query("1 / third == 1 / third").find();
     CHECK_EQUAL(match, key0);
 
     // Nifty test: Compare operator must preserve precision of each side, hence NO match; if double accidentially
     // was truncated to float, or float was rounded to nearest double, then this test would fail.
-    match = (1 / second == 1 / third).find();
+    match = table.query("1 / second == 1 / third").find();
     CHECK_EQUAL(match, null_key);
+
+    match = table.query("first / 2 == 8").find();
+    CHECK_EQUAL(match, key0);
 
     // For `float < int_column` we had a bug where int was promoted to float instead of double.
     table.clear();

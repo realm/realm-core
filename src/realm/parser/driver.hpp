@@ -57,26 +57,38 @@ public:
         }
         children = newChildren;
     }
+private:
+    virtual std::string get_operator() const = 0;
 };
 
 class AndNode : public LogicalNode {
 public:
     using LogicalNode::LogicalNode;
     Query visit(ParserDriver*);
+private:
+    std::string get_operator() const override
+    {
+        return " && ";
+    }
 };
 
 class OrNode : public LogicalNode {
 public:
     using LogicalNode::LogicalNode;
     Query visit(ParserDriver*);
+private:
+    std::string get_operator() const override
+    {
+        return " || ";
+    }
 };
 
 class NotNode : public QueryNode {
 public:
-    QueryNode* atom_pred = nullptr;
+    QueryNode* query = nullptr;
 
-    NotNode(QueryNode* expr)
-        : atom_pred(expr)
+    NotNode(QueryNode* q)
+        : query(q)
     {
     }
     Query visit(ParserDriver*) override;
@@ -95,6 +107,39 @@ public:
     static constexpr int CONTAINS = 8;
     static constexpr int LIKE = 9;
     static constexpr int IN = 10;
+
+#ifdef REALM_DEBUG
+    static std::string to_string(int id)
+    {
+        switch (id) {
+            case 0:
+                return "==";
+            case 1:
+                return "!=";
+            case 2:
+                return ">";
+            case 3:
+                return "<";
+            case 4:
+                return ">=";
+            case 5:
+                return "<=";
+            case 6:
+                return " BEGINSWITH ";
+            case 7:
+                return " ENDSWITH ";
+            case 8:
+                return " CONTAINS ";
+            case 9:
+                return " LIKE ";
+            case 10:
+                return " IN ";
+            default:
+                break;
+        }
+        return "??";
+    }
+#endif
 };
 
 class ConstantNode : public ParserNode {
@@ -148,7 +193,16 @@ public:
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
 };
 
-class ValueNode : public ParserNode {
+class ExpressionNode : public ParserNode {
+public:
+    virtual bool is_constant()
+    {
+        return false;
+    }
+    virtual std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) = 0;
+};
+
+class ValueNode : public ExpressionNode {
 public:
     ConstantNode* constant = nullptr;
     PropertyNode* prop = nullptr;
@@ -161,15 +215,49 @@ public:
         : prop(node)
     {
     }
+    bool is_constant() final
+    {
+        return constant != nullptr;
+    }
+    ConstantNode* get_constant()
+    {
+        REALM_ASSERT(is_constant());
+        return constant;
+    }
+
+    std::unique_ptr<Subexpr> visit(ParserDriver* drv, DataType type) override
+    {
+        if (prop)
+            return prop->visit(drv);
+        return constant->visit(drv, type);
+    }
+};
+
+class OperationNode : public ExpressionNode {
+public:
+    ExpressionNode* m_left;
+    ExpressionNode* m_right;
+    char m_op;
+    OperationNode(ExpressionNode* left, char op, ExpressionNode* right)
+        : m_left(left)
+        , m_right(right)
+        , m_op(op)
+    {
+    }
+    bool is_constant() final
+    {
+        return m_left->is_constant() && m_right->is_constant();
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
 };
 
 class EqualityNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<ExpressionNode*> values;
     int op;
     bool case_sensitive = true;
 
-    EqualityNode(ValueNode* left, int t, ValueNode* right)
+    EqualityNode(ExpressionNode* left, int t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -180,10 +268,10 @@ public:
 
 class RelationalNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<ExpressionNode*> values;
     int op;
 
-    RelationalNode(ValueNode* left, int t, ValueNode* right)
+    RelationalNode(ExpressionNode* left, int t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -207,7 +295,7 @@ public:
 
 class StringOpsNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<ExpressionNode*> values;
     int op;
     bool case_sensitive = true;
 
@@ -397,6 +485,7 @@ public:
 // Conducting the whole scanning and parsing of Calc++.
 class ParserDriver {
 public:
+    using SubexprPtr = std::unique_ptr<Subexpr>;
     class ParserNodeStore {
     public:
         template <typename T, typename... Args>
@@ -447,8 +536,8 @@ public:
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
-    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
-    std::unique_ptr<Subexpr> column(LinkChain&, std::string);
+    std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
+    SubexprPtr column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
     std::string translate(LinkChain&, const std::string&);
 

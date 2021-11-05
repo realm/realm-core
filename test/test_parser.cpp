@@ -5125,5 +5125,32 @@ TEST(Parser_Logical)
     verify_query(test_context, t, "id1 == 5 && (id2 == 10 || id1 == 7) && id3 == 15", 1);
     verify_query(test_context, t, "!id1 == 5 && !(id2 == 12) && !id3 == 12", 7);
 }
+    
+TEST(Parser_Arithmetic)
+{
+    Group g;
+    TableRef person = g.add_table_with_primary_key("person", type_String, "name");
+    ColKey col_age = person->add_column(type_Int, "age");
+    ColKey col_spouse = person->add_column(*person, "spouse");
+
+    auto per = person->create_object_with_primary_key("Per").set(col_age, 42);
+    auto poul = person->create_object_with_primary_key("Poul").set(col_age, 25);
+    auto anne = person->create_object_with_primary_key("Anne").set(col_age, 40);
+    auto andrea = person->create_object_with_primary_key("Andrea").set(col_age, 27);
+    per.set(col_spouse, anne.get_key());
+    poul.set(col_spouse, andrea.get_key());
+    anne.set(col_spouse, per.get_key());
+    andrea.set(col_spouse, poul.get_key());
+
+    verify_query(test_context, person, "2 * age > 60", 2);
+    verify_query(test_context, person, "2 * age + 5 == 55", 1);
+    verify_query(test_context, person, "2 * (age - 5) == 70", 1);
+    verify_query(test_context, person, "age / 3 == 14", 1);
+    verify_query(test_context, person, "age == (10 + 11)*2", 1);
+    verify_query(test_context, person, "age > spouse.age + 1", 2);
+
+    std::vector<Mixed> args = {2, 50};
+    verify_query_sub(test_context, person, "age * $0 == $1", args, 1);
+}
 
 #endif // TEST_PARSER

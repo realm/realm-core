@@ -1920,7 +1920,7 @@ TEST(Query_NullShowcase)
     CHECK(equals(tv, {1, 2}));
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
-    tv = (price + shipping < 100).find_all();
+    tv = table->query("Price + Shipping < 100").find_all();
     CHECK(equals(tv, {2}));
 
     //  null < 0 == false
@@ -1940,10 +1940,10 @@ TEST(Query_NullShowcase)
     tv = (price > rating).find_all();
     CHECK(equals(tv, {1, 2}));
 
-    tv = (price + rating == null()).find_all();
+    tv = table->query("Price + Rating == null").find_all();
     CHECK(equals(tv, {0}));
 
-    tv = (price + rating != null()).find_all();
+    tv = table->query("Price + Rating != null").find_all();
     CHECK(equals(tv, {1, 2}));
 
 
@@ -1998,7 +1998,7 @@ TEST(Query_NullShowcase)
     // You can also compare against user-given null with > and <, but only in the expression syntax!
     tv = (price > null()).find_all();
     CHECK(equals(tv, {}));
-    tv = (price + rating > null()).find_all();
+    tv = table->query("Price + Rating > null").find_all();
     CHECK(equals(tv, {}));
 
     // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
@@ -2341,7 +2341,7 @@ TEST(Query_Null_Two_Columns)
 
     // integer + null == null
     // note: booleans can convert to 0 and 1 when compared agaist numeric values, like in c++
-    tv = (price + shipping == stock).find_all();
+    tv = table->query("Price + Shipping == Stock").find_all();
     CHECK(equals(tv, {1}));
 
     // Test a few untested things
@@ -3069,7 +3069,8 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->link(col_linktest).column<Int>(col_int) * 2 == table2->column<Int>(col_int2);
+    std::string link_prop = table2->get_column_name(col_linktest);
+    q = table2->query(link_prop + ".int * 2 == int");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -3077,7 +3078,7 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 
     // Rows 1 and 2 should match this query as 2 * 2 == 4.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(col_int2) == 2 * table2->link(col_linktest).column<Int>(col_int);
+    q = table2->query("int == 2 * " + link_prop + ".int");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -3085,7 +3086,7 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->link(col_linktest).column<Double>(col_dbl) * 2 == table2->column<Int>(col_int2);
+    q = table2->query(link_prop + ".double * 2 == int");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -3093,7 +3094,7 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 
     // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
     // Row 0 should not as the multiplication will not produce any results.
-    q = table2->column<Int>(col_int2) == 2 * table2->link(col_linktest).column<Double>(col_dbl);
+    q = table2->query("int == 2 * " + link_prop + ".double");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(k1, tv.get_key(0));
@@ -4417,7 +4418,7 @@ TEST(Query_ArrayLeafRelocate)
 
         Query q1 = (contact->link(col_link).column<Int>(col_int) == 0);
         Query q2 = contact_type->where().equal(col_int, 0);
-        Query q3 = (contact_type->column<Int>(col_int) + contact_type->column<Int>(col_int) == 0);
+        Query q3 = contact_type->query("id + id == 0");
         Query q4 = (contact_type->column<Int>(col_int) == 0);
         Query q5 = (contact_type->column<String>(col_str) == "hejsa");
 
@@ -4531,7 +4532,7 @@ TEST(Query_ColumnDeletionExpression)
     obj0.set(col_bin6, BinaryData("Binary", 6));
 
     // Expression
-    auto q = foo.column<Int>(col_int0) == foo.column<Int>(col_int1) + 1;
+    auto q = foo.query("a == b + 1");
     // TwoColumnsNode
     auto q1 = foo.column<Int>(col_int0) == foo.column<Int>(col_int1);
     TableView tv = q.find_all();
