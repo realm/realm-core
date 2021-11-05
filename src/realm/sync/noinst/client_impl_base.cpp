@@ -418,13 +418,6 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
 }
 
 
-bool Connection::websocket_pong_message_received(const char* data, std::size_t size)
-{
-    handle_pong_received(data, size);
-    return bool(m_websocket);
-}
-
-
 bool Connection::websocket_close_message_received(std::error_code error_code, StringData message)
 {
     if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
@@ -955,14 +948,6 @@ void Connection::handle_message_received(const char* data, std::size_t size)
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
     get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data, size));
-}
-
-
-void Connection::handle_pong_received(const char* data, std::size_t size)
-{
-    // parse_pong_received() parses the pong and calls the proper handler on the
-    // Connection object (this).
-    get_client_protocol().parse_pong_received<Connection>(*this, std::string_view(data, size));
 }
 
 

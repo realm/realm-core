@@ -82,7 +82,6 @@ public:
     /// websocket object is destroyed during execution of the function.
     virtual bool websocket_binary_message_received(const char* data, size_t size) = 0;
     virtual bool websocket_close_message_received(std::error_code error_code, StringData message) = 0;
-    virtual bool websocket_pong_message_received(const char* data, size_t size) = 0;
     //@}
 
 protected:
