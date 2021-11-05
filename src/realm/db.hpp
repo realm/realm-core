@@ -369,8 +369,6 @@ public:
         Management,
         Note,
         Log,
-        LogA, // This is a legacy version of `Log`.
-        LogB, // This is a legacy version of `Log`.
     };
 
     /// Get the path for the given type of file for a base Realm file path.
