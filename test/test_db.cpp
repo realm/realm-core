@@ -37,6 +37,4 @@ TEST(DB_getCoreFiles_adding_path)
     CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Management), path + extension_management);
     CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Note), path + extension_note);
     CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Log), path + extension_log);
-    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::LogA), path + extension_log_a);
-    CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::LogB), path + extension_log_b);
 }
