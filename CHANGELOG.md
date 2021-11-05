@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Added type to manage flexible sync subscriptions. [#5005](https://github.com/realm/realm-core/pull/5005)
 
 ----------------------------------------------
 

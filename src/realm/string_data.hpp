@@ -100,6 +100,8 @@ public:
     template <class T, class A>
     StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
+    StringData(std::string_view sv);
+
     StringData(const null&) noexcept;
 
     /// Initialize from a zero terminated C style string. Pass null to construct
@@ -197,6 +199,12 @@ inline StringData::StringData(const char* external_data, size_t data_size) noexc
     , m_size(data_size)
 {
     REALM_ASSERT_DEBUG(external_data || data_size == 0);
+}
+
+inline StringData::StringData(std::string_view sv)
+    : m_data(sv.data())
+    , m_size(sv.size())
+{
 }
 
 template <class T, class A>
