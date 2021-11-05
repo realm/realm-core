@@ -208,7 +208,6 @@ private:
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
     const port_type m_server_port;
-    const std::string m_multiplex_ident;
     const std::string m_authorization_header_name;
     const std::map<std::string, std::string> m_custom_http_headers;
     const bool m_verify_servers_ssl_certificate;
@@ -293,8 +292,7 @@ private:
     std::int_fast64_t m_staged_upload_mark = 0, m_staged_download_mark = 0;
     std::int_fast64_t m_reached_upload_mark = 0, m_reached_download_mark = 0;
 
-    void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port,
-                     std::string multiplex_ident);
+    void do_initiate(ProtocolEnvelope, std::string server_address, port_type server_port);
 
     void on_sync_progress();
     void on_upload_completion();
@@ -726,7 +724,6 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
-    , m_multiplex_ident{std::move(config.multiplex_ident)}
     , m_authorization_header_name{config.authorization_header_name}
     , m_custom_http_headers{config.custom_http_headers}
     , m_verify_servers_ssl_certificate{config.verify_servers_ssl_certificate}
@@ -792,7 +789,7 @@ inline void SessionWrapper::initiate()
     // lightweight (when many share a single connection). The original idea was
     // that all connection related information is passed directly from the
     // caller of initiate() to the connection constructor.
-    do_initiate(m_protocol_envelope, m_server_address, m_server_port, m_multiplex_ident); // Throws
+    do_initiate(m_protocol_envelope, m_server_address, m_server_port); // Throws
 }
 
 
@@ -801,7 +798,7 @@ inline void SessionWrapper::initiate(ProtocolEnvelope protocol, std::string serv
 {
     m_virt_path = std::move(virt_path);
     m_signed_access_token = std::move(signed_access_token);
-    do_initiate(protocol, std::move(server_address), server_port, m_multiplex_ident); // Throws
+    do_initiate(protocol, std::move(server_address), server_port); // Throws
 }
 
 
@@ -1092,11 +1089,10 @@ inline void SessionWrapper::report_sync_transact(VersionID old_version, VersionI
         m_sync_transact_handler(old_version, new_version); // Throws
 }
 
-void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port,
-                                 std::string multiplex_ident)
+void SessionWrapper::do_initiate(ProtocolEnvelope protocol, std::string server_address, port_type server_port)
 {
     REALM_ASSERT(!m_initiated);
-    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port, std::move(multiplex_ident)};
+    ServerEndpoint server_endpoint{protocol, std::move(server_address), server_port};
     m_client.register_unactualized_session_wrapper(this, std::move(server_endpoint)); // Throws
     m_initiated = true;
 }

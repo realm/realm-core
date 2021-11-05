@@ -221,17 +221,6 @@ public:
         /// authorization_header_name must be set to anther value.
         std::map<std::string, std::string> custom_http_headers;
 
-        /// Sessions can be multiplexed over the same TCP/SSL connection.
-        /// Sessions might share connection if they have identical server_address,
-        /// server_port, and protocol. multiplex_ident is a parameter that allows
-        /// finer control over session multiplexing. If two sessions have distinct
-        /// multiplex_ident, they will never share connection. The typical use of
-        /// multilex_ident is to give sessions with incompatible SSL requirements
-        /// distinct multiplex_idents.
-        /// multiplex_ident can be any string and the value has no meaning except
-        /// for partitioning the sessions.
-        std::string multiplex_ident;
-
         /// Controls whether the server certificate is verified for SSL
         /// connections. It should generally be true in production.
         bool verify_servers_ssl_certificate = true;

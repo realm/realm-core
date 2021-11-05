@@ -509,7 +509,6 @@ void SyncSession::do_create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
-    session_config.multiplex_ident = m_multiplex_identity;
     {
         std::string sync_route = m_sync_manager->sync_route();
 
@@ -814,11 +813,6 @@ uint64_t SyncSession::register_connection_change_callback(std::function<Connecti
 void SyncSession::unregister_connection_change_callback(uint64_t token)
 {
     m_connection_change_notifier.remove_callback(token);
-}
-
-void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
-{
-    m_multiplex_identity = std::move(multiplex_identity);
 }
 
 SyncSession::~SyncSession() {}
