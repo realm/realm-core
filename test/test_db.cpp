@@ -29,8 +29,6 @@ TEST(DB_getCoreFiles_adding_path)
     auto extension_management = ".management";
     auto extension_note = ".note";
     auto extension_log = ".log";
-    auto extension_log_a = ".log_a";
-    auto extension_log_b = ".log_b";
 
     CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Lock), path + extension_lock);
     CHECK_EQUAL(DB::get_core_file(path, DB::CoreFileType::Storage), path + extension_storage);
