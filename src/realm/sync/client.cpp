@@ -189,7 +189,6 @@ public:
     bool wait_for_download_complete_or_client_stopped();
 
     void refresh(std::string signed_access_token);
-    void override_server(std::string address, port_type port);
 
     static void abandon(util::bind_ptr<SessionWrapper>) noexcept;
 
@@ -305,7 +304,6 @@ private:
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
     void report_progress();
-    void change_server_endpoint(ServerEndpoint);
 
     friend class SessionWrapperStack;
     friend class ClientImpl::Session;
@@ -984,27 +982,6 @@ void SessionWrapper::refresh(std::string signed_access_token)
 }
 
 
-void SessionWrapper::override_server(std::string address, port_type port)
-{
-    // Thread safety required
-    REALM_ASSERT(m_initiated);
-
-    util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), address = std::move(address), port] {
-        REALM_ASSERT(self->m_actualized);
-        if (REALM_UNLIKELY(!self->m_sess))
-            return; // Already finalized
-        SessionImpl& sess = *self->m_sess;
-        ClientImpl::Connection& conn = sess.get_connection();
-        ServerEndpoint endpoint = conn.get_server_endpoint(); // Throws (copy)
-        std::get<1>(endpoint) = std::move(address);
-        std::get<2>(endpoint) = port;
-        self->change_server_endpoint(std::move(endpoint)); // Throws
-    };
-    m_client.get_service().post(std::move(handler)); // Throws
-}
-
-
 inline void SessionWrapper::abandon(util::bind_ptr<SessionWrapper> wrapper) noexcept
 {
     if (wrapper->m_initiated) {
@@ -1245,70 +1222,6 @@ void SessionWrapper::report_progress()
                        snapshot_version);
 }
 
-
-void SessionWrapper::change_server_endpoint(ServerEndpoint endpoint)
-{
-    REALM_ASSERT(m_actualized);
-    REALM_ASSERT(m_sess);
-
-    SessionImpl& old_sess = *m_sess;
-    ClientImpl::Connection& old_conn = old_sess.get_connection();
-
-    bool was_created = false;
-    ClientImpl::Connection& new_conn = m_client.get_connection(
-        std::move(endpoint), m_authorization_header_name, m_custom_http_headers, m_verify_servers_ssl_certificate,
-        m_ssl_trust_certificate_path, m_ssl_verify_callback, m_proxy_config,
-        was_created); // Throws
-    try {
-        if (&new_conn == &old_conn) {
-            REALM_ASSERT(!was_created);
-            return;
-        }
-
-        if (m_connection_state_change_listener) {
-            ConnectionState state = old_conn.get_state();
-            if (state != ConnectionState::disconnected) {
-                std::error_code ec = ClientError::connection_closed;
-                bool is_fatal = false;
-                std::string detailed_message = ec.message(); // Throws (copy)
-                SessionErrorInfo error_info{ec, is_fatal, detailed_message};
-                m_connection_state_change_listener(ConnectionState::disconnected,
-                                                   &error_info); // Throws
-            }
-        }
-
-        // FIXME: This only makes sense when each session uses a separate connection.
-        new_conn.update_connect_info(m_http_request_path_prefix, m_virt_path,
-                                     m_signed_access_token); // Throws
-        std::unique_ptr<SessionImpl> new_sess_2 = std::make_unique<SessionImpl>(*this, new_conn); // Throws
-        SessionImpl& new_sess = *new_sess_2;
-        new_sess.logger.detail("Rebinding '%1' to '%2'", m_db->get_path(),
-                               m_virt_path);              // Throws
-        new_conn.activate_session(std::move(new_sess_2)); // Throws
-
-        m_sess = &new_sess;
-    }
-    catch (...) {
-        if (was_created)
-            m_client.remove_connection(new_conn);
-        throw;
-    }
-
-    old_conn.initiate_session_deactivation(&old_sess); // Throws
-
-    if (was_created)
-        new_conn.activate(); // Throws
-
-    if (m_connection_state_change_listener) {
-        ConnectionState state = new_conn.get_state();
-        if (state != ConnectionState::disconnected) {
-            m_connection_state_change_listener(ConnectionState::connecting, nullptr); // Throws
-            if (state == ConnectionState::connected)
-                m_connection_state_change_listener(ConnectionState::connected, nullptr); // Throws
-        }
-    }
-}
-
 // ################ ClientImpl::Connection ################
 
 ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ident, ServerEndpoint endpoint,
@@ -1544,12 +1457,6 @@ bool Session::wait_for_download_complete_or_client_stopped()
 void Session::refresh(std::string signed_access_token)
 {
     m_impl->refresh(signed_access_token); // Throws
-}
-
-
-void Session::override_server(std::string address, port_type port)
-{
-    m_impl->override_server(address, port); // Throws
 }
 
 

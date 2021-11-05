@@ -718,9 +718,6 @@ public:
     /// thread, and by multiple threads concurrently.
     void cancel_reconnect_delay();
 
-    /// \brief Change address of server for this session.
-    void override_server(std::string address, port_type);
-
 private:
     SessionWrapper* m_impl = nullptr;
 
