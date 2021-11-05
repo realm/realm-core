@@ -1320,8 +1320,6 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
                                    Optional<ProxyConfig> proxy_config, ReconnectInfo reconnect_info)
     : logger{make_logger_prefix(ident), client.logger} // Throws
     , m_client{client}
-    , m_read_ahead_buffer{} // Throws
-    , m_websocket{*this}    // Throws
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
     , m_port{std::get<2>(endpoint)}
@@ -1388,15 +1386,6 @@ std::string ClientImpl::Connection::get_http_request_path() const
 {
     std::string path = m_http_request_path_prefix; // Throws (copy)
     return path;
-}
-
-
-void ClientImpl::Connection::set_http_request_headers(HTTPHeaders& headers)
-{
-    headers[m_authorization_header_name] = _impl::make_authorization_header(m_signed_access_token); // Throws
-
-    for (auto const& header : m_custom_http_headers)
-        headers[header.first] = header.second;
 }
 
 

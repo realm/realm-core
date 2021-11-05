@@ -655,6 +655,7 @@ let headers: [String] = [
     "realm/util/utf8.hpp",
     "realm/util/value_reset_guard.hpp",
     "realm/util/websocket.hpp",
+    "realm/util/ez_websocket.hpp",
     "realm/utilities.hpp",
     "realm/uuid.hpp",
     "realm/version.hpp",

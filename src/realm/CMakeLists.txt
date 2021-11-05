@@ -103,7 +103,6 @@ set(UTIL_SOURCES
     util/resource_limits.cpp
     util/substitute.cpp
     util/uri.cpp
-    util/websocket.cpp
 )
 
 set(REALM_INSTALL_HEADERS

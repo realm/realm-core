@@ -15,7 +15,7 @@
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/util/ez_websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -160,6 +160,7 @@ private:
     const std::string m_user_agent_string;
     util::network::Service m_service;
     std::mt19937_64 m_random;
+    util::websocket::EZSocketFactory m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
@@ -276,11 +277,9 @@ static_assert(ClientImpl::get_oldest_supported_protocol_version() <= get_current
 /// terminated. This is used to determinte the delay until the next connection
 /// initiation attempt.
 enum class ClientImpl::ConnectionTerminationReason {
-    resolve_operation_canceled,        ///< Resolve operation (DNS) aborted by client
     resolve_operation_failed,          ///< Failure during resolve operation (DNS)
-    connect_operation_canceled,        ///< TCP connect operation aborted by client
     connect_operation_failed,          ///< Failure during TCP connect operation
-    closed_voluntarily,                ///< Voluntarily closed after successful connect operation
+    closed_voluntarily,                ///< Voluntarily closed or connection operation canceled
     premature_end_of_input,            ///< Premature end of input (before ERROR message was received)
     read_or_write_error,               ///< Read/write error after successful TCP connect operation
     http_tunnel_failed,                ///< Failure to establish HTTP tunnel with proxy
@@ -304,7 +303,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
-class ClientImpl::Connection final : public util::websocket::Config {
+class ClientImpl::Connection final : public util::websocket::EZObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
     using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
@@ -313,8 +312,6 @@ public:
                                    size_t pem_size, int preverify_ok, int depth);
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImpl::ReconnectInfo;
-    using ReadCompletionHandler = util::websocket::ReadCompletionHandler;
-    using WriteCompletionHandler = util::websocket::WriteCompletionHandler;
 
     util::PrefixLogger logger;
 
@@ -381,13 +378,12 @@ public:
     /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
-    // Overriding methods in util::websocket::Config
-    util::Logger& websocket_get_logger() noexcept override;
-    std::mt19937_64& websocket_get_random() noexcept override;
-    void async_read(char*, std::size_t, ReadCompletionHandler) override;
-    void async_read_until(char*, std::size_t, char, ReadCompletionHandler) override;
-    void async_write(const char*, std::size_t, WriteCompletionHandler) override;
+    // Overriding methods in util::websocket::EZObserver
     void websocket_handshake_completion_handler(const util::HTTPHeaders&) override;
+    void websocket_tcp_connect_error_handler(std::error_code) override;
+    void websocket_resolve_error_handler(std::error_code) override;
+    void websocket_http_tunnel_error_handler(std::error_code) override;
+    void websocket_ssl_handshake_error_handler(std::error_code) override;
     void websocket_read_error_handler(std::error_code) override;
     void websocket_write_error_handler(std::error_code) override;
     void websocket_handshake_error_handler(std::error_code, const util::HTTPHeaders*,
@@ -441,25 +437,12 @@ private:
 
     std::string get_http_request_path() const;
 
-    /// The application can override this function to set custom headers. The
-    /// default implementation sets no headers.
-    void set_http_request_headers(util::HTTPHeaders&);
-
     void initiate_reconnect_wait();
     void handle_reconnect_wait(std::error_code);
     void initiate_reconnect();
     void initiate_connect_wait();
     void handle_connect_wait(std::error_code);
-    void initiate_resolve();
-    void handle_resolve(std::error_code, util::network::Endpoint::List);
-    void initiate_tcp_connect(util::network::Endpoint::List, std::size_t);
-    void handle_tcp_connect(std::error_code, util::network::Endpoint::List, std::size_t);
-    void initiate_http_tunnel();
-    void handle_http_tunnel(std::error_code);
-    void initiate_websocket_or_ssl_handshake();
-    void initiate_ssl_handshake();
-    void handle_ssl_handshake(std::error_code);
-    void initiate_websocket_handshake();
+
     void handle_connection_established();
     void schedule_urgent_ping();
     void initiate_ping_delay(milliseconds_type now);
@@ -476,10 +459,6 @@ private:
     void handle_pong_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
-    void resolve_error(std::error_code);
-    void tcp_connect_error(std::error_code);
-    void http_tunnel_error(std::error_code);
-    void ssl_handshake_error(std::error_code);
     void read_error(std::error_code);
     void write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code);
@@ -519,12 +498,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    util::Optional<util::network::Resolver> m_resolver;
-    util::Optional<util::network::Socket> m_socket;
-    util::Optional<util::network::ssl::Context> m_ssl_context;
-    util::Optional<util::network::ssl::Stream> m_ssl_stream;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
-    util::websocket::Socket m_websocket;
+    std::unique_ptr<util::websocket::EZSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -533,7 +507,6 @@ private:
     const util::Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SSLVerifyCallback> m_ssl_verify_callback;
     const util::Optional<ProxyConfig> m_proxy_config;
-    util::Optional<util::HTTPClient<Connection>> m_proxy_client;
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
 
@@ -1287,8 +1260,6 @@ inline auto ClientImpl::Connection::get_session(session_ident_type ident) const 
 inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason reason) noexcept
 {
     switch (reason) {
-        case ConnectionTerminationReason::resolve_operation_canceled:
-        case ConnectionTerminationReason::connect_operation_canceled:
         case ConnectionTerminationReason::closed_voluntarily:
             return true;
         case ConnectionTerminationReason::resolve_operation_failed:
