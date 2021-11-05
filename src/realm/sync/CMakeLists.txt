@@ -18,6 +18,7 @@ set(SYNC_SOURCES
     instructions.cpp
     object_id.cpp
     protocol.cpp
+    subscriptions.cpp
     transform.cpp
     ../util/network_ssl.cpp
     ../util/network.cpp
@@ -41,6 +42,7 @@ set(SYNC_INSTALL_HEADERS
     instructions.hpp
     object_id.hpp
     protocol.hpp
+    subscriptions.hpp
     transform.hpp
 )
 

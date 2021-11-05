@@ -53,7 +53,7 @@ case $(uname -s) in
             ubuntu)
                 MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-4.4.1.tgz"
                 STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_patch_20e2e4201581e8a98e0f1eb87c62e23e985c7e15_608c2a54c9ec44445262d94b_21_04_30_16_03_33/libmongo-ubuntu2004-x86_64.so"
-                STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-v4.4/stitch-support/ubuntu2004/03d22bb5884e280934d36702136d99a9363fb720/stitch-support-4.4.2-rc0-3-g03d22bb.tgz"
+                STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-v4.4/stitch-support/ubuntu2004/58971da1ef93435a9f62bf4708a81713def6e88c/stitch-support-4.4.9-73-g58971da.tgz"
             ;;
             rhel)
                 case $DISTRO_VERSION_MAJOR in
