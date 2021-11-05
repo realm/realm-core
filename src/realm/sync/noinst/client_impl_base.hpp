@@ -391,7 +391,6 @@ public:
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
-    bool websocket_pong_message_received(const char*, std::size_t) override;
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
@@ -456,7 +455,6 @@ private:
     void initiate_write_ping(const OutputBuffer&);
     void handle_write_ping();
     void handle_message_received(const char* data, std::size_t size);
-    void handle_pong_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
     void read_error(std::error_code);

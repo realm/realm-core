@@ -205,25 +205,6 @@ public:
 
     // Messages received by the client.
 
-    // parse_pong_received takes a (WebSocket) pong and parses it.
-    // The result of the parsing is handled by an object of type Connection.
-    // Typically, Connection would be the Connection class from client.cpp
-    template <typename Connection>
-    void parse_pong_received(Connection& connection, std::string_view msg_data)
-    {
-        util::Logger& logger = connection.logger;
-
-        HeaderLineParser msg(msg_data);
-        try {
-            auto timestamp = msg.read_next<milliseconds_type>('\n');
-            connection.receive_pong(timestamp);
-        }
-        catch (const ProtocolCodecException& e) {
-            logger.error("Bad syntax in input message '%1': %2", msg_data, e.what());
-            connection.handle_protocol_error(Error::bad_syntax); // throws
-        }
-    }
-
     // parse_message_received takes a (WebSocket) message and parses it.
     // The result of the parsing is handled by an object of type Connection.
     // Typically, Connection would be the Connection class from client.cpp

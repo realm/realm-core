@@ -69,10 +69,6 @@ private:
     {
         return m_observer.websocket_binary_message_received(ptr, size);
     }
-    bool websocket_pong_message_received(const char* ptr, std::size_t size) override
-    {
-        return m_observer.websocket_pong_message_received(ptr, size);
-    }
 
     void initiate_resolve();
     void handle_resolve(std::error_code, util::network::Endpoint::List);
