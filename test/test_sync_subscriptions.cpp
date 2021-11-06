@@ -238,6 +238,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
     CHECK_NOT(notification_futures[3].is_ready());
     sub_set = store.get_mutable_by_version(4);
+    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     sub_set.update_state(SubscriptionSet::State::Error, error_msg);
     sub_set.commit();
 
