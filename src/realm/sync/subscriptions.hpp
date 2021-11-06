@@ -26,6 +26,7 @@
 #include "realm/util/future.hpp"
 #include "realm/util/optional.hpp"
 
+#include <list>
 #include <string_view>
 
 namespace realm::sync {
@@ -157,6 +158,8 @@ public:
     // subscription set will be unchanged.
     SubscriptionSet make_mutable_copy() const;
 
+    util::Future<void> get_state_change_notification(State notify_when) const;
+
     // The query version number used in the sync wire protocol to identify this subscription set to the server.
     int64_t version() const;
 
@@ -231,6 +234,8 @@ protected:
     void insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name, StringData object_class_name,
                          StringData query_str);
 
+    void process_notifications();
+
     explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
 
     Subscription subscription_from_iterator(LnkLst::iterator it) const;
@@ -239,6 +244,8 @@ protected:
     TransactionRef m_tr;
     Obj m_obj;
     LnkLst m_sub_list;
+
+    bool m_state_changed = false;
 };
 
 // A SubscriptionStore manages the FLX metadata tables and the lifecycles of SubscriptionSets and Subscriptions.
@@ -278,6 +285,19 @@ protected:
         ColKey subscriptions;
     };
 
+    struct NotificationRequest {
+        NotificationRequest(int64_t version, util::Promise<void> promise, SubscriptionSet::State notify_when)
+            : version(version)
+            , promise(std::move(promise))
+            , notify_when(notify_when)
+        {
+        }
+
+        int64_t version;
+        util::Promise<void> promise;
+        SubscriptionSet::State notify_when;
+    };
+
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
 
     friend class Subscription;
@@ -285,6 +305,10 @@ protected:
 
     std::unique_ptr<SubscriptionSetKeys> m_sub_set_keys;
     std::unique_ptr<SubscriptionKeys> m_sub_keys;
+
+    mutable std::mutex m_pending_notifications_mutex;
+    mutable int64_t m_min_outstanding_version = 0;
+    mutable std::list<NotificationRequest> m_pending_notifications;
 };
 
 } // namespace realm::sync

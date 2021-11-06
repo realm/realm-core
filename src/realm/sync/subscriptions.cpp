@@ -284,6 +284,7 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string> 
             m_mgr->supercede_prior_to(m_tr, version());
             break;
     }
+    m_state_changed = true;
 }
 
 SubscriptionSet SubscriptionSet::make_mutable_copy() const
@@ -305,6 +306,64 @@ SubscriptionSet SubscriptionSet::make_mutable_copy() const
     return new_set_obj;
 }
 
+util::Future<void> SubscriptionSet::get_state_change_notification(State notify_when) const
+{
+    // If we've already reached the desired state, or if the subscription is in an error state,
+    // we can return a ready future immediately.
+    if (state() == notify_when) {
+        return util::Future<void>::make_ready();
+    }
+    else if (state() == State::Error) {
+        return util::Future<void>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
+    }
+
+    std::lock_guard<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
+
+    // If we've already been superceded by another version getting completed, then we should skip registering
+    // a notification because it may never fire.
+    if (m_mgr->m_min_outstanding_version > version()) {
+        return util::Future<void>::make_ready();
+    }
+
+    // Otherwise, make a promise/future pair and add it to the list of pending notifications.
+    auto [promise, future] = util::make_promise_future<void>();
+    m_mgr->m_pending_notifications.emplace_back(version(), std::move(promise), notify_when);
+    return std::move(future);
+}
+
+void SubscriptionSet::process_notifications()
+{
+    auto new_state = state();
+    auto my_version = version();
+
+    std::list<SubscriptionStore::NotificationRequest> to_finish;
+    std::unique_lock<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
+    for (auto it = m_mgr->m_pending_notifications.begin(); it != m_mgr->m_pending_notifications.end();) {
+        if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
+            (new_state == State::Complete && it->version < my_version)) {
+            to_finish.splice(to_finish.end(), m_mgr->m_pending_notifications, it++);
+        }
+        else {
+            ++it;
+        }
+    }
+
+    if (new_state == State::Complete) {
+        m_mgr->m_min_outstanding_version = my_version;
+    }
+
+    lk.unlock();
+
+    for (auto& req : to_finish) {
+        if (new_state == State::Error && req.version == my_version) {
+            req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
+        }
+        else {
+            req.promise.emplace_value();
+        }
+    }
+}
+
 void SubscriptionSet::commit()
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
@@ -314,6 +373,10 @@ void SubscriptionSet::commit()
         update_state(State::Pending, util::none);
     }
     m_tr->commit_and_continue_as_read();
+
+    if (m_state_changed) {
+        process_notifications();
+    }
 }
 
 SubscriptionStore::SubscriptionStore(DBRef db)
