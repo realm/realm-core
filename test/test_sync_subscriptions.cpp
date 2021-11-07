@@ -254,12 +254,20 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_NOT(notification_futures[4].is_ready());
     CHECK_NOT(notification_futures[5].is_ready());
 
+    auto old_sub_set = store.get_by_version(5);
+
     sub_set = store.get_mutable_by_version(6);
     sub_set.update_state(SubscriptionSet::State::Complete);
     sub_set.commit();
 
     notification_futures[4].get();
     notification_futures[5].get();
+
+    // Also check that new requests for the superceded sub set get filled immediately.
+    old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get();
+
+    // Check that asking for a state change that is less than the current state of the sub set gets filled immediately.
+    sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get();
 }
 
 } // namespace realm::sync

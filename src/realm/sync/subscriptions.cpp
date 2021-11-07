@@ -310,7 +310,7 @@ util::Future<void> SubscriptionSet::get_state_change_notification(State notify_w
 {
     // If we've already reached the desired state, or if the subscription is in an error state,
     // we can return a ready future immediately.
-    if (state() == notify_when) {
+    if (state() >= notify_when) {
         return util::Future<void>::make_ready();
     }
     else if (state() == State::Error) {
@@ -500,6 +500,13 @@ const SubscriptionSet SubscriptionStore::get_active() const
 SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
+    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
+}
+
+const SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
+{
+    auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
     return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }

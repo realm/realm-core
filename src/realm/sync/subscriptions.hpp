@@ -265,6 +265,10 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_mutable_by_version(int64_t version_id);
 
+    // To be used internally by the sync client. This returns a read-only view of a subscription set by its
+    // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
+    const SubscriptionSet get_by_version(int64_t version_id) const;
+
 private:
     DBRef m_db;
 
