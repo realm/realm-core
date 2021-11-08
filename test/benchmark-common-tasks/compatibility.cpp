@@ -30,8 +30,6 @@ DBOptions::Durability durability(RealmDurability level)
         return DBOptions::Durability::Full;
     case RealmDurability::MemOnly:
         return DBOptions::Durability::MemOnly;
-    case RealmDurability::Async:
-        return DBOptions::Durability::Async;
     }
     REALM_ASSERT(false); // unhandled case
     return DBOptions::Durability::Full;
