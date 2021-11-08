@@ -58,9 +58,10 @@ Schema::Schema(base types) noexcept
 
 Schema::iterator Schema::find(StringData name) noexcept
 {
-    auto it = std::lower_bound(begin(), end(), std::string_view(name.data(), name.size()), [](ObjectSchema const& lft, std::string_view rgt) {
-        return lft.name < rgt;
-    });
+    auto it = std::lower_bound(begin(), end(), std::string_view(name.data(), name.size()),
+                               [](ObjectSchema const& lft, std::string_view rgt) {
+                                   return lft.name < rgt;
+                               });
     if (it != end() && it->name != name) {
         it = end();
     }
