@@ -5,9 +5,8 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Don't keep trying to refresh the access token if the client's clock is more than 30 minutes fast. ([#4941](https://github.com/realm/realm-core/issues/4941))
+
 ### Breaking changes
 * None.
 
