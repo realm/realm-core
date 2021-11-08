@@ -455,7 +455,7 @@ public:
     }
 
 private:
-    friend class ConstTableView;
+    friend class TableView;
     friend class Query;
 
     Lst<ObjKey> m_list;

@@ -4215,6 +4215,7 @@ TEST(Sync_UploadDownloadProgress_2)
     CHECK_EQUAL(downloadable_bytes_1, 0);
 
     CHECK_NOT_EQUAL(downloaded_bytes_2, 0);
+    CHECK_NOT_EQUAL(downloadable_bytes_2, 0);
 
     CHECK_NOT_EQUAL(uploaded_bytes_1, 0);
     CHECK_NOT_EQUAL(uploadable_bytes_1, 0);
@@ -4246,8 +4247,10 @@ TEST(Sync_UploadDownloadProgress_2)
     session_2.wait_for_download_complete_or_client_stopped();
 
     CHECK_NOT_EQUAL(downloaded_bytes_1, 0);
+    CHECK_NOT_EQUAL(downloadable_bytes_1, 0);
 
     CHECK_NOT_EQUAL(downloaded_bytes_2, 0);
+    CHECK_NOT_EQUAL(downloadable_bytes_2, 0);
 
     CHECK_NOT_EQUAL(uploaded_bytes_1, 0);
     CHECK_NOT_EQUAL(uploadable_bytes_1, 0);
@@ -4273,12 +4276,12 @@ TEST(Sync_UploadDownloadProgress_2)
     session_1.wait_for_download_complete_or_client_stopped();
     session_2.wait_for_download_complete_or_client_stopped();
 
-    CHECK_EQUAL(downloadable_bytes_1, 0);
+    CHECK_EQUAL(downloaded_bytes_1, downloadable_bytes_1);
 
     // uncertainty due to merge
     CHECK_NOT_EQUAL(downloaded_bytes_1, 0);
 
-    CHECK_EQUAL(downloadable_bytes_2, 0);
+    CHECK_EQUAL(downloaded_bytes_2, downloadable_bytes_2);
     CHECK_NOT_EQUAL(downloaded_bytes_2, 0);
 
     CHECK_NOT_EQUAL(uploaded_bytes_1, 0);
@@ -4559,7 +4562,7 @@ TEST(Sync_UploadDownloadProgress_4)
         else if (entry_2 == 2) {
             CHECK_GREATER(progress_version, 0);
             CHECK_NOT_EQUAL(downloaded_bytes, 0);
-            CHECK_EQUAL(downloadable_bytes, 0);
+            CHECK_NOT_EQUAL(downloadable_bytes, 0);
             CHECK_EQUAL(snapshot_version, 4);
         }
 
@@ -5000,11 +5003,11 @@ TEST_IF(Sync_MergeLargeBinary, !(REALM_ARCHITECTURE_X86_32))
         CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') || (cb.size() == binary_sizes[7] && cb[0] == 'h'));
     }
 
-    CHECK_EQUAL(downloadable_bytes_1, 0);
+    CHECK_EQUAL(downloadable_bytes_1, downloaded_bytes_1);
     CHECK_EQUAL(uploadable_bytes_1, uploaded_bytes_1);
     CHECK_NOT_EQUAL(uploaded_bytes_1, 0);
 
-    CHECK_EQUAL(downloadable_bytes_2, 0);
+    CHECK_EQUAL(downloadable_bytes_2, downloaded_bytes_2);
     CHECK_EQUAL(uploadable_bytes_2, uploaded_bytes_2);
     CHECK_NOT_EQUAL(uploaded_bytes_2, 0);
 
@@ -5154,11 +5157,11 @@ TEST(Sync_MergeLargeBinaryReducedMemory)
         CHECK((cb.size() == binary_sizes[3] && cb[0] == 'd') || (cb.size() == binary_sizes[7] && cb[0] == 'h'));
     }
 
-    CHECK_EQUAL(downloadable_bytes_1, 0);
+    CHECK_EQUAL(downloadable_bytes_1, downloaded_bytes_1);
     CHECK_EQUAL(uploadable_bytes_1, uploaded_bytes_1);
     CHECK_NOT_EQUAL(uploaded_bytes_1, 0);
 
-    CHECK_EQUAL(downloadable_bytes_2, 0);
+    CHECK_EQUAL(downloadable_bytes_2, downloaded_bytes_2);
     CHECK_EQUAL(uploadable_bytes_2, uploaded_bytes_2);
     CHECK_NOT_EQUAL(uploaded_bytes_2, 0);
 
@@ -5489,10 +5492,15 @@ TEST(Sync_UploadLogCompactionEnabled)
     fixture.bind_session(session_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](uint_fast64_t, uint_fast64_t, uint_fast64_t uploaded_bytes,
-                                uint_fast64_t uploadable_bytes, uint_fast64_t, uint_fast64_t) {
+    auto progress_handler = [&](uint_fast64_t downloaded_bytes, uint_fast64_t downloadable_bytes,
+                                uint_fast64_t uploaded_bytes, uint_fast64_t uploadable_bytes,
+                                uint_fast64_t progress_version, uint_fast64_t snapshot_version) {
+        CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
+        static_cast<void>(snapshot_version);
+        if (progress_version > 0)
+            CHECK_NOT_EQUAL(downloadable_bytes, 0);
     };
 
     session_2.set_progress_handler(progress_handler);
@@ -5543,10 +5551,15 @@ TEST(Sync_UploadLogCompactionDisabled)
     Session session_1 = fixture.make_bound_session(db_1, "/test");
     session_1.wait_for_upload_complete_or_client_stopped();
 
-    auto progress_handler = [&](std::uint_fast64_t, std::uint_fast64_t, std::uint_fast64_t uploaded_bytes,
-                                std::uint_fast64_t uploadable_bytes, std::uint_fast64_t, std::uint_fast64_t) {
+    auto progress_handler = [&](std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
+                                std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
+                                std::uint_fast64_t progress_version, std::uint_fast64_t snapshot_version) {
+        CHECK_EQUAL(downloaded_bytes, downloadable_bytes);
         CHECK_EQUAL(0, uploaded_bytes);
         CHECK_EQUAL(0, uploadable_bytes);
+        static_cast<void>(snapshot_version);
+        if (progress_version > 0)
+            CHECK_NOT_EQUAL(0, downloadable_bytes);
     };
 
     Session session_2 = fixture.make_session(db_2);
@@ -5905,8 +5918,6 @@ TEST(Sync_ClientErrorHandler)
 }
 
 
-#ifndef REALM_PLATFORM_WIN32
-
 TEST(Sync_VerifyServerHistoryAfterLargeUpload)
 {
     TEST_DIR(server_dir);
@@ -5947,8 +5958,6 @@ TEST(Sync_VerifyServerHistoryAfterLargeUpload)
         }
     }
 }
-
-#endif // REALM_PLATFORM_WIN32
 
 
 TEST(Sync_ServerSideModify_Randomize)

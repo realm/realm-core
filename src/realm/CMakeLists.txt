@@ -241,7 +241,6 @@ set(REALM_INSTALL_HEADERS
     util/sha_crypto.hpp
     util/shared_ptr.hpp
     util/string_buffer.hpp
-    util/string_view.hpp
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp

@@ -3539,7 +3539,7 @@ TEST(LangBindHelper_HandoverNestedTableViews)
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     {
         TransactionRef reader;
-        std::unique_ptr<ConstTableView> tv;
+        std::unique_ptr<TableView> tv;
         {
             auto writer = sg->start_write();
             TableRef table = writer->add_table("table2");
@@ -3569,12 +3569,12 @@ TEST(LangBindHelper_HandoverAccessors)
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     TransactionRef reader;
     ColKey col;
-    std::unique_ptr<ConstTableView> tv2;
-    std::unique_ptr<ConstTableView> tv3;
-    std::unique_ptr<ConstTableView> tv4;
-    std::unique_ptr<ConstTableView> tv5;
-    std::unique_ptr<ConstTableView> tv6;
-    std::unique_ptr<ConstTableView> tv7;
+    std::unique_ptr<TableView> tv2;
+    std::unique_ptr<TableView> tv3;
+    std::unique_ptr<TableView> tv4;
+    std::unique_ptr<TableView> tv5;
+    std::unique_ptr<TableView> tv6;
+    std::unique_ptr<TableView> tv7;
     {
         TableView tv;
         auto writer = sg->start_write();
@@ -4353,7 +4353,7 @@ TEST(LangBindHelper_HandoverDistinctView)
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef sg = DB::create(*hist, path, DBOptions(crypt_key()));
     TransactionRef reader;
-    std::unique_ptr<ConstTableView> tv2;
+    std::unique_ptr<TableView> tv2;
     Obj obj2b;
     {
         {

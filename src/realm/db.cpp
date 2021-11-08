@@ -2540,10 +2540,6 @@ std::string DB::get_core_file(const std::string& base_path, CoreFileType type)
             return base_path + ".note";
         case CoreFileType::Log:
             return base_path + ".log";
-        case CoreFileType::LogA:
-            return base_path + ".log_a";
-        case CoreFileType::LogB:
-            return base_path + ".log_b";
     }
     REALM_UNREACHABLE();
 }
@@ -2556,8 +2552,6 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
 
     File::try_remove(get_core_file(base_path, CoreFileType::Note));
     File::try_remove(get_core_file(base_path, CoreFileType::Log));
-    File::try_remove(get_core_file(base_path, CoreFileType::LogA));
-    File::try_remove(get_core_file(base_path, CoreFileType::LogB));
     util::try_remove_dir_recursive(get_core_file(base_path, CoreFileType::Management));
 
     if (delete_lockfile) {
@@ -2945,11 +2939,6 @@ std::unique_ptr<Query> Transaction::import_copy_of(Query& query, PayloadPolicy p
 }
 
 std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPolicy policy)
-{
-    return tv.clone_for_handover(this, policy);
-}
-
-std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, PayloadPolicy policy)
 {
     return tv.clone_for_handover(this, policy);
 }

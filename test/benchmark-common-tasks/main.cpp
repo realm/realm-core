@@ -301,7 +301,7 @@ struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
     void operator()(DBRef)
     {
         ConstTableRef table = m_table;
-        ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
+        TableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
 
@@ -314,7 +314,7 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
     void operator()(DBRef)
     {
         ConstTableRef table = m_table;
-        ConstTableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
+        TableView view = table->where().equal(m_col, StringData("10", 2)).find_all();
     }
 };
 
@@ -1095,7 +1095,7 @@ struct BenchmarkQuery : BenchmarkWithStrings {
     void operator()(DBRef)
     {
         ConstTableRef table = m_table;
-        ConstTableView view = table->find_all_string(m_col, "200");
+        TableView view = table->find_all_string(m_col, "200");
     }
 };
 
@@ -1188,7 +1188,7 @@ struct BenchmarkSort : BenchmarkWithStrings {
     void operator()(DBRef)
     {
         ConstTableRef table = m_table;
-        ConstTableView view = table->get_sorted_view(m_col);
+        TableView view = table->get_sorted_view(m_col);
     }
 };
 
@@ -1217,7 +1217,7 @@ struct BenchmarkSortInt : BenchmarkWithInts {
     void operator()(DBRef)
     {
         ConstTableRef table = m_table;
-        ConstTableView view = table->get_sorted_view(m_col);
+        TableView view = table->get_sorted_view(m_col);
     }
 };
 

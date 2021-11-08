@@ -1,9 +1,9 @@
 #include "testsettings.hpp"
 #ifdef TEST_UTIL_FROM_CHARS
 
-#include <realm/util/from_chars.hpp>
+#include <charconv>
 
-#include <realm/util/string_view.hpp>
+#include <realm/util/from_chars.hpp>
 
 #include "test.hpp"
 
@@ -11,10 +11,10 @@ using namespace realm::util;
 
 TEST(Util_FromChars_Base10)
 {
-    StringView okay_byte("254 is a fine byte");
-    StringView overflow_byte("260 should overflow a byte");
-    StringView negative_byte("-110 should be negative");
-    StringView not_a_number("hello, world!\n");
+    const std::string_view okay_byte("254 is a fine byte");
+    const std::string_view overflow_byte("260 should overflow a byte");
+    const std::string_view negative_byte("-110 should be negative");
+    const std::string_view not_a_number("hello, world!\n");
 
     uint8_t byte = 0;
     FromCharsResult res = from_chars(okay_byte.data(), okay_byte.data() + okay_byte.size(), byte, 10);
@@ -52,8 +52,8 @@ TEST(Util_FromChars_Base10)
 
 TEST(Util_FromChars_Base16)
 {
-    StringView okay_byte("ff");
-    StringView overflow_byte("100");
+    const std::string_view okay_byte("ff");
+    const std::string_view overflow_byte("100");
 
     uint8_t byte = 0;
     FromCharsResult res = from_chars(okay_byte.data(), okay_byte.data() + okay_byte.size(), byte, 16);

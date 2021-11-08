@@ -30,7 +30,6 @@
 #include <realm/util/demangle.hpp>
 #include <realm/util/enum.hpp>
 #include <realm/util/time.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/random.hpp>
 #include <realm/util/thread.hpp>

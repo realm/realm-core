@@ -372,8 +372,6 @@ public:
         Management,
         Note,
         Log,
-        LogA, // This is a legacy version of `Log`.
-        LogB, // This is a legacy version of `Log`.
     };
 
     /// Get the path for the given type of file for a base Realm file path.
@@ -659,7 +657,6 @@ public:
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
     std::unique_ptr<TableView> import_copy_of(TableView&, PayloadPolicy);
-    std::unique_ptr<ConstTableView> import_copy_of(ConstTableView&, PayloadPolicy);
 
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
