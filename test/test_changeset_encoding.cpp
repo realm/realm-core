@@ -13,7 +13,7 @@ Changeset encode_then_parse(const Changeset& changeset)
 {
     using realm::_impl::SimpleNoCopyInputStream;
 
-    util::AppendBuffer<char> buffer;
+    sync::ChangesetEncoder::Buffer buffer;
     encode_changeset(changeset, buffer);
     SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
     Changeset parsed;

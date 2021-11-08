@@ -345,7 +345,7 @@ bool ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                                 changesets.size(), reporter, &logger); // Throws
 
         for (std::size_t i = 0; i < num_changesets; ++i) {
-            util::AppendBuffer<char> transformed_changeset;
+            ChangesetEncoder::Buffer transformed_changeset;
             encode_changeset(changesets[i], transformed_changeset);
 
             InstructionApplier applier{*transact};
@@ -924,7 +924,7 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         }
 
         if (did_modify) {
-            util::AppendBuffer<char> modified;
+            ChangesetEncoder::Buffer modified;
             encode_changeset(log, modified);
             BinaryData result = BinaryData{modified.data(), modified.size()};
             m_arrays->changesets.set(i, result);

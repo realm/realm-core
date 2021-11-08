@@ -2632,13 +2632,14 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
 void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history)
 {
     try {
-        util::Buffer<char> output_buffer;
+        ChangesetEncoder::Buffer output_buffer;
         for (const auto& entry : m_reciprocal_transform_cache) {
             if (entry.second->is_dirty()) {
-                std::size_t size = emit_changesets(&*entry.second, 1, output_buffer); // Throws
+                encode_changeset(*entry.second, output_buffer); // Throws
                 version_type version = entry.first;
-                BinaryData data{output_buffer.data(), size};
+                BinaryData data{output_buffer.data(), output_buffer.size()};
                 history.set_reciprocal_transform(version, data); // Throws
+                output_buffer.clear();
             }
         }
         m_reciprocal_transform_cache.clear();
@@ -2647,20 +2648,6 @@ void TransformerImpl::flush_reciprocal_transform_cache(TransformHistory& history
         m_reciprocal_transform_cache.clear();
         throw;
     }
-}
-
-
-size_t TransformerImpl::emit_changesets(const Changeset* changesets, size_t num_changesets,
-                                        util::Buffer<char>& out_buffer)
-{
-    // FIXME: Consider taking an output stream argument rather than an output buffer.
-    AppendBuffer<char> buffer;
-    for (size_t i = 0; i < num_changesets; ++i) {
-        encode_changeset(changesets[i], buffer);
-    }
-    size_t r = buffer.size();
-    out_buffer = buffer.release();
-    return r;
 }
 
 } // namespace _impl

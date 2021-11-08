@@ -1,19 +1,56 @@
 # NEXT RELEASE
 
 ### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * None.
 
 ### Fixed
-* <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* The Swift package could not be imported in Xcode 12.5 (since v11.5.0).
+* Don't keep trying to refresh the access token if the client's clock is more than 30 minutes fast. ([#4941](https://github.com/realm/realm-core/issues/4941))
 
 ### Breaking changes
 * None.
 
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
 -----------
 
 ### Internals
-* None.
+* Added type to manage flexible sync subscriptions. [#5005](https://github.com/realm/realm-core/pull/5005)
+
+----------------------------------------------
+
+# 11.6.0 Release notes
+
+### Enhancements
+* Adding `Object::set_property_value(ContextType&, const Property&, ValueType, CreatePolicy)` for SDKs which have performed the property lookup.
+
+### Fixed
+* SyncManager had some inconsistent locking which could result in data races and/or deadlocks, mostly in ways that would never be hit outside of tests doing very strange things ([#4999](https://github.com/realm/realm-core/pull/4999),since v10.0.0).
+* Streaming download notifiers reported incorrect values for transferrable bytes ([#5008](https://github.com/realm/realm-core/pull/5008), since 11.5.2).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+ 
+-----------
+
+### Internals
+* ConstTableView and TableView are merged into just TableView. TableView::front(), TableView::back(), TableView::remove() and TableView::remove_last() function are removed as they were not used outside tests.
+* The client file UUID has been removed as it was no longer being used for anything.
+* Reduce the peak memory usage of changeset uploading by eliminating an extra copy of each changeset which was held in memory.
+
+----------------------------------------------
+
+# 11.5.2 Release notes
+
+### Fixed
+* The Swift package could not be imported in Xcode 12.5 ([#4997](https://github.com/realm/realm-core/pull/4997), since v11.5.0).
+* Sync progress notifiers would not trigger when the downloadable bytes size would equal 0. ([#4989](https://github.com/realm/realm-core/pull/4989))
+
+-----------
+
+### Internals
+* Unit tests now run in parallel by default.
 
 ----------------------------------------------
 
@@ -43,6 +80,7 @@
 * Added the `App` functionality (except access to Atlas collections) to the C API. ([#4951](https://github.com/realm/realm-core/pull/4951))
 
 ### Fixed
+* Fixed the creation of a frozen realm, that was created using the full schema instead of the schema of the originating realm. ([#4939](https://github.com/realm/realm-core/issues/4939))
 * Fixed forgetting to insert a backlink when inserting a mixed link directly using Table::FieldValues. ([#4899](https://github.com/realm/realm-core/issues/4899) since the introduction of Mixed in v11.0.0)
 * Using "sort", "distinct", or "limit" as field name in query expression would cause an "Invalid predicate" error ([#7545](https://github.com/realm/realm-java/issues/7545) since v10.1.2)
 * Crash when quering with 'Not()' followed by empty group. ([#4168](https://github.com/realm/realm-core/issues/4168) since v1.0.0)
@@ -76,8 +114,6 @@
 * Cleaned out some old server tools and add the remaining ones to the default build.
 * App can now use bundled realm without getting "progress error" from server.
 * Refactored the wire protocol message parsing to not use std::istream or goto's for flow control.
-* Stopped running RaspberryPi testing in CI ([#4967](https://github.com/realm/realm-core/issues/4967)
-* Unit tests now run in parallel by default.
 
 ----------------------------------------------
 

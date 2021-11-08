@@ -171,7 +171,7 @@ struct SyncTestFile : TestFile {
 
     SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name = "",
                  std::string user_name = "test");
-    SyncTestFile(std::shared_ptr<realm::SyncUser> user, std::string partition, realm::Schema schema);
+    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition, realm::Schema schema);
     SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
 };
 

@@ -45,7 +45,7 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///
 /// WAITING_FOR_ACCESS_TOKEN: a request has been initiated to ask
 /// for an updated access token and the session is waiting for a response.
-/// From: ACTIVE
+/// From: INACTIVE, DYING
 /// To:
 ///    * ACTIVE: when the SDK successfully refreshes the token
 ///    * INACTIVE: if asked to log out, or if asked to close
@@ -57,8 +57,6 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
 ///                is Immediate.
 ///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
-///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
-///                                but the token is invalid or expired.
 ///
 /// DYING: the session is performing clean-up work in preparation to be destroyed.
 /// From: ACTIVE
@@ -67,6 +65,8 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///                revived, or if explicitly asked to log out before the
 ///                clean-up work begins
 ///    * ACTIVE: if the session is revived
+///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
+///                                but the token is invalid or expired.
 ///
 /// INACTIVE: the user owning this session has logged out, the `sync::Session`
 /// owned by this session is destroyed, and the session is quiescent.
@@ -75,25 +75,14 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 /// From: initial, ACTIVE, DYING, WAITING_FOR_ACCESS_TOKEN
 /// To:
 ///    * ACTIVE: if the session is revived
+///    * WAITING_FOR_ACCESS_TOKEN: if the session tried to enter ACTIVE,
+///                                but the token is invalid or expired.
 
 void SyncSession::become_active(std::unique_lock<std::mutex>& lock)
 {
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(m_state != State::Active);
     m_state = State::Active;
-
-    const auto& user = m_config.user;
-    if (user && user->access_token_refresh_required()) {
-        become_waiting_for_access_token(lock);
-        // Release the lock for SDKs with a single threaded
-        // networking implementation such as our test suite
-        // so that the update can trigger a state change from
-        // the completion handler.
-        REALM_ASSERT(lock.owns_lock());
-        lock.unlock();
-        initiate_access_token_refresh();
-        return;
-    }
 
     // when entering from the Dying state the session will still be bound
     if (!m_session) {
@@ -635,14 +624,28 @@ void SyncSession::revive_if_needed()
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     switch (m_state) {
-        case State::Dying:
-        case State::Inactive:
-            // Revive.
-            become_active(lock);
-            break;
         case State::Active:
         case State::WaitingForAccessToken:
+            return;
+        case State::Dying:
+        case State::Inactive: {
+            // Revive.
+            const auto& user = m_config.user;
+            if (!user || !user->access_token_refresh_required()) {
+                become_active(lock);
+                return;
+            }
+
+            become_waiting_for_access_token(lock);
+            // Release the lock for SDKs with a single threaded
+            // networking implementation such as our test suite
+            // so that the update can trigger a state change from
+            // the completion handler.
+            REALM_ASSERT(lock.owns_lock());
+            lock.unlock();
+            initiate_access_token_refresh();
             break;
+        }
     }
 }
 
@@ -977,28 +980,24 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress,
                                                                                bool& is_expired)
 {
-    uint64_t transferrable;
-    if (is_streaming) {
-        transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    }
-    else if (captured_transferrable) {
-        transferrable = *captured_transferrable;
-    }
-    else {
-        if (is_download)
-            captured_transferrable = current_progress.downloadable;
-        else {
-            // If the sync client has not yet processed all of the local
-            // transactions then the uploadable data is incorrect and we should
-            // not invoke the callback
-            if (snapshot_version > current_progress.snapshot_version)
-                return [] {};
-            captured_transferrable = current_progress.uploadable;
-        }
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
+    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    if (!is_streaming) {
+        // If the sync client has not yet processed all of the local
+        // transactions then the uploadable data is incorrect and we should
+        // not invoke the callback
+        if (!is_download && snapshot_version > current_progress.snapshot_version)
+            return [] {};
+
+        // The initial download size we get from the server is the uncompacted
+        // size, and so the download may complete before we actually receive
+        // that much data. When that happens, transferrable will drop and we
+        // need to use the new value instead of the captured one.
+        if (!captured_transferrable || *captured_transferrable > transferrable)
+            captured_transferrable = transferrable;
         transferrable = *captured_transferrable;
     }
 
-    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
     is_expired = !is_streaming && transferred >= transferrable;

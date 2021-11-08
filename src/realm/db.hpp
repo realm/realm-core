@@ -369,8 +369,6 @@ public:
         Management,
         Note,
         Log,
-        LogA, // This is a legacy version of `Log`.
-        LogB, // This is a legacy version of `Log`.
     };
 
     /// Get the path for the given type of file for a base Realm file path.
@@ -446,15 +444,7 @@ private:
     int m_file_format_version = 0;
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
-#ifdef REALM_ASYNC_DAEMON
-    util::InterprocessMutex m_balancemutex;
-#endif
     util::InterprocessMutex m_controlmutex;
-#ifdef REALM_ASYNC_DAEMON
-    util::InterprocessCondVar m_room_to_write;
-    util::InterprocessCondVar m_work_to_do;
-    util::InterprocessCondVar m_daemon_becomes_ready;
-#endif
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
@@ -497,8 +487,7 @@ private:
     void open(BinaryData, bool take_ownership = true);
     void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
 
-
-    void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
+    void do_open(const std::string& file, bool no_create, const DBOptions options);
 
     Replication* const* get_repl() const noexcept
     {
@@ -656,7 +645,6 @@ public:
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
     std::unique_ptr<TableView> import_copy_of(TableView&, PayloadPolicy);
-    std::unique_ptr<ConstTableView> import_copy_of(ConstTableView&, PayloadPolicy);
 
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;

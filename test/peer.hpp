@@ -399,7 +399,7 @@ private:
 
     void encode_changesets(Changeset* changesets, std::size_t num_changesets, util::Logger* logger)
     {
-        util::AppendBuffer<char> encode_buffer;
+        sync::ChangesetEncoder::Buffer encode_buffer;
         for (size_t i = 0; i < num_changesets; ++i) {
             encode_changeset(changesets[i], encode_buffer); // Throws
 
@@ -420,7 +420,7 @@ private:
 
     void encode_changesets(Changeset** changesets, std::size_t num_changesets, util::Logger* logger)
     {
-        util::AppendBuffer<char> encode_buffer;
+        sync::ChangesetEncoder::Buffer encode_buffer;
         for (size_t i = 0; i < num_changesets; ++i) {
             encode_changeset(*changesets[i], encode_buffer); // Throws
 
@@ -491,7 +491,7 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets.data(),
                                                changesets.size(), reporter, logger);
 
-    util::AppendBuffer<char> assembled_transformed_changeset;
+    sync::ChangesetEncoder::Buffer assembled_transformed_changeset;
 
     for (size_t i = 0; i < num_changesets; ++i) {
         sync::InstructionApplier applier{*transact};

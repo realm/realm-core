@@ -11,7 +11,6 @@
 #include <realm/util/network.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/util/time.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/noinst/server/metrics.hpp>
@@ -63,7 +62,7 @@ public:
     /// rejected for that server-side Realm.
     using ClientFileBlacklists = std::map<std::string, ClientFileBlacklist>;
 
-    using SessionBootstrapCallback = void(util::StringView virt_path, file_ident_type client_file_ident);
+    using SessionBootstrapCallback = void(std::string_view virt_path, file_ident_type client_file_ident);
 
     // FIXME: The default values for `http_request_timeout`,
     // `http_response_timeout`, `connection_reaper_timeout`, and

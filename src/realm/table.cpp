@@ -2488,7 +2488,7 @@ TableView Table::find_all_int(ColKey col_key, int64_t value)
     return find_all<int64_t>(col_key, value);
 }
 
-ConstTableView Table::find_all_int(ColKey col_key, int64_t value) const
+TableView Table::find_all_int(ColKey col_key, int64_t value) const
 {
     return const_cast<Table*>(this)->find_all<int64_t>(col_key, value);
 }
@@ -2498,7 +2498,7 @@ TableView Table::find_all_bool(ColKey col_key, bool value)
     return find_all<bool>(col_key, value);
 }
 
-ConstTableView Table::find_all_bool(ColKey col_key, bool value) const
+TableView Table::find_all_bool(ColKey col_key, bool value) const
 {
     return const_cast<Table*>(this)->find_all<int64_t>(col_key, value);
 }
@@ -2509,7 +2509,7 @@ TableView Table::find_all_float(ColKey col_key, float value)
     return find_all<float>(col_key, value);
 }
 
-ConstTableView Table::find_all_float(ColKey col_key, float value) const
+TableView Table::find_all_float(ColKey col_key, float value) const
 {
     return const_cast<Table*>(this)->find_all<float>(col_key, value);
 }
@@ -2519,7 +2519,7 @@ TableView Table::find_all_double(ColKey col_key, double value)
     return find_all<double>(col_key, value);
 }
 
-ConstTableView Table::find_all_double(ColKey col_key, double value) const
+TableView Table::find_all_double(ColKey col_key, double value) const
 {
     return const_cast<Table*>(this)->find_all<double>(col_key, value);
 }
@@ -2529,7 +2529,7 @@ TableView Table::find_all_string(ColKey col_key, StringData value)
     return where().equal(col_key, value).find_all();
 }
 
-ConstTableView Table::find_all_string(ColKey col_key, StringData value) const
+TableView Table::find_all_string(ColKey col_key, StringData value) const
 {
     return const_cast<Table*>(this)->find_all_string(col_key, value);
 }
@@ -2539,7 +2539,7 @@ TableView Table::find_all_binary(ColKey, BinaryData)
     throw util::runtime_error("Not implemented");
 }
 
-ConstTableView Table::find_all_binary(ColKey col_key, BinaryData value) const
+TableView Table::find_all_binary(ColKey col_key, BinaryData value) const
 {
     return const_cast<Table*>(this)->find_all_binary(col_key, value);
 }
@@ -2549,7 +2549,7 @@ TableView Table::find_all_null(ColKey col_key)
     return where().equal(col_key, null{}).find_all();
 }
 
-ConstTableView Table::find_all_null(ColKey col_key) const
+TableView Table::find_all_null(ColKey col_key) const
 {
     return const_cast<Table*>(this)->find_all_null(col_key);
 }
@@ -2561,7 +2561,7 @@ TableView Table::get_sorted_view(ColKey col_key, bool ascending)
     return tv;
 }
 
-ConstTableView Table::get_sorted_view(ColKey col_key, bool ascending) const
+TableView Table::get_sorted_view(ColKey col_key, bool ascending) const
 {
     return const_cast<Table*>(this)->get_sorted_view(col_key, ascending);
 }
@@ -2573,7 +2573,7 @@ TableView Table::get_sorted_view(SortDescriptor order)
     return tv;
 }
 
-ConstTableView Table::get_sorted_view(SortDescriptor order) const
+TableView Table::get_sorted_view(SortDescriptor order) const
 {
     return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }

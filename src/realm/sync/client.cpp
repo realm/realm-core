@@ -1226,14 +1226,9 @@ void SessionWrapper::report_progress()
     ClientHistory::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes, uploaded_bytes,
                                              uploadable_bytes, snapshot_version);
 
-    // In protocol versions 25 and earlier, downloadable_bytes was the total
-    // size of the history. From protocol version 26, downloadable_bytes
-    // represent the non-downloaded bytes on the server. Since the user supplied
-    // progress handler interprets downloadable_bytes as the total size of
-    // downloadable bytes, this number must be calculated.  We could change the
-    // meaning of downloadable_bytes for the progress handler, but that would be
-    // a breaking change. Note that protocol version 25 (and earlier) is no
-    // longer supported by clients.
+    // uploadable_bytes is uploaded + remaining to upload, while downloadable_bytes
+    // is only the remaining to download. This is confusing, so make them use
+    // the same units.
     std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
 
     m_sess->logger.debug("Progress handler called, downloaded = %1, "
