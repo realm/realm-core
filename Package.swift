@@ -638,7 +638,6 @@ let headers: [String] = [
     "realm/util/scratch_allocator.hpp",
     "realm/util/serializer.hpp",
     "realm/util/sha_crypto.hpp",
-    "realm/util/shared_ptr.hpp",
     "realm/util/signal_blocker.hpp",
     "realm/util/string_buffer.hpp",
     "realm/util/substitute.hpp",

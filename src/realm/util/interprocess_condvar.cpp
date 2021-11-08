@@ -169,8 +169,8 @@ private:
     static MutexOwnerThread& get() noexcept
     {
         // Note, intentionally not destroying at process end.
-        static MutexOwnerThread* const instance = new MutexOwnerThread();
-        return *instance;
+        static MutexOwnerThread& instance = *new MutexOwnerThread();
+        return instance;
     }
 
     void thread_loop() noexcept

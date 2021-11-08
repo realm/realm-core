@@ -1196,7 +1196,7 @@ size_t SlabAlloc::get_allocated_size() const noexcept
 void SlabAlloc::extend_fast_mapping_with_slab(char* address)
 {
     ++m_translation_table_size;
-    auto new_fast_mapping = new RefTranslation[m_translation_table_size];
+    auto new_fast_mapping = std::make_unique<RefTranslation[]>(m_translation_table_size);
     for (size_t i = 0; i < m_translation_table_size - 1; ++i) {
         new_fast_mapping[i] = m_ref_translation_ptr[i];
     }
@@ -1206,7 +1206,7 @@ void SlabAlloc::extend_fast_mapping_with_slab(char* address)
     // Memory ranges with slab (working memory) can never have arrays that straddle a boundary,
     // so optimize by clamping the lowest possible xover offset to the end of the section.
     new_fast_mapping[m_translation_table_size - 1].lowest_possible_xover_offset = 1ULL << section_shift;
-    m_ref_translation_ptr = new_fast_mapping;
+    m_ref_translation_ptr = new_fast_mapping.release();
 }
 
 void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_num_sections)

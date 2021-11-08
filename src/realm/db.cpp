@@ -384,6 +384,18 @@ private:
     ReadCount data[init_readers_size];
 };
 
+void TransactionDeleter(Transaction* t)
+{
+    t->close();
+    delete t;
+}
+
+template <typename... Args>
+TransactionRef make_transaction_ref(Args&&... args)
+{
+    return TransactionRef(new Transaction(std::forward<Args>(args)...), TransactionDeleter);
+}
+
 } // anonymous namespace
 
 
@@ -2112,48 +2124,43 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
         File::try_remove(get_core_file(base_path, CoreFileType::Lock));
     }
 }
-void TransactionDeleter(Transaction* t)
-{
-    t->close();
-    delete t;
-}
 
 TransactionRef DB::start_read(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    Transaction* tr;
+    TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
-        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
     }
     else {
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
         g.release();
     }
     tr->set_file_format_version(get_file_format_version());
-    return TransactionRef(tr, TransactionDeleter);
+    return tr;
 }
 
 TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    Transaction* tr;
+    TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
-        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
     }
     else {
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
         g.release();
     }
     tr->set_file_format_version(get_file_format_version());
-    return TransactionRef(tr, TransactionDeleter);
+    return tr;
 }
 
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
@@ -2372,11 +2379,11 @@ TransactionRef DB::start_write(bool nonblocking)
         m_write_transaction_open = true;
     }
     ReadLockInfo read_lock;
-    Transaction* tr;
+    TransactionRef tr;
     try {
         grab_read_lock(read_lock, VersionID());
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         version_type current_version = read_lock.m_version;
         m_alloc.init_mapping_management(current_version);
@@ -2391,7 +2398,7 @@ TransactionRef DB::start_write(bool nonblocking)
         throw;
     }
 
-    return TransactionRef(tr, TransactionDeleter);
+    return tr;
 }
 
 Obj Transaction::import_copy_of(const Obj& original)

@@ -2471,6 +2471,14 @@ public:
     {
     }
 
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : m_link_map(table, links)
+        , m_comparison_type(type)
+        , m_is_list(column_key.is_list())
+    {
+    }
+
     Query is_null()
     {
         if (m_link_map.get_nb_hops() > 1)
@@ -2567,14 +2575,6 @@ private:
     bool m_is_list;
     friend class Table;
     friend class LinkChain;
-
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_link_map(table, links)
-        , m_comparison_type(type)
-        , m_is_list(column_key.is_list())
-    {
-    }
 };
 
 template <typename T>
