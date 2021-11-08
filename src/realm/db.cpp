@@ -1483,6 +1483,12 @@ void DB::create_new_history(Replication& repl)
         }
         tr->commit_and_continue_writing();
         // Now the schema should be in place - create the objects
+#ifdef REALM_DEBUG
+        constexpr int number_of_objects_to_create_before_committing = 100;
+#else
+        constexpr int number_of_objects_to_create_before_committing = 1000;
+#endif
+        auto n = number_of_objects_to_create_before_committing;
         for (auto tk : public_table_keys) {
             auto table = tr->get_table(tk);
             if (table->is_embedded())
@@ -1493,6 +1499,10 @@ void DB::create_new_history(Replication& repl)
                 auto obj_key = o.get_key();
                 repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, o.get_any(pk_col));
                 generate_properties_for_obj(repl, o, cols);
+                if (--n == 0) {
+                    tr->commit_and_continue_writing();
+                    n = number_of_objects_to_create_before_committing;
+                }
             }
         }
         tr->commit();

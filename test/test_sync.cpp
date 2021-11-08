@@ -7565,13 +7565,16 @@ TEST(Sync_UpgradeToClientHistory)
         auto col_dict = baas->add_column_dictionary(type_Int, "dictionary");
         auto col_child = baas->add_column(*embedded, "child");
 
-        auto foos = tr->add_table_with_primary_key("class_Foo", type_Int, "_id");
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
         auto col_str = foos->add_column(type_String, "str");
         auto col_children = foos->add_column_list(*embedded, "children");
 
+        auto foobaas = tr->add_table_with_primary_key("class_FooBaa", type_ObjectId, "_id");
+        auto col_time = foobaas->add_column(type_Timestamp, "time");
+
         auto col_link = baas->add_column(*foos, "link");
 
-        auto foo = foos->create_object_with_primary_key(123).set(col_str, "Hello");
+        auto foo = foos->create_object_with_primary_key("123").set(col_str, "Hello");
         auto children = foo.get_linklist(col_children);
         children.create_and_insert_linked_object(0);
         auto baa = baas->create_object_with_primary_key(999).set(col_link, foo.get_key());
@@ -7595,16 +7598,20 @@ TEST(Sync_UpgradeToClientHistory)
         dict.insert("key8", 8);
         dict.insert("key9", 9);
 
+        for (int i = 0; i < 100; i++) {
+            foobaas->create_object_with_primary_key(ObjectId::gen()).set(col_time, Timestamp(::time(nullptr), i));
+        }
+
         tr->commit();
     }
     {
         auto tr = db_2->start_write();
         auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
-        auto foos = tr->add_table_with_primary_key("class_Foo", type_Int, "_id");
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
         auto col_str = foos->add_column(type_String, "str");
         auto col_link = baas->add_column(*foos, "link");
 
-        auto foo = foos->create_object_with_primary_key(123).set(col_str, "Goodbye");
+        auto foo = foos->create_object_with_primary_key("123").set(col_str, "Goodbye");
         auto baa = baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
 
         tr->commit();
@@ -7624,7 +7631,7 @@ TEST(Sync_UpgradeToClientHistory)
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
         auto foos = tr.get_group().get_table("class_Foo");
-        auto foo = foos->create_object_with_primary_key(456);
+        auto foo = foos->create_object_with_primary_key("456");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
