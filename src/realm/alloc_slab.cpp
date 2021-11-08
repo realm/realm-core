@@ -1217,6 +1217,7 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         requires_new_translation = true;
     }
     RefTranslation* new_translation_table = m_ref_translation_ptr;
+    std::unique_ptr<RefTranslation[]> new_translation_table_owner;
     if (requires_new_translation) {
         // we need a new translation table, but must preserve old, as translations using it
         // may be in progress concurrently
@@ -1224,7 +1225,8 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
             m_old_translations.emplace_back(m_youngest_live_version, m_translation_table_size - free_space_size,
                                             m_ref_translation_ptr.load());
         m_translation_table_size = num_mappings + free_space_size;
-        new_translation_table = new RefTranslation[m_translation_table_size];
+        new_translation_table_owner = std::make_unique<RefTranslation[]>(m_translation_table_size);
+        new_translation_table = new_translation_table_owner.get();
         old_num_sections = 0;
     }
     for (size_t i = old_num_sections; i < num_mappings; ++i) {
@@ -1244,6 +1246,11 @@ void SlabAlloc::rebuild_translations(bool requires_new_translation, size_t old_n
         REALM_ASSERT(base);
         new_translation_table[num_mappings + k].mapping_addr = base;
     }
+
+    // This will either be null or the same as new_translation_table, which is about to become owned by
+    // m_ref_translation_ptr.
+    (void)new_translation_table_owner.release();
+
     m_ref_translation_ptr = new_translation_table;
 }
 

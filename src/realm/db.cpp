@@ -384,11 +384,11 @@ private:
     ReadCount data[init_readers_size];
 };
 
-void TransactionDeleter(Transaction* t)
-{
+// Using lambda rather than function so that shared_ptr shared state doesn't need to hold a function pointer.
+constexpr auto TransactionDeleter = [](Transaction* t) {
     t->close();
     delete t;
-}
+};
 
 template <typename... Args>
 TransactionRef make_transaction_ref(Args&&... args)

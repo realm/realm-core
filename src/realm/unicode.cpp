@@ -53,8 +53,8 @@ std::wstring utf8_to_wstring(StringData str)
     int wchars_num = MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, nullptr, 0);
     auto wstr = std::make_unique<wchar_t[]>(wchars_num);
     // Then convert
-    MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, wstr, wchars_num);
-    std::wstring w_result{wstr};
+    MultiByteToWideChar(CP_UTF8, 0, str.data(), -1, wstr.get(), wchars_num);
+    std::wstring w_result{wstr.get()};
 
     return w_result;
 #else
