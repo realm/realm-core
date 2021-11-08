@@ -320,10 +320,10 @@ private:
     friend class Cluster;
     friend class ColumnListBase;
     friend class CollectionBase;
-    friend class ConstTableView;
+    friend class TableView;
     template <class, class>
     friend class Collection;
-    template <class>
+    template <class, class>
     friend class CollectionBaseImpl;
     template <class>
     friend class Lst;

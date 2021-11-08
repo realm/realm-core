@@ -4,12 +4,12 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/sync/history.hpp>
-#include <realm/sync/noinst/object_id_history_state.hpp>
 #include <realm/array_integer.hpp>
 
 namespace realm {
-namespace _impl {
+namespace sync {
 
+class ClientReplication;
 // As new schema versions come into existence, describe them here.
 //
 //  0  Initial version
@@ -48,111 +48,201 @@ constexpr int get_client_history_schema_version() noexcept
     return 11;
 }
 
-class ClientHistoryImpl : public sync::ClientReplication, private History, public sync::TransformHistory {
+class ClientHistory final : public _impl::History, public TransformHistory {
 public:
-    using file_ident_type = sync::file_ident_type;
     using version_type = sync::version_type;
+    using RemoteChangeset = Transformer::RemoteChangeset;
 
-    // clang-format off
-    using SaltedFileIdent = sync::SaltedFileIdent;
-    using SaltedVersion   = sync::SaltedVersion;
-    using DownloadCursor  = sync::DownloadCursor;
-    using UploadCursor    = sync::UploadCursor;
-    using SyncProgress    = sync::SyncProgress;
-    using VersionInfo     = sync::VersionInfo;
-    using HistoryEntry    = sync::HistoryEntry;
-    using Transformer     = sync::Transformer;
-    // clang-format on
-
-    struct LocalChangeset {
-        version_type version;
+    struct UploadChangeset {
+        timestamp_type origin_timestamp;
+        file_ident_type origin_file_ident;
+        UploadCursor progress;
         ChunkedBinaryData changeset;
+        std::unique_ptr<char[]> buffer;
     };
 
-    ClientHistoryImpl(const std::string& realm_path);
+    // FIXME: Apparently, this feature is expected by object store, but why?
+    // What is it ultimately used for? (@tgoyne)
+    class SyncTransactReporter {
+    public:
+        virtual void report_sync_transact(VersionID old_version, VersionID new_version) = 0;
 
-    /// set_client_file_ident_and_downloaded_bytes() sets the salted client
-    /// file ident and downloaded_bytes. The function is used when a state
-    /// Realm has been downloaded from the server. The function creates a write
-    /// transaction.
-    void make_final_async_open_adjustements(SaltedFileIdent client_file_ident, uint_fast64_t downloaded_bytes);
+    protected:
+        ~SyncTransactReporter() {}
+    };
 
-    /// set_initial_state_realm_history_numbers() sets the history numbers for a
-    /// new state Realm. The function is used when the server creates a new
-    /// State Realm.
-    ///
-    /// The history object must be in a write transaction before this function
-    /// is called.
-    void set_initial_state_realm_history_numbers(version_type local_version, sync::SaltedVersion server_version);
-
-    // virtual void set_client_file_ident_in_wt() sets the client file ident.
-    // The history must be in a write transaction with version 'current_version'.
-    void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
-
-    // get_next_local_changeset returns the first changeset with version
-    // greater than or equal to 'begin_version'. 'begin_version' must be at
-    // least 1.
-    //
-    // The history must be in a transaction when this function is called.
-    // The return value is none if there are no such local changesets.
-    util::Optional<LocalChangeset> get_next_local_changeset(version_type current_version,
-                                                            version_type begin_version) const;
+    enum class IntegrationError { bad_origin_file_ident, bad_changeset };
 
     /// set_client_reset_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The shared group associated with
     /// this history object must be in a write transaction when this function
     /// is called.
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
-                                      sync::SaltedVersion server_version, uint_fast64_t downloaded_bytes,
-                                      BinaryData uploadable_changeset);
+                                      SaltedVersion server_version, BinaryData uploadable_changeset);
 
-    /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
-    /// of local origin. This should only be used for testing and defaults to calling
-    /// sync::generate_changeset_timestamp().
-    void set_local_origin_timestamp_source(std::function<sync::timestamp_type()> source_fn);
+    /// Get the version of the latest snapshot of the associated Realm, as well
+    /// as the client file identifier and the synchronization progress as they
+    /// are stored in that snapshot.
+    ///
+    /// The returned current client version is the version produced by the last
+    /// changeset in the history. The type of version returned here, is the one
+    /// that identifies an entry in the sync history. Whether this is the same
+    /// as the snapshot number of the Realm file depends on the history
+    /// implementation.
+    ///
+    /// The returned client file identifier is the one that was last stored by
+    /// set_client_file_ident(), or `SaltedFileIdent{0, 0}` if
+    /// set_client_file_ident() has never been called.
+    ///
+    /// The returned SyncProgress is the one that was last stored by
+    /// set_sync_progress(), or `SyncProgress{}` if set_sync_progress() has
+    /// never been called.
+    void get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
+                    SyncProgress& progress) const;
 
-    // Overriding member functions in realm::Replication
-    void initialize(DB& sg) override final;
-    void initiate_session(version_type) override final;
-    void terminate_session() noexcept override final;
-    HistoryType get_history_type() const noexcept override final;
-    int get_history_schema_version() const noexcept override final;
-    bool is_upgradable_history_schema(int) const noexcept override final;
-    void upgrade_history_schema(int) override final;
-    History* _get_history_write() override;
-    std::unique_ptr<History> _create_history_read() override;
-    void do_initiate_transact(Group& group, version_type version, bool history_updated) override final;
+    /// Stores the server assigned client file identifier in the associated
+    /// Realm file, such that it is available via get_status() during future
+    /// synchronization sessions. It is an error to set this identifier more
+    /// than once per Realm file.
+    ///
+    /// \param client_file_ident The server assigned client-side file
+    /// identifier. A client-side file identifier is a non-zero positive integer
+    /// strictly less than 2**64. The server guarantees that all client-side
+    /// file identifiers generated on behalf of a particular server Realm are
+    /// unique with respect to each other. The server is free to generate
+    /// identical identifiers for two client files if they are associated with
+    /// different server Realms.
+    ///
+    /// \param fix_up_object_ids The object ids that depend on client file ident
+    /// will be fixed in both state and history if this parameter is true. If
+    /// it is known that there are no objects to fix, it can be set to false to
+    /// achieve higher performance.
+    ///
+    /// The client is required to obtain the file identifier before engaging in
+    /// synchronization proper, and it must store the identifier and use it to
+    /// reestablish the connection between the client file and the server file
+    /// when engaging in future synchronization sessions.
+    void set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids);
 
-    // Overriding member functions in realm::TrivialReplication
-    version_type prepare_changeset(const char*, size_t, version_type) override final;
-    void finalize_changeset() noexcept override final;
+    /// Stores the synchronization progress in the associated Realm file in a
+    /// way that makes it available via get_status() during future
+    /// synchronization sessions. Progress is reported by the server in the
+    /// DOWNLOAD message.
+    ///
+    /// See struct SyncProgress for a description of \a progress.
+    ///
+    /// \param downloadable_bytes If specified, and if the implementation cares
+    /// about byte-level progress, this function updates the persistent record
+    /// of the estimate of the number of remaining bytes to be downloaded.
+    void set_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes, VersionInfo&);
 
-    // Overriding member functions in realm::sync::ClientReplicationBase
-    void get_status(version_type&, SaltedFileIdent&, SyncProgress&) const override final;
-    void set_client_file_ident(SaltedFileIdent, bool) override final;
-    void set_sync_progress(const SyncProgress&, const std::uint_fast64_t*, VersionInfo&) override final;
-    void find_uploadable_changesets(UploadCursor&, version_type, std::vector<UploadChangeset>&,
-                                    version_type&) const override final;
-    bool integrate_server_changesets(const SyncProgress&, const std::uint_fast64_t*, const RemoteChangeset*,
-                                     std::size_t, VersionInfo&, IntegrationError&, util::Logger&,
-                                     SyncTransactReporter*) override final;
+    /// \brief Scan through the history for changesets to be uploaded.
+    ///
+    /// This function scans the history for changesets to be uploaded, i.e., for
+    /// changesets that are not empty, and were not produced by integration of
+    /// changesets recieved from the server. The scan begins at the position
+    /// specified by the initial value of \a upload_progress.client_version, and
+    /// ends no later than at the position specified by \a end_version.
+    ///
+    /// The implementation is allowed to end the scan before \a end_version,
+    /// such as to limit the combined size of returned changesets. However, if
+    /// the specified range contains any changesets that are supposed to be
+    /// uploaded, this function must return at least one.
+    ///
+    /// Upon return, \a upload_progress will have been updated to point to the
+    /// position from which the next scan should resume. This must be a position
+    /// after the last returned changeset, and before any remaining changesets
+    /// that are supposed to be uploaded, although never a position that
+    /// succeeds \a end_version.
+    ///
+    /// The value passed as \a upload_progress by the caller, must either be one
+    /// that was produced by an earlier invocation of
+    /// find_uploadable_changesets(), one that was returned by get_status(), or
+    /// one that was received by the client in a DOWNLOAD message from the
+    /// server. When the value comes from a DOWNLOAD message, it is supposed to
+    /// reflect a value of UploadChangeset::progress produced by an earlier
+    /// invocation of find_uploadable_changesets().
+    ///
+    /// Found changesets are added to \a uploadable_changesets.
+    ///
+    /// \param locked_server_version will be set to the value that should be
+    /// used as `<locked server version>` in a DOWNLOAD message.
+    ///
+    /// For changesets of local origin, UploadChangeset::origin_file_ident will
+    /// be zero.
+    void find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
+                                    std::vector<UploadChangeset>& uploadable_changesets,
+                                    version_type& locked_server_version) const;
+
+
+    /// \brief Integrate a sequence of changesets received from the server using
+    /// a single Realm transaction.
+    ///
+    /// Each changeset will be transformed as if by a call to
+    /// Transformer::transform_remote_changeset(), and then applied to the
+    /// associated Realm.
+    ///
+    /// As a final step, each changeset will be added to the local history (list
+    /// of applied changesets).
+    ///
+    /// This function checks whether the specified changesets specify valid
+    /// remote origin file identifiers and whether the changesets contain valid
+    /// sequences of instructions. The caller must already have ensured that the
+    /// origin file identifiers are strictly positive and not equal to the file
+    /// identifier assigned to this client by the server.
+    ///
+    /// If any of the changesets are invalid, this function returns false and
+    /// sets `integration_error` to the appropriate value. If they are all
+    /// deemed valid, this function updates \a version_info to reflect the new
+    /// version produced by the transaction.
+    ///
+    /// \param progress The synchronization progress is what was received in the
+    /// DOWNLOAD message along with the specified changesets. The progress will
+    /// be persisted along with the changesets.
+    ///
+    /// \param downloadable_bytes If specified, and if the implementation cares
+    /// about byte-level progress, this function updates the persistent record
+    /// of the estimate of the number of remaining bytes to be downloaded.
+    ///
+    /// \param num_changesets The number of passed changesets. Must be non-zero.
+    ///
+    /// \param transact_reporter An optional callback which will be called with the
+    /// version immediately processing the sync transaction and that of the sync
+    /// transaction.
+    bool integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+                                     const RemoteChangeset* changesets, std::size_t num_changesets,
+                                     VersionInfo& new_version, IntegrationError& integration_error, util::Logger&,
+                                     SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
-    // Overriding member functions in realm::sync::ClientHistory
-    void get_upload_download_bytes(std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
-                                   std::uint_fast64_t&) override final;
-    UploadCursor get_upload_anchor_of_current_transact(const Transaction&) const override final;
-    util::StringView get_sync_changeset_of_current_transact(const Transaction&) const noexcept override final;
 
-    // Overriding member functions in realm::sync::TransformHistory
+    // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override final;
     ChunkedBinaryData get_reciprocal_transform(version_type) const override final;
     void set_reciprocal_transform(version_type, BinaryData) override final;
 
+public: // Stuff in this section is only used by CLI tools.
+    /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
+    /// of local origin. This should only be used for testing and defaults to calling
+    /// generate_changeset_timestamp().
+    void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
+
+public: // Stuff in this section is only used by tests.
+    // virtual void set_client_file_ident_in_wt() sets the client file ident.
+    // The history must be in a write transaction with version 'current_version'.
+    void set_client_file_ident_in_wt(version_type current_version, SaltedFileIdent client_file_ident);
+
 private:
+    friend class ClientReplication;
     static constexpr version_type s_initial_version = 1;
 
+    ClientHistory(ClientReplication* owner)
+        : m_replication(owner)
+    {
+    }
+
+    ClientReplication* m_replication;
     DB* m_db = nullptr;
 
     // FIXME: All history objects belonging to a particular client object
@@ -165,7 +255,7 @@ private:
     /// m_ct_history.size()` is equal to the version that is associated with the
     /// currently bound snapshot, but after add_ct_history_entry() is called, it
     /// is equal to that plus one.
-    mutable version_type m_ct_history_base_version;
+    mutable version_type m_ct_history_base_version = 0;
 
     /// Version on which the first changeset in the synchronization history is
     /// based, or if that history is empty, the version on which the next
@@ -173,7 +263,7 @@ private:
     /// `m_sync_history_base_version + m_sync_history_size` is equal to the
     /// version, that is associated with the currently bound snapshot, but after
     /// add_sync_history_entry() is called, it is equal to that plus one.
-    mutable version_type m_sync_history_base_version;
+    mutable version_type m_sync_history_base_version = 0;
 
     using IntegerBpTree = BPlusTree<int64_t>;
     struct Arrays {
@@ -260,7 +350,13 @@ private:
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
-    std::function<sync::timestamp_type()> m_local_origin_timestamp_source = sync::generate_changeset_timestamp;
+    std::function<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
+
+    void initialize(DB& db) noexcept
+    {
+        REALM_ASSERT(!m_db);
+        m_db = &db;
+    }
 
     static version_type find_sync_history_entry(Arrays& arrays, version_type base_version, version_type begin_version,
                                                 version_type end_version, HistoryEntry& entry,
@@ -272,7 +368,7 @@ private:
                                                   version_type end_version) const noexcept;
 
     void prepare_for_write();
-    void add_ct_history_entry(BinaryData changeset);
+    Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(HistoryEntry);
     void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes);
     void trim_ct_history();
@@ -299,18 +395,55 @@ private:
     void update_from_parent(version_type current_version) override final;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override final;
     void set_oldest_bound_version(version_type) override final;
-    BinaryData get_uncommitted_changes() const noexcept override final;
     void verify() const override final;
     bool no_pending_local_changes(version_type version) const final;
 };
 
+class ClientReplication final : public SyncReplication {
+public:
+    ClientReplication()
+        : m_history(this)
+    {
+    }
+
+    // Overriding member functions in realm::Replication
+    void initialize(DB& sg) override final;
+    HistoryType get_history_type() const noexcept override final;
+    int get_history_schema_version() const noexcept override final;
+    bool is_upgradable_history_schema(int) const noexcept override final;
+    void upgrade_history_schema(int) override final;
+
+    _impl::History* _get_history_write() override
+    {
+        return &m_history;
+    }
+    std::unique_ptr<_impl::History> _create_history_read() override
+    {
+        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(this));
+        hist->initialize(*m_history.m_db);
+        return hist;
+    }
+
+    // Overriding member functions in realm::Replication
+    version_type prepare_changeset(const char*, size_t, version_type) override final;
+    void finalize_changeset() noexcept override final;
+
+    ClientHistory& get_history()
+    {
+        return m_history;
+    }
+
+    const ClientHistory& get_history() const
+    {
+        return m_history;
+    }
+
+private:
+    ClientHistory m_history;
+};
+
 
 // Implementation
-
-inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path)
-    : ClientReplication{realm_path}
-{
-}
 
 // Clamp the beginning of the specified upload skippable version range to the
 // beginning of the synchronization history.
@@ -334,7 +467,7 @@ inline ClientHistoryImpl::ClientHistoryImpl(const std::string& realm_path)
 //
 // See trim_sync_history() for further details, and in particular, for a
 // definition of *upload skippable*.
-inline void ClientHistoryImpl::clamp_sync_version_range(version_type& begin, version_type& end) const noexcept
+inline void ClientHistory::clamp_sync_version_range(version_type& begin, version_type& end) const noexcept
 {
     REALM_ASSERT(begin <= end);
     REALM_ASSERT(m_progress_download.last_integrated_client_version <= begin);
@@ -345,15 +478,22 @@ inline void ClientHistoryImpl::clamp_sync_version_range(version_type& begin, ver
     }
 }
 
-inline auto ClientHistoryImpl::get_transformer() -> Transformer&
+inline auto ClientHistory::get_transformer() -> Transformer&
 {
     if (!m_transformer)
-        m_transformer = sync::make_transformer(); // Throws
+        m_transformer = make_transformer(); // Throws
     return *m_transformer;
 }
 
 
-} // namespace _impl
+/// \brief Create a "sync history" implementation of the realm::Replication
+/// interface.
+///
+/// The intended role for such an object is as a plugin for new
+/// realm::DB objects.
+std::unique_ptr<ClientReplication> make_client_replication();
+
+} // namespace sync
 } // namespace realm
 
 #endif // REALM_NOINST_CLIENT_HISTORY_IMPL_HPP

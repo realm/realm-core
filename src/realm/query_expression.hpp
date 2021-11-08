@@ -793,6 +793,54 @@ Query create(L left, const Subexpr2<R>& right)
     }
 }
 
+// Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
+// query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
+// query_expression.hpp node.
+//
+// This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
+template <class Cond, typename L, typename R>
+Query create2(const Subexpr2<L>& left, const Subexpr2<R>& right)
+{
+#ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
+    // Test if expressions are of type Columns. Other possibilities are Value and Operator.
+    const Columns<L>* left_col = dynamic_cast<const Columns<L>*>(&left);
+    const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
+
+    // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
+    // >=},
+    // but only if both columns are non-nullable, and aren't in linked tables.
+    if (left_col && right_col) {
+        ConstTableRef t = left_col->get_base_table();
+        ConstTableRef t_right = right_col->get_base_table();
+        REALM_ASSERT_DEBUG(t);
+        REALM_ASSERT_DEBUG(t_right);
+        // we only support multi column comparisons if they stem from the same table
+        if (t->get_key() != t_right->get_key()) {
+            throw std::runtime_error(util::format(
+                "Comparison between two properties must be linked with a relationship or exist on the same "
+                "Table (%1 and %2)",
+                t->get_name(), t_right->get_name()));
+        }
+        if (!left_col->links_exist() && !right_col->links_exist()) {
+            if constexpr (std::is_same_v<Cond, Less>)
+                return Query(t).less(left_col->column_key(), right_col->column_key());
+            if constexpr (std::is_same_v<Cond, Greater>)
+                return Query(t).greater(left_col->column_key(), right_col->column_key());
+            if constexpr (std::is_same_v<Cond, Equal>)
+                return Query(t).equal(left_col->column_key(), right_col->column_key());
+            if constexpr (std::is_same_v<Cond, NotEqual>)
+                return Query(t).not_equal(left_col->column_key(), right_col->column_key());
+            if constexpr (std::is_same_v<Cond, LessEqual>)
+                return Query(t).less_equal(left_col->column_key(), right_col->column_key());
+            if constexpr (std::is_same_v<Cond, GreaterEqual>)
+                return Query(t).greater_equal(left_col->column_key(), right_col->column_key());
+        }
+    }
+#endif
+    // Return query_expression.hpp node
+    return make_expression<Compare<Cond>>(left.clone(), right.clone());
+}
+
 // All overloads where left-hand-side is Subexpr2<L>:
 //
 // left-hand-side       operator                              right-hand-side
@@ -803,146 +851,138 @@ template <class L, class R>
 class Overloads {
     typedef typename Common<L, R>::type CommonType;
 
-    std::unique_ptr<Subexpr> clone_subexpr() const
-    {
-        return static_cast<const Subexpr2<L>&>(*this).clone();
-    }
-
 public:
     // Arithmetic, right side constant
-    Operator<Plus<CommonType>> operator+(R right) const
+    friend Operator<Plus<CommonType>> operator+(const Subexpr2<L>& left, R right)
     {
-        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+        return {left.clone(), make_subexpr<Value<R>>(right)};
     }
-    Operator<Minus<CommonType>> operator-(R right) const
+    friend Operator<Minus<CommonType>> operator-(const Subexpr2<L>& left, R right)
     {
-        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+        return {left.clone(), make_subexpr<Value<R>>(right)};
     }
-    Operator<Mul<CommonType>> operator*(R right) const
+    friend Operator<Mul<CommonType>> operator*(const Subexpr2<L>& left, R right)
     {
-        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+        return {left.clone(), make_subexpr<Value<R>>(right)};
     }
-    Operator<Div<CommonType>> operator/(R right) const
+    friend Operator<Div<CommonType>> operator/(const Subexpr2<L>& left, R right)
     {
-        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+        return {left.clone(), make_subexpr<Value<R>>(right)};
+    }
+
+    // Arithmetic, left side constant
+    friend Operator<Plus<CommonType>> operator+(R left, const Subexpr2<L>& right)
+    {
+        return {make_subexpr<Value<R>>(left), right.clone()};
+    }
+    friend Operator<Minus<CommonType>> operator-(R left, const Subexpr2<L>& right)
+    {
+        return {make_subexpr<Value<R>>(left), right.clone()};
+    }
+    friend Operator<Mul<CommonType>> operator*(R left, const Subexpr2<L>& right)
+    {
+        return {make_subexpr<Value<R>>(left), right.clone()};
+    }
+    friend Operator<Div<CommonType>> operator/(R left, const Subexpr2<L>& right)
+    {
+        return {make_subexpr<Value<R>>(left), right.clone()};
     }
 
     // Arithmetic, right side subexpression
-    Operator<Plus<CommonType>> operator+(const Subexpr2<R>& right) const
+    friend Operator<Plus<CommonType>> operator+(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return {clone_subexpr(), right.clone()};
+        return {left.clone(), right.clone()};
     }
-    Operator<Minus<CommonType>> operator-(const Subexpr2<R>& right) const
+    friend Operator<Minus<CommonType>> operator-(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return {clone_subexpr(), right.clone()};
+        return {left.clone(), right.clone()};
     }
-    Operator<Mul<CommonType>> operator*(const Subexpr2<R>& right) const
+    friend Operator<Mul<CommonType>> operator*(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return {clone_subexpr(), right.clone()};
+        return {left.clone(), right.clone()};
     }
-    Operator<Div<CommonType>> operator/(const Subexpr2<R>& right) const
+    friend Operator<Div<CommonType>> operator/(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return {clone_subexpr(), right.clone()};
+        return {left.clone(), right.clone()};
     }
 
     // Compare, right side constant
-    Query operator>(R right)
+    friend Query operator>(const Subexpr2<L>& left, R right)
     {
-        return create<Less>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Less>(right, left);
     }
-    Query operator<(R right)
+    friend Query operator<(const Subexpr2<L>& left, R right)
     {
-        return create<Greater>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Greater>(right, left);
     }
-    Query operator>=(R right)
+    friend Query operator>=(const Subexpr2<L>& left, R right)
     {
-        return create<LessEqual>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<LessEqual>(right, left);
     }
-    Query operator<=(R right)
+    friend Query operator<=(const Subexpr2<L>& left, R right)
     {
-        return create<GreaterEqual>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<GreaterEqual>(right, left);
     }
-    Query operator==(R right)
+    friend Query operator==(const Subexpr2<L>& left, R right)
     {
-        return create<Equal>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<Equal>(right, left);
     }
-    Query operator!=(R right)
+    friend Query operator!=(const Subexpr2<L>& left, R right)
     {
-        return create<NotEqual>(right, static_cast<Subexpr2<L>&>(*this));
+        return create<NotEqual>(right, left);
     }
 
-    // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
-    // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
-    // query_expression.hpp node.
-    //
-    // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
-    template <class Cond>
-    Query create2(const Subexpr2<R>& right)
+    // Compare left-side constant
+    friend Query operator>(R left, const Subexpr2<L>& right)
     {
-#ifdef REALM_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
-        // Test if expressions are of type Columns. Other possibilities are Value and Operator.
-        const Columns<L>* left_col = dynamic_cast<const Columns<L>*>(static_cast<Subexpr2<L>*>(this));
-        const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
-
-        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=,
-        // >=},
-        // but only if both columns are non-nullable, and aren't in linked tables.
-        if (left_col && right_col) {
-            ConstTableRef t = left_col->get_base_table();
-            ConstTableRef t_right = right_col->get_base_table();
-            REALM_ASSERT_DEBUG(t);
-            REALM_ASSERT_DEBUG(t_right);
-            // we only support multi column comparisons if they stem from the same table
-            if (t->get_key() != t_right->get_key()) {
-                throw std::runtime_error(util::format(
-                    "Comparison between two properties must be linked with a relationship or exist on the same "
-                    "Table (%1 and %2)",
-                    t->get_name(), t_right->get_name()));
-            }
-            if (!left_col->links_exist() && !right_col->links_exist()) {
-                if constexpr (std::is_same_v<Cond, Less>)
-                    return Query(t).less(left_col->column_key(), right_col->column_key());
-                if constexpr (std::is_same_v<Cond, Greater>)
-                    return Query(t).greater(left_col->column_key(), right_col->column_key());
-                if constexpr (std::is_same_v<Cond, Equal>)
-                    return Query(t).equal(left_col->column_key(), right_col->column_key());
-                if constexpr (std::is_same_v<Cond, NotEqual>)
-                    return Query(t).not_equal(left_col->column_key(), right_col->column_key());
-                if constexpr (std::is_same_v<Cond, LessEqual>)
-                    return Query(t).less_equal(left_col->column_key(), right_col->column_key());
-                if constexpr (std::is_same_v<Cond, GreaterEqual>)
-                    return Query(t).greater_equal(left_col->column_key(), right_col->column_key());
-            }
-        }
-#endif
-        // Return query_expression.hpp node
-        return make_expression<Compare<Cond>>(clone_subexpr(), right.clone());
+        return create<Greater>(left, right);
     }
+    friend Query operator<(R left, const Subexpr2<L>& right)
+    {
+        return create<Less>(left, right);
+    }
+    friend Query operator>=(R left, const Subexpr2<L>& right)
+    {
+        return create<GreaterEqual>(left, right);
+    }
+    friend Query operator<=(R left, const Subexpr2<L>& right)
+    {
+        return create<LessEqual>(left, right);
+    }
+    friend Query operator==(R left, const Subexpr2<L>& right)
+    {
+        return create<Equal>(left, right);
+    }
+    friend Query operator!=(R left, const Subexpr2<L>& right)
+    {
+        return create<NotEqual>(left, right);
+    }
+
 
     // Compare, right side subexpression
-    Query operator==(const Subexpr2<R>& right)
+    friend Query operator==(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return create2<Equal>(right);
+        return create2<Equal>(left, right);
     }
-    Query operator!=(const Subexpr2<R>& right)
+    friend Query operator!=(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return create2<NotEqual>(right);
+        return create2<NotEqual>(left, right);
     }
-    Query operator>(const Subexpr2<R>& right)
+    friend Query operator>(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return create2<Greater>(right);
+        return create2<Greater>(left, right);
     }
-    Query operator<(const Subexpr2<R>& right)
+    friend Query operator<(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return create2<Less>(right);
+        return create2<Less>(left, right);
     }
-    Query operator>=(const Subexpr2<R>& right)
+    friend Query operator>=(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return create2<GreaterEqual>(right);
+        return create2<GreaterEqual>(left, right);
     }
-    Query operator<=(const Subexpr2<R>& right)
+    friend Query operator<=(const Subexpr2<L>& left, const Subexpr2<R>& right)
     {
-        return create2<LessEqual>(right);
+        return create2<LessEqual>(left, right);
     }
 };
 
@@ -951,7 +991,6 @@ public:
 // consider if it's simpler/better to remove this class completely and just list all 100 overloads manually anyway.
 template <class T>
 class Subexpr2 : public Subexpr,
-                 public Overloads<T, const char*>,
                  public Overloads<T, int>,
                  public Overloads<T, float>,
                  public Overloads<T, double>,
@@ -971,23 +1010,12 @@ public:
     {
         return ColumnTypeTraits<T>::id;
     }
-
-#define RLM_U2(t, o) using Overloads<T, t>::operator o;
-#define RLM_U(o)                                                                                                     \
-    RLM_U2(int, o)                                                                                                   \
-    RLM_U2(float, o)                                                                                                 \
-    RLM_U2(double, o)                                                                                                \
-    RLM_U2(int64_t, o)                                                                                               \
-    RLM_U2(StringData, o)                                                                                            \
-    RLM_U2(bool, o)                                                                                                  \
-    RLM_U2(Timestamp, o)                                                                                             \
-    RLM_U2(ObjectId, o)                                                                                              \
-    RLM_U2(Decimal128, o)                                                                                            \
-    RLM_U2(UUID, o)                                                                                                  \
-    RLM_U2(Mixed, o)                                                                                                 \
-    RLM_U2(null, o)
-    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
+
+template <class Operator>
+Query compare(const Subexpr2<Link>& left, const Obj& obj);
+template <class Operator>
+Query compare(const Subexpr2<Link>& left, null obj);
 
 // Subexpr2<Link> only provides equality comparisons. Their implementations can be found later in this file.
 template <>
@@ -996,6 +1024,49 @@ public:
     DataType get_type() const
     {
         return type_Link;
+    }
+
+    friend Query operator==(const Subexpr2<Link>& left, const Obj& row)
+    {
+        return compare<Equal>(left, row);
+    }
+    friend Query operator!=(const Subexpr2<Link>& left, const Obj& row)
+    {
+        return compare<NotEqual>(left, row);
+    }
+    friend Query operator==(const Obj& row, const Subexpr2<Link>& right)
+    {
+        return compare<Equal>(right, row);
+    }
+    friend Query operator!=(const Obj& row, const Subexpr2<Link>& right)
+    {
+        return compare<NotEqual>(right, row);
+    }
+
+    friend Query operator==(const Subexpr2<Link>& left, null)
+    {
+        return compare<Equal>(left, null());
+    }
+    friend Query operator!=(const Subexpr2<Link>& left, null)
+    {
+        return compare<NotEqual>(left, null());
+    }
+    friend Query operator==(null, const Subexpr2<Link>& right)
+    {
+        return compare<Equal>(right, null());
+    }
+    friend Query operator!=(null, const Subexpr2<Link>& right)
+    {
+        return compare<NotEqual>(right, null());
+    }
+
+    friend Query operator==(const Subexpr2<Link>& left, const Subexpr2<Link>& right)
+    {
+        return make_expression<Compare<Equal>>(left.clone(), right.clone());
+    }
+    friend Query operator!=(const Subexpr2<Link>& left, const Subexpr2<Link>& right)
+    {
+        return make_expression<Compare<NotEqual>>(left.clone(), right.clone());
     }
 };
 
@@ -1044,7 +1115,6 @@ public:
 template <>
 class Subexpr2<Mixed> : public Subexpr,
                         public Overloads<Mixed, Mixed>,
-                        public Overloads<Mixed, const char*>,
                         public Overloads<Mixed, int>,
                         public Overloads<Mixed, float>,
                         public Overloads<Mixed, double>,
@@ -1075,7 +1145,6 @@ public:
     }
 
     using T = Mixed; // used inside the following macros for operator overloads
-    RLM_U(+) RLM_U(-) RLM_U(*) RLM_U(/) RLM_U(>) RLM_U(<) RLM_U(==) RLM_U(!=) RLM_U(>=) RLM_U(<=)
 };
 
 template <>
@@ -1269,332 +1338,6 @@ private:
 
     OwnedBinaryData m_buffer;
 };
-
-// All overloads where left-hand-side is L:
-//
-// left-hand-side       operator                              right-hand-side
-// L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
-//
-// For L = R = {int, int64_t, float, double, Timestamp, ObjectId, Decimal128}:
-// Compare numeric values
-template <class R>
-Query operator>(double left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-template <class R>
-Query operator>(float left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-template <class R>
-Query operator>(int left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-template <class R>
-Query operator>(int64_t left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-template <class R>
-Query operator>(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-template <class R>
-Query operator>(ObjectId left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-template <class R>
-Query operator>(Decimal128 left, const Subexpr2<R>& right)
-{
-    return create<Greater>(left, right);
-}
-
-template <class R>
-Query operator<(double left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-template <class R>
-Query operator<(float left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-template <class R>
-Query operator<(int left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-template <class R>
-Query operator<(int64_t left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-template <class R>
-Query operator<(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-template <class R>
-Query operator<(ObjectId left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-template <class R>
-Query operator<(Decimal128 left, const Subexpr2<R>& right)
-{
-    return create<Less>(left, right);
-}
-
-template <class R>
-Query operator==(double left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(float left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(int left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(int64_t left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(ObjectId left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(Decimal128 left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(bool left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-template <class R>
-Query operator==(UUID left, const Subexpr2<R>& right)
-{
-    return create<Equal>(left, right);
-}
-
-
-template <class R>
-Query operator>=(double left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(float left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(int left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(int64_t left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(ObjectId left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-template <class R>
-Query operator>=(Decimal128 left, const Subexpr2<R>& right)
-{
-    return create<GreaterEqual>(left, right);
-}
-
-template <class R>
-Query operator<=(double left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(float left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(int left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(int64_t left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(ObjectId left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-template <class R>
-Query operator<=(Decimal128 left, const Subexpr2<R>& right)
-{
-    return create<LessEqual>(left, right);
-}
-
-template <class R>
-Query operator!=(double left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(float left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(int left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(int64_t left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(Timestamp left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(ObjectId left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(Decimal128 left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(bool left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-template <class R>
-Query operator!=(UUID left, const Subexpr2<R>& right)
-{
-    return create<NotEqual>(left, right);
-}
-
-// Arithmetic
-template <class R>
-Operator<Plus<typename Common<R, double>::type>> operator+(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Plus<typename Common<R, float>::type>> operator+(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Plus<typename Common<R, int>::type>> operator+(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Plus<typename Common<R, int64_t>::type>> operator+(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, double>::type>> operator-(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, float>::type>> operator-(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, int>::type>> operator-(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Minus<typename Common<R, int64_t>::type>> operator-(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, double>::type>> operator*(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, float>::type>> operator*(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, int>::type>> operator*(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Mul<typename Common<R, int64_t>::type>> operator*(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, double>::type>> operator/(double left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<double>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, float>::type>> operator/(float left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<float>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, int>::type>> operator/(int left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int>>(left), right.clone()};
-}
-template <class R>
-Operator<Div<typename Common<R, int64_t>::type>> operator/(int64_t left, const Subexpr2<R>& right)
-{
-    return {make_subexpr<Value<int64_t>>(left), right.clone()};
-}
 
 // Unary operators
 template <class T>
@@ -2139,6 +1882,46 @@ class Columns<Timestamp> : public SimpleQuerySupport<Timestamp> {
 template <>
 class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
     using SimpleQuerySupport::SimpleQuerySupport;
+
+    friend Query operator==(const Columns<BinaryData>& left, BinaryData right)
+    {
+        return create<Equal>(right, left);
+    }
+
+    friend Query operator==(BinaryData left, const Columns<BinaryData>& right)
+    {
+        return create<Equal>(left, right);
+    }
+
+    friend Query operator!=(const Columns<BinaryData>& left, BinaryData right)
+    {
+        return create<NotEqual>(right, left);
+    }
+
+    friend Query operator!=(BinaryData left, const Columns<BinaryData>& right)
+    {
+        return create<NotEqual>(left, right);
+    }
+
+    friend Query operator==(const Columns<BinaryData>& left, realm::null)
+    {
+        return create<Equal>(BinaryData(), left);
+    }
+
+    friend Query operator==(realm::null, const Columns<BinaryData>& right)
+    {
+        return create<Equal>(BinaryData(), right);
+    }
+
+    friend Query operator!=(const Columns<BinaryData>& left, realm::null)
+    {
+        return create<NotEqual>(BinaryData(), left);
+    }
+
+    friend Query operator!=(realm::null, const Columns<BinaryData>& right)
+    {
+        return create<NotEqual>(BinaryData(), right);
+    }
 };
 
 template <>
@@ -2159,27 +1942,6 @@ class Columns<Mixed> : public SimpleQuerySupport<Mixed> {
 template <>
 class Columns<UUID> : public SimpleQuerySupport<UUID> {
     using SimpleQuerySupport::SimpleQuerySupport;
-};
-
-template <>
-class Columns<StringData> : public SimpleQuerySupport<StringData> {
-public:
-    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : SimpleQuerySupport(column, table, links, type)
-    {
-    }
-
-    Columns(Columns const& other)
-        : SimpleQuerySupport(other)
-    {
-    }
-
-    Columns(Columns&& other) noexcept
-        : SimpleQuerySupport(other)
-    {
-    }
-    using SimpleQuerySupport::size;
 };
 
 template <class T, class S, class I>
@@ -2208,6 +1970,67 @@ Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData
     else
         return make_expression<Compare<I>>(right.clone(), left.clone());
 }
+
+template <>
+class Columns<StringData> : public SimpleQuerySupport<StringData> {
+public:
+    Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : SimpleQuerySupport(column, table, links, type)
+    {
+    }
+
+    Columns(Columns const& other)
+        : SimpleQuerySupport(other)
+    {
+    }
+
+    Columns(Columns&& other) noexcept
+        : SimpleQuerySupport(other)
+    {
+    }
+    using SimpleQuerySupport::size;
+
+    // Columns<String> == Columns<String>
+    friend Query operator==(const Columns<StringData>& left, const Columns<StringData>& right)
+    {
+        return string_compare<Equal, EqualIns>(left, right, true);
+    }
+
+    // Columns<String> != Columns<String>
+    friend Query operator!=(const Columns<StringData>& left, const Columns<StringData>& right)
+    {
+        return string_compare<NotEqual, NotEqualIns>(left, right, true);
+    }
+
+    // String == Columns<String>
+    template <class T>
+    friend Query operator==(T left, const Columns<StringData>& right)
+    {
+        return operator==(right, left);
+    }
+
+    // String != Columns<String>
+    template <class T>
+    friend Query operator!=(T left, const Columns<StringData>& right)
+    {
+        return operator!=(right, left);
+    }
+
+    // Columns<String> == String
+    template <class T>
+    friend Query operator==(const Columns<StringData>& left, T right)
+    {
+        return string_compare<T, Equal, EqualIns>(left, right, true);
+    }
+
+    // Columns<String> != String
+    template <class T>
+    friend Query operator!=(const Columns<StringData>& left, T right)
+    {
+        return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
+    }
+};
 
 template <class T, class S, class I>
 Query binary_compare(const Subexpr2<BinaryData>& left, T right, bool case_sensitive)
@@ -2245,87 +2068,6 @@ Query mixed_compare(const Subexpr2<Mixed>& left, const Subexpr2<Mixed>& right, b
         return make_expression<Compare<S>>(right.clone(), left.clone());
     else
         return make_expression<Compare<I>>(right.clone(), left.clone());
-}
-
-// Columns<String> == Columns<String>
-inline Query operator==(const Columns<StringData>& left, const Columns<StringData>& right)
-{
-    return string_compare<Equal, EqualIns>(left, right, true);
-}
-
-// Columns<String> != Columns<String>
-inline Query operator!=(const Columns<StringData>& left, const Columns<StringData>& right)
-{
-    return string_compare<NotEqual, NotEqualIns>(left, right, true);
-}
-
-// String == Columns<String>
-template <class T>
-Query operator==(T left, const Columns<StringData>& right)
-{
-    return operator==(right, left);
-}
-
-// String != Columns<String>
-template <class T>
-Query operator!=(T left, const Columns<StringData>& right)
-{
-    return operator!=(right, left);
-}
-
-// Columns<String> == String
-template <class T>
-Query operator==(const Columns<StringData>& left, T right)
-{
-    return string_compare<T, Equal, EqualIns>(left, right, true);
-}
-
-// Columns<String> != String
-template <class T>
-Query operator!=(const Columns<StringData>& left, T right)
-{
-    return string_compare<T, NotEqual, NotEqualIns>(left, right, true);
-}
-
-
-inline Query operator==(const Columns<BinaryData>& left, BinaryData right)
-{
-    return create<Equal>(right, left);
-}
-
-inline Query operator==(BinaryData left, const Columns<BinaryData>& right)
-{
-    return create<Equal>(left, right);
-}
-
-inline Query operator!=(const Columns<BinaryData>& left, BinaryData right)
-{
-    return create<NotEqual>(right, left);
-}
-
-inline Query operator!=(BinaryData left, const Columns<BinaryData>& right)
-{
-    return create<NotEqual>(left, right);
-}
-
-inline Query operator==(const Columns<BinaryData>& left, realm::null)
-{
-    return create<Equal>(BinaryData(), left);
-}
-
-inline Query operator==(realm::null, const Columns<BinaryData>& right)
-{
-    return create<Equal>(BinaryData(), right);
-}
-
-inline Query operator!=(const Columns<BinaryData>& left, realm::null)
-{
-    return create<NotEqual>(BinaryData(), left);
-}
-
-inline Query operator!=(realm::null, const Columns<BinaryData>& right)
-{
-    return create<NotEqual>(BinaryData(), right);
 }
 
 
@@ -3625,56 +3367,12 @@ Query compare(const Subexpr2<Link>& left, const Obj& obj)
     }
     return make_expression<Compare<Operator>>(left.clone(), make_subexpr<KeyValue>(obj.get_key()));
 }
-
-inline Query operator==(const Subexpr2<Link>& left, const Obj& row)
-{
-    return compare<Equal>(left, row);
-}
-inline Query operator!=(const Subexpr2<Link>& left, const Obj& row)
-{
-    return compare<NotEqual>(left, row);
-}
-inline Query operator==(const Obj& row, const Subexpr2<Link>& right)
-{
-    return compare<Equal>(right, row);
-}
-inline Query operator!=(const Obj& row, const Subexpr2<Link>& right)
-{
-    return compare<NotEqual>(right, row);
-}
-
 template <class Operator>
 Query compare(const Subexpr2<Link>& left, null)
 {
     static_assert(std::is_same_v<Operator, Equal> || std::is_same_v<Operator, NotEqual>,
                   "Links can only be compared for equality.");
     return make_expression<Compare<Operator>>(left.clone(), make_subexpr<KeyValue>(ObjKey{}));
-}
-
-inline Query operator==(const Subexpr2<Link>& left, null)
-{
-    return compare<Equal>(left, null());
-}
-inline Query operator!=(const Subexpr2<Link>& left, null)
-{
-    return compare<NotEqual>(left, null());
-}
-inline Query operator==(null, const Subexpr2<Link>& right)
-{
-    return compare<Equal>(right, null());
-}
-inline Query operator!=(null, const Subexpr2<Link>& right)
-{
-    return compare<NotEqual>(right, null());
-}
-
-inline Query operator==(const Subexpr2<Link>& left, const Subexpr2<Link>& right)
-{
-    return make_expression<Compare<Equal>>(left.clone(), right.clone());
-}
-inline Query operator!=(const Subexpr2<Link>& left, const Subexpr2<Link>& right)
-{
-    return make_expression<Compare<NotEqual>>(left.clone(), right.clone());
 }
 
 
@@ -3747,10 +3445,10 @@ public:
             // Not a Link column
             size_t colsize = leaf->size();
 
-            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage. If it's an integer
-            // leaf, then it contains the method get_chunk() which copies these values in a super fast way (first
-            // case of the `if` below. Otherwise, copy the values one by one in a for-loop (the `else` case).
+            // Now load `ValueBase::chunk_size` rows from from the leaf into m_storage.
             if constexpr (std::is_same_v<U, int64_t>) {
+                // If it's an integer leaf, then it contains the method get_chunk() which copies
+                // these values in a super fast way (only feasible if more than chunk_size in column)
                 if (index + ValueBase::chunk_size <= colsize) {
                     // If you want to modify 'chunk_size' then update Array::get_chunk()
                     REALM_ASSERT_3(ValueBase::chunk_size, ==, 8);

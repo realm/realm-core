@@ -2,13 +2,14 @@
 #define REALM_OBJECT_STORE_C_API_UTIL_HPP
 
 #include <realm/object-store/c_api/types.hpp>
+#include <realm/util/functional.hpp>
 
 namespace realm::c_api {
 
 void set_last_exception(std::exception_ptr eptr);
 
 template <class F>
-inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
+inline auto wrap_err(F&& f) noexcept -> decltype(f())
 {
     try {
         return f();
@@ -17,6 +18,18 @@ inline auto wrap_err(F&& f) -> decltype(std::declval<F>()())
         set_last_exception(std::current_exception());
         return {};
     };
+}
+
+template <class F>
+inline auto wrap_err(F&& f, const decltype(f())& e) noexcept
+{
+    try {
+        return f();
+    }
+    catch (...) {
+        set_last_exception(std::current_exception());
+        return e;
+    }
 }
 
 inline const ObjectSchema& schema_for_table(const std::shared_ptr<Realm>& realm, TableKey table_key)
@@ -100,6 +113,14 @@ inline Mixed objkey_to_typed_link(Mixed val, ColKey col_key, const Table& table)
     return val;
 }
 
+inline char* duplicate_string(const std::string& string)
+{
+    char* ret = reinterpret_cast<char*>(malloc(string.size() + 1));
+    string.copy(ret, string.size());
+    ret[string.size()] = '\0';
+    return ret;
+}
+
 struct FreeUserdata {
     realm_free_userdata_func_t m_func;
     FreeUserdata(realm_free_userdata_func_t func = nullptr)
@@ -115,6 +136,99 @@ struct FreeUserdata {
 };
 
 using UserdataPtr = std::unique_ptr<void, FreeUserdata>;
+using SharedUserdata = std::shared_ptr<void>;
+
+/**
+ * Convenience class for managing callbacks.
+ *
+ * WARNING: This class doesn't provide any thread-safety guarantees
+ * about which threads modifies or invokes callbacks.
+ *
+ * @tparam Args The argument types of the callback.
+ */
+template <typename... Args>
+class CallbackRegistry {
+public:
+    uint64_t add(util::UniqueFunction<void(Args...)>&& callback)
+    {
+        uint64_t token = m_next_token++;
+        m_callbacks.emplace_hint(m_callbacks.end(), token, std::move(callback));
+        return token;
+    }
+
+    void remove(uint64_t token)
+    {
+        m_callbacks.erase(token);
+    }
+
+    void invoke(Args... args)
+    {
+        for (auto& callback : m_callbacks) {
+            callback.second(args...);
+        }
+    }
+
+private:
+    std::map<uint64_t, util::UniqueFunction<void(Args...)>> m_callbacks;
+    uint64_t m_next_token = 0;
+};
+
+/**
+ * Convenience struct for safely filling external arrays with new-allocated pointers.
+ *
+ * Calling new T() might throw, which requires that extra care needs to be put in
+ * freeing any elements allocated into the buffer up to that point.
+ */
+template <typename T>
+struct OutBuffer {
+public:
+    OutBuffer(T** buffer)
+        : m_buffer(buffer)
+    {
+    }
+
+    template <typename... Args>
+    void emplace(Args&&... args)
+    {
+        m_buffer[m_size++] = new T(std::forward<Args>(args)...);
+    }
+
+    size_t size()
+    {
+        return m_size;
+    }
+
+    /**
+     * Release ownership of the elements in the buffer so that they won't be
+     * freed when this goes out of scope.
+     *
+     * @param out_n Total number of items added to the buffer. Can be null.
+     */
+    void release(size_t* out_n)
+    {
+        m_released = true;
+        if (out_n) {
+            *out_n = m_size;
+        }
+    }
+
+    ~OutBuffer()
+    {
+        if (m_released) {
+            return;
+        }
+
+        while (m_size--) {
+            delete m_buffer[m_size];
+            m_buffer[m_size] = nullptr;
+        }
+    }
+
+private:
+    T** m_buffer;
+    size_t m_size = 0;
+    bool m_released = false;
+};
 } // namespace realm::c_api
 
 #endif // REALM_OBJECT_STORE_C_API_UTIL_HPP

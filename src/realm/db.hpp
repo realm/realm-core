@@ -112,10 +112,12 @@ public:
     // Create a DB and associate it with a file. DB Objects can only be associated with one file,
     // the association determined on creation of the DB Object. The association can be broken by
     // calling DB::close(), but after that no new association can be established. To reopen the
-    // file (or another file), a new DB object is needed.
+    // file (or another file), a new DB object is needed. The specified Replication instance, if
+    // any, must remain in existence for as long as the DB.
     static DBRef create(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
-    static DBRef create(Replication& repl, const DBOptions options = DBOptions());
-    static DBRef create(std::unique_ptr<Replication> repl, const DBOptions options = DBOptions());
+    static DBRef create(Replication& repl, const std::string& file, const DBOptions options = DBOptions());
+    static DBRef create(std::unique_ptr<Replication> repl, const std::string& file,
+                        const DBOptions options = DBOptions());
     static DBRef create(BinaryData, bool take_ownership = true);
 
     ~DB() noexcept;
@@ -160,7 +162,7 @@ public:
         m_replication = repl;
     }
 
-    const std::string& get_path() const
+    const std::string& get_path() const noexcept
     {
         return m_db_path;
     }
@@ -371,8 +373,6 @@ public:
         Management,
         Note,
         Log,
-        LogA, // This is a legacy version of `Log`.
-        LogB, // This is a legacy version of `Log`.
     };
 
     /// Get the path for the given type of file for a base Realm file path.
@@ -499,10 +499,7 @@ private:
     /// how to migrate from.
     void open(const std::string& file, bool no_create = false, const DBOptions options = DBOptions());
     void open(BinaryData, bool take_ownership = true);
-
-    /// Open this group in replication mode. The specified Replication instance
-    /// must remain in existence for as long as the DB.
-    void open(Replication&, const DBOptions options = DBOptions());
+    void open(Replication&, const std::string& file, const DBOptions options = DBOptions());
 
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const DBOptions options);
@@ -672,7 +669,6 @@ public:
     // handover of the heavier Query and TableView
     std::unique_ptr<Query> import_copy_of(Query&, PayloadPolicy);
     std::unique_ptr<TableView> import_copy_of(TableView&, PayloadPolicy);
-    std::unique_ptr<ConstTableView> import_copy_of(ConstTableView&, PayloadPolicy);
 
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
@@ -1038,8 +1034,6 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
 
     if (!holds_write_mutex())
         db->do_end_write();
-
-    repl->abort_transact();
 
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);

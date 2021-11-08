@@ -12,7 +12,6 @@
 #include <sstream>
 
 #include <realm/util/optional.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/util/logger.hpp>
 
 
@@ -93,19 +92,19 @@ public:
 
     ProtoDef operator[](const char* name) noexcept;
 
-    bool expand(StringView text, std::ostream&, A&&...) const;
+    bool expand(std::string_view text, std::ostream&, A&&...) const;
 
-    bool parse(StringView text, Template&) const;
-    bool parse(StringView text, Template&, Logger&) const;
+    bool parse(std::string_view text, Template&) const;
+    bool parse(std::string_view text, Template&, Logger&) const;
 
 private:
-    using size_type = StringView::size_type;
+    using size_type = std::string_view::size_type;
     struct Substitution;
 
     const bool m_lenient;
     Logger& m_logger;
 
-    using Variables = std::map<StringView, std::function<EvalFunc>>;
+    using Variables = std::map<std::string_view, std::function<EvalFunc>>;
     Variables m_variables;
 
     void define(const char* name, std::function<EvalFunc>);
@@ -142,7 +141,7 @@ public:
     bool refers_to(const char* name) const noexcept;
 
 private:
-    StringView m_text;
+    std::string_view m_text;
     std::vector<Substitution> m_substitutions;
 
     friend class Substituter;
@@ -200,7 +199,7 @@ inline auto Substituter<A...>::operator[](const char* name) noexcept -> ProtoDef
 }
 
 template <class... A>
-inline bool Substituter<A...>::expand(StringView text, std::ostream& out, A&&... arg) const
+inline bool Substituter<A...>::expand(std::string_view text, std::ostream& out, A&&... arg) const
 {
     Template templ;
     if (parse(text, templ)) {                       // Throws
@@ -211,23 +210,23 @@ inline bool Substituter<A...>::expand(StringView text, std::ostream& out, A&&...
 }
 
 template <class... A>
-inline bool Substituter<A...>::parse(StringView text, Template& templ) const
+inline bool Substituter<A...>::parse(std::string_view text, Template& templ) const
 {
     return parse(text, templ, m_logger); // Throws
 }
 
 template <class... A>
-bool Substituter<A...>::parse(StringView text, Template& templ, Logger& logger) const
+bool Substituter<A...>::parse(std::string_view text, Template& templ, Logger& logger) const
 {
     bool error = false;
     Logger::Level log_level = (m_lenient ? Logger::Level::warn : Logger::Level::error);
     std::vector<Substitution> substitutions;
-    StringView var_name;
+    std::string_view var_name;
     size_type curr = 0;
     size_type end = text.size();
     for (;;) {
         size_type i = text.find('@', curr);
-        if (i == StringView::npos)
+        if (i == std::string_view::npos)
             break;
         if (i + 1 == end) {
             logger.log(log_level, "Unterminated `@` at end of text"); // Throws
@@ -237,7 +236,7 @@ bool Substituter<A...>::parse(StringView text, Template& templ, Logger& logger) 
         char ch = text[i + 1];
         if (ch == '{') {
             size_type j = text.find('}', i + 2);
-            if (j == StringView::npos) {
+            if (j == std::string_view::npos) {
                 logger.log(log_level, "Unterminated `@{`"); // Throws
                 error = true;
                 curr = i + 2;
@@ -350,7 +349,7 @@ void Substituter<A...>::Template::expand(std::ostream& out, A... arg) const
 template <class... A>
 inline bool Substituter<A...>::Template::refers_to(const char* name) const noexcept
 {
-    StringView name_2 = name;
+    std::string_view name_2 = name;
     for (const auto& subst : m_substitutions) {
         if (subst.var_def) {
             if (name_2 != subst.var_def->first)

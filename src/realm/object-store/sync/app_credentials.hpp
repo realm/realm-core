@@ -84,6 +84,8 @@ enum class AuthProvider {
 
 IdentityProvider provider_type_from_enum(AuthProvider provider);
 
+AuthProvider enum_from_provider_type(const IdentityProvider& provider);
+
 // Opaque credentials representing a specific Realm Object Server user.
 struct AppCredentials {
     // Construct and return credentials from a Facebook account token.

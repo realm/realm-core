@@ -25,7 +25,7 @@
 using namespace realm;
 
 TEST_CASE("progress notification", "[sync]") {
-    using NotifierType = SyncSession::NotifierType;
+    using NotifierType = SyncSession::ProgressDirection;
     _impl::SyncProgressNotifier progress;
 
     SECTION("callback is not called prior to first update") {
@@ -620,6 +620,60 @@ TEST_CASE("progress notification", "[sync]") {
             current_downloadable = 289;
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called_2);
+        }
+
+        SECTION("download notifiers handle transferrable decreasing") {
+            // Prime the progress updater
+            current_transferred = 60;
+            current_transferrable = 501;
+            const uint64_t original_transferrable = current_transferrable;
+            progress.update(current_transferred, current_transferrable, 21, 26, 1, 1);
+
+            progress.register_callback(
+                [&](auto xferred, auto xferable) {
+                    transferred = xferred;
+                    transferrable = xferable;
+                    callback_was_called = true;
+                },
+                NotifierType::download, false);
+            // Wait for the initial callback.
+            REQUIRE(callback_was_called);
+
+            // Download some data but also drop the total. transferrable should
+            // update because it decreased.
+            callback_was_called = false;
+            current_transferred = 160;
+            current_transferrable = 451;
+            progress.update(current_transferred, current_transferrable, 25, 26, 1, 1);
+            CHECK(callback_was_called);
+            CHECK(transferred == current_transferred);
+            CHECK(transferrable == current_transferrable);
+
+            // Increasing current_transferrable should not increase transferrable
+            const uint64_t previous_transferrable = current_transferrable;
+            callback_was_called = false;
+            current_transferrable = 1000;
+            progress.update(current_transferred, current_transferrable, 68, 191, 1, 1);
+            CHECK(callback_was_called);
+            CHECK(transferred == current_transferred);
+            CHECK(transferrable == previous_transferrable);
+
+            // Transferrable dropping to be equal to transferred should notify
+            // and then expire the notifier
+            callback_was_called = false;
+            current_transferred = 200;
+            current_transferrable = current_transferred;
+            progress.update(current_transferred, current_transferrable, 191, 192, 1, 1);
+            CHECK(callback_was_called);
+            CHECK(transferred == current_transferred);
+            CHECK(transferrable == current_transferred);
+
+            // The notifier should be unregistered at this point, and not fire.
+            callback_was_called = false;
+            current_transferred = original_transferrable + 250;
+            current_transferrable = 1228;
+            progress.update(current_transferred, current_transferrable, 199, 591, 1, 1);
+            CHECK(!callback_was_called);
         }
     }
 }

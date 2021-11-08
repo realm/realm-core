@@ -34,19 +34,27 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 
 void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception_ptr)> callback)
 {
-    auto session = m_session.load();
-    if (!session)
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!m_session)
         return;
 
+    m_session->revive_if_needed();
+
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    session->wait_for_download_completion([callback, self, this](std::error_code ec) {
-        auto session = m_session.exchange(nullptr);
-        if (!session)
-            return; // Swallow all events if the task as been canceled.
+    m_session->wait_for_download_completion([callback, self, this](std::error_code ec) {
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (!m_session)
+                return; // Swallow all events if the task has been cancelled.
+
+            for (auto token : m_registered_callbacks) {
+                m_session->unregister_progress_notifier(token);
+            }
+            m_session = nullptr;
+        }
 
         // Release our references to the coordinator after calling the callback
         auto coordinator = std::move(m_coordinator);
-        m_coordinator = nullptr;
 
         if (ec)
             return callback({}, std::make_exception_ptr(std::system_error(ec)));
@@ -64,17 +72,38 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
 
 void AsyncOpenTask::cancel()
 {
-    if (auto session = m_session.exchange(nullptr)) {
+    std::shared_ptr<SyncSession> session;
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_session)
+            return;
+
+        for (auto token : m_registered_callbacks) {
+            m_session->unregister_progress_notifier(token);
+        }
+
+        session = std::move(m_session);
+        m_coordinator = nullptr;
+    }
+
+    // We need to release the mutex before we log the session out as that will invoke the
+    // wait_for_download_completion callback which will also attempt to acquire the mutex
+    // thus deadlocking.
+    if (session) {
         // Does a better way exists for canceling the download?
         session->log_out();
-        m_coordinator = nullptr;
     }
 }
 
-uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback)
+uint64_t
+AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback> callback)
 {
-    if (auto session = m_session.load()) {
-        return session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_session) {
+        auto token = m_session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
+        m_registered_callbacks.emplace_back(token);
+        return token;
     }
     else {
         return 0;
@@ -83,8 +112,9 @@ uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncPr
 
 void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
 {
-    if (auto session = m_session.load())
-        session->unregister_progress_notifier(token);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_session)
+        m_session->unregister_progress_notifier(token);
 }
 
 } // namespace realm

@@ -311,7 +311,7 @@ std::string make_temp_dir()
                 throw;
         }
     }
-    return path.u8string();
+    return path.string();
 
 #else // POSIX.1-2008 version
 
@@ -322,7 +322,12 @@ std::string make_temp_dir()
     }
     return std::string(buffer);
 #else
-    std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
+    char* tmp_dir_env = getenv("TMPDIR");
+    std::string base_dir = tmp_dir_env ? tmp_dir_env : std::string(P_tmpdir);
+    if (!base_dir.empty() && base_dir[base_dir.length() - 1] != '/') {
+        base_dir = base_dir + "/";
+    }
+    std::string tmp = base_dir + std::string("realm_XXXXXX") + std::string("\0", 1);
     std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
     memcpy(buffer.get(), tmp.c_str(), tmp.size());
     if (mkdtemp(buffer.get()) == 0) {
@@ -915,7 +920,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
         std::string msg = get_errno_msg("posix_fallocate() failed: ", status);
         throw OutOfDiskSpace(msg);
     }
-    if (status == EINVAL) {
+    if (status == EINVAL || status == EPERM) {
         return false; // Retry with non-atomic version
     }
     throw std::system_error(status, std::system_category(), "posix_fallocate() failed");
@@ -1607,7 +1612,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
     if (path_.is_absolute())
         return path;
 
-    return (std::filesystem::path(base_dir) / path_).u8string();
+    return (std::filesystem::path(base_dir) / path_).string();
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
@@ -1841,7 +1846,7 @@ bool DirScanner::next(std::string& name)
 {
     const std::filesystem::directory_iterator end;
     if (m_iterator != end) {
-        name = m_iterator->path().filename().u8string();
+        name = m_iterator->path().filename().string();
         m_iterator++;
         return true;
     }

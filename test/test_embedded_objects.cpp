@@ -17,7 +17,7 @@ TEST(EmbeddedObjects_Basic)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
         top->add_column(*sub, "sub");
         sub->add_column(type_Int, "i");
@@ -77,7 +77,7 @@ TEST(EmbeddedObjects_ArrayOfObjects)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
         top->add_column_list(*sub, "sub");
         sub->add_column(type_Int, "i");
@@ -111,7 +111,7 @@ TEST(EmbeddedObjects_DictionaryOfObjects)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
         top->add_column_dictionary(*sub, "sub");
         sub->add_column(type_Int, "i");
@@ -145,7 +145,7 @@ TEST(EmbeddedObjects_NestedArray)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef threads = sync::create_table_with_primary_key(tr, "class_ForumThread", type_Int, "pk");
+        TableRef threads = tr.get_group().add_table_with_primary_key("class_ForumThread", type_Int, "pk");
         TableRef comments = tr.add_embedded_table("class_Comment");
         threads->add_column_list(*comments, "comments");
         comments->add_column_list(*comments, "replies");
@@ -205,7 +205,7 @@ TEST(EmbeddedObjects_ImplicitErase)
         auto client_2 = &*it.clients[1];
 
         client_1->create_schema([](WriteTransaction& tr) {
-            TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+            TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
             TableRef sub = tr.add_embedded_table("class_Sub");
             top->add_column(*sub, "sub");
             sub->add_column(type_Int, "i");
@@ -255,7 +255,7 @@ TEST(EmbeddedObjects_SetDefaultNullIgnored)
         auto client_2 = &*it.clients[1];
 
         client_1->create_schema([](WriteTransaction& tr) {
-            TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+            TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
             TableRef sub = tr.add_embedded_table("class_Sub");
             top->add_column(*sub, "sub");
             sub->add_column(type_Int, "i");
@@ -306,7 +306,7 @@ TEST(EmbeddedObjects_DiscardThroughImplicitErase)
         auto client_2 = &*it.clients[1];
 
         client_1->create_schema([](WriteTransaction& tr) {
-            TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+            TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
             TableRef sub = tr.add_embedded_table("class_Sub");
             top->add_column(*sub, "sub");
             sub->add_column(type_Int, "i");
@@ -355,7 +355,7 @@ TEST(EmbeddedObjects_AdjustPathOnInsert)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
         top->add_column_list(*sub, "sub");
         sub->add_column_list(*sub, "sub");
@@ -429,7 +429,7 @@ TEST(EmbeddedObjects_AdjustPathOnErase)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef top = sync::create_table_with_primary_key(tr, "class_Top", type_Int, "pk");
+        TableRef top = tr.get_group().add_table_with_primary_key("class_Top", type_Int, "pk");
         TableRef sub = tr.add_embedded_table("class_Sub");
         top->add_column_list(*sub, "sub");
         sub->add_column_list(*sub, "sub");
@@ -507,7 +507,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject)
         // Create baseline
         client_1->transaction([&](Peer& c) {
             auto& tr = *c.group;
-            auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
+            auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
             auto embedded = tr.add_embedded_table("class_embedded");
             embedded->add_column(type_Int, "int");
             table->add_column(*embedded, "embedded");
@@ -574,7 +574,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject_Nested)
         // Create baseline
         client_1->transaction([&](Peer& c) {
             auto& tr = *c.group;
-            auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
+            auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
             auto embedded = tr.add_embedded_table("class_embedded");
             embedded->add_column(type_Int, "int");
             embedded->add_column(*embedded, "embedded");

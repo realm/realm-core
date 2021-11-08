@@ -245,12 +245,6 @@ public:
     void make_file_action_metadata(StringData original_name, StringData partition_key_value, StringData local_uuid,
                                    SyncFileActionMetadata::Action action, StringData new_name = {}) const;
 
-    // Get the unique identifier of this client.
-    const std::string& client_uuid() const
-    {
-        return m_client_uuid;
-    }
-
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);
 
@@ -274,8 +268,6 @@ private:
     SyncClientMetadata::Schema m_client_schema;
     SyncClientMetadata::Schema m_current_user_identity_schema;
     SyncAppMetadata::Schema m_app_metadata_schema;
-
-    std::string m_client_uuid;
 
     std::shared_ptr<Realm> get_realm() const;
 

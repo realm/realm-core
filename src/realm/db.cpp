@@ -717,7 +717,7 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 #if REALM_HAVE_STD_FILESYSTEM
-std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().u8string();
+std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().string();
 #else
 std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #endif
@@ -1155,9 +1155,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                                                     path);
                 }
 
-                if (Replication* repl = get_replication())
-                    repl->initiate_session(version); // Throws
-
                 if (m_key) {
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
@@ -1347,7 +1344,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-void DB::open(Replication& repl, const DBOptions options)
+void DB::open(Replication& repl, const std::string& file, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -1358,12 +1355,6 @@ void DB::open(Replication& repl, const DBOptions options)
 
     set_replication(&repl);
 
-    // Register the DB using this replication object. If the replication object is
-    // deleted before the DB object, the replication object should call set_replication(nullptr)
-    // on the DB. This will prevent the DB from calling the replication object when it closes.
-    repl.register_db(this);
-
-    std::string file = repl.get_database_path();
     bool no_create = false;
     bool is_backend = false;
     do_open(file, no_create, is_backend, options); // Throws
@@ -1549,10 +1540,6 @@ size_t DB::get_allocated_size() const
 DB::~DB() noexcept
 {
     close();
-
-    if (m_replication) {
-        m_replication->register_db(nullptr);
-    }
 }
 
 void DB::release_all_read_locks() noexcept
@@ -1586,8 +1573,6 @@ void DB::close(bool allow_open_read_transactions)
         }
         if (m_alloc.is_attached())
             m_alloc.detach();
-        if (m_replication)
-            m_replication->terminate_session();
         m_fake_read_lock_if_immutable.reset();
     }
     else {
@@ -1635,8 +1620,6 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
                 catch (...) {
                 } // ignored on purpose.
             }
-            if (m_replication)
-                m_replication->terminate_session();
         }
         lock.unlock();
     }
@@ -2279,13 +2262,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
-        try {
-            low_level_commit(new_version, transaction, commit_to_disk); // Throws
-        }
-        catch (...) {
-            repl->abort_transact();
-            throw;
-        }
+        low_level_commit(new_version, transaction, commit_to_disk); // Throws
         repl->finalize_commit();
     }
     else {
@@ -2548,10 +2525,6 @@ std::string DB::get_core_file(const std::string& base_path, CoreFileType type)
             return base_path + ".note";
         case CoreFileType::Log:
             return base_path + ".log";
-        case CoreFileType::LogA:
-            return base_path + ".log_a";
-        case CoreFileType::LogB:
-            return base_path + ".log_b";
     }
     REALM_UNREACHABLE();
 }
@@ -2564,8 +2537,6 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
 
     File::try_remove(get_core_file(base_path, CoreFileType::Note));
     File::try_remove(get_core_file(base_path, CoreFileType::Log));
-    File::try_remove(get_core_file(base_path, CoreFileType::LogA));
-    File::try_remove(get_core_file(base_path, CoreFileType::LogB));
     util::try_remove_dir_recursive(get_core_file(base_path, CoreFileType::Management));
 
     if (delete_lockfile) {
@@ -2716,9 +2687,6 @@ void Transaction::rollback()
     db->reset_free_space_tracking();
     if (!holds_write_mutex())
         db->do_end_write();
-
-    if (Replication* repl = db->get_replication())
-        repl->abort_transact();
 
     do_end_read();
 }
@@ -2970,11 +2938,6 @@ std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPol
     return tv.clone_for_handover(this, policy);
 }
 
-std::unique_ptr<ConstTableView> Transaction::import_copy_of(ConstTableView& tv, PayloadPolicy policy)
-{
-    return tv.clone_for_handover(this, policy);
-}
-
 inline DB::DB(const DBOptions& options)
     : m_key(options.encryption_key)
     , m_upgrade_callback(std::move(options.upgrade_callback))
@@ -2999,19 +2962,19 @@ DBRef DB::create(const std::string& file, bool no_create, const DBOptions option
     return retval;
 }
 
-DBRef DB::create(Replication& repl, const DBOptions options)
+DBRef DB::create(Replication& repl, const std::string& file, const DBOptions options)
 {
     DBRef retval = std::make_shared<DBInit>(options);
-    retval->open(repl, options);
+    retval->open(repl, file, options);
     return retval;
 }
 
-DBRef DB::create(std::unique_ptr<Replication> repl, const DBOptions options)
+DBRef DB::create(std::unique_ptr<Replication> repl, const std::string& file, const DBOptions options)
 {
     REALM_ASSERT(repl);
     DBRef retval = std::make_shared<DBInit>(options);
     retval->m_history = std::move(repl);
-    retval->open(*retval->m_history, options);
+    retval->open(*retval->m_history, file, options);
     return retval;
 }
 
@@ -3045,14 +3008,6 @@ void DB::release_sync_agent()
     REALM_ASSERT(info->sync_agent_present);
     info->sync_agent_present = 0;
     m_is_sync_agent = false;
-}
-
-// HACK: Somewhat misplaced, but we have no replication.cpp
-Replication::~Replication()
-{
-    if (m_db) {
-        m_db->set_replication(nullptr);
-    }
 }
 
 void Transaction::async_request_sync_to_storage(std::function<void()> when_synchronized)

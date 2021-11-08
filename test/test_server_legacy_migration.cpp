@@ -1,9 +1,9 @@
 #include <realm/list.hpp>
 #include <realm/table.hpp>
 #include <realm/group.hpp>
-#include <realm/sync/noinst/server_legacy_migration.hpp>
-#include <realm/sync/noinst/server_history.hpp>
-#include <realm/sync/object.hpp>
+#include <realm/sync/noinst/server/server_legacy_migration.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/history.hpp>
 
 #include "test.hpp"
@@ -61,9 +61,9 @@ TEST(ServerLegacyMigration_ClientFileToCore6)
     SHARED_GROUP_TEST_PATH(copy_path);
     util::File::copy(path, copy_path);
 
-    std::unique_ptr<Replication> history = make_client_replication(copy_path);
+    std::unique_ptr<Replication> history = make_client_replication();
     // Upgrade not possible
-    CHECK_THROW_ANY(DB::create(*history));
+    CHECK_THROW_ANY(DB::create(*history, copy_path));
 }
 
 } // unnamed namespace

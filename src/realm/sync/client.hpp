@@ -10,197 +10,26 @@
 #include <string>
 
 #include <realm/util/buffer.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network.hpp>
-#include <realm/impl/cont_transact_hist.hpp>
-#include <realm/sync/protocol.hpp>
-#include <realm/sync/history.hpp>
+#include <realm/sync/client_base.hpp>
 
-namespace realm {
-namespace sync {
-
+namespace realm::sync {
 
 class Client {
 public:
-    enum class Error;
-
     using port_type = util::network::Endpoint::port_type;
-    using RoundtripTimeHandler = void(milliseconds_type roundtrip_time);
 
-    static constexpr milliseconds_type default_connect_timeout = 120000;        // 2 minutes
-    static constexpr milliseconds_type default_connection_linger_time = 30000;  // 30 seconds
-    static constexpr milliseconds_type default_ping_keepalive_period = 60000;   // 1 minute
-    static constexpr milliseconds_type default_pong_keepalive_timeout = 120000; // 2 minutes
-    static constexpr milliseconds_type default_fast_reconnect_limit = 60000;    // 1 minute
+    using Error = ClientError;
 
-    struct Config {
-        Config() {}
+    static constexpr milliseconds_type default_connect_timeout = sync::default_connect_timeout;
+    static constexpr milliseconds_type default_connection_linger_time = sync::default_connection_linger_time;
+    static constexpr milliseconds_type default_ping_keepalive_period = sync::default_ping_keepalive_period;
+    static constexpr milliseconds_type default_pong_keepalive_timeout = sync::default_pong_keepalive_timeout;
+    static constexpr milliseconds_type default_fast_reconnect_limit = sync::default_fast_reconnect_limit;
 
-        /// An optional custom platform description to be sent to server as part
-        /// of a user agent description (HTTP `User-Agent` header).
-        ///
-        /// If left empty, the platform description will be whatever is returned
-        /// by util::get_platform_info().
-        std::string user_agent_platform_info;
-
-        /// Optional information about the application to be added to the user
-        /// agent description as sent to the server. The intention is that the
-        /// application describes itself using the following (rough) syntax:
-        ///
-        ///     <application info>  ::=  (<space> <layer>)*
-        ///     <layer>             ::=  <name> "/" <version> [<space> <details>]
-        ///     <name>              ::=  (<alnum>)+
-        ///     <version>           ::=  <digit> (<alnum> | "." | "-" | "_")*
-        ///     <details>           ::=  <parentherized>
-        ///     <parentherized>     ::=  "(" (<nonpar> | <parentherized>)* ")"
-        ///
-        /// Where `<space>` is a single space character, `<digit>` is a decimal
-        /// digit, `<alnum>` is any alphanumeric character, and `<nonpar>` is
-        /// any character other than `(` and `)`.
-        ///
-        /// When multiple levels are present, the innermost layer (the one that
-        /// is closest to this API) should appear first.
-        ///
-        /// Example:
-        ///
-        ///     RealmJS/2.13.0 RealmStudio/2.9.0
-        ///
-        /// Note: The user agent description is not intended for machine
-        /// interpretation, but should still follow the specified syntax such
-        /// that it remains easily interpretable by human beings.
-        std::string user_agent_application_info;
-
-        /// An optional logger to be used by the client. If no logger is
-        /// specified, the client will use an instance of util::StderrLogger
-        /// with the log level threshold set to util::Logger::Level::info. The
-        /// client does not require a thread-safe logger, and it guarantees that
-        /// all logging happens either on behalf of the constructor or on behalf
-        /// of the invocation of run().
-        util::Logger* logger = nullptr;
-
-        /// Use ports 80 and 443 by default instead of 7800 and 7801
-        /// respectively. Ideally, these default ports should have been made
-        /// available via a different URI scheme instead (http/https or ws/wss).
-        bool enable_default_port_hack = true;
-
-        /// For testing purposes only.
-        ReconnectMode reconnect_mode = ReconnectMode::normal;
-
-        /// Create a separate connection for each session. For testing purposes
-        /// only.
-        ///
-        /// FIXME: This setting needs to be true for now, due to limitations in
-        /// the load balancer.
-        bool one_connection_per_session = true;
-
-        /// Do not access the local file system. Sessions will act as if
-        /// initiated on behalf of an empty (or nonexisting) local Realm
-        /// file. Received DOWNLOAD messages will be accepted, but otherwise
-        /// ignored. No UPLOAD messages will be generated. For testing purposes
-        /// only.
-        ///
-        /// Many operations, such as serialized transactions, are not suppored
-        /// in this mode.
-        bool dry_run = false;
-
-        /// The maximum number of milliseconds to allow for a connection to
-        /// become fully established. This includes the time to resolve the
-        /// network address, the TCP connect operation, the SSL handshake, and
-        /// the WebSocket handshake.
-        milliseconds_type connect_timeout = default_connect_timeout;
-
-        /// The number of milliseconds to keep a connection open after all
-        /// sessions have been abandoned (or suspended by errors).
-        ///
-        /// The purpose of this linger time is to avoid close/reopen cycles
-        /// during short periods of time where there are no sessions interested
-        /// in using the connection.
-        ///
-        /// If the connection gets closed due to an error before the linger time
-        /// expires, the connection will be kept closed until there are sessions
-        /// willing to use it again.
-        milliseconds_type connection_linger_time = default_connection_linger_time;
-
-        /// The client will send PING messages periodically to allow the server
-        /// to detect dead connections (heartbeat). This parameter specifies the
-        /// time, in milliseconds, between these PING messages. When scheduling
-        /// the next PING message, the client will deduct a small random amount
-        /// from the specified value to help spread the load on the server from
-        /// many clients.
-        milliseconds_type ping_keepalive_period = default_ping_keepalive_period;
-
-        /// Whenever the server receives a PING message, it is supposed to
-        /// respond with a PONG messsage to allow the client to detect dead
-        /// connections (heartbeat). This parameter specifies the time, in
-        /// milliseconds, that the client will wait for the PONG response
-        /// message before it assumes that the connection is dead, and
-        /// terminates it.
-        milliseconds_type pong_keepalive_timeout = default_pong_keepalive_timeout;
-
-        /// The maximum amount of time, in milliseconds, since the loss of a
-        /// prior connection, for a new connection to be considered a *fast
-        /// reconnect*.
-        ///
-        /// In general, when a client establishes a connection to the server,
-        /// the uploading process remains suspended until the initial
-        /// downloading process completes (as if by invocation of
-        /// Session::async_wait_for_download_completion()). However, to avoid
-        /// unnecessary latency in change propagation during ongoing
-        /// application-level activity, if the new connection is established
-        /// less than a certain amount of time (`fast_reconnect_limit`) since
-        /// the client was previously connected to the server, then the
-        /// uploading process will be activated immediately.
-        ///
-        /// For now, the purpose of the general delaying of the activation of
-        /// the uploading process, is to increase the chance of multiple initial
-        /// transactions on the client-side, to be uploaded to, and processed by
-        /// the server as a single unit. In the longer run, the intention is
-        /// that the client should upload transformed (from reciprocal history),
-        /// rather than original changesets when applicable to reduce the need
-        /// for changeset to be transformed on both sides. The delaying of the
-        /// upload process will increase the number of cases where this is
-        /// possible.
-        ///
-        /// FIXME: Currently, the time between connections is not tracked across
-        /// sessions, so if the application closes its session, and opens a new
-        /// one immediately afterwards, the activation of the upload process
-        /// will be delayed unconditionally.
-        milliseconds_type fast_reconnect_limit = default_fast_reconnect_limit;
-
-        /// Set to true to completely disable delaying of the upload process. In
-        /// this mode, the upload process will be activated immediately, and the
-        /// value of `fast_reconnect_limit` is ignored.
-        ///
-        /// For testing purposes only.
-        bool disable_upload_activation_delay = false;
-
-        /// If `disable_upload_compaction` is true, every changeset will be
-        /// compacted before it is uploaded to the server. Compaction will
-        /// reduce the size of a changeset if the same field is set multiple
-        /// times or if newly created objects are deleted within the same
-        /// transaction. Log compaction increeses CPU usage and memory
-        /// consumption.
-        bool disable_upload_compaction = false;
-
-        /// Set the `TCP_NODELAY` option on all TCP/IP sockets. This disables
-        /// the Nagle algorithm. Disabling it, can in some cases be used to
-        /// decrease latencies, but possibly at the expense of scalability. Be
-        /// sure to research the subject before you enable this option.
-        bool tcp_no_delay = false;
-
-        /// The specified function will be called whenever a PONG message is
-        /// received on any connection. The round-trip time in milliseconds will
-        /// be pased to the function. The specified function will always be
-        /// called by the client's event loop thread, i.e., the thread that
-        /// calls `Client::run()`. This feature is mainly for testing purposes.
-        std::function<RoundtripTimeHandler> roundtrip_time_handler;
-
-        /// Disable sync to disk (fsync(), msync()) for all realm files managed
-        /// by this client.
-        ///
-        /// Testing/debugging feature. Should never be enabled in production.
-        bool disable_sync_to_disk = false;
-    };
+    using Config = ClientConfig;
 
     /// \throw util::EventLoop::Implementation::NotAvailable if no event loop
     /// implementation was specified, and
@@ -269,8 +98,7 @@ public:
                               port_type& port, std::string& path) const;
 
 private:
-    class Impl;
-    std::unique_ptr<Impl> m_impl;
+    std::unique_ptr<ClientImpl> m_impl;
     friend class Session;
 };
 
@@ -334,6 +162,7 @@ class BadServerUrl; // Exception
 /// guaranteed to not be executing after Client::run() has returned.
 class Session {
 public:
+    using ErrorInfo = SessionErrorInfo;
     using port_type = util::network::Endpoint::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
@@ -484,95 +313,10 @@ public:
         /// identity and access rights of the current user.
         std::string signed_user_token;
 
-        /// ClientReset is used for both async open and client reset. If
-        /// client_reset is not util::none, the sync client will perform
-        /// async open for this session if the local Realm does not exist, and
-        /// client reset if the local Realm exists. If client_reset is
-        /// util::none, an ordinary sync session will take place.
-        ///
-        /// A session will perform async open by downloading a state Realm, and
-        /// some metadata, from the server, patching up the metadata part of
-        /// the Realm and finally move the downloaded Realm into the path of
-        /// the local Realm. After completion of async open, the application
-        /// can open and use the Realm.
-        ///
-        /// A session will perform client reset by downloading a state Realm, and
-        /// some metadata, from the server. After download, the state Realm will
-        /// be integrated into the local Realm in a write transaction. The
-        /// application is free to use the local realm during the entire client
-        /// reset. Like a DOWNLOAD message, the application will not be able
-        /// to perform a write transaction at the same time as the sync client
-        /// performs its own write transaction. Client reset is not more
-        /// disturbing for the application than any DOWNLOAD message. The
-        /// application can listen to change notifications from the client
-        /// reset exactly as in a DOWNLOAD message.
-        ///
-        /// Async open and client reset require a private directory for
-        /// metadata. This directory must be specified in the option
-        /// 'metadata_dir'. The metadata_dir must not be touched during async
-        /// open or client reset. The metadata_dir can safely be removed at
-        /// times where async open or client reset do not take place. The sync
-        /// client attempts to clean up metadata_dir. The metadata_dir can be
-        /// reused across app restarts to resume an interrupted download. It is
-        /// recommended to leave the metadata_dir unchanged except when it is
-        /// known that async open or client reset is done.
-        ///
-        /// The recommended usage of async open is to use it for the initial
-        /// bootstrap if Realm usage is not needed until after the server state
-        /// has been downloaded.
-        ///
-        /// The recommended usage of client reset is after a previous session
-        /// encountered an error that implies the need for a client reset. It
-        /// is not recommended to persist the need for a client reset. The
-        /// application should just attempt to synchronize in the usual fashion
-        /// and only after hitting an error, start a new session with a client
-        /// reset. In other words, if the application crashes during a client reset,
-        /// the application should attempt to perform ordinary synchronization
-        /// after restart and switch to client reset if needed.
-        ///
-        /// Error codes that imply the need for a client reset are the session
-        /// level error codes:
-        ///
-        /// bad_client_file_ident        = 208, // Bad client file identifier (IDENT)
-        /// bad_server_version           = 209, // Bad server version (IDENT, UPLOAD)
-        /// bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
-        /// diverging_histories          = 211, // Diverging histories (IDENT)
-        ///
-        /// However, other errors such as bad changeset (UPLOAD) could also be resolved
-        /// with a client reset. Client reset can even be used without any prior error
-        /// if so desired.
-        ///
-        /// After completion of async open and client reset, the sync client
-        /// will continue synchronizing with the server in the usual fashion.
-        ///
-        /// The progress of async open and client reset can be tracked with the
-        /// standard progress handler.
-        ///
-        /// Async open and client reset are done when the progress handler
-        /// arguments satisfy "progress_version > 0". However, if the
-        /// application wants to ensure that it has all data present on the
-        /// server, it should wait for download completion using either
-        /// void async_wait_for_download_completion(WaitOperCompletionHandler)
-        /// or
-        /// bool wait_for_download_complete_or_client_stopped().
-        struct ClientReset {
-            std::string metadata_dir;
-        };
+        using ClientReset = sync::ClientReset;
         util::Optional<ClientReset> client_reset_config;
 
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
-
-        /// Set to true to disable the upload process for this session. This
-        /// includes the sending of empty UPLOAD messages.
-        ///
-        /// This feature exists exclusively for testing purposes at this time.
-        bool disable_upload = false;
-
-        /// Set to true to disable sending of empty UPLOAD messages for this
-        /// session.
-        ///
-        /// This feature exists exclusively for testing purposes at this time.
-        bool disable_empty_upload = false;
 
         /// Set to true to cause the integration of the first received changeset
         /// (in a DOWNLOAD message) to fail.
@@ -586,7 +330,7 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, Config = {});
+    Session(Client&, std::shared_ptr<DB>, Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
@@ -725,41 +469,8 @@ public:
     /// under Session for more on this.
     void set_progress_handler(std::function<ProgressHandler>);
 
-    enum class ConnectionState { disconnected, connecting, connected };
 
-    /// \brief Information about an error causing a session to be temporarily
-    /// disconnected from the server.
-    ///
-    /// In general, the connection will be automatically reestablished
-    /// later. Whether this happens quickly, generally depends on \ref
-    /// is_fatal. If \ref is_fatal is true, it means that the error is deemed to
-    /// be of a kind that is likely to persist, and cause all future reconnect
-    /// attempts to fail. In that case, if another attempt is made at
-    /// reconnecting, the delay will be substantial (at least an hour).
-    ///
-    /// \ref error_code specifies the error that caused the connection to be
-    /// closed. For the list of errors reported by the server, see \ref
-    /// ProtocolError (or `protocol.md`). For the list of errors corresponding
-    /// to protocol violations that are detected by the client, see
-    /// Client::Error. The error may also be a system level error, or an error
-    /// from one of the potential intermediate protocol layers (SSL or
-    /// WebSocket).
-    ///
-    /// \ref detailed_message is the most detailed message available to describe
-    /// the error. It is generally equal to `error_code.message()`, but may also
-    /// be a more specific message (one that provides extra context). The
-    /// purpose of this message is mostly to aid in debugging. For non-debugging
-    /// purposes, `error_code.message()` should generally be considered
-    /// sufficient.
-    ///
-    /// \sa set_connection_state_change_listener().
-    struct ErrorInfo {
-        std::error_code error_code;
-        bool is_fatal;
-        const std::string& detailed_message;
-    };
-
-    using ConnectionStateChangeListener = void(ConnectionState, const ErrorInfo*);
+    using ConnectionStateChangeListener = void(ConnectionState, const SessionErrorInfo*);
 
     /// \brief Install a connection state change listener.
     ///
@@ -771,7 +482,7 @@ public:
     /// after "connected" is always "disconnected". A switch to the
     /// "disconnected" state only happens when an error occurs.
     ///
-    /// Whenever the installed function is called, an ErrorInfo object is passed
+    /// Whenever the installed function is called, an SessionErrorInfo object is passed
     /// when, and only when the passed state is ConnectionState::disconnected.
     ///
     /// When multiple sessions share a single connection, the state changes will
@@ -1012,76 +723,13 @@ public:
     void override_server(std::string address, port_type);
 
 private:
-    class Impl;
-    Impl* m_impl = nullptr;
+    SessionWrapper* m_impl = nullptr;
 
     void abandon() noexcept;
     void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);
 };
 
-
-/// \brief Protocol errors discovered by the client.
-///
-/// These errors will terminate the network connection (disconnect all sessions
-/// associated with the affected connection), and the error will be reported to
-/// the application via the connection state change listeners of the affected
-/// sessions.
-enum class Client::Error {
-    // clang-format off
-    connection_closed           = 100, ///< Connection closed (no error)
-    unknown_message             = 101, ///< Unknown type of input message
-    bad_syntax                  = 102, ///< Bad syntax in input message head
-    limits_exceeded             = 103, ///< Limits exceeded in input message
-    bad_session_ident           = 104, ///< Bad session identifier in input message
-    bad_message_order           = 105, ///< Bad input message order
-    bad_client_file_ident       = 106, ///< Bad client file identifier (IDENT)
-    bad_progress                = 107, ///< Bad progress information (DOWNLOAD)
-    bad_changeset_header_syntax = 108, ///< Bad syntax in changeset header (DOWNLOAD)
-    bad_changeset_size          = 109, ///< Bad changeset size in changeset header (DOWNLOAD)
-    bad_origin_file_ident       = 110, ///< Bad origin file identifier in changeset header (DOWNLOAD)
-    bad_server_version          = 111, ///< Bad server version in changeset header (DOWNLOAD)
-    bad_changeset               = 112, ///< Bad changeset (DOWNLOAD)
-    bad_request_ident           = 113, ///< Bad request identifier (MARK)
-    bad_error_code              = 114, ///< Bad error code (ERROR),
-    bad_compression             = 115, ///< Bad compression (DOWNLOAD)
-    bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
-    pong_timeout                = 118, ///< Timeout on reception of PONG respone message
-    bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
-    bad_file_ident              = 120, ///< Bad file identifier (ALLOC)
-    connect_timeout             = 121, ///< Sync connection was not fully established in time
-    bad_timestamp               = 122, ///< Bad timestamp (PONG)
-    bad_protocol_from_server    = 123, ///< Bad or missing protocol version information from server
-    client_too_old_for_server   = 124, ///< Protocol version negotiation failed: Client is too old for server
-    client_too_new_for_server   = 125, ///< Protocol version negotiation failed: Client is too new for server
-    protocol_mismatch           = 126, ///< Protocol version negotiation failed: No version supported by both client and server
-    bad_state_message           = 127, ///< Bad values in state message (STATE)
-    missing_protocol_feature    = 128, ///< Requested feature missing in negotiated protocol version
-    http_tunnel_failed          = 131, ///< Failed to establish HTTP tunnel with configured proxy
-    // clang-format on
-};
-
-const std::error_category& client_error_category() noexcept;
-
-std::error_code make_error_code(Client::Error) noexcept;
-
 std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
-
-} // namespace sync
-} // namespace realm
-
-namespace std {
-
-template <>
-struct is_error_code_enum<realm::sync::Client::Error> {
-    static const bool value = true;
-};
-
-} // namespace std
-
-namespace realm {
-namespace sync {
-
 
 // Implementation
 
@@ -1125,7 +773,7 @@ inline void Session::detach() noexcept
 
 inline void Session::set_error_handler(std::function<ErrorHandler> handler)
 {
-    auto handler_2 = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
+    auto handler_2 = [handler = std::move(handler)](ConnectionState state, const SessionErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
@@ -1155,7 +803,6 @@ inline void Session::async_wait_for_download_completion(WaitOperCompletionHandle
     async_wait_for(upload_completion, download_completion, std::move(handler)); // Throws
 }
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_SYNC_CLIENT_HPP

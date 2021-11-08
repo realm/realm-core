@@ -439,7 +439,10 @@ public:
     void clear() noexcept;
     OperQueue() noexcept = default;
     OperQueue(OperQueue&&) noexcept;
-    ~OperQueue() noexcept;
+    ~OperQueue() noexcept
+    {
+        clear();
+    }
 
 private:
     Oper* m_back = nullptr;
@@ -1780,12 +1783,6 @@ inline Service::OperQueue<Oper>::OperQueue(OperQueue&& q) noexcept
     : m_back{q.m_back}
 {
     q.m_back = nullptr;
-}
-
-template <class Oper>
-inline Service::OperQueue<Oper>::~OperQueue() noexcept
-{
-    clear();
 }
 
 // ---------------- Service::Descriptor ----------------

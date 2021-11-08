@@ -285,10 +285,23 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
     return payload.get_realm();
 }
 
+template <typename T>
+bool ThreadSafeReference::is() const
+{
+    return dynamic_cast<PayloadImpl<T>*>(m_payload.get()) != nullptr;
+}
+
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm> const&);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm> const&);
 template object_store::Set ThreadSafeReference::resolve<object_store::Set>(std::shared_ptr<Realm> const&);
 template OsDict ThreadSafeReference::resolve<OsDict>(std::shared_ptr<Realm> const&);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm> const&);
+
+template bool ThreadSafeReference::is<std::shared_ptr<Realm>>() const;
+template bool ThreadSafeReference::is<Results>() const;
+template bool ThreadSafeReference::is<List>() const;
+template bool ThreadSafeReference::is<object_store::Set>() const;
+template bool ThreadSafeReference::is<OsDict>() const;
+template bool ThreadSafeReference::is<Object>() const;
 
 } // namespace realm

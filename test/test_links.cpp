@@ -719,8 +719,8 @@ TEST(Links_LinkList_Basics)
 TEST(ListList_Clear)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef db = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef db = DB::create(*hist, path);
     auto group = db->start_write();
 
     auto target = group->add_table("target");
@@ -999,8 +999,8 @@ TEST(Links_CircularAccessors)
 TEST(Links_Transactions)
 {
     SHARED_GROUP_TEST_PATH(path);
-    auto hist = make_in_realm_history(path);
-    auto db = DB::create(*hist);
+    auto hist = make_in_realm_history();
+    auto db = DB::create(*hist, path);
 
     ColKey dog_col;
     ObjKey tim_key;

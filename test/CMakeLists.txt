@@ -261,8 +261,8 @@ if(REALM_ENABLE_SYNC)
 	    test_stable_ids.cpp
 	    test_sync.cpp
 	    test_sync_auth.cpp
-	    test_sync_server_history_compaction.cpp
 	    test_sync_history_migration.cpp
+	    test_sync_subscriptions.cpp
 	    test_transform.cpp
 	    test_util_circular_buffer.cpp
 	    test_util_buffer_stream.cpp

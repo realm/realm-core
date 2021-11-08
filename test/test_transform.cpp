@@ -18,7 +18,6 @@
 #include <realm/list.hpp>
 #include <realm/set.hpp>
 #include <realm/sync/transform.hpp>
-#include <realm/sync/object.hpp>
 
 #include "test.hpp"
 #include "util/quote.hpp"
@@ -74,7 +73,7 @@ TEST(Transform_OneClient)
     auto client = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
 
     client->create_schema([](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_foo");
+        TableRef t = tr.get_or_add_table("class_foo");
         t->add_column(type_Int, "i");
     });
     synchronize(server.get(), {client.get()});
@@ -93,7 +92,7 @@ TEST(Transform_TwoClients)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto create_schema = [](WriteTransaction& tr) {
-        TableRef foo = sync::create_table(tr, "class_foo");
+        TableRef foo = tr.get_or_add_table("class_foo");
         foo->add_column(type_Int, "i");
     };
 
@@ -121,13 +120,13 @@ TEST(Transform_AddTableInOrder)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        sync::create_table(tr, "class_foo");
-        sync::create_table(tr, "class_bar");
+        tr.get_or_add_table("class_foo");
+        tr.get_or_add_table("class_bar");
     });
 
     client_2->create_schema([](WriteTransaction& tr) {
-        sync::create_table(tr, "class_foo");
-        sync::create_table(tr, "class_bar");
+        tr.get_or_add_table("class_foo");
+        tr.get_or_add_table("class_bar");
     });
 
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -151,13 +150,13 @@ TEST(Transform_AddTableOutOfOrder)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        sync::create_table(tr, "class_foo");
-        sync::create_table(tr, "class_bar");
+        tr.get_or_add_table("class_foo");
+        tr.get_or_add_table("class_bar");
     });
 
     client_2->create_schema([](WriteTransaction& tr) {
-        sync::create_table(tr, "class_bar");
-        sync::create_table(tr, "class_foo");
+        tr.get_or_add_table("class_bar");
+        tr.get_or_add_table("class_foo");
     });
 
     synchronize(server.get(), {client_1.get(), client_2.get()});
@@ -181,18 +180,18 @@ TEST(Transform_AddColumnsInOrder)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef foo = sync::create_table(tr, "class_foo");
+        TableRef foo = tr.get_or_add_table("class_foo");
         foo->add_column(type_Int, "foo_col");
         foo->add_column(type_String, "foo_col2");
-        TableRef bar = sync::create_table(tr, "class_bar");
+        TableRef bar = tr.get_or_add_table("class_bar");
         bar->add_column(type_String, "bar_col");
     });
 
     client_2->create_schema([](WriteTransaction& tr) {
-        TableRef foo = sync::create_table(tr, "class_foo");
+        TableRef foo = tr.get_or_add_table("class_foo");
         foo->add_column(type_Int, "foo_col");
         foo->add_column(type_String, "foo_col2");
-        TableRef bar = sync::create_table(tr, "class_bar");
+        TableRef bar = tr.get_or_add_table("class_bar");
         bar->add_column(type_String, "bar_col");
     });
 
@@ -217,18 +216,18 @@ TEST(Transform_AddColumnsOutOfOrder)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->create_schema([](WriteTransaction& tr) {
-        TableRef bar = sync::create_table(tr, "class_bar");
+        TableRef bar = tr.get_or_add_table("class_bar");
         bar->add_column(type_String, "bar_col");
-        TableRef foo = sync::create_table(tr, "class_foo");
+        TableRef foo = tr.get_or_add_table("class_foo");
         foo->add_column(type_Int, "foo_int");
         foo->add_column(type_String, "foo_string");
     });
 
     client_2->create_schema([](WriteTransaction& tr) {
-        TableRef foo = sync::create_table(tr, "class_foo");
+        TableRef foo = tr.get_or_add_table("class_foo");
         foo->add_column(type_String, "foo_string");
         foo->add_column(type_Int, "foo_int");
-        TableRef bar = sync::create_table(tr, "class_bar");
+        TableRef bar = tr.get_or_add_table("class_bar");
         bar->add_column(type_String, "bar_col");
     });
 
@@ -248,9 +247,9 @@ TEST(Transform_LinkListSet_vs_MoveLastOver)
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
     auto create_schema = [](WriteTransaction& transaction) {
-        TableRef foo = sync::create_table(transaction, "class_foo");
+        TableRef foo = transaction.get_or_add_table("class_foo");
         foo->add_column(type_Int, "i");
-        TableRef bar = sync::create_table(transaction, "class_bar");
+        TableRef bar = transaction.get_or_add_table("class_bar");
         bar->add_column_list(*foo, "ll");
     };
     client_1->create_schema(create_schema);
@@ -291,9 +290,9 @@ TEST(Transform_LinkListInsert_vs_MoveLastOver)
     auto client_1 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
     auto create_schema = [](WriteTransaction& transaction) {
-        TableRef foo = sync::create_table(transaction, "class_foo");
+        TableRef foo = transaction.get_or_add_table("class_foo");
         foo->add_column(type_Int, "i");
-        TableRef bar = sync::create_table(transaction, "class_bar");
+        TableRef bar = transaction.get_or_add_table("class_bar");
         bar->add_column_list(*foo, "ll");
     };
     client_1->create_schema(create_schema);
@@ -334,8 +333,8 @@ TEST(Transform_Experiment)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
-        TableRef t2 = sync::create_table(tr, "class_t2");
+        TableRef t = tr.get_or_add_table("class_t");
+        TableRef t2 = tr.get_or_add_table("class_t2");
         t2->add_column(type_Int, "i");
         t->add_column_list(*t2, "ll");
     };
@@ -388,8 +387,8 @@ TEST(Transform_SelectLinkList)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
-        TableRef t2 = sync::create_table(tr, "class_t2");
+        TableRef t = tr.get_or_add_table("class_t");
+        TableRef t2 = tr.get_or_add_table("class_t2");
         t2->add_column(type_Int, "i");
         t->add_column_list(*t2, "ll");
     };
@@ -439,7 +438,7 @@ TEST(Transform_InsertRows)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
+        TableRef t = tr.get_or_add_table("class_t");
         t->add_column(type_Int, "i");
     };
 
@@ -474,9 +473,9 @@ TEST(Transform_AdjustSetLinkPayload)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
+        TableRef t = tr.get_or_add_table("class_t");
         t->add_column(type_Int, "i");
-        TableRef l = sync::create_table(tr, "class_l");
+        TableRef l = tr.get_or_add_table("class_l");
         l->add_column(*t, "l");
     };
 
@@ -528,9 +527,9 @@ TEST(Transform_AdjustLinkListSetPayload)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
+        TableRef t = tr.get_or_add_table("class_t");
         t->add_column(type_Int, "i");
-        TableRef l = sync::create_table(tr, "class_ll");
+        TableRef l = tr.get_or_add_table("class_ll");
         l->add_column_list(*t, "ll");
     };
 
@@ -576,7 +575,7 @@ TEST(Transform_MergeInsertSetAndErase)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
+        TableRef t = tr.get_or_add_table("class_t");
         t->add_column(type_Int, "i");
     };
 
@@ -623,9 +622,9 @@ TEST(Transform_MergeSetLinkAndMoveLastOver)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table(tr, "class_t");
+        TableRef t = tr.get_or_add_table("class_t");
         t->add_column(type_Int, "i");
-        TableRef l = sync::create_table(tr, "class_l");
+        TableRef l = tr.get_or_add_table("class_l");
         l->add_column(*t, "l");
     };
 
@@ -671,7 +670,7 @@ TEST(Transform_MergeSetDefault)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table_with_primary_key(tr, "class_t", type_Int, "i");
+        TableRef t = tr.get_group().add_table_with_primary_key("class_t", type_Int, "i");
         t->add_column(type_Int, "j");
     };
 
@@ -719,8 +718,8 @@ TEST(Transform_MergeLinkListsWithPrimaryKeys)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t = sync::create_table_with_primary_key(tr, "class_t", type_Int, "i");
-        TableRef t2 = sync::create_table(tr, "class_t2");
+        TableRef t = tr.get_group().add_table_with_primary_key("class_t", type_Int, "i");
+        TableRef t2 = tr.get_or_add_table("class_t2");
         t->add_column(type_String, "s");
         t->add_column_list(*t2, "ll");
         t2->add_column(type_Int, "i2");
@@ -790,7 +789,7 @@ TEST(Transform_AddInteger)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t1 = sync::create_table(tr, "class_t");
+        TableRef t1 = tr.get_or_add_table("class_t");
         t1->add_column(type_Int, "i");
     };
 
@@ -855,7 +854,7 @@ TEST(Transform_AddIntegerSetNull)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto schema = [](WriteTransaction& tr) {
-        TableRef t1 = sync::create_table(tr, "class_t");
+        TableRef t1 = tr.get_or_add_table("class_t");
         bool nullable = true;
         t1->add_column(type_Int, "i", nullable);
     };
@@ -909,8 +908,8 @@ TEST(Transform_EraseSelectedLinkView)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     auto init = [](WriteTransaction& tr) {
-        TableRef origin = sync::create_table(tr, "class_origin");
-        TableRef target = sync::create_table(tr, "class_target");
+        TableRef origin = tr.get_or_add_table("class_origin");
+        TableRef target = tr.get_or_add_table("class_target");
         origin->add_column_list(*target, "ll");
         target->add_column(type_Int, "");
         origin->create_object();
@@ -1036,12 +1035,12 @@ std::tuple<double, double, double> timer_two_clients(TestContext& test_context, 
     auto client_2 = Peer::create_client(test_context, 3, nullptr, path_add_on);
 
     client_1->create_schema([&](WriteTransaction& tr) {
-        TableRef table = sync::create_table(tr, table_name_1);
+        TableRef table = tr.get_or_add_table(table_name_1);
         table->add_column(type_Int, "int column");
     });
 
     client_2->create_schema([&](WriteTransaction& tr) {
-        TableRef table = sync::create_table(tr, table_name_2);
+        TableRef table = tr.get_or_add_table(table_name_2);
         table->add_column(type_Int, "int column");
     });
 
@@ -1133,7 +1132,7 @@ double timer_multi_clients(TestContext& test_context, const std::string path_add
 
     for (int i = 0; i < nclients; ++i) {
         clients[i]->create_schema([&](WriteTransaction& tr) {
-            TableRef table = sync::create_table(tr, table_name);
+            TableRef table = tr.get_or_add_table(table_name);
             table->add_column(type_Int, "int column");
         });
         integrate_changesets(server.get(), clients[i].get());
@@ -1199,7 +1198,7 @@ double timer_integrate_change_sets(TestContext& test_context, const std::string 
     auto client_2 = Peer::create_client(test_context, 3, nullptr, path_add_on);
 
     client_1->create_schema([&](WriteTransaction& tr) {
-        TableRef table = sync::create_table(tr, table_name);
+        TableRef table = tr.get_or_add_table(table_name);
         table->add_column(type_Int, "int column");
     });
 
@@ -1420,8 +1419,8 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
     auto client_2 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
 
     client_1->transaction([](Peer& c) {
-        TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
-        TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
+        TableRef a = c.group->add_table_with_primary_key("class_a", type_Int, "pk");
+        TableRef b = c.group->add_table_with_primary_key("class_b", type_Int, "pk");
         a->add_column_list(*b, "ll");
         Obj a_obj = a->create_object_with_primary_key(123);
         Obj b_obj = b->create_object_with_primary_key(456);
@@ -1429,8 +1428,8 @@ TEST(Transform_ErrorCase_LinkListDoubleMerge)
     });
 
     client_2->transaction([](Peer& c) {
-        TableRef a = sync::create_table_with_primary_key(*c.group, "class_a", type_Int, "pk");
-        TableRef b = sync::create_table_with_primary_key(*c.group, "class_b", type_Int, "pk");
+        TableRef a = c.group->add_table_with_primary_key("class_a", type_Int, "pk");
+        TableRef b = c.group->add_table_with_primary_key("class_b", type_Int, "pk");
         a->add_column_list(*b, "ll");
         Obj a_obj = a->create_object_with_primary_key(123);
         Obj b_obj = b->create_object_with_primary_key(456);
@@ -1455,8 +1454,8 @@ TEST(Transform_ArrayInsert_EraseObject)
     ObjKey k0, k1;
 
     client_1->transaction([&k0, &k1](Peer& c) {
-        TableRef source = sync::create_table(*c.group, "class_source");
-        TableRef target = sync::create_table(*c.group, "class_target");
+        TableRef source = c.group->add_table("class_source");
+        TableRef target = c.group->add_table("class_target");
         source->add_column_list(*target, "ll");
         source->create_object();
         k0 = target->create_object().get_key();
@@ -1497,7 +1496,7 @@ TEST(Transform_ArrayClearVsArrayClear_TimestampBased)
 
     // Create baseline
     client_1->transaction([&](Peer& c) {
-        TableRef table = sync::create_table(*c.group, "class_table");
+        TableRef table = c.group->add_table("class_table");
         col_ints = table->add_column_list(type_Int, "ints");
         auto obj = table->create_object();
         auto ints = obj.get_list<int64_t>("ints");
@@ -1569,7 +1568,7 @@ TEST(Transform_CreateEraseCreateSequencePreservesObject)
 
         // Create baseline
         client_1->transaction([&](Peer& c) {
-            auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
+            auto table = c.group->add_table_with_primary_key("class_table", type_Int, "pk");
             table->add_column(type_Int, "int");
             auto obj = table->create_object_with_primary_key(123);
             obj.set<int64_t>("int", 0);
@@ -1627,7 +1626,7 @@ TEST(Transform_AddIntegerSurvivesSetNull)
 
         // Create baseline
         client_1->transaction([&](Peer& c) {
-            auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
+            auto table = c.group->add_table_with_primary_key("class_table", type_Int, "pk");
             const bool nullable = true;
             table->add_column(type_Int, "int", nullable);
             auto obj = table->create_object_with_primary_key(0);
@@ -1704,7 +1703,7 @@ TEST(Transform_AddIntegerSurvivesSetDefault)
 
         // Create baseline
         client_1->transaction([&](Peer& c) {
-            auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
+            auto table = c.group->add_table_with_primary_key("class_table", type_Int, "pk");
             table->add_column(type_Int, "int");
             auto obj = table->create_object_with_primary_key(0);
         });
@@ -1760,7 +1759,7 @@ TEST(Transform_AddIntegerSurvivesSetDefault_NoRegularSets)
 
         // Create baseline
         client_1->transaction([&](Peer& c) {
-            auto table = sync::create_table_with_primary_key(*c.group, "class_table", type_Int, "pk");
+            auto table = c.group->add_table_with_primary_key("class_table", type_Int, "pk");
             table->add_column(type_Int, "int");
             auto obj = table->create_object_with_primary_key(0);
         });
@@ -1816,8 +1815,8 @@ TEST(Transform_DanglingLinks)
         // Create baseline
         client_1->transaction([&](Peer& c) {
             auto& tr = *c.group;
-            auto table = sync::create_table_with_primary_key(tr, "class_table", type_Int, "pk");
-            auto table2 = sync::create_table_with_primary_key(tr, "class_table2", type_Int, "pk");
+            auto table = tr.add_table_with_primary_key("class_table", type_Int, "pk");
+            auto table2 = tr.add_table_with_primary_key("class_table2", type_Int, "pk");
             table->add_column_list(*table2, "links");
             auto obj = table->create_object_with_primary_key(0);
             auto obj2 = table2->create_object_with_primary_key(0);
@@ -2427,7 +2426,7 @@ TEST(Transform_ArrayClearVersusClearRegression)
     auto client_2 = Peer::create_client(test_context, 2, changeset_dump_dir_gen.get());
     auto client_3 = Peer::create_client(test_context, 3, changeset_dump_dir_gen.get());
     client_2->start_transaction();
-    sync::create_table(*client_2->group, "class_F");
+    client_2->group->get_or_add_table("class_F");
     client_2->commit(); // changeset 2
     client_2->history.advance_time(5);
     client_2->start_transaction();
@@ -2435,7 +2434,7 @@ TEST(Transform_ArrayClearVersusClearRegression)
     client_2->selected_table->add_column_list(type_Int, "g", 0);
     client_2->commit(); // changeset 3
     client_3->start_transaction();
-    sync::create_table(*client_3->group, "class_F");
+    client_3->group->get_or_add_table("class_F");
     client_3->commit(); // changeset 2
     client_2->history.advance_time(2);
     server->integrate_next_changeset_from(*client_2);
@@ -2472,7 +2471,7 @@ TEST(Transform_ArrayClearVersusClearRegression)
     server->integrate_next_changeset_from(*client_2);
     client_2->history.advance_time(2);
     client_2->start_transaction();
-    sync::create_table_with_primary_key(*client_2->group, "class_C", type_Int, "pk");
+    client_2->group->add_table_with_primary_key("class_C", type_Int, "pk");
     client_2->commit(); // changeset 6
     client_3->history.advance_time(1);
     server->integrate_next_changeset_from(*client_3);
@@ -2587,7 +2586,7 @@ TEST(Transform_ArrayClearVersusClearRegression)
     client_2->commit(); // changeset 18
     server->integrate_next_changeset_from(*client_2);
     client_2->start_transaction();
-    sync::create_table_with_primary_key(*client_2->group, "class_E", type_Int, "pk");
+    client_2->group->add_table_with_primary_key("class_E", type_Int, "pk");
     client_2->commit(); // changeset 19
     client_3->start_transaction();
     client_3->selected_table = client_3->group->get_table("class_F");

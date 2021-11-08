@@ -235,10 +235,17 @@ inline std::ostream& operator<<(std::ostream& ostr, ObjKey key)
 
 class ObjKeys : public std::vector<ObjKey> {
 public:
-    ObjKeys(const std::vector<int64_t>& init)
+    explicit ObjKeys(const std::vector<int64_t>& init)
     {
         reserve(init.size());
         for (auto i : init) {
+            emplace_back(i);
+        }
+    }
+    ObjKeys(const std::initializer_list<int64_t>& list)
+    {
+        reserve(list.size());
+        for (auto i : list) {
             emplace_back(i);
         }
     }
@@ -306,9 +313,6 @@ private:
     TableKey m_table_key;
 };
 
-using TableKeyType = decltype(TableKey::value);
-using ObjKeyType = decltype(ObjKey::value);
-
 inline std::ostream& operator<<(std::ostream& os, ObjLink link)
 {
     os << '{' << link.get_table_key() << ',' << link.get_obj_key() << '}';
@@ -337,7 +341,13 @@ struct hash<realm::ObjKey> {
         return std::hash<uint64_t>{}(key.value);
     }
 };
-
+template <>
+struct hash<realm::ColKey> {
+    size_t operator()(realm::ColKey key) const
+    {
+        return std::hash<int64_t>{}(key.value);
+    }
+};
 template <>
 struct hash<realm::TableKey> {
     size_t operator()(realm::TableKey key) const

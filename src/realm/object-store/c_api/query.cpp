@@ -428,4 +428,13 @@ RLM_API realm_results_t* realm_results_from_thread_safe_reference(const realm_t*
     });
 }
 
+RLM_API realm_results_t* realm_results_resolve_in(realm_results_t* from_results, const realm_t* target_realm)
+{
+    return wrap_err([&]() {
+        const auto& realm = *target_realm;
+        auto resolved_results = from_results->freeze(realm);
+        return new realm_results_t{std::move(resolved_results)};
+    });
+}
+
 } // namespace realm::c_api

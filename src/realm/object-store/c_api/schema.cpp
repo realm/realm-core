@@ -1,5 +1,6 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
+#include "realm.hpp"
 
 namespace realm::c_api {
 
@@ -264,6 +265,23 @@ RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_clas
 
         return true;
     });
+}
+
+RLM_API uint64_t realm_add_schema_changed_callback(realm_t* realm, realm_on_schema_change_func_t callback,
+                                                   void* userdata, realm_free_userdata_func_t free_userdata)
+{
+    util::UniqueFunction<void(const Schema&)> func =
+        [callback, userdata = UserdataPtr{userdata, free_userdata}](const Schema& schema) {
+            auto c_schema = new realm_schema_t(&schema);
+            callback(userdata.get(), c_schema);
+            realm_release(c_schema);
+        };
+    return CBindingContext::get(*realm).schema_changed_callbacks().add(std::move(func));
+}
+
+RLM_API void realm_remove_schema_changed_callback(realm_t* realm, uint64_t token)
+{
+    CBindingContext::get(*realm).schema_changed_callbacks().remove(token);
 }
 
 } // namespace realm::c_api

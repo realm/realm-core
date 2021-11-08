@@ -9,11 +9,11 @@
 #include <realm/string_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server_dir.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/client.hpp>
-#include <realm/sync/server.hpp>
+#include <realm/sync/noinst/server/server.hpp>
 
 #include "test.hpp"
 
@@ -586,7 +586,6 @@ public:
     // make_session().
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
-        using ConnectionState = Session::ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
         auto handler_2 = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
             if (state != ConnectionState::disconnected)
@@ -653,7 +652,6 @@ public:
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
         else {
-            using ConnectionState = Session::ConnectionState;
             using ErrorInfo = Session::ErrorInfo;
             auto fallback_listener = [this](ConnectionState state, const ErrorInfo* error) {
                 if (state != ConnectionState::disconnected)
@@ -902,13 +900,13 @@ public:
         return MultiClientServerFixture::get_server(0);
     }
 
-    Session make_session(DBRef db, Session::Config config = {})
+    Session make_session(DBRef db, Session::Config&& config = {})
     {
         return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
     }
-    Session make_session(std::string const& path, Session::Config config = {})
+    Session make_session(std::string const& path, Session::Config&& config = {})
     {
-        auto db = DB::create(make_client_replication(path));
+        auto db = DB::create(make_client_replication(), path);
         return MultiClientServerFixture::make_session(0, std::move(db), std::move(config));
     }
 
@@ -920,14 +918,14 @@ public:
                                                protocol);
     }
 
-    Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config config = {})
+    Session make_bound_session(DBRef db, std::string server_path = "/test", Session::Config&& config = {})
     {
         return MultiClientServerFixture::make_bound_session(0, std::move(db), 0, std::move(server_path),
                                                             std::move(config));
     }
 
     Session make_bound_session(DBRef db, std::string server_path, std::string signed_user_token,
-                               Session::Config config = {})
+                               Session::Config&& config = {})
     {
         return MultiClientServerFixture::make_bound_session(0, std::move(db), 0, std::move(server_path),
                                                             std::move(signed_user_token), std::move(config));
@@ -1025,7 +1023,7 @@ private:
 inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, const std::string& real_path,
                                   const std::string& virt_path, Config config)
     : m_self_ref{std::make_shared<SelfRef>(this)}                            // Throws
-    , m_db{DB::create(make_client_replication(real_path))}                   // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                 // Throws
     , m_session{client_server_fixture.make_session(m_db, std::move(config))} // Throws
 {
     if (config.error_handler)
@@ -1037,7 +1035,7 @@ inline RealmFixture::RealmFixture(ClientServerFixture& client_server_fixture, co
 inline RealmFixture::RealmFixture(MultiClientServerFixture& client_server_fixture, int client_index, int server_index,
                                   const std::string& real_path, const std::string& virt_path, Config config)
     : m_self_ref{std::make_shared<SelfRef>(this)}                                          // Throws
-    , m_db{DB::create(make_client_replication(real_path))}                                 // Throws
+    , m_db{DB::create(make_client_replication(), real_path)}                               // Throws
     , m_session{client_server_fixture.make_session(client_index, m_db, std::move(config))} // Throws
 {
     if (config.error_handler)
@@ -1061,9 +1059,7 @@ inline void RealmFixture::empty_transact()
 inline void RealmFixture::nonempty_transact()
 {
     auto func = [](Transaction& tr) {
-        TableRef table = tr.get_table("class_Table");
-        if (!table)
-            table = sync::create_table(tr, "class_Test");
+        TableRef table = tr.get_or_add_table("class_Table");
         table->create_object();
         return true;
     };
@@ -1110,14 +1106,13 @@ inline version_type RealmFixture::get_last_integrated_server_version() const
     version_type current_client_version = 0;    // Dummy
     SaltedFileIdent client_file_ident = {0, 0}; // Dummy
     SyncProgress progress;
-    auto& history = static_cast<_impl::ClientHistoryImpl&>(*m_db->get_replication());
-    history.get_status(current_client_version, client_file_ident, progress);
+    auto& repl = static_cast<ClientReplication&>(*m_db->get_replication());
+    repl.get_history().get_status(current_client_version, client_file_ident, progress);
     return progress.download.server_version;
 }
 
 inline void RealmFixture::setup_error_handler(std::function<ErrorHandler> handler)
 {
-    using ConnectionState = Session::ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
     auto listener = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {
         if (state != ConnectionState::disconnected)
@@ -1137,7 +1132,7 @@ namespace accounting {
 // Set up schema
 inline bool init(Transaction& tr, int account_identifier, std::int_fast64_t initial_balance)
 {
-    TableRef account = sync::create_table(tr, "class_Account");
+    TableRef account = tr.add_table("class_Account");
     ColKey col_ndx_identifier = account->add_column(type_Int, "identifier");
     ColKey col_ndx_balance = account->add_column(type_Int, "balance");
     account->create_object().set(col_ndx_identifier, account_identifier).set(col_ndx_balance, initial_balance);
@@ -1168,7 +1163,7 @@ inline TableRef find_or_create_result_sets_table(Transaction& g)
 {
     TableRef result_sets = g.get_table(g_partial_sync_result_sets_table_name);
     if (!result_sets) {
-        result_sets = sync::create_table(g, g_partial_sync_result_sets_table_name);
+        result_sets = g.add_table(g_partial_sync_result_sets_table_name);
         result_sets->add_column(type_String, "query");
         result_sets->add_column(type_String, "matches_property");
         result_sets->add_column(type_Int, "status");
