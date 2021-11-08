@@ -819,23 +819,75 @@ TEST_CASE("list") {
         REQUIRE(results.size() == 10);
 
         // Aggregates don't inherently have to convert to TableView, but do
-        // because aggregates aren't implemented for LinkView
+        // because aggregates aren't implemented for Collection
         REQUIRE(results.sum(col_target_value) == 45);
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
-        // Reset to LinkView mode to test implicit conversion to TableView on get()
+        // Reset to Collection mode to test implicit conversion to TableView on get()
         results = list.sort({{{col_target_value}}, {false}});
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[9 - i]);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
-        // Zero sort columns should leave it in LinkView mode
+        // Zero sort columns should leave it in Collection mode
         results = list.sort(SortDescriptor());
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[i]);
         REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
         REQUIRE(results.get_mode() == Results::Mode::Collection);
+    }
+
+    SECTION("distinct()") {
+        // Make it so that there's actually duplicate values in the target
+        write([&] {
+            for (int i = 0; i < 10; ++i)
+                target->get_object(i).set_all(i / 2);
+        });
+
+        auto objectschema = &*r->schema().find("target");
+        List list(r, *lv);
+        auto results = list.as_results().distinct(DistinctDescriptor({{col_target_value}}));
+        REQUIRE(&results.get_object_schema() == objectschema);
+        REQUIRE(results.get_mode() == Results::Mode::Collection);
+
+        SECTION("size()") {
+            REQUIRE(results.size() == 5);
+        }
+
+        SECTION("aggregates") {
+            REQUIRE(results.sum(col_target_value) == 10);
+        }
+
+        SECTION("get()") {
+            for (size_t i = 0; i < 5; ++i)
+                REQUIRE(results.get(i).get_key() == target_keys[i * 2]);
+            REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 greater than max 4");
+            REQUIRE(results.get_mode() == Results::Mode::TableView);
+        }
+
+        SECTION("clear()") {
+            REQUIRE(target->size() == 10);
+            write([&] {
+                results.clear();
+            });
+            REQUIRE(target->size() == 5);
+
+            // After deleting the first object with each distinct value, the
+            // results should now contain the second object with each distinct
+            // value (which in this case means that the size hasn't changed)
+            REQUIRE(results.size() == 5);
+            for (size_t i = 0; i < 5; ++i)
+                REQUIRE(results.get(i).get_key() == target_keys[(i + 1) * 2 - 1]);
+        }
+
+        SECTION("empty distinct descriptor does nothing") {
+            results = list.as_results().distinct(DistinctDescriptor());
+            for (size_t i = 0; i < 10; ++i)
+                REQUIRE(results.get(i).get_key() == target_keys[i]);
+            REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+            REQUIRE(results.get_mode() == Results::Mode::Collection);
+        }
     }
 
     SECTION("filter()") {

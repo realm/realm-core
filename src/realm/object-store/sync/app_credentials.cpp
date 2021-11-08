@@ -62,6 +62,40 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
     throw std::runtime_error("unknown provider type in provider_type_from_enum");
 }
 
+AuthProvider enum_from_provider_type(const IdentityProvider& provider)
+{
+    if (provider == IdentityProviderAnonymous) {
+        return AuthProvider::ANONYMOUS;
+    }
+    else if (provider == IdentityProviderApple) {
+        return AuthProvider::APPLE;
+    }
+    else if (provider == IdentityProviderFacebook) {
+        return AuthProvider::FACEBOOK;
+    }
+    else if (provider == IdentityProviderGoogle) {
+        return AuthProvider::GOOGLE;
+    }
+    else if (provider == IdentityProviderCustom) {
+        return AuthProvider::CUSTOM;
+    }
+    else if (provider == IdentityProviderUsernamePassword) {
+        return AuthProvider::USERNAME_PASSWORD;
+    }
+    else if (provider == IdentityProviderFunction) {
+        return AuthProvider::FUNCTION;
+    }
+    else if (provider == IdentityProviderUserAPIKey) {
+        return AuthProvider::USER_API_KEY;
+    }
+    else if (provider == IdentityProviderServerAPIKey) {
+        return AuthProvider::SERVER_API_KEY;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
+
 AppCredentials::AppCredentials(AuthProvider provider, std::function<std::string()> factory)
     : m_provider(provider)
     , m_payload_factory(factory)

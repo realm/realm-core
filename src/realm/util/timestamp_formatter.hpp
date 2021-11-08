@@ -9,7 +9,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
-#include <realm/util/string_view.hpp>
 #include <realm/util/memory_stream.hpp>
 
 
@@ -19,7 +18,7 @@ namespace util {
 class TimestampFormatter {
 public:
     using char_type = char;
-    using string_view_type = util::BasicStringView<char_type>;
+    using string_view_type = std::basic_string_view<char_type>;
 
     enum class Precision { seconds, milliseconds, microseconds, nanoseconds };
 

@@ -73,9 +73,9 @@ protected:
 };
 
 template <class T>
-class Lst final : public CollectionBaseImpl<LstBase> {
+class Lst final : public CollectionBaseImpl<LstBase, Lst<T>> {
 public:
-    using Base = CollectionBaseImpl<LstBase>;
+    using Base = CollectionBaseImpl<LstBase, Lst<T>>;
     using iterator = LstIterator<T>;
     using value_type = T;
 
@@ -85,6 +85,8 @@ public:
     Lst(Lst&&) noexcept;
     Lst& operator=(const Lst& other);
     Lst& operator=(Lst&& other) noexcept;
+
+    using Base::operator==;
 
     iterator begin() const noexcept
     {
@@ -453,7 +455,7 @@ public:
     }
 
 private:
-    friend class ConstTableView;
+    friend class TableView;
     friend class Query;
 
     Lst<ObjKey> m_list;
@@ -500,7 +502,7 @@ inline Lst<T>::Lst(const Lst& other)
 {
     // Reset the content version so we can rely on init_from_parent() being
     // called lazily when the accessor is used.
-    reset_content_version();
+    Base::reset_content_version();
 }
 
 template <class T>
@@ -522,7 +524,7 @@ Lst<T>& Lst<T>::operator=(const Lst& other)
         // Just reset the pointer and rely on init_from_parent() being called
         // when the accessor is actually used.
         m_tree.reset();
-        reset_content_version();
+        Base::reset_content_version();
     }
 
     return *this;

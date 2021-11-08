@@ -75,7 +75,8 @@ public:
     ///             attention to efficiency.
     ///     trace   A version of 'debug' that allows for very high volume
     ///             output.
-    enum class Level { all, trace, debug, detail, info, warn, error, fatal, off };
+    // equivalent to realm_log_level_e in realm.h and must be kept in sync
+    enum class Level { all = 0, trace = 1, debug = 2, detail = 3, info = 4, warn = 5, error = 6, fatal = 7, off = 8 };
 
     template <class... Params>
     void log(Level, const char* message, Params&&...);

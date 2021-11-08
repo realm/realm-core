@@ -297,12 +297,12 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
         session->wait_for_download_completion([&](std::error_code ec) {
             REQUIRE(ec == util::error::operation_aborted);
             REQUIRE(session->config().client_validate_ssl);
-            REQUIRE(session->state() == SyncSession::PublicState::Inactive);
+            REQUIRE(session->state() == SyncSession::State::Inactive);
 
             wait_called = true;
             session->revive_if_needed();
 
-            REQUIRE(session->state() != SyncSession::PublicState::Inactive);
+            REQUIRE(session->state() != SyncSession::State::Inactive);
         });
 
         auto config = session->config();
@@ -367,7 +367,7 @@ TEST_CASE("sync: error handling", "[sync]") {
                                 "Something bad happened", false};
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
-        REQUIRE(session->state() == SyncSession::PublicState::Inactive);
+        REQUIRE(session->state() == SyncSession::State::Inactive);
         std::time_t just_after_raw = std::time(nullptr);
         auto just_before = util::localtime(just_before_raw);
         auto just_after = util::localtime(just_after_raw);
@@ -462,7 +462,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
         // Now close the session, causing the state to transition to Dying.
         // (it should remain stuck there until we start the server)
         session->close();
-        REQUIRE(session->state() == SyncSession::PublicState::Dying);
+        REQUIRE(session->state() == SyncSession::State::Dying);
 
         SECTION("transitions to Inactive once the server is started") {
             server.start();
@@ -477,7 +477,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
                 auto realm = Realm::get_shared_realm(config);
                 session2 = user->sync_manager()->get_existing_session(config.path);
             }
-            REQUIRE(session->state() == SyncSession::PublicState::Active);
+            REQUIRE(session->state() == SyncSession::State::Active);
             REQUIRE(session2 == session);
         }
 
@@ -495,14 +495,14 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser)
             std::error_code code =
                 std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
             SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
-            REQUIRE(session->state() == SyncSession::PublicState::Dying);
+            REQUIRE(session->state() == SyncSession::State::Dying);
             CHECK(!error_handler_invoked);
         }
     }
 
     SECTION("can change to Immediately after opening the session") {
         auto session = create_session(SyncSessionStopPolicy::AfterChangesUploaded);
-        REQUIRE(session->state() == SyncSession::PublicState::Active);
+        REQUIRE(session->state() == SyncSession::State::Active);
 
         auto config = session->config();
         config.stop_policy = SyncSessionStopPolicy::Immediately;
@@ -647,220 +647,3 @@ TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
     }
 }
 #endif
-
-TEST_CASE("sync: client reset") {
-    using namespace std::literals::chrono_literals;
-    if (!EventLoop::has_implementation())
-        return;
-
-
-    TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
-    auto sync_manager = init_sync_manager.app()->sync_manager();
-    SyncTestFile config(init_sync_manager.app(), "default");
-    config.schema = Schema{
-        {"object",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
-        {"link target",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
-        {"pk link target",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
-        {"link origin",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"link", PropertyType::Object | PropertyType::Nullable, "link target"},
-             {"pk link", PropertyType::Object | PropertyType::Nullable, "pk link target"},
-             {"list", PropertyType::Object | PropertyType::Array, "link target"},
-             {"pk list", PropertyType::Object | PropertyType::Array, "pk link target"},
-         }},
-    };
-    SyncTestFile config2(init_sync_manager.app(), "default");
-
-    auto get_table = [](Realm& realm, StringData object_type) {
-        return ObjectStore::table_for_object_type(realm.read_group(), object_type);
-    };
-    auto create_object = [&](Realm& realm, StringData object_type) -> Obj {
-        auto table = get_table(realm, object_type);
-        REQUIRE(table);
-        static int64_t pk = 0;
-        return table->create_object_with_primary_key(pk++);
-    };
-
-    auto setup = [&](auto fn) {
-        auto realm = Realm::get_shared_realm(config);
-        realm->begin_transaction();
-        fn(*realm);
-        realm->commit_transaction();
-        wait_for_upload(*realm);
-    };
-
-    auto trigger_client_reset = [&](auto local, auto remote) -> std::shared_ptr<Realm> {
-        auto realm = Realm::get_shared_realm(config);
-        auto session = sync_manager->get_existing_session(realm->config().path);
-        {
-            realm->begin_transaction();
-
-            auto obj = create_object(*realm, "object");
-            auto col = obj.get_table()->get_column_key("value");
-            obj.set(col, 1);
-            obj.set(col, 2);
-            obj.set(col, 3);
-            realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            session->log_out();
-
-            // Make a change while offline so that log compaction will cause a
-            // client reset
-            realm->begin_transaction();
-            obj.set(col, 4);
-            local(*realm);
-            realm->commit_transaction();
-        }
-
-        // Make writes from another client while advancing the time so that
-        // the server performs log compaction
-        {
-            auto realm2 = Realm::get_shared_realm(config2);
-
-            for (int i = 0; i < 2; ++i) {
-                wait_for_download(*realm2);
-                realm2->begin_transaction();
-                auto table = get_table(*realm2, "object");
-                auto col = table->get_column_key("value");
-                table->begin()->set(col, i + 5);
-                realm2->commit_transaction();
-                wait_for_upload(*realm2);
-                server.advance_clock(10s);
-            }
-
-            realm2->begin_transaction();
-            remote(*realm2);
-            realm2->commit_transaction();
-            wait_for_upload(*realm2);
-            server.advance_clock(10s);
-            realm2->close();
-        }
-
-        // Resuming sync on the first realm should now result in a client reset
-        session->revive_if_needed();
-        return realm;
-    };
-
-    SECTION("should trigger error callback when mode is manual") {
-        config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        std::atomic<bool> called{false};
-        config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
-            REQUIRE(error.is_client_reset_requested());
-            called = true;
-        };
-
-        auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});
-
-        EventLoop::main().run_until([&] {
-            return called.load();
-        });
-    }
-
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError) {
-        FAIL("Error handler should not have been called");
-    };
-
-    SECTION("should discard local changeset when mode is discard")
-    {
-        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
-        auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});
-        wait_for_download(*realm);
-        REQUIRE_THROWS(realm->refresh());
-        CHECK(ObjectStore::table_for_object_type(realm->read_group(), "object")->begin()->get<Int>("value") == 4);
-        realm->close();
-        SharedRealm r_after;
-        REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
-        CHECK(ObjectStore::table_for_object_type(r_after->read_group(), "object")->begin()->get<Int>("value") == 6);
-    }
-
-    SECTION("should honor encryption key for downloaded Realm") {
-        config.encryption_key.resize(64, 'a');
-        config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
-        auto realm = trigger_client_reset([](auto&) {}, [](auto&) {});
-        wait_for_download(*realm);
-        realm->close();
-        SharedRealm r_after;
-        REQUIRE_NOTHROW(r_after = Realm::get_shared_realm(config));
-        CHECK(ObjectStore::table_for_object_type(r_after->read_group(), "object")->begin()->get<Int>("value") == 6);
-    }
-
-    SECTION("add table in discarded transaction") {
-        setup([&](auto& realm) {
-            auto table = ObjectStore::table_for_object_type(realm.read_group(), "object2");
-            REQUIRE(!table);
-        });
-
-        auto realm = trigger_client_reset(
-            [&create_object](auto& realm) {
-                realm.update_schema(
-                    {
-                        {"object2",
-                         {
-                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                             {"value2", PropertyType::Int},
-                         }},
-                    },
-                    0, nullptr, nullptr, true);
-                create_object(realm, "object2");
-            },
-            [](auto&) {});
-        wait_for_download(*realm);
-        // test local realm that changes were persisted
-        REQUIRE_THROWS(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-        REQUIRE(table);
-        REQUIRE(table->size() == 1);
-        // test reset realm that changes were overwritten
-        realm = Realm::get_shared_realm(config);
-        table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-        REQUIRE(!table);
-    }
-
-    SECTION("add column in discarded transaction") {
-        auto realm = trigger_client_reset(
-            [](auto& realm) {
-                realm.update_schema(
-                    {
-                        {"object",
-                         {
-                             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                             {"value2", PropertyType::Int},
-                         }},
-                    },
-                    0, nullptr, nullptr, true);
-                ObjectStore::table_for_object_type(realm.read_group(), "object")->begin()->set("value2", 123);
-            },
-            [](auto&) {});
-        wait_for_download(*realm);
-        // test local realm that changes were persisted
-        REQUIRE_THROWS(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table->get_column_count() == 3);
-        REQUIRE(table->begin()->get<Int>("value2") == 123);
-        REQUIRE_THROWS(realm->refresh());
-        // test resync'd realm that changes were overwritten
-        realm = Realm::get_shared_realm(config);
-        table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-        REQUIRE(table);
-        REQUIRE(table->get_column_count() == 2);
-        REQUIRE(!bool(table->get_column_key("value2")));
-    }
-}

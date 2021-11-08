@@ -33,16 +33,17 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 
-#include <realm/db.hpp>
-
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
 #endif
 
+#include <realm/db.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/fifo_helper.hpp>
 #include <realm/util/scope_exit.hpp>
+
+#include <external/json/json.hpp>
 
 namespace realm {
 class TestHelper {
@@ -71,7 +72,7 @@ class Observer : public BindingContext {
 public:
     Observer(Obj& obj)
     {
-        m_result.push_back(ObserverState{obj.get_table()->get_key(), obj.get_key().value, nullptr});
+        m_result.push_back(ObserverState{obj.get_table()->get_key(), obj.get_key(), nullptr});
     }
 
     IndexSet array_change(size_t index, ColKey col_key) const noexcept
@@ -538,6 +539,33 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm->read_transaction_version() == frozen2->read_transaction_version());
         REQUIRE(frozen2->read_transaction_version() > frozen1->read_transaction_version());
     }
+
+    SECTION("frozen realm should have the same schema as originating realm") {
+        auto full_schema = Schema{
+            {"object1", {{"value", PropertyType::Int}}},
+            {"object2", {{"value", PropertyType::Int}}},
+        };
+
+        auto subset_schema = Schema{
+            {"object1", {{"value", PropertyType::Int}}},
+        };
+
+        config.schema = full_schema;
+
+        auto realm = Realm::get_shared_realm(config);
+        realm->close();
+
+        config.schema = subset_schema;
+
+        realm = Realm::get_shared_realm(config);
+        realm->read_group();
+        auto frozen_realm = realm->freeze();
+        auto frozen_schema = frozen_realm->schema();
+
+        REQUIRE(full_schema != subset_schema);
+        REQUIRE(realm->schema() == subset_schema);
+        REQUIRE(frozen_schema == subset_schema);
+    }
 }
 
 #if REALM_ENABLE_SYNC
@@ -662,6 +690,62 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
+    }
+
+    SECTION("progress notifiers of a task are cancelled if the task is cancelled") {
+        bool progress_notifier1_called = false;
+        bool task1_completed = false;
+        bool progress_notifier2_called = false;
+        bool task2_completed = false;
+        {
+            auto realm = Realm::get_shared_realm(config2);
+            realm->begin_transaction();
+            realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+            realm->commit_transaction();
+            wait_for_upload(*realm);
+        }
+
+        std::shared_ptr<AsyncOpenTask> task = Realm::get_synchronized_realm(config);
+        std::shared_ptr<AsyncOpenTask> task2 = Realm::get_synchronized_realm(config);
+        REQUIRE(task);
+        REQUIRE(task2);
+        auto realm = Realm::get_shared_realm(config);
+        realm->begin_transaction(); // block sync from writing until we cancel
+        task->register_download_progress_notifier([&](uint64_t, uint64_t) {
+            std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!task1_completed);
+            progress_notifier1_called = true;
+        });
+        task2->register_download_progress_notifier([&](uint64_t, uint64_t) {
+            std::lock_guard<std::mutex> guard(mutex);
+            REQUIRE(!task2_completed);
+            progress_notifier2_called = true;
+        });
+        task->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+            REQUIRE(!err);
+            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            REQUIRE(realm);
+            std::lock_guard<std::mutex> guard(mutex);
+            task1_completed = true;
+        });
+        task->cancel();
+        task2->start([&](ThreadSafeReference realm_ref, std::exception_ptr err) {
+            REQUIRE(!err);
+            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            REQUIRE(realm);
+            std::lock_guard<std::mutex> guard(mutex);
+            task2_completed = true;
+        });
+        realm->cancel_transaction(); // unblock sync
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard<std::mutex> guard(mutex);
+            return task2_completed;
+        });
+        std::lock_guard<std::mutex> guard(mutex);
+        REQUIRE(!progress_notifier1_called);
+        REQUIRE(!task1_completed);
+        REQUIRE(progress_notifier2_called);
+        REQUIRE(task2_completed);
     }
 
     SECTION("downloads latest state for Realms which already exist locally") {
@@ -1400,11 +1484,7 @@ TEST_CASE("Realm::delete_files()") {
     // We need to create some additional files that might not be present
     // for a freshly opened realm but need to be tested for as the will
     // be created during a Realm's life cycle.
-    // .log_a and .log_b are legacy versions of .log that might be present
-    // for older Realms.
     util::File(path + ".log", util::File::mode_Write);
-    util::File(path + ".log_a", util::File::mode_Write);
-    util::File(path + ".log_b", util::File::mode_Write);
 
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
@@ -1415,8 +1495,6 @@ TEST_CASE("Realm::delete_files()") {
         REQUIRE_FALSE(util::File::exists(path + ".management"));
         REQUIRE_FALSE(util::File::exists(path + ".note"));
         REQUIRE_FALSE(util::File::exists(path + ".log"));
-        REQUIRE_FALSE(util::File::exists(path + ".log_a"));
-        REQUIRE_FALSE(util::File::exists(path + ".log_b"));
 
         // Deleting the .lock file is not safe. It must still exist.
         REQUIRE(util::File::exists(path + ".lock"));
@@ -1429,8 +1507,6 @@ TEST_CASE("Realm::delete_files()") {
         REQUIRE(util::File::exists(path + ".management"));
         REQUIRE(util::File::exists(path + ".note"));
         REQUIRE(util::File::exists(path + ".log"));
-        REQUIRE(util::File::exists(path + ".log_a"));
-        REQUIRE(util::File::exists(path + ".log_b"));
     }
 
     SECTION("Deleting the same Realm multiple times.") {

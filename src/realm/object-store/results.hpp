@@ -166,8 +166,9 @@ public:
     Results snapshot() const& REQUIRES(!m_mutex);
     Results snapshot() && REQUIRES(!m_mutex);
 
-    // Returns a frozen copy of this result.
-    Results freeze(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
+    // Returns a frozen copy of this result
+    // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+    Results freeze(std::shared_ptr<Realm> const& frozen_realm) REQUIRES(!m_mutex);
 
     // Returns whether or not this Results is frozen.
     bool is_frozen() const REQUIRES(!m_mutex);
@@ -200,11 +201,26 @@ public:
     }
 
     enum class Mode {
-        Empty,      // Backed by nothing (for missing tables)
-        Table,      // Backed directly by a Table
-        Collection, // Backed by a collection of links or primitives
-        Query,      // Backed by a query that has not yet been turned into a TableView
-        TableView,  // Backed by a TableView created from a Query
+        // A default-constructed Results which is backed by nothing. This
+        // behaves as if it was backed by an empty table/collection, and is
+        // inteded for read-only Realms which are missing tables.
+        Empty,
+        // Backed directly by a Table with no sort/filter/distinct.
+        Table,
+        // Backed by a Collection, possibly with sort/distinct (but no filter).
+        // Collections of Objects with a sort/distinct will transition to
+        // TableView the first time they're accessed, while collections of other
+        // types will remain in mode Collection and apply sort/distinct via
+        // m_list_indices.
+        Collection,
+        // Backed by a Query that has not yet been run. May have sort and distinct.
+        // Switches to mode TableView as soon as the query has to be run for
+        // the first time, except for size() with no distinct, which gets the
+        // count from the Query directly.
+        Query,
+        // Backed by a TableView of some sort, which encompases things like
+        // sort and distinct
+        TableView,
     };
     // Get the current mode of the Results
     // Ideally this would not be public but it's needed for some KVO stuff
@@ -341,6 +357,7 @@ private:
     void prepare_async(ForCallback);
 
     ColKey key(StringData) const;
+    size_t actual_index(size_t) const noexcept REQUIRES(m_mutex);
 
     template <typename T>
     util::Optional<T> try_get(size_t) REQUIRES(m_mutex);
@@ -352,8 +369,11 @@ private:
     template <typename Fn>
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
-    void evaluate_sort_and_distinct_on_collection() REQUIRES(m_mutex);
-    void do_evaluate_query_if_needed(bool wants_notifications = true) REQUIRES(m_mutex);
+    enum class EvaluateMode { Count, Snapshot, Normal };
+    void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
+
+    // Shared logic between freezing and thawing Results as the Core API is the same.
+    Results import_copy_into_realm(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);
 
     class IteratorWrapper {
     public:

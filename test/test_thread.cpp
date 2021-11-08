@@ -899,7 +899,7 @@ TEST_IF(Thread_CondvarAtomicWaitUnlock, !running_with_valgrind && TEST_DURATION 
                     // just 1. That's intentional and will cover other OS'es with bigger time slices.
                     volatile int sum = 0; // must be volatile, else it compiles into no-op
                     for (uint64_t t = 0; t < clocks_to_wait; t++) {
-                        sum++;
+                        sum = sum + 1;
                     }
 
                     condvar.wait(mutex, nullptr);

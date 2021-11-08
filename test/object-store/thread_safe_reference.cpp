@@ -86,8 +86,8 @@ TEST_CASE("thread safe reference") {
         auto int_obj_list = List(int_obj_list_obj, int_obj_list_obj.get_object_schema().property_for_name("value"));
         r->commit_transaction();
 
-        auto history = make_in_realm_history(config.path);
-        auto db = DB::create(*history, config.options());
+        auto history = make_in_realm_history();
+        auto db = DB::create(*history, config.path, config.options());
         auto initial_version = db->get_version_id_of_latest_snapshot();
         REQUIRE(db->get_number_of_versions() == 2);
 
@@ -1029,8 +1029,8 @@ TEST_CASE("thread safe reference") {
 
                 // Perform additional writes until the TSR's source version
                 // no longer exists
-                auto history = make_in_realm_history(config.path);
-                auto db = DB::create(*history, config.options());
+                auto history = make_in_realm_history();
+                auto db = DB::create(*history, config.path, config.options());
                 auto tsr_version = db->get_version_id_of_latest_snapshot();
                 while (true) {
                     REQUIRE(db->get_number_of_versions() < 5);

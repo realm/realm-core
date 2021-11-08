@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 
-ARG NDK_VERSION=r22
-ARG CMAKE_VERSION=3.20.0
+ARG NDK_VERSION=r23
+ARG CMAKE_VERSION=3.21.3
 
 ENV DEBIAN_FRONTEND "noninteractive"
 
@@ -30,14 +30,15 @@ RUN apt-get update -qq \
 # Install CMake
 RUN cd /opt \
     && wget https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-linux-x86_64.tar.gz \
-    && tar zxvf cmake-$CMAKE_VERSION-linux-x86_64.tar.gz
+    && tar zxvf cmake-$CMAKE_VERSION-linux-x86_64.tar.gz \
+    && rm -f cmake-$CMAKE_VERSION-linux-x86_64.tar.gz
 
 ENV PATH "/opt/cmake-$CMAKE_VERSION-linux-x86_64/bin:$PATH"
 
 # Install the NDK
 RUN cd /opt \
-    && wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux-x86_64.zip \
-    && unzip android-ndk-$NDK_VERSION-linux-x86_64.zip \
-    && rm -f android-ndk-$NDK_VERSION-linux-x86_64.zip
+    && wget https://dl.google.com/android/repository/android-ndk-$NDK_VERSION-linux.zip \
+    && unzip android-ndk-$NDK_VERSION-linux.zip \
+    && rm -f android-ndk-$NDK_VERSION-linux.zip
     
 ENV ANDROID_NDK "/opt/android-ndk-$NDK_VERSION"

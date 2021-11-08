@@ -674,11 +674,11 @@ void Peer::dump_result_sets()
 void Peer::open_realm()
 {
     if (!m_shared_group) {
-        m_history = sync::make_client_replication(m_realm_path);
+        m_history = sync::make_client_replication();
         DBOptions options;
         if (m_context.disable_sync_to_disk)
             options.durability = DBOptions::Durability::Unsafe;
-        m_shared_group = DB::create(*m_history, std::move(options));
+        m_shared_group = DB::create(*m_history, m_realm_path, std::move(options));
     }
 }
 
@@ -686,11 +686,11 @@ void Peer::open_realm()
 void Peer::open_realm_for_receive()
 {
     if (!m_receive_group) {
-        m_receive_history = sync::make_client_replication(m_realm_path);
+        m_receive_history = sync::make_client_replication();
         DBOptions options;
         if (m_context.disable_sync_to_disk)
             options.durability = DBOptions::Durability::Unsafe;
-        m_receive_shared_group = DB::create(*m_receive_history, std::move(options));
+        m_receive_shared_group = DB::create(*m_receive_history, m_realm_path, std::move(options));
         m_receive_group = m_receive_shared_group->start_read();
     }
 }

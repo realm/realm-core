@@ -31,12 +31,12 @@ using namespace realm::util;
 
 inline bool sessions_are_active(const SyncSession& session)
 {
-    return session.state() == SyncSession::PublicState::Active;
+    return session.state() == SyncSession::State::Active;
 }
 
 inline bool sessions_are_inactive(const SyncSession& session)
 {
-    return session.state() == SyncSession::PublicState::Inactive;
+    return session.state() == SyncSession::State::Inactive;
 }
 
 inline bool sessions_are_disconnected(const SyncSession& session)

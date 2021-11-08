@@ -1,6 +1,7 @@
 #include <realm.hpp>
 #include <iostream>
 #include <ctime>
+#include "realm/util/time.hpp"
 
 using namespace realm;
 
@@ -99,9 +100,9 @@ void print_objects(ConstTableRef table, size_t begin, size_t end)
                 case type_Timestamp: {
                     auto value = obj.get<Timestamp>(col);
                     auto seconds = time_t(value.get_seconds());
-                    auto tm = gmtime(&seconds);
-                    printf("  %4d-%02d-%02d %02d:%02d:%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                           tm->tm_hour, tm->tm_min, tm->tm_sec);
+                    auto tm = util::gmtime(seconds);
+                    printf("  %4d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour,
+                           tm.tm_min, tm.tm_sec);
                     break;
                 }
                 case type_Link: {

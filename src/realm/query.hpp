@@ -50,7 +50,7 @@ namespace realm {
 class ParentNode;
 class Table;
 class TableView;
-class ConstTableView;
+class TableView;
 class Array;
 class Expression;
 class Group;
@@ -83,8 +83,8 @@ struct QueryGroup {
 
 class Query final {
 public:
-    Query(ConstTableRef table, ConstTableView* tv = nullptr);
-    Query(ConstTableRef table, std::unique_ptr<ConstTableView>);
+    Query(ConstTableRef table, TableView* tv = nullptr);
+    Query(ConstTableRef table, std::unique_ptr<TableView>);
     Query(ConstTableRef table, const ObjList& list);
     Query(ConstTableRef table, LinkCollectionPtr&& list_ptr);
     Query();
@@ -285,9 +285,14 @@ public:
 #if REALM_MULTITHREAD_QUERY
     // Multi-threading
     TableView find_all_multi(size_t start = 0, size_t end = size_t(-1));
-    ConstTableView find_all_multi(size_t start = 0, size_t end = size_t(-1)) const;
+    TableView find_all_multi(size_t start = 0, size_t end = size_t(-1)) const;
     int set_threads(unsigned int threadcount);
 #endif
+
+    const ConstTableRef& get_table() const noexcept
+    {
+        return m_table;
+    }
 
     ConstTableRef& get_table()
     {
@@ -365,7 +370,7 @@ private:
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                             ArrayPayload* source_column) const;
 
-    void find_all(ConstTableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
+    void find_all(TableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     size_t do_count(size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 
@@ -382,7 +387,7 @@ private:
     void add_node(std::unique_ptr<ParentNode>);
 
     friend class Table;
-    friend class ConstTableView;
+    friend class TableView;
     friend class SubQueryCount;
     friend class PrimitiveListCount;
     friend class metrics::QueryInfo;
@@ -405,8 +410,8 @@ private:
     // this includes: LnkLst, LnkSet, and DictionaryLinkValues. It cannot be a list of primitives because
     // it is used to populate a query through a collection of objects and there are asserts for this.
     LinkCollectionPtr m_source_collection;         // collections are owned by the query.
-    ConstTableView* m_source_table_view = nullptr; // table views are not refcounted, and not owned by the query.
-    std::unique_ptr<ConstTableView> m_owned_source_table_view; // <--- except when indicated here
+    TableView* m_source_table_view = nullptr;      // table views are not refcounted, and not owned by the query.
+    std::unique_ptr<TableView> m_owned_source_table_view; // <--- except when indicated here
     std::shared_ptr<DescriptorOrdering> m_ordering;
 };
 

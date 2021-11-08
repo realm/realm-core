@@ -220,8 +220,6 @@ private:
                                         const HistoryEntry&);
     void flush_reciprocal_transform_cache(TransformHistory&);
 
-    static size_t emit_changesets(const Changeset*, size_t num_changesets, util::Buffer<char>& output_buffer);
-
     struct Discriminant;
     struct Transformer;
     struct MergeTracer;

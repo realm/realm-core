@@ -13,6 +13,11 @@
 #include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/app.hpp>
+#include <realm/object-store/sync/impl/sync_client.hpp>
+#endif
+
 #include <stdexcept>
 #include <string>
 
@@ -34,6 +39,10 @@ struct ImmutableException : std::exception {
 
 
 struct UnexpectedPrimaryKeyException : std::logic_error {
+    using std::logic_error::logic_error;
+};
+
+struct DuplicatePrimaryKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 
@@ -227,6 +236,12 @@ struct shared_realm : realm::c_api::WrapC, realm::SharedRealm {
             : realm::ThreadSafeReference(rlm)
         {
         }
+
+        thread_safe_reference(realm::ThreadSafeReference&& other)
+            : realm::ThreadSafeReference(std::move(other))
+        {
+            REALM_ASSERT(this->is<realm::SharedRealm>());
+        }
     };
 
     realm_thread_safe_reference_t* get_thread_safe_reference() const final
@@ -394,5 +409,125 @@ struct realm_results : realm::c_api::WrapC, realm::Results {
     }
 };
 
+#if REALM_ENABLE_SYNC
+struct realm_http_transport : realm::c_api::WrapC, std::shared_ptr<realm::app::GenericNetworkTransport> {
+    realm_http_transport(std::shared_ptr<realm::app::GenericNetworkTransport> transport)
+        : std::shared_ptr<realm::app::GenericNetworkTransport>(std::move(transport))
+    {
+    }
+
+    realm_http_transport* clone() const override
+    {
+        return new realm_http_transport{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_http_transport*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_app_config : realm::c_api::WrapC, realm::app::App::Config {
+    using Config::Config;
+};
+
+struct realm_sync_client_config : realm::c_api::WrapC, realm::SyncClientConfig {
+    using SyncClientConfig::SyncClientConfig;
+};
+
+struct realm_sync_config : realm::c_api::WrapC, realm::SyncConfig {
+    using SyncConfig::SyncConfig;
+};
+
+struct realm_app : realm::c_api::WrapC, realm::app::SharedApp {
+    realm_app(realm::app::SharedApp app)
+        : realm::app::SharedApp{std::move(app)}
+    {
+    }
+
+    realm_app* clone() const override
+    {
+        return new realm_app{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_app*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_app_credentials : realm::c_api::WrapC, realm::app::AppCredentials {
+    realm_app_credentials(realm::app::AppCredentials credentials)
+        : realm::app::AppCredentials{std::move(credentials)}
+    {
+    }
+};
+
+struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
+    realm_user(std::shared_ptr<realm::SyncUser> user)
+        : std::shared_ptr<realm::SyncUser>{std::move(user)}
+    {
+    }
+
+    realm_user* clone() const override
+    {
+        return new realm_user{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSession> {
+    realm_sync_session(std::shared_ptr<realm::SyncSession> session)
+        : std::shared_ptr<realm::SyncSession>{std::move(session)}
+    {
+    }
+
+    realm_sync_session* clone() const override
+    {
+        return new realm_sync_session{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_sync_session*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+
+struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {
+    realm_async_open_task(std::shared_ptr<realm::AsyncOpenTask> task)
+        : std::shared_ptr<realm::AsyncOpenTask>{std::move(task)}
+    {
+    }
+
+    realm_async_open_task* clone() const override
+    {
+        return new realm_async_open_task{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_async_open_task*>(&other)) {
+            return get() == ptr->get();
+        }
+        return false;
+    }
+};
+#endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP

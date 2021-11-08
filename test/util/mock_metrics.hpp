@@ -7,7 +7,7 @@
 
 #include <realm/util/logger.hpp>
 #include <realm/util/thread.hpp>
-#include <realm/sync/metrics.hpp>
+#include <realm/sync/noinst/server/metrics.hpp>
 
 namespace realm {
 namespace test_util {

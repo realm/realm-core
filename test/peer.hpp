@@ -37,6 +37,7 @@
 
 #include "util/test_path.hpp"
 #include "util/compare_groups.hpp"
+#include "util/unit_test.hpp"
 
 #include <fstream>
 #include <numeric>
@@ -80,16 +81,6 @@ public:
     version_type integrate_remote_changesets(file_ident_type remote_file_ident, DB&,
                                              const Transformer::RemoteChangeset* incoming_changesets,
                                              std::size_t num_changesets, util::Logger* replay_logger);
-
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
 
     version_type prepare_changeset(const char* data, std::size_t size, version_type orig_version) override
     {
@@ -242,10 +233,9 @@ public:
 
     std::map<TableKey, std::unordered_map<GlobalKey, ObjKey>> m_optimistic_object_id_collisions;
 
-    ShortCircuitHistory(const std::string& database_file, file_ident_type local_file_ident,
+    ShortCircuitHistory(file_ident_type local_file_ident,
                         TestDirNameGenerator* changeset_dump_dir_gen)
-        : SyncReplication(database_file)                    // Throws
-        , m_write_history(std::make_unique<History>(*this)) // Throws
+        : m_write_history(std::make_unique<History>(*this)) // Throws
         , m_local_file_ident(local_file_ident)
         , m_transformer(std::make_unique<TransformerImpl>(changeset_dump_dir_gen)) // Throws
         , m_incoming_changeset(nullptr, util::STLDeleter<char[]>{util::DefaultAllocator::get_default()})
@@ -409,7 +399,7 @@ private:
 
     void encode_changesets(Changeset* changesets, std::size_t num_changesets, util::Logger* logger)
     {
-        util::AppendBuffer<char> encode_buffer;
+        sync::ChangesetEncoder::Buffer encode_buffer;
         for (size_t i = 0; i < num_changesets; ++i) {
             encode_changeset(changesets[i], encode_buffer); // Throws
 
@@ -430,7 +420,7 @@ private:
 
     void encode_changesets(Changeset** changesets, std::size_t num_changesets, util::Logger* logger)
     {
-        util::AppendBuffer<char> encode_buffer;
+        sync::ChangesetEncoder::Buffer encode_buffer;
         for (size_t i = 0; i < num_changesets; ++i) {
             encode_changeset(*changesets[i], encode_buffer); // Throws
 
@@ -501,7 +491,7 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets.data(),
                                                changesets.size(), reporter, logger);
 
-    util::AppendBuffer<char> assembled_transformed_changeset;
+    sync::ChangesetEncoder::Buffer assembled_transformed_changeset;
 
     for (size_t i = 0; i < num_changesets; ++i) {
         sync::InstructionApplier applier{*transact};
@@ -673,8 +663,8 @@ private:
         : local_file_ident(file_ident)
         , path_guard(test_path) // Throws
         , logger(l)
-        , history(test_path, file_ident, changeset_dump_dir_gen) // Throws
-        , shared_group(DB::create(history))                      // Throws
+        , history(file_ident, changeset_dump_dir_gen)  // Throws
+        , shared_group(DB::create(history, test_path)) // Throws
     {
     }
 

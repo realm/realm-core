@@ -19,16 +19,14 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
+#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
-#include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
 
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -206,13 +204,13 @@ public:
     ~SyncUser();
 
     // Return a list of all sessions belonging to this user.
-    std::vector<std::shared_ptr<SyncSession>> all_sessions();
+    std::vector<std::shared_ptr<SyncSession>> all_sessions() REQUIRES(!m_mutex);
 
     // Return a session for a given on disk path.
     // In most cases, bindings shouldn't expose this to consumers, since the on-disk
     // path for a synced Realm is an opaque implementation detail. This API is retained
     // for testing purposes, and for bindings for consumers that are servers or tools.
-    std::shared_ptr<SyncSession> session_for_on_disk_path(const std::string& path);
+    std::shared_ptr<SyncSession> session_for_on_disk_path(const std::string& path) REQUIRES(!m_mutex);
 
     // Update the user's state and refresh/access tokens atomically in a Realm transaction.
     // If the user is transitioning between LoggedIn and LoggedOut, then the access_token and
@@ -220,27 +218,27 @@ public:
     // logged out and logged in.
     // Note that this is called by the SyncManager, and should not be directly called.
     void update_state_and_tokens(SyncUser::State state, const std::string& access_token,
-                                 const std::string& refresh_token);
+                                 const std::string& refresh_token) REQUIRES(!m_mutex);
 
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_refresh_token(std::string&& token);
+    void update_refresh_token(std::string&& token) REQUIRES(!m_mutex);
 
     // Update the user's access token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_access_token(std::string&& token);
+    void update_access_token(std::string&& token) REQUIRES(!m_mutex);
 
     // Update the user's profile.
-    void update_user_profile(const SyncUserProfile& profile);
+    void update_user_profile(const SyncUserProfile& profile) REQUIRES(!m_mutex);
 
     // Update the user's identities.
-    void update_identities(std::vector<SyncUserIdentity> identities);
+    void update_identities(std::vector<SyncUserIdentity> identities) REQUIRES(!m_mutex);
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
-    void log_out();
+    void log_out() REQUIRES(!m_mutex);
 
     /// Returns true id the users access_token and refresh_token are set.
-    bool is_logged_in() const;
+    bool is_logged_in() const REQUIRES(!m_mutex);
 
     const std::string& identity() const noexcept
     {
@@ -257,28 +255,23 @@ public:
         return m_local_identity;
     }
 
-    std::string access_token() const;
+    std::string access_token() const REQUIRES(!m_mutex);
 
-    std::string refresh_token() const;
+    std::string refresh_token() const REQUIRES(!m_mutex);
 
-    RealmJWT refresh_jwt() const
-    {
-        return m_refresh_token;
-    }
+    std::string device_id() const REQUIRES(!m_mutex);
 
-    std::string device_id() const;
+    bool has_device_id() const REQUIRES(!m_mutex);
 
-    bool has_device_id() const;
+    SyncUserProfile user_profile() const REQUIRES(!m_mutex);
 
-    SyncUserProfile user_profile() const;
-
-    std::vector<SyncUserIdentity> identities() const;
+    std::vector<SyncUserIdentity> identities() const REQUIRES(!m_mutex);
 
     // Custom user data embedded in the access token.
-    util::Optional<bson::BsonDocument> custom_data() const;
+    util::Optional<bson::BsonDocument> custom_data() const REQUIRES(!m_mutex);
 
-    State state() const;
-    void set_state(SyncUser::State state);
+    State state() const REQUIRES(!m_mutex);
+    void set_state(SyncUser::State state) REQUIRES(!m_mutex);
 
     std::shared_ptr<SyncUserContext> binding_context() const
     {
@@ -289,33 +282,35 @@ public:
     // A registered session will be bound at the earliest opportunity: either
     // immediately, or upon the user becoming Active.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void register_session(std::shared_ptr<SyncSession>);
+    void register_session(std::shared_ptr<SyncSession>) REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
-    void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
+    void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block) REQUIRES(!m_mutex);
 
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.
-    bool access_token_refresh_required() const;
+    bool access_token_refresh_required() const REQUIRES(!m_mutex);
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
 
-    std::shared_ptr<SyncManager> sync_manager() const;
+    std::shared_ptr<SyncManager> sync_manager() const REQUIRES(!m_mutex);
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
-    app::MongoClient mongo_client(const std::string& service_name);
+    app::MongoClient mongo_client(const std::string& service_name) REQUIRES(!m_mutex);
 
 protected:
     friend class SyncManager;
-    void detach_from_sync_manager();
+    void detach_from_sync_manager() REQUIRES(!m_mutex);
 
 private:
     static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
 
-    State m_state;
+    bool do_is_logged_in() const REQUIRES(m_mutex);
+
+    State m_state GUARDED_BY(m_mutex);
 
     util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
@@ -326,12 +321,9 @@ private:
     const std::string m_provider_type;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.
-    void invalidate();
+    void invalidate() REQUIRES(!m_mutex);
 
-    mutable std::mutex m_mutex;
-
-    // The user's refresh token.
-    RealmJWT m_refresh_token;
+    mutable util::CheckedMutex m_mutex;
 
     // Set by the server. The unique ID of the user account on the Realm Applcication.
     const std::string m_identity;
@@ -343,13 +335,16 @@ private:
     // Waiting sessions are those that should be asked to connect once this user is logged in.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 
+    // The user's refresh token.
+    RealmJWT m_refresh_token GUARDED_BY(m_mutex);
+
     // The user's access token.
-    RealmJWT m_access_token;
+    RealmJWT m_access_token GUARDED_BY(m_mutex);
 
     // The identities associated with this user.
-    std::vector<SyncUserIdentity> m_user_identities;
+    std::vector<SyncUserIdentity> m_user_identities GUARDED_BY(m_mutex);
 
-    SyncUserProfile m_user_profile;
+    SyncUserProfile m_user_profile GUARDED_BY(m_mutex);
 
     const std::string m_device_id;
 

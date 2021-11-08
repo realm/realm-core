@@ -1,4 +1,5 @@
 set(TEST_CLIENT_SOURCES
+    auth.cpp
     peer.cpp
     main.cpp
 )

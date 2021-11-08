@@ -152,7 +152,10 @@ public:
     {
         return false;
     }
-    virtual void index_based_aggregate(size_t, Evaluator) {}
+    virtual const std::vector<ObjKey>& index_based_keys()
+    {
+        return s_dummy_keys;
+    }
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -319,6 +322,7 @@ protected:
     const Cluster* m_cluster = nullptr;
     QueryStateBase* m_state = nullptr;
     std::string error_code;
+    static std::vector<ObjKey> s_dummy_keys;
 
     ColumnType get_real_column_type(ColKey key)
     {
@@ -546,14 +550,9 @@ public:
         return this->m_table->has_search_index(IntegerNodeBase<LeafType>::m_condition_column_key);
     }
 
-    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    const std::vector<ObjKey>& index_based_keys() override
     {
-        for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
-            auto obj = this->m_table->get_object(m_result[t]);
-            if (evaluator(obj)) {
-                --limit;
-            }
-        }
+        return m_result;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1246,14 +1245,9 @@ public:
         }
     }
 
-    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    const std::vector<ObjKey>& index_based_keys() override
     {
-        for (size_t t = 0; t < m_result.size() && limit > 0; ++t) {
-            auto obj = this->m_table->get_object(m_result[t]);
-            if (evaluator(obj)) {
-                --limit;
-            }
-        }
+        return m_result;
     }
 
     bool has_search_index() const override
@@ -1437,11 +1431,11 @@ protected:
 template <>
 class MixedNode<Equal> : public MixedNodeBase {
 public:
-    MixedNode<Equal>(Mixed v, ColKey column)
+    MixedNode(Mixed v, ColKey column)
         : MixedNodeBase(v, column)
     {
     }
-    MixedNode<Equal>(const MixedNode<Equal>& other)
+    MixedNode(const MixedNode<Equal>& other)
         : MixedNodeBase(other)
         , m_has_search_index(other.m_has_search_index)
     {
@@ -1488,7 +1482,10 @@ protected:
     size_t m_results_end;
     bool m_has_search_index = false;
 
-    void index_based_aggregate(size_t limit, Evaluator evaluator) override;
+    const std::vector<ObjKey>& index_based_keys() override
+    {
+        return m_index_matches;
+    }
 };
 
 class StringNodeBase : public ParentNode {
@@ -1863,7 +1860,7 @@ public:
 
     std::string describe(util::serializer::SerialisationState& state) const override;
 
-    StringNode<Equal>(const StringNode& from)
+    StringNode(const StringNode& from)
         : StringNodeEqualBase(from)
     {
         for (auto& needle : from.m_needles) {
@@ -1877,24 +1874,20 @@ public:
             }
         }
     }
-    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    const std::vector<ObjKey>& index_based_keys() override
     {
-        if (limit == 0)
-            return;
+        m_obj_key_buffer.clear();
         if (m_index_matches == nullptr) {
             if (m_results_end) { // 1 result
-                auto obj = m_table->get_object(m_actual_key);
-                evaluator(obj);
+                m_obj_key_buffer.push_back(m_actual_key);
             }
         }
         else { // multiple results
-            for (size_t t = m_results_start; t < m_results_end && limit > 0; ++t) {
-                auto obj = m_table->get_object(ObjKey(m_index_matches->get(t)));
-                if (evaluator(obj)) {
-                    --limit;
-                }
+            for (size_t t = m_results_start; t < m_results_end; ++t) {
+                m_obj_key_buffer.push_back(ObjKey(m_index_matches->get(t)));
             }
         }
+        return m_obj_key_buffer;
     }
 
 private:
@@ -1914,6 +1907,7 @@ private:
     size_t _find_first_local(size_t start, size_t end) override;
     std::unordered_set<StringData> m_needles;
     std::vector<std::unique_ptr<char[]>> m_needle_storage;
+    std::vector<ObjKey> m_obj_key_buffer;
 };
 
 
@@ -1966,14 +1960,9 @@ public:
     {
     }
 
-    void index_based_aggregate(size_t limit, Evaluator evaluator) override
+    const std::vector<ObjKey>& index_based_keys() override
     {
-        for (size_t t = 0; t < m_index_matches.size() && limit > 0; ++t) {
-            auto obj = m_table->get_object(m_index_matches[t]);
-            if (evaluator(obj)) {
-                --limit;
-            }
-        }
+        return m_index_matches;
     }
 
 private:

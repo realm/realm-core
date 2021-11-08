@@ -18,7 +18,7 @@
 
 #include "baas_admin_api.hpp"
 
-#ifdef REALM_ENABLE_AUTH_TESTS
+#if REALM_ENABLE_AUTH_TESTS
 
 #include <iostream>
 #include <mutex>
@@ -182,10 +182,11 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& o
     auto& prop_sub_obj = schema_json["properties"];
     if (m_include_prop(m_partition_key) && prop_sub_obj.find(m_partition_key.name) == prop_sub_obj.end()) {
         prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key));
-        if (!m_partition_key.type_is_nullable()) {
+        if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }
     }
+    std::string test = schema_json.dump();
     return {
         {"database", m_mongo_db_name},
         {"collection", obj_schema.name},
@@ -301,6 +302,10 @@ app::Response do_http_request(const app::Request& request)
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
+    else if (request.method == app::HttpMethod::patch) {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
+    }
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
@@ -349,6 +354,14 @@ app::Response AdminAPIEndpoint::get() const
 {
     app::Request req;
     req.method = app::HttpMethod::get;
+    req.url = m_url;
+    return do_request(std::move(req));
+}
+
+app::Response AdminAPIEndpoint::del() const
+{
+    app::Request req;
+    req.method = app::HttpMethod::del;
     req.url = m_url;
     return do_request(std::move(req));
 }
@@ -440,39 +453,31 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
     return AdminAPISession(std::move(base_url), std::move(access_token), std::move(group_id));
 }
 
-void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string app_id)
+void AdminAPISession::revoke_user_sessions(const std::string& user_id, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/logout", m_base_url, m_group_id, app_id, user_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"][user_id]["logout"];
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
 }
 
-void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string app_id)
+void AdminAPISession::disable_user_sessions(const std::string& user_id, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/disable", m_base_url, m_group_id, app_id, user_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"][user_id]["disable"];
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
 }
 
-void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string app_id)
+void AdminAPISession::enable_user_sessions(const std::string& user_id, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/%4/enable", m_base_url, m_group_id, app_id, user_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"][user_id]["enable"];
     auto response = endpoint.put("");
     REALM_ASSERT(response.http_status_code == 204);
 }
 
 // returns false for an invalid/expired access token
-bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string app_id)
+bool AdminAPISession::verify_access_token(const std::string& access_token, const std::string& app_id)
 {
-    auto endpoint = AdminAPIEndpoint(
-        util::format("%1/api/admin/v3.0/groups/%2/apps/%3/users/verify_token", m_base_url, m_group_id, app_id),
-        m_access_token);
+    auto endpoint = apps()[app_id]["users"]["verify_token"];
     nlohmann::json request_body{
         {"token", access_token},
     };
@@ -491,6 +496,109 @@ bool AdminAPISession::verify_access_token(const std::string& access_token, const
         }
     }
     return false;
+}
+
+void AdminAPISession::set_development_mode_to(const std::string& app_id, bool enable)
+{
+    auto endpoint = apps()[app_id]["sync"]["config"];
+    endpoint.put_json({{"development_mode_enabled", enable}});
+}
+
+void AdminAPISession::delete_app(const std::string& app_id)
+{
+    auto app_endpoint = apps()[app_id];
+    auto resp = app_endpoint.del();
+    REALM_ASSERT(resp.http_status_code == 204);
+}
+
+std::vector<AdminAPISession::Service> AdminAPISession::get_services(const std::string& app_id)
+{
+    auto endpoint = apps()[app_id]["services"];
+    auto response = endpoint.get_json();
+    std::vector<AdminAPISession::Service> services;
+    for (auto service : response) {
+        services.push_back(
+            {service["_id"], service["name"], service["type"], service["version"], service["last_modified"]});
+    }
+    return services;
+}
+
+
+AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& app_id)
+{
+    auto services = get_services(app_id);
+    auto sync_service = std::find_if(services.begin(), services.end(), [&](auto s) {
+        return s.type == "mongodb";
+    });
+    REALM_ASSERT(sync_service != services.end());
+    return *sync_service;
+}
+
+nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
+{
+    return nlohmann::json{
+        {"database_name", config.database_name}, {"partition", config.partition}, {"state", config.state}};
+}
+
+AdminAPIEndpoint AdminAPISession::service_config_endpoint(const std::string& app_id, const std::string& service_id)
+{
+    return apps()[app_id]["services"][service_id]["config"];
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::disable_sync(const std::string& app_id, const std::string& service_id,
+                                                             AdminAPISession::ServiceConfig sync_config)
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    if (sync_config.state != "") {
+        sync_config.state = "";
+        endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    }
+    return sync_config;
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::pause_sync(const std::string& app_id, const std::string& service_id,
+                                                           AdminAPISession::ServiceConfig sync_config)
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    if (sync_config.state != "disabled") {
+        sync_config.state = "disabled";
+        endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    }
+    return sync_config;
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::enable_sync(const std::string& app_id, const std::string& service_id,
+                                                            AdminAPISession::ServiceConfig sync_config)
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    sync_config.state = "enabled";
+    endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    return sync_config;
+}
+
+AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& app_id,
+                                                           const AdminAPISession::Service& service)
+{
+    auto endpoint = service_config_endpoint(app_id, service.id);
+    auto response = endpoint.get_json();
+    AdminAPISession::ServiceConfig config;
+    try {
+        auto sync = response["sync"];
+        config.state = sync["state"];
+        config.database_name = sync["database_name"];
+        config.partition = sync["partition"];
+    }
+    catch (const std::exception&) {
+        // ignored - the config for a disabled sync service will be empty
+    }
+    return config;
+}
+
+bool AdminAPISession::is_sync_enabled(const std::string& app_id)
+{
+    auto sync_service = get_sync_service(app_id);
+    auto config = get_config(app_id, sync_service);
+    return config.state == "enabled";
 }
 
 AdminAPIEndpoint AdminAPISession::apps() const
@@ -723,7 +831,7 @@ AppSession create_app(const AppCreateConfig& config)
                    {
                        {"key", config.partition_key.name},
                        {"type", property_type_to_bson_type_str(config.partition_key.type)},
-                       {"required", false},
+                       {"required", !is_nullable(config.partition_key.type)},
                        {"permissions",
                         {
                             {"read", true},
@@ -809,6 +917,24 @@ AppSession create_app(const AppCreateConfig& config)
 
     return {client_app_id, app_id, session, config};
 }
+
+app::App::Config get_integration_config()
+{
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto app_session = get_runtime_app_session(base_url);
+    return get_config(instance_of<SynchronousTestTransport>, app_session);
+}
+
+AppSession get_runtime_app_session(std::string base_url)
+{
+    static const AppSession cached_app_session = [&] {
+        auto cached_app_session = create_app(default_app_config(base_url));
+        return cached_app_session;
+    }();
+    return cached_app_session;
+}
+
 
 #ifdef REALM_MONGODB_ENDPOINT
 TEST_CASE("app: baas admin api", "[sync][app]") {

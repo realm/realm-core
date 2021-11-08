@@ -139,21 +139,17 @@ size_t Results::size()
 size_t Results::do_size()
 {
     validate_read();
+    ensure_up_to_date(EvaluateMode::Count);
     switch (m_mode) {
         case Mode::Empty:
             return 0;
         case Mode::Table:
             return m_table ? m_table->size() : 0;
         case Mode::Collection:
-            evaluate_sort_and_distinct_on_collection();
             return m_list_indices ? m_list_indices->size() : m_collection->size();
         case Mode::Query:
-            m_query.sync_view_if_needed();
-            if (!m_descriptor_ordering.will_apply_distinct())
-                return m_query.count(m_descriptor_ordering);
-            REALM_FALLTHROUGH;
+            return m_query.count(m_descriptor_ordering);
         case Mode::TableView:
-            do_evaluate_query_if_needed();
             return m_table_view.size();
     }
     REALM_COMPILER_HINT_UNREACHABLE();
@@ -183,50 +179,131 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
-void Results::evaluate_sort_and_distinct_on_collection()
+void Results::ensure_up_to_date(EvaluateMode mode)
 {
-    if (m_descriptor_ordering.is_empty())
-        return;
-
-    if (do_get_type() == PropertyType::Object) {
-        m_query = do_get_query();
-        m_mode = Mode::Query;
-        do_evaluate_query_if_needed();
+    if (m_update_policy == UpdatePolicy::Never) {
+        REALM_ASSERT(m_mode == Mode::TableView);
         return;
     }
 
-    // We can't use the sorted list from the notifier if we're in a write
-    // transaction as we only check the transaction version to see if the data matches
-    if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
-        return;
+    switch (m_mode) {
+        case Mode::Empty:
+            return;
+        case Mode::Table:
+            // Tables are always up-to-date
+            return;
+        case Mode::Collection: {
+            // Collections themselves are always up-to-date, but we may need
+            // to apply sort descriptors
+            if (m_descriptor_ordering.is_empty())
+                return;
 
-    bool needs_update = m_collection->has_changed();
-    if (!m_list_indices) {
-        m_list_indices = std::vector<size_t>{};
-        needs_update = true;
-    }
-    if (!needs_update)
-        return;
-    if (m_collection->is_empty()) {
-        m_list_indices->clear();
-        return;
-    }
+            // Collections of objects are sorted/distincted by converting them
+            // to a TableView
+            if (do_get_type() == PropertyType::Object) {
+                m_query = do_get_query();
+                m_mode = Mode::Query;
+                ensure_up_to_date(mode);
+                return;
+            }
 
-    util::Optional<bool> sort_order;
-    bool do_distinct = false;
-    auto sz = m_descriptor_ordering.size();
-    for (size_t i = 0; i < sz; i++) {
-        auto descr = m_descriptor_ordering[i];
-        if (descr->get_type() == DescriptorType::Sort)
-            sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
-        if (descr->get_type() == DescriptorType::Distinct)
-            do_distinct = true;
-    }
+            // Other types we do manually via m_list_indices. Ideally we just
+            // pull the updated one from the notifier, but we can't if it hasn't
+            // run yet or if we're currently in a write transaction (as we can't
+            // know if any relevant changes have happened so far in the write).
+            if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
+                return;
 
-    if (do_distinct)
-        m_collection->distinct(*m_list_indices, sort_order);
-    else if (sort_order)
-        m_collection->sort(*m_list_indices, *sort_order);
+            bool needs_update = m_collection->has_changed();
+            if (!m_list_indices) {
+                m_list_indices = std::vector<size_t>{};
+                needs_update = true;
+            }
+            if (!needs_update)
+                return;
+            if (m_collection->is_empty()) {
+                m_list_indices->clear();
+                return;
+            }
+
+            // Note that for objects this would be wrong as .sort().distinct()
+            // and distinct().sort() can pick different objects which have the
+            // same value in the column being distincted, but that's not
+            // applicable to non-objects. If there's two equal strings, it doesn't
+            // matter which we pick.
+            util::Optional<bool> sort_order;
+            bool do_distinct = false;
+            auto sz = m_descriptor_ordering.size();
+            for (size_t i = 0; i < sz; i++) {
+                auto descr = m_descriptor_ordering[i];
+                if (descr->get_type() == DescriptorType::Sort)
+                    sort_order = static_cast<const SortDescriptor*>(descr)->is_ascending(0);
+                if (descr->get_type() == DescriptorType::Distinct)
+                    do_distinct = true;
+            }
+
+            if (do_distinct)
+                m_collection->distinct(*m_list_indices, sort_order);
+            else if (sort_order)
+                m_collection->sort(*m_list_indices, *sort_order);
+            return;
+        }
+
+        case Mode::Query:
+            // Everything except for size() requires evaluating the Query and
+            // getting a TableView, and size() does as well if distinct is involved.
+            if (mode == EvaluateMode::Count && !m_descriptor_ordering.will_apply_distinct()) {
+                m_query.sync_view_if_needed();
+                return;
+            }
+
+            // First we check if we ran the Query in the background and can
+            // just use that
+            if (m_notifier && m_notifier->get_tableview(m_table_view)) {
+                m_mode = Mode::TableView;
+                return;
+            }
+
+            // We have to actually run the Query locally. We have an option
+            // to disable this for testing purposes as it's otherwise very
+            // difficult to determine if the async query is actually being
+            // used.
+            m_query.sync_view_if_needed();
+            if (m_update_policy != UpdatePolicy::AsyncOnly)
+                m_table_view = m_query.find_all(m_descriptor_ordering);
+            m_mode = Mode::TableView;
+
+            // Unless we're creating a snapshot, create an async notifier that'll
+            // rerun this query in the background.
+            if (mode != EvaluateMode::Snapshot && !m_notifier)
+                prepare_async(ForCallback{false});
+            return;
+
+        case Mode::TableView:
+            // Unless we're creating a snapshot, create an async notifier that'll
+            // rerun this query in the background.
+            if (mode != EvaluateMode::Snapshot && !m_notifier)
+                prepare_async(ForCallback{false});
+            // First check if we have an up-to-date TableView waiting for us
+            // which was generated on the background thread
+            else if (m_notifier)
+                m_notifier->get_tableview(m_table_view);
+            // This option is here so that tests can verify that the notifier
+            // is actually being used.
+            if (m_update_policy == UpdatePolicy::Auto)
+                m_table_view.sync_if_needed();
+            if (auto audit = m_realm->audit_context())
+                audit->record_query(m_realm->read_transaction_version(), m_table_view);
+            return;
+    }
+}
+
+size_t Results::actual_index(size_t ndx) const noexcept
+{
+    if (auto& indices = m_list_indices) {
+        return ndx < indices->size() ? (*indices)[ndx] : npos;
+    }
+    return ndx;
 }
 
 template <typename T>
@@ -243,11 +320,9 @@ template <typename T>
 util::Optional<T> Results::try_get(size_t ndx)
 {
     validate_read();
+    ensure_up_to_date();
     if (m_mode == Mode::Collection) {
-        evaluate_sort_and_distinct_on_collection();
-        if (m_list_indices) {
-            ndx = (ndx < m_list_indices->size()) ? (*m_list_indices)[ndx] : realm::npos;
-        }
+        ndx = actual_index(ndx);
         if (ndx < m_collection->size()) {
             return get_unwraped<T>(*m_collection, ndx);
         }
@@ -285,6 +360,7 @@ template <>
 util::Optional<Obj> Results::try_get(size_t row_ndx)
 {
     validate_read();
+    ensure_up_to_date();
     switch (m_mode) {
         case Mode::Empty:
             break;
@@ -293,23 +369,19 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
                 return m_table_iterator.get(*m_table, row_ndx);
             break;
         case Mode::Collection:
-            evaluate_sort_and_distinct_on_collection();
-            if (m_mode == Mode::Collection) {
-                if (row_ndx < m_collection->size()) {
-                    auto m = m_collection->get_any(row_ndx);
-                    if (m.is_null())
-                        return Obj();
-                    if (m.get_type() == type_Link)
-                        return m_table->get_object(m.get<ObjKey>());
-                    if (m.get_type() == type_TypedLink)
-                        return m_table->get_parent_group()->get_object(m.get_link());
-                }
-                break;
+            if (row_ndx < m_collection->size()) {
+                auto m = m_collection->get_any(row_ndx);
+                if (m.is_null())
+                    return Obj();
+                if (m.get_type() == type_Link)
+                    return m_table->get_object(m.get<ObjKey>());
+                if (m.get_type() == type_TypedLink)
+                    return m_table->get_parent_group()->get_object(m.get_link());
             }
-            [[fallthrough]];
+            break;
         case Mode::Query:
+            REALM_UNREACHABLE();
         case Mode::TableView:
-            do_evaluate_query_if_needed();
             if (row_ndx >= m_table_view.size())
                 break;
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(row_ndx))
@@ -323,6 +395,7 @@ Mixed Results::get_any(size_t ndx)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
+    ensure_up_to_date();
     switch (m_mode) {
         case Mode::Empty:
             break;
@@ -331,21 +404,12 @@ Mixed Results::get_any(size_t ndx)
                 return m_table_iterator.get(*m_table, ndx);
             break;
         case Mode::Collection:
-            evaluate_sort_and_distinct_on_collection();
-            if (m_list_indices) {
-                if (ndx < m_list_indices->size())
-                    return m_collection->get_any((*m_list_indices)[ndx]);
-                break;
-            }
-            if (m_mode == Mode::Collection) {
-                if (ndx < m_collection->size())
-                    return m_collection->get_any(ndx);
-                break;
-            }
-            REALM_FALLTHROUGH;
+            if (auto actual = actual_index(ndx); actual < m_collection->size())
+                return m_collection->get_any(actual);
+            break;
         case Mode::Query:
+            REALM_UNREACHABLE();
         case Mode::TableView: {
-            do_evaluate_query_if_needed();
             if (ndx >= m_table_view.size())
                 break;
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(ndx))
@@ -364,12 +428,8 @@ std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
     auto& dict = static_cast<Dictionary&>(*m_collection);
     REALM_ASSERT(typeid(dict) == typeid(Dictionary));
 
-    evaluate_sort_and_distinct_on_collection();
-    size_t actual = ndx;
-    if (m_list_indices)
-        actual = ndx < m_list_indices->size() ? (*m_list_indices)[ndx] : npos;
-
-    if (actual < dict.size()) {
+    ensure_up_to_date();
+    if (size_t actual = actual_index(ndx); actual < dict.size()) {
         auto val = dict.get_pair(ndx);
         return {val.first.get_string(), val.second};
     }
@@ -399,7 +459,7 @@ util::Optional<T> Results::last()
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
     if (m_mode == Mode::Query)
-        do_evaluate_query_if_needed(); // avoid running the query twice (for size() and for get())
+        ensure_up_to_date(); // avoid running the query twice (for size() and for get())
     return try_get<T>(do_size() - 1);
 }
 
@@ -407,42 +467,7 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
-    do_evaluate_query_if_needed(wants_notifications);
-}
-
-void Results::do_evaluate_query_if_needed(bool wants_notifications)
-{
-    if (m_update_policy == UpdatePolicy::Never) {
-        REALM_ASSERT(m_mode == Mode::TableView);
-        return;
-    }
-
-    switch (m_mode) {
-        case Mode::Empty:
-        case Mode::Table:
-        case Mode::Collection:
-            return;
-        case Mode::Query:
-            if (m_notifier && m_notifier->get_tableview(m_table_view)) {
-                m_mode = Mode::TableView;
-                break;
-            }
-            m_query.sync_view_if_needed();
-            if (m_update_policy == UpdatePolicy::Auto)
-                m_table_view = m_query.find_all(m_descriptor_ordering);
-            m_mode = Mode::TableView;
-            REALM_FALLTHROUGH;
-        case Mode::TableView:
-            if (wants_notifications && !m_notifier)
-                prepare_async(ForCallback{false});
-            else if (m_notifier)
-                m_notifier->get_tableview(m_table_view);
-            if (m_update_policy == UpdatePolicy::Auto)
-                m_table_view.sync_if_needed();
-            if (auto audit = m_realm->audit_context())
-                audit->record_query(m_realm->read_transaction_version(), m_table_view);
-            break;
-    }
+    ensure_up_to_date(wants_notifications ? EvaluateMode::Normal : EvaluateMode::Snapshot);
 }
 
 template <>
@@ -450,6 +475,7 @@ size_t Results::index_of(Obj const& row)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
+    ensure_up_to_date();
     if (!row.is_valid()) {
         throw DetatchedAccessorException{};
     }
@@ -463,13 +489,9 @@ size_t Results::index_of(Obj const& row)
         case Mode::Table:
             return m_table->get_object_ndx(row.get_key());
         case Mode::Collection:
-            evaluate_sort_and_distinct_on_collection();
-            if (m_mode == Mode::Collection)
-                return m_collection->find_any(row.get_key());
-            [[fallthrough]];
+            return m_collection->find_any(row.get_key());
         case Mode::Query:
         case Mode::TableView:
-            do_evaluate_query_if_needed();
             return m_table_view.find_by_source_ndx(row.get_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
@@ -480,9 +502,9 @@ size_t Results::index_of(T const& value)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
+    ensure_up_to_date();
     if (m_mode != Mode::Collection)
         return not_found; // Non-Collection results can only ever contain Objects
-    evaluate_sort_and_distinct_on_collection();
     if (m_list_indices) {
         for (size_t i = 0; i < m_list_indices->size(); ++i) {
             if (value == get_unwraped<T>(*m_collection, (*m_list_indices)[i]))
@@ -524,7 +546,7 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
-            do_evaluate_query_if_needed();
+            ensure_up_to_date();
             type = m_table->get_column_type(column);
             break;
         default:
@@ -848,20 +870,18 @@ util::Optional<Mixed> Results::average(ColKey column)
 void Results::clear()
 {
     util::CheckedUniqueLock lock(m_mutex);
+    validate_write();
+    ensure_up_to_date();
     switch (m_mode) {
         case Mode::Empty:
             return;
         case Mode::Table:
-            validate_write();
             const_cast<Table&>(*m_table).clear();
             break;
         case Mode::Query:
             // Not using Query:remove() because building the tableview and
             // clearing it is actually significantly faster
         case Mode::TableView:
-            validate_write();
-            do_evaluate_query_if_needed();
-
             switch (m_update_policy) {
                 case UpdatePolicy::Auto:
                     m_table_view.clear();
@@ -876,7 +896,6 @@ void Results::clear()
             }
             break;
         case Mode::Collection:
-            validate_write();
             if (auto list = dynamic_cast<LnkLst*>(m_collection.get()))
                 list->remove_all_target_rows();
             else if (auto set = dynamic_cast<LnkSet*>(m_collection.get()))
@@ -954,7 +973,7 @@ Query Results::do_get_query() const
             if (m_update_policy == UpdatePolicy::Auto) {
                 m_table_view.sync_if_needed();
             }
-            return Query(m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
+            return Query(m_table, std::unique_ptr<TableView>(new TableView(m_table_view)));
         }
         case Mode::Collection:
             if (auto list = dynamic_cast<ObjList*>(m_collection.get())) {
@@ -976,16 +995,13 @@ TableView Results::get_tableview()
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
+    ensure_up_to_date();
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Collection:
-            evaluate_sort_and_distinct_on_collection();
-            if (m_mode == Mode::Collection)
-                return do_get_query().find_all();
-            return m_table_view;
+            return do_get_query().find_all();
         case Mode::Query:
         case Mode::TableView:
-            do_evaluate_query_if_needed();
             return m_table_view;
         case Mode::Table:
             return m_table->where().find_all();
@@ -1157,9 +1173,11 @@ Results Results::snapshot() &&
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
-            do_evaluate_query_if_needed(false);
+            ensure_up_to_date(EvaluateMode::Snapshot);
             m_notifier.reset();
-            m_update_policy = UpdatePolicy::Never;
+            if (do_get_type() == PropertyType::Object) {
+                m_update_policy = UpdatePolicy::Never;
+            }
             return std::move(*this);
     }
     REALM_COMPILER_HINT_UNREACHABLE();
@@ -1255,22 +1273,20 @@ REALM_RESULTS_TYPE(util::Optional<UUID>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
+Results Results::import_copy_into_realm(std::shared_ptr<Realm> const& realm)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_mode == Mode::Empty)
         return *this;
     switch (m_mode) {
         case Mode::Table:
-            return Results(frozen_realm, frozen_realm->import_copy_of(m_table));
+            return Results(realm, realm->import_copy_of(m_table));
         case Mode::Collection:
-            return Results(frozen_realm, frozen_realm->import_copy_of(*m_collection), m_descriptor_ordering);
+            return Results(realm, realm->import_copy_of(*m_collection), m_descriptor_ordering);
         case Mode::Query:
-            return Results(frozen_realm, *frozen_realm->import_copy_of(m_query, PayloadPolicy::Copy),
-                           m_descriptor_ordering);
+            return Results(realm, *realm->import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
         case Mode::TableView: {
-            Results results(frozen_realm, *frozen_realm->import_copy_of(m_table_view, PayloadPolicy::Copy),
-                            m_descriptor_ordering);
+            Results results(realm, *realm->import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
             results.assert_unlocked();
             results.evaluate_query_if_needed(false);
             return results;
@@ -1278,6 +1294,11 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
+}
+
+Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
+{
+    return import_copy_into_realm(frozen_realm);
 }
 
 bool Results::is_frozen() const

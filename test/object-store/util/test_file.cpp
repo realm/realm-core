@@ -18,13 +18,14 @@
 
 #include "util/test_file.hpp"
 
+#include "baas_admin_api.hpp"
 #include "test_utils.hpp"
-
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
 #endif
 
@@ -36,6 +37,7 @@
 #include <realm/util/file.hpp>
 
 #include <cstdlib>
+#include <iostream>
 
 #ifdef _WIN32
 #include <io.h>
@@ -61,7 +63,11 @@ using namespace realm;
 TestFile::TestFile()
 {
     disable_sync_to_disk();
-    path = util::format("%1/realm.XXXXXX", util::make_temp_dir());
+    m_temp_dir = util::make_temp_dir();
+    if (m_temp_dir.size() == 0 || m_temp_dir[m_temp_dir.size() - 1] != '/') {
+        m_temp_dir = m_temp_dir + "/";
+    }
+    path = util::format("%1realm.XXXXXX", m_temp_dir);
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;
@@ -80,12 +86,15 @@ TestFile::TestFile()
 
 TestFile::~TestFile()
 {
-    if (!m_persist)
-#ifdef _WIN32
-        _unlink(path.c_str());
-#else // POSIX
-        unlink(path.c_str());
-#endif
+    if (!m_persist) {
+        try {
+            util::File::try_remove(path);
+            util::try_remove_dir_recursive(m_temp_dir);
+        }
+        catch (...) {
+            // clean up is best effort, ignored.
+        }
+    }
 }
 
 DBOptions TestFile::options() const
@@ -120,9 +129,30 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
                                                                    app->base_url(), fake_device_id),
                                      name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](auto, auto) {
+    sync_config->error_handler = [](auto, SyncError error) {
+        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
+                                  error.message)
+                  << std::endl;
         abort();
     };
+    schema_mode = SchemaMode::AdditiveExplicit;
+}
+
+SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson partition, realm::Schema _schema)
+{
+    if (!user)
+        throw std::runtime_error("Must provide `user` for SyncTestFile");
+
+    sync_config = std::make_shared<realm::SyncConfig>(user, partition);
+    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
+    sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
+        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
+                                  error.message)
+                  << std::endl;
+        abort();
+    };
+    schema_version = 1;
+    schema = _schema;
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
@@ -232,6 +262,7 @@ std::error_code wait_for_download(Realm& realm)
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
+    , m_app_session(config.app_session)
 {
     app::App::Config app_config = config.app_config;
     if (!app_config.transport) {
@@ -272,10 +303,17 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 
 TestSyncManager::~TestSyncManager()
 {
-    if (m_should_teardown_test_directory && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
-        m_app->sync_manager()->reset_for_testing();
-        util::try_remove_dir_recursive(m_base_file_path);
-        app::App::clear_cached_apps();
+    if (m_should_teardown_test_directory) {
+        if (!m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+            m_app->sync_manager()->reset_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+            app::App::clear_cached_apps();
+        }
+#if REALM_ENABLE_AUTH_TESTS
+        if (m_app_session) {
+            m_app_session->admin_api.delete_app(m_app_session->server_app_id);
+        }
+#endif
     }
 }
 

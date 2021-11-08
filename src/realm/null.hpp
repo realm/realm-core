@@ -68,43 +68,6 @@ struct null {
         return util::none;
     }
 
-    template <class T>
-    bool operator==(const T&) const
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-    template <class T>
-    bool operator!=(const T&) const
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-    template <class T>
-    bool operator>(const T&) const
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-    template <class T>
-    bool operator>=(const T&) const
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-    template <class T>
-    bool operator<=(const T&) const
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-    template <class T>
-    bool operator<(const T&) const
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-
     /// Returns whether `v` bitwise equals the null bit-pattern
     template <class T>
     static bool is_null_float(T v)

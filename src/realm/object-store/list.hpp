@@ -61,6 +61,7 @@ public:
 
     template <typename T = Obj>
     T get(size_t row_ndx) const;
+
     template <typename T>
     size_t find(T const& value) const;
 
@@ -81,8 +82,9 @@ public:
 
     Results filter(Query q) const;
 
-    // Returns a frozen copy of this result
-    List freeze(std::shared_ptr<Realm> const& realm) const;
+    // Returns a frozen copy of this List.
+    // Equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+    List freeze(std::shared_ptr<Realm> const& frozen_realm) const;
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
@@ -133,6 +135,9 @@ private:
 
     friend struct std::hash<List>;
 };
+
+template <>
+Obj List::get(size_t row_ndx) const;
 
 template <typename T>
 auto& List::as() const

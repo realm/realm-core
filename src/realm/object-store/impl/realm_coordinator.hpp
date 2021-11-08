@@ -73,6 +73,12 @@ public:
     // This is also created as part of opening a Realm, so only use this
     // method if the session needs to exist before the Realm does.
     void create_session(const Realm::Config& config) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
+
+    std::shared_ptr<SyncSession> sync_session() REQUIRES(!m_realm_mutex)
+    {
+        util::CheckedLockGuard lock(m_realm_mutex);
+        return m_sync_session;
+    }
 #endif
 
     // Get the existing cached Realm if it exists for the specified scheduler or config.scheduler

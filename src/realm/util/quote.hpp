@@ -1,7 +1,7 @@
 #ifndef REALM_UTIL_QUOTE_HPP
 #define REALM_UTIL_QUOTE_HPP
 
-#include <realm/util/string_view.hpp>
+#include <string_view>
 
 namespace realm {
 namespace util {
@@ -9,7 +9,7 @@ namespace util {
 template <class C, class T>
 struct Quote {
     bool smart;
-    util::BasicStringView<C, T> view;
+    std::basic_string_view<C, T> view;
 };
 
 
@@ -30,7 +30,7 @@ struct Quote {
 /// Quotation happens as the string is written to a stream, so there is no
 /// intermediate representation of the quoted string.
 template <class C, class T>
-Quote<C, T> quoted(util::BasicStringView<C, T>) noexcept;
+Quote<C, T> quoted(std::basic_string_view<C, T>) noexcept;
 
 
 /// Same as quoted(), except that in this case, quotation is elided when the
@@ -39,7 +39,7 @@ Quote<C, T> quoted(util::BasicStringView<C, T>) noexcept;
 /// printable charcters (std::isprint()), does not contain space (` `), and does
 /// not conatian quotation (`"`) or backslash (`\`).
 template <class C, class T>
-Quote<C, T> smart_quoted(util::BasicStringView<C, T>) noexcept;
+Quote<C, T> smart_quoted(std::basic_string_view<C, T>) noexcept;
 
 
 template <class C, class T>
@@ -49,14 +49,14 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, Quote<C, T>);
 // Implementation
 
 template <class C, class T>
-inline Quote<C, T> quoted(util::BasicStringView<C, T> view) noexcept
+inline Quote<C, T> quoted(std::basic_string_view<C, T> view) noexcept
 {
     bool smart = false;
     return {smart, view};
 }
 
 template <class C, class T>
-inline Quote<C, T> smart_quoted(util::BasicStringView<C, T> view) noexcept
+inline Quote<C, T> smart_quoted(std::basic_string_view<C, T> view) noexcept
 {
     bool smart = true;
     return {smart, view};
@@ -69,7 +69,7 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, Quote
     const std::ctype<C>& ctype = std::use_facet<std::ctype<C>>(loc);
     C dquote = ctype.widen('"');
     C bslash = ctype.widen('\\');
-    util::BasicStringView<C, T> view = quoted.view;
+    std::basic_string_view<C, T> view = quoted.view;
     if (quoted.smart && !view.empty()) {
         for (C ch : view) {
             if (ch == dquote || ch == bslash || !ctype.is(ctype.graph, ch))

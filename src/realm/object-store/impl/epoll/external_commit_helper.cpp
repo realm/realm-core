@@ -218,7 +218,7 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
         throw std::system_error(err, std::system_category());
     }
 
-    m_thread = std::thread([=] {
+    m_thread = std::thread([this] {
         try {
             listen();
         }

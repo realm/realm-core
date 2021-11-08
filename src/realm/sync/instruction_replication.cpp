@@ -1,22 +1,10 @@
 #include <realm/sync/instruction_replication.hpp>
 #include <realm/db.hpp>
 #include <realm/sync/transform.hpp> // TransformError
-#include <realm/sync/object.hpp>
 #include <realm/list.hpp>
 
 namespace realm {
 namespace sync {
-
-SyncReplication::SyncReplication(const std::string& realm_path)
-    : TrivialReplication(realm_path)
-{
-}
-
-void SyncReplication::initialize(DB& sg)
-{
-    REALM_ASSERT(!m_db);
-    m_db = &sg;
-}
 
 void SyncReplication::reset()
 {
@@ -32,7 +20,7 @@ void SyncReplication::reset()
 
 void SyncReplication::do_initiate_transact(Group& group, version_type current_version, bool history_updated)
 {
-    TrivialReplication::do_initiate_transact(group, current_version, history_updated);
+    Replication::do_initiate_transact(group, current_version, history_updated);
     m_transaction = dynamic_cast<Transaction*>(&group); // FIXME: Is this safe?
     reset();
 }
@@ -144,7 +132,7 @@ Instruction::Payload SyncReplication::as_payload(const Table& table, ColKey col_
 
 InternString SyncReplication::emit_class_name(StringData table_name)
 {
-    return m_encoder.intern_string(table_name_to_class_name(table_name));
+    return m_encoder.intern_string(Group::table_name_to_class_name(table_name));
 }
 
 InternString SyncReplication::emit_class_name(const Table& table)
@@ -191,7 +179,7 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
 
 void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
 {
-    TrivialReplication::add_class(tk, name, is_embedded);
+    Replication::add_class(tk, name, is_embedded);
 
     bool is_class = name.begins_with("class_");
 
@@ -217,7 +205,7 @@ void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
 void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, DataType pk_type, StringData pk_field,
                                                  bool nullable)
 {
-    TrivialReplication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable);
+    Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable);
 
     bool is_class = name.begins_with("class_");
 
@@ -240,7 +228,7 @@ void SyncReplication::create_object(const Table* table, GlobalKey oid)
         unsupported_instruction(); // FIXME: TODO
     }
 
-    TrivialReplication::create_object(table, oid);
+    Replication::create_object(table, oid);
     if (select_table(*table)) {
         if (table->get_primary_key_column()) {
             // Trying to create object without a primary key in a table that
@@ -284,7 +272,7 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
         unsupported_instruction();
     }
 
-    TrivialReplication::create_object_with_primary_key(table, oid, value);
+    Replication::create_object_with_primary_key(table, oid, value);
     if (select_table(*table)) {
         auto col = table->get_primary_key_column();
         if (col && ((value.is_null() && col.is_nullable()) || DataType(col.get_type()) == value.get_type())) {
@@ -310,7 +298,7 @@ void SyncReplication::prepare_erase_class(TableKey table_key)
 
 void SyncReplication::erase_class(TableKey table_key, size_t num_tables)
 {
-    TrivialReplication::erase_class(table_key, num_tables);
+    Replication::erase_class(table_key, num_tables);
 
     StringData table_name = m_transaction->get_table_name(table_key);
 
@@ -338,7 +326,7 @@ void SyncReplication::rename_class(TableKey, StringData)
 void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType type, StringData name,
                                     Table* target_table)
 {
-    TrivialReplication::insert_column(table, col_key, type, name, target_table);
+    Replication::insert_column(table, col_key, type, name, target_table);
     using CollectionType = Instruction::AddColumn::CollectionType;
 
     if (select_table(*table)) {
@@ -386,7 +374,7 @@ void SyncReplication::insert_column(const Table* table, ColKey col_key, DataType
 
 void SyncReplication::erase_column(const Table* table, ColKey col_ndx)
 {
-    TrivialReplication::erase_column(table, col_ndx);
+    Replication::erase_column(table, col_ndx);
 
     if (select_table(*table)) {
         if (table->get_key() == m_table_being_erased) {
@@ -410,7 +398,7 @@ void SyncReplication::rename_column(const Table*, ColKey, StringData)
 
 void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed value)
 {
-    TrivialReplication::list_set(list, ndx, value);
+    Replication::list_set(list, ndx, value);
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
@@ -462,7 +450,7 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 
 void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value)
 {
-    TrivialReplication::list_insert(list, ndx, value);
+    Replication::list_insert(list, ndx, value);
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
@@ -486,7 +474,7 @@ void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed 
 
 void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fast64_t value)
 {
-    TrivialReplication::add_int(table, col, ndx, value);
+    Replication::add_int(table, col, ndx, value);
 
     if (select_table(*table)) {
         REALM_ASSERT(col != table->get_primary_key_column());
@@ -500,7 +488,7 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
 
 void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed value, _impl::Instruction variant)
 {
-    TrivialReplication::set(table, col, key, value, variant);
+    Replication::set(table, col, key, value, variant);
 
     if (key.is_unresolved()) {
         return;
@@ -547,7 +535,7 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
 
 void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 {
-    TrivialReplication::remove_object(table, row_ndx);
+    Replication::remove_object(table, row_ndx);
     if (table->is_embedded())
         return;
     REALM_ASSERT(!row_ndx.is_unresolved());
@@ -567,7 +555,7 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 
 void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, size_t to_ndx)
 {
-    TrivialReplication::list_move(view, from_ndx, to_ndx);
+    Replication::list_move(view, from_ndx, to_ndx);
     if (select_collection(view)) {
         Instruction::ArrayMove instr;
         populate_path_instr(instr, view, uint32_t(from_ndx));
@@ -580,7 +568,7 @@ void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, siz
 void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
 {
     size_t prior_size = view.size();
-    TrivialReplication::list_erase(view, ndx);
+    Replication::list_erase(view, ndx);
     if (select_collection(view)) {
         Instruction::ArrayErase instr;
         populate_path_instr(instr, view, uint32_t(ndx));
@@ -591,7 +579,7 @@ void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
 
 void SyncReplication::list_clear(const CollectionBase& view)
 {
-    TrivialReplication::list_clear(view);
+    Replication::list_clear(view);
     if (select_collection(view)) {
         Instruction::Clear instr;
         populate_path_instr(instr, view);
@@ -601,7 +589,7 @@ void SyncReplication::list_clear(const CollectionBase& view)
 
 void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixed value)
 {
-    TrivialReplication::set_insert(set, set_ndx, value);
+    Replication::set_insert(set, set_ndx, value);
 
     if (select_collection(set)) {
         Instruction::SetInsert instr;
@@ -613,7 +601,7 @@ void SyncReplication::set_insert(const CollectionBase& set, size_t set_ndx, Mixe
 
 void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed value)
 {
-    TrivialReplication::set_erase(set, set_ndx, value);
+    Replication::set_erase(set, set_ndx, value);
 
     if (select_collection(set)) {
         Instruction::SetErase instr;
@@ -625,7 +613,7 @@ void SyncReplication::set_erase(const CollectionBase& set, size_t set_ndx, Mixed
 
 void SyncReplication::set_clear(const CollectionBase& set)
 {
-    TrivialReplication::set_clear(set);
+    Replication::set_clear(set);
 
     if (select_collection(set)) {
         Instruction::Clear instr;
@@ -660,19 +648,19 @@ void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed&
 
 void SyncReplication::dictionary_insert(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_insert(dict, ndx, key, value);
+    Replication::dictionary_insert(dict, ndx, key, value);
     dictionary_update(dict, key, value);
 }
 
 void SyncReplication::dictionary_set(const CollectionBase& dict, size_t ndx, Mixed key, Mixed value)
 {
-    TrivialReplication::dictionary_set(dict, ndx, key, value);
+    Replication::dictionary_set(dict, ndx, key, value);
     dictionary_update(dict, key, value);
 }
 
 void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, Mixed key)
 {
-    TrivialReplication::dictionary_erase(dict, ndx, key);
+    Replication::dictionary_erase(dict, ndx, key);
 
     if (select_collection(dict)) {
         Instruction::Update instr;
@@ -688,7 +676,7 @@ void SyncReplication::dictionary_erase(const CollectionBase& dict, size_t ndx, M
 
 void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey ndx)
 {
-    TrivialReplication::nullify_link(table, col_ndx, ndx);
+    Replication::nullify_link(table, col_ndx, ndx);
 
     if (select_table(*table)) {
         Instruction::Update instr;
@@ -703,7 +691,7 @@ void SyncReplication::nullify_link(const Table* table, ColKey col_ndx, ObjKey nd
 void SyncReplication::link_list_nullify(const Lst<ObjKey>& view, size_t ndx)
 {
     size_t prior_size = view.size();
-    TrivialReplication::link_list_nullify(view, ndx);
+    Replication::link_list_nullify(view, ndx);
     if (select_collection(view)) {
         Instruction::ArrayErase instr;
         populate_path_instr(instr, view, uint32_t(ndx));

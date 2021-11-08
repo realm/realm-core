@@ -162,6 +162,13 @@ public:
     /// usable/logical size.
     REALM_NODISCARD Buffer<T, Allocator> release() noexcept;
 
+    friend void swap(AppendBuffer& a, AppendBuffer& b) noexcept
+    {
+        using std::swap;
+        swap(a.m_buffer, b.m_buffer);
+        swap(a.m_size, b.m_size);
+    }
+
 private:
     util::Buffer<T, Allocator> m_buffer;
     size_t m_size;

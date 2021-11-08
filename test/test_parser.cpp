@@ -2787,8 +2787,8 @@ TEST(Parser_SortAndDistinct)
 TEST(Parser_Limit)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    auto sg = DB::create(*hist, DBOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    auto sg = DB::create(*hist, path, DBOptions(crypt_key()));
 
     auto wt = sg->start_write();
     TableRef people = wt->add_table("person");
@@ -4008,34 +4008,30 @@ TEST(Parser_ObjectId)
     using util::serializer::print_value;
     Group g;
     auto table = g.add_table_with_primary_key("table", type_ObjectId, "id");
-    auto pk_col_key = table->get_primary_key_column();
     auto nullable_oid_col_key = table->add_column(type_ObjectId, "nid", true);
 
-    auto now = std::chrono::system_clock::now();
-
+    ObjectId generated_at_now = ObjectId::gen();
     Timestamp ts_t1{1, 1};
-    Timestamp ts_now{now};
-    Timestamp ts_t25{now + std::chrono::seconds(25)};
+    Timestamp ts_before_now{generated_at_now.get_timestamp().get_time_point() - std::chrono::seconds(1)};
+    Timestamp ts_after_now{generated_at_now.get_timestamp().get_time_point() + std::chrono::seconds(25)};
     Timestamp ts_00{0, 0};
-    std::vector<Timestamp> times = {ts_t1, ts_now, ts_t25, ts_00};
+    CHECK_GREATER(generated_at_now.get_timestamp().get_seconds(), 0);
+    CHECK_GREATER_EQUAL(generated_at_now.get_timestamp().get_seconds() - ts_before_now.get_seconds(), 1);
+    std::vector<Timestamp> times = {ts_t1, ts_before_now, ts_after_now, ts_00};
     int machine_id = 0;
     int process_id = 0;
-    ObjectId t1{ts_t1, machine_id, process_id};
-    ObjectId tNow{ts_now, machine_id, process_id};
-    ObjectId t25{ts_t25, machine_id, process_id};
-    ObjectId t00{ts_00, machine_id, process_id};
-    std::vector<ObjectId> ids = {t1, tNow, t25, t00};
+    ObjectId oid_1{ts_t1, machine_id, process_id};
+    ObjectId oid_before_now{ts_before_now, machine_id, process_id};
+    ObjectId oid_after_now{ts_after_now, machine_id, process_id};
+    ObjectId oid_0{ts_00, machine_id, process_id};
+    std::vector<ObjectId> ids = {oid_1, oid_before_now, oid_after_now, oid_0};
 
     for (size_t i = 0; i < times.size(); ++i) {
         auto obj = table->create_object_with_primary_key({ids[i]});
         obj.set(nullable_oid_col_key, ids[i]);
     }
-    // add one object with default values, we assume time > now, and null
-    auto obj_generated = table->create_object_with_primary_key(ObjectId::gen());
-    ObjectId generated_pk = obj_generated.get<ObjectId>(pk_col_key);
-    CHECK(std::abs(generated_pk.get_timestamp().get_seconds() - ts_now.get_seconds()) <= 1);
+    auto obj_generated = table->create_object_with_primary_key(generated_at_now);
     auto generated_nullable = obj_generated.get<util::Optional<ObjectId>>(nullable_oid_col_key);
-    CHECK_GREATER(Timestamp{now}.get_seconds(), 0);
     CHECK(!generated_nullable);
 
     //  id  |  nid  |
@@ -4047,7 +4043,7 @@ TEST(Parser_ObjectId)
     //  tNow|  null |
 
     // g.to_json(std::cout);
-    verify_query(test_context, table, "id == oid(" + generated_pk.to_string() + ")", 1);
+    verify_query(test_context, table, "id == oid(" + generated_at_now.to_string() + ")", 1);
     verify_query(test_context, table, "nid == NULL", 1);
 
     for (auto oid : ids) {
@@ -4069,7 +4065,7 @@ TEST(Parser_ObjectId)
     verify_query(test_context, table, "nid == NULL", 1);
 
     // argument substitution checks with an ObjectId
-    util::Any args[] = {t1, tNow, t25, t00, realm::null()};
+    util::Any args[] = {oid_1, oid_before_now, oid_after_now, oid_0, realm::null()};
     size_t num_args = 5;
 
     verify_query_sub(test_context, table, "id == $0", args, num_args, 1);
@@ -5019,8 +5015,8 @@ void worker(test_util::unit_test::TestContext& test_context, TransactionRef froz
 TEST(Parser_Threads)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    DBRef db = DB::create(*hist);
+    std::unique_ptr<Replication> hist(make_in_realm_history());
+    DBRef db = DB::create(*hist, path);
     TransactionRef frozen;
 
     {

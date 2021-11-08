@@ -294,7 +294,7 @@ struct AverageHelper<T, std::void_t<ColumnSumType<T>>> {
 /// Convenience base class for collections, which implements most of the
 /// relevant interfaces for a collection that is bound to an object accessor and
 /// representable as a BPlusTree<T>.
-template <class Interface>
+template <class Interface, class Derived>
 class CollectionBaseImpl : public Interface, protected ArrayParent {
 public:
     static_assert(std::is_base_of_v<CollectionBase, Interface>);
@@ -360,13 +360,13 @@ protected:
     CollectionBaseImpl& operator=(const CollectionBaseImpl& other) = default;
     CollectionBaseImpl& operator=(CollectionBaseImpl&& other) = default;
 
-    bool operator==(const CollectionBaseImpl& other) const noexcept
+    bool operator==(const Derived& other) const noexcept
     {
         return get_table() == other.get_table() && get_owner_key() == other.get_owner_key() &&
                get_col_key() == other.get_col_key();
     }
 
-    bool operator!=(const CollectionBaseImpl& other) const noexcept
+    bool operator!=(const Derived& other) const noexcept
     {
         return !(*this == other);
     }

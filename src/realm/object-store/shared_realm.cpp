@@ -182,6 +182,11 @@ std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     return coordinator->get_synchronized_realm(std::move(config));
 }
+
+std::shared_ptr<SyncSession> Realm::sync_session() const
+{
+    return m_coordinator->sync_session();
+}
 #endif
 
 void Realm::set_schema(Schema const& reference, Schema schema)
@@ -1122,6 +1127,8 @@ SharedRealm Realm::freeze()
     auto config = m_config;
     auto version = read_transaction_version();
     config.scheduler = util::Scheduler::make_frozen(version);
+    config.schema = m_schema;
+    config.schema_version = m_schema_version;
     return Realm::get_frozen_realm(std::move(config), version);
 }
 

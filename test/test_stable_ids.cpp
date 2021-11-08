@@ -1,10 +1,10 @@
 #include "test.hpp"
 
 #include <realm/sync/history.hpp>
-#include <realm/sync/noinst/server_history.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/db.hpp>
 
-#include <realm/sync/object.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/instruction_applier.hpp>
@@ -16,18 +16,9 @@ using namespace realm::sync;
 namespace {
 
 struct MakeClientHistory {
-    static std::unique_ptr<ClientReplication> make_history(const std::string& realm_path)
+    static std::unique_ptr<ClientReplication> make_history()
     {
-        return realm::sync::make_client_replication(realm_path);
-    }
-
-    static file_ident_type get_client_file_ident(ClientReplication& history)
-    {
-        version_type current_client_version;
-        SaltedFileIdent client_file_ident;
-        SyncProgress progress;
-        history.get_status(current_client_version, client_file_ident, progress);
-        return client_file_ident.ident;
+        return realm::sync::make_client_replication();
     }
 };
 
@@ -46,21 +37,15 @@ struct MakeServerHistory {
                               public _impl::ServerHistory::DummyCompactionControl,
                               public _impl::ServerHistory {
     public:
-        explicit WrapServerHistory(const std::string& realm_path)
-            : _impl::ServerHistory{realm_path, *this, *this}
+        WrapServerHistory()
+            : _impl::ServerHistory{*this, *this}
         {
         }
     };
 
-    static std::unique_ptr<_impl::ServerHistory> make_history(const std::string& realm_path)
+    static std::unique_ptr<_impl::ServerHistory> make_history()
     {
-        return std::make_unique<WrapServerHistory>(realm_path);
-    }
-
-    static _impl::ServerHistory::file_ident_type get_client_file_ident(_impl::ServerHistory&)
-    {
-        // For un-migrated Realms, the server's client file ident is always 1.
-        return 1;
+        return std::make_unique<WrapServerHistory>();
     }
 };
 
@@ -70,12 +55,12 @@ struct MakeServerHistory {
 TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, MakeServerHistory)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = TEST_TYPE::make_history(test_dir);
-    DBRef sg = DB::create(*history);
+    auto history = TEST_TYPE::make_history();
+    DBRef sg = DB::create(*history, test_dir);
 
     {
         WriteTransaction wt{sg};
-        sync::create_table(wt, "class_foo");
+        wt.get_or_add_table("class_foo");
         wt.commit();
     }
 
@@ -98,16 +83,16 @@ TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, 
 TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, MakeServerHistory)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = TEST_TYPE::make_history(test_dir);
+    auto history = TEST_TYPE::make_history();
 
-    DBRef sg = DB::create(*history);
+    DBRef sg = DB::create(*history, test_dir);
 
-    auto client_file_ident = TEST_TYPE::get_client_file_ident(*history);
+    auto client_file_ident = sg->start_read()->get_sync_file_id();
 
     // Tables without primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
+        TableRef t0 = wt.get_or_add_table("class_t0");
 
         auto obj0 = t0->create_object();
         auto obj1 = t0->create_object();
@@ -120,7 +105,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables with integer primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
+        TableRef t1 = wt.get_group().add_table_with_primary_key("class_t1", type_Int, "pk");
         auto obj0 = t1->create_object_with_primary_key(123);
 
         GlobalKey expected_object_id(123);
@@ -130,7 +115,7 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // Tables with string primary keys:
     {
         WriteTransaction wt{sg};
-        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_String, "pk");
+        TableRef t2 = wt.get_group().add_table_with_primary_key("class_t2", type_String, "pk");
         auto obj0 = t2->create_object_with_primary_key("foo");
 
         GlobalKey expected_object_id("foo");
@@ -141,20 +126,24 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
     // is used.
     {
         WriteTransaction wt{sg};
-        TableRef t1 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
-        TableRef t11 = sync::create_table_with_primary_key(wt, "class_t1", type_Int, "pk");
+        TableRef t1 = wt.get_group().get_or_add_table_with_primary_key("class_t1", type_Int, "pk");
+        TableRef t11 = wt.get_group().get_or_add_table_with_primary_key("class_t1", type_Int, "pk");
         CHECK_EQUAL(t1, t11);
 
-        TableRef t2 = sync::create_table_with_primary_key(wt, "class_t2", type_Int, "pk", /* nullable */ true);
-        TableRef t21 = sync::create_table_with_primary_key(wt, "class_t2", type_Int, "pk", /* nullable */ true);
+        TableRef t2 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t2", type_Int, "pk", /* nullable */ true);
+        TableRef t21 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t2", type_Int, "pk", /* nullable */ true);
         CHECK_EQUAL(t2, t21);
 
-        TableRef t3 = sync::create_table_with_primary_key(wt, "class_t3", type_String, "pk");
-        TableRef t31 = sync::create_table_with_primary_key(wt, "class_t3", type_String, "pk");
+        TableRef t3 = wt.get_group().get_or_add_table_with_primary_key("class_t3", type_String, "pk");
+        TableRef t31 = wt.get_group().get_or_add_table_with_primary_key("class_t3", type_String, "pk");
         CHECK_EQUAL(t3, t31);
 
-        TableRef t4 = sync::create_table_with_primary_key(wt, "class_t4", type_String, "pk", /* nullable */ true);
-        TableRef t41 = sync::create_table_with_primary_key(wt, "class_t4", type_String, "pk", /* nullable */ true);
+        TableRef t4 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t4", type_String, "pk", /* nullable */ true);
+        TableRef t41 =
+            wt.get_group().get_or_add_table_with_primary_key("class_t4", type_String, "pk", /* nullable */ true);
         CHECK_EQUAL(t4, t41);
     }
 
@@ -165,15 +154,15 @@ TEST_TYPES(InstructionReplication_PopulatesObjectIdColumn, MakeClientHistory, Ma
 TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
 {
     SHARED_GROUP_TEST_PATH(test_dir);
-    auto history = make_client_replication(test_dir);
+    auto repl = make_client_replication();
 
-    DBRef sg = DB::create(*history);
+    DBRef sg = DB::create(*repl, test_dir);
 
     ColKey link_col;
     {
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
-        TableRef t1 = sync::create_table(wt, "class_t1");
+        TableRef t0 = wt.get_or_add_table("class_t0");
+        TableRef t1 = wt.get_or_add_table("class_t1");
         link_col = t0->add_column(*t1, "link");
 
         Obj t1_k1 = t1->create_object();
@@ -187,13 +176,14 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
     }
 
     bool fix_up_object_ids = true;
-    history->set_client_file_ident({1, 123}, fix_up_object_ids);
+    auto& history = repl->get_history();
+    history.set_client_file_ident({1, 123}, fix_up_object_ids);
 
     // Save the changeset to replay later
     UploadCursor upload_cursor{0, 0};
-    std::vector<ClientReplication::UploadChangeset> changesets;
+    std::vector<ClientHistory::UploadChangeset> changesets;
     version_type locked_server_version; // Dummy
-    history->find_uploadable_changesets(upload_cursor, 2, changesets, locked_server_version);
+    history.find_uploadable_changesets(upload_cursor, 2, changesets, locked_server_version);
     CHECK_GREATER_EQUAL(changesets.size(), 1);
     auto& changeset = changesets[0].changeset;
     ChunkedBinaryInputStream stream{changeset};
@@ -220,8 +210,8 @@ TEST(StableIDs_ChangesGlobalObjectIdWhenPeerIdReceived)
     // Replay the transaction to see that the instructions were modified.
     {
         SHARED_GROUP_TEST_PATH(test_dir_2);
-        auto history_2 = make_client_replication(test_dir_2);
-        DBRef sg_2 = DB::create(*history_2);
+        auto history_2 = make_client_replication();
+        DBRef sg_2 = DB::create(*history_2, test_dir_2);
 
         WriteTransaction wt{sg_2};
         InstructionApplier applier{wt};
@@ -249,20 +239,20 @@ TEST_TYPES(StableIDs_PersistPerTableSequenceNumber, MakeClientHistory, MakeServe
 {
     SHARED_GROUP_TEST_PATH(test_dir);
     {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
+        auto history = TEST_TYPE::make_history();
+        DBRef sg = DB::create(*history, test_dir);
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
+        TableRef t0 = wt.get_or_add_table("class_t0");
         t0->create_object();
         t0->create_object();
         CHECK_EQUAL(t0->size(), 2);
         wt.commit();
     }
     {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
+        auto history = TEST_TYPE::make_history();
+        DBRef sg = DB::create(*history, test_dir);
         WriteTransaction wt{sg};
-        TableRef t0 = sync::create_table(wt, "class_t0");
+        TableRef t0 = wt.get_or_add_table("class_t0");
         t0->create_object();
         t0->create_object();
         CHECK_EQUAL(t0->size(), 4);
@@ -281,11 +271,11 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
     SHARED_GROUP_TEST_PATH(test_dir);
 
     {
-        auto history = TEST_TYPE::make_history(test_dir);
-        DBRef sg = DB::create(*history);
+        auto history = TEST_TYPE::make_history();
+        DBRef sg = DB::create(*history, test_dir);
         {
             WriteTransaction wt{sg};
-            TableRef t0 = sync::create_table_with_primary_key(wt, "class_t0", type_String, "pk");
+            TableRef t0 = wt.get_group().add_table_with_primary_key("class_t0", type_String, "pk");
 
             char buffer[12];
             for (size_t i = 0; i < num_objects_with_guaranteed_collision; ++i) {
@@ -313,8 +303,8 @@ TEST_TYPES(StableIDs_CollisionMapping, MakeClientHistory, MakeServerHistory)
 
     // Check that locally allocated IDs are properly persisted
     {
-        auto history_2 = TEST_TYPE::make_history(test_dir);
-        DBRef sg_2 = DB::create(*history_2);
+        auto history_2 = TEST_TYPE::make_history();
+        DBRef sg_2 = DB::create(*history_2, test_dir);
         WriteTransaction wt{sg_2};
         TableRef t0 = wt.get_table("class_t0");
 

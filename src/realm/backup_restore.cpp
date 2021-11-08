@@ -18,6 +18,7 @@
 
 #include <realm/backup_restore.hpp>
 #include <realm/util/file.hpp>
+#include <realm/util/time.hpp>
 
 #include <vector>
 #include <chrono>
@@ -148,7 +149,8 @@ void BackupHandler::prep_logging()
     ensure_logger();
     // preformat time string for later logging
     std::time_t t = std::time(nullptr);
-    std::strftime(m_time_buf, sizeof(m_time_buf), "%c", std::gmtime(&t));
+    auto tm = util::gmtime(t);
+    std::strftime(m_time_buf, sizeof(m_time_buf), "%c", &tm);
 }
 
 
