@@ -24,6 +24,7 @@
 #include "sync/session/session_util.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_utils.hpp"
+
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -88,7 +89,8 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         auto user = init_sync_manager.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
                                                                       ENCODE_FAKE_JWT("not_a_real_token"),
                                                                       auth_server_url, dummy_device_id);
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(*user, raw_url) == expected);
+        SyncConfig config(user, bson::Bson{});
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -97,7 +99,8 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoEncryption));
         const auto expected = base_path + "mongodb-realm/app_id/" + server_identity +
                               "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(*user, raw_url) == expected);
+        SyncConfig config(user, bson::Bson{});
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
 
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/" + server_identity + "/");
@@ -283,7 +286,8 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
 TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
     reset_test_directory(base_path);
-    auto file_manager = SyncFileManager(base_path, "app_id");
+    const std::string app_id = "test_app_id*$#@!%1";
+    auto file_manager = SyncFileManager(base_path, app_id);
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
     using Cfg = TestSyncManager::Config;
@@ -320,7 +324,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
-            TestSyncManager tsm(Cfg(base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(Cfg(app_id, base_path, SyncManager::MetadataMode::NoEncryption));
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 3);
             REQUIRE(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
@@ -335,48 +339,128 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         }
     }
 
+    const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
+    const std::string manager_path = base_path + "mongodb-realm/" + expected_clean_app_id + "/";
+
+    struct TestPath {
+        std::string partition;
+        std::string expected_path;
+        bool pre_create = true;
+    };
+    std::vector<std::string> dirs_to_create;
+    std::vector<TestPath> paths_under_test;
+
     SECTION("when users are marked") {
-        const std::string auth_url = "https://example.realm.org";
+        const std::string provider_type = "user-pass";
         const std::string identity_1 = "foo-2";
         const std::string identity_2 = "bar-2";
         const std::string identity_3 = "baz-2";
 
         // Create the user metadata.
-        auto u1 = manager.get_or_make_user_metadata(identity_1, auth_url);
-        u1->mark_for_removal();
-        auto u2 = manager.get_or_make_user_metadata(identity_2, auth_url);
-        u2->mark_for_removal();
+        auto u1 = manager.get_or_make_user_metadata(identity_1, provider_type);
+        auto u2 = manager.get_or_make_user_metadata(identity_2, provider_type);
         // Don't mark this user for deletion.
-        auto u3 = manager.get_or_make_user_metadata(identity_3, auth_url);
-        u3->set_access_token(a_token_3);
-        u3->set_refresh_token(r_token_3);
-        u3->set_device_id(dummy_device_id);
-        // Pre-populate the user directories.
-        const auto user_dir_1 = file_manager.user_directory(u1->identity());
-        const auto user_dir_2 = file_manager.user_directory(u2->identity());
-        const auto user_dir_3 = file_manager.user_directory(u3->identity());
-        create_dummy_realm(user_dir_1 + "123456789");
-        create_dummy_realm(user_dir_1 + "foo");
-        create_dummy_realm(user_dir_2 + "123456789");
-        create_dummy_realm(user_dir_3 + "foo");
-        create_dummy_realm(user_dir_3 + "bar");
-        create_dummy_realm(user_dir_3 + "baz");
+        auto u3 = manager.get_or_make_user_metadata(identity_3, provider_type);
+
+        {
+            auto expected_u1_path = [&](std::string partition) {
+                return ExpectedRealmPaths(base_path, app_id, u1->identity(), u1->local_uuid(), partition);
+            };
+            std::string partition = "partition1";
+            auto expected_paths = expected_u1_path(partition);
+            paths_under_test.push_back({partition, expected_paths.current_preferred_path, false});
+
+            partition = "partition2";
+            expected_paths = expected_u1_path(partition);
+            paths_under_test.push_back({partition, expected_paths.current_preferred_path, true});
+
+            partition = "partition3";
+            expected_paths = expected_u1_path(partition);
+            paths_under_test.push_back({partition, expected_paths.fallback_hashed_path});
+
+            partition = "partition4";
+            expected_paths = expected_u1_path(partition);
+            paths_under_test.push_back({partition, expected_paths.legacy_local_id_path});
+            dirs_to_create.insert(dirs_to_create.end(), expected_paths.legacy_sync_directories_to_make.begin(),
+                                  expected_paths.legacy_sync_directories_to_make.end());
+
+            partition = "partition5";
+            expected_paths = expected_u1_path(partition);
+            paths_under_test.push_back({partition, expected_paths.legacy_sync_path});
+            dirs_to_create.insert(dirs_to_create.end(), expected_paths.legacy_sync_directories_to_make.begin(),
+                                  expected_paths.legacy_sync_directories_to_make.end());
+        }
+
+        auto shared_test_config = Cfg(app_id, base_path, SyncManager::MetadataMode::NoEncryption);
+        std::vector<std::string> paths;
+        {
+            shared_test_config.should_teardown_test_directory = false;
+            TestSyncManager tsm(shared_test_config);
+
+            // Pre-populate the user directories.
+            auto user1 = tsm.app()->sync_manager()->get_user(u1->identity(), r_token_1, a_token_1,
+                                                             u1->provider_type(), dummy_device_id);
+            auto user2 = tsm.app()->sync_manager()->get_user(u2->identity(), r_token_2, a_token_2,
+                                                             u2->provider_type(), dummy_device_id);
+            auto user3 = tsm.app()->sync_manager()->get_user(u3->identity(), r_token_3, a_token_3,
+                                                             u3->provider_type(), dummy_device_id);
+            for (auto& dir : dirs_to_create) {
+                try_make_dir(dir);
+            }
+            for (auto& test : paths_under_test) {
+                if (test.pre_create) {
+                    create_dummy_realm(test.expected_path);
+                }
+            }
+
+            paths = {tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, "123456789"}),
+                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, "foo"}),
+                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user2, "partition"}, {"123456789"}),
+                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user3, "foo"}),
+                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user3, "bar"}),
+                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user3, "baz"})};
+
+            for (auto& test : paths_under_test) {
+                std::string actual = tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, test.partition});
+                REQUIRE(actual == test.expected_path);
+                paths.push_back(actual);
+            }
+
+            for (auto& path : paths) {
+                create_dummy_realm(path);
+            }
+            tsm.app()->sync_manager()->remove_user(u1->identity());
+            tsm.app()->sync_manager()->remove_user(u2->identity());
+        }
+        for (auto& path : paths) {
+            REQUIRE_REALM_EXISTS(path);
+        }
+        app::App::clear_cached_apps();
 
         SECTION("they should be cleaned up if metadata is enabled") {
-            TestSyncManager tsm(Cfg(base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(shared_test_config);
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 1);
-            REQUIRE(validate_user_in_vector(users, identity_3, auth_url, r_token_3, a_token_3, dummy_device_id));
-            REQUIRE_DIR_DOES_NOT_EXIST(user_dir_1);
-            REQUIRE_DIR_DOES_NOT_EXIST(user_dir_2);
-            REQUIRE_DIR_EXISTS(user_dir_3);
+            REQUIRE(validate_user_in_vector(users, identity_3, provider_type, r_token_3, a_token_3, dummy_device_id));
+            REQUIRE_REALM_DOES_NOT_EXIST(paths[0]);
+            REQUIRE_REALM_DOES_NOT_EXIST(paths[1]);
+            REQUIRE_REALM_DOES_NOT_EXIST(paths[2]);
+            REQUIRE_REALM_EXISTS(paths[3]);
+            REQUIRE_REALM_EXISTS(paths[4]);
+            REQUIRE_REALM_EXISTS(paths[5]);
+            // all the remaining user 1 realms should have been deleted
+            for (size_t i = 6; i < paths.size(); ++i) {
+                REQUIRE_REALM_DOES_NOT_EXIST(paths[i]);
+            }
         }
         SECTION("they should be left alone if metadata is disabled") {
-            TestSyncManager tsm(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
+            shared_test_config.should_teardown_test_directory = true;
+            shared_test_config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
+            TestSyncManager tsm(shared_test_config);
             auto users = tsm.app()->sync_manager()->all_users();
-            REQUIRE_DIR_EXISTS(user_dir_1);
-            REQUIRE_DIR_EXISTS(user_dir_2);
-            REQUIRE_DIR_EXISTS(user_dir_3);
+            for (auto& path : paths) {
+                REQUIRE_REALM_EXISTS(path);
+            }
         }
     }
 }
@@ -391,6 +475,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 
     const std::string realm_url = "https://example.realm.com/~/1";
+    const std::string partition = "partition_foo";
     const std::string uuid_1 = "uuid-foo-1";
     const std::string uuid_2 = "uuid-bar-1";
     const std::string uuid_3 = "uuid-baz-1";
@@ -402,10 +487,10 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     const std::string local_uuid_4 = "baz-2";
 
     // Realm paths
-    const std::string realm_path_1 = file_manager.realm_file_path(uuid_1, local_uuid_1, realm_url);
-    const std::string realm_path_2 = file_manager.realm_file_path(uuid_2, local_uuid_2, realm_url);
-    const std::string realm_path_3 = file_manager.realm_file_path(uuid_3, local_uuid_3, realm_url);
-    const std::string realm_path_4 = file_manager.realm_file_path(uuid_4, local_uuid_4, realm_url);
+    const std::string realm_path_1 = file_manager.realm_file_path(uuid_1, local_uuid_1, realm_url, partition);
+    const std::string realm_path_2 = file_manager.realm_file_path(uuid_2, local_uuid_2, realm_url, partition);
+    const std::string realm_path_3 = file_manager.realm_file_path(uuid_3, local_uuid_3, realm_url, partition);
+    const std::string realm_path_4 = file_manager.realm_file_path(uuid_4, local_uuid_4, realm_url, partition);
 
     SECTION("Action::DeleteRealm") {
         // Create some file actions
@@ -488,7 +573,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 
         SECTION("should copy the Realm to the recovery_directory_path") {
             const std::string identity = "b241922032489d4836ecd0c82d0445f0";
-            const auto realm_base_path = file_manager.user_directory(identity) + "realmtasks";
+            const auto realm_base_path = file_manager.realm_file_path(identity, "", "realmtasks", partition);
             std::string recovery_path = util::reserve_unique_file_name(
                 file_manager.recovery_directory_path(), util::create_timestamped_template("recovered_realm"));
             create_dummy_realm(realm_base_path);
