@@ -32,7 +32,6 @@ struct DBOptions {
     enum class Durability : uint16_t {
         Full,
         MemOnly,
-        Async, ///< Not yet supported on windows.
         Unsafe // If you use this, you loose ACID property
     };
 

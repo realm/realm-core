@@ -24,11 +24,7 @@ namespace compatibility {
 /// The indirection is necessary because old versions
 /// of core should still be able to compile with this
 /// benchmark test.
-enum class RealmDurability {
-    Full,
-    MemOnly,
-    Async
-};
+enum class RealmDurability { Full, MemOnly };
 
 #ifdef REALM_CLUSTER_IF
 using RdTrans = realm::ReadTransaction;

@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.5.2"
+let versionStr = "11.6.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -114,6 +114,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/protocol_codec.cpp",
     "realm/sync/object_id.cpp",
     "realm/sync/protocol.cpp",
+    "realm/sync/subscriptions.cpp",
     "realm/sync/transform.cpp",
     "realm/table.cpp",
     "realm/table_cluster_tree.cpp",
@@ -561,6 +562,7 @@ let headers: [String] = [
     "realm/sync/noinst/server/vacuum.hpp",
     "realm/sync/object_id.hpp",
     "realm/sync/protocol.hpp",
+    "realm/sync/subscriptions.hpp",
     "realm/sync/transform.hpp",
     "realm/table.hpp",
     "realm/table_cluster_tree.hpp",

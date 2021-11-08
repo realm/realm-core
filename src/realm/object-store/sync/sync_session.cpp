@@ -980,40 +980,24 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
 std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress,
                                                                                bool& is_expired)
 {
-    uint64_t transferrable;
-    if (is_streaming) {
-        transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
-    }
-    else if (captured_transferrable) {
-        if (is_download && (current_progress.downloadable == 0)) {
-            captured_transferrable = 0;
-        }
-        transferrable = *captured_transferrable;
-    }
-    else {
-        if (is_download) {
-            // In protocol versions 25 and earlier, downloadable_bytes was the total
-            // size of the history. From protocol version 26, downloadable_bytes
-            // represent the non-downloaded bytes on the server. Since the user supplied
-            // progress handler interprets downloadable_bytes as the total size of
-            // downloadable bytes, this number must be calculated.  We could change the
-            // meaning of downloadable_bytes for the progress handler, but that would be
-            // a breaking change. Note that protocol version 25 (and earlier) is no
-            // longer supported by clients.
-            captured_transferrable = current_progress.downloaded + current_progress.downloadable;
-        }
-        else {
-            // If the sync client has not yet processed all of the local
-            // transactions then the uploadable data is incorrect and we should
-            // not invoke the callback
-            if (snapshot_version > current_progress.snapshot_version)
-                return [] {};
-            captured_transferrable = current_progress.uploadable;
-        }
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
+    uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
+    if (!is_streaming) {
+        // If the sync client has not yet processed all of the local
+        // transactions then the uploadable data is incorrect and we should
+        // not invoke the callback
+        if (!is_download && snapshot_version > current_progress.snapshot_version)
+            return [] {};
+
+        // The initial download size we get from the server is the uncompacted
+        // size, and so the download may complete before we actually receive
+        // that much data. When that happens, transferrable will drop and we
+        // need to use the new value instead of the captured one.
+        if (!captured_transferrable || *captured_transferrable > transferrable)
+            captured_transferrable = transferrable;
         transferrable = *captured_transferrable;
     }
 
-    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
     is_expired = !is_streaming && transferred >= transferrable;

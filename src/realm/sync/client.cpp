@@ -1226,17 +1226,22 @@ void SessionWrapper::report_progress()
     ClientHistory::get_upload_download_bytes(m_db.get(), downloaded_bytes, downloadable_bytes, uploaded_bytes,
                                              uploadable_bytes, snapshot_version);
 
+    // uploadable_bytes is uploaded + remaining to upload, while downloadable_bytes
+    // is only the remaining to download. This is confusing, so make them use
+    // the same units.
+    std::uint_fast64_t total_bytes = downloaded_bytes + downloadable_bytes;
+
     m_sess->logger.debug("Progress handler called, downloaded = %1, "
                          "downloadable(total) = %2, uploaded = %3, "
                          "uploadable = %4, reliable_download_progress = %5, "
                          "snapshot version = %6",
-                         downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes,
+                         downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes,
                          m_reliable_download_progress, snapshot_version);
 
-    // Ignore progress messages from before we first receive a DOWNLOAD message.
-    // FIXME: This could be a bool instead of std::uint_fast64_t
-    std::uint_fast64_t download_version = (m_reliable_download_progress ? 1 : 0);
-    m_progress_handler(downloaded_bytes, downloadable_bytes, uploaded_bytes, uploadable_bytes, download_version,
+    // FIXME: Why is this boolean status communicated to the application as
+    // a 64-bit integer? Also, the name `progress_version` is confusing.
+    std::uint_fast64_t progress_version = (m_reliable_download_progress ? 1 : 0);
+    m_progress_handler(downloaded_bytes, total_bytes, uploaded_bytes, uploadable_bytes, progress_version,
                        snapshot_version);
 }
 
