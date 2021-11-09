@@ -46,11 +46,13 @@ private:
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
-        m_observer.websocket_read_error_handler(ec);
+        logger().error("Reading failed: %1", ec.message()); // Throws
+        m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
-        m_observer.websocket_write_error_handler(ec);
+        logger().error("Writing failed: %1", ec.message()); // Throws
+        m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders* headers,
                                            const std::string_view* body) override
@@ -169,7 +171,8 @@ void EZSocketImpl::initiate_resolve()
 void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
 {
     if (ec) {
-        m_observer.websocket_resolve_error_handler(ec); // Throws
+        logger().error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
+        m_observer.websocket_connect_error_handler(ec);                                                     // Throws
         return;
     }
 
@@ -207,7 +210,8 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
             return;
         }
         // All endpoints failed
-        m_observer.websocket_tcp_connect_error_handler(ec); // Throws
+        logger().error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
+        m_observer.websocket_connect_error_handler(ec); // Throws
         return;
     }
 
@@ -247,7 +251,8 @@ void EZSocketImpl::initiate_http_tunnel()
     m_proxy_client.emplace(*this, logger());
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
-            m_observer.websocket_http_tunnel_error_handler(ec); // Throws
+            logger().error("Failed to establish HTTP tunnel: %1", ec.message());
+            m_observer.websocket_connect_error_handler(ec); // Throws
             return;
         }
 
@@ -255,7 +260,7 @@ void EZSocketImpl::initiate_http_tunnel()
             logger().error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             std::error_code ec2 =
                 util::websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
-            m_observer.websocket_http_tunnel_error_handler(ec2);             // Throws
+            m_observer.websocket_connect_error_handler(ec2);                 // Throws
             return;
         }
 
