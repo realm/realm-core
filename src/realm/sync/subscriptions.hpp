@@ -244,8 +244,6 @@ protected:
     TransactionRef m_tr;
     Obj m_obj;
     LnkLst m_sub_list;
-
-    bool m_state_changed = false;
 };
 
 // A SubscriptionStore manages the FLX metadata tables and the lifecycles of SubscriptionSets and Subscriptions.

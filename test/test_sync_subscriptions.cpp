@@ -248,6 +248,12 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(err_res.code(), ErrorCodes::RuntimeError);
     CHECK_EQUAL(err_res.reason(), error_msg);
 
+    // Getting a ready future on a set that's already in the error state should also return immediately with an error.
+    err_res = store.get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
+    CHECK_NOT(err_res.is_ok());
+    CHECK_EQUAL(err_res.code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.reason(), error_msg);
+
     // When a higher version supercedes an older one - i.e. you send query sets for versions 5/6 and the server starts
     // bootstrapping version 6 - we expect the notifications for both versions to be fulfilled when the latest one
     // completes bootstrapping.

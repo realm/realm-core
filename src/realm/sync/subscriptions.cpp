@@ -284,7 +284,6 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string> 
             m_mgr->supercede_prior_to(m_tr, version());
             break;
     }
-    m_state_changed = true;
 }
 
 SubscriptionSet SubscriptionSet::make_mutable_copy() const
@@ -310,11 +309,12 @@ util::Future<void> SubscriptionSet::get_state_change_notification(State notify_w
 {
     // If we've already reached the desired state, or if the subscription is in an error state,
     // we can return a ready future immediately.
-    if (state() >= notify_when) {
-        return util::Future<void>::make_ready();
-    }
-    else if (state() == State::Error) {
+    auto cur_state = state();
+    if (cur_state == State::Error) {
         return util::Future<void>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
+    }
+    else if (cur_state >= notify_when) {
+        return util::Future<void>::make_ready();
     }
 
     std::lock_guard<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
@@ -374,9 +374,7 @@ void SubscriptionSet::commit()
     }
     m_tr->commit_and_continue_as_read();
 
-    if (m_state_changed) {
-        process_notifications();
-    }
+    process_notifications();
 }
 
 SubscriptionStore::SubscriptionStore(DBRef db)
