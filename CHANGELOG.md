@@ -5,7 +5,7 @@
 * None.
 
 ### Fixed
-* Fix Schema::find sort order. This enables the use of accented characters in class names. ([#4773](https://github.com/realm/realm-cocoa/issues/4773.))
+* Fix Schema::find sort order. This enables the use of accented characters in class names. ([#4773](https://github.com/realm/realm-cocoa/issues/4773))
 * Don't keep trying to refresh the access token if the client's clock is more than 30 minutes fast. ([#4941](https://github.com/realm/realm-core/issues/4941))
 
 ### Breaking changes
