@@ -1671,10 +1671,10 @@ public:
                 return;
             }
             m_running = true;
+            m_thread = std::make_unique<std::thread>([this]() {
+                main();
+            });
         }
-        m_thread = std::make_unique<std::thread>([this]() {
-            main();
-        });
     }
     void begin_write(std::function<void()> fn)
     {
@@ -2301,17 +2301,29 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     db->grab_read_lock(new_read_lock, version_id); // Throws
 
     if (commit_to_disk || m_oldest_version_not_persisted) {
+        // Here we are either committing to disk or we are already
+        // holding on to an older version. In either case there is
+        // no need to hold onto this now historic version.
         db->release_read_lock(m_read_lock);
     }
     else {
+        // We are not commiting to disk and there is no older
+        // version not persisted, so hold onto this one
         m_oldest_version_not_persisted = m_read_lock;
     }
 
     if (commit_to_disk && m_oldest_version_not_persisted) {
+        // We are committing to disk so we can release the
+        // version we are holding on to
         db->release_read_lock(*m_oldest_version_not_persisted);
         m_oldest_version_not_persisted.reset();
     }
     m_read_lock = new_read_lock;
+    // We can be sure that m_read_lock != m_oldest_version_not_persisted
+    // because m_oldest_version_not_persisted is either equal to former m_read_lock
+    // or older and former m_read_lock is older than current m_read_lock
+    REALM_ASSERT(!m_oldest_version_not_persisted ||
+                 m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
 
     if (m_async_stage == AsyncState::Idle) {
         db->do_end_write();
@@ -2641,9 +2653,8 @@ void Transaction::do_end_read() noexcept
 {
     detach();
 
+    REALM_ASSERT(!m_oldest_version_not_persisted);
     db->release_read_lock(m_read_lock);
-    if (m_oldest_version_not_persisted)
-        db->release_read_lock(*m_oldest_version_not_persisted);
 
     m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
@@ -2853,6 +2864,7 @@ void DB::async_request_write_mutex(TransactionRef tr, std::function<void()> when
             std::unique_lock<std::mutex> lck(tr->mtx);
             tr->m_async_stage = Transaction::AsyncState::HasLock;
             if (tr->waiting_for_write_lock) {
+                tr->waiting_for_write_lock = false;
                 tr->cv.notify_one();
             }
             else if (when_acquired) {
@@ -3064,6 +3076,7 @@ void Transaction::async_request_sync_to_storage(std::function<void()> when_synch
         std::unique_lock<std::mutex> lck(mtx);
         m_async_stage = AsyncState::Idle;
         if (waiting_for_sync) {
+            waiting_for_sync = false;
             cv.notify_one();
         }
         else if (when_synchronized) {

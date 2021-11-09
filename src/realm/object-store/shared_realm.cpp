@@ -646,7 +646,8 @@ void Realm::call_completion_callbacks()
     }
 
     for (auto cb : m_async_commit_q) {
-        cb();
+        if (cb)
+            cb();
     }
     m_is_running_async_commit_completions = false;
 
@@ -794,8 +795,7 @@ void Realm::async_commit_transaction(const std::function<void()>& the_done_block
     REALM_ASSERT(!audit_context());
     // grab a version lock on current version, push it along with the done block
     // do in-buffer-cache commit_transaction();
-    if (the_done_block)
-        m_async_commit_q.push_back(std::move(the_done_block));
+    m_async_commit_q.push_back(std::move(the_done_block));
     m_coordinator->commit_write(*this, /* commit_to_disk: */ false);
 
     if (m_is_running_async_writes) {

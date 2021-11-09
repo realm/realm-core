@@ -721,8 +721,9 @@ public:
         std::unique_lock<std::mutex> lck(mtx);
         if (m_async_stage == Transaction::AsyncState::Requesting) {
             waiting_for_write_lock = true;
-            cv.wait(lck);
-            waiting_for_write_lock = false;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_write_lock);
         }
     }
 
@@ -732,8 +733,9 @@ public:
         std::unique_lock<std::mutex> lck(mtx);
         if (m_async_stage == Transaction::AsyncState::Syncing) {
             waiting_for_sync = true;
-            cv.wait(lck);
-            waiting_for_sync = false;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_sync);
             did_wait = true;
         }
         if (m_commit_exception)
@@ -772,13 +774,16 @@ private:
 
     DB::ReadLockInfo m_read_lock;
     util::Optional<DB::ReadLockInfo> m_oldest_version_not_persisted;
+    std::exception_ptr m_commit_exception;
+
+    // Mutex is protecting access to members just below
     std::mutex mtx;
     std::condition_variable cv;
-    DB::TransactStage m_transact_stage = DB::transact_Ready;
     AsyncState m_async_stage = AsyncState::Idle;
     bool waiting_for_write_lock = false;
     bool waiting_for_sync = false;
-    std::exception_ptr m_commit_exception;
+
+    DB::TransactStage m_transact_stage = DB::transact_Ready;
 
     friend class DB;
     friend class DisableReplication;
