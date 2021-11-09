@@ -301,21 +301,18 @@ void Connection::cancel_reconnect_delay()
 }
 
 
-void Connection::websocket_handshake_completion_handler(const HTTPHeaders& headers)
+void Connection::websocket_handshake_completion_handler(const std::string& protocol)
 {
-    auto i = headers.find("Sec-WebSocket-Protocol");
-    if (i != headers.end()) {
-        std::string_view value = i->second;
+    if (!protocol.empty()) {
         std::string_view expected_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
-
         // FIXME: Use std::string_view::begins_with() in C++20.
         auto prefix_matches = [&](std::string_view other) {
-            return value.size() >= other.size() && (value.substr(0, other.size()) == other);
+            return protocol.size() >= other.size() && (protocol.substr(0, other.size()) == other);
         };
         if (prefix_matches(expected_prefix)) {
             util::MemoryInputStream in;
-            in.set_buffer(value.data() + expected_prefix.size(), value.data() + value.size());
+            in.set_buffer(protocol.data() + expected_prefix.size(), protocol.data() + protocol.size());
             in.imbue(std::locale::classic());
             in.unsetf(std::ios_base::skipws);
             int value_2 = 0;
@@ -331,7 +328,7 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
                 }
             }
         }
-        logger.error("Bad protocol info from server: '%1'", value); // Throws
+        logger.error("Bad protocol info from server: '%1'", protocol); // Throws
     }
     else {
         logger.error("Missing protocol info from server"); // Throws
@@ -348,8 +345,7 @@ void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 }
 
 
-void Connection::websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                                   const std::string_view* body)
+void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
 {
     bool is_fatal;
     if (ec == util::websocket::Error::bad_response_3xx_redirection ||

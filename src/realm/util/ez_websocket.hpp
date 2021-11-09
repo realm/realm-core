@@ -43,7 +43,7 @@ public:
     /// websocket_handshake_completion_handler() is called when the websocket is connected, .i.e.
     /// after the handshake is done. It is not allowed to send messages on the socket before the
     /// handshake is done. No message_received callbacks will be called before the handshake is done.
-    virtual void websocket_handshake_completion_handler(const HTTPHeaders&) = 0;
+    virtual void websocket_handshake_completion_handler(const std::string& protocol) = 0;
 
     //@{
     /// websocket_read_error_handler() and websocket_write_error_handler() are called when an
@@ -63,8 +63,7 @@ public:
     virtual void websocket_connect_error_handler(std::error_code) = 0;
     virtual void websocket_ssl_handshake_error_handler(std::error_code) = 0;
     virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
-    virtual void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*,
-                                                   const std::string_view* body) = 0;
+    virtual void websocket_handshake_error_handler(std::error_code, const std::string_view* body) = 0;
     virtual void websocket_protocol_error_handler(std::error_code) = 0;
     //@}
 

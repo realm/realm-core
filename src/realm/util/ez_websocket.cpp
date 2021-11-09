@@ -42,7 +42,9 @@ private:
 
     void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
     {
-        m_observer.websocket_handshake_completion_handler(headers);
+        const std::string empty;
+        auto it = headers.find("Sec-WebSocket-Protocol");
+        m_observer.websocket_handshake_completion_handler(it == headers.end() ? empty : it->second);
     }
     void websocket_read_error_handler(std::error_code ec) override
     {
@@ -54,10 +56,10 @@ private:
         logger().error("Writing failed: %1", ec.message()); // Throws
         m_observer.websocket_read_or_write_error_handler(ec);
     }
-    void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders* headers,
+    void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
                                            const std::string_view* body) override
     {
-        m_observer.websocket_handshake_error_handler(ec, headers, body);
+        m_observer.websocket_handshake_error_handler(ec, body);
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
