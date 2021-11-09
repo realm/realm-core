@@ -283,6 +283,9 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string> 
             m_obj.set(m_mgr->m_sub_set_keys->state, static_cast<int64_t>(new_state));
             m_mgr->supercede_prior_to(m_tr, version());
             break;
+        case State::Superceded:
+            throw std::logic_error("Cannot set a subscription to the superceded state");
+            break;
     }
 }
 
@@ -305,16 +308,16 @@ SubscriptionSet SubscriptionSet::make_mutable_copy() const
     return new_set_obj;
 }
 
-util::Future<void> SubscriptionSet::get_state_change_notification(State notify_when) const
+util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
 {
     // If we've already reached the desired state, or if the subscription is in an error state,
     // we can return a ready future immediately.
     auto cur_state = state();
     if (cur_state == State::Error) {
-        return util::Future<void>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
+        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
     }
     else if (cur_state >= notify_when) {
-        return util::Future<void>::make_ready();
+        return util::Future<State>::make_ready(cur_state);
     }
 
     std::lock_guard<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
@@ -322,11 +325,11 @@ util::Future<void> SubscriptionSet::get_state_change_notification(State notify_w
     // If we've already been superceded by another version getting completed, then we should skip registering
     // a notification because it may never fire.
     if (m_mgr->m_min_outstanding_version > version()) {
-        return util::Future<void>::make_ready();
+        return util::Future<State>::make_ready(State::Superceded);
     }
 
     // Otherwise, make a promise/future pair and add it to the list of pending notifications.
-    auto [promise, future] = util::make_promise_future<void>();
+    auto [promise, future] = util::make_promise_future<State>();
     m_mgr->m_pending_notifications.emplace_back(version(), std::move(promise), notify_when);
     return std::move(future);
 }
@@ -358,8 +361,11 @@ void SubscriptionSet::process_notifications()
         if (new_state == State::Error && req.version == my_version) {
             req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
         }
+        else if (req.version < my_version) {
+            req.promise.emplace_value(State::Superceded);
+        }
         else {
-            req.promise.emplace_value();
+            req.promise.emplace_value(new_state);
         }
     }
 }

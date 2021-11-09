@@ -76,6 +76,7 @@ public:
         Bootstrapping,
         Complete,
         Error,
+        Superceded,
     };
 
     // Used in tests.
@@ -96,6 +97,9 @@ public:
                 break;
             case State::Error:
                 o << "Error";
+                break;
+            case State::Superceded:
+                o << "Superceded";
                 break;
         }
         return o;
@@ -158,7 +162,11 @@ public:
     // subscription set will be unchanged.
     SubscriptionSet make_mutable_copy() const;
 
-    util::Future<void> get_state_change_notification(State notify_when) const;
+    // Returns a future that will resolve either with an error status if this subscription set encounters an
+    // error, or resolves when the subscription set reaches at least that state. It's possible for a subscription
+    // set to skip a state (i.e. go from Pending to Complete or Pending to Superceded), and the future value
+    // will the the state it actually reached.
+    util::Future<State> get_state_change_notification(State notify_when) const;
 
     // The query version number used in the sync wire protocol to identify this subscription set to the server.
     int64_t version() const;
@@ -288,7 +296,8 @@ protected:
     };
 
     struct NotificationRequest {
-        NotificationRequest(int64_t version, util::Promise<void> promise, SubscriptionSet::State notify_when)
+        NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
+                            SubscriptionSet::State notify_when)
             : version(version)
             , promise(std::move(promise))
             , notify_when(notify_when)
@@ -296,7 +305,7 @@ protected:
         }
 
         int64_t version;
-        util::Promise<void> promise;
+        util::Promise<SubscriptionSet::State> promise;
         SubscriptionSet::State notify_when;
     };
 
