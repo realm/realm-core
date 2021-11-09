@@ -182,7 +182,6 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
 {
     return [session](util::Optional<app::AppError> error) {
         auto session_user = session->user();
-
         if (!session_user) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
@@ -205,9 +204,22 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
                 session->handle_bad_auth(session_user, error->error_code, "Unable to refresh the user access token.");
             }
             else {
-                // 10 seconds is arbitrary, but it is to not swamp the server
-                std::this_thread::sleep_for(std::chrono::seconds(10));
-                session_user->refresh_custom_data(handle_refresh(session));
+                // A refresh request has failed. This is an unexpected non-fatal error and we would
+                // like to retry but we shouldn't do this immediately in order to not swamp the
+                // server with requests. Consider two scenarios:
+                // 1) If this request was spawned from the proactive token check, or a user
+                // initiated request, the token may actually be valid. Just advance to Active
+                // from WaitingForAccessToken if needed and let the sync server tell us if the
+                // token is valid or not. If this also fails we will end up in case 2 below.
+                // 2) If the sync connection initiated the request because the server is
+                // unavailable or the connection otherwise encounters an unexpected error, we want
+                // to let the sync client attempt to reinitialize the connection using its own
+                // internal backoff timer which will happen automatically so nothing needs to
+                // happen here.
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                if (session->m_state == State::WaitingForAccessToken) {
+                    session->become_active(lock);
+                }
             }
         }
         else {
@@ -382,7 +394,7 @@ void SyncSession::handle_error(SyncError error)
         switch (static_cast<ClientError>(error_code.value())) {
             case ClientError::connection_closed:
             case ClientError::pong_timeout:
-                // Not real errors, don't need to be reported to the binding.
+                // Not real errors, don't need to be reported to the SDK.
                 return;
             case ClientError::bad_changeset:
             case ClientError::bad_changeset_header_syntax:

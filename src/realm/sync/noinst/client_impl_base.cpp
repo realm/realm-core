@@ -357,6 +357,7 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const HTT
     bool is_fatal;
     if (ec == util::websocket::Error::bad_response_3xx_redirection ||
         ec == util::websocket::Error::bad_response_301_moved_permanently ||
+        ec == util::websocket::Error::bad_response_401_unauthorized ||
         ec == util::websocket::Error::bad_response_5xx_server_error ||
         ec == util::websocket::Error::bad_response_500_internal_server_error ||
         ec == util::websocket::Error::bad_response_502_bad_gateway ||

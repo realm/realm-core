@@ -7,6 +7,7 @@
 ### Fixed
 * A sync user's Realm was not deleted when the user was removed if the Realm path was too long such that it triggered the fallback hashed name (this is OS dependant but is 300 characters on linux). ([#4187](https://github.com/realm/realm-core/issues/4187), since the introduction of hashed paths in object-store before monorepo, circa early v10 (https://github.com/realm/realm-object-store/pull/1049))
 * Don't keep trying to refresh the access token if the client's clock is more than 30 minutes fast. ([#4941](https://github.com/realm/realm-core/issues/4941))
+* Don't sleep the sync thread artificially if an auth request fails. This could be observed as a UI hang on js applications when sync tries to connect after being offline for more than 30 minutes. ([realm-js#3882](https://github.com/realm/realm-js/issues/3882), since sync to MongoDB was introduced in v10.0.0)
 
 ### Breaking changes
 * None.
