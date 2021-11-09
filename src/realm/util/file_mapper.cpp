@@ -52,7 +52,6 @@
 
 #include <realm/util/file.hpp>
 #include <realm/util/errno.hpp>
-#include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
 #include <cstring> // for memset
@@ -99,14 +98,14 @@ struct mappings_for_file {
     dev_t device;
     ino_t inode;
 #endif
-    SharedPtr<SharedFileInfo> info;
+    std::shared_ptr<SharedFileInfo> info;
 };
 
 // Group the information we need to map a SIGSEGV address to an
 // EncryptedFileMapping for the sake of cache-friendliness with 3+ active
 // mappings (and no worse with only two
 struct mapping_and_addr {
-    SharedPtr<EncryptedFileMapping> mapping;
+    std::shared_ptr<EncryptedFileMapping> mapping;
     void* addr;
     size_t size;
 };
@@ -558,7 +557,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
 #endif
 
         try {
-            f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
+            f.info = std::make_shared<SharedFileInfo>(reinterpret_cast<const uint8_t*>(encryption_key), fd);
         }
         catch (...) {
 #ifdef _WIN32
@@ -578,10 +577,9 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t f
         mapping_and_addr m;
         m.addr = addr;
         m.size = size;
-        EncryptedFileMapping* m_ptr = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
-        m.mapping = m_ptr;
+        m.mapping = std::make_shared<EncryptedFileMapping>(*it->info, file_offset, addr, size, access);
         mappings_by_addr.push_back(m); // can't throw due to reserve() above
-        return m_ptr;
+        return m.mapping.get();
     }
     catch (...) {
         if (it->info->mappings.empty()) {

@@ -32,7 +32,6 @@ set(CORE_TEST_SOURCES
     test_array_integer.cpp
     test_array_mixed.cpp
     test_array_string_short.cpp
-    test_basic_utils.cpp
     test_binary_data.cpp
     test_bplus_tree.cpp
     test_column.cpp

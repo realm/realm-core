@@ -394,20 +394,14 @@ public:
         template <typename T, typename... Args>
         T* create(Args&&... args)
         {
-            auto ret = new T(args...);
-            m_store.push_back(ret);
+            auto owned = std::make_unique<T>(std::forward<Args>(args)...);
+            auto ret = owned.get();
+            m_store.push_back(std::move(owned));
             return ret;
         }
 
-        ~ParserNodeStore()
-        {
-            for (auto it : m_store) {
-                delete it;
-            }
-        }
-
     private:
-        std::vector<ParserNode*> m_store;
+        std::vector<std::unique_ptr<ParserNode>> m_store;
     };
 
     ParserDriver()
@@ -446,7 +440,7 @@ public:
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
     std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
-    Subexpr* column(LinkChain&, std::string);
+    std::unique_ptr<Subexpr> column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
     std::string translate(LinkChain&, const std::string&);
 
