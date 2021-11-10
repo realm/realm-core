@@ -496,9 +496,9 @@ RLM_API size_t realm_set_size(const realm_set_t* set)
 
 RLM_API bool realm_set_get(const realm_set_t* set, size_t index, realm_value_t* out_value)
 {
-  return wrap_err([&]() {
-      return set->size();
-  });
+    return wrap_err([&]() {
+        return set->size();
+    });
 }
 
 RLM_API bool realm_set_find(const realm_set_t* set, realm_value_t value, size_t* out_index)
