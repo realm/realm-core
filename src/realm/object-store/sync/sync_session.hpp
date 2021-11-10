@@ -24,6 +24,7 @@
 #include <realm/sync/config.hpp>
 
 #include <realm/util/optional.hpp>
+#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>
@@ -220,10 +221,10 @@ public:
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
-    std::shared_ptr<SyncSession> external_reference();
+    std::shared_ptr<SyncSession> external_reference() REQUIRES(!m_external_reference_mutex);
 
     // Return an existing external reference to this session, if one exists. Otherwise, returns `nullptr`.
-    std::shared_ptr<SyncSession> existing_external_reference();
+    std::shared_ptr<SyncSession> existing_external_reference() REQUIRES(!m_external_reference_mutex);
 
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
@@ -319,7 +320,7 @@ private:
 
     void create_sync_session();
     void do_create_sync_session();
-    void did_drop_external_reference();
+    void did_drop_external_reference() REQUIRES(!m_external_reference_mutex);
     void detach_from_sync_manager();
     void close(std::unique_lock<std::mutex>&);
 
@@ -367,8 +368,9 @@ private:
     _impl::SyncProgressNotifier m_progress_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;
 
+    mutable util::CheckedMutex m_external_reference_mutex;
     class ExternalReference;
-    std::weak_ptr<ExternalReference> m_external_reference;
+    std::weak_ptr<ExternalReference> m_external_reference GUARDED_BY(m_external_reference_mutex);
 };
 
 } // namespace realm
