@@ -12,14 +12,13 @@
 #include <realm/util/buffer.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
-#include <realm/util/network.hpp>
 #include <realm/sync/client_base.hpp>
 
 namespace realm::sync {
 
 class Client {
 public:
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = sync::port_type;
 
     using Error = ClientError;
 
@@ -163,7 +162,7 @@ class BadServerUrl; // Exception
 class Session {
 public:
     using ErrorInfo = SessionErrorInfo;
-    using port_type = util::network::Endpoint::port_type;
+    using port_type = sync::port_type;
     using SyncTransactCallback = void(VersionID old_version, VersionID new_version);
     using ProgressHandler = void(std::uint_fast64_t downloaded_bytes, std::uint_fast64_t downloadable_bytes,
                                  std::uint_fast64_t uploaded_bytes, std::uint_fast64_t uploadable_bytes,
@@ -221,17 +220,6 @@ public:
         /// If "Authorization" is used as a custom header name,
         /// authorization_header_name must be set to anther value.
         std::map<std::string, std::string> custom_http_headers;
-
-        /// Sessions can be multiplexed over the same TCP/SSL connection.
-        /// Sessions might share connection if they have identical server_address,
-        /// server_port, and protocol. multiplex_ident is a parameter that allows
-        /// finer control over session multiplexing. If two sessions have distinct
-        /// multiplex_ident, they will never share connection. The typical use of
-        /// multilex_ident is to give sessions with incompatible SSL requirements
-        /// distinct multiplex_idents.
-        /// multiplex_ident can be any string and the value has no meaning except
-        /// for partitioning the sessions.
-        std::string multiplex_ident;
 
         /// Controls whether the server certificate is verified for SSL
         /// connections. It should generally be true in production.
@@ -718,9 +706,6 @@ public:
     /// This function is fully thread-safe. That is, it may be called by any
     /// thread, and by multiple threads concurrently.
     void cancel_reconnect_delay();
-
-    /// \brief Change address of server for this session.
-    void override_server(std::string address, port_type);
 
 private:
     SessionWrapper* m_impl = nullptr;

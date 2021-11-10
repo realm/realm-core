@@ -19,6 +19,8 @@
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
+#include <realm/util/websocket.hpp> // Only for websocket::Error TODO remove
+
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
 
@@ -115,7 +117,14 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
-    , m_client_protocol{}                                 // Throws
+    , m_socket_factory(util::websocket::EZConfig{
+          logger,
+          m_random,
+          m_service,
+          get_user_agent_string(),
+          get_tcp_no_delay(),
+      })
+    , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
 {
@@ -292,54 +301,6 @@ void Connection::cancel_reconnect_delay()
 }
 
 
-util::Logger& Connection::websocket_get_logger() noexcept
-{
-    return logger;
-}
-
-
-std::mt19937_64& Connection::websocket_get_random() noexcept
-{
-    return m_client.m_random;
-}
-
-
-void Connection::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
-{
-    REALM_ASSERT(m_socket);
-    if (m_ssl_stream) {
-        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
-    }
-    else {
-        m_socket->async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
-    }
-}
-
-
-void Connection::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
-{
-    REALM_ASSERT(m_socket);
-    if (m_ssl_stream) {
-        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
-    }
-    else {
-        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
-    }
-}
-
-
-void Connection::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
-{
-    REALM_ASSERT(m_socket);
-    if (m_ssl_stream) {
-        m_ssl_stream->async_write(data, size, handler); // Throws
-    }
-    else {
-        m_socket->async_write(data, size, handler); // Throws
-    }
-}
-
-
 void Connection::websocket_handshake_completion_handler(const HTTPHeaders& headers)
 {
     auto i = headers.find("Sec-WebSocket-Protocol");
@@ -449,18 +410,11 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
         read_error(ec);
-        return true;
+        return bool(m_websocket);
     }
 
     handle_message_received(data, size);
-    return true;
-}
-
-
-bool Connection::websocket_pong_message_received(const char* data, std::size_t size)
-{
-    handle_pong_received(data, size);
-    return true;
+    return bool(m_websocket);
 }
 
 
@@ -472,7 +426,7 @@ bool Connection::websocket_close_message_received(std::error_code error_code, St
         involuntary_disconnect(error_code, false, &message);
     }
 
-    return true;
+    return bool(m_websocket);
 }
 
 // Guarantees that handle_reconnect_wait() is never called from within the
@@ -530,8 +484,6 @@ void Connection::initiate_reconnect_wait()
         bool record_delay_as_zero = false;
         if (!zero_delay && !infinite_delay) {
             switch (*m_reconnect_info.m_reason) {
-                case ConnectionTerminationReason::resolve_operation_canceled:
-                case ConnectionTerminationReason::connect_operation_canceled:
                 case ConnectionTerminationReason::closed_voluntarily:
                 case ConnectionTerminationReason::read_or_write_error:
                 case ConnectionTerminationReason::premature_end_of_input:
@@ -664,10 +616,7 @@ void Connection::initiate_reconnect()
 
     m_state = ConnectionState::connecting;
     report_connection_state_change(ConnectionState::connecting, nullptr); // Throws
-    m_read_ahead_buffer.clear();
-    m_ssl_stream = util::none;
-    m_socket = util::none;
-    m_resolver = util::none;
+    m_websocket.reset();
 
     // In most cases, the reconnect delay will be counting from the point in
     // time of the initiation of the last reconnect operation (the initiation of
@@ -679,7 +628,53 @@ void Connection::initiate_reconnect()
     // Watchdog
     initiate_connect_wait(); // Throws
 
-    initiate_resolve(); // Throws
+    // There are three outcomes of the connection operation; success, failure,
+    // or cancellation. Since it is complicated to update the connection
+    // termination reason on cancellation, we mark it as voluntarily closed now, and then
+    // change it if the outcome ends up being success or failure.
+    m_reconnect_info.m_reason = ConnectionTerminationReason::closed_voluntarily;
+
+    std::string sec_websocket_protocol;
+    {
+        std::ostringstream out;
+        out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+        out.imbue(std::locale::classic());
+        const char* protocol_prefix = get_websocket_protocol_prefix();
+        int min = get_oldest_supported_protocol_version();
+        int max = get_current_protocol_version();
+        REALM_ASSERT(min <= max);
+        // List protocol version in descending order to ensure that the server
+        // selects the highest possible version.
+        int version = max;
+        for (;;) {
+            out << protocol_prefix << version; // Throws
+            if (version == min)
+                break;
+            out << ", "; // Throws
+            --version;
+        }
+        sec_websocket_protocol = std::move(out).str();
+    }
+
+    util::HTTPHeaders headers;
+    headers[m_authorization_header_name] = _impl::make_authorization_header(m_signed_access_token); // Throws
+
+    for (auto const& header : m_custom_http_headers)
+        headers[header.first] = header.second;
+
+    m_websocket = m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
+                                                              m_address,
+                                                              m_port,
+                                                              m_http_host,
+                                                              get_http_request_path(),
+                                                              std::move(sec_websocket_protocol),
+                                                              is_ssl(m_protocol_envelope),
+                                                              std::move(headers),
+                                                              m_verify_servers_ssl_certificate,
+                                                              m_ssl_trust_certificate_path,
+                                                              m_ssl_verify_callback,
+                                                              m_proxy_config,
+                                                          });
 }
 
 
@@ -717,258 +712,6 @@ void Connection::handle_connect_wait(std::error_code ec)
     bool is_fatal = false;
     StringData* custom_message = nullptr;
     involuntary_disconnect(ec_2, is_fatal, custom_message); // Throws
-}
-
-
-void Connection::initiate_resolve()
-{
-    // There are three outcomes of the DNS resolve operation; success, failure,
-    // or cancellation. Since it is complicated to update the connection
-    // termination reason on cancellation, we mark it as canceled now, and then
-    // change it if the outcome ends up being success or failure.
-    m_reconnect_info.m_reason = ConnectionTerminationReason::resolve_operation_canceled;
-
-    const std::string& address = m_proxy_config ? m_proxy_config->address : m_address;
-    const port_type& port = m_proxy_config ? m_proxy_config->port : m_port;
-
-    if (m_proxy_config) {
-        // logger.detail("Using %1 proxy", m_proxy_config->type); // Throws
-    }
-
-    logger.detail("Resolving '%1:%2'", address, port); // Throws
-
-    util::network::Resolver::Query query(address, util::to_string(port)); // Throws
-    auto handler = [this](std::error_code ec, util::network::Endpoint::List endpoints) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_resolve(ec, std::move(endpoints)); // Throws
-    };
-    m_resolver.emplace(m_client.get_service());                      // Throws
-    m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
-}
-
-
-void Connection::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
-{
-    if (ec) {
-        resolve_error(ec); // Throws
-        return;
-    }
-
-    initiate_tcp_connect(std::move(endpoints), 0); // Throws
-}
-
-
-void Connection::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
-{
-    REALM_ASSERT(i < endpoints.size());
-
-    // There are three outcomes of the TCP connect operation; success, failure,
-    // or cancellation. Since it is complicated to update the connection
-    // termination reason on cancellation, we mark it as canceled now, and then
-    // change it if the outcome ends up being success or failure.
-    m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_canceled;
-
-    util::network::Endpoint ep = *(endpoints.begin() + i);
-    std::size_t n = endpoints.size();
-    auto handler = [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_tcp_connect(ec, std::move(endpoints), i); // Throws
-    };
-    m_socket.emplace(m_client.get_service());                                                     // Throws
-    m_socket->async_connect(ep, std::move(handler));                                              // Throws
-    logger.detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
-}
-
-
-void Connection::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
-{
-    REALM_ASSERT(i < endpoints.size());
-    const util::network::Endpoint& ep = *(endpoints.begin() + i);
-    if (ec) {
-        logger.error("Failed to connect to endpoint '%1:%2': %3", ep.address(), ep.port(),
-                     ec.message()); // Throws
-        std::size_t i_2 = i + 1;
-        if (i_2 < endpoints.size()) {
-            initiate_tcp_connect(std::move(endpoints), i_2); // Throws
-            return;
-        }
-        // All endpoints failed
-        tcp_connect_error(ec); // Throws
-        return;
-    }
-
-    REALM_ASSERT(m_socket);
-    if (m_client.get_tcp_no_delay())
-        m_socket->set_option(util::network::SocketBase::no_delay(true)); // Throws
-    util::network::Endpoint ep_2 = m_socket->local_endpoint();
-    logger.info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
-                ep_2.port()); // Throws
-
-    // At this point, when the connection is ultimately closed, it will either
-    // be because of an error, or because the client closes it voluntarily. For
-    // technical reasons, the most robust way to get the connection termination
-    // reason correctly recorded, is to mark it as 'closed voluntarily' at this
-    // time, and then update the reason later if the connection ends up being
-    // terminated by an error (nonvoluntarily).
-    m_reconnect_info.m_reason = ConnectionTerminationReason::closed_voluntarily;
-
-    // TODO: Handle HTTPS proxies
-    if (m_proxy_config) {
-        initiate_http_tunnel(); // Throws
-        return;
-    }
-
-    initiate_websocket_or_ssl_handshake(); // Throws
-}
-
-void Connection::initiate_websocket_or_ssl_handshake()
-{
-    bool ssl_mode = false;
-    {
-        switch (m_protocol_envelope) {
-            case ProtocolEnvelope::realm:
-            case ProtocolEnvelope::ws:
-                break;
-            case ProtocolEnvelope::realms:
-            case ProtocolEnvelope::wss:
-                ssl_mode = true;
-                break;
-        }
-    }
-
-    if (ssl_mode) {
-        initiate_ssl_handshake(); // Throws
-    }
-    else {
-        initiate_websocket_handshake(); // Throws
-    }
-}
-
-void Connection::initiate_http_tunnel()
-{
-    HTTPRequest req;
-    req.method = HTTPMethod::Connect;
-    req.headers.emplace("Host", util::format("%1:%2", m_address, m_port));
-    // TODO handle proxy authorization
-
-    m_proxy_client.emplace(*this, logger);
-    auto handler = [this](HTTPResponse response, std::error_code ec) {
-        if (ec && ec != util::error::operation_aborted) {
-            http_tunnel_error(ec); // Throws
-            return;
-        }
-
-        if (response.status != HTTPStatus::Ok) {
-            logger.error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
-            std::error_code ec2 =
-                util::websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
-            http_tunnel_error(ec2);                                          // Throws
-            return;
-        }
-
-        initiate_websocket_or_ssl_handshake(); // Throws
-    };
-
-    m_proxy_client->async_request(req, std::move(handler)); // Throws
-}
-
-void Connection::initiate_ssl_handshake()
-{
-    using namespace util::network::ssl;
-
-    if (!m_ssl_context) {
-        m_ssl_context.emplace(); // Throws
-        if (m_verify_servers_ssl_certificate) {
-            if (m_ssl_trust_certificate_path) {
-                m_ssl_context->use_verify_file(*m_ssl_trust_certificate_path); // Throws
-            }
-            else if (!m_ssl_verify_callback) {
-                m_ssl_context->use_default_verify(); // Throws
-            }
-        }
-    }
-
-    m_ssl_stream.emplace(*m_socket, *m_ssl_context, Stream::client); // Throws
-    m_ssl_stream->set_logger(&logger);
-    m_ssl_stream->set_host_name(m_address); // Throws
-    if (m_verify_servers_ssl_certificate) {
-        m_ssl_stream->set_verify_mode(VerifyMode::peer); // Throws
-        m_ssl_stream->set_server_port(m_port);
-        if (!m_ssl_trust_certificate_path) {
-            if (m_ssl_verify_callback) {
-                m_ssl_stream->use_verify_callback(m_ssl_verify_callback);
-            }
-            else {
-                // The included certificates are used if neither the trust
-                // certificate nor the callback function is set.
-#if REALM_INCLUDE_CERTS
-                m_ssl_stream->use_included_certificates(); // Throws
-#endif
-            }
-        }
-    }
-
-    auto handler = [this](std::error_code ec) {
-        // If the operation is aborted, the connection object may have been
-        // destroyed.
-        if (ec != util::error::operation_aborted)
-            handle_ssl_handshake(ec); // Throws
-    };
-    m_ssl_stream->async_handshake(std::move(handler)); // Throws
-
-    // FIXME: We also need to perform the SSL shutdown operation somewhere
-}
-
-
-void Connection::handle_ssl_handshake(std::error_code ec)
-{
-    if (ec) {
-        REALM_ASSERT(ec != util::error::operation_aborted);
-        ssl_handshake_error(ec); // Throws
-        return;
-    }
-
-    initiate_websocket_handshake(); // Throws
-}
-
-
-void Connection::initiate_websocket_handshake()
-{
-    std::string path = get_http_request_path(); // Throws
-
-    std::string sec_websocket_protocol;
-    {
-        std::ostringstream out;
-        out.exceptions(std::ios_base::failbit | std::ios_base::badbit);
-        out.imbue(std::locale::classic());
-        const char* protocol_prefix = get_websocket_protocol_prefix();
-        int min = get_oldest_supported_protocol_version();
-        int max = get_current_protocol_version();
-        REALM_ASSERT(min <= max);
-        // List protocol version in descending order to ensure that the server
-        // selects the highest possible version.
-        int version = max;
-        for (;;) {
-            out << protocol_prefix << version; // Throws
-            if (version == min)
-                break;
-            out << ", "; // Throws
-            --version;
-        }
-        sec_websocket_protocol = std::move(out).str();
-    }
-
-    HTTPHeaders headers;
-    ClientImpl& client = get_client();
-    headers["User-Agent"] = client.get_user_agent_string(); // Throws
-    set_http_request_headers(headers);                      // Throws
-
-    m_websocket.initiate_client_handshake(path, m_http_host, sec_websocket_protocol,
-                                          std::move(headers)); // Throws
 }
 
 
@@ -1106,7 +849,7 @@ void Connection::initiate_write_message(const OutputBuffer& out, Session* sess)
     auto handler = [this] {
         handle_write_message(); // Throws
     };
-    m_websocket.async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
+    m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
     m_sending_session = sess;
     m_sending = true;
 }
@@ -1186,7 +929,7 @@ void Connection::initiate_write_ping(const OutputBuffer& out)
     auto handler = [this] {
         handle_write_ping(); // Throws
     };
-    m_websocket.async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
+    m_websocket->async_write_binary(out.data(), out.size(), std::move(handler)); // Throws
     m_sending = true;
 }
 
@@ -1205,14 +948,6 @@ void Connection::handle_message_received(const char* data, std::size_t size)
     // parse_message_received() parses the message and calls the proper handler
     // on the Connection object (this).
     get_client_protocol().parse_message_received<Connection>(*this, std::string_view(data, size));
-}
-
-
-void Connection::handle_pong_received(const char* data, std::size_t size)
-{
-    // parse_pong_received() parses the pong and calls the proper handler on the
-    // Connection object (this).
-    get_client_protocol().parse_pong_received<Connection>(*this, std::string_view(data, size));
 }
 
 
@@ -1260,7 +995,7 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 }
 
 
-void Connection::resolve_error(std::error_code ec)
+void Connection::websocket_resolve_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::resolve_operation_failed;
     logger.error("Failed to resolve '%1:%2': %3", m_address, m_port, ec.message()); // Throws
@@ -1271,7 +1006,7 @@ void Connection::resolve_error(std::error_code ec)
 }
 
 
-void Connection::tcp_connect_error(std::error_code ec)
+void Connection::websocket_tcp_connect_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
     logger.error("Failed to connect to '%1:%2': All endpoints failed", m_address, m_port); // Throws
@@ -1281,14 +1016,14 @@ void Connection::tcp_connect_error(std::error_code ec)
     involuntary_disconnect(ec, is_fatal, custom_message); // Throws
 }
 
-void Connection::http_tunnel_error(std::error_code ec)
+void Connection::websocket_http_tunnel_error_handler(std::error_code ec)
 {
     logger.error("Failed to establish HTTP tunnel: %1", ec.message());
     m_reconnect_info.m_reason = ConnectionTerminationReason::http_tunnel_failed;
     close_due_to_client_side_error(ClientError::http_tunnel_failed, true); // Throws
 }
 
-void Connection::ssl_handshake_error(std::error_code ec)
+void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
 {
     logger.error("SSL handshake failed: %1", ec.message()); // Throws
     // FIXME: Some error codes (those from OpenSSL) most likely indicate a
@@ -1419,16 +1154,15 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
     m_heartbeat_timer = util::none;
     m_previous_ping_rtt = 0;
 
-    m_websocket.stop();
-    m_ssl_stream = util::none;
-    m_socket = util::none;
-    m_resolver = util::none;
+    // Must do this before resetting the websocket since that can invalidate custom_message.
+    std::string detailed_message = (custom_message ? std::string(*custom_message) : ec.message()); // Throws
+
+    m_websocket.reset();
     m_input_body_buffer.reset();
     m_sending_session = nullptr;
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 
-    std::string detailed_message = (custom_message ? std::string(*custom_message) : ec.message()); // Throws
     SessionErrorInfo error_info{ec, is_fatal, detailed_message};
     report_connection_state_change(ConnectionState::disconnected, &error_info); // Throws
     initiate_reconnect_wait();                     // Throws
