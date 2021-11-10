@@ -180,4 +180,104 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     }
 }
 
+TEST(Sync_SubscriptionStoreNotifications)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    SubscriptionStore store(fixture.db);
+
+    std::vector<util::Future<SubscriptionSet::State>> notification_futures;
+    auto sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
+    sub_set.commit();
+
+    // This should complete immediately because transitioning to the Pending state happens when you commit.
+    CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
+
+    // This should also return immediately with a ready future because the subset is in the correct state.
+    CHECK_EQUAL(store.get_mutable_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
+                SubscriptionSet::State::Pending);
+
+    // This should not be ready yet because we haven't updated its state.
+    CHECK_NOT(notification_futures[1].is_ready());
+
+    sub_set = store.get_mutable_by_version(2);
+    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
+    sub_set.commit();
+
+    // Now we should be able to get the future result because we updated the state.
+    CHECK_EQUAL(notification_futures[1].get(), SubscriptionSet::State::Bootstrapping);
+
+    // This should not be ready yet because we haven't updated its state.
+    CHECK_NOT(notification_futures[2].is_ready());
+
+    // Update the state to complete - skipping the bootstrapping phase entirely.
+    sub_set = store.get_mutable_by_version(3);
+    sub_set.update_state(SubscriptionSet::State::Complete);
+    sub_set.commit();
+
+    // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
+    // phase.
+    CHECK_EQUAL(notification_futures[2].get(), SubscriptionSet::State::Complete);
+
+    // Update one of the subscription sets to have an error state along with an error message.
+    std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
+    CHECK_NOT(notification_futures[3].is_ready());
+    sub_set = store.get_mutable_by_version(4);
+    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
+    sub_set.update_state(SubscriptionSet::State::Error, error_msg);
+    sub_set.commit();
+
+    // This should return a non-OK Status with the error message we set on the subscription set.
+    auto err_res = notification_futures[3].get_no_throw();
+    CHECK_NOT(err_res.is_ok());
+    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+
+    // Getting a ready future on a set that's already in the error state should also return immediately with an error.
+    err_res = store.get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
+    CHECK_NOT(err_res.is_ok());
+    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+
+    // When a higher version supercedes an older one - i.e. you send query sets for versions 5/6 and the server starts
+    // bootstrapping version 6 - we expect the notifications for both versions to be fulfilled when the latest one
+    // completes bootstrapping.
+    CHECK_NOT(notification_futures[4].is_ready());
+    CHECK_NOT(notification_futures[5].is_ready());
+
+    auto old_sub_set = store.get_by_version(5);
+
+    sub_set = store.get_mutable_by_version(6);
+    sub_set.update_state(SubscriptionSet::State::Complete);
+    sub_set.commit();
+
+    CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superceded);
+    CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
+
+    // Also check that new requests for the superceded sub set get filled immediately.
+    CHECK_EQUAL(old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get(),
+                SubscriptionSet::State::Superceded);
+
+    // Check that asking for a state change that is less than the current state of the sub set gets filled
+    // immediately.
+    CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
+                SubscriptionSet::State::Complete);
+}
+
 } // namespace realm::sync
