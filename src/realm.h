@@ -1689,11 +1689,13 @@ RLM_API realm_set_t* realm_get_set(const realm_object_t*, realm_property_key_t);
 RLM_API size_t realm_set_size(const realm_set_t*);
 RLM_API bool realm_set_get(const realm_set_t*, size_t index, realm_value_t* out_value);
 RLM_API bool realm_set_find(const realm_set_t*, realm_value_t value, size_t* out_index);
-RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t out_index);
+RLM_API bool realm_set_insert(realm_set_t*, realm_value_t value, size_t* out_index);
 RLM_API bool realm_set_erase(realm_set_t*, realm_value_t value, bool* out_erased);
 RLM_API bool realm_set_clear(realm_set_t*);
-RLM_API bool realm_set_assign(realm_set_t*, realm_value_t values, size_t num_values);
-RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_object_t*, void* userdata,
+RLM_API bool realm_set_assign_union(realm_set_t*, realm_value_t* values, size_t num_values);
+RLM_API bool realm_set_assign_difference(realm_set_t*, realm_value_t* values, size_t num_values);
+RLM_API bool realm_set_assign_intersection(realm_set_t*, realm_value_t* values, size_t num_values);
+RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, void* userdata,
                                                                         realm_free_userdata_func_t free,
                                                                         realm_on_collection_change_func_t on_change,
                                                                         realm_callback_error_func_t on_error,

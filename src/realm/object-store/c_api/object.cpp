@@ -316,6 +316,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
     });
 }
 
+// MARK: List
 RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {
@@ -483,6 +484,97 @@ RLM_API bool realm_list_is_valid(const realm_list_t* list)
     if (!list)
         return false;
     return list->is_valid();
+}
+
+// MARK: Set
+RLM_API size_t realm_set_size(const realm_set_t* set)
+{
+    return wrap_err([&]() {
+        return set->size();
+    });
+}
+
+RLM_API bool realm_set_get(const realm_set_t* set, size_t index, realm_value_t* out_value)
+{
+  return wrap_err([&]() {
+      return set->size();
+  });
+}
+
+RLM_API bool realm_set_find(const realm_set_t* set, realm_value_t value, size_t* out_index)
+{
+    return wrap_err([&]() {
+        auto val = from_capi(value);
+        if (out_index)
+            *out_index = set->find_any(val);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_insert(realm_set_t* set, realm_value_t value, size_t* out_index)
+{
+    return wrap_err([&]() {
+        auto val = from_capi(value);
+        auto ret_val = set->insert_any(val);
+        if (out_index)
+            *out_index = ret_val.first;
+        return ret_val.second;
+    });
+}
+
+RLM_API bool realm_set_erase(realm_set_t* set, realm_value_t value, bool* out_erased)
+{
+    return wrap_err([&]() {
+        auto val = from_capi(value);
+        auto ret_val = set->remove(val);
+        if (out_erased)
+            *out_erased = ret_val.first;
+        return true;
+    });
+}
+
+RLM_API bool realm_set_clear(realm_set_t* set)
+{
+    return wrap_err([&]() {
+        set->remove_all();
+        return true;
+    });
+}
+
+RLM_API bool realm_set_assign_union(realm_set_t* set, realm_value_t* values, size_t num_values)
+{
+    return wrap_err([&]() {
+        auto collection = realm::object_store::Set();
+        for (size_t i = 0; i < num_values; i++) {
+            collection.insert(values[i]);
+        }
+        set->assign_union(collection);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_assign_intersection(realm_set_t* set, realm_value_t* values, size_t num_values)
+{
+    return wrap_err([&]() {
+        auto collection = realm::object_store::Set();
+        for (size_t i = 0; i < num_values; i++) {
+            collection.insert(values[i]);
+        }
+        set->assign_intersection(collection);
+        return true;
+    });
+}
+
+RLM_API bool realm_set_assign_difference(realm_set_t* set, realm_value_t* values, size_t num_values)
+{
+    return wrap_err([&]() {
+        auto collection = realm::object_store::Set();
+        for (size_t i = 0; i < num_values; i++) {
+            collection.insert(values[i]);
+        }
+        set->assign_difference(collection);
+        return true;
+    });
 }
 
 } // namespace realm::c_api
