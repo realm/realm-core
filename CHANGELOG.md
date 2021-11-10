@@ -18,6 +18,7 @@
 
 ### Internals
 * Added type to manage flexible sync subscriptions. [#5005](https://github.com/realm/realm-core/pull/5005)
+* Added support for notifications on flexible sync subscription state changes [#5027](https://github.com/realm/realm-core/pull/5027)
 
 ----------------------------------------------
 
