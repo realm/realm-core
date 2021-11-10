@@ -390,8 +390,7 @@ public:
     SyncServerMode get_sync_server_mode() const noexcept;
     bool is_flx_sync_connection() const noexcept;
 
-    void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
-                             const std::string& signed_access_token);
+    void update_connect_info(const std::string& http_request_path_prefix, const std::string& signed_access_token);
 
     void resume_active_sessions();
 
@@ -591,7 +590,6 @@ private:
     const std::map<std::string, std::string> m_custom_http_headers;
 
     std::string m_http_request_path_prefix;
-    std::string m_realm_virt_path;
     std::string m_signed_access_token;
 };
 
