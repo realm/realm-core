@@ -211,7 +211,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
         const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
         size_t before_callback_invoctions = 0;
         size_t after_callback_invocations = 0;
+        std::mutex mtx;
         local_config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
+            std::lock_guard<std::mutex> lock(mtx);
             ++before_callback_invoctions;
             REQUIRE(local);
             REQUIRE(local->is_frozen());
@@ -225,6 +227,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(util::File::exists(fresh_path));
         };
         local_config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
+            std::lock_guard<std::mutex> lock(mtx);
             ++after_callback_invocations;
             REQUIRE(local);
             REQUIRE(local->get_table("class_object"));
@@ -354,6 +357,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 auto realm = Realm::get_shared_realm(local_config);
                 timed_sleeping_wait_for(
                     [&]() -> bool {
+                        std::lock_guard<std::mutex> lock(mtx);
                         realm->begin_transaction();
                         TableRef table = get_table(*realm, "object");
                         REQUIRE(table);
@@ -369,8 +373,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             if (session) {
                 session->shutdown_and_wait();
             }
-            REQUIRE(before_callback_invoctions == 1);
-            REQUIRE(after_callback_invocations == 1);
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(after_callback_invocations == 1);
+            }
         }
 
         SECTION("failing to download a fresh copy results in an error") {
