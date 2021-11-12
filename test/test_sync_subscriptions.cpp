@@ -59,6 +59,9 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_a.get_description());
         out.commit();
+
+        CHECK_EQUAL(store.get_latest().size(), 1);
+        CHECK_EQUAL(latest.size(), 1);
     }
 
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
