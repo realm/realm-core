@@ -1067,7 +1067,6 @@ TEST_CASE("SharedRealm: async_writes") {
     }
     SECTION("asynchronous transaction mixed with sync transaction that is cancelled") {
         bool persisted = false;
-        Realm::AsyncHandle handle = 0;
         realm->async_begin_transaction([&]() {
             auto table = realm->read_group().get_table("class_object");
             auto col = table->get_column_key("value");
@@ -1081,9 +1080,10 @@ TEST_CASE("SharedRealm: async_writes") {
             auto table = realm->read_group().get_table("class_object");
             auto col = table->get_column_key("value");
             table->create_object().set(col, 45);
-            handle = realm->async_commit_transaction([&]() {
+            auto handle = realm->async_commit_transaction([&]() {
                 throw std::runtime_error("Should not go here");
             });
+            realm->async_cancel_transaction(handle);
         });
         util::EventLoop::main().run_until([&] {
             return done;
@@ -1098,12 +1098,9 @@ TEST_CASE("SharedRealm: async_writes") {
         realm->cancel_transaction();
 
         util::EventLoop::main().run_until([&] {
-            return handle != 0;
-        });
-        realm->async_cancel_transaction(handle);
-        util::EventLoop::main().run_until([&] {
             return !realm->is_in_async_transaction();
         });
+
         REQUIRE(table->size() == 2);
         REQUIRE(!table->find_first_int(col, 90));
     }
