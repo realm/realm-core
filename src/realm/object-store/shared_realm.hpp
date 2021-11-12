@@ -337,7 +337,7 @@ public:
     //   intervening synchronization of stable storage.
     // * Such a sequence of commits form a group. In case of a platform crash,
     //   either none or all of the commits in a group will reach stable storage.
-    void async_commit_transaction(const std::function<void()>& the_done_block, bool allow_grouping = false);
+    void async_commit_transaction(const std::function<void()>& the_done_block = nullptr, bool allow_grouping = false);
 
     // Returns true when async transactiona has been created and the result of the last
     // commit has not yet reached permanent storage.
@@ -554,8 +554,7 @@ private:
         bool notify_only;
     };
     std::deque<async_write_desc> m_async_write_q;
-    using async_commit_desc = std::pair<DB::ReadLockInfo, std::function<void()>>;
-    std::vector<async_commit_desc> m_async_commit_q;
+    std::vector<std::function<void()>> m_async_commit_q;
     bool m_is_running_async_writes = false;
     bool m_notify_only = false;
     bool m_is_running_async_commit_completions = false;
@@ -564,6 +563,7 @@ private:
     void run_async_completions_on_proper_thread();
     void check_pending_write_requests();
     void end_current_write();
+    void call_completion_callbacks();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

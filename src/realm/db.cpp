@@ -1653,25 +1653,27 @@ public:
     }
     ~AsyncCommitHelper()
     {
-        if (!m_terminated) {
-            {
-                std::unique_lock lg(m_mutex);
-                m_terminated = true;
-                m_changed.notify_one();
+        {
+            std::unique_lock lg(m_mutex);
+            if (!m_running) {
+                return;
             }
-            m_thread->join();
+            m_running = false;
+            m_changed.notify_one();
         }
+        m_thread->join();
     }
     void start_thread()
     {
-        if (m_terminated) {
+        {
             std::unique_lock lg(m_mutex);
-            if (m_terminated) {
-                m_thread = std::make_unique<std::thread>([this]() {
-                    main();
-                });
-                m_terminated = false;
+            if (m_running) {
+                return;
             }
+            m_running = true;
+            m_thread = std::make_unique<std::thread>([this]() {
+                main();
+            });
         }
     }
     void begin_write(std::function<void()> fn)
@@ -1704,7 +1706,7 @@ private:
     std::deque<std::function<void()>> m_pending_writes;
     util::Optional<std::function<void()>> m_pending_sync;
     bool m_pending_mx_release = false;
-    bool m_terminated = true;
+    bool m_running = false;
     bool m_has_write_mutex = false;
 
     void main();
@@ -1713,7 +1715,10 @@ private:
 void DB::AsyncCommitHelper::main()
 {
     std::unique_lock lg(m_mutex);
-    while (!m_terminated) {
+    while (m_running) {
+#if 0 // Enable for testing purposes
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif
         if (m_has_write_mutex) {
             if (m_pending_sync) {
                 std::function<void()> cb = m_pending_sync.value();
@@ -1735,14 +1740,14 @@ void DB::AsyncCommitHelper::main()
             // Waiting for write req
             REALM_ASSERT(!m_pending_sync && !m_pending_mx_release);
             if (!m_pending_writes.empty()) {
-                // acquire write mutex
-                m_db->do_begin_write();
-                m_has_write_mutex = true;
                 auto callback = m_pending_writes.front();
                 m_pending_writes.pop_front();
                 lg.unlock();
+                // acquire write mutex
+                m_db->do_begin_write();
                 callback();
                 lg.lock();
+                m_has_write_mutex = true;
                 continue;
             }
         }
@@ -2240,6 +2245,7 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
     m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
@@ -2293,8 +2299,31 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // Grabbing the new lock before releasing the old one prevents m_transaction_count
     // from going shortly to zero
     db->grab_read_lock(new_read_lock, version_id); // Throws
-    db->release_read_lock(m_read_lock);
+
+    if (commit_to_disk || m_oldest_version_not_persisted) {
+        // Here we are either committing to disk or we are already
+        // holding on to an older version. In either case there is
+        // no need to hold onto this now historic version.
+        db->release_read_lock(m_read_lock);
+    }
+    else {
+        // We are not commiting to disk and there is no older
+        // version not persisted, so hold onto this one
+        m_oldest_version_not_persisted = m_read_lock;
+    }
+
+    if (commit_to_disk && m_oldest_version_not_persisted) {
+        // We are committing to disk so we can release the
+        // version we are holding on to
+        db->release_read_lock(*m_oldest_version_not_persisted);
+        m_oldest_version_not_persisted.reset();
+    }
     m_read_lock = new_read_lock;
+    // We can be sure that m_read_lock != m_oldest_version_not_persisted
+    // because m_oldest_version_not_persisted is either equal to former m_read_lock
+    // or older and former m_read_lock is older than current m_read_lock
+    REALM_ASSERT(!m_oldest_version_not_persisted ||
+                 m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
 
     if (m_async_stage == AsyncState::Idle) {
         db->do_end_write();
@@ -2471,6 +2500,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
             r.filesize = new_file_size;
             r.version = new_version;
             r_info->readers.use_next();
+
             // REALM_ASSERT(m_alloc.matches_section_boundary(new_file_size));
             REALM_ASSERT(new_top_ref < new_file_size);
         }
@@ -2622,7 +2652,10 @@ void Transaction::end_read()
 void Transaction::do_end_read() noexcept
 {
     detach();
+
+    REALM_ASSERT(!m_oldest_version_not_persisted);
     db->release_read_lock(m_read_lock);
+
     m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
@@ -2775,12 +2808,6 @@ Transaction::~Transaction()
 }
 
 
-DB::VersionID Transaction::get_version_of_current_transaction()
-{
-    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-}
-
-
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (m_fake_read_lock_if_immutable) {
@@ -2828,13 +2855,22 @@ TransactionRef DB::start_write(bool nonblocking)
 
 void DB::async_request_write_mutex(TransactionRef tr, std::function<void()> when_acquired)
 {
+    std::unique_lock<std::mutex> lck(tr->mtx);
+    REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
     tr->m_async_stage = Transaction::AsyncState::Requesting;
-    // TODO make async
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, when_acquired]() {
         if (auto tr = weak_tr.lock()) {
+            std::unique_lock<std::mutex> lck(tr->mtx);
             tr->m_async_stage = Transaction::AsyncState::HasLock;
-            when_acquired();
+            if (tr->waiting_for_write_lock) {
+                tr->waiting_for_write_lock = false;
+                tr->cv.notify_one();
+            }
+            else if (when_acquired) {
+                when_acquired();
+            }
+            tr.reset(); // Release pointer while lock is held
         }
     });
 }
@@ -3012,20 +3048,39 @@ void DB::release_sync_agent()
 
 void Transaction::async_request_sync_to_storage(std::function<void()> when_synchronized)
 {
+    std::unique_lock<std::mutex> lck(mtx);
     REALM_ASSERT(m_async_stage == AsyncState::HasCommits);
     m_async_stage = AsyncState::Syncing;
+    m_commit_exception = std::exception_ptr();
     // get a callback on the helper thread, in which to sync to disk
-    get_db()->async_sync_to_disk([&, when_synchronized]() {
+    get_db()->async_sync_to_disk([&, when_synchronized]() noexcept {
         // sync to disk:
-        DB::ReadLockInfo read_lock;
-        db->grab_read_lock(read_lock, VersionID());
-        GroupWriter out(*this);
-        out.commit(read_lock.m_top_ref);
-        // we must release the write mutex before the callback, because the callback
-        // is allowed to re-request it.
-        db->release_read_lock(read_lock);
-        db->do_end_write();
-        when_synchronized();
+        try {
+            DB::ReadLockInfo read_lock;
+            db->grab_read_lock(read_lock, VersionID());
+            GroupWriter out(*this);
+            out.commit(read_lock.m_top_ref); // Throws
+            // we must release the write mutex before the callback, because the callback
+            // is allowed to re-request it.
+            db->release_read_lock(read_lock);
+            if (m_oldest_version_not_persisted) {
+                db->release_read_lock(*m_oldest_version_not_persisted);
+                m_oldest_version_not_persisted.reset();
+            }
+            db->do_end_write();
+        }
+        catch (...) {
+            m_commit_exception = std::current_exception();
+        }
+
+        std::unique_lock<std::mutex> lck(mtx);
         m_async_stage = AsyncState::Idle;
+        if (waiting_for_sync) {
+            waiting_for_sync = false;
+            cv.notify_one();
+        }
+        else if (when_synchronized) {
+            when_synchronized();
+        }
     });
 }

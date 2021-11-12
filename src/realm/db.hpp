@@ -33,6 +33,7 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <condition_variable>
 
 namespace realm {
 
@@ -401,6 +402,13 @@ public:
     void claim_sync_agent();
     void release_sync_agent();
 
+protected:
+    explicit DB(const DBOptions& options); // Is this ever used?
+
+private:
+    class AsyncCommitHelper;
+    struct SharedInfo;
+    struct ReadCount;
     struct ReadLockInfo {
         uint_fast64_t m_version = std::numeric_limits<version_type>::max();
         uint_fast32_t m_reader_idx = 0;
@@ -418,19 +426,12 @@ public:
     };
     class ReadLockGuard;
 
-protected:
-    explicit DB(const DBOptions& options); // Is this ever used?
-
-private:
-    class AsyncCommitHelper;
     // Member variables
     std::recursive_mutex m_mutex;
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
     Replication* m_replication = nullptr;
-    struct SharedInfo;
-    struct ReadCount;
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
@@ -601,6 +602,19 @@ public:
     {
         return db->get_version_of_latest_snapshot();
     }
+    DB::VersionID get_oldest_version_not_persisted()
+    {
+        if (m_oldest_version_not_persisted) {
+            return VersionID(m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_reader_idx);
+        }
+        return {};
+    }
+    /// Get a version id which may be used to request a different transaction locked to specific version.
+    DB::VersionID get_version_of_current_transaction() const noexcept
+    {
+        return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
+    }
+
     void close();
     bool is_attached()
     {
@@ -646,8 +660,9 @@ public:
     {
         return m_transact_stage == DB::transact_Frozen;
     }
-    bool is_async() const noexcept
+    bool is_async() noexcept
     {
+        std::unique_lock<std::mutex> lck(mtx);
         return m_async_stage != AsyncState::Idle;
     }
     TransactionRef duplicate();
@@ -673,9 +688,6 @@ public:
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
 
-    /// Get a version id which may be used to request a different transaction locked to specific version.
-    VersionID get_version_of_current_transaction();
-
     void upgrade_file_format(int target_file_format_version);
 
     /// Task oriented/async interface for continuous transactions.
@@ -686,31 +698,54 @@ public:
     }
     // request full synchronization to stable storage for all writes done since
     // last sync. The write mutex is released after full synchronization.
-    void async_request_sync_to_storage(std::function<void()> when_synchronized);
+    void async_request_sync_to_storage(std::function<void()> when_synchronized = nullptr);
     // release the write lock without any sync to disk
     void async_release_write_lock()
     {
-        REALM_ASSERT(m_async_stage == AsyncState::HasLock);
-        m_async_stage = AsyncState::Idle;
-        get_db()->async_end_write();
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == AsyncState::HasLock) {
+            m_async_stage = AsyncState::Idle;
+            get_db()->async_end_write();
+        }
     }
 
     // true if sync to disk has been requested
-    bool is_synchronizing() const noexcept
+    bool is_synchronizing() noexcept
     {
+        std::unique_lock<std::mutex> lck(mtx);
         return m_async_stage == AsyncState::Syncing;
     }
 
-    // methods for use with async interface for cont. transactions
-    DB::ReadLockInfo grab_read_lock()
+    void wait_for_write_lock()
     {
-        DB::ReadLockInfo rli;
-        get_db()->grab_read_lock(rli, VersionID());
-        return rli;
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Requesting) {
+            waiting_for_write_lock = true;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_write_lock);
+        }
     }
-    void release_read_lock(DB::ReadLockInfo& read_lock)
+
+    bool wait_for_sync()
     {
-        get_db()->release_read_lock(read_lock);
+        bool did_wait = false;
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Syncing) {
+            waiting_for_sync = true;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_sync);
+            did_wait = true;
+        }
+        if (m_commit_exception)
+            throw m_commit_exception;
+        return did_wait;
+    }
+
+    std::exception_ptr get_commit_exception()
+    {
+        return m_commit_exception;
     }
 
 private:
@@ -738,8 +773,17 @@ private:
     mutable _impl::History* m_history = nullptr;
 
     DB::ReadLockInfo m_read_lock;
-    DB::TransactStage m_transact_stage = DB::transact_Ready;
+    util::Optional<DB::ReadLockInfo> m_oldest_version_not_persisted;
+    std::exception_ptr m_commit_exception;
+
+    // Mutex is protecting access to members just below
+    std::mutex mtx;
+    std::condition_variable cv;
     AsyncState m_async_stage = AsyncState::Idle;
+    bool waiting_for_write_lock = false;
+    bool waiting_for_sync = false;
+
+    DB::TransactStage m_transact_stage = DB::transact_Ready;
 
     friend class DB;
     friend class DisableReplication;
