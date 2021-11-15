@@ -325,7 +325,8 @@ public:
     // * Write blocks from multiple calls to async_transaction() will be
     //   executed in order.
     // * A later call to async_begin_transaction() will wait for any earlier write blocks.
-    void async_begin_transaction(const std::function<void()>& the_block, bool notify_only = false);
+    using AsyncHandle = unsigned;
+    AsyncHandle async_begin_transaction(const std::function<void()>& the_block, bool notify_only = false);
 
     // Asynchronous commit.
     // * 'the_done_block' is queued for execution on the scheduler associated with
@@ -337,7 +338,13 @@ public:
     //   intervening synchronization of stable storage.
     // * Such a sequence of commits form a group. In case of a platform crash,
     //   either none or all of the commits in a group will reach stable storage.
-    void async_commit_transaction(const std::function<void()>& the_done_block = nullptr, bool allow_grouping = false);
+    AsyncHandle async_commit_transaction(const std::function<void()>& the_done_block = nullptr,
+                                         bool allow_grouping = false);
+
+    // Cancel a queued code block (either for an async_transaction or for an async_commit)
+    // * Cancelling a commit will not abort the commit, it will only cancel the callback
+    //   informing of commit completion.
+    void async_cancel_transaction(AsyncHandle);
 
     // Returns true when async transactiona has been created and the result of the last
     // commit has not yet reached permanent storage.
@@ -552,9 +559,15 @@ private:
     struct async_write_desc {
         std::function<void()> writer;
         bool notify_only;
+        unsigned handle;
     };
     std::deque<async_write_desc> m_async_write_q;
-    std::vector<std::function<void()>> m_async_commit_q;
+    struct async_commit_desc {
+        std::function<void()> when_completed;
+        unsigned handle;
+    };
+    std::vector<async_commit_desc> m_async_commit_q;
+    unsigned m_async_commit_handle = 0;
     bool m_is_running_async_writes = false;
     bool m_notify_only = false;
     bool m_is_running_async_commit_completions = false;

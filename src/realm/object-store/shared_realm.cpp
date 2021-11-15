@@ -646,8 +646,8 @@ void Realm::call_completion_callbacks()
     }
 
     for (auto cb : m_async_commit_q) {
-        if (cb)
-            cb();
+        if (cb.when_completed)
+            cb.when_completed();
     }
     m_is_running_async_commit_completions = false;
 
@@ -762,7 +762,7 @@ void Realm::run_writes()
     end_current_write();
 }
 
-void Realm::async_begin_transaction(const std::function<void()>& the_write_block, bool notify_only)
+auto Realm::async_begin_transaction(const std::function<void()>& the_write_block, bool notify_only) -> AsyncHandle
 {
     verify_thread();
     check_can_create_write_transaction(this);
@@ -771,7 +771,8 @@ void Realm::async_begin_transaction(const std::function<void()>& the_write_block
 
     // make sure we have a (at least a) read transaction
     transaction();
-    m_async_write_q.push_back({std::move(the_write_block), notify_only});
+    auto handle = m_async_commit_handle++;
+    m_async_write_q.push_back({std::move(the_write_block), notify_only, handle});
 
     if (!m_is_running_async_writes) {
         REALM_ASSERT(m_scheduler);
@@ -784,9 +785,10 @@ void Realm::async_begin_transaction(const std::function<void()>& the_write_block
             });
         }
     }
+    return handle;
 }
 
-void Realm::async_commit_transaction(const std::function<void()>& the_done_block, bool allow_grouping)
+auto Realm::async_commit_transaction(const std::function<void()>& the_done_block, bool allow_grouping) -> AsyncHandle
 {
     REALM_ASSERT(m_transaction->holds_write_mutex());
     REALM_ASSERT(!m_is_running_async_commit_completions);
@@ -795,7 +797,8 @@ void Realm::async_commit_transaction(const std::function<void()>& the_done_block
     REALM_ASSERT(!audit_context());
     // grab a version lock on current version, push it along with the done block
     // do in-buffer-cache commit_transaction();
-    m_async_commit_q.push_back(std::move(the_done_block));
+    auto handle = m_async_commit_handle++;
+    m_async_commit_q.push_back({std::move(the_done_block), handle});
     m_coordinator->commit_write(*this, /* commit_to_disk: */ false);
 
     if (m_is_running_async_writes) {
@@ -804,7 +807,6 @@ void Realm::async_commit_transaction(const std::function<void()>& the_done_block
         if (!allow_grouping) {
             m_async_commit_barrier_requested = true;
         }
-
     }
     else {
         // we're called from outside the callback loop so we have to take care of
@@ -817,6 +819,26 @@ void Realm::async_commit_transaction(const std::function<void()>& the_done_block
                 run_async_completions_on_proper_thread();
             });
         }
+    }
+    return handle;
+}
+
+void Realm::async_cancel_transaction(AsyncHandle handle)
+{
+    auto it1 = std::find_if(m_async_write_q.begin(), m_async_write_q.end(), [handle](auto& elem) {
+        return elem.handle == handle;
+    });
+    if (it1 != m_async_write_q.end()) {
+        m_async_write_q.erase(it1);
+        return;
+    }
+    auto it2 = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), [handle](auto& elem) {
+        return elem.handle == handle;
+    });
+    if (it2 != m_async_commit_q.end()) {
+        // Just delete the callback. It is important that we know
+        // that there are still commits pending.
+        it2->when_completed = nullptr;
     }
 }
 
