@@ -677,15 +677,27 @@ public:
             make_frame(fin, opcode, mask, data, size, m_write_buffer.data(), m_config.websocket_get_random());
 
         auto handler = [this](std::error_code ec, size_t) {
-            // If the operation is aborted, the socket object may have been destroyed.
-            if (ec != util::error::operation_aborted) {
-                if (ec) {
-                    stop();
-                    m_config.websocket_write_error_handler(ec);
-                    return;
-                }
-                handle_write_message(); // Throws
+            // If the operation is aborted, then the write operation was canceled and we should ignore this callback.
+            if (ec == util::error::operation_aborted) {
+                return;
             }
+
+            auto is_socket_closed_err = (ec == util::error::make_error_code(util::error::connection_reset) ||
+                                         ec == util::make_error_code(util::MiscExtErrors::end_of_input));
+            // If the socket has been closed then we should continue to read from it until we've drained
+            // the receive buffer. Eventually we will either receive an in-band error message from the
+            // server about why we got disconnected or we'll receive ECONNRESET on the receive side as well.
+            if (is_socket_closed_err) {
+                return;
+            }
+
+            // Otherwise we've got some other I/O error that we should surface to the sync client.
+            if (ec) {
+                stop();
+                return m_config.websocket_write_error_handler(ec);
+            }
+
+            handle_write_message();
         };
 
         m_config.async_write(m_write_buffer.data(), message_size, handler);
