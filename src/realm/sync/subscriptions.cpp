@@ -151,10 +151,10 @@ size_t SubscriptionSet::size() const
     return m_sub_list.size();
 }
 
-Subscription SubscriptionSet::get_at_index(size_t index) const
+Subscription SubscriptionSet::at(size_t index) const
 {
     if (index >= m_sub_list.size()) {
-        return Subscription(this, Obj{});
+        throw std::out_of_range("index");
     }
 
     return Subscription(this, m_sub_list.get_object(index));
