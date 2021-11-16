@@ -58,10 +58,20 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK_EQUAL(it->name(), "a sub");
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_a.get_description());
-        out.commit();
 
-        CHECK_EQUAL(store.get_latest().size(), 1);
-        CHECK_EQUAL(latest.size(), 1);
+        // Add a second sub in the same update call
+        Query query_b(read_tr->get_table("class_a"));
+        query_b.equal(fixture.foo_col, StringData("TD")).greater_equal(fixture.bar_col, int64_t(1));
+        auto&& [it2, inserted2] = out.insert_or_assign("b sub", query_b);
+        CHECK(inserted2);
+        CHECK_NOT_EQUAL(it2, out.end());
+        // This fails - it2 is "a sub"
+        CHECK_EQUAL(it2->name(), "b sub");
+        CHECK_EQUAL(it2->object_class_name(), "a");
+        // This fails - it2 has query_a's description
+        CHECK_EQUAL(it2->query_string(), query_b.get_description());
+
+        out.commit();
     }
 
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
