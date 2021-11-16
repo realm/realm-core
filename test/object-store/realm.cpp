@@ -955,6 +955,26 @@ TEST_CASE("SharedRealm: async_writes") {
             return done;
         });
     }
+    SECTION("exception thrown during transaction") {
+        Realm::AsyncHandle h = 7;
+        bool called = false;
+        realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
+            CHECK(error);
+            CHECK(handle == h);
+            called = true;
+        });
+        h = realm->async_begin_transaction([&] {
+            done = true;
+            auto table = realm->read_group().get_table("class_object");
+            table->create_object_with_primary_key(45); // Will throw
+            realm->async_commit_transaction();
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        realm->close();
+        REQUIRE(called);
+    }
     SECTION("Canceling async transaction") {
         auto handle = realm->async_begin_transaction([&]() {
             auto table = realm->read_group().get_table("class_object");
