@@ -184,6 +184,8 @@ public:
     const_iterator begin() const;
     const_iterator end() const;
 
+    Subscription get_at_index(size_t index) const;
+
     // Returns a const_iterator to the query matching either the name or Query object, or end() if no such
     // subscription exists.
     const_iterator find(StringData name) const;
