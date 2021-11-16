@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* The 'power' unary operator template to be used in a query expression is removed
 
 ----------------------------------------------
 
