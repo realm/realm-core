@@ -709,7 +709,7 @@ void Realm::run_writes()
         }
 
         // It is safe to use a reference here. Elements are not invalidated by new insertions
-        auto& write_desc = m_async_write_q.front();
+        async_write_desc& write_desc = m_async_write_q.front();
 
         CountGuard sending_notifications(m_is_sending_notifications);
         try {
@@ -730,6 +730,8 @@ void Realm::run_writes()
         catch (const std::exception&) {
             // The version check below will cause a rollback to be performed if a commit
             // was not done
+            if (m_async_exception_handler)
+                m_async_exception_handler(write_desc.handle, std::current_exception());
         }
         auto new_version = m_transaction->get_version();
         m_async_write_q.pop_front();

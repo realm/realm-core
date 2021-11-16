@@ -350,6 +350,11 @@ public:
     // commit has not yet reached permanent storage.
     bool is_in_async_transaction() const noexcept;
 
+    void set_async_error_handler(const std::function<void(AsyncHandle, std::exception_ptr)>& hndlr)
+    {
+        m_async_exception_handler = std::move(hndlr);
+    }
+
     // Returns a frozen copy for the current version of this Realm
     // If called from within a write transaction, the returned Realm will
     // reflect the state at the beginning of the write transaction. Any
@@ -572,6 +577,7 @@ private:
     bool m_notify_only = false;
     bool m_is_running_async_commit_completions = false;
     bool m_async_commit_barrier_requested = false;
+    std::function<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
     void run_writes_on_proper_thread();
     void run_async_completions_on_proper_thread();
     void check_pending_write_requests();
