@@ -777,8 +777,6 @@ SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
         return m_flx_subscription_store.get();
     }
 
-    REALM_ASSERT(m_virt_path.empty());
-
     m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db);
     return m_flx_subscription_store.get();
 }
@@ -1203,6 +1201,13 @@ void SessionWrapper::on_resumed()
 
 void SessionWrapper::on_connection_state_changed(ConnectionState state, const SessionErrorInfo* error_info)
 {
+    if (state == ConnectionState::connected && m_sess) {
+        ClientImpl::Connection& conn = m_sess->get_connection();
+        if (conn.is_flx_sync_connection()) {
+            get_or_create_flx_subscription_store();
+        }
+    }
+
     if (m_connection_state_change_listener) {
         if (!m_suspended)
             m_connection_state_change_listener(state, error_info); // Throws

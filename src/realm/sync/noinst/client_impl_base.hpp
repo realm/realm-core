@@ -394,6 +394,7 @@ public:
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
     ConnectionState get_state() const noexcept;
+    bool is_flx_sync_connection() const noexcept;
 
     void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
                              const std::string& signed_access_token);
@@ -468,7 +469,6 @@ private:
     void change_state_to_disconnected() noexcept;
 
     // These are only called from ClientProtocol class.
-    bool is_flx_sync_connection() const noexcept;
     void receive_pong(milliseconds_type timestamp);
     void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
