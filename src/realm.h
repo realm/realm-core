@@ -2479,7 +2479,7 @@ typedef enum realm_sync_client_reconnect_mode {
 
 typedef enum realm_sync_session_resync_mode {
     RLM_SYNC_SESSION_RESYNC_MODE_MANUAL,
-    RLM_SYNC_SESSION_RESYNC_MODE_SEAMLESS_LOSS,
+    RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL,
 } realm_sync_session_resync_mode_e;
 
 typedef enum realm_sync_session_stop_policy {

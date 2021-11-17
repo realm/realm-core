@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* The client reset callbacks now pass out SharedRealm objects instead of TransactionRefs. ([#5048](https://github.com/realm/realm-core/issues/5048), since v11.5.0) 
  
 ### Breaking changes
 * None.
@@ -18,6 +18,7 @@
 
 ### Internals
 * The 'power' unary operator template to be used in a query expression is removed
+* Renamed ClientResyncMode::SeamlessLoss -> DiscardLocal.
 
 ----------------------------------------------
 
