@@ -58,7 +58,7 @@ class SessionWrapper;
 /// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
 /// bool wait_for_download_complete_or_client_stopped().
 struct ClientReset {
-    bool seamless_loss = false;
+    bool discard_local = false;
     DBRef fresh_copy;
     util::UniqueFunction<void(std::string local, std::string remote)> notify_before_client_reset;
     util::UniqueFunction<void(std::string local)> notify_after_client_reset;

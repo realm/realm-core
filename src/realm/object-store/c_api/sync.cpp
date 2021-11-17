@@ -40,8 +40,8 @@ static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_S
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
 
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Manual) == RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
-static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::SeamlessLoss) ==
-              RLM_SYNC_SESSION_RESYNC_MODE_SEAMLESS_LOSS);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::DiscardLocal) ==
+              RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
 
 static_assert(realm_sync_session_stop_policy_e(SyncSessionStopPolicy::Immediately) ==
               RLM_SYNC_SESSION_STOP_POLICY_IMMEDIATELY);

@@ -96,7 +96,7 @@ enum class ClientResyncMode : unsigned char {
     // Fire a client reset error
     Manual,
     // Discard local changes, without disrupting accessors or closing the Realm
-    SeamlessLoss,
+    DiscardLocal,
 };
 
 enum class ReconnectMode {

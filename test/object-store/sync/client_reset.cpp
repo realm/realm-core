@@ -204,10 +204,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
         FAIL("Error handler should not have been called");
     };
 
-    SECTION("seamless loss") {
+    SECTION("discard local") {
         local_config.cache = false;
         local_config.automatic_change_notifications = false;
-        local_config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+        local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
         size_t before_callback_invoctions = 0;
         size_t after_callback_invocations = 0;
@@ -937,7 +937,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -954,7 +954,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema = Schema{
         {"object",
          {
@@ -1425,7 +1425,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     }
 }
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless loss][collections]",
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard local][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
@@ -1459,7 +1459,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
 
@@ -1672,7 +1672,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema = Schema{
         {"object",
          {

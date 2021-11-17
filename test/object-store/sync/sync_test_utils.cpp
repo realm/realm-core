@@ -229,13 +229,13 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> 
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
 
-// fake seamless loss by turning off sync and calling transfer group directly
+// fake discard local mode by turning off sync and calling transfer group directly
 struct FakeLocalClientReset : public TestClientReset {
     FakeLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
         : TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
-        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::SeamlessLoss);
+        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::DiscardLocal);
         // turn off sync, we only fake it
         m_local_config.sync_config = {};
         m_remote_config.sync_config = {};

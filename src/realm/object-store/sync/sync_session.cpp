@@ -371,7 +371,7 @@ void SyncSession::handle_error(SyncError error)
                     case ClientResyncMode::Manual:
                         user_handles_client_reset();
                         break;
-                    case ClientResyncMode::SeamlessLoss: {
+                    case ClientResyncMode::DiscardLocal: {
                         REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                         std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
                         m_config.get_fresh_realm_for_path(fresh_path, [weak_self_ref = weak_from_this()](
@@ -541,7 +541,7 @@ void SyncSession::do_create_sync_session()
 
     if (m_force_client_reset) {
         sync::Session::Config::ClientReset config;
-        config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
+        config.discard_local = (m_config.client_resync_mode == ClientResyncMode::DiscardLocal);
         config.notify_after_client_reset = [this](std::string local_path) {
             SharedRealm frozen_local;
             if (!local_path.empty()) {
