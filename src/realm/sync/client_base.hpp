@@ -60,8 +60,8 @@ class SessionWrapper;
 struct ClientReset {
     bool seamless_loss = false;
     DBRef fresh_copy;
-    util::UniqueFunction<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
-    util::UniqueFunction<void(TransactionRef local)> notify_after_client_reset;
+    util::UniqueFunction<void(std::string local, std::string remote)> notify_before_client_reset;
+    util::UniqueFunction<void(std::string local)> notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.

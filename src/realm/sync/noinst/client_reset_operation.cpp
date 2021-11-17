@@ -67,20 +67,17 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
             clean_up_state();
         });
 
+        std::string local_path = m_db.get_path();
+        std::string fresh_path = m_db_fresh ? m_db_fresh->get_path() : "";
         if (m_notify_before) {
-            TransactionRef local_frozen, remote_frozen;
-            local_frozen = m_db.start_frozen();
-            if (m_db_fresh) {
-                remote_frozen = m_db_fresh->start_frozen();
-            }
-            m_notify_before(local_frozen, remote_frozen);
+            m_notify_before(local_path, fresh_path);
         }
 
         local_version_ids =
             client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger); // throws
 
         if (m_notify_after) {
-            m_notify_after(m_db.start_frozen());
+            m_notify_after(local_path);
         }
 
         m_client_reset_old_version = local_version_ids.old_version;

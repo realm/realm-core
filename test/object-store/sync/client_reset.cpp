@@ -211,23 +211,26 @@ TEST_CASE("sync: client reset", "[client reset]") {
         const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
         size_t before_callback_invoctions = 0;
         size_t after_callback_invocations = 0;
-        local_config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
+        local_config.sync_config->notify_before_client_reset = [&](SharedRealm local, SharedRealm remote) {
             ++before_callback_invoctions;
             REQUIRE(local);
             REQUIRE(local->is_frozen());
-            REQUIRE(local->get_table("class_object"));
+            REQUIRE(local->read_group().get_table("class_object"));
+            REQUIRE(local->config().path == local_config.path);
 
             REQUIRE(remote);
             REQUIRE(remote->is_frozen());
-            REQUIRE(remote->get_table("class_object"));
+            REQUIRE(remote->read_group().get_table("class_object"));
+            REQUIRE(remote->config().path == fresh_path);
 
             REQUIRE(util::File::exists(local_config.path));
             REQUIRE(util::File::exists(fresh_path));
         };
-        local_config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
+        local_config.sync_config->notify_after_client_reset = [&](SharedRealm local) {
             ++after_callback_invocations;
             REQUIRE(local);
-            REQUIRE(local->get_table("class_object"));
+            REQUIRE(local->read_group().get_table("class_object"));
+            REQUIRE(local->config().path == local_config.path);
         };
 
         Results results;
@@ -568,6 +571,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
         }
 
         SECTION("extra local column creates a client reset error") {
@@ -599,8 +604,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
+
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
