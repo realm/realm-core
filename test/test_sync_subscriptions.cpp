@@ -152,6 +152,21 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         // By marking version 2 as complete version 1 will get superceded and removed.
         CHECK_THROW(store.get_mutable_by_version(1), KeyNotFound);
     }
+
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        set.insert_or_assign(query_a);
+        CHECK_EQUAL(set.size(), 2);
+        auto it = set.begin();
+        it = set.erase(it);
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 1);
+        CHECK_EQUAL(it->name(), "b sub");
+        it = set.erase(it);
+        CHECK_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 0);
+    }
 }
 
 TEST(Sync_SubscriptionStoreUpdateExisting)
