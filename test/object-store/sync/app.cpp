@@ -68,34 +68,7 @@ using util::Optional;
 
 using namespace std::string_view_literals;
 
-std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
-{
-    if (!error) {
-        os << "(none)";
-    }
-    else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
-           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
-    }
-    return os;
-}
-
 namespace {
-template <typename Factory>
-App::Config get_config(Factory factory)
-{
-    return {"app name",
-            factory,
-            util::none,
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
-}
-
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app,
                                  app::AppCredentials credentials = app::AppCredentials::anonymous())
 {

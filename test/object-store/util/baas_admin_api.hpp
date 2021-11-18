@@ -143,6 +143,8 @@ struct AppCreateConfig {
     Schema schema;
     Property partition_key;
     bool dev_mode_enabled;
+    enum class SyncMode { FLX, PBS };
+    SyncMode sync_mode = SyncMode::PBS;
 
     std::vector<FunctionDef> functions;
 

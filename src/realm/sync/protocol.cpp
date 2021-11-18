@@ -62,8 +62,10 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "The server sent an invalid DOWNLOAD message (Bad changeset header syntax)";
         case ProtocolError::bad_changeset_size:
             return "The server sent an invalid DOWNLOAD message (Bad changeset size)";
-        case ProtocolError::bad_changesets:
-            return "The server sent an invalid DOWNLOAD message (Bad changeset)";
+        case ProtocolError::switch_to_flx_sync:
+            return "Wrong wire protocol, switch to the flexible sync wire protocol";
+        case ProtocolError::switch_to_pbs:
+            return "Wrong wire protocol, switch to the partition-based sync wire protocol";
 
         case ProtocolError::session_closed:
             return "Session closed (no error)";

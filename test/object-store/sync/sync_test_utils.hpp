@@ -67,6 +67,22 @@ void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
 template <typename Transport>
 const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 
+std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
+
+template <typename Factory>
+app::App::Config get_config(Factory factory)
+{
+    return {"app name",
+            factory,
+            util::none,
+            util::none,
+            util::Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"};
+}
+
 #if REALM_ENABLE_AUTH_TESTS
 
 #ifdef REALM_MONGODB_ENDPOINT

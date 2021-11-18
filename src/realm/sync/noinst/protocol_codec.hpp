@@ -169,8 +169,11 @@ public:
 
     void make_refresh_message(OutputBuffer&, session_ident_type session_ident, const std::string& signed_user_token);
 
-    void make_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
-                            const SyncProgress& progress);
+    void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
+                                const SyncProgress& progress);
+
+    void make_flx_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
+                                const SyncProgress& progress, std::string_view query_body);
 
     class UploadMessageBuilder {
     public:
@@ -298,6 +301,10 @@ private:
         progress.latest_server_version.salt = msg.read_next<salt_type>();
         progress.upload.client_version = msg.read_next<version_type>();
         progress.upload.last_integrated_server_version = msg.read_next<version_type>();
+        auto query_version = connection.is_flx_sync_connection() ? msg.read_next<int64_t>() : 0;
+
+        // If this is a PBS connection, then every download message is its own complete batch.
+        auto last_in_batch = connection.is_flx_sync_connection() ? msg.read_next<bool>() : true;
         auto downloadable_bytes = msg.read_next<int64_t>();
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();
@@ -342,12 +349,10 @@ private:
                 return report_error(Error::bad_changeset_size, "Bad changeset size %1 > %2", changeset_size,
                                     msg.bytes_remaining());
             }
-
             if (cur_changeset.remote_version == 0) {
                 return report_error(Error::bad_server_version,
                                     "Server version in downloaded changeset cannot be zero");
             }
-
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
 
             if (logger.would_log(util::Logger::Level::trace)) {
@@ -379,7 +384,9 @@ private:
             received_changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
-        connection.receive_download_message(session_ident, progress, downloadable_bytes,
+        auto batch_state =
+            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+        connection.receive_download_message(session_ident, progress, downloadable_bytes, query_version, batch_state,
                                             received_changesets); // Throws
     }
 

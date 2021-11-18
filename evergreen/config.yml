@@ -112,6 +112,10 @@ functions:
               set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
           fi
 
+          if [ -n "${enable_flx_sync|}" ]; then
+              set_cmake_var realm_vars REALM_ENABLE_FLX_SYNC BOOL On
+          fi
+
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
@@ -417,7 +421,11 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir
+            if [ -n "${enable_flx_sync}" ]; then
+                BAAS_BRANCH="-b master"
+            fi
+
+            ./evergreen/install_baas.sh -w ./baas-work-dir $BAAS_BRANCH
         fi
 
   - command: shell.exec
@@ -535,6 +543,18 @@ task_groups:
   - compile
   - .test_suite
 
+- name: compile_test_flx
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  tasks:
+  - compile
+  - object-store-tests
+
 - name: benchmarks
   setup_group_can_fail_task: true
   setup_group:
@@ -578,6 +598,21 @@ buildvariants:
   - name: compile_test
     distros:
     - ubuntu2004-large
+
+- name: ubuntu2004-flx-sync
+  display_name: "Ubuntu 20.04 x86_64 (FLX Sync Enabled)"
+  run_on: ubuntu2004-large
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    enable_flx_sync: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+  tasks:
+  - name: compile_test_flx
 
 - name: ubuntu2004-release
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 Release build)"
@@ -683,6 +718,20 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+
+- name: macos-1015-flx
+  display_name: "MacOS 10.15 x86_64 (FLX sync)"
+  run_on: macos-1015
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    enable_flx_sync: On
+  tasks:
+  - name: compile_test_flx
 
 - name: macos-1015-release
   display_name: "MacOS 10.15 x86_64 (Release build)"

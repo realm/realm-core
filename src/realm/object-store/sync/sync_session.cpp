@@ -875,6 +875,16 @@ std::string const& SyncSession::path() const
     return m_db->get_path();
 }
 
+sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
+{
+    return m_session->get_flx_subscription_store();
+}
+
+bool SyncSession::has_flx_subscription_store() const
+{
+    return m_session->has_flx_subscription_store();
+}
+
 void SyncSession::update_configuration(SyncConfig new_config)
 {
     while (true) {
