@@ -151,6 +151,15 @@ size_t SubscriptionSet::size() const
     return m_sub_list.size();
 }
 
+Subscription SubscriptionSet::at(size_t index) const
+{
+    if (index >= m_sub_list.size()) {
+        throw std::out_of_range("index");
+    }
+
+    return Subscription(this, m_sub_list.get_object(index));
+}
+
 SubscriptionSet::const_iterator SubscriptionSet::begin() const
 {
     return iterator(this, m_sub_list.begin());
