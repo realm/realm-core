@@ -96,7 +96,7 @@ void on_change_but_no_notify(realm::Realm& realm);
 #if REALM_ENABLE_SYNC
 
 #ifndef TEST_ENABLE_SYNC_LOGGING
-#define TEST_ENABLE_SYNC_LOGGING 1 // change to 1 to enable logging
+#define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
 #endif
 
 struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {

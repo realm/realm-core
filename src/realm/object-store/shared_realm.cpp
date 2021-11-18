@@ -42,9 +42,12 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/history.hpp>
 #endif
 
 using namespace realm;
@@ -728,6 +731,28 @@ void Realm::write_copy(StringData path, BinaryData key)
     }
     catch (...) {
         _impl::translate_file_exception(path);
+    }
+}
+
+void Realm::write_copy(const Config& config)
+{
+    std::string new_location = config.path;
+    BinaryData encryption_key(config.encryption_key.data(), config.encryption_key.size());
+    if (config.sync_config) {
+#if REALM_ENABLE_SYNC
+        if (util::File::exists(new_location)) {
+            throw std::runtime_error("not implemented");
+        }
+        else {
+            write_copy(new_location, encryption_key);
+            DBOptions options;
+            if (encryption_key.size()) {
+                options.encryption_key = encryption_key.data();
+            }
+            auto db = DB::create(make_in_realm_history(), new_location, options);
+            db->create_new_history(sync::make_client_replication());
+        }
+#endif
     }
 }
 

@@ -1547,19 +1547,19 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     local_config.cache = true;
     local_config.schema_version = 1;
     local_config.schema = schema;
+    auto local_realm = Realm::get_shared_realm(local_config);
     {
-        auto r = Realm::get_shared_realm(local_config);
-        auto origin = r->read_group().get_table("class_origin");
-        auto target = r->read_group().get_table("class_target");
-        auto other_origin = r->read_group().get_table("class_other_origin");
-        auto other_target = r->read_group().get_table("class_other_target");
+        auto origin = local_realm->read_group().get_table("class_origin");
+        auto target = local_realm->read_group().get_table("class_target");
+        auto other_origin = local_realm->read_group().get_table("class_other_origin");
+        auto other_target = local_realm->read_group().get_table("class_other_target");
 
-        r->begin_transaction();
+        local_realm->begin_transaction();
         auto o = target->create_object_with_primary_key("Foo").set("name", "Egon");
         origin->create_object_with_primary_key(47).set("link", o.get_key());
         other_target->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
         other_origin->create_object_with_primary_key(ObjectId::gen());
-        r->commit_transaction();
+        local_realm->commit_transaction();
     }
 
     auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
@@ -1571,9 +1571,9 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
 
     create_user_and_log_in(app);
     auto user1 = app->current_user();
-    SyncTestFile config(user1, partition, schema);
+    SyncTestFile config1(user1, partition, schema);
 
-    auto r1 = Realm::get_shared_realm(config);
+    auto r1 = Realm::get_shared_realm(config1);
 
     auto origin = r1->read_group().get_table("class_origin");
     auto target = r1->read_group().get_table("class_target");
@@ -1592,8 +1592,9 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     auto user2 = app->current_user();
     REQUIRE(user1 != user2);
 
-    local_config.sync_config = std::make_shared<SyncConfig>(user2, bson::Bson(partition));
-    auto r2 = Realm::get_shared_realm(local_config);
+    SyncTestFile config2(user1, partition, schema);
+    local_realm->write_copy(config2);
+    auto r2 = Realm::get_shared_realm(config2);
 
     CHECK(!wait_for_download(*r2));
     advance_and_notify(*r2);
@@ -1604,6 +1605,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     REQUIRE(g.get_table("class_other_origin")->size() == 2);
     REQUIRE(g.get_table("class_other_target")->size() == 2);
 
+    CHECK(!wait_for_upload(*r2));
     CHECK(!wait_for_download(*r1));
     advance_and_notify(*r1);
     // r1->read_group().to_json(std::cout);

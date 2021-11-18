@@ -369,6 +369,7 @@ public:
     // be written. This is to be sure that the file can be used as a stating point for a newly
     // installed application. The function will throw if there are pending uploads.
     void write_copy(StringData path, BinaryData encryption_key);
+    void write_copy(const Config& config);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;
