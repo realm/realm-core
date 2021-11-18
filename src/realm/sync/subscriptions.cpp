@@ -189,7 +189,9 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
 SubscriptionSet::const_iterator SubscriptionSet::erase(const_iterator it)
 {
     m_sub_list.remove_target_row(it.m_sub_it.index());
-    return it;
+    auto at_end = (it.m_sub_it.index() == m_sub_list.size());
+    return at_end ? const_iterator(this, m_sub_list.end())
+                  : const_iterator(this, LnkLst::iterator(&m_sub_list, it.m_sub_it.index()));
 }
 
 void SubscriptionSet::clear()

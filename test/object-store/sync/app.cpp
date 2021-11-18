@@ -1820,7 +1820,8 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
 
 constexpr size_t minus_25_percent(size_t val)
 {
-    return val * .75 - 1;
+    REALM_ASSERT(val * .75 > 10);
+    return val * .75 - 10;
 }
 
 TEST_CASE("app: sync integration", "[sync][app]") {
@@ -2087,7 +2088,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(!user->is_logged_in());
         }
 
-        SECTION("Requests that receive an error are retried on an backoff") {
+        SECTION("Requests that receive an error are retried on a backoff") {
             using namespace std::chrono;
             std::vector<time_point<steady_clock>> response_times;
             std::atomic<bool> did_receive_valid_token{false};

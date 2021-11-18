@@ -152,6 +152,27 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         // By marking version 2 as complete version 1 will get superceded and removed.
         CHECK_THROW(store.get_mutable_by_version(1), KeyNotFound);
     }
+
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        // This is just to create a unique name for this sub so we can verify that the iterator returned by
+        // insert_or_assign is pointing to the subscription that was just created.
+        std::string new_sub_name = ObjectId::gen().to_string();
+        auto&& [inserted_it, inserted] = set.insert_or_assign(new_sub_name, query_a);
+        CHECK(inserted);
+        CHECK_EQUAL(inserted_it->name(), new_sub_name);
+        CHECK_EQUAL(set.size(), 2);
+        auto it = set.begin();
+        CHECK_EQUAL(it->name(), "b sub");
+        it = set.erase(it);
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 1);
+        CHECK_EQUAL(it->name(), new_sub_name);
+        it = set.erase(it);
+        CHECK_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 0);
+    }
 }
 
 TEST(Sync_SubscriptionStoreUpdateExisting)
