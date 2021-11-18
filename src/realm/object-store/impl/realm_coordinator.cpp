@@ -115,6 +115,9 @@ void RealmCoordinator::create_sync_session()
                 // Do not use 'discard local' mode on the fresh Realm. Use manual mode so that
                 // any error during the download is propagated back to the original session.
                 // This prevents a cycle if the fresh copy itself experiences a client reset.
+                // To make this change and not have it affect the actual sync session, an explicit
+                // copy must be made of the sync config because it is a shared pointer.
+                copy_config.sync_config = std::make_shared<SyncConfig>(*m_config.sync_config);
                 copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
                 std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
                 REALM_ASSERT(rc);

@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * The client reset callbacks now pass out SharedRealm objects instead of TransactionRefs. ([#5048](https://github.com/realm/realm-core/issues/5048), since v11.5.0) 
+* A client reset in DiscardLocal mode would revert to Manual mode on the next restart of the session. ([#5050](https://github.com/realm/realm-core/issues/5050), since v11.5.0)
  
 ### Breaking changes
 * None.
