@@ -654,6 +654,7 @@ RealmCoordinator::~RealmCoordinator()
 
 void RealmCoordinator::unregister_realm(Realm* realm)
 {
+    util::CheckedLockGuard lock(m_realm_mutex);
     // Normally results notifiers are cleaned up by the background worker thread
     // but if that's disabled we need to ensure that any notifiers from this
     // Realm get cleaned up
@@ -662,7 +663,6 @@ void RealmCoordinator::unregister_realm(Realm* realm)
         clean_up_dead_notifiers();
     }
     {
-        util::CheckedLockGuard lock(m_realm_mutex);
         auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [=](auto& notifier) {
             return notifier.expired() || notifier.is_for_realm(realm);
         });
