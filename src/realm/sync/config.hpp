@@ -34,6 +34,7 @@ namespace realm {
 
 class SyncUser;
 class SyncSession;
+class Realm;
 
 namespace bson {
 class Bson;
@@ -95,7 +96,7 @@ enum class ClientResyncMode : unsigned char {
     // Fire a client reset error
     Manual,
     // Discard local changes, without disrupting accessors or closing the Realm
-    SeamlessLoss,
+    DiscardLocal,
 };
 
 enum class ReconnectMode {
@@ -153,8 +154,8 @@ struct SyncConfig {
     // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
-    std::function<void(TransactionRef local, TransactionRef remote)> notify_before_client_reset;
-    std::function<void(TransactionRef local)> notify_after_client_reset;
+    std::function<void(std::shared_ptr<Realm> local, std::shared_ptr<Realm> remote)> notify_before_client_reset;
+    std::function<void(std::shared_ptr<Realm> local)> notify_after_client_reset;
     std::function<void(const std::string&, std::function<void(DBRef, util::Optional<std::string>)>)>
         get_fresh_realm_for_path;
 

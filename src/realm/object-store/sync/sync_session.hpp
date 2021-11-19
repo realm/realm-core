@@ -22,6 +22,7 @@
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/sync/config.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/optional.hpp>
 #include <realm/object-store/util/checked_mutex.hpp>
@@ -218,6 +219,9 @@ public:
     {
         return m_server_url;
     }
+
+    bool has_flx_subscription_store() const;
+    sync::SubscriptionStore* get_flx_subscription_store();
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.

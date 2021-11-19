@@ -148,7 +148,7 @@ TEST(ClientReset_NoLocalChanges)
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.seamless_loss = true;
+                client_reset_config.discard_local = true;
                 client_reset_config.fresh_copy = std::move(sg_fresh);
                 session_config.client_reset_config = std::move(client_reset_config);
             }
@@ -221,7 +221,7 @@ TEST(ClientReset_InitialLocalChanges)
     Session::Config session_config_2;
     {
         Session::Config::ClientReset client_reset_config;
-        client_reset_config.seamless_loss = true;
+        client_reset_config.discard_local = true;
         client_reset_config.fresh_copy = std::move(sg_fresh);
         session_config_2.client_reset_config = std::move(client_reset_config);
     }
@@ -573,14 +573,14 @@ TEST(ClientReset_ThreeClients)
             Session::Config session_config_1;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.seamless_loss = true;
+                client_reset_config.discard_local = true;
                 client_reset_config.fresh_copy = std::move(sg_fresh1);
                 session_config_1.client_reset_config = std::move(client_reset_config);
             }
             Session::Config session_config_2;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.seamless_loss = true;
+                client_reset_config.discard_local = true;
                 client_reset_config.fresh_copy = std::move(sg_fresh2);
                 session_config_2.client_reset_config = std::move(client_reset_config);
             }
@@ -700,7 +700,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.seamless_loss = true;
+            client_reset_config.discard_local = true;
             client_reset_config.fresh_copy = std::move(sg_fresh1);
             session_config.client_reset_config = std::move(client_reset_config);
         }

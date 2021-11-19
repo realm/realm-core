@@ -1935,10 +1935,6 @@ TEST(Query_NullShowcase)
     tv = (price > 0).find_all();
     CHECK(equals(tv, {1, 2}));
 
-    // Show that power(null) == null
-    tv = (power(price) == null()).find_all();
-    CHECK(equals(tv, {0}));
-
     // Doubles
     // (null > double) == false
     tv = (price > rating).find_all();
@@ -3068,42 +3064,6 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 
     Query q;
     TableView tv;
-
-    // Unary operators.
-
-    // Rows 1 and 2 should match this query as 2 * 2 == 4.
-    // Row 0 should not as the power subexpression will not produce any results.
-    q = power(table2->link(col_linktest).column<Int>(col_int)) == table2->column<Int>(col_int2);
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(k1, tv.get_key(0));
-    CHECK_EQUAL(k2, tv.get_key(1));
-
-    // Rows 1 and 2 should match this query as 2 * 2 == 4.
-    // Row 0 should not as the power subexpression will not produce any results.
-    q = table2->column<Int>(col_int2) == power(table2->link(col_linktest).column<Int>(col_int));
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(k1, tv.get_key(0));
-    CHECK_EQUAL(k2, tv.get_key(1));
-
-
-    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
-    // Row 0 should not as the power subexpression will not produce any results.
-    q = power(table2->link(col_linktest).column<Double>(col_dbl)) == table2->column<Int>(col_int2);
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(k1, tv.get_key(0));
-    CHECK_EQUAL(k2, tv.get_key(1));
-
-    // Rows 1 and 2 should match this query as 2.0 * 2.0 == 4.0.
-    // Row 0 should not as the power subexpression will not produce any results.
-    q = table2->column<Int>(col_int2) == power(table2->link(col_linktest).column<Double>(col_dbl));
-    tv = q.find_all();
-    CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(k1, tv.get_key(0));
-    CHECK_EQUAL(k2, tv.get_key(1));
-
 
     // Binary operators.
 

@@ -151,6 +151,15 @@ size_t SubscriptionSet::size() const
     return m_sub_list.size();
 }
 
+Subscription SubscriptionSet::at(size_t index) const
+{
+    if (index >= m_sub_list.size()) {
+        throw std::out_of_range("index");
+    }
+
+    return Subscription(this, m_sub_list.get_object(index));
+}
+
 SubscriptionSet::const_iterator SubscriptionSet::begin() const
 {
     return iterator(this, m_sub_list.begin());
@@ -191,7 +200,7 @@ void SubscriptionSet::clear()
 void SubscriptionSet::insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name,
                                       StringData object_class_name, StringData query_str)
 {
-    auto new_sub = m_sub_list.create_and_insert_linked_object(m_sub_list.is_empty() ? 0 : m_sub_list.size() - 1);
+    auto new_sub = m_sub_list.create_and_insert_linked_object(m_sub_list.is_empty() ? 0 : m_sub_list.size());
     new_sub.set(m_mgr->m_sub_keys->created_at, created_at);
     new_sub.set(m_mgr->m_sub_keys->updated_at, updated_at);
     new_sub.set(m_mgr->m_sub_keys->name, name);

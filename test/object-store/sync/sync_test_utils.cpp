@@ -31,6 +31,19 @@
 
 namespace realm {
 
+std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
+{
+    if (!error) {
+        os << "(none)";
+    }
+    else {
+        os << "AppError(error_code=" << error->error_code
+           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
+           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
+    }
+    return os;
+}
+
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity,
                            const std::string& provider_type)
 {
@@ -229,13 +242,13 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> 
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
 
-// fake seamless loss by turning off sync and calling transfer group directly
+// fake discard local mode by turning off sync and calling transfer group directly
 struct FakeLocalClientReset : public TestClientReset {
     FakeLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
         : TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
-        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::SeamlessLoss);
+        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::DiscardLocal);
         // turn off sync, we only fake it
         m_local_config.sync_config = {};
         m_remote_config.sync_config = {};
@@ -469,7 +482,7 @@ struct BaasClientReset : public TestClientReset {
                     }
                     return count_external > 0;
                 },
-                std::chrono::minutes(3));
+                std::chrono::minutes(5));
             session->log_out();
 
             realm->begin_transaction();

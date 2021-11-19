@@ -2479,7 +2479,7 @@ typedef enum realm_sync_client_reconnect_mode {
 
 typedef enum realm_sync_session_resync_mode {
     RLM_SYNC_SESSION_RESYNC_MODE_MANUAL,
-    RLM_SYNC_SESSION_RESYNC_MODE_SEAMLESS_LOSS,
+    RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL,
 } realm_sync_session_resync_mode_e;
 
 typedef enum realm_sync_session_stop_policy {
@@ -2572,7 +2572,8 @@ typedef enum realm_sync_errno_connection {
     RLM_SYNC_ERR_CONNECTION_BAD_DECOMPRESSION = 110,
     RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_HEADER_SYNTAX = 111,
     RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE = 112,
-    RLM_SYNC_ERR_CONNECTION_BAD_CHANGESETS = 113,
+    RLM_SYNC_ERR_CONNECTION_SWITCH_TO_FLX_SYNC = 113,
+    RLM_SYNC_ERR_CONNECTION_SWITCH_TO_PBS = 114,
 } realm_sync_errno_connection_e;
 
 typedef enum realm_sync_errno_session {

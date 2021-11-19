@@ -1433,19 +1433,6 @@ TEST(Query_Expressions0)
     match = (1 / second == 1 / third).find();
     CHECK_EQUAL(match, null_key);
 
-    // power operator (power(x) = x^2)
-    match = (power(first) == 400).find();
-    CHECK_EQUAL(key0, match);
-
-    match = (power(first) == 401).find();
-    CHECK_EQUAL(null_key, match);
-
-    Query qq = (power(first) == 401);
-
-    // power of floats. Using a range check because of float arithmetic imprecisions
-    match = (power(second) < 9.001 && power(second) > 8.999).find();
-    CHECK_EQUAL(key0, match);
-
     // For `float < int_column` we had a bug where int was promoted to float instead of double.
     table.clear();
     auto k = table.create_object().set(col_int, 1000000001).get_key();

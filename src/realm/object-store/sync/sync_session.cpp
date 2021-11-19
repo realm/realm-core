@@ -182,7 +182,6 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
 {
     return [session](util::Optional<app::AppError> error) {
         auto session_user = session->user();
-
         if (!session_user) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
@@ -205,9 +204,22 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
                 session->handle_bad_auth(session_user, error->error_code, "Unable to refresh the user access token.");
             }
             else {
-                // 10 seconds is arbitrary, but it is to not swamp the server
-                std::this_thread::sleep_for(std::chrono::seconds(10));
-                session_user->refresh_custom_data(handle_refresh(session));
+                // A refresh request has failed. This is an unexpected non-fatal error and we would
+                // like to retry but we shouldn't do this immediately in order to not swamp the
+                // server with requests. Consider two scenarios:
+                // 1) If this request was spawned from the proactive token check, or a user
+                // initiated request, the token may actually be valid. Just advance to Active
+                // from WaitingForAccessToken if needed and let the sync server tell us if the
+                // token is valid or not. If this also fails we will end up in case 2 below.
+                // 2) If the sync connection initiated the request because the server is
+                // unavailable or the connection otherwise encounters an unexpected error, we want
+                // to let the sync client attempt to reinitialize the connection using its own
+                // internal backoff timer which will happen automatically so nothing needs to
+                // happen here.
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                if (session->m_state == State::WaitingForAccessToken) {
+                    session->become_active(lock);
+                }
             }
         }
         else {
@@ -359,7 +371,7 @@ void SyncSession::handle_error(SyncError error)
                     case ClientResyncMode::Manual:
                         user_handles_client_reset();
                         break;
-                    case ClientResyncMode::SeamlessLoss: {
+                    case ClientResyncMode::DiscardLocal: {
                         REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                         std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
                         m_config.get_fresh_realm_for_path(fresh_path, [weak_self_ref = weak_from_this()](
@@ -382,7 +394,7 @@ void SyncSession::handle_error(SyncError error)
         switch (static_cast<ClientError>(error_code.value())) {
             case ClientError::connection_closed:
             case ClientError::pong_timeout:
-                // Not real errors, don't need to be reported to the binding.
+                // Not real errors, don't need to be reported to the SDK.
                 return;
             case ClientError::bad_changeset:
             case ClientError::bad_changeset_header_syntax:
@@ -529,9 +541,38 @@ void SyncSession::do_create_sync_session()
 
     if (m_force_client_reset) {
         sync::Session::Config::ClientReset config;
-        config.seamless_loss = (m_config.client_resync_mode == ClientResyncMode::SeamlessLoss);
-        config.notify_after_client_reset = m_config.notify_after_client_reset;
-        config.notify_before_client_reset = m_config.notify_before_client_reset;
+        config.discard_local = (m_config.client_resync_mode == ClientResyncMode::DiscardLocal);
+        config.notify_after_client_reset = [this](std::string local_path) {
+            SharedRealm frozen_local;
+            if (!local_path.empty()) {
+                if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+                    auto local_config = local_coordinator->get_config();
+                    local_config.scheduler = nullptr;
+                    frozen_local = local_coordinator->get_realm(local_config, VersionID());
+                }
+            }
+            m_config.notify_after_client_reset(frozen_local);
+        };
+        config.notify_before_client_reset = [this](std::string local_path, std::string remote_path) {
+            SharedRealm frozen_local, frozen_remote;
+            Realm::Config local_config;
+            if (!local_path.empty()) {
+                if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+                    local_config = local_coordinator->get_config();
+                    local_config.scheduler = nullptr;
+                    frozen_local = local_coordinator->get_realm(local_config, VersionID());
+                }
+            }
+            if (!remote_path.empty() && frozen_local) {
+                Realm::Config remote_config;
+                remote_config.path = remote_path;
+                remote_config.force_sync_history = true;
+                remote_config.encryption_key = local_config.encryption_key;
+                auto remote_coordinator = RealmCoordinator::get_coordinator(remote_config);
+                frozen_remote = remote_coordinator->get_realm(remote_config, VersionID());
+            }
+            m_config.notify_before_client_reset(frozen_local, frozen_remote);
+        };
         config.fresh_copy = std::move(m_client_reset_fresh_copy);
         session_config.client_reset_config = std::move(config);
         m_force_client_reset = false;
@@ -832,6 +873,16 @@ SyncSession::ConnectionState SyncSession::connection_state() const
 std::string const& SyncSession::path() const
 {
     return m_db->get_path();
+}
+
+sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
+{
+    return m_session->get_flx_subscription_store();
+}
+
+bool SyncSession::has_flx_subscription_store() const
+{
+    return m_session->has_flx_subscription_store();
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

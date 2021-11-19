@@ -68,34 +68,7 @@ using util::Optional;
 
 using namespace std::string_view_literals;
 
-std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
-{
-    if (!error) {
-        os << "(none)";
-    }
-    else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
-           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
-    }
-    return os;
-}
-
 namespace {
-template <typename Factory>
-App::Config get_config(Factory factory)
-{
-    return {"app name",
-            factory,
-            util::none,
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
-}
-
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app,
                                  app::AppCredentials credentials = app::AppCredentials::anonymous())
 {
@@ -1845,6 +1818,12 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
     }
 }
 
+constexpr size_t minus_25_percent(size_t val)
+{
+    REALM_ASSERT(val * .75 > 10);
+    return val * .75 - 10;
+}
+
 TEST_CASE("app: sync integration", "[sync][app]") {
     const auto schema = Schema{{"Dog",
                                 {{"_id", PropertyType::ObjectId | PropertyType::Nullable, true},
@@ -1953,19 +1932,22 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(const Request request,
-                                    std::function<void(const Response)> completion_block) override
+        void send_request_to_server(const Request request, std::function<void(Response)> completion_block) override
         {
-            if (hook) {
-                if (util::Optional<Response> response = hook(request)) {
-                    completion_block(*response);
-                    return;
-                }
+            if (request_hook) {
+                request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
+            SynchronousTestTransport::send_request_to_server(request, [&](Response response) {
+                if (response_hook) {
+                    response_hook(request, response);
+                }
+                completion_block(response);
+            });
         }
-        std::function<util::Optional<Response>(const Request)> hook;
+        std::function<void(const Request&, Response&)> response_hook;
+        std::function<void(const Request&)> request_hook;
     };
+
     SECTION("Fast clock on client") {
         {
             TestSyncManager sync_manager(app_config, {});
@@ -1997,7 +1979,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->hook = [&](const Request) -> util::Optional<Response> {
+        transport->request_hook = [&](const Request) {
             auto user = app->current_user();
             REQUIRE(user);
             for (auto session : user->all_sessions()) {
@@ -2008,7 +1990,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     seen_waiting_for_access_token = true;
                 }
             }
-            return util::none; // send all requests through http
         };
         SyncTestFile config(app, partition, schema);
         auto r = Realm::get_shared_realm(config);
@@ -2018,6 +1999,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
         REQUIRE(dogs.get(0).get<String>("name") == "fido");
     }
+
     SECTION("Expired Tokens") {
         sync::AccessToken token;
         {
@@ -2061,7 +2043,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             bool seen_waiting_for_access_token = false;
-            transport->hook = [&](const Request) -> util::Optional<Response> {
+            transport->request_hook = [&](const Request) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto session : user->all_sessions()) {
@@ -2070,7 +2052,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                         seen_waiting_for_access_token = true;
                     }
                 }
-                return util::none; // send all requests through http
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -2083,17 +2064,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
-            transport->hook = [&](const Request request) -> util::Optional<Response> {
+            transport->response_hook = [&](const Request request, Response& response) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
                 if (request.url.find("/session") != std::string::npos) {
-                    Response faked;
-                    faked.http_status_code = 401;
-                    faked.body = "fake: refresh token could not be refreshed";
-                    return util::make_optional<Response>(std::move(faked));
+                    response.http_status_code = 401;
+                    response.body = "fake: refresh token could not be refreshed";
                 }
-                return util::none;
             };
             SyncTestFile config(app, partition, schema);
             std::atomic<bool> sync_error_handler_called{false};
@@ -2108,6 +2086,54 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
             // the failed refresh logs out the user
             REQUIRE(!user->is_logged_in());
+        }
+
+        SECTION("Requests that receive an error are retried on a backoff") {
+            using namespace std::chrono;
+            std::vector<time_point<steady_clock>> response_times;
+            std::atomic<bool> did_receive_valid_token{false};
+            constexpr size_t num_error_responses = 6;
+
+            transport->response_hook = [&](const Request& request, Response& response) {
+                // simulate the server experiencing an internal server error
+                if (request.url.find("/session") != std::string::npos) {
+                    if (response_times.size() >= num_error_responses) {
+                        did_receive_valid_token.store(true);
+                        return;
+                    }
+                    response.http_status_code = 500;
+                }
+            };
+            transport->request_hook = [&](const Request& request) {
+                if (!did_receive_valid_token.load() && request.url.find("/session") != std::string::npos) {
+                    response_times.push_back(steady_clock::now());
+                }
+            };
+            SyncTestFile config(app, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            create_one_dog(r);
+            timed_wait_for(
+                [&] {
+                    return did_receive_valid_token.load();
+                },
+                30s);
+            REQUIRE(user->is_logged_in());
+            REQUIRE(response_times.size() >= num_error_responses);
+            std::vector<uint64_t> delay_times;
+            for (size_t i = 1; i < response_times.size(); ++i) {
+                delay_times.push_back(duration_cast<milliseconds>(response_times[i] - response_times[i - 1]).count());
+            }
+
+            // sync delays start at 1000ms minus a random number of up to 25%.
+            // the subsequent delay is double the previous one minus a random 25% again.
+            constexpr size_t min_first_delay = minus_25_percent(1000);
+            std::vector<uint64_t> expected_min_delays = {0, min_first_delay};
+            while (expected_min_delays.size() < delay_times.size()) {
+                expected_min_delays.push_back(minus_25_percent(expected_min_delays.back() << 1));
+            }
+            for (size_t i = 0; i < delay_times.size(); ++i) {
+                REQUIRE(delay_times[i] > expected_min_delays[i]);
+            }
         }
     }
 
