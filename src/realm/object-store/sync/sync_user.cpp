@@ -379,7 +379,7 @@ bool SyncUser::is_logged_in() const
 
 bool SyncUser::do_is_logged_in() const
 {
-    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && m_state == State::LoggedIn;
+    return !m_access_token.token.empty() && !m_refresh_token.token.empty() && state() == State::LoggedIn;
 }
 
 void SyncUser::invalidate()
@@ -411,7 +411,7 @@ bool SyncUser::has_device_id() const
     return !m_device_id.empty() && m_device_id != "000000000000000000000000";
 }
 
-SyncUser::State SyncUser::state() const
+SyncUser::State SyncUser::state() const NO_THREAD_SAFETY_ANALYSIS
 {
     return m_state;
 }

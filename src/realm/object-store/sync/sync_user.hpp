@@ -270,7 +270,7 @@ public:
     // Custom user data embedded in the access token.
     util::Optional<bson::BsonDocument> custom_data() const REQUIRES(!m_tokens_mutex);
 
-    State state() const REQUIRES(!m_mutex);
+    State state() const;
     void set_state(SyncUser::State state) REQUIRES(!m_mutex);
 
     std::shared_ptr<SyncUserContext> binding_context() const
@@ -315,7 +315,7 @@ private:
 
     bool do_is_logged_in() const REQUIRES(m_tokens_mutex);
 
-    std::atomic<State> m_state;
+    std::atomic<State> m_state GUARDED_BY(m_mutex);
 
     util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
