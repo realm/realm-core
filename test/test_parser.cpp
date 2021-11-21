@@ -5082,4 +5082,23 @@ TEST(Parser_UTF8)
     verify_query(test_context, t, "姓名 == 'Bob'", 1);
 }
 
+TEST(Parser_Logical)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    ColKey col1 = t->add_column(type_Int, "id1");
+    ColKey col2 = t->add_column(type_Int, "id2");
+    ColKey col3 = t->add_column(type_Int, "id3");
+
+    for (int64_t i = 0; i < 10; i++) {
+        t->create_object().set(col1, i).set(col2, 2 * i).set(col3, 3 * i);
+    }
+
+    verify_query(test_context, t, "id1 == 5 || id1 == 9 || id2 == 10 || id2 == 16", 3);
+    verify_query(test_context, t, "id1 == 5 && id2 == 10 || id1 == 7 && id2 == 14", 2);
+    verify_query(test_context, t, "id1 == 5 && id2 == 10 && id3 == 15", 1);
+    verify_query(test_context, t, "id1 == 5 && (id2 == 10 || id1 == 7) && id3 == 15", 1);
+    verify_query(test_context, t, "!id1 == 5 && !(id2 == 12) && !id3 == 12", 7);
+}
+
 #endif // TEST_PARSER

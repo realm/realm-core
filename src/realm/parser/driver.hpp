@@ -24,58 +24,87 @@ public:
     virtual ~ParserNode();
 };
 
-class AtomPredNode : public ParserNode {
+class QueryNode : public ParserNode {
 public:
-    ~AtomPredNode() override;
+    enum class Type { Comp, And, Or, Not, True, False };
+    Type m_type;
+
+    ~QueryNode() override;
     virtual Query visit(ParserDriver*) = 0;
+    virtual void canonicalize() {}
+
+protected:
+    QueryNode(Type t)
+        : m_type(t)
+    {
+    }
 };
 
-class AndNode : public ParserNode {
+class LogicalNode : public QueryNode {
 public:
-    std::vector<AtomPredNode*> atom_preds;
-
-    AndNode(AtomPredNode* node)
+    std::vector<QueryNode*> children;
+    LogicalNode(Type t, QueryNode* left, QueryNode* right)
+        : QueryNode(t)
     {
-        atom_preds.emplace_back(node);
+        children.emplace_back(left);
+        children.emplace_back(right);
+    }
+    void canonicalize() override
+    {
+        std::vector<QueryNode*> newChildren;
+        for (auto& child : children) {
+            child->canonicalize();
+            if (child->m_type == m_type) {
+                auto logical_node = static_cast<LogicalNode*>(child);
+                for (auto c : logical_node->children) {
+                    newChildren.push_back(c);
+                }
+            }
+            else {
+                newChildren.push_back(child);
+            }
+        }
+        children = newChildren;
+    }
+};
+
+class AndNode : public LogicalNode {
+public:
+    AndNode(QueryNode* left, QueryNode* right)
+        : LogicalNode(Type::And, left, right)
+    {
     }
     Query visit(ParserDriver*);
 };
 
-class OrNode : public ParserNode {
+class OrNode : public LogicalNode {
 public:
-    std::vector<AndNode*> and_preds;
-
-    OrNode(AndNode* node)
+    OrNode(QueryNode* left, QueryNode* right)
+        : LogicalNode(Type::Or, left, right)
     {
-        and_preds.emplace_back(node);
     }
     Query visit(ParserDriver*);
 };
 
-class NotNode : public AtomPredNode {
+class NotNode : public QueryNode {
 public:
-    AtomPredNode* atom_pred = nullptr;
+    QueryNode* atom_pred = nullptr;
 
-    NotNode(AtomPredNode* expr)
-        : atom_pred(expr)
+    NotNode(QueryNode* expr)
+        : QueryNode(Type::Not)
+        , atom_pred(expr)
     {
     }
     Query visit(ParserDriver*) override;
 };
 
-class ParensNode : public AtomPredNode {
+class CompareNode : public QueryNode {
 public:
-    OrNode* pred = nullptr;
-
-    ParensNode(OrNode* expr)
-        : pred(expr)
+    CompareNode()
+        : QueryNode(Type::Comp)
     {
     }
-    Query visit(ParserDriver*) override;
-};
 
-class CompareNode : public AtomPredNode {
-public:
     static constexpr int EQUAL = 0;
     static constexpr int NOT_EQUAL = 1;
     static constexpr int GREATER = 2;
@@ -212,12 +241,13 @@ public:
     Query visit(ParserDriver*) override;
 };
 
-class TrueOrFalseNode : public AtomPredNode {
+class TrueOrFalseNode : public QueryNode {
 public:
     bool true_or_false;
 
     TrueOrFalseNode(bool type)
-        : true_or_false(type)
+        : QueryNode(type ? Type::True : Type::Not)
+        , true_or_false(type)
     {
     }
     Query visit(ParserDriver*);
@@ -328,9 +358,9 @@ class SubqueryNode : public PropertyNode {
 public:
     PropNode* prop = nullptr;
     std::string variable_name;
-    OrNode* subquery = nullptr;
+    QueryNode* subquery = nullptr;
 
-    SubqueryNode(PropNode* node, std::string var_name, OrNode* query)
+    SubqueryNode(PropNode* node, std::string var_name, QueryNode* query)
         : prop(node)
         , variable_name(var_name)
         , subquery(query)
@@ -413,7 +443,7 @@ public:
     ~ParserDriver();
 
     util::serializer::SerialisationState m_serializer_state;
-    OrNode* result = nullptr;
+    QueryNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
