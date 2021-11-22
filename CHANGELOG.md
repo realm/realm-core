@@ -21,6 +21,8 @@
 * The 'power' unary operator template to be used in a query expression is removed
 * Renamed ClientResyncMode::SeamlessLoss -> DiscardLocal.
 * Updated sync client to be able to open connections to FLX sync-enabled apps in baas ([#5009](https://github.com/realm/realm-core/pull/5009))
+* SubscriptionSet::erase now returns the correct itererator for the "next" subscription ([#5053](https://github.com/realm/realm-core/pull/5053))
+* SubscriptionSet::insert_or_assign now returns an iterator pointing to the correct subscription ([#5049](https://github.com/realm/realm-core/pull/5049))
 
 ----------------------------------------------
 
