@@ -211,12 +211,9 @@ CPtr<T> clone_cptr(const T* ptr)
 #define CHECK_ERR(err)                                                                                               \
     do {                                                                                                             \
         realm_error_t* _err = realm_get_last_error();                                                                \
-        _err->message = "";                                                                                          \
-        _err->error = RLM_ERR_NONE;                                                                                  \
         CHECK(_err != nullptr);                                                                                      \
         if (_err->error != err) {                                                                                    \
             CHECK(_err->error == err);                                                                               \
-            CHECK(std::string{_err->message} == "");                                                                 \
         }                                                                                                            \
         else {                                                                                                       \
             realm_clear_last_error();                                                                                \

@@ -82,12 +82,11 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
         err->message = nullptr;
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
-            if (err) {
-                err->error = error_number;
-                // copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence
-                // the ex.what() ptr will get invalidated when create_error completes
-                err->message = copy_message(ex.what());
-            }
+            err->error = error_number;
+            // copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence
+            // the ex.what() ptr will get invalidated when create_error completes
+            err->message = copy_message(ex.what());
+        
             *ptr = std::current_exception();
         };
 
