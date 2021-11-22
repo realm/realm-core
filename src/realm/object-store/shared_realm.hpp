@@ -22,6 +22,7 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm/util/optional.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
@@ -326,7 +327,7 @@ public:
     //   executed in order.
     // * A later call to async_begin_transaction() will wait for any earlier write blocks.
     using AsyncHandle = unsigned;
-    AsyncHandle async_begin_transaction(const std::function<void()>& the_block, bool notify_only = false);
+    AsyncHandle async_begin_transaction(util::UniqueFunction<void()>&& the_block, bool notify_only = false);
 
     // Asynchronous commit.
     // * 'the_done_block' is queued for execution on the scheduler associated with
@@ -338,7 +339,7 @@ public:
     //   intervening synchronization of stable storage.
     // * Such a sequence of commits form a group. In case of a platform crash,
     //   either none or all of the commits in a group will reach stable storage.
-    AsyncHandle async_commit_transaction(const std::function<void()>& the_done_block = nullptr,
+    AsyncHandle async_commit_transaction(util::UniqueFunction<void()>&& the_done_block = nullptr,
                                          bool allow_grouping = false);
 
     // Cancel a queued code block (either for an async_transaction or for an async_commit)
@@ -350,7 +351,7 @@ public:
     // commit has not yet reached permanent storage.
     bool is_in_async_transaction() const noexcept;
 
-    void set_async_error_handler(const std::function<void(AsyncHandle, std::exception_ptr)>& hndlr)
+    void set_async_error_handler(util::UniqueFunction<void(AsyncHandle, std::exception_ptr)>&& hndlr)
     {
         m_async_exception_handler = std::move(hndlr);
     }
@@ -561,23 +562,23 @@ private:
     Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
-    struct async_write_desc {
-        std::function<void()> writer;
+    struct AsyncWriteDesc {
+        util::UniqueFunction<void()> writer;
         bool notify_only;
         unsigned handle;
     };
-    std::deque<async_write_desc> m_async_write_q;
-    struct async_commit_desc {
-        std::function<void()> when_completed;
+    std::deque<AsyncWriteDesc> m_async_write_q;
+    struct AsyncCommitDesc {
+        util::UniqueFunction<void()> when_completed;
         unsigned handle;
     };
-    std::vector<async_commit_desc> m_async_commit_q;
+    std::vector<AsyncCommitDesc> m_async_commit_q;
     unsigned m_async_commit_handle = 0;
     bool m_is_running_async_writes = false;
     bool m_notify_only = false;
     bool m_is_running_async_commit_completions = false;
     bool m_async_commit_barrier_requested = false;
-    std::function<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
+    util::UniqueFunction<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
     void run_writes_on_proper_thread();
     void run_async_completions_on_proper_thread();
     void check_pending_write_requests();
