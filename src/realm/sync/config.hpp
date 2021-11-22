@@ -97,6 +97,8 @@ enum class ClientResyncMode : unsigned char {
     Manual,
     // Discard local changes, without disrupting accessors or closing the Realm
     DiscardLocal,
+    // Attempt to recover unsynchronized but committed changes.
+    Recover,
 };
 
 enum class ReconnectMode {

@@ -49,9 +49,7 @@ std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
 
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 {
-    if (m_discard_local) {
-        REALM_ASSERT(m_db_fresh);
-    }
+    REALM_ASSERT(m_db_fresh);
 
     m_salted_file_ident = salted_file_ident;
     // only do the reset if there is data to reset
@@ -59,8 +57,8 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
     // sync should be able to continue as normal
     bool local_realm_exists = m_db.get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
-        m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2", m_db.get_path(),
-                       local_realm_exists);
+        m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, discard_local = %3",
+                       m_db.get_path(), local_realm_exists, m_discard_local);
 
         client_reset::LocalVersionIDs local_version_ids;
         auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
