@@ -70,6 +70,7 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
     if (ptr && *ptr) {
         realm_error_t* err = new realm_error_t;
         err->kind.code = 0;
+        err->message = nullptr;
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
             if (err) {
@@ -78,7 +79,7 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
                 // copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence
                 // the ex.what() ptr will get invalidated
                 std::string message(ex.what());
-                char* messagePtr = static_cast<char*>(std::calloc(message.size() + 1u, sizeof(char*)));
+                char* messagePtr = static_cast<char*>(std::malloc(message.size() + 1u));
                 std::copy(message.data(), message.data() + message.size() + 1u, messagePtr);
                 messagePtr[message.size()] = '\0';
                 err->message = static_cast<const char*>(messagePtr);
