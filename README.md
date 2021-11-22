@@ -38,3 +38,5 @@ Please also see THIRD-PARTY-NOTICES for and licenses related to included third p
 ## Feedback
 
 Feedback to the Realm SDK's should be given in the respective SDK's github mentioned in the top of this readme. Anything else about the Realm Core, please create an [issue here](https://github.com/realm/realm-core/issues/new).
+
+<img style="width: 0px; height: 0px;" src="https://3eaz4mshcd.execute-api.us-east-1.amazonaws.com/prod?s=https://github.com/realm/realm-core#README.md">
