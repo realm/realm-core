@@ -400,8 +400,8 @@ RLM_API void realm_release_last_error(realm_error_t* err);
  * Get information about an async error, potentially coming from another thread.
  *
  * This function does allocate memory. It should be released with a call to `realm_release_last_error`.
- * 
- * 
+ *
+ *
  * @see realm_get_last_error()
  * @return A pointer to a `realm_error_t` struct that will be populated with
  *         information about the error.
