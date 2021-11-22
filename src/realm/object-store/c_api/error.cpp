@@ -75,7 +75,8 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
             if (err) {
                 err->error = error_number;
 
-                //copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence the ex.what() ptr will get invalidated
+                // copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence
+                // the ex.what() ptr will get invalidated
                 std::string message(ex.what());
                 char* messagePtr = static_cast<char*>(std::calloc(message.size() + 1u, sizeof(char*)));
                 std::copy(message.data(), message.data() + message.size() + 1u, messagePtr);

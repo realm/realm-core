@@ -11,7 +11,7 @@
 #define CHECK_ERROR()                                                                                                \
     do {                                                                                                             \
         realm_error_t* err = realm_get_last_error();                                                                 \
-        if (err) {                                                                                                  \
+        if (err) {                                                                                                   \
             fprintf(stderr, "ERROR: %s\n", err->message);                                                            \
             realm_release_last_error(err);                                                                           \
             return 1;                                                                                                \

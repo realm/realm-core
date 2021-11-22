@@ -221,7 +221,7 @@ CPtr<T> clone_cptr(const T* ptr)
         else {                                                                                                       \
             realm_clear_last_error();                                                                                \
         }                                                                                                            \
-        realm_release_last_error(_err);                                                                           \
+        realm_release_last_error(_err);                                                                              \
     } while (false);
 
 TEST_CASE("C API (C)") {
@@ -269,7 +269,7 @@ TEST_CASE("C API (non-database)") {
         realm_error_t* err = realm_get_last_error(&err);
         CHECK(err);
         CHECK(err->error == RLM_ERR_OTHER_EXCEPTION);
-        CHECK(std::string{err=>message} == "Synthetic error");
+        CHECK(std::string{err->message} == "Synthetic error");
         realm_release_last_error(err);
         realm_clear_last_error();
     }
