@@ -210,62 +210,96 @@ TEST_CASE("sync: client reset", "[client reset]") {
         FAIL("Error handler should not have been called");
     };
 
-    SECTION("discard local") {
-        local_config.cache = false;
-        local_config.automatic_change_notifications = false;
-        local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-        const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
-        size_t before_callback_invoctions = 0;
-        size_t after_callback_invocations = 0;
-        std::mutex mtx;
-        local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
-            std::lock_guard<std::mutex> lock(mtx);
-            ++before_callback_invoctions;
-            REQUIRE(before);
-            REQUIRE(before->is_frozen());
-            REQUIRE(before->read_group().get_table("class_object"));
-            REQUIRE(before->config().path == local_config.path);
-            REQUIRE(util::File::exists(local_config.path));
-        };
-        local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after) {
-            std::lock_guard<std::mutex> lock(mtx);
-            ++after_callback_invocations;
-            REQUIRE(before);
-            REQUIRE(before->is_frozen());
-            REQUIRE(before->read_group().get_table("class_object"));
-            REQUIRE(before->config().path == local_config.path);
-            REQUIRE(after);
-            REQUIRE(!after->is_frozen());
-            REQUIRE(after->read_group().get_table("class_object"));
-            REQUIRE(after->config().path == local_config.path);
-            REQUIRE(after->current_transaction_version() > before->current_transaction_version());
-        };
+    local_config.cache = false;
+    local_config.automatic_change_notifications = false;
+    const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+    size_t before_callback_invoctions = 0;
+    size_t after_callback_invocations = 0;
+    std::mutex mtx;
+    local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+        std::lock_guard<std::mutex> lock(mtx);
+        ++before_callback_invoctions;
+        REQUIRE(before);
+        REQUIRE(before->is_frozen());
+        REQUIRE(before->read_group().get_table("class_object"));
+        REQUIRE(before->config().path == local_config.path);
+        REQUIRE(util::File::exists(local_config.path));
+    };
+    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after) {
+        std::lock_guard<std::mutex> lock(mtx);
+        ++after_callback_invocations;
+        REQUIRE(before);
+        REQUIRE(before->is_frozen());
+        REQUIRE(before->read_group().get_table("class_object"));
+        REQUIRE(before->config().path == local_config.path);
+        REQUIRE(after);
+        REQUIRE(!after->is_frozen());
+        REQUIRE(after->read_group().get_table("class_object"));
+        REQUIRE(after->config().path == local_config.path);
+        REQUIRE(after->current_transaction_version() > before->current_transaction_version());
+    };
 
-        Results results;
-        Object object;
-        CollectionChangeSet object_changes, results_changes;
-        NotificationToken object_token, results_token;
-        auto setup_listeners = [&](SharedRealm realm) {
-            results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"))
-                          .sort({{{"value", true}}});
-            if (results.size() >= 1) {
-                REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
+    Results results;
+    Object object;
+    CollectionChangeSet object_changes, results_changes;
+    NotificationToken object_token, results_token;
+    auto setup_listeners = [&](SharedRealm realm) {
+        results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"))
+                      .sort({{{"value", true}}});
+        if (results.size() >= 1) {
+            REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
 
-                auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "object")->begin();
-                REQUIRE(obj.get<Int>("value") == 4);
-                object = Object(realm, obj);
-                object_token =
-                    object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                        REQUIRE_FALSE(err);
-                        object_changes = std::move(changes);
-                    });
-            }
-            results_token =
-                results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "object")->begin();
+            REQUIRE(obj.get<Int>("value") == 4);
+            object = Object(realm, obj);
+            object_token =
+                object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
                     REQUIRE_FALSE(err);
-                    results_changes = std::move(changes);
+                    object_changes = std::move(changes);
                 });
-        };
+        }
+        results_token =
+            results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                results_changes = std::move(changes);
+            });
+    };
+
+    SECTION("recovery") {
+        local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
+        SECTION("modify") {
+            test_reset
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(object.obj().get<Int>("value") == 4);
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.modifications);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(local_config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+    }
+
+    SECTION("discard local") {
+        local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
 
         SECTION("modify") {
@@ -1026,6 +1060,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+/*
 namespace cf = realm::collection_fixtures;
 TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
@@ -2077,5 +2112,5 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
                                                "{EmbeddedObject, EmbeddedObject2, TopLevel}");
     }
 }
-
+*/
 } // namespace realm

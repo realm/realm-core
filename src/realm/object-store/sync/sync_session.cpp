@@ -437,10 +437,11 @@ void SyncSession::handle_error(SyncError error)
                         next_state = NextStateAfterError::inactive;
                         delete_file = ShouldBackup::yes;
                         break;
-                    case ClientResyncMode::DiscardLocal: {
+                    case ClientResyncMode::DiscardLocal:
+                        [[fallthrough]];
+                    case ClientResyncMode::Recover:
                         download_fresh_realm();
                         return; // do not propgate the error to the user at this point
-                    }
                 }
                 break;
         }

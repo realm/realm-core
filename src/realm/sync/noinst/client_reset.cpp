@@ -500,7 +500,7 @@ void EmbeddedObjectConverter::process_pending()
 }
 
 
-} // namespace
+} // anonymous namespace
 
 void client_reset::transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
@@ -804,14 +804,15 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
 
 client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_local, DBRef db_remote,
                                                                       sync::SaltedFileIdent client_file_ident,
-                                                                      util::Logger& logger)
+                                                                      util::Logger& logger,
+                                                                      bool recover_local_changes)
 {
     logger.info("Client reset, path_local = %1, "
                 "client_file_ident.ident = %2, "
                 "client_file_ident.salt = %3,"
-                "remote = %4,",
+                "remote = %4, mode = %5",
                 db_local.get_path(), client_file_ident.ident, client_file_ident.salt,
-                (db_remote ? db_remote->get_path() : "<none>"));
+                (db_remote ? db_remote->get_path() : "<none>"), recover_local_changes ? "recover" : "discardLocal");
 
     auto wt_local = db_local.start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
@@ -819,9 +820,28 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     sync::version_type current_version_local = old_version_local.version;
     wt_local->get_history()->ensure_updated(current_version_local);
     BinaryData recovered_changeset;
+    std::vector<ChunkedBinaryData> local_changes;
+
+    if (recover_local_changes) {
+        // FIXME: make sure that there are no silly copies made of the changesets into
+        // memory along the way the history entries here should just be pointers into the
+        // history compartment.
+        local_changes = history_local->get_local_changes(current_version_local);
+        logger.debug("Local changesets to recover: %1", local_changes.size());
+
+        // FIXME: this is for debugging only
+        for (const auto& change : local_changes) {
+            // Debug.
+            ChunkedBinaryInputStream in{change};
+            sync::Changeset log;
+            sync::parse_changeset(in, log); // Throws
+            log.print();
+        }
+    }
+
     sync::SaltedVersion fresh_server_version = {0, 0};
 
-    if (db_remote) { // 'discard local' mode
+    if (db_remote) {
         auto wt_remote = db_remote->start_write();
         auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
         sync::version_type current_version_remote = wt_remote->get_version();
@@ -836,6 +856,14 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
 
         transfer_group(*wt_remote, *wt_local, logger);
     }
+
+    // FIXME: keep track of current version, and apply the recovered changes, then erase the history before the
+    // recovered changes
+    //    RecoverLocalChangesetsHandler handler{logger};
+    //        bool success = handler.process_changeset(local_changeset->changeset);
+    //        if (!success)
+    //            return false;
+
     history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                 recovered_changeset);
 
