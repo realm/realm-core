@@ -65,6 +65,14 @@ static std::exception_ptr* get_last_exception()
 
 #endif // RLM_NO_THREAD_LOCAL
 
+static const char* copy_message(const char* msg) {
+    std::string message(msg);
+    char* messagePtr = static_cast<char*>(std::malloc(message.size() + 1u));
+    std::copy(message.data(), message.data() + message.size() + 1u, messagePtr);
+    messagePtr[message.size()] = '\0';
+    return static_cast<const char*>(messagePtr);
+}
+
 static realm_error_t* create_error(std::exception_ptr* ptr)
 {
     if (ptr && *ptr) {
@@ -75,14 +83,9 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
             if (err) {
                 err->error = error_number;
-
                 // copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence
-                // the ex.what() ptr will get invalidated
-                std::string message(ex.what());
-                char* messagePtr = static_cast<char*>(std::malloc(message.size() + 1u));
-                std::copy(message.data(), message.data() + message.size() + 1u, messagePtr);
-                messagePtr[message.size()] = '\0';
-                err->message = static_cast<const char*>(messagePtr);
+                // the ex.what() ptr will get invalidated when create_error completes
+                err->message = copy_message(ex.what());
             }
             *ptr = std::current_exception();
         };
@@ -184,7 +187,7 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
         // FIXME: Handle more exception types.
         catch (...) {
             err->error = RLM_ERR_UNKNOWN;
-            err->message = "Unknown error";
+            err->message = copy_message("Unknown error");
             *ptr = std::current_exception();
         }
         return err;
