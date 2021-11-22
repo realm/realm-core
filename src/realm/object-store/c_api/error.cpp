@@ -208,7 +208,7 @@ RLM_API void realm_release_last_error(realm_error_t* err)
     if (err) {
         if (err->message) {
             void* ptr = static_cast<void*>(const_cast<char*>(err->message));
-            delete [] ptr;
+            delete[] ptr;
         }
         delete err;
     }
