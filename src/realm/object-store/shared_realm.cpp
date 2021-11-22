@@ -645,7 +645,7 @@ void Realm::call_completion_callbacks()
             throw error;
     }
 
-    for (auto cb : m_async_commit_q) {
+    for (auto& cb : m_async_commit_q) {
         if (cb.when_completed)
             cb.when_completed();
     }
@@ -709,7 +709,7 @@ void Realm::run_writes()
         }
 
         // It is safe to use a reference here. Elements are not invalidated by new insertions
-        async_write_desc& write_desc = m_async_write_q.front();
+        auto& write_desc = m_async_write_q.front();
 
         CountGuard sending_notifications(m_is_sending_notifications);
         try {
@@ -764,7 +764,7 @@ void Realm::run_writes()
     end_current_write();
 }
 
-auto Realm::async_begin_transaction(const std::function<void()>& the_write_block, bool notify_only) -> AsyncHandle
+auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_block, bool notify_only) -> AsyncHandle
 {
     verify_thread();
     check_can_create_write_transaction(this);
@@ -790,7 +790,8 @@ auto Realm::async_begin_transaction(const std::function<void()>& the_write_block
     return handle;
 }
 
-auto Realm::async_commit_transaction(const std::function<void()>& the_done_block, bool allow_grouping) -> AsyncHandle
+auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_block, bool allow_grouping)
+    -> AsyncHandle
 {
     REALM_ASSERT(m_transaction->holds_write_mutex());
     REALM_ASSERT(!m_is_running_async_commit_completions);
