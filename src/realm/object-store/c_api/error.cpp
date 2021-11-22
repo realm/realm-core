@@ -65,12 +65,12 @@ static std::exception_ptr* get_last_exception()
 
 #endif // RLM_NO_THREAD_LOCAL
 
-static const char* copy_message(const char* msg) {
-    std::string message(msg);
-    char* messagePtr = static_cast<char*>(std::malloc(message.size() + 1u));
-    std::copy(message.data(), message.data() + message.size() + 1u, messagePtr);
-    messagePtr[message.size()] = '\0';
-    return static_cast<const char*>(messagePtr);
+static const char* copy_message(const char* msg)
+{
+    std::string_view message_contents(msg);
+    auto message = std::make_unique<char[]>(message_contents.size() + 1);
+    std::strcpy(message.get(), msg);
+    return const_cast<const char*>(message.release());
 }
 
 static realm_error_t* create_error(std::exception_ptr* ptr)
@@ -209,7 +209,7 @@ RLM_API void realm_release_last_error(realm_error_t* err)
     if (err) {
         if (err->message) {
             void* ptr = static_cast<void*>(const_cast<char*>(err->message));
-            std::free(ptr);
+            delete ptr;
         }
         delete err;
     }
