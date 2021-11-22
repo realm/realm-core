@@ -86,7 +86,7 @@ static realm_error_t* create_error(std::exception_ptr* ptr)
             // copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence
             // the ex.what() ptr will get invalidated when create_error completes
             err->message = copy_message(ex.what());
-        
+
             *ptr = std::current_exception();
         };
 
