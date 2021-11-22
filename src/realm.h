@@ -378,7 +378,8 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  * Note: Calling this function does not clear the current last error.
  *
  * This function does allocate memory. It should be released with a call to `realm_release_last_error`.
- * 
+ *
+ *
  * Note: As a best practice always check the function result for success before calling realm_get_last_error since it
  * copies the error message everytime and needs a subsequent `realm_release_last_error() call`
  *
@@ -389,8 +390,8 @@ RLM_API realm_error_t* realm_get_last_error();
 
 /**
  * Releases the `realm_error_t` allocated by `realm_get_last_error()` and `realm_get_async_error()`
- * 
- * 
+ *
+ *
  * @see realm_get_last_error()
  */
 RLM_API void realm_release_last_error(realm_error_t* err);
@@ -399,6 +400,7 @@ RLM_API void realm_release_last_error(realm_error_t* err);
  * Get information about an async error, potentially coming from another thread.
  *
  * This function does allocate memory. It should be released with a call to `realm_release_last_error`.
+ * 
  * 
  * @see realm_get_last_error()
  * @return A pointer to a `realm_error_t` struct that will be populated with
