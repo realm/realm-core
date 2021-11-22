@@ -10,9 +10,10 @@
 
 #define CHECK_ERROR()                                                                                                \
     do {                                                                                                             \
-        realm_error_t err;                                                                                           \
-        if (realm_get_last_error(&err)) {                                                                            \
-            fprintf(stderr, "ERROR: %s\n", err.message);                                                             \
+        realm_error_t* err = realm_get_last_error();                                                                 \
+        if (err) {                                                                                                  \
+            fprintf(stderr, "ERROR: %s\n", err->message);                                                            \
+            realm_release_last_error(err);                                                                           \
             return 1;                                                                                                \
         }                                                                                                            \
     } while (0)
@@ -236,9 +237,10 @@ int realm_c_api_tests(const char* file)
     CHECK_ERROR();
 
     realm_object_create(realm, foo_info.key);
-    realm_error_t err;
-    assert(realm_get_last_error(&err));
-    assert(err.error == RLM_ERR_NOT_IN_A_TRANSACTION);
+    realm_error_t* err = realm_get_last_error();
+    assert(err);
+    assert(err->error == RLM_ERR_NOT_IN_A_TRANSACTION);
+    realm_release_last_error(err);
     realm_clear_last_error();
 
     realm_object_t* foo_1;

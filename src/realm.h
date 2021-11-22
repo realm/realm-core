@@ -371,33 +371,37 @@ RLM_API void realm_get_library_version_numbers(int* out_major, int* out_minor, i
  * the call that caused the error to occur. The error is specific to the current
  * thread, and not the Realm instance for which the error occurred.
  *
- * Note: The error message in @a err will only be safe to use until the next API
- *       call is made on the current thread.
- *
  * Note: The error is not cleared by subsequent successful calls to this
  *       function, but it will be overwritten by subsequent failing calls to
  *       other library functions.
  *
  * Note: Calling this function does not clear the current last error.
  *
- * This function does not allocate any memory.
+ * This function does allocate memory. It should be released with a call to `realm_release_last_error`.
+ * 
+ * Note: As a best practice always check the function result for success before calling realm_get_last_error since it copies the error message everytime 
+ * and needs a subsequent `realm_release_last_error() call`
  *
- * @param err A pointer to a `realm_error_t` struct that will be populated with
- *            information about the last error, if there is one. May be NULL.
- * @return True if an error occurred.
+ * @return A pointer to a `realm_error_t` struct that will be populated with
+ *         information about the last error, if there is one. Or NULL if no error occured.
  */
-RLM_API bool realm_get_last_error(realm_error_t* err);
+RLM_API realm_error_t* realm_get_last_error();
+
+/**
+ * Releases the `realm_error_t` allocated by `realm_get_last_error()`
+ * 
+ * @see realm_get_last_error()
+ */
+RLM_API void realm_release_last_error(realm_error_t* err);
 
 /**
  * Get information about an async error, potentially coming from another thread.
  *
- * This function does not allocate any memory.
- *
- * @param err A pointer to a `realm_error_t` struct that will be populated with
- *            information about the error. May not be NULL.
  * @see realm_get_last_error()
+ * @return A pointer to a `realm_error_t` struct that will be populated with
+ *         information about the error. 
  */
-RLM_API void realm_get_async_error(const realm_async_error_t* err, realm_error_t* out_err);
+RLM_API realm_error_t* realm_get_async_error(const realm_async_error_t* err);
 
 /**
  * Convert the last error to `realm_async_error_t`, which can safely be passed

@@ -65,15 +65,22 @@ static std::exception_ptr* get_last_exception()
 
 #endif // RLM_NO_THREAD_LOCAL
 
-static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
+static realm_error_t* create_error(std::exception_ptr* ptr)
 {
     if (ptr && *ptr) {
+        realm_error_t* err = new realm_error_t;
         err->kind.code = 0;
 
         auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
             if (err) {
                 err->error = error_number;
-                err->message = ex.what();
+
+                //copy the message. rethrow_exception copies the exception object on some platforms (Windows) hence the ex.what() ptr will get invalidated
+                std::string message(ex.what());
+                char* messagePtr = static_cast<char*>(std::calloc(message.size() + 1u, sizeof(char*)));
+                std::copy(message.data(), message.data() + message.size() + 1u, messagePtr);
+                messagePtr[message.size()] = '\0';
+                err->message = static_cast<const char*>(messagePtr);
             }
             *ptr = std::current_exception();
         };
@@ -178,18 +185,29 @@ static bool convert_error(std::exception_ptr* ptr, realm_error_t* err)
             err->message = "Unknown error";
             *ptr = std::current_exception();
         }
-        return true;
+        return err;
     }
-    return false;
+    return nullptr;
 }
 
-RLM_API bool realm_get_last_error(realm_error_t* err)
+RLM_API realm_error_t* realm_get_last_error()
 {
     std::exception_ptr* ptr = get_last_exception();
     if (ptr) {
-        return convert_error(ptr, err);
+        return create_error(ptr);
     }
-    return false;
+    return nullptr;
+}
+
+RLM_API void realm_release_last_error(realm_error_t* err)
+{
+    if (err) {
+        if (err->message) {
+            void* ptr = static_cast<void*>(const_cast<char*>(err->message));
+            std::free(ptr);
+        }
+        delete err;
+    }
 }
 
 RLM_API bool realm_clear_last_error()
@@ -211,9 +229,9 @@ RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void)
     return nullptr;
 }
 
-RLM_API void realm_get_async_error(const realm_async_error_t* async_err, realm_error_t* out_err)
+RLM_API realm_error_t* realm_get_async_error(const realm_async_error_t* async_err)
 {
-    convert_error(&const_cast<realm_async_error_t*>(async_err)->ep, out_err);
+    return create_error(&const_cast<realm_async_error_t*>(async_err)->ep);
 }
 
 } // namespace realm::c_api
