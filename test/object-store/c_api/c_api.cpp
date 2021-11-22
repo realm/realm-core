@@ -266,7 +266,7 @@ TEST_CASE("C API (non-database)") {
         };
         CHECK(!realm_wrap_exceptions(synthetic));
 
-        realm_error_t* err = realm_get_last_error(&err);
+        realm_error_t* err = realm_get_last_error();
         CHECK(err);
         CHECK(err->error == RLM_ERR_OTHER_EXCEPTION);
         CHECK(std::string{err->message} == "Synthetic error");
