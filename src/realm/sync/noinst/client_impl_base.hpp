@@ -22,6 +22,7 @@
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 
 namespace realm {
@@ -471,6 +472,8 @@ private:
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
     void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
+    void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
+                                     session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   int64_t query_version, DownloadBatchState batch_state, const ReceivedChangesets&);
@@ -714,6 +717,12 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
+    /// \brief Gets or creates the subscription store associated with this Session.
+    SubscriptionStore* get_or_create_flx_subscription_store();
+
+    /// \brief Callback for when a new subscription set has been created for FLX sync.
+    void on_new_flx_subscription_set(int64_t new_version);
+
     /// \brief Announce that a new access token is available.
     ///
     /// By calling this function, the application announces to the session
@@ -916,6 +925,12 @@ private:
     void on_resumed();
     //@}
 
+    void on_flx_sync_error(int64_t version, std::string_view err_msg);
+    void on_flx_sync_progress(int64_t verison, DownloadBatchState batch_state);
+
+    void begin_resumption_delay();
+    void clear_resumption_delay_state();
+
 private:
     Connection& m_conn;
     const session_ident_type m_ident;
@@ -929,6 +944,9 @@ private:
     State m_state = Unactivated;
 
     bool m_suspended = false;
+
+    util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
+    std::chrono::milliseconds m_try_again_activation_delay{1000};
 
     // Set to false when a new access token is available and needs to be
     // uploaded to the server. Set to true when uploading of the token has been
@@ -953,6 +971,9 @@ private:
     bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
     bool m_error_message_received;              // Session specific ERROR message received
     bool m_unbound_message_received;            // UNBOUND message received
+
+    // True when there is a new FLX sync query we need to send to the server.
+    bool m_pending_query_message = false;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1089,12 +1110,14 @@ private:
     void send_alloc_message();
     void send_refresh_message();
     void send_unbind_message();
+    void send_query_change_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(int error_code, StringData message, bool try_again);
+    std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
 
     void initiate_rebind();
     void reset_protocol_state() noexcept;

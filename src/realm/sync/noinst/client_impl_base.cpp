@@ -1284,6 +1284,31 @@ void Connection::receive_error_message(int raw_error_code, StringData message, b
 }
 
 
+void Connection::receive_query_error_message(int raw_error_code, std::string_view message, int64_t query_version,
+                                             session_ident_type session_ident)
+{
+    if (session_ident == 0) {
+        logger.error("Received query error message for session ident 0."); // throws;
+        return close_due_to_protocol_error(ClientError::bad_session_ident);
+    }
+
+    if (!is_flx_sync_connection()) {
+        logger.error("Received query error message on a non-FLX sync connection");
+        return close_due_to_protocol_error(ClientError::bad_protocol_from_server);
+    }
+
+    auto session = get_session(session_ident);
+    if (!session) {
+        logger.error("Bad session identifier in QUERY_ERROR mesage, session_ident = %1", session_ident); // throws
+        return close_due_to_protocol_error(ClientError::bad_session_ident);                              // throws
+    }
+
+    if (auto ec = session->receive_query_error_message(raw_error_code, message, query_version); ec) {
+        close_due_to_protocol_error(ec);
+    }
+}
+
+
 void Connection::receive_ident_message(session_ident_type session_ident, SaltedFileIdent client_file_ident)
 {
     Session* sess = get_session(session_ident);
@@ -1665,6 +1690,10 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
+    if (m_pending_query_message) {
+        return send_query_change_message(); // throws
+    }
+
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
     if (m_allow_upload && m_download_batch_state == DownloadBatchState::LastInBatch &&
@@ -1715,16 +1744,15 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_conn.is_flx_sync_connection()) {
-        // TODO(JBR) fetch the active FLX subscription set serialized as an extended-JSON string here.
-        std::string_view dummy_query = "{}";
+        auto active_query = get_or_create_flx_subscription_store()->get_active().to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
                      "latest_server_version_salt=%6, query_size: %7 query: \"%8\")",
                      m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
                      m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-                     m_progress.latest_server_version.salt, dummy_query.size(), dummy_query); // Throws
+                     m_progress.latest_server_version.salt, active_query.size(), active_query); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
-                                        dummy_query); // Throws
+                                        active_query); // Throws
     }
     else {
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
@@ -1741,6 +1769,32 @@ void Session::send_ident_message()
 
     // Other messages may be waiting to be sent
     enlist_to_send(); // Throws
+}
+
+void Session::send_query_change_message()
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(m_ident_message_sent);
+    REALM_ASSERT(!m_unbind_message_sent);
+    REALM_ASSERT(m_pending_query_message);
+
+    if (REALM_UNLIKELY(get_client().is_dry_run())) {
+        return;
+    }
+
+    auto latest_sub_set = get_or_create_flx_subscription_store()->get_latest();
+    auto latest_queries = latest_sub_set.to_ext_json();
+    logger.debug("Sending: QUERY(query_verison=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
+                 latest_queries.size(), latest_queries);
+
+    OutputBuffer& out = m_conn.get_output_buffer();
+    session_ident_type session_ident = get_ident();
+    ClientProtocol& protocol = m_conn.get_client_protocol();
+    protocol.make_query_change_message(out, session_ident, latest_sub_set.version(), latest_queries);
+    m_conn.initiate_write_message(out, this);
+    m_pending_query_message = false;
+
+    enlist_to_send(); // throws
 }
 
 void Session::send_upload_message()
@@ -2106,6 +2160,13 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
+    if (query_version != 0) {
+        on_flx_sync_progress(query_version, batch_state);
+    }
+
+    // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
+    // after a retryable session error.
+    clear_resumption_delay_state();
 }
 
 
@@ -2170,6 +2231,13 @@ std::error_code Session::receive_unbound_message()
 }
 
 
+std::error_code Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
+{
+    logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_verison=%3)", message, error_code, query_version);
+    on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
+    return {};
+}
+
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
 std::error_code Session::receive_error_message(int error_code, StringData message, bool try_again)
@@ -2225,7 +2293,9 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
         on_suspended(ec, message, is_fatal); // Throws
     }
 
-    // FIXME: If `try_again` is true, find a way to automatically resume the session after a delay.
+    if (try_again) {
+        begin_resumption_delay();
+    }
 
     // Ready to send the UNBIND message, if it has not been sent already
     if (!m_unbind_message_sent)
@@ -2234,6 +2304,32 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
     return std::error_code{}; // Success
 }
 
+void Session::begin_resumption_delay()
+{
+    REALM_ASSERT(!m_try_again_activation_timer);
+    m_try_again_activation_timer.emplace(m_conn.get_client().get_service());
+    logger.debug("Will attempt to resume session after %1 milliseconds", m_try_again_activation_delay.count());
+    m_try_again_activation_timer->async_wait(m_try_again_activation_delay,
+                                             [this](std::error_code ec) {
+                                                 if (ec == util::error::operation_aborted) {
+                                                     return;
+                                                 }
+
+                                                 m_try_again_activation_timer.reset();
+                                                 if (m_try_again_activation_delay < std::chrono::minutes{5}) {
+                                                    m_try_again_activation_delay *= 2;
+                                                 }
+                                                 cancel_resumption_delay();
+                                             });
+}
+
+void Session::clear_resumption_delay_state()
+{
+    if (m_try_again_activation_timer) {
+        logger.debug("Clearing resumption delay state after successful download");
+        m_try_again_activation_delay = std::chrono::milliseconds{1000};
+    }
+}
 
 void Session::update_progress(const SyncProgress& progress)
 {

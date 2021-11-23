@@ -175,6 +175,8 @@ public:
     void make_flx_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                                 const SyncProgress& progress, std::string_view query_body);
 
+    void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version, std::string_view query_body);
+
     class UploadMessageBuilder {
     public:
         util::Logger& logger;
@@ -255,6 +257,16 @@ public:
                 auto message = msg.read_sized_data<StringData>(message_size);
 
                 connection.receive_error_message(error_code, message, try_again, session_ident); // Throws
+            }
+            else if (message_type == "query_error") {
+                auto error_code = msg.read_next<int>();
+                auto message_size = msg.read_next<size_t>();
+                auto session_ident = msg.read_next<session_ident_type>();
+                auto query_version = msg.read_next<int64_t>('\n');
+
+                auto message = msg.read_sized_data<std::string_view>(message_size);
+
+                connection.receive_query_error_message(error_code, message, query_version, session_ident); // throws
             }
             else if (message_type == "mark") {
                 auto session_ident = msg.read_next<session_ident_type>();

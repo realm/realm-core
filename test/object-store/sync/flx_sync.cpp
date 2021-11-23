@@ -44,6 +44,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
 
     TestSyncManager::Config smc(app_config);
+    smc.verbose_sync_client_logging = true;
     TestSyncManager sync_manager(std::move(smc), {});
     auto app = sync_manager.app();
 

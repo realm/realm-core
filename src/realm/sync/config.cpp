@@ -111,11 +111,13 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::partial_sync_disabled:
         case ProtocolError::user_mismatch:
         case ProtocolError::too_many_sessions:
+        case ProtocolError::bad_query:
             return SimplifiedProtocolError::UnexpectedInternalIssue;
         // Session errors
         case ProtocolError::session_closed:
         case ProtocolError::other_session_error:
         case ProtocolError::disabled_session:
+        case ProtocolError::initial_sync_not_completed:
             // The binding doesn't need to be aware of these because they are strictly informational, and do not
             // represent actual errors.
             return SimplifiedProtocolError::SessionIssue;
@@ -137,6 +139,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::invalid_schema_change:
         case ProtocolError::server_file_deleted:
         case ProtocolError::user_blacklisted:
+        case ProtocolError::object_already_exists:
+        case ProtocolError::server_permissions_changed:
             return SimplifiedProtocolError::ClientResetRequested;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.

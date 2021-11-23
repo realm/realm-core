@@ -208,8 +208,12 @@ private:
     DBRef m_db;
     Replication* m_replication;
 
+    std::once_flag m_flx_subscription_store_init_flag;
     mutable std::mutex m_flx_subscription_store_mutex;
     std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
+    int64_t m_flx_active_version = 0;
+    int64_t m_flx_last_seen_version = 0;
+    int64_t m_flx_latest_version = 0;
 
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
@@ -306,6 +310,9 @@ private:
     void on_suspended(std::error_code ec, StringData message, bool is_fatal);
     void on_resumed();
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
+    void on_new_flx_subscription_set(int64_t new_version);
+    void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
+    void on_flx_sync_error(int64_t version, std::string_view err_msg);
 
     void report_progress();
 
@@ -720,6 +727,27 @@ void SessionImpl::on_resumed()
 }
 
 
+void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
+{
+    logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
+    m_pending_query_message = true;
+}
+
+void SessionImpl::on_flx_sync_error(int64_t version, std::string_view err_msg)
+{
+    m_wrapper.on_flx_sync_error(version, err_msg);
+}
+
+void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch_state)
+{
+    m_wrapper.on_flx_sync_progress(version, batch_state);
+}
+
+SubscriptionStore* SessionImpl::get_or_create_flx_subscription_store()
+{
+    return m_wrapper.get_or_create_flx_subscription_store();
+}
+
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config config)
@@ -770,14 +798,74 @@ bool SessionWrapper::has_flx_subscription_store() const
     return static_cast<bool>(m_flx_subscription_store);
 }
 
-SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
+void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
 {
-    std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
-    if (m_flx_subscription_store) {
-        return m_flx_subscription_store.get();
+    REALM_ASSERT(m_flx_latest_version != 0);
+    REALM_ASSERT(m_flx_latest_version <= version);
+
+    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(version);
+    mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
+    mut_subs.commit();
+}
+
+void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
+{
+    // If this is called with a new version of zero, then there cannot be any subscriptions to update.
+    if (new_version == 0) {
+        return;
     }
 
-    m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db);
+    REALM_ASSERT(new_version >= m_flx_last_seen_version);
+    REALM_ASSERT(new_version >= m_flx_active_version);
+    SubscriptionSet::State new_state;
+    switch (batch_state) {
+        case DownloadBatchState::LastInBatch:
+            if (m_flx_active_version == new_version) {
+                return;
+            }
+
+            m_flx_last_seen_version = new_version;
+            m_flx_active_version = new_version;
+            new_state = SubscriptionSet::State::Complete;
+            break;
+        case DownloadBatchState::MoreToCome:
+            if (m_flx_last_seen_version == new_version) {
+                return;
+            }
+
+            m_flx_last_seen_version = new_version;
+            new_state = SubscriptionSet::State::Bootstrapping;
+            break;
+    }
+
+    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(new_version);
+    mut_subs.update_state(new_state);
+    mut_subs.commit();
+}
+
+SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
+{
+    std::call_once(m_flx_subscription_store_init_flag, [&] {
+        std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
+        m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
+            REALM_ASSERT(m_initiated);
+
+            m_client.get_service().post([new_version, self = util::bind_ptr<SessionWrapper>(this)] {
+                REALM_ASSERT(self->m_actualized);
+                if (REALM_UNLIKELY(!self->m_sess))
+                    return; // Already finalized
+                if (new_version <= self->m_flx_latest_version || !self->m_flx_subscription_store) {
+                    return;
+                }
+                self->m_flx_latest_version = new_version;
+                self->m_sess->on_new_flx_subscription_set(new_version);
+            });
+        });
+
+        m_flx_latest_version = m_flx_subscription_store->get_latest().version();
+        m_flx_active_version = m_flx_subscription_store->get_active().version();
+    });
+
     return m_flx_subscription_store.get();
 }
 
