@@ -26,25 +26,15 @@ public:
 
 class QueryNode : public ParserNode {
 public:
-    enum class Type { Comp, And, Or, Not, True, False };
-    Type m_type;
-
     ~QueryNode() override;
     virtual Query visit(ParserDriver*) = 0;
     virtual void canonicalize() {}
-
-protected:
-    QueryNode(Type t)
-        : m_type(t)
-    {
-    }
 };
 
 class LogicalNode : public QueryNode {
 public:
     std::vector<QueryNode*> children;
-    LogicalNode(Type t, QueryNode* left, QueryNode* right)
-        : QueryNode(t)
+    LogicalNode(QueryNode* left, QueryNode* right)
     {
         children.emplace_back(left);
         children.emplace_back(right);
@@ -52,9 +42,10 @@ public:
     void canonicalize() override
     {
         std::vector<QueryNode*> newChildren;
+        auto& my_type = typeid(*this);
         for (auto& child : children) {
             child->canonicalize();
-            if (child->m_type == m_type) {
+            if (typeid(*child) == my_type) {
                 auto logical_node = static_cast<LogicalNode*>(child);
                 for (auto c : logical_node->children) {
                     newChildren.push_back(c);
@@ -70,19 +61,13 @@ public:
 
 class AndNode : public LogicalNode {
 public:
-    AndNode(QueryNode* left, QueryNode* right)
-        : LogicalNode(Type::And, left, right)
-    {
-    }
+    using LogicalNode::LogicalNode;
     Query visit(ParserDriver*);
 };
 
 class OrNode : public LogicalNode {
 public:
-    OrNode(QueryNode* left, QueryNode* right)
-        : LogicalNode(Type::Or, left, right)
-    {
-    }
+    using LogicalNode::LogicalNode;
     Query visit(ParserDriver*);
 };
 
@@ -91,8 +76,7 @@ public:
     QueryNode* atom_pred = nullptr;
 
     NotNode(QueryNode* expr)
-        : QueryNode(Type::Not)
-        , atom_pred(expr)
+        : atom_pred(expr)
     {
     }
     Query visit(ParserDriver*) override;
@@ -100,11 +84,6 @@ public:
 
 class CompareNode : public QueryNode {
 public:
-    CompareNode()
-        : QueryNode(Type::Comp)
-    {
-    }
-
     static constexpr int EQUAL = 0;
     static constexpr int NOT_EQUAL = 1;
     static constexpr int GREATER = 2;
@@ -246,8 +225,7 @@ public:
     bool true_or_false;
 
     TrueOrFalseNode(bool type)
-        : QueryNode(type ? Type::True : Type::Not)
-        , true_or_false(type)
+        : true_or_false(type)
     {
     }
     Query visit(ParserDriver*);
