@@ -32,7 +32,6 @@ namespace realm {
 struct ObjKey;
 struct ObjLink;
 class Decimal128;
-class ObjectId;
 class Mixed;
 class Timestamp;
 class ArraySmallBlobs;

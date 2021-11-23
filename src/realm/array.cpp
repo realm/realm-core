@@ -17,6 +17,14 @@
  **************************************************************************/
 
 #include <realm/array_with_find.hpp>
+#include <realm/utilities.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/column_integer.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/query_conditions.hpp>
+#include <realm/array_integer.hpp>
+#include <realm/array_key.hpp>
+#include <realm/impl/array_writer.hpp>
 
 #include <array>
 #include <cstring> // std::memcpy
@@ -33,15 +41,6 @@
 #include <intrin.h>
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
-
-#include <realm/utilities.hpp>
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/column_integer.hpp>
-#include <realm/bplustree.hpp>
-#include <realm/query_conditions.hpp>
-#include <realm/array_integer.hpp>
-#include <realm/array_key.hpp>
-#include <realm/impl/array_writer.hpp>
 
 
 // Header format (8 bytes):

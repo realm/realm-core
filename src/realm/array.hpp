@@ -545,7 +545,7 @@ private:
     friend class Allocator;
     friend class SlabAlloc;
     friend class GroupWriter;
-    friend class ArrayWithFind;
+    // friend class ArrayWithFind;
 };
 
 // Implementation:
