@@ -76,7 +76,6 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         clear();
         return;
     }
-    m_err->kind.code = 0;
 
     auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
         m_err.emplace();
@@ -192,6 +191,8 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         m_message_buf = "Unknown error";
         m_err->message = m_message_buf.c_str();
     }
+
+    m_err->kind.code = 0;
 }
 
 bool ErrorStorage::has_error() const noexcept
