@@ -15,7 +15,7 @@
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
-#include <realm/util/websocket.hpp>
+#include <realm/util/ez_websocket.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -31,7 +31,7 @@ namespace sync {
 //
 // `protocol` is included for convenience, even though it is not strictly part
 // of an endpoint.
-using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, util::network::Endpoint::port_type, std::string>;
+using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, util::network::Endpoint::port_type>;
 
 class SessionWrapper;
 
@@ -160,6 +160,7 @@ private:
     const std::string m_user_agent_string;
     util::network::Service m_service;
     std::mt19937_64 m_random;
+    util::websocket::EZSocketFactory m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
@@ -248,7 +249,8 @@ private:
                                            bool verify_servers_ssl_certificate,
                                            util::Optional<std::string> ssl_trust_certificate_path,
                                            std::function<SyncConfig::SSLVerifyCallback>,
-                                           util::Optional<SyncConfig::ProxyConfig>, bool& was_created);
+                                           util::Optional<SyncConfig::ProxyConfig>, SyncServerMode,
+                                           bool& was_created);
 
     // Destroys the specified connection.
     void remove_connection(ClientImpl::Connection&) noexcept;
@@ -276,11 +278,9 @@ static_assert(ClientImpl::get_oldest_supported_protocol_version() <= get_current
 /// terminated. This is used to determinte the delay until the next connection
 /// initiation attempt.
 enum class ClientImpl::ConnectionTerminationReason {
-    resolve_operation_canceled,        ///< Resolve operation (DNS) aborted by client
     resolve_operation_failed,          ///< Failure during resolve operation (DNS)
-    connect_operation_canceled,        ///< TCP connect operation aborted by client
     connect_operation_failed,          ///< Failure during TCP connect operation
-    closed_voluntarily,                ///< Voluntarily closed after successful connect operation
+    closed_voluntarily,                ///< Voluntarily closed or connection operation canceled
     premature_end_of_input,            ///< Premature end of input (before ERROR message was received)
     read_or_write_error,               ///< Read/write error after successful TCP connect operation
     http_tunnel_failed,                ///< Failure to establish HTTP tunnel with proxy
@@ -295,6 +295,7 @@ enum class ClientImpl::ConnectionTerminationReason {
     server_said_try_again_later,       ///< Client received ERROR message with try_again=yes
     server_said_do_not_reconnect,      ///< Client received ERROR message with try_again=no
     pong_timeout,                      ///< Client did not receive PONG after PING
+    switch_wire_protocols,             ///< Client should reconnect with a different wire protocols
 
     /// The application requested a feature that is unavailable in the
     /// negotiated protocol version.
@@ -304,17 +305,12 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
-class ClientImpl::Connection final : public util::websocket::Config {
+class ClientImpl::Connection final : public util::websocket::EZObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
-    using ServerEndpoint = std::tuple<ProtocolEnvelope, std::string, port_type, std::string>;
-
-    using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
-                                   size_t pem_size, int preverify_ok, int depth);
+    using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
     using ProxyConfig = SyncConfig::ProxyConfig;
     using ReconnectInfo = ClientImpl::ReconnectInfo;
-    using ReadCompletionHandler = util::websocket::ReadCompletionHandler;
-    using WriteCompletionHandler = util::websocket::WriteCompletionHandler;
 
     util::PrefixLogger logger;
 
@@ -381,13 +377,12 @@ public:
     /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
-    // Overriding methods in util::websocket::Config
-    util::Logger& websocket_get_logger() noexcept override;
-    std::mt19937_64& websocket_get_random() noexcept override;
-    void async_read(char*, std::size_t, ReadCompletionHandler) override;
-    void async_read_until(char*, std::size_t, char, ReadCompletionHandler) override;
-    void async_write(const char*, std::size_t, WriteCompletionHandler) override;
+    // Overriding methods in util::websocket::EZObserver
     void websocket_handshake_completion_handler(const util::HTTPHeaders&) override;
+    void websocket_tcp_connect_error_handler(std::error_code) override;
+    void websocket_resolve_error_handler(std::error_code) override;
+    void websocket_http_tunnel_error_handler(std::error_code) override;
+    void websocket_ssl_handshake_error_handler(std::error_code) override;
     void websocket_read_error_handler(std::error_code) override;
     void websocket_write_error_handler(std::error_code) override;
     void websocket_handshake_error_handler(std::error_code, const util::HTTPHeaders*,
@@ -395,11 +390,11 @@ public:
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
-    bool websocket_pong_message_received(const char*, std::size_t) override;
 
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
     ConnectionState get_state() const noexcept;
+    bool is_flx_sync_connection() const noexcept;
 
     void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
                              const std::string& signed_access_token);
@@ -409,7 +404,7 @@ public:
     Connection(ClientImpl&, connection_ident_type, ServerEndpoint, const std::string& authorization_header_name,
                const std::map<std::string, std::string>& custom_http_headers, bool verify_servers_ssl_certificate,
                util::Optional<std::string> ssl_trust_certificate_path, std::function<SSLVerifyCallback>,
-               util::Optional<ProxyConfig>, ReconnectInfo);
+               util::Optional<ProxyConfig>, ReconnectInfo, SyncServerMode);
 
     ~Connection();
 
@@ -441,25 +436,12 @@ private:
 
     std::string get_http_request_path() const;
 
-    /// The application can override this function to set custom headers. The
-    /// default implementation sets no headers.
-    void set_http_request_headers(util::HTTPHeaders&);
-
     void initiate_reconnect_wait();
     void handle_reconnect_wait(std::error_code);
     void initiate_reconnect();
     void initiate_connect_wait();
     void handle_connect_wait(std::error_code);
-    void initiate_resolve();
-    void handle_resolve(std::error_code, util::network::Endpoint::List);
-    void initiate_tcp_connect(util::network::Endpoint::List, std::size_t);
-    void handle_tcp_connect(std::error_code, util::network::Endpoint::List, std::size_t);
-    void initiate_http_tunnel();
-    void handle_http_tunnel(std::error_code);
-    void initiate_websocket_or_ssl_handshake();
-    void initiate_ssl_handshake();
-    void handle_ssl_handshake(std::error_code);
-    void initiate_websocket_handshake();
+
     void handle_connection_established();
     void schedule_urgent_ping();
     void initiate_ping_delay(milliseconds_type now);
@@ -473,13 +455,8 @@ private:
     void initiate_write_ping(const OutputBuffer&);
     void handle_write_ping();
     void handle_message_received(const char* data, std::size_t size);
-    void handle_pong_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
-    void resolve_error(std::error_code);
-    void tcp_connect_error(std::error_code);
-    void http_tunnel_error(std::error_code);
-    void ssl_handshake_error(std::error_code);
     void read_error(std::error_code);
     void write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code);
@@ -496,7 +473,7 @@ private:
     void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                                  const ReceivedChangesets&);
+                                  int64_t query_version, DownloadBatchState batch_state, const ReceivedChangesets&);
     void receive_mark_message(session_ident_type, request_ident_type);
     void receive_unbound_message(session_ident_type);
     void handle_protocol_error(ClientProtocol::Error);
@@ -519,12 +496,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    util::Optional<util::network::Resolver> m_resolver;
-    util::Optional<util::network::Socket> m_socket;
-    util::Optional<util::network::ssl::Context> m_ssl_context;
-    util::Optional<util::network::ssl::Stream> m_ssl_stream;
-    util::network::ReadAheadBuffer m_read_ahead_buffer;
-    util::websocket::Socket m_websocket;
+    std::unique_ptr<util::websocket::EZSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
@@ -533,9 +505,10 @@ private:
     const util::Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SSLVerifyCallback> m_ssl_verify_callback;
     const util::Optional<ProxyConfig> m_proxy_config;
-    util::Optional<util::HTTPClient<Connection>> m_proxy_client;
     ReconnectInfo m_reconnect_info;
     int m_negotiated_protocol_version = 0;
+    SyncServerMode m_sync_mode = SyncServerMode::PBS;
+    bool m_is_flx_sync_connection = false;
 
     ConnectionState m_state = ConnectionState::disconnected;
 
@@ -792,7 +765,8 @@ public:
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
     bool integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, IntegrationError&);
+                              const ReceivedChangesets&, VersionInfo&, IntegrationError&,
+                              DownloadBatchState last_in_batch);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -805,7 +779,7 @@ public:
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
     void on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                  IntegrationError error);
+                                  IntegrationError error, DownloadBatchState batch_state);
 
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
@@ -910,7 +884,8 @@ private:
     ///
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, const ReceivedChangesets&);
+    void initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
+                                       const ReceivedChangesets&);
 
     /// See request_upload_completion_notification().
     ///
@@ -959,6 +934,8 @@ private:
     // uploaded to the server. Set to true when uploading of the token has been
     // initiated via a BIND or a REFRESH message.
     bool m_access_token_sent = false;
+
+    DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
 
     // Set to true when download completion is reached. Set to false after a
     // slow reconnect, such that the upload process will become suspended until
@@ -1114,7 +1091,7 @@ private:
     void send_unbind_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                                  const ReceivedChangesets&);
+                                  DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(int error_code, StringData message, bool try_again);
@@ -1287,8 +1264,6 @@ inline auto ClientImpl::Connection::get_session(session_ident_type ident) const 
 inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason reason) noexcept
 {
     switch (reason) {
-        case ConnectionTerminationReason::resolve_operation_canceled:
-        case ConnectionTerminationReason::connect_operation_canceled:
         case ConnectionTerminationReason::closed_voluntarily:
             return true;
         case ConnectionTerminationReason::resolve_operation_failed:
@@ -1308,6 +1283,7 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::pong_timeout:
         case ConnectionTerminationReason::missing_protocol_feature:
         case ConnectionTerminationReason::http_tunnel_failed:
+        case ConnectionTerminationReason::switch_wire_protocols:
             break;
     }
     return false;
@@ -1514,6 +1490,7 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     m_upload_progress = m_progress.upload;
     m_last_version_selected_for_upload = m_upload_progress.client_version;
     m_last_download_mark_sent          = m_last_download_mark_received;
+    m_download_batch_state = DownloadBatchState::LastInBatch;
     // clang-format on
 }
 

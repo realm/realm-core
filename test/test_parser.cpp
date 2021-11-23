@@ -4704,6 +4704,31 @@ TEST(Parser_DictionaryObjects)
     verify_query(test_context, persons, "pets.@values.age > 4", 1);
 }
 
+TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)
+{
+    using type = typename TEST_TYPE::type;
+
+    std::array<type, 3> values = {type(5.55444333), type(6.55444333), type(7.55444333)};
+
+    Group g;
+    auto table = g.add_table("table");
+    auto col = table->add_column_dictionary(TEST_TYPE::data_type, "dict");
+    auto obj = table->create_object();
+    Dictionary dict = obj.get_dictionary(col);
+    dict.insert("1", values[0]);
+    dict.insert("2", values[1]);
+    dict.insert("3", values[2]);
+
+    Any arg = values[0];
+    verify_query_sub(test_context, table, "dict.@min == $0", &arg, 1, 1);
+    arg = values[2];
+    verify_query_sub(test_context, table, "dict.@max == $0", &arg, 1, 1);
+    arg = values[0] + values[1] + values[2];
+    verify_query_sub(test_context, table, "dict.@sum == $0", &arg, 1, 1);
+    arg = (values[0] + values[1] + values[2]) / 3;
+    verify_query_sub(test_context, table, "dict.@avg == $0", &arg, 1, 1);
+}
+
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,
            Prop<String>, Prop<BinaryData>, Prop<UUID>, Nullable<int64_t>, Nullable<float>, Nullable<double>,
            Nullable<Decimal128>, Nullable<ObjectId>, Nullable<Timestamp>, Nullable<String>, Nullable<BinaryData>,

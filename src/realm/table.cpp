@@ -672,7 +672,7 @@ ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, T
 void Table::populate_search_index(ColKey col_key)
 {
     auto col_ndx = col_key.get_index().val;
-    StringIndex* index = m_index_accessors[col_ndx];
+    StringIndex* index = m_index_accessors[col_ndx].get();
 
     // Insert ref to index
     for (auto o : *this) {
@@ -737,7 +737,7 @@ void Table::erase_from_search_indexes(ObjKey key)
 {
     // Tombstones do not use index - will crash if we try to erase values
     if (!key.is_unresolved()) {
-        for (auto index : m_index_accessors) {
+        for (auto&& index : m_index_accessors) {
             if (index) {
                 index->erase(key);
             }
@@ -764,7 +764,7 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
             ++value;
         }
 
-        if (auto index = m_index_accessors[column_ndx]) {
+        if (auto&& index = m_index_accessors[column_ndx]) {
             // There is an index for this column
             auto col_key = m_leaf_ndx2colkey[column_ndx];
             auto type = col_key.get_type();
@@ -831,7 +831,7 @@ void Table::update_indexes(ObjKey key, const FieldValues& values)
 
 void Table::clear_indexes()
 {
-    for (auto index : m_index_accessors) {
+    for (auto&& index : m_index_accessors) {
         if (index) {
             index->clear();
         }
@@ -858,8 +858,9 @@ void Table::do_add_search_index(ColKey col_key)
     REALM_ASSERT(m_index_accessors[column_ndx] == nullptr);
 
     // Create the index
-    StringIndex* index = new StringIndex(ClusterColumn(&m_clusters, col_key), get_alloc()); // Throws
-    m_index_accessors[column_ndx] = index;
+    m_index_accessors[column_ndx] =
+        std::make_unique<StringIndex>(ClusterColumn(&m_clusters, col_key), get_alloc()); // Throws
+    StringIndex* index = m_index_accessors[column_ndx].get();
 
     // Insert ref to index
     index->set_parent(&m_index_refs, column_ndx);
@@ -897,11 +898,10 @@ void Table::remove_search_index(ColKey col_key)
         return;
 
     // Destroy and remove the index column
-    StringIndex* index = m_index_accessors[column_ndx.val];
+    auto& index = m_index_accessors[column_ndx.val];
     REALM_ASSERT(index != nullptr);
     index->destroy();
-    delete index;
-    m_index_accessors[column_ndx.val] = nullptr;
+    index.reset();
 
     m_index_refs.set(column_ndx.val, 0);
 
@@ -1010,8 +1010,7 @@ void Table::do_erase_root_column(ColKey col_key)
     if (index_ref) {
         Array::destroy_deep(index_ref, m_index_refs.get_alloc());
         m_index_refs.set(col_ndx, 0);
-        delete m_index_accessors[col_ndx];
-        m_index_accessors[col_ndx] = nullptr;
+        m_index_accessors[col_ndx].reset();
     }
     m_opposite_table.set(col_ndx, TableKey().value);
     m_opposite_column.set(col_ndx, ColKey().value);
@@ -1115,9 +1114,6 @@ void Table::fully_detach() noexcept
 {
     m_spec.detach();
     m_top.detach();
-    for (auto& index : m_index_accessors) {
-        delete index;
-    }
     m_index_refs.detach();
     m_opposite_table.detach();
     m_opposite_column.detach();
@@ -1135,9 +1131,6 @@ Table::~Table() noexcept
         fully_detach();
     }
     else {
-        for (auto e : m_index_accessors) {
-            REALM_ASSERT(e == nullptr);
-        }
         REALM_ASSERT(m_index_accessors.size() == 0);
     }
     m_cookie = cookie_deleted;
@@ -1227,9 +1220,9 @@ void Table::migrate_indexes(ColKey pk_col_key)
                 // Primary key columns does not need an index
                 if (m_leaf_ndx2colkey[col_ndx] != pk_col_key) {
                     // Otherwise create new index. Will be updated when objects are created
-                    StringIndex* index =
-                        new StringIndex(ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
-                    m_index_accessors[col_ndx] = index;
+                    m_index_accessors[col_ndx] = std::make_unique<StringIndex>(
+                        ClusterColumn(&m_clusters, m_spec.get_key(col_ndx)), get_alloc()); // Throws
+                    auto index = m_index_accessors[col_ndx].get();
                     index->set_parent(&m_index_refs, col_ndx);
                     m_index_refs.set(col_ndx, index->get_ref());
                 }
@@ -2608,7 +2601,7 @@ void Table::update_from_parent() noexcept
         m_spec.update_from_parent();
         m_clusters.update_from_parent();
         m_index_refs.update_from_parent();
-        for (auto index : m_index_accessors) {
+        for (auto&& index : m_index_accessors) {
             if (index != nullptr) {
                 index->update_from_parent();
             }
@@ -2823,12 +2816,6 @@ void Table::refresh_index_accessors()
 
     // First eliminate any index accessors for eliminated last columns
     size_t col_ndx_end = m_leaf_ndx2colkey.size();
-    for (size_t col_ndx = col_ndx_end; col_ndx < m_index_accessors.size(); col_ndx++) {
-        if (m_index_accessors[col_ndx]) {
-            delete m_index_accessors[col_ndx];
-            m_index_accessors[col_ndx] = nullptr;
-        }
-    }
     m_index_accessors.resize(col_ndx_end);
 
     // Then eliminate/refresh/create accessors within column range
@@ -2836,12 +2823,11 @@ void Table::refresh_index_accessors()
     // and the index accessor vector is not updated correspondingly.
     for (size_t col_ndx = 0; col_ndx < col_ndx_end; col_ndx++) {
 
-        bool has_old_accessor = m_index_accessors[col_ndx];
+        bool has_old_accessor = bool(m_index_accessors[col_ndx]);
         ref_type ref = m_index_refs.get_as_ref(col_ndx);
 
         if (has_old_accessor && ref == 0) { // accessor drop
-            delete m_index_accessors[col_ndx];
-            m_index_accessors[col_ndx] = nullptr;
+            m_index_accessors[col_ndx].reset();
         }
         else if (has_old_accessor && ref != 0) { // still there, refresh:
             auto col_key = m_leaf_ndx2colkey[col_ndx];
@@ -2851,7 +2837,8 @@ void Table::refresh_index_accessors()
         else if (!has_old_accessor && ref != 0) { // new index!
             auto col_key = m_leaf_ndx2colkey[col_ndx];
             ClusterColumn virtual_col(&m_clusters, col_key);
-            m_index_accessors[col_ndx] = new StringIndex(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
+            m_index_accessors[col_ndx] =
+                std::make_unique<StringIndex>(ref, &m_index_refs, col_ndx, virtual_col, get_alloc());
         }
     }
 }
@@ -3031,7 +3018,7 @@ ObjKey Table::find_primary_key(Mixed primary_key) const
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
 
-    if (auto index = m_index_accessors[primary_key_col.get_index().val]) {
+    if (auto&& index = m_index_accessors[primary_key_col.get_index().val]) {
         return index->find_first(primary_key);
     }
 

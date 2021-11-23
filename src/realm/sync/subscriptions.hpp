@@ -26,6 +26,7 @@
 #include "realm/util/future.hpp"
 #include "realm/util/optional.hpp"
 
+#include <list>
 #include <string_view>
 
 namespace realm::sync {
@@ -75,6 +76,7 @@ public:
         Bootstrapping,
         Complete,
         Error,
+        Superceded,
     };
 
     // Used in tests.
@@ -95,6 +97,9 @@ public:
                 break;
             case State::Error:
                 o << "Error";
+                break;
+            case State::Superceded:
+                o << "Superceded";
                 break;
         }
         return o;
@@ -157,6 +162,12 @@ public:
     // subscription set will be unchanged.
     SubscriptionSet make_mutable_copy() const;
 
+    // Returns a future that will resolve either with an error status if this subscription set encounters an
+    // error, or resolves when the subscription set reaches at least that state. It's possible for a subscription
+    // set to skip a state (i.e. go from Pending to Complete or Pending to Superceded), and the future value
+    // will the the state it actually reached.
+    util::Future<State> get_state_change_notification(State notify_when) const;
+
     // The query version number used in the sync wire protocol to identify this subscription set to the server.
     int64_t version() const;
 
@@ -172,6 +183,8 @@ public:
     // A const_iterator interface for finding/working with individual subscriptions.
     const_iterator begin() const;
     const_iterator end() const;
+
+    Subscription at(size_t index) const;
 
     // Returns a const_iterator to the query matching either the name or Query object, or end() if no such
     // subscription exists.
@@ -231,6 +244,8 @@ protected:
     void insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name, StringData object_class_name,
                          StringData query_str);
 
+    void process_notifications();
+
     explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
 
     Subscription subscription_from_iterator(LnkLst::iterator it) const;
@@ -258,6 +273,10 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_mutable_by_version(int64_t version_id);
 
+    // To be used internally by the sync client. This returns a read-only view of a subscription set by its
+    // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
+    const SubscriptionSet get_by_version(int64_t version_id) const;
+
 private:
     DBRef m_db;
 
@@ -278,6 +297,20 @@ protected:
         ColKey subscriptions;
     };
 
+    struct NotificationRequest {
+        NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
+                            SubscriptionSet::State notify_when)
+            : version(version)
+            , promise(std::move(promise))
+            , notify_when(notify_when)
+        {
+        }
+
+        int64_t version;
+        util::Promise<SubscriptionSet::State> promise;
+        SubscriptionSet::State notify_when;
+    };
+
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
 
     friend class Subscription;
@@ -285,6 +318,10 @@ protected:
 
     std::unique_ptr<SubscriptionSetKeys> m_sub_set_keys;
     std::unique_ptr<SubscriptionKeys> m_sub_keys;
+
+    mutable std::mutex m_pending_notifications_mutex;
+    mutable int64_t m_min_outstanding_version = 0;
+    mutable std::list<NotificationRequest> m_pending_notifications;
 };
 
 } // namespace realm::sync

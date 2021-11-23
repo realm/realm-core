@@ -10,7 +10,7 @@
 #include <locale>
 
 #include <realm/util/optional.hpp>
-#include <realm/util/network.hpp>
+#include <realm/util/basic_system_errors.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/string_data.hpp>
 

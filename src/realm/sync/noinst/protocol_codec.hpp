@@ -169,8 +169,11 @@ public:
 
     void make_refresh_message(OutputBuffer&, session_ident_type session_ident, const std::string& signed_user_token);
 
-    void make_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
-                            const SyncProgress& progress);
+    void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
+                                const SyncProgress& progress);
+
+    void make_flx_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
+                                const SyncProgress& progress, std::string_view query_body);
 
     class UploadMessageBuilder {
     public:
@@ -204,25 +207,6 @@ public:
     std::string compressed_hex_dump(BinaryData blob);
 
     // Messages received by the client.
-
-    // parse_pong_received takes a (WebSocket) pong and parses it.
-    // The result of the parsing is handled by an object of type Connection.
-    // Typically, Connection would be the Connection class from client.cpp
-    template <typename Connection>
-    void parse_pong_received(Connection& connection, std::string_view msg_data)
-    {
-        util::Logger& logger = connection.logger;
-
-        HeaderLineParser msg(msg_data);
-        try {
-            auto timestamp = msg.read_next<milliseconds_type>('\n');
-            connection.receive_pong(timestamp);
-        }
-        catch (const ProtocolCodecException& e) {
-            logger.error("Bad syntax in input message '%1': %2", msg_data, e.what());
-            connection.handle_protocol_error(Error::bad_syntax); // throws
-        }
-    }
 
     // parse_message_received takes a (WebSocket) message and parses it.
     // The result of the parsing is handled by an object of type Connection.
@@ -317,6 +301,10 @@ private:
         progress.latest_server_version.salt = msg.read_next<salt_type>();
         progress.upload.client_version = msg.read_next<version_type>();
         progress.upload.last_integrated_server_version = msg.read_next<version_type>();
+        auto query_version = connection.is_flx_sync_connection() ? msg.read_next<int64_t>() : 0;
+
+        // If this is a PBS connection, then every download message is its own complete batch.
+        auto last_in_batch = connection.is_flx_sync_connection() ? msg.read_next<bool>() : true;
         auto downloadable_bytes = msg.read_next<int64_t>();
         auto is_body_compressed = msg.read_next<bool>();
         auto uncompressed_body_size = msg.read_next<size_t>();
@@ -361,12 +349,10 @@ private:
                 return report_error(Error::bad_changeset_size, "Bad changeset size %1 > %2", changeset_size,
                                     msg.bytes_remaining());
             }
-
             if (cur_changeset.remote_version == 0) {
                 return report_error(Error::bad_server_version,
                                     "Server version in downloaded changeset cannot be zero");
             }
-
             auto changeset_data = msg.read_sized_data<BinaryData>(changeset_size);
 
             if (logger.would_log(util::Logger::Level::trace)) {
@@ -398,7 +384,9 @@ private:
             received_changesets.push_back(std::move(cur_changeset)); // Throws
         }
 
-        connection.receive_download_message(session_ident, progress, downloadable_bytes,
+        auto batch_state =
+            last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
+        connection.receive_download_message(session_ident, progress, downloadable_bytes, query_version, batch_state,
                                             received_changesets); // Throws
     }
 

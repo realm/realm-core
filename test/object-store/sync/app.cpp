@@ -54,6 +54,13 @@
 #include <mutex>
 #include <thread>
 
+#if REALM_PLATFORM_APPLE
+#import <CommonCrypto/CommonHMAC.h>
+#else
+#include <openssl/sha.h>
+#include <openssl/hmac.h>
+#endif
+
 using namespace realm;
 using namespace realm::app;
 using util::any_cast;
@@ -61,34 +68,7 @@ using util::Optional;
 
 using namespace std::string_view_literals;
 
-std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
-{
-    if (!error) {
-        os << "(none)";
-    }
-    else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
-           << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
-    }
-    return os;
-}
-
 namespace {
-template <typename Factory>
-App::Config get_config(Factory factory)
-{
-    return {"app name",
-            factory,
-            util::none,
-            util::none,
-            Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
-}
-
 std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app,
                                  app::AppCredentials credentials = app::AppCredentials::anonymous())
 {
@@ -121,6 +101,70 @@ app::AppError failed_log_in(std::shared_ptr<App> app,
 
 
 #if REALM_ENABLE_AUTH_TESTS
+
+static std::string HMAC_SHA256(std::string_view key, std::string_view data)
+{
+#if REALM_PLATFORM_APPLE
+    std::string ret;
+    ret.resize(CC_SHA256_DIGEST_LENGTH);
+    CCHmac(kCCHmacAlgSHA256, key.data(), key.size(), data.data(), data.size(),
+           reinterpret_cast<uint8_t*>(const_cast<char*>(ret.data())));
+    return ret;
+#else
+    std::array<unsigned char, EVP_MAX_MD_SIZE> hash;
+    unsigned int hashLen;
+    HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()), reinterpret_cast<unsigned char const*>(data.data()),
+         static_cast<int>(data.size()), hash.data(), &hashLen);
+    return std::string{reinterpret_cast<char const*>(hash.data()), hashLen};
+#endif
+}
+
+std::string create_jwt(const std::string appId)
+{
+    nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
+    nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1661896476}};
+
+    payload["user_data"]["name"] = "Foo Bar";
+    payload["user_data"]["occupation"] = "firefighter";
+
+    payload["my_metadata"]["name"] = "Bar Foo";
+    payload["my_metadata"]["occupation"] = "stock analyst";
+
+    std::string headerStr = header.dump();
+    std::string payloadStr = payload.dump();
+
+    util::StringBuffer header_buffer;
+    header_buffer.resize(util::base64_encoded_size(headerStr.length()));
+    util::base64_encode(headerStr.data(), headerStr.length(), header_buffer.data(), header_buffer.size());
+
+    util::StringBuffer payload_buffer;
+    payload_buffer.resize(util::base64_encoded_size(payloadStr.length()));
+    util::base64_encode(payloadStr.data(), payloadStr.length(), payload_buffer.data(), payload_buffer.size());
+
+    // Remove padding characters.
+
+    std::string encodedHeaderStr = header_buffer.str();
+    encodedHeaderStr.erase(remove(encodedHeaderStr.begin(), encodedHeaderStr.end(), '='), encodedHeaderStr.end());
+
+    std::string encodedPayloadStr = payload_buffer.str();
+    encodedPayloadStr.erase(remove(encodedPayloadStr.begin(), encodedPayloadStr.end(), '='), encodedPayloadStr.end());
+
+    std::string jwtPayload = encodedHeaderStr + "." + encodedPayloadStr;
+
+    auto mac = HMAC_SHA256("My_very_confidential_secretttttt", jwtPayload);
+
+    util::StringBuffer signature_buffer;
+    signature_buffer.resize(util::base64_encoded_size(mac.length()));
+    util::base64_encode(mac.data(), mac.length(), signature_buffer.data(), signature_buffer.size());
+
+    std::string encodedSignatureStr = signature_buffer.str();
+    encodedSignatureStr.erase(remove(encodedSignatureStr.begin(), encodedSignatureStr.end(), '='),
+                              encodedSignatureStr.end());
+    std::replace(encodedSignatureStr.begin(), encodedSignatureStr.end(), '+', '-');
+    std::replace(encodedSignatureStr.begin(), encodedSignatureStr.end(), '/', '_');
+
+    return jwtPayload + "." + encodedSignatureStr;
+}
 
 // MARK: - Login with Credentials Tests
 
@@ -1863,6 +1907,12 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
     }
 }
 
+constexpr size_t minus_25_percent(size_t val)
+{
+    REALM_ASSERT(val * .75 > 10);
+    return val * .75 - 10;
+}
+
 TEST_CASE("app: sync integration", "[sync][app]") {
     const auto schema = Schema{{"Dog",
                                 {{"_id", PropertyType::ObjectId | PropertyType::Nullable, true},
@@ -1971,19 +2021,74 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(const Request request,
-                                    std::function<void(const Response)> completion_block) override
+        void send_request_to_server(const Request request, std::function<void(Response)> completion_block) override
         {
-            if (hook) {
-                if (util::Optional<Response> response = hook(request)) {
-                    completion_block(*response);
-                    return;
+            if (request_hook) {
+                request_hook(request);
+            }
+            SynchronousTestTransport::send_request_to_server(request, [&](Response response) {
+                if (response_hook) {
+                    response_hook(request, response);
+                }
+                completion_block(response);
+            });
+        }
+        std::function<void(const Request&, Response&)> response_hook;
+        std::function<void(const Request&)> request_hook;
+    };
+
+    SECTION("Fast clock on client") {
+        {
+            TestSyncManager sync_manager(app_config, {});
+            auto app = sync_manager.app();
+            create_user_and_log_in(app);
+            std::shared_ptr<SyncUser> user = app->current_user();
+            SyncTestFile config(app, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+
+            REQUIRE(get_dogs(r).size() == 0);
+            create_one_dog(r);
+            REQUIRE(get_dogs(r).size() == 1);
+        }
+
+        auto transport = std::make_shared<HookedTransport>();
+        app_config.transport = transport;
+
+        TestSyncManager sync_manager(app_config, {});
+        auto app = sync_manager.app();
+        auto creds = create_user_and_log_in(app);
+        std::shared_ptr<SyncUser> user = app->current_user();
+        REQUIRE(user);
+        REQUIRE(!user->access_token_refresh_required());
+        // Make the SyncUser behave as if the client clock is 31 minutes fast, so the token looks expired locallaly
+        // (access tokens have an lifetime of 30 mintutes today).
+        user->set_seconds_to_adjust_time_for_testing(31 * 60);
+        REQUIRE(user->access_token_refresh_required());
+
+        // This assumes that we make an http request for the new token while
+        // already in the WaitingForAccessToken state.
+        bool seen_waiting_for_access_token = false;
+        transport->request_hook = [&](const Request) {
+            auto user = app->current_user();
+            REQUIRE(user);
+            for (auto session : user->all_sessions()) {
+                // Prior to the fix for #4941, this callback would be called from an infinite loop, always in the
+                // WaitingForAccessToken state.
+                if (session->state() == SyncSession::State::WaitingForAccessToken) {
+                    REQUIRE(!seen_waiting_for_access_token);
+                    seen_waiting_for_access_token = true;
                 }
             }
-            SynchronousTestTransport::send_request_to_server(request, std::move(completion_block));
-        }
-        std::function<util::Optional<Response>(const Request)> hook;
-    };
+        };
+        SyncTestFile config(app, partition, schema);
+        auto r = Realm::get_shared_realm(config);
+        REQUIRE(seen_waiting_for_access_token);
+        Results dogs = get_dogs(r);
+        REQUIRE(dogs.size() == 1);
+        REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
+        REQUIRE(dogs.get(0).get<String>("name") == "fido");
+    }
+
     SECTION("Expired Tokens") {
         sync::AccessToken token;
         {
@@ -2026,19 +2131,20 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         SECTION("Expired Access Token is Refreshed") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
-            std::vector<SyncSession::State> seen_states;
-            transport->hook = [&](const Request) -> util::Optional<Response> {
+            bool seen_waiting_for_access_token = false;
+            transport->request_hook = [&](const Request) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 for (auto session : user->all_sessions()) {
-                    seen_states.push_back(session->state());
+                    if (session->state() == SyncSession::State::WaitingForAccessToken) {
+                        REQUIRE(!seen_waiting_for_access_token);
+                        seen_waiting_for_access_token = true;
+                    }
                 }
-                return util::none; // send all requests through http
             };
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
-            REQUIRE(std::find(begin(seen_states), end(seen_states), SyncSession::State::WaitingForAccessToken) !=
-                    end(seen_states));
+            REQUIRE(seen_waiting_for_access_token);
             Results dogs = get_dogs(r);
             REQUIRE(dogs.size() == 1);
             REQUIRE(dogs.get(0).get<String>("breed") == "bulldog");
@@ -2047,17 +2153,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
-            transport->hook = [&](const Request request) -> util::Optional<Response> {
+            transport->response_hook = [&](const Request request, Response& response) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
                 if (request.url.find("/session") != std::string::npos) {
-                    Response faked;
-                    faked.http_status_code = 401;
-                    faked.body = "fake: refresh token could not be refreshed";
-                    return util::make_optional<Response>(std::move(faked));
+                    response.http_status_code = 401;
+                    response.body = "fake: refresh token could not be refreshed";
                 }
-                return util::none;
             };
             SyncTestFile config(app, partition, schema);
             std::atomic<bool> sync_error_handler_called{false};
@@ -2072,6 +2175,54 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
             // the failed refresh logs out the user
             REQUIRE(!user->is_logged_in());
+        }
+
+        SECTION("Requests that receive an error are retried on a backoff") {
+            using namespace std::chrono;
+            std::vector<time_point<steady_clock>> response_times;
+            std::atomic<bool> did_receive_valid_token{false};
+            constexpr size_t num_error_responses = 6;
+
+            transport->response_hook = [&](const Request& request, Response& response) {
+                // simulate the server experiencing an internal server error
+                if (request.url.find("/session") != std::string::npos) {
+                    if (response_times.size() >= num_error_responses) {
+                        did_receive_valid_token.store(true);
+                        return;
+                    }
+                    response.http_status_code = 500;
+                }
+            };
+            transport->request_hook = [&](const Request& request) {
+                if (!did_receive_valid_token.load() && request.url.find("/session") != std::string::npos) {
+                    response_times.push_back(steady_clock::now());
+                }
+            };
+            SyncTestFile config(app, partition, schema);
+            auto r = Realm::get_shared_realm(config);
+            create_one_dog(r);
+            timed_wait_for(
+                [&] {
+                    return did_receive_valid_token.load();
+                },
+                30s);
+            REQUIRE(user->is_logged_in());
+            REQUIRE(response_times.size() >= num_error_responses);
+            std::vector<uint64_t> delay_times;
+            for (size_t i = 1; i < response_times.size(); ++i) {
+                delay_times.push_back(duration_cast<milliseconds>(response_times[i] - response_times[i - 1]).count());
+            }
+
+            // sync delays start at 1000ms minus a random number of up to 25%.
+            // the subsequent delay is double the previous one minus a random 25% again.
+            constexpr size_t min_first_delay = minus_25_percent(1000);
+            std::vector<uint64_t> expected_min_delays = {0, min_first_delay};
+            while (expected_min_delays.size() < delay_times.size()) {
+                expected_min_delays.push_back(minus_25_percent(expected_min_delays.back() << 1));
+            }
+            for (size_t i = 0; i < delay_times.size(); ++i) {
+                REQUIRE(delay_times[i] > expected_min_delays[i]);
+            }
         }
     }
 
@@ -2398,6 +2549,38 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
         CHECK(processed);
         auto data = *user->custom_data();
         CHECK(data["favorite_color"] == "green");
+    }
+}
+
+TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
+    auto app_config = get_integration_config();
+    auto jwt = create_jwt(app_config.app_id);
+
+    SECTION("jwt happy path") {
+        TestSyncManager sync_manager(app_config);
+        auto app = sync_manager.app();
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> user = log_in(app, app::AppCredentials::custom(jwt));
+
+        app->call_function(user, "updateUserData", {bson::BsonDocument({{"name", "Not Foo Bar"}})},
+                           [&](auto error, auto response) {
+                               CHECK(error == none);
+                               CHECK(response);
+                               CHECK(*response == true);
+                               processed = true;
+                           });
+        CHECK(processed);
+        processed = false;
+        app->refresh_custom_data(user, [&](auto) {
+            processed = true;
+        });
+        CHECK(processed);
+        auto metadata = user->user_profile();
+        auto custom_data = *user->custom_data();
+        CHECK(custom_data["name"] == "Not Foo Bar");
+        CHECK(metadata["name"] == "Foo Bar");
     }
 }
 
@@ -3939,7 +4122,8 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
             std::cout << error.message << std::endl;
         };
         realm_config.schema_version = 1;
-        realm_config.path = app->sync_manager()->path_for_realm(*cur_user, "default.realm");
+        realm_config.path =
+            app->sync_manager()->path_for_realm(*realm_config.sync_config, std::string("default.realm"));
 
         auto r = Realm::get_shared_realm(std::move(realm_config));
         auto session = cur_user->session_for_on_disk_path(r->config().path);

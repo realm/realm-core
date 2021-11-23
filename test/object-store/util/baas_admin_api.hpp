@@ -143,6 +143,8 @@ struct AppCreateConfig {
     Schema schema;
     Property partition_key;
     bool dev_mode_enabled;
+    enum class SyncMode { FLX, PBS };
+    SyncMode sync_mode = SyncMode::PBS;
 
     std::vector<FunctionDef> functions;
 
@@ -150,6 +152,7 @@ struct AppCreateConfig {
     util::Optional<std::string> custom_function_auth;
     bool enable_api_key_auth = false;
     bool enable_anonymous_auth = false;
+    bool enable_custom_token_auth = false;
 };
 
 AppCreateConfig default_app_config(const std::string& base_url);

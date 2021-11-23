@@ -20,8 +20,12 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
+#include <realm/util/network.hpp>
 
 namespace realm {
+
+// sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
+static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type>);
 
 using ProtocolError = realm::sync::ProtocolError;
 
@@ -83,6 +87,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         // Connection level errors
         case ProtocolError::connection_closed:
         case ProtocolError::other_error:
+        case ProtocolError::switch_to_flx_sync:
+        case ProtocolError::switch_to_pbs:
             // Not real errors, don't need to be reported to the binding.
             return SimplifiedProtocolError::ConnectionIssue;
         case ProtocolError::unknown_message:
@@ -99,7 +105,6 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::bad_changeset:
         case ProtocolError::bad_changeset_header_syntax:
         case ProtocolError::bad_changeset_size:
-        case ProtocolError::bad_changesets:
         case ProtocolError::bad_decompression:
         case ProtocolError::unsupported_session_feature:
         case ProtocolError::transact_before_upload:

@@ -300,6 +300,11 @@ public:
     /// @param service_name The name of the cluster
     app::MongoClient mongo_client(const std::string& service_name) REQUIRES(!m_mutex);
 
+    void set_seconds_to_adjust_time_for_testing(int seconds)
+    {
+        m_seconds_to_adjust_time_for_testing.store(seconds);
+    }
+
 protected:
     friend class SyncManager;
     void detach_from_sync_manager() REQUIRES(!m_mutex);
@@ -349,6 +354,8 @@ private:
     const std::string m_device_id;
 
     SyncManager* m_sync_manager;
+
+    std::atomic<int> m_seconds_to_adjust_time_for_testing = 0;
 };
 
 } // namespace realm

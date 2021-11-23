@@ -19,6 +19,7 @@
 #ifndef REALM_OS_CHECKED_MUTEX_HPP
 #define REALM_OS_CHECKED_MUTEX_HPP
 
+#include <memory>
 #include <mutex>
 
 // Clang's thread safety analysis can be used to statically check that variables
