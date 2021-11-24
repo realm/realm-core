@@ -39,7 +39,9 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     };
 
     auto server_app_config = minimal_app_config(base_url, "flx_connect", schema);
-    server_app_config.sync_mode = AppCreateConfig::SyncMode::FLX;
+    AppCreateConfig::FLXSyncConfig flx_config;
+    flx_config.queryable_fields["TopLevel"] = {"queryable_int_field", "queryable_str_field"};
+    server_app_config.flx_sync_config = std::move(flx_config);
     auto app_session = create_app(server_app_config);
     auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
 
