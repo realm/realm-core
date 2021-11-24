@@ -6,6 +6,7 @@
 #include "realm/query_expression.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
+#include <external/json/json.hpp>
 
 #define YY_DECL yy::parser::symbol_type yylex(void* yyscanner)
 #include "realm/parser/generated/query_bison.hpp"
@@ -24,13 +25,19 @@ public:
     virtual ~ParserNode();
 };
 
+class QueryNode : public ParserNode {
+public:
+    ~QueryNode() override;
+    virtual Query visit(ParserDriver*) = 0;
+};
+
 class AtomPredNode : public ParserNode {
 public:
     ~AtomPredNode() override;
     virtual Query visit(ParserDriver*) = 0;
 };
 
-class AndNode : public ParserNode {
+class AndNode : public QueryNode {
 public:
     std::vector<AtomPredNode*> atom_preds;
 
@@ -38,10 +45,10 @@ public:
     {
         atom_preds.emplace_back(node);
     }
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
 };
 
-class OrNode : public ParserNode {
+class OrNode : public QueryNode {
 public:
     std::vector<AndNode*> and_preds;
 
@@ -49,7 +56,7 @@ public:
     {
         and_preds.emplace_back(node);
     }
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
 };
 
 class NotNode : public AtomPredNode {
@@ -413,7 +420,7 @@ public:
     ~ParserDriver();
 
     util::serializer::SerialisationState m_serializer_state;
-    OrNode* result = nullptr;
+    QueryNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
@@ -423,6 +430,7 @@ public:
 
     // Run the parser on file F.  Return 0 on success.
     int parse(const std::string& str);
+    int parse(const nlohmann::json&);
 
     // Handling the scanner.
     void scan_begin(void*, bool trace_scanning);
@@ -453,6 +461,13 @@ private:
 
     static NoArguments s_default_args;
     static query_parser::KeyPathMapping s_default_mapping;
+
+    OrNode* build_pred_or(nlohmann::json fragment);
+    AndNode* build_pred_and(nlohmann::json fragment);
+    AtomPredNode* build_pred_atom(nlohmann::json fragment);
+    void add_sort_column(DescriptorNode* descriptor, nlohmann::json fragment);
+    ValueNode* get_value_node(nlohmann::json json);
+    ConstantNode* get_constant_node(realm::Mixed value);
 };
 
 template <class T>

@@ -12,6 +12,7 @@
 
 using namespace realm;
 using namespace std::string_literals;
+using json = nlohmann::json;
 
 // Whether to generate parser debug traces.
 static bool trace_parsing = false;
@@ -257,6 +258,8 @@ Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
 }
 
 ParserNode::~ParserNode() {}
+
+QueryNode::~QueryNode() {}
 
 AtomPredNode::~AtomPredNode() {}
 
@@ -1370,6 +1373,269 @@ int ParserDriver::parse(const std::string& str)
     return res;
 }
 
+OrNode* ParserDriver::build_pred_or(json fragment)
+{
+
+    if (fragment["kind"] == "or") {
+        auto or_node = m_parse_nodes.create<OrNode>(build_pred_and(fragment["left"]));
+        or_node->and_preds.emplace_back(build_pred_and(fragment["right"]));
+        return or_node;
+    }
+
+    return m_parse_nodes.create<OrNode>(build_pred_and(fragment));
+}
+
+AndNode* ParserDriver::build_pred_and(json fragment)
+{
+    if (fragment["kind"] == "and") {
+        auto and_node = m_parse_nodes.create<AndNode>(build_pred_atom(fragment["left"]));
+        and_node->atom_preds.emplace_back(build_pred_atom(fragment["right"]));
+        return and_node;
+    }
+    else if (fragment["kind"] == "or") {
+        auto parens_node = m_parse_nodes.create<ParensNode>(build_pred_or(fragment));
+        return m_parse_nodes.create<AndNode>(parens_node);
+    }
+
+    return m_parse_nodes.create<AndNode>(build_pred_atom(fragment));
+}
+
+AtomPredNode* ParserDriver::build_pred_atom(json fragment)
+{
+    if (fragment["kind"] == "not") {
+        return m_parse_nodes.create<NotNode>(build_pred_atom(fragment["expression"]));
+    }
+    else if (fragment["kind"] == "and") {
+        auto or_node = m_parse_nodes.create<OrNode>(build_pred_and(fragment));
+        return m_parse_nodes.create<ParensNode>(or_node);
+    }
+    else if (fragment["kind"] == "or") {
+        return m_parse_nodes.create<ParensNode>(build_pred_or(fragment));
+    }
+    auto left = get_value_node(fragment["left"]);
+    auto right = get_value_node(fragment["right"]);
+    if (fragment["kind"] == "eq") {
+        auto eq = m_parse_nodes.create<EqualityNode>(std::move(left), CompareNode::EQUAL, std::move(right));
+        eq->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
+        return eq;
+    }
+    else if (fragment["kind"] == "neq") {
+        return m_parse_nodes.create<EqualityNode>(left, CompareNode::NOT_EQUAL, right);
+    }
+    else if (fragment["kind"] == "gt") {
+        return m_parse_nodes.create<RelationalNode>(left, CompareNode::GREATER, right);
+    }
+    else if (fragment["kind"] == "gte") {
+        return m_parse_nodes.create<RelationalNode>(left, CompareNode::GREATER_EQUAL, right);
+    }
+    else if (fragment["kind"] == "lt") {
+        return m_parse_nodes.create<RelationalNode>(left, CompareNode::LESS, right);
+    }
+    else if (fragment["kind"] == "lte") {
+        return m_parse_nodes.create<RelationalNode>(left, CompareNode::LESS_EQUAL, right);
+    }
+    else if (fragment["kind"] == "beginsWith") {
+        auto begins_with = m_parse_nodes.create<StringOpsNode>(left, CompareNode::BEGINSWITH, right);
+        begins_with->case_sensitive =
+            fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
+        return begins_with;
+    }
+    else if (fragment["kind"] == "endsWith") {
+        auto ends_with = m_parse_nodes.create<StringOpsNode>(left, CompareNode::ENDSWITH, right);
+        ends_with->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
+        return ends_with;
+    }
+    else if (fragment["kind"] == "contains") {
+        auto contains = m_parse_nodes.create<StringOpsNode>(left, CompareNode::CONTAINS, right);
+        contains->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
+        return contains;
+    }
+    else if (fragment["kind"] == "like") {
+        auto like = m_parse_nodes.create<StringOpsNode>(left, CompareNode::LIKE, right);
+        like->case_sensitive = fragment["caseSensitivity"].is_null() ? true : (bool)fragment["caseSensitivity"];
+        return like;
+    }
+    REALM_UNREACHABLE();
+    return nullptr;
+}
+
+void ParserDriver::add_sort_column(DescriptorNode* descriptor, json fragment)
+{
+    std::vector<std::string> empty_path;
+    descriptor->add(empty_path, fragment["property"], fragment["isAscending"]);
+}
+
+AggrNode::Type get_aggr_type(json fragment)
+{
+    if (fragment["aggrType"] == "sum") {
+        return AggrNode::Type::SUM;
+    }
+    else if (fragment["aggrType"] == "avg") {
+        return AggrNode::Type::AVG;
+    }
+    else if (fragment["aggrType"] == "min") {
+        return AggrNode::Type::MIN;
+    }
+    else if (fragment["aggrType"] == "max") {
+        return AggrNode::Type::MAX;
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+}
+
+ValueNode* ParserDriver::get_value_node(json fragment)
+{
+    if (fragment["kind"] == "property") {
+        auto path = m_parse_nodes.create<PathNode>();
+        auto link_size = fragment["path"].size();
+        auto prop_pos = link_size - 1;
+        for (size_t i = 0; i < prop_pos; i++) {
+            path->add_element(fragment["path"][i]);
+        }
+        auto prop_node = m_parse_nodes.create<PropNode>(path, fragment["path"][prop_pos]);
+        auto value_node = m_parse_nodes.create<ValueNode>(prop_node);
+        return value_node;
+    }
+    if (fragment["kind"] == "linkAggr") {
+        auto path = m_parse_nodes.create<PathNode>();
+        auto path_size = fragment["path"].size();
+        auto link_pos = path_size - 2;
+        auto prop_pos = path_size - 1;
+        for (size_t i = 0; i < link_pos; i++) {
+            path->add_element(fragment["path"][i]);
+        }
+        AggrNode::Type type = get_aggr_type(fragment);
+        auto aggr = m_parse_nodes.create<AggrNode>(type);
+        auto link_aggr_node =
+            m_parse_nodes.create<LinkAggrNode>(path, fragment["path"][link_pos], aggr, fragment["path"][prop_pos]);
+        auto value_node = m_parse_nodes.create<ValueNode>(link_aggr_node);
+        return value_node;
+    }
+    if (fragment["kind"] == "collectionAggr") {
+        auto path = m_parse_nodes.create<PathNode>();
+        auto path_size = fragment["path"].size();
+        auto id_pos = path_size - 1;
+        for (size_t i = 0; i < id_pos; i++) {
+            path->add_element(fragment["path"][i]);
+        }
+        AggrNode::Type type = get_aggr_type(fragment);
+        auto aggr = m_parse_nodes.create<AggrNode>(type);
+        auto list_aggr_node = m_parse_nodes.create<ListAggrNode>(path, fragment["path"][id_pos], aggr);
+        auto value_node = m_parse_nodes.create<ValueNode>(list_aggr_node);
+        return value_node;
+    }
+    if (fragment["kind"] == "constant") {
+        ConstantNode* const_node;
+        if (fragment["value"].is_null()) {
+            return m_parse_nodes.create<ValueNode>(get_constant_node(Mixed()));
+        }
+        else if (fragment["type"] == "string") {
+            std::string value = fragment["value"].get<std::string>();
+            const_node = get_constant_node(value);
+        }
+        else if (fragment["type"] == "int") {
+            int value = fragment["value"].get<int>();
+            const_node = get_constant_node(value);
+        }
+        else if (fragment["type"] == "float") {
+            float value = fragment["value"].get<float>();
+            const_node = get_constant_node(value);
+        }
+        else if (fragment["type"] == "long") {
+            int64_t value = fragment["value"].get<int64_t>();
+            const_node = get_constant_node(value);
+        }
+        else if (fragment["type"] == "double") {
+            double value = fragment["value"].get<double>();
+            const_node = get_constant_node(value);
+        }
+        else if (fragment["type"] == "bool") {
+            bool value = fragment["value"].get<bool>();
+            const_node = get_constant_node(value);
+        }
+        else if (fragment["type"] == "arg") {
+            std::string value = fragment["value"].get<std::string>();
+            const_node = m_parse_nodes.create<ConstantNode>(ConstantNode::Type::ARG, value);
+        }
+        else {
+            REALM_UNREACHABLE();
+        }
+
+        return m_parse_nodes.create<ValueNode>(const_node);
+    }
+    REALM_UNREACHABLE();
+}
+
+ConstantNode* ParserDriver::get_constant_node(realm::Mixed value)
+{
+    ConstantNode::Type type;
+    std::string string_value;
+    std::ostringstream stream;
+    if (value.is_null()) {
+        return m_parse_nodes.create<ConstantNode>(ConstantNode::Type::NULL_VAL, "null");
+    }
+    switch (value.get_type()) {
+        case realm::DataType::Type::String:
+            type = ConstantNode::Type::STRING;
+            string_value = realm::util::format("'%1'", value.get_string());
+            break;
+        case realm::DataType::Type::Int:
+            type = ConstantNode::Type::NUMBER;
+            stream << value;
+            string_value = stream.str();
+            break;
+        case realm::DataType::Type::Double:
+            type = ConstantNode::Type::FLOAT;
+            string_value = std::to_string(value.get_double());
+            break;
+        case realm::DataType::Type::Float:
+            type = ConstantNode::Type::FLOAT;
+            stream << value;
+            string_value = stream.str();
+            break;
+        case realm::DataType::Type::Bool:
+            type = value.get_bool() ? ConstantNode::Type::TRUE : ConstantNode::Type::FALSE;
+            string_value = "";
+            break;
+        default:
+            REALM_UNREACHABLE();
+    }
+    auto constant_node = m_parse_nodes.create<ConstantNode>(type, string_value);
+    return constant_node;
+}
+
+int ParserDriver::parse(const nlohmann::json& json)
+{
+    AndNode* and_node = nullptr;
+    if (!json.contains("whereClauses") || json["whereClauses"].size() == 0) {
+        auto true_node = m_parse_nodes.create<TrueOrFalseNode>(true);
+        and_node = m_parse_nodes.create<AndNode>(true_node);
+        result = and_node;
+    }
+    else {
+        for (auto predicate : json["whereClauses"]) {
+            auto& expr = predicate["expression"];
+            if (and_node) {
+                and_node->atom_preds.emplace_back(build_pred_atom(expr));
+            }
+            else {
+                and_node = build_pred_and(expr);
+            }
+        }
+        result = and_node;
+    }
+    ordering = m_parse_nodes.create<DescriptorOrderingNode>();
+    if (json.contains("orderingClauses")) {
+        auto descriptor = m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT);
+        for (auto o : json["orderingClauses"]) {
+            add_sort_column(descriptor, o);
+        }
+        ordering->add_descriptor(descriptor);
+    }
+    return 0;
+}
+
 void parse(const std::string& str)
 {
     ParserDriver driver;
@@ -1420,7 +1686,14 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
                    const query_parser::KeyPathMapping& mapping) const
 {
     ParserDriver driver(m_own_ref, args, mapping);
-    driver.parse(query_string);
+    auto first_non_ws = query_string.find_first_not_of(" \n\r\t");
+    if (query_string[first_non_ws] == '{') {
+        auto jsonObj = json::parse(query_string);
+        driver.parse(jsonObj);
+    }
+    else {
+        driver.parse(query_string);
+    }
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
