@@ -26,6 +26,7 @@
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/features.h>
+#include <realm/util/functional.hpp>
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/version_id.hpp>
@@ -200,7 +201,7 @@ public:
     /// and changes done by another thread in the same process as the caller.
     ///
     /// Has db been changed ?
-    bool has_changed(TransactionRef);
+    bool has_changed(TransactionRef&);
 
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to
@@ -208,7 +209,7 @@ public:
     /// immediately. To restore the ability to wait for a change, a call to
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
-    bool wait_for_change(TransactionRef);
+    bool wait_for_change(TransactionRef&);
 
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
@@ -239,7 +240,7 @@ public:
     // ask for write mutex. Callback takes place when mutex has been acquired.
     // callback may occur on ANOTHER THREAD. Must not be called if write mutex
     // has already been acquired.
-    void async_request_write_mutex(TransactionRef tr, std::function<void()> when_acquired);
+    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>& when_acquired);
 
     // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed
@@ -571,9 +572,9 @@ private:
 
     void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions);
 
-    void async_begin_write(std::function<void()> fn);
+    void async_begin_write(util::UniqueFunction<void()> fn);
     void async_end_write();
-    void async_sync_to_disk(std::function<void()> fn);
+    void async_sync_to_disk(util::UniqueFunction<void()> fn);
 
     friend class Transaction;
 };
@@ -698,7 +699,7 @@ public:
     }
     // request full synchronization to stable storage for all writes done since
     // last sync. The write mutex is released after full synchronization.
-    void async_request_sync_to_storage(std::function<void()> when_synchronized = nullptr);
+    void async_request_sync_to_storage(util::UniqueFunction<void()> when_synchronized = nullptr);
     // release the write lock without any sync to disk
     void async_release_write_lock()
     {
