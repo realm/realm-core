@@ -41,16 +41,13 @@ Thumbs.db
 /Visual\ Studio
 
 # Ignore user-local configuration for Visual Studio Code
-/.vscode/c_cpp_properties.json
-/.vscode/extensions.json
-/.vscode/launch.json
-/.vscode/settings.json
-/.vscode/tasks.json
-
-.cproject
+/.vscode
+/.cache
+compile_commands.json
 
 # Ignore Eclipse settings
 /.settings
+.cproject
 
 *.dSYM
 

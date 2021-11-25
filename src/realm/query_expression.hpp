@@ -972,9 +972,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, Mixed>,
                  public Overloads<T, null> {
 public:
-    virtual ~Subexpr2() {}
-
-    DataType get_type() const final
+    DataType get_type() const override
     {
         return ColumnTypeTraits<T>::id;
     }
@@ -1107,7 +1105,7 @@ public:
     Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true);
     Query like(Mixed sd, bool case_sensitive = true);
     Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    DataType get_type() const final
+    DataType get_type() const override
     {
         return type_Mixed;
     }
@@ -3153,6 +3151,11 @@ public:
     {
     }
 
+    DataType get_type() const override
+    {
+        return DataType(m_columns_collection.m_column_key.get_type());
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<CollectionColumnAggregate>(*this);
@@ -3278,10 +3281,10 @@ private:
             return dict_cluster.min();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Average<Mixed>>) {
-            return dict_cluster.avg();
+            return dict_cluster.avg(nullptr, get_type());
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Sum<Mixed>>) {
-            return dict_cluster.sum();
+            return dict_cluster.sum(nullptr, get_type());
         }
         REALM_UNREACHABLE();
     }

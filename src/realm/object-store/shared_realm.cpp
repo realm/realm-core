@@ -822,6 +822,10 @@ bool Realm::do_refresh()
         return false;
     }
 
+    if (m_config.immutable()) {
+        throw std::logic_error("Can't refresh a read-only Realm.");
+    }
+
     // can't be any new changes if we're in a write transaction
     if (is_in_transaction()) {
         return false;

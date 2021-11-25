@@ -350,6 +350,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
+
+        SECTION("refreshing an immutable Realm throws") {
+            REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh a read-only Realm.");
+        }
     }
 
     SECTION("should support using different table subsets on different threads") {
