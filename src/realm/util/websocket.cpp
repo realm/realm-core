@@ -678,14 +678,21 @@ public:
 
         auto handler = [this](std::error_code ec, size_t) {
             // If the operation is aborted, the socket object may have been destroyed.
-            if (ec != util::error::operation_aborted) {
-                if (ec) {
-                    stop();
-                    m_config.websocket_write_error_handler(ec);
-                    return;
-                }
-                handle_write_message(); // Throws
+            // If the socket has been closed then we should continue to read from it until we've drained
+            // the receive buffer. Eventually we will either receive an in-band error message from the
+            // server about why we got disconnected or we'll receive ECONNRESET on the receive side as well.
+            bool closed = (ec == util::error::operation_aborted ||
+                           ec == util::error::make_error_code(util::error::connection_reset) ||
+                           ec == util::make_error_code(util::MiscExtErrors::end_of_input));
+            if (closed) {
+                return;
             }
+            if (ec) {
+                stop();
+                return m_config.websocket_write_error_handler(ec);
+            }
+
+            handle_write_message();
         };
 
         m_config.async_write(m_write_buffer.data(), message_size, handler);
