@@ -30,8 +30,8 @@ namespace realm::_impl {
 // state Realm download.
 class ClientResetOperation {
 public:
-    using CallbackBeforeType = util::UniqueFunction<void(std::string, std::string)>;
-    using CallbackAfterType = util::UniqueFunction<void(std::string)>;
+    using CallbackBeforeType = util::UniqueFunction<void(std::string)>;
+    using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID)>;
 
     ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool discard_local,
                          CallbackBeforeType notify_before, CallbackAfterType notify_after);

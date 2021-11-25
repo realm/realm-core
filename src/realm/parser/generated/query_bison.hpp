@@ -58,7 +58,7 @@
     class TrueOrFalseNode;
     class OrNode;
     class AndNode;
-    class AtomPredNode;
+    class QueryNode;
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
@@ -427,61 +427,56 @@ namespace yy {
       // aggr_op
       char dummy1[sizeof (AggrNode*)];
 
-      // and_pred
-      char dummy2[sizeof (AndNode*)];
-
-      // atom_pred
-      char dummy3[sizeof (AtomPredNode*)];
-
       // constant
-      char dummy4[sizeof (ConstantNode*)];
+      char dummy2[sizeof (ConstantNode*)];
 
       // distinct
       // distinct_param
       // sort
       // sort_param
       // limit
-      char dummy5[sizeof (DescriptorNode*)];
+      char dummy3[sizeof (DescriptorNode*)];
 
-      // pred_suffix
-      char dummy6[sizeof (DescriptorOrderingNode*)];
+      // post_query
+      char dummy4[sizeof (DescriptorOrderingNode*)];
 
       // list
       // list_content
-      char dummy7[sizeof (ListNode*)];
-
-      // pred
-      char dummy8[sizeof (OrNode*)];
+      char dummy5[sizeof (ListNode*)];
 
       // path
-      char dummy9[sizeof (PathNode*)];
+      char dummy6[sizeof (PathNode*)];
 
       // post_op
-      char dummy10[sizeof (PostOpNode*)];
+      char dummy7[sizeof (PostOpNode*)];
 
       // simple_prop
-      char dummy11[sizeof (PropNode*)];
+      char dummy8[sizeof (PropNode*)];
 
       // prop
-      char dummy12[sizeof (PropertyNode*)];
+      char dummy9[sizeof (PropertyNode*)];
+
+      // query
+      // compare
+      char dummy10[sizeof (QueryNode*)];
 
       // subquery
-      char dummy13[sizeof (SubqueryNode*)];
+      char dummy11[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy14[sizeof (TrueOrFalseNode*)];
+      char dummy12[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy15[sizeof (ValueNode*)];
+      char dummy13[sizeof (ValueNode*)];
 
       // direction
-      char dummy16[sizeof (bool)];
+      char dummy14[sizeof (bool)];
 
       // comp_type
       // equality
       // relational
       // stringop
-      char dummy17[sizeof (int)];
+      char dummy15[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -510,7 +505,7 @@ namespace yy {
       // "key or value"
       // path_elem
       // id
-      char dummy18[sizeof (std::string)];
+      char dummy16[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -691,34 +686,33 @@ namespace yy {
         SYM_61_ = 61,                            // '{'
         SYM_62_ = 62,                            // '}'
         SYM_YYACCEPT = 63,                       // $accept
-        SYM_query = 64,                          // query
-        SYM_pred = 65,                           // pred
-        SYM_and_pred = 66,                       // and_pred
-        SYM_atom_pred = 67,                      // atom_pred
-        SYM_value = 68,                          // value
-        SYM_prop = 69,                           // prop
-        SYM_simple_prop = 70,                    // simple_prop
-        SYM_subquery = 71,                       // subquery
-        SYM_pred_suffix = 72,                    // pred_suffix
-        SYM_distinct = 73,                       // distinct
-        SYM_distinct_param = 74,                 // distinct_param
-        SYM_sort = 75,                           // sort
-        SYM_sort_param = 76,                     // sort_param
-        SYM_limit = 77,                          // limit
-        SYM_direction = 78,                      // direction
-        SYM_list = 79,                           // list
-        SYM_list_content = 80,                   // list_content
-        SYM_constant = 81,                       // constant
-        SYM_boolexpr = 82,                       // boolexpr
-        SYM_comp_type = 83,                      // comp_type
-        SYM_post_op = 84,                        // post_op
-        SYM_aggr_op = 85,                        // aggr_op
-        SYM_equality = 86,                       // equality
-        SYM_relational = 87,                     // relational
-        SYM_stringop = 88,                       // stringop
-        SYM_path = 89,                           // path
-        SYM_path_elem = 90,                      // path_elem
-        SYM_id = 91                              // id
+        SYM_final = 64,                          // final
+        SYM_query = 65,                          // query
+        SYM_compare = 66,                        // compare
+        SYM_value = 67,                          // value
+        SYM_prop = 68,                           // prop
+        SYM_simple_prop = 69,                    // simple_prop
+        SYM_subquery = 70,                       // subquery
+        SYM_post_query = 71,                     // post_query
+        SYM_distinct = 72,                       // distinct
+        SYM_distinct_param = 73,                 // distinct_param
+        SYM_sort = 74,                           // sort
+        SYM_sort_param = 75,                     // sort_param
+        SYM_limit = 76,                          // limit
+        SYM_direction = 77,                      // direction
+        SYM_list = 78,                           // list
+        SYM_list_content = 79,                   // list_content
+        SYM_constant = 80,                       // constant
+        SYM_boolexpr = 81,                       // boolexpr
+        SYM_comp_type = 82,                      // comp_type
+        SYM_post_op = 83,                        // post_op
+        SYM_aggr_op = 84,                        // aggr_op
+        SYM_equality = 85,                       // equality
+        SYM_relational = 86,                     // relational
+        SYM_stringop = 87,                       // stringop
+        SYM_path = 88,                           // path
+        SYM_path_elem = 89,                      // path_elem
+        SYM_id = 90                              // id
       };
     };
 
@@ -757,14 +751,6 @@ namespace yy {
         value.move< AggrNode* > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.move< ConstantNode* > (std::move (that.value));
         break;
@@ -777,17 +763,13 @@ namespace yy {
         value.move< DescriptorNode* > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.move< DescriptorOrderingNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -804,6 +786,11 @@ namespace yy {
 
       case symbol_kind::SYM_prop: // prop
         value.move< PropertyNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.move< QueryNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -893,30 +880,6 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AndNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AndNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AtomPredNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AtomPredNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, ConstantNode*&& v)
         : Base (t)
         , value (std::move (v))
@@ -965,18 +928,6 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, OrNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const OrNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, PathNode*&& v)
         : Base (t)
         , value (std::move (v))
@@ -1019,6 +970,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const PropertyNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, QueryNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const QueryNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1140,14 +1103,6 @@ switch (yykind)
         value.template destroy< AggrNode* > ();
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.template destroy< AndNode* > ();
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.template destroy< AtomPredNode* > ();
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.template destroy< ConstantNode* > ();
         break;
@@ -1160,17 +1115,13 @@ switch (yykind)
         value.template destroy< DescriptorNode* > ();
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.template destroy< DescriptorOrderingNode* > ();
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.template destroy< ListNode* > ();
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.template destroy< OrNode* > ();
         break;
 
       case symbol_kind::SYM_path: // path
@@ -1187,6 +1138,11 @@ switch (yykind)
 
       case symbol_kind::SYM_prop: // prop
         value.template destroy< PropertyNode* > ();
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.template destroy< QueryNode* > ();
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -2559,9 +2515,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 299,     ///< Last index in yytable_.
-      yynnts_ = 29,  ///< Number of nonterminal symbols.
-      yyfinal_ = 39 ///< Termination state number.
+      yylast_ = 296,     ///< Last index in yytable_.
+      yynnts_ = 28,  ///< Number of nonterminal symbols.
+      yyfinal_ = 38 ///< Termination state number.
     };
 
 
@@ -2636,14 +2592,6 @@ switch (yykind)
         value.copy< AggrNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.copy< AndNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.copy< AtomPredNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.copy< ConstantNode* > (YY_MOVE (that.value));
         break;
@@ -2656,17 +2604,13 @@ switch (yykind)
         value.copy< DescriptorNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.copy< DescriptorOrderingNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.copy< ListNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.copy< OrNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -2683,6 +2627,11 @@ switch (yykind)
 
       case symbol_kind::SYM_prop: // prop
         value.copy< PropertyNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.copy< QueryNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -2773,14 +2722,6 @@ switch (yykind)
         value.move< AggrNode* > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.move< ConstantNode* > (YY_MOVE (s.value));
         break;
@@ -2793,17 +2734,13 @@ switch (yykind)
         value.move< DescriptorNode* > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.move< DescriptorOrderingNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -2820,6 +2757,11 @@ switch (yykind)
 
       case symbol_kind::SYM_prop: // prop
         value.move< PropertyNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.move< QueryNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery

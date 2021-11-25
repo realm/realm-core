@@ -75,9 +75,7 @@ target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
 create_coverage_target(generate-coverage ObjectStoreTests)
 
-if (NOT REALM_TSAN)
-    add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
-endif()
+add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
 
 if (REALM_ENABLE_FLX_SYNC)
     target_compile_definitions(ObjectStoreTests PRIVATE

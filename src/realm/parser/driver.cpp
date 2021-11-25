@@ -258,7 +258,7 @@ Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
 
 ParserNode::~ParserNode() {}
 
-AtomPredNode::~AtomPredNode() {}
+QueryNode::~QueryNode() {}
 
 Query NotNode::visit(ParserDriver* drv)
 {
@@ -269,20 +269,11 @@ Query NotNode::visit(ParserDriver* drv)
     return {q};
 }
 
-Query ParensNode::visit(ParserDriver* drv)
-{
-    return pred->visit(drv);
-}
-
 Query OrNode::visit(ParserDriver* drv)
 {
-    if (and_preds.size() == 1) {
-        return and_preds[0]->visit(drv);
-    }
-
     Query q(drv->m_base_table);
     q.group();
-    for (auto it : and_preds) {
+    for (auto it : children) {
         q.Or();
         q.and_query(it->visit(drv));
     }
@@ -293,11 +284,8 @@ Query OrNode::visit(ParserDriver* drv)
 
 Query AndNode::visit(ParserDriver* drv)
 {
-    if (atom_preds.size() == 1) {
-        return atom_preds[0]->visit(drv);
-    }
     Query q(drv->m_base_table);
-    for (auto it : atom_preds) {
+    for (auto it : children) {
         q.and_query(it->visit(drv));
     }
     return q;
@@ -452,8 +440,7 @@ Query BetweenNode::visit(ParserDriver* drv)
     ValueNode max(limits->elements.at(1));
     RelationalNode cmp1(prop, CompareNode::GREATER, &min);
     RelationalNode cmp2(prop, CompareNode::LESS, &max);
-    AndNode and_node(&cmp1);
-    and_node.atom_preds.emplace_back(&cmp2);
+    AndNode and_node(&cmp1, &cmp2);
 
     return and_node.visit(drv);
 }
@@ -1421,6 +1408,7 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
+    driver.result->canonicalize();
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 

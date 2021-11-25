@@ -154,8 +154,8 @@ struct SyncConfig {
     // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
-    std::function<void(std::shared_ptr<Realm> local, std::shared_ptr<Realm> remote)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> local)> notify_after_client_reset;
+    std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
+    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
     std::function<void(const std::string&, std::function<void(DBRef, util::Optional<std::string>)>)>
         get_fresh_realm_for_path;
 
