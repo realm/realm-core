@@ -925,7 +925,7 @@ private:
 
 std::shared_ptr<SyncSession> SyncSession::external_reference()
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
+    util::CheckedLockGuard lock(m_external_reference_mutex);
 
     if (auto external_reference = m_external_reference.lock())
         return std::shared_ptr<SyncSession>(external_reference, this);
@@ -937,7 +937,7 @@ std::shared_ptr<SyncSession> SyncSession::external_reference()
 
 std::shared_ptr<SyncSession> SyncSession::existing_external_reference()
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
+    util::CheckedLockGuard lock(m_external_reference_mutex);
 
     if (auto external_reference = m_external_reference.lock())
         return std::shared_ptr<SyncSession>(external_reference, this);
@@ -947,13 +947,16 @@ std::shared_ptr<SyncSession> SyncSession::existing_external_reference()
 
 void SyncSession::did_drop_external_reference()
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
+    std::unique_lock<std::mutex> lock1(m_state_mutex);
+    {
+        util::CheckedLockGuard lock2(m_external_reference_mutex);
 
-    // If the session is being resurrected we should not close the session.
-    if (!m_external_reference.expired())
-        return;
+        // If the session is being resurrected we should not close the session.
+        if (!m_external_reference.expired())
+            return;
+    }
 
-    close(lock);
+    close(lock1);
 }
 
 uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,

@@ -25,6 +25,7 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/util/uuid.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 #if REALM_PLATFORM_APPLE
 #include <realm/object-store/impl/apple/keychain_helper.hpp>
 #endif
@@ -109,6 +110,26 @@ realm::Schema make_schema()
                     {c_sync_app_metadata_ws_hostname, PropertyType::String}}}};
 }
 
+class DummyScheduler : public realm::util::Scheduler {
+public:
+    bool is_on_thread() const noexcept override
+    {
+        return true;
+    }
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        auto o = dynamic_cast<const DummyScheduler*>(other);
+        return (o != nullptr);
+    }
+    bool can_deliver_notifications() const noexcept override
+    {
+        return false;
+    }
+
+    void set_notify_callback(std::function<void()>) override {}
+    void notify() override {}
+};
+
 } // anonymous namespace
 
 namespace realm {
@@ -126,6 +147,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
     config.schema = make_schema();
     config.schema_version = SCHEMA_VERSION;
     config.schema_mode = SchemaMode::Automatic;
+    config.scheduler = std::make_shared<DummyScheduler>();
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
         encryption_key = keychain::metadata_realm_encryption_key(util::File::exists(path));
