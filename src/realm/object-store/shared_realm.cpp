@@ -686,15 +686,11 @@ void Realm::check_pending_write_requests()
 
 void Realm::end_current_write()
 {
+    m_transaction->async_end([this]() {
+        run_async_completions_on_proper_thread();
+    });
     if (m_async_commit_q.empty()) {
-        // Nothing to commit to disk - just release write lock
-        m_transaction->async_release_write_lock();
         check_pending_write_requests();
-    }
-    else {
-        m_transaction->async_request_sync_to_storage([this]() {
-            run_async_completions_on_proper_thread();
-        });
     }
 }
 
@@ -829,7 +825,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_blo
             run_writes();
         }
         else {
-            m_transaction->async_request_sync_to_storage([this]() {
+            m_transaction->async_end([this]() {
                 run_async_completions_on_proper_thread();
             });
         }
@@ -869,9 +865,10 @@ void Realm::begin_transaction()
         m_transaction->wait_for_write_lock();
 
         // Wait for potential syncing to finish
-        m_transaction->wait_for_sync();
+        if (m_transaction->wait_for_sync()) {
+            call_completion_callbacks();
+        }
     }
-    call_completion_callbacks();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -916,14 +913,18 @@ void Realm::commit_transaction()
     constexpr bool commit_to_disk = false;
     m_coordinator->commit_write(*this, commit_to_disk);
     cache_new_schema();
-    m_transaction->async_request_sync_to_storage();
-    m_transaction->wait_for_sync();
+
+    // Realm might have been closed
+    if (m_transaction) {
+        m_transaction->async_end();
+        m_transaction->wait_for_sync();
+        call_completion_callbacks();
+        if (!m_is_running_async_writes)
+            check_pending_write_requests();
+    }
     if (auto audit = audit_context()) {
         audit->record_write(prev_version, transaction().get_version_of_current_transaction());
     }
-    call_completion_callbacks();
-    if (!m_is_running_async_writes)
-        check_pending_write_requests();
 }
 
 void Realm::cancel_transaction()
@@ -938,10 +939,7 @@ void Realm::cancel_transaction()
 
     if (!m_is_running_async_writes) {
         transaction::cancel(transaction(), m_binding_context.get());
-
-        if (m_transaction->holds_write_mutex()) {
-            end_current_write();
-        }
+        end_current_write();
     }
 }
 
@@ -1180,6 +1178,7 @@ void Realm::close()
 
     if (!m_config.immutable() && m_transaction) {
         // Wait for potential syncing to finish
+        m_transaction->async_end();
         m_transaction->wait_for_sync();
         call_completion_callbacks();
         transaction().close();

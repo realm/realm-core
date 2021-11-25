@@ -688,18 +688,11 @@ public:
     {
         return m_async_stage == AsyncState::HasLock || m_async_stage == AsyncState::HasCommits;
     }
+
     // request full synchronization to stable storage for all writes done since
-    // last sync. The write mutex is released after full synchronization.
-    void async_request_sync_to_storage(util::UniqueFunction<void()> when_synchronized = nullptr);
-    // release the write lock without any sync to disk
-    void async_release_write_lock()
-    {
-        std::unique_lock<std::mutex> lck(mtx);
-        if (m_async_stage == AsyncState::HasLock) {
-            m_async_stage = AsyncState::Idle;
-            get_db()->async_end_write();
-        }
-    }
+    // last sync - or just release write mutex.
+    // The write mutex is released after full synchronization.
+    void async_end(util::UniqueFunction<void()> when_synchronized = nullptr);
 
     // true if sync to disk has been requested
     bool is_synchronizing() noexcept
