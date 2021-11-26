@@ -6,7 +6,11 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* The client reset callbacks now pass out SharedRealm objects instead of TransactionRefs. ([#5048](https://github.com/realm/realm-core/issues/5048), since v11.5.0) 
+* A client reset in DiscardLocal mode would revert to Manual mode on the next restart of the session. ([#5050](https://github.com/realm/realm-core/issues/5050), since v11.5.0)
+* `@sum` and `@avg` queries on Dictionaries of floats or doubles used too much precision for intermediates, resulting in incorrect rounding (since v10.2.0).
+* Change the exception message for calling refresh on an immutable Realm from "Continuous transaction through DB object without history information." to "Can't refresh a read-only Realm." ([#5061](https://github.com/realm/realm-core/issues/5061), old exception message was since 10.7.2 via https://github.com/realm/realm-core/pull/4688).
+* The client reset callbacks have changed so that the pre and post Realm state are passed to the 'after' callback and thee 'before' callback only has the local state. ([#5066](https://github.com/realm/realm-core/issues/5066), since 11.5.0).
  
 ### Breaking changes
 * None.
@@ -17,7 +21,30 @@
 -----------
 
 ### Internals
+* The 'power' unary operator template to be used in a query expression is removed
+* Renamed ClientResyncMode::SeamlessLoss -> DiscardLocal.
+* Updated sync client to be able to open connections to FLX sync-enabled apps in baas ([#5009](https://github.com/realm/realm-core/pull/5009))
+* SubscriptionSet::erase now returns the correct itererator for the "next" subscription ([#5053](https://github.com/realm/realm-core/pull/5053))
+* SubscriptionSet::insert_or_assign now returns an iterator pointing to the correct subscription ([#5049](https://github.com/realm/realm-core/pull/5049))
+* `SimulatedFailure` mmap handling was not thread-safe.
+
+----------------------------------------------
+
+# 11.6.1 Release notes
+
+### Fixed
+* A sync user's Realm was not deleted when the user was removed if the Realm path was too long such that it triggered the fallback hashed name (this is OS dependant but is 300 characters on linux). ([#4187](https://github.com/realm/realm-core/issues/4187), since the introduction of hashed paths in object-store before monorepo, circa early v10 (https://github.com/realm/realm-object-store/pull/1049))
+* Don't keep trying to refresh the access token if the client's clock is more than 30 minutes fast. ([#4941](https://github.com/realm/realm-core/issues/4941))
+* Don't sleep the sync thread artificially if an auth request fails. This could be observed as a UI hang on js applications when sync tries to connect after being offline for more than 30 minutes. ([realm-js#3882](https://github.com/realm/realm-js/issues/3882), since sync to MongoDB was introduced in v10.0.0)
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
 * Added type to manage flexible sync subscriptions. [#5005](https://github.com/realm/realm-core/pull/5005)
+* Added support for notifications on flexible sync subscription state changes [#5027](https://github.com/realm/realm-core/pull/5027)
 
 ----------------------------------------------
 

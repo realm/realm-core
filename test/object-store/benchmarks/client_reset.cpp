@@ -50,7 +50,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
         : reset_utils::TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
-        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::SeamlessLoss);
+        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::DiscardLocal);
         // turn off sync, we only fake it
         m_local_config.sync_config = {};
         m_remote_config.sync_config = {};
@@ -130,7 +130,7 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
     SharedRealm m_remote;
 };
 
-TEST_CASE("client reset seamless loss", "[benchmark]") {
+TEST_CASE("client reset: discard local", "[benchmark]") {
     const std::string valid_pk_name = "_id";
     const std::string partition_value = "partition_foo";
     Property partition_prop = {"realm_id", PropertyType::String | PropertyType::Nullable};
@@ -167,7 +167,7 @@ TEST_CASE("client reset seamless loss", "[benchmark]") {
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
 

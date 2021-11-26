@@ -46,6 +46,7 @@ if(REALM_ENABLE_SYNC)
         bson.cpp
         sync/client_reset.cpp
         sync/file.cpp
+        sync/flx_sync.cpp
         sync/metadata.cpp
         sync/remote_mongo_tests.cpp
         sync/session/connection_change_notifications.cpp
@@ -74,8 +75,12 @@ target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
 create_coverage_target(generate-coverage ObjectStoreTests)
 
-if (NOT REALM_TSAN)
-    add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
+add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
+
+if (REALM_ENABLE_FLX_SYNC)
+    target_compile_definitions(ObjectStoreTests PRIVATE
+        REALM_ENABLE_FLX_SYNC=1
+    )
 endif()
 
 if(REALM_ENABLE_SYNC)

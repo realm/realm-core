@@ -204,30 +204,35 @@ TEST_CASE("sync: client reset", "[client reset]") {
         FAIL("Error handler should not have been called");
     };
 
-    SECTION("seamless loss") {
+    SECTION("discard local") {
         local_config.cache = false;
         local_config.automatic_change_notifications = false;
-        local_config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+        local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
         size_t before_callback_invoctions = 0;
         size_t after_callback_invocations = 0;
-        local_config.sync_config->notify_before_client_reset = [&](TransactionRef local, TransactionRef remote) {
+        std::mutex mtx;
+        local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+            std::lock_guard<std::mutex> lock(mtx);
             ++before_callback_invoctions;
-            REQUIRE(local);
-            REQUIRE(local->is_frozen());
-            REQUIRE(local->get_table("class_object"));
-
-            REQUIRE(remote);
-            REQUIRE(remote->is_frozen());
-            REQUIRE(remote->get_table("class_object"));
-
+            REQUIRE(before);
+            REQUIRE(before->is_frozen());
+            REQUIRE(before->read_group().get_table("class_object"));
+            REQUIRE(before->config().path == local_config.path);
             REQUIRE(util::File::exists(local_config.path));
-            REQUIRE(util::File::exists(fresh_path));
         };
-        local_config.sync_config->notify_after_client_reset = [&](TransactionRef local) {
+        local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after) {
+            std::lock_guard<std::mutex> lock(mtx);
             ++after_callback_invocations;
-            REQUIRE(local);
-            REQUIRE(local->get_table("class_object"));
+            REQUIRE(before);
+            REQUIRE(before->is_frozen());
+            REQUIRE(before->read_group().get_table("class_object"));
+            REQUIRE(before->config().path == local_config.path);
+            REQUIRE(after);
+            REQUIRE(!after->is_frozen());
+            REQUIRE(after->read_group().get_table("class_object"));
+            REQUIRE(after->config().path == local_config.path);
+            REQUIRE(after->current_transaction_version() > before->current_transaction_version());
         };
 
         Results results;
@@ -354,6 +359,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 auto realm = Realm::get_shared_realm(local_config);
                 timed_sleeping_wait_for(
                     [&]() -> bool {
+                        std::lock_guard<std::mutex> lock(mtx);
                         realm->begin_transaction();
                         TableRef table = get_table(*realm, "object");
                         REQUIRE(table);
@@ -369,8 +375,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             if (session) {
                 session->shutdown_and_wait();
             }
-            REQUIRE(before_callback_invoctions == 1);
-            REQUIRE(after_callback_invocations == 1);
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(after_callback_invocations == 1);
+            }
         }
 
         SECTION("failing to download a fresh copy results in an error") {
@@ -568,6 +577,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
         }
 
         SECTION("extra local column creates a client reset error") {
@@ -599,8 +610,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
+
             REQUIRE(err);
             REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
         }
 
         SECTION("compatible schema changes in both remote and local transactions") {
@@ -929,7 +943,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
 }
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -946,7 +960,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema = Schema{
         {"object",
          {
@@ -1417,7 +1431,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][seamless loss]", cf::Mi
     }
 }
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless loss][collections]",
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard local][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
@@ -1451,7 +1465,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][seamless
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
 
@@ -1664,7 +1678,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::SeamlessLoss;
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
     config.schema = Schema{
         {"object",
          {

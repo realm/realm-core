@@ -151,6 +151,15 @@ size_t SubscriptionSet::size() const
     return m_sub_list.size();
 }
 
+Subscription SubscriptionSet::at(size_t index) const
+{
+    if (index >= m_sub_list.size()) {
+        throw std::out_of_range("index");
+    }
+
+    return Subscription(this, m_sub_list.get_object(index));
+}
+
 SubscriptionSet::const_iterator SubscriptionSet::begin() const
 {
     return iterator(this, m_sub_list.begin());
@@ -180,7 +189,9 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
 SubscriptionSet::const_iterator SubscriptionSet::erase(const_iterator it)
 {
     m_sub_list.remove_target_row(it.m_sub_it.index());
-    return it;
+    auto at_end = (it.m_sub_it.index() == m_sub_list.size());
+    return at_end ? const_iterator(this, m_sub_list.end())
+                  : const_iterator(this, LnkLst::iterator(&m_sub_list, it.m_sub_it.index()));
 }
 
 void SubscriptionSet::clear()
@@ -191,7 +202,7 @@ void SubscriptionSet::clear()
 void SubscriptionSet::insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name,
                                       StringData object_class_name, StringData query_str)
 {
-    auto new_sub = m_sub_list.create_and_insert_linked_object(m_sub_list.is_empty() ? 0 : m_sub_list.size() - 1);
+    auto new_sub = m_sub_list.create_and_insert_linked_object(m_sub_list.is_empty() ? 0 : m_sub_list.size());
     new_sub.set(m_mgr->m_sub_keys->created_at, created_at);
     new_sub.set(m_mgr->m_sub_keys->updated_at, updated_at);
     new_sub.set(m_mgr->m_sub_keys->name, name);
@@ -283,6 +294,9 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string> 
             m_obj.set(m_mgr->m_sub_set_keys->state, static_cast<int64_t>(new_state));
             m_mgr->supercede_prior_to(m_tr, version());
             break;
+        case State::Superceded:
+            throw std::logic_error("Cannot set a subscription to the superceded state");
+            break;
     }
 }
 
@@ -305,6 +319,68 @@ SubscriptionSet SubscriptionSet::make_mutable_copy() const
     return new_set_obj;
 }
 
+util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
+{
+    // If we've already reached the desired state, or if the subscription is in an error state,
+    // we can return a ready future immediately.
+    auto cur_state = state();
+    if (cur_state == State::Error) {
+        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
+    }
+    else if (cur_state >= notify_when) {
+        return util::Future<State>::make_ready(cur_state);
+    }
+
+    std::lock_guard<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
+
+    // If we've already been superceded by another version getting completed, then we should skip registering
+    // a notification because it may never fire.
+    if (m_mgr->m_min_outstanding_version > version()) {
+        return util::Future<State>::make_ready(State::Superceded);
+    }
+
+    // Otherwise, make a promise/future pair and add it to the list of pending notifications.
+    auto [promise, future] = util::make_promise_future<State>();
+    m_mgr->m_pending_notifications.emplace_back(version(), std::move(promise), notify_when);
+    return std::move(future);
+}
+
+void SubscriptionSet::process_notifications()
+{
+    auto new_state = state();
+    auto my_version = version();
+
+    std::list<SubscriptionStore::NotificationRequest> to_finish;
+    std::unique_lock<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
+    for (auto it = m_mgr->m_pending_notifications.begin(); it != m_mgr->m_pending_notifications.end();) {
+        if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
+            (new_state == State::Complete && it->version < my_version)) {
+            to_finish.splice(to_finish.end(), m_mgr->m_pending_notifications, it++);
+        }
+        else {
+            ++it;
+        }
+    }
+
+    if (new_state == State::Complete) {
+        m_mgr->m_min_outstanding_version = my_version;
+    }
+
+    lk.unlock();
+
+    for (auto& req : to_finish) {
+        if (new_state == State::Error && req.version == my_version) {
+            req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
+        }
+        else if (req.version < my_version) {
+            req.promise.emplace_value(State::Superceded);
+        }
+        else {
+            req.promise.emplace_value(new_state);
+        }
+    }
+}
+
 void SubscriptionSet::commit()
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
@@ -314,6 +390,8 @@ void SubscriptionSet::commit()
         update_state(State::Pending, util::none);
     }
     m_tr->commit_and_continue_as_read();
+
+    process_notifications();
 }
 
 SubscriptionStore::SubscriptionStore(DBRef db)
@@ -437,6 +515,13 @@ const SubscriptionSet SubscriptionStore::get_active() const
 SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
+    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
+}
+
+const SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
+{
+    auto tr = m_db->start_read();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
     return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }

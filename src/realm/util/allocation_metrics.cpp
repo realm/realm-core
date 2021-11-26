@@ -110,8 +110,8 @@ AllocationMetricsContext& AllocationMetricsContext::get_current() noexcept
 
 AllocationMetricsContext& AllocationMetricsContext::get_unknown()
 {
-    static AllocationMetricsContext* unknown = new AllocationMetricsContext;
-    return *unknown;
+    static AllocationMetricsContext& unknown = *new AllocationMetricsContext;
+    return unknown;
 }
 
 MeteredAllocator& AllocationMetricsContext::get_metric(const AllocationMetricName& name) noexcept

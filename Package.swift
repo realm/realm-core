@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.6.0"
+let versionStr = "11.6.1"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -642,7 +642,6 @@ let headers: [String] = [
     "realm/util/scratch_allocator.hpp",
     "realm/util/serializer.hpp",
     "realm/util/sha_crypto.hpp",
-    "realm/util/shared_ptr.hpp",
     "realm/util/signal_blocker.hpp",
     "realm/util/string_buffer.hpp",
     "realm/util/substitute.hpp",
@@ -659,6 +658,7 @@ let headers: [String] = [
     "realm/util/utf8.hpp",
     "realm/util/value_reset_guard.hpp",
     "realm/util/websocket.hpp",
+    "realm/util/ez_websocket.hpp",
     "realm/utilities.hpp",
     "realm/uuid.hpp",
     "realm/version.hpp",

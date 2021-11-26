@@ -25,16 +25,16 @@
 
 namespace realm::_impl {
 
-ClientResetOperation::ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool seamless_loss,
+ClientResetOperation::ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool discard_local,
                                            CallbackBeforeType notify_before, CallbackAfterType notify_after)
     : m_logger{logger}
     , m_db{db}
     , m_db_fresh(std::move(db_fresh))
-    , m_seamless_loss(seamless_loss)
+    , m_discard_local(discard_local)
     , m_notify_before(std::move(notify_before))
     , m_notify_after(std::move(notify_after))
 {
-    logger.debug("Create ClientResetOperation, realm_path = %1, seamless_loss = %2", m_db.get_path(), seamless_loss);
+    logger.debug("Create ClientResetOperation, realm_path = %1, discard_local = %2", m_db.get_path(), discard_local);
 }
 
 std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
@@ -49,7 +49,7 @@ std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
 
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 {
-    if (m_seamless_loss) {
+    if (m_discard_local) {
         REALM_ASSERT(m_db_fresh);
     }
 
@@ -67,20 +67,21 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
             clean_up_state();
         });
 
+        std::string local_path = m_db.get_path();
         if (m_notify_before) {
-            TransactionRef local_frozen, remote_frozen;
-            local_frozen = m_db.start_frozen();
-            if (m_db_fresh) {
-                remote_frozen = m_db_fresh->start_frozen();
-            }
-            m_notify_before(local_frozen, remote_frozen);
+            m_notify_before(local_path);
         }
 
+        // If m_notify_after is set, pin the previous state to keep it around.
+        TransactionRef previous_state;
+        if (m_notify_after) {
+            previous_state = m_db.start_frozen();
+        }
         local_version_ids =
             client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger); // throws
 
         if (m_notify_after) {
-            m_notify_after(m_db.start_frozen());
+            m_notify_after(local_path, previous_state->get_version_of_current_transaction());
         }
 
         m_client_reset_old_version = local_version_ids.old_version;

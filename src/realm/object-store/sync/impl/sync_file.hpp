@@ -60,27 +60,25 @@ class SyncFileManager {
 public:
     SyncFileManager(const std::string& base_path, const std::string& app_id);
 
-    /// Return the user directory for a given user, creating it if it does not already exist.
-    std::string user_directory(const std::string& identity) const;
-
-    /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& identity) const; // throws
-
-    /// Rename a user directory. Returns true if a directory at `old_name` existed
-    /// and was successfully renamed to `new_name`. Returns false if no directory
-    /// exists at `old_name`.
-    bool try_rename_user_directory(const std::string& old_name, const std::string& new_name) const;
+    /// Remove the Realms at the specified absolute paths along with any associated helper files.
+    void remove_user_realms(const std::string& user_identity,
+                            const std::vector<std::string>& realm_paths) const; // throws
 
     /// A non throw version of File::exists(),  returning false if any exceptions are thrown when attempting to access
     /// this file.
     static bool try_file_exists(const std::string& path) noexcept;
 
+    util::Optional<std::string> get_existing_realm_file_path(const std::string& user_identity,
+                                                             const std::string& local_user_identity,
+                                                             const std::string& realm_file_name,
+                                                             const std::string& partition) const;
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
     std::string realm_file_path(const std::string& user_identity, const std::string& local_user_identity,
-                                const std::string& realm_file_name) const;
+                                const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& user_identity, const std::string& realm_file_name) const;
+    bool remove_realm(const std::string& user_identity, const std::string& local_identity,
+                      const std::string& realm_file_name, const std::string& partition) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -134,13 +132,17 @@ private:
     {
         return get_special_directory(c_utility_directory);
     }
-
+    /// Return the user directory for a given user, creating it if it does not already exist.
+    std::string user_directory(const std::string& identity) const;
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& user_identity) const;
+    std::string legacy_hashed_partition_path(const std::string& user_identity, const std::string& partition) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity,
                                        const std::string& realm_file_name) const;
     std::string legacy_local_identity_path(const std::string& local_user_identity,
                                            const std::string& realm_file_name) const;
+    std::string preferred_realm_path_without_suffix(const std::string& user_identity,
+                                                    const std::string& realm_file_name) const;
     std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };
 

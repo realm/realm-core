@@ -22,6 +22,8 @@ set(SYNC_SOURCES
     transform.cpp
     ../util/network_ssl.cpp
     ../util/network.cpp
+    ../util/websocket.cpp
+    ../util/ez_websocket.cpp
 )
 
 set(IMPL_INSTALL_HEADERS

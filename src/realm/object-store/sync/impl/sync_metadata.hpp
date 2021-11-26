@@ -38,11 +38,11 @@ class SyncMetadataManager;
 class SyncAppMetadata {
 public:
     struct Schema {
-        ColKey idx_id;
-        ColKey idx_deployment_model;
-        ColKey idx_location;
-        ColKey idx_hostname;
-        ColKey idx_ws_hostname;
+        ColKey id_col;
+        ColKey deployment_model_col;
+        ColKey location_col;
+        ColKey hostname_col;
+        ColKey ws_hostname_col;
     };
 
     std::string deployment_model;
@@ -56,24 +56,27 @@ class SyncUserMetadata {
 public:
     struct Schema {
         // The ROS identity of the user. This, plus the auth server URL, uniquely identifies a user.
-        ColKey idx_identity;
+        ColKey identity_col;
         // A locally issued UUID for the user. This is used to generate the on-disk user directory.
-        ColKey idx_local_uuid;
+        ColKey local_uuid_col;
         // Whether or not this user has been marked for removal.
-        ColKey idx_marked_for_removal;
+        ColKey marked_for_removal_col;
         // The cached refresh token for this user.
-        ColKey idx_refresh_token;
+        ColKey refresh_token_col;
         // The URL of the authentication server this user resides upon.
-        ColKey idx_provider_type;
+        ColKey provider_type_col;
         // The cached access token for this user.
-        ColKey idx_access_token;
+        ColKey access_token_col;
         // The identities for this user.
-        ColKey idx_identities;
+        ColKey identities_col;
         // The current state of this user.
-        ColKey idx_state;
+        ColKey state_col;
         // The device id of this user.
-        ColKey idx_device_id;
-        ColKey idx_profile_dump;
+        ColKey device_id_col;
+        // Any additional profile attributes, formatted as a bson string.
+        ColKey profile_dump_col;
+        // The set of absolute file paths to Realms belonging to this user.
+        ColKey realm_file_paths_col;
     };
 
     // Cannot be set after creation.
@@ -99,6 +102,9 @@ public:
 
     SyncUserProfile profile() const;
     void set_user_profile(const SyncUserProfile&);
+
+    std::vector<std::string> realm_file_paths() const;
+    void add_realm_file_path(const std::string& path);
 
     void set_state(SyncUser::State);
 

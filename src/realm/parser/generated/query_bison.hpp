@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.7.4.
+// A Bison parser, made by GNU Bison 3.8.2.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
-// Copyright (C) 2002-2015, 2018-2020 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2021 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // As a special exception, you may create a larger work that contains
 // part or all of the Bison parser skeleton and distribute that work
@@ -58,7 +58,7 @@
     class TrueOrFalseNode;
     class OrNode;
     class AndNode;
-    class AtomPredNode;
+    class QueryNode;
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
@@ -137,17 +137,23 @@
 
 /* Suppress unused-variable warnings by "using" E.  */
 #if ! defined lint || defined __GNUC__
-# define YYUSE(E) ((void) (E))
+# define YY_USE(E) ((void) (E))
 #else
-# define YYUSE(E) /* empty */
+# define YY_USE(E) /* empty */
 #endif
 
-#if defined __GNUC__ && ! defined __ICC && 407 <= __GNUC__ * 100 + __GNUC_MINOR__
 /* Suppress an incorrect diagnostic about yylval being uninitialized.  */
-# define YY_IGNORE_MAYBE_UNINITIALIZED_BEGIN                            \
+#if defined __GNUC__ && ! defined __ICC && 406 <= __GNUC__ * 100 + __GNUC_MINOR__
+# if __GNUC__ * 100 + __GNUC_MINOR__ < 407
+#  define YY_IGNORE_MAYBE_UNINITIALIZED_BEGIN                           \
+    _Pragma ("GCC diagnostic push")                                     \
+    _Pragma ("GCC diagnostic ignored \"-Wuninitialized\"")
+# else
+#  define YY_IGNORE_MAYBE_UNINITIALIZED_BEGIN                           \
     _Pragma ("GCC diagnostic push")                                     \
     _Pragma ("GCC diagnostic ignored \"-Wuninitialized\"")              \
     _Pragma ("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
+# endif
 # define YY_IGNORE_MAYBE_UNINITIALIZED_END      \
     _Pragma ("GCC diagnostic pop")
 #else
@@ -208,27 +214,32 @@ namespace yy {
   class parser
   {
   public:
-#ifndef YYSTYPE
+#ifdef YYSTYPE
+# ifdef __GNUC__
+#  pragma GCC message "bison: do not #define YYSTYPE in C++, use %define api.value.type"
+# endif
+    typedef YYSTYPE value_type;
+#else
   /// A buffer to store and retrieve objects.
   ///
   /// Sort of a variant, but does not keep track of the nature
   /// of the stored data, since that knowledge is available
   /// via the current parser state.
-  class semantic_type
+  class value_type
   {
   public:
     /// Type of *this.
-    typedef semantic_type self_type;
+    typedef value_type self_type;
 
     /// Empty construction.
-    semantic_type () YY_NOEXCEPT
-      : yybuffer_ ()
+    value_type () YY_NOEXCEPT
+      : yyraw_ ()
       , yytypeid_ (YY_NULLPTR)
     {}
 
     /// Construct and fill.
     template <typename T>
-    semantic_type (YY_RVREF (T) t)
+    value_type (YY_RVREF (T) t)
       : yytypeid_ (&typeid (T))
     {
       YY_ASSERT (sizeof (T) <= size);
@@ -237,13 +248,13 @@ namespace yy {
 
 #if 201103L <= YY_CPLUSPLUS
     /// Non copyable.
-    semantic_type (const self_type&) = delete;
+    value_type (const self_type&) = delete;
     /// Non copyable.
     self_type& operator= (const self_type&) = delete;
 #endif
 
     /// Destruction, allowed only if empty.
-    ~semantic_type () YY_NOEXCEPT
+    ~value_type () YY_NOEXCEPT
     {
       YY_ASSERT (!yytypeid_);
     }
@@ -387,7 +398,7 @@ namespace yy {
   private:
 #if YY_CPLUSPLUS < 201103L
     /// Non copyable.
-    semantic_type (const self_type&);
+    value_type (const self_type&);
     /// Non copyable.
     self_type& operator= (const self_type&);
 #endif
@@ -397,7 +408,7 @@ namespace yy {
     T*
     yyas_ () YY_NOEXCEPT
     {
-      void *yyp = yybuffer_.yyraw;
+      void *yyp = yyraw_;
       return static_cast<T*> (yyp);
      }
 
@@ -406,7 +417,7 @@ namespace yy {
     const T*
     yyas_ () const YY_NOEXCEPT
     {
-      const void *yyp = yybuffer_.yyraw;
+      const void *yyp = yyraw_;
       return static_cast<const T*> (yyp);
      }
 
@@ -416,61 +427,56 @@ namespace yy {
       // aggr_op
       char dummy1[sizeof (AggrNode*)];
 
-      // and_pred
-      char dummy2[sizeof (AndNode*)];
-
-      // atom_pred
-      char dummy3[sizeof (AtomPredNode*)];
-
       // constant
-      char dummy4[sizeof (ConstantNode*)];
+      char dummy2[sizeof (ConstantNode*)];
 
       // distinct
       // distinct_param
       // sort
       // sort_param
       // limit
-      char dummy5[sizeof (DescriptorNode*)];
+      char dummy3[sizeof (DescriptorNode*)];
 
-      // pred_suffix
-      char dummy6[sizeof (DescriptorOrderingNode*)];
+      // post_query
+      char dummy4[sizeof (DescriptorOrderingNode*)];
 
       // list
       // list_content
-      char dummy7[sizeof (ListNode*)];
-
-      // pred
-      char dummy8[sizeof (OrNode*)];
+      char dummy5[sizeof (ListNode*)];
 
       // path
-      char dummy9[sizeof (PathNode*)];
+      char dummy6[sizeof (PathNode*)];
 
       // post_op
-      char dummy10[sizeof (PostOpNode*)];
+      char dummy7[sizeof (PostOpNode*)];
 
       // simple_prop
-      char dummy11[sizeof (PropNode*)];
+      char dummy8[sizeof (PropNode*)];
 
       // prop
-      char dummy12[sizeof (PropertyNode*)];
+      char dummy9[sizeof (PropertyNode*)];
+
+      // query
+      // compare
+      char dummy10[sizeof (QueryNode*)];
 
       // subquery
-      char dummy13[sizeof (SubqueryNode*)];
+      char dummy11[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy14[sizeof (TrueOrFalseNode*)];
+      char dummy12[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy15[sizeof (ValueNode*)];
+      char dummy13[sizeof (ValueNode*)];
 
       // direction
-      char dummy16[sizeof (bool)];
+      char dummy14[sizeof (bool)];
 
       // comp_type
       // equality
       // relational
       // stringop
-      char dummy17[sizeof (int)];
+      char dummy15[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -499,7 +505,7 @@ namespace yy {
       // "key or value"
       // path_elem
       // id
-      char dummy18[sizeof (std::string)];
+      char dummy16[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -509,18 +515,19 @@ namespace yy {
     union
     {
       /// Strongest alignment constraints.
-      long double yyalign_me;
+      long double yyalign_me_;
       /// A buffer large enough to store any of the semantic values.
-      char yyraw[size];
-    } yybuffer_;
+      char yyraw_[size];
+    };
 
     /// Whether the content is built: if defined, the name of the stored type.
     const std::type_info *yytypeid_;
   };
 
-#else
-    typedef YYSTYPE semantic_type;
 #endif
+    /// Backward compatibility (Bison 3.8).
+    typedef value_type semantic_type;
+
 
     /// Syntax errors thrown from user actions.
     struct syntax_error : std::runtime_error
@@ -603,7 +610,7 @@ namespace yy {
     };
 
     /// Token kind, as returned by yylex.
-    typedef token::yytokentype token_kind_type;
+    typedef token::token_kind_type token_kind_type;
 
     /// Backward compatibility alias (Bison 3.6).
     typedef token_kind_type token_type;
@@ -679,34 +686,33 @@ namespace yy {
         SYM_61_ = 61,                            // '{'
         SYM_62_ = 62,                            // '}'
         SYM_YYACCEPT = 63,                       // $accept
-        SYM_query = 64,                          // query
-        SYM_pred = 65,                           // pred
-        SYM_and_pred = 66,                       // and_pred
-        SYM_atom_pred = 67,                      // atom_pred
-        SYM_value = 68,                          // value
-        SYM_prop = 69,                           // prop
-        SYM_simple_prop = 70,                    // simple_prop
-        SYM_subquery = 71,                       // subquery
-        SYM_pred_suffix = 72,                    // pred_suffix
-        SYM_distinct = 73,                       // distinct
-        SYM_distinct_param = 74,                 // distinct_param
-        SYM_sort = 75,                           // sort
-        SYM_sort_param = 76,                     // sort_param
-        SYM_limit = 77,                          // limit
-        SYM_direction = 78,                      // direction
-        SYM_list = 79,                           // list
-        SYM_list_content = 80,                   // list_content
-        SYM_constant = 81,                       // constant
-        SYM_boolexpr = 82,                       // boolexpr
-        SYM_comp_type = 83,                      // comp_type
-        SYM_post_op = 84,                        // post_op
-        SYM_aggr_op = 85,                        // aggr_op
-        SYM_equality = 86,                       // equality
-        SYM_relational = 87,                     // relational
-        SYM_stringop = 88,                       // stringop
-        SYM_path = 89,                           // path
-        SYM_path_elem = 90,                      // path_elem
-        SYM_id = 91                              // id
+        SYM_final = 64,                          // final
+        SYM_query = 65,                          // query
+        SYM_compare = 66,                        // compare
+        SYM_value = 67,                          // value
+        SYM_prop = 68,                           // prop
+        SYM_simple_prop = 69,                    // simple_prop
+        SYM_subquery = 70,                       // subquery
+        SYM_post_query = 71,                     // post_query
+        SYM_distinct = 72,                       // distinct
+        SYM_distinct_param = 73,                 // distinct_param
+        SYM_sort = 74,                           // sort
+        SYM_sort_param = 75,                     // sort_param
+        SYM_limit = 76,                          // limit
+        SYM_direction = 77,                      // direction
+        SYM_list = 78,                           // list
+        SYM_list_content = 79,                   // list_content
+        SYM_constant = 80,                       // constant
+        SYM_boolexpr = 81,                       // boolexpr
+        SYM_comp_type = 82,                      // comp_type
+        SYM_post_op = 83,                        // post_op
+        SYM_aggr_op = 84,                        // aggr_op
+        SYM_equality = 85,                       // equality
+        SYM_relational = 86,                     // relational
+        SYM_stringop = 87,                       // stringop
+        SYM_path = 88,                           // path
+        SYM_path_elem = 89,                      // path_elem
+        SYM_id = 90                              // id
       };
     };
 
@@ -729,7 +735,7 @@ namespace yy {
       typedef Base super_type;
 
       /// Default constructor.
-      basic_symbol ()
+      basic_symbol () YY_NOEXCEPT
         : value ()
       {}
 
@@ -745,14 +751,6 @@ namespace yy {
         value.move< AggrNode* > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (std::move (that.value));
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.move< ConstantNode* > (std::move (that.value));
         break;
@@ -765,17 +763,13 @@ namespace yy {
         value.move< DescriptorNode* > (std::move (that.value));
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.move< DescriptorOrderingNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (std::move (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -792,6 +786,11 @@ namespace yy {
 
       case symbol_kind::SYM_prop: // prop
         value.move< PropertyNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.move< QueryNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -881,30 +880,6 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AndNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AndNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, AtomPredNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const AtomPredNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, ConstantNode*&& v)
         : Base (t)
         , value (std::move (v))
@@ -953,18 +928,6 @@ namespace yy {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, OrNode*&& v)
-        : Base (t)
-        , value (std::move (v))
-      {}
-#else
-      basic_symbol (typename Base::kind_type t, const OrNode*& v)
-        : Base (t)
-        , value (v)
-      {}
-#endif
-
-#if 201103L <= YY_CPLUSPLUS
       basic_symbol (typename Base::kind_type t, PathNode*&& v)
         : Base (t)
         , value (std::move (v))
@@ -1007,6 +970,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const PropertyNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, QueryNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const QueryNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1090,8 +1065,10 @@ namespace yy {
         clear ();
       }
 
+
+
       /// Destroy contents, and record that is empty.
-      void clear ()
+      void clear () YY_NOEXCEPT
       {
         // User destructor.
         symbol_kind_type yykind = this->kind ();
@@ -1126,14 +1103,6 @@ switch (yykind)
         value.template destroy< AggrNode* > ();
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.template destroy< AndNode* > ();
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.template destroy< AtomPredNode* > ();
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.template destroy< ConstantNode* > ();
         break;
@@ -1146,17 +1115,13 @@ switch (yykind)
         value.template destroy< DescriptorNode* > ();
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.template destroy< DescriptorOrderingNode* > ();
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.template destroy< ListNode* > ();
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.template destroy< OrNode* > ();
         break;
 
       case symbol_kind::SYM_path: // path
@@ -1173,6 +1138,11 @@ switch (yykind)
 
       case symbol_kind::SYM_prop: // prop
         value.template destroy< PropertyNode* > ();
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.template destroy< QueryNode* > ();
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -1251,7 +1221,7 @@ switch (yykind)
       void move (basic_symbol& s);
 
       /// The semantic value.
-      semantic_type value;
+      value_type value;
 
     private:
 #if YY_CPLUSPLUS < 201103L
@@ -1263,25 +1233,27 @@ switch (yykind)
     /// Type access provider for token (enum) based symbols.
     struct by_kind
     {
-      /// Default constructor.
-      by_kind ();
-
-#if 201103L <= YY_CPLUSPLUS
-      /// Move constructor.
-      by_kind (by_kind&& that);
-#endif
-
-      /// Copy constructor.
-      by_kind (const by_kind& that);
-
       /// The symbol kind as needed by the constructor.
       typedef token_kind_type kind_type;
 
+      /// Default constructor.
+      by_kind () YY_NOEXCEPT;
+
+#if 201103L <= YY_CPLUSPLUS
+      /// Move constructor.
+      by_kind (by_kind&& that) YY_NOEXCEPT;
+#endif
+
+      /// Copy constructor.
+      by_kind (const by_kind& that) YY_NOEXCEPT;
+
       /// Constructor from (external) token numbers.
-      by_kind (kind_type t);
+      by_kind (kind_type t) YY_NOEXCEPT;
+
+
 
       /// Record that this symbol is empty.
-      void clear ();
+      void clear () YY_NOEXCEPT;
 
       /// Steal the symbol kind from \a that.
       void move (by_kind& that);
@@ -1308,17 +1280,18 @@ switch (yykind)
       typedef basic_symbol<by_kind> super_type;
 
       /// Empty symbol.
-      symbol_type () {}
+      symbol_type () YY_NOEXCEPT {}
 
       /// Constructor for valueless symbols, and symbols from each type.
 #if 201103L <= YY_CPLUSPLUS
       symbol_type (int tok)
-        : super_type(token_type (tok))
+        : super_type (token_kind_type (tok))
 #else
       symbol_type (int tok)
-        : super_type(token_type (tok))
+        : super_type (token_kind_type (tok))
 #endif
       {
+#if !defined _MSC_VER || defined __clang__
         YY_ASSERT (tok == token::TOK_END
                    || (token::TOK_YYerror <= tok && tok <= token::TOK_NOT)
                    || (40 <= tok && tok <= 41)
@@ -1328,16 +1301,19 @@ switch (yykind)
                    || tok == 44
                    || tok == 123
                    || tok == 125);
+#endif
       }
 #if 201103L <= YY_CPLUSPLUS
       symbol_type (int tok, std::string v)
-        : super_type(token_type (tok), std::move (v))
+        : super_type (token_kind_type (tok), std::move (v))
 #else
       symbol_type (int tok, const std::string& v)
-        : super_type(token_type (tok), v)
+        : super_type (token_kind_type (tok), v)
 #endif
       {
+#if !defined _MSC_VER || defined __clang__
         YY_ASSERT ((token::TOK_ID <= tok && tok <= token::TOK_KEY_VAL));
+#endif
       }
     };
 
@@ -1385,7 +1361,7 @@ switch (yykind)
     /// YYSYMBOL.  No bounds checking.
     static std::string symbol_name (symbol_kind_type yysymbol);
 
-    // Implementation of make_symbol for each symbol type.
+    // Implementation of make_symbol for each token kind.
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
@@ -2217,8 +2193,8 @@ switch (yykind)
     {
     public:
       context (const parser& yyparser, const symbol_type& yyla);
-      const symbol_type& lookahead () const { return yyla_; }
-      symbol_kind_type token () const { return yyla_.kind (); }
+      const symbol_type& lookahead () const YY_NOEXCEPT { return yyla_; }
+      symbol_kind_type token () const YY_NOEXCEPT { return yyla_.kind (); }
       /// Put in YYARG at most YYARGN of the expected tokens, and return the
       /// number of tokens stored in YYARG.  If YYARG is null, return the
       /// number of expected tokens (guaranteed to be less than YYNTOKENS).
@@ -2255,19 +2231,19 @@ switch (yykind)
 
     /// Whether the given \c yypact_ value indicates a defaulted state.
     /// \param yyvalue   the value to check
-    static bool yy_pact_value_is_default_ (int yyvalue);
+    static bool yy_pact_value_is_default_ (int yyvalue) YY_NOEXCEPT;
 
     /// Whether the given \c yytable_ value indicates a syntax error.
     /// \param yyvalue   the value to check
-    static bool yy_table_value_is_error_ (int yyvalue);
+    static bool yy_table_value_is_error_ (int yyvalue) YY_NOEXCEPT;
 
     static const signed char yypact_ninf_;
     static const signed char yytable_ninf_;
 
     /// Convert a scanner token kind \a t to a symbol kind.
     /// In theory \a t should be a token_kind_type, but character literals
-    /// are valid, yet not members of the token_type enum.
-    static symbol_kind_type yytranslate_ (int t);
+    /// are valid, yet not members of the token_kind_type enum.
+    static symbol_kind_type yytranslate_ (int t) YY_NOEXCEPT;
 
     /// Convert the symbol name \a n to a form suitable for a diagnostic.
     static std::string yytnamerr_ (const char *yystr);
@@ -2290,7 +2266,7 @@ switch (yykind)
     static const signed char yypgoto_[];
 
     // YYDEFGOTO[NTERM-NUM].
-    static const short yydefgoto_[];
+    static const unsigned char yydefgoto_[];
 
     // YYTABLE[YYPACT[STATE-NUM]] -- What to do in state STATE-NUM.  If
     // positive, shift that token.  If negative, reduce the rule whose
@@ -2299,14 +2275,14 @@ switch (yykind)
 
     static const short yycheck_[];
 
-    // YYSTOS[STATE-NUM] -- The (internal number of the) accessing
-    // symbol of state STATE-NUM.
+    // YYSTOS[STATE-NUM] -- The symbol kind of the accessing symbol of
+    // state STATE-NUM.
     static const signed char yystos_[];
 
-    // YYR1[YYN] -- Symbol number of symbol that rule YYN derives.
+    // YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.
     static const signed char yyr1_[];
 
-    // YYR2[YYN] -- Number of symbols on the right hand side of rule YYN.
+    // YYR2[RULE-NUM] -- Number of symbols on the right-hand side of rule RULE-NUM.
     static const signed char yyr2_[];
 
 
@@ -2405,7 +2381,7 @@ switch (yykind)
       typedef typename S::size_type size_type;
       typedef typename std::ptrdiff_t index_type;
 
-      stack (size_type n = 200)
+      stack (size_type n = 200) YY_NOEXCEPT
         : seq_ (n)
       {}
 
@@ -2484,7 +2460,7 @@ switch (yykind)
       class slice
       {
       public:
-        slice (const stack& stack, index_type range)
+        slice (const stack& stack, index_type range) YY_NOEXCEPT
           : stack_ (stack)
           , range_ (range)
         {}
@@ -2534,14 +2510,14 @@ switch (yykind)
     void yypush_ (const char* m, state_type s, YY_MOVE_REF (symbol_type) sym);
 
     /// Pop \a n symbols from the stack.
-    void yypop_ (int n = 1);
+    void yypop_ (int n = 1) YY_NOEXCEPT;
 
     /// Constants.
     enum
     {
-      yylast_ = 299,     ///< Last index in yytable_.
-      yynnts_ = 29,  ///< Number of nonterminal symbols.
-      yyfinal_ = 39 ///< Termination state number.
+      yylast_ = 296,     ///< Last index in yytable_.
+      yynnts_ = 28,  ///< Number of nonterminal symbols.
+      yyfinal_ = 38 ///< Termination state number.
     };
 
 
@@ -2553,7 +2529,7 @@ switch (yykind)
 
   inline
   parser::symbol_kind_type
-  parser::yytranslate_ (int t)
+  parser::yytranslate_ (int t) YY_NOEXCEPT
   {
     // YYTRANSLATE[TOKEN-NUM] -- Symbol number corresponding to
     // TOKEN-NUM as returned by yylex.
@@ -2599,7 +2575,7 @@ switch (yykind)
     if (t <= 0)
       return symbol_kind::SYM_YYEOF;
     else if (t <= code_max)
-      return YY_CAST (symbol_kind_type, translate_table[t]);
+      return static_cast <symbol_kind_type> (translate_table[t]);
     else
       return symbol_kind::SYM_YYUNDEF;
   }
@@ -2616,14 +2592,6 @@ switch (yykind)
         value.copy< AggrNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.copy< AndNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.copy< AtomPredNode* > (YY_MOVE (that.value));
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.copy< ConstantNode* > (YY_MOVE (that.value));
         break;
@@ -2636,17 +2604,13 @@ switch (yykind)
         value.copy< DescriptorNode* > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.copy< DescriptorOrderingNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.copy< ListNode* > (YY_MOVE (that.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.copy< OrNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -2663,6 +2627,11 @@ switch (yykind)
 
       case symbol_kind::SYM_prop: // prop
         value.copy< PropertyNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.copy< QueryNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -2726,12 +2695,14 @@ switch (yykind)
 
 
 
+
   template <typename Base>
   parser::symbol_kind_type
   parser::basic_symbol<Base>::type_get () const YY_NOEXCEPT
   {
     return this->kind ();
   }
+
 
   template <typename Base>
   bool
@@ -2751,14 +2722,6 @@ switch (yykind)
         value.move< AggrNode* > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_and_pred: // and_pred
-        value.move< AndNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_atom_pred: // atom_pred
-        value.move< AtomPredNode* > (YY_MOVE (s.value));
-        break;
-
       case symbol_kind::SYM_constant: // constant
         value.move< ConstantNode* > (YY_MOVE (s.value));
         break;
@@ -2771,17 +2734,13 @@ switch (yykind)
         value.move< DescriptorNode* > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::SYM_pred_suffix: // pred_suffix
+      case symbol_kind::SYM_post_query: // post_query
         value.move< DescriptorOrderingNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.move< ListNode* > (YY_MOVE (s.value));
-        break;
-
-      case symbol_kind::SYM_pred: // pred
-        value.move< OrNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_path: // path
@@ -2798,6 +2757,11 @@ switch (yykind)
 
       case symbol_kind::SYM_prop: // prop
         value.move< PropertyNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_query: // query
+      case symbol_kind::SYM_compare: // compare
+        value.move< QueryNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_subquery: // subquery
@@ -2861,13 +2825,13 @@ switch (yykind)
 
   // by_kind.
   inline
-  parser::by_kind::by_kind ()
+  parser::by_kind::by_kind () YY_NOEXCEPT
     : kind_ (symbol_kind::SYM_YYEMPTY)
   {}
 
 #if 201103L <= YY_CPLUSPLUS
   inline
-  parser::by_kind::by_kind (by_kind&& that)
+  parser::by_kind::by_kind (by_kind&& that) YY_NOEXCEPT
     : kind_ (that.kind_)
   {
     that.clear ();
@@ -2875,18 +2839,20 @@ switch (yykind)
 #endif
 
   inline
-  parser::by_kind::by_kind (const by_kind& that)
+  parser::by_kind::by_kind (const by_kind& that) YY_NOEXCEPT
     : kind_ (that.kind_)
   {}
 
   inline
-  parser::by_kind::by_kind (token_kind_type t)
+  parser::by_kind::by_kind (token_kind_type t) YY_NOEXCEPT
     : kind_ (yytranslate_ (t))
   {}
 
+
+
   inline
   void
-  parser::by_kind::clear ()
+  parser::by_kind::clear () YY_NOEXCEPT
   {
     kind_ = symbol_kind::SYM_YYEMPTY;
   }
@@ -2906,12 +2872,14 @@ switch (yykind)
     return kind_;
   }
 
+
   inline
   parser::symbol_kind_type
   parser::by_kind::type_get () const YY_NOEXCEPT
   {
     return this->kind ();
   }
+
 
 } // yy
 

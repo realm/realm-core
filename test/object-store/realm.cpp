@@ -350,6 +350,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].column_key == table->get_column_key("value"));
+
+        SECTION("refreshing an immutable Realm throws") {
+            REQUIRE_THROWS_WITH(realm->refresh(), "Can't refresh a read-only Realm.");
+        }
     }
 
     SECTION("should support using different table subsets on different threads") {
@@ -552,20 +556,22 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
     std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
+        ThreadSafeReference realm_ref;
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!error);
             called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
+            realm_ref = std::move(ref);
         });
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
+        REQUIRE(realm_ref);
+        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
     }
 
     SECTION("can write a realm file without client file id") {
@@ -639,20 +645,21 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
+        ThreadSafeReference realm_ref;
         std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
         task->start([&](auto ref, auto error) {
             std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(!error);
             called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
+            realm_ref = std::move(ref);
         });
         util::EventLoop::main().run_until([&] {
             return called.load();
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
+        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
     }
 
     SECTION("progress notifiers of a task are cancelled if the task is cancelled") {

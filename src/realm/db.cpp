@@ -62,12 +62,6 @@ using Durability = DBOptions::Durability;
 
 namespace {
 
-// Constants controlling the amount of uncommited writes in flight:
-#ifdef REALM_ASYNC_DAEMON
-const uint16_t max_write_slots = 100;
-const uint16_t relaxed_sync_threshold = 50;
-#endif
-
 // value   change
 // --------------------
 //  4      Unknown
@@ -390,6 +384,18 @@ private:
     ReadCount data[init_readers_size];
 };
 
+// Using lambda rather than function so that shared_ptr shared state doesn't need to hold a function pointer.
+constexpr auto TransactionDeleter = [](Transaction* t) {
+    t->close();
+    delete t;
+};
+
+template <typename... Args>
+TransactionRef make_transaction_ref(Args&&... args)
+{
+    return TransactionRef(new Transaction(std::forward<Args>(args)...), TransactionDeleter);
+}
+
 } // anonymous namespace
 
 
@@ -511,9 +517,6 @@ struct alignas(8) DB::SharedInfo {
     uint16_t filler_2; // Offset 46
 
     InterprocessMutex::SharedPart shared_writemutex; // Offset 48
-#ifdef REALM_ASYNC_DAEMON
-    InterprocessMutex::SharedPart shared_balancemutex;
-#endif
     InterprocessMutex::SharedPart shared_controlmutex;
     InterprocessCondVar::SharedPart room_to_write;
     InterprocessCondVar::SharedPart work_to_do;
@@ -549,9 +552,6 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
     , shared_writemutex() // Throws
-#ifdef REALM_ASYNC_DAEMON
-    , shared_balancemutex() // Throws
-#endif
     , shared_controlmutex() // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
@@ -562,11 +562,6 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
     InterprocessCondVar::init_shared_part(pick_next_writer);     // Throws
     next_ticket = 0;
-#ifdef REALM_ASYNC_DAEMON
-    InterprocessCondVar::init_shared_part(room_to_write);        // Throws
-    InterprocessCondVar::init_shared_part(work_to_do);           // Throws
-    InterprocessCondVar::init_shared_part(daemon_becomes_ready); // Throws
-#endif
 
 // IMPORTANT: The offsets, types (, and meanings) of these members must
 // never change, not even when the SharedInfo layout version is bumped. The
@@ -618,101 +613,6 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 #endif
 }
 
-
-namespace {
-
-#ifdef REALM_ASYNC_DAEMON
-void spawn_daemon(const std::string& file)
-{
-    REALM_ASSERT(false); // this code is currently not maintained.
-    // determine maximum number of open descriptors
-    errno = 0;
-    int m = int(sysconf(_SC_OPEN_MAX));
-    if (m < 0) {
-        if (errno) {
-            int err = errno; // Eliminate any risk of clobbering
-            throw std::system_error(err, std::system_category(), "sysconf(_SC_OPEN_MAX) failed");
-        }
-        throw std::runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
-    }
-
-    int pid = fork();
-    if (0 == pid) { // child process:
-
-        // close all descriptors:
-        int i;
-        for (i = m - 1; i >= 0; --i)
-            close(i);
-#ifdef REALM_ENABLE_LOGFILE
-        i = ::open(get_core_file(CoreFileType::Log).c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
-#else
-        i = ::open("/dev/null", O_RDWR);
-#endif
-        if (i >= 0) {
-            int j = dup(i);
-            static_cast<void>(j);
-        }
-#ifdef REALM_ENABLE_LOGFILE
-        std::cerr << "Detaching" << std::endl;
-#endif
-        // detach from current session:
-        setsid();
-
-        // start commit daemon executable
-        // Note that getenv (which is not thread safe) is called in a
-        // single threaded context. This is ensured by the fork above.
-        const char* async_daemon = getenv("REALM_ASYNC_DAEMON");
-        if (!async_daemon) {
-#ifndef REALM_DEBUG
-            async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd";
-#else
-            async_daemon = REALM_INSTALL_LIBEXECDIR "/realmd-dbg";
-#endif
-        }
-        execl(async_daemon, async_daemon, file.c_str(), static_cast<char*>(0));
-
-// if we continue here, exec has failed so return error
-// if exec succeeds, we don't come back here.
-#if REALM_ANDROID
-        _exit(1);
-#else
-        _Exit(1);
-#endif
-        // child process ends here
-    }
-    else if (pid > 0) { // parent process, fork succeeded:
-
-        // use childs exit code to catch and report any errors:
-        int status;
-        int pid_changed;
-        do {
-            pid_changed = waitpid(pid, &status, 0);
-        } while (pid_changed == -1 && errno == EINTR);
-        if (pid_changed != pid) {
-            std::cerr << "Waitpid returned pid = " << pid_changed << " and status = " << std::hex << status
-                      << std::endl;
-            throw std::runtime_error("call to waitpid failed");
-        }
-        if (!WIFEXITED(status))
-            throw std::runtime_error("failed starting async commit (exit)");
-        if (WEXITSTATUS(status) == 1) {
-            throw std::runtime_error("async commit daemon not found");
-        }
-        if (WEXITSTATUS(status) == 2)
-            throw std::runtime_error("async commit daemon failed");
-        if (WEXITSTATUS(status) == 3)
-            throw std::runtime_error("wrong db given to async daemon");
-    }
-    else { // Parent process, fork failed!
-
-        throw std::runtime_error("Failed to spawn async commit");
-    }
-}
-#endif
-
-
-} // anonymous namespace
-
 #if REALM_HAVE_STD_FILESYSTEM
 std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().string();
 #else
@@ -737,17 +637,12 @@ std::string DBOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, const DBOptions options)
+void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
 
     REALM_ASSERT(!is_attached());
-
-#ifndef REALM_ASYNC_DAEMON
-    if (options.durability == Durability::Async)
-        throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
-#endif
 
     m_db_path = path;
     SlabAlloc& alloc = m_alloc;
@@ -954,10 +849,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
             throw IncompatibleLockFile(ss.str());
         }
         m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
-#ifdef REALM_ASYNC_DAEMON
-        if (info->durability == static_cast<uint16_t>(Durability::Async))
-            m_balancemutex.set_shared_part(info->shared_balancemutex, m_lockfile_prefix, "balance");
-#endif
         m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
@@ -1246,28 +1137,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
                                                    options.temp_dir);
             m_pick_next_writer.set_shared_part(info->pick_next_writer, m_lockfile_prefix, "pick_writer",
                                                options.temp_dir);
-#ifdef REALM_ASYNC_DAEMON
-            if (options.durability == Durability::Async) {
-                m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready",
-                                                       options.temp_dir);
-                m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
-                m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write",
-                                                options.temp_dir);
-                // In async mode, we need to make sure the daemon is running and ready:
-                if (!is_backend) {
-                    while (info->daemon_ready == 0) {
-                        if (info->daemon_started == 0) {
-                            spawn_daemon(path);
-                            info->daemon_started = 1;
-                        }
-                        // std::cerr << "Waiting for daemon" << std::endl;
-                        m_daemon_becomes_ready.wait(m_controlmutex, 0);
-                        // std::cerr << " - notified" << std::endl;
-                    }
-                }
-            }
-// std::cerr << "daemon should be ready" << std::endl;
-#endif // REALM_ASYNC_DAEMON
 
             // make our presence noted:
             ++info->num_participants;
@@ -1280,18 +1149,6 @@ void DB::do_open(const std::string& path, bool no_create_file, bool is_backend, 
         }
         break;
     }
-
-    // std::cerr << "open completed" << std::endl;
-
-#ifdef REALM_ASYNC_DAEMON
-    if (options.durability == Durability::Async) {
-        if (is_backend) {
-            do_async_commits();
-        }
-    }
-#else
-    static_cast<void>(is_backend);
-#endif
 
     // Upgrade file format and/or history schema
     try {
@@ -1332,15 +1189,6 @@ void DB::open(BinaryData buffer, bool take_ownership)
         m_alloc.own_buffer();
 }
 
-void DB::open(const std::string& path, bool no_create_file, const DBOptions options)
-{
-    // Exception safety: Since open() is called from constructors, if it throws,
-    // it must leave the file closed.
-
-    bool is_backend = false;
-    do_open(path, no_create_file, is_backend, options); // Throws
-}
-
 void DB::open(Replication& repl, const std::string& file, const DBOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
@@ -1353,8 +1201,7 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions option
     set_replication(&repl);
 
     bool no_create = false;
-    bool is_backend = false;
-    do_open(file, no_create, is_backend, options); // Throws
+    open(file, no_create, options); // Throws
 }
 
 
@@ -1620,11 +1467,6 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     {
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
 
-#ifdef REALM_ASYNC_DAEMON
-        m_room_to_write.close();
-        m_work_to_do.close();
-        m_daemon_becomes_ready.close();
-#endif
         m_new_commit_available.close();
         m_pick_next_writer.close();
 
@@ -1712,111 +1554,6 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 
     m_transact_stage = stage;
 }
-
-#ifdef REALM_ASYNC_DAEMON
-void DB::do_async_commits()
-{
-    bool shutdown = false;
-    SharedInfo* info = m_file_map.get_addr();
-
-    // We always want to keep a read lock on the last version
-    // that was commited to disk, to protect it against being
-    // overwritten by commits being made to memory by others.
-    {
-        VersionID version_id = VersionID();      // Latest available snapshot
-        grab_read_lock(m_read_lock, version_id); // Throws
-    }
-    // we must treat version and version_index the same way:
-    {
-        std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-        info->free_write_slots = max_write_slots;
-        info->daemon_ready = 1;
-        m_daemon_becomes_ready.notify_all();
-    }
-
-    while (true) {
-        if (m_file.is_removed()) { // operator removed the lock file. take a hint!
-
-            shutdown = true;
-#ifdef REALM_ENABLE_LOGFILE
-            std::cerr << "Lock file removed, initiating shutdown" << std::endl;
-#endif
-        }
-
-        bool is_same;
-        ReadLockInfo next_read_lock = m_read_lock;
-        {
-            // detect if we're the last "client", and if so, shutdown (must be under lock):
-            std::lock_guard<InterprocessMutex> lock2(m_writemutex);
-            std::lock_guard<InterprocessMutex> lock(m_controlmutex);
-            version_type old_version = next_read_lock.m_version;
-            VersionID version_id = VersionID(); // Latest available snapshot
-            grab_read_lock(next_read_lock, version_id);
-            is_same = (next_read_lock.m_version == old_version);
-            if (is_same && (shutdown || info->num_participants == 1)) {
-#ifdef REALM_ENABLE_LOGFILE
-                std::cerr << "Daemon exiting nicely" << std::endl << std::endl;
-#endif
-                release_read_lock(next_read_lock);
-                release_read_lock(m_read_lock);
-                info->daemon_started = 0;
-                info->daemon_ready = 0;
-                return;
-            }
-        }
-
-        if (!is_same) {
-
-#ifdef REALM_ENABLE_LOGFILE
-            std::cerr << "Syncing from version " << m_read_lock.m_version << " to " << next_read_lock.m_version
-                      << std::endl;
-#endif
-
-            GroupWriter writer(m_group);
-            writer.commit(next_read_lock.m_top_ref);
-
-#ifdef REALM_ENABLE_LOGFILE
-            std::cerr << "..and Done" << std::endl;
-#endif
-        }
-
-        // Now we can release the version that was previously commited
-        // to disk and just keep the lock on the latest version.
-        release_read_lock(m_read_lock);
-        m_read_lock = next_read_lock;
-
-        m_balancemutex.lock();
-
-        // We have caught up with the writers, let them know that there are
-        // now free write slots, wakeup any that has been suspended.
-        uint16_t free_write_slots = info->free_write_slots;
-        info->free_write_slots = max_write_slots;
-        if (free_write_slots <= 0) {
-            m_room_to_write.notify_all();
-        }
-
-        // If we have plenty of write slots available, relax and wait a bit before syncing
-        if (free_write_slots > relaxed_sync_threshold) {
-            timespec ts;
-            timeval tv;
-            // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
-            gettimeofday(&tv, nullptr);
-            ts.tv_sec = tv.tv_sec;
-            ts.tv_nsec = tv.tv_usec * 1000;
-            ts.tv_nsec += 10000000;         // 10 msec
-            if (ts.tv_nsec >= 1000000000) { // overflow
-                ts.tv_nsec -= 1000000000;
-                ts.tv_sec += 1;
-            }
-
-            // no timeout support if the condvars are only emulated, so this will assert
-            m_work_to_do.wait(m_balancemutex, &ts);
-        }
-        m_balancemutex.unlock();
-    }
-}
-#endif // REALM_ASYNC_DAEMON
-
 
 void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
                              int current_hist_schema_version, int target_hist_schema_version)
@@ -2080,24 +1817,6 @@ void DB::finish_begin_write()
         throw std::runtime_error("Crash of other process detected, session restart required");
     }
 
-#ifdef REALM_ASYNC_DAEMON
-    if (info->durability == static_cast<uint16_t>(Durability::Async)) {
-
-        m_balancemutex.lock(); // Throws
-
-        // if we are running low on write slots, kick the sync daemon
-        if (info->free_write_slots < relaxed_sync_threshold)
-            m_work_to_do.notify_all();
-        // if we are out of write slots, wait for the sync daemon to catch up
-        while (info->free_write_slots <= 0) {
-            m_room_to_write.wait(m_balancemutex, 0);
-        }
-
-        info->free_write_slots--;
-        m_balancemutex.unlock();
-    }
-#endif // REALM_ASYNC_DAEMON
-
     m_alloc.set_read_only(false);
 }
 
@@ -2298,7 +2017,6 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
                 out.commit(new_top_ref); // Throws
                 break;
             case Durability::MemOnly:
-            case Durability::Async:
                 // In Durability::MemOnly mode, we just use the file as backing for
                 // the shared memory. So we never actually flush the data to disk
                 // (the OS may do so opportinisticly, or when swapping). So in this
@@ -2406,48 +2124,43 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
         File::try_remove(get_core_file(base_path, CoreFileType::Lock));
     }
 }
-void TransactionDeleter(Transaction* t)
-{
-    t->close();
-    delete t;
-}
 
 TransactionRef DB::start_read(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    Transaction* tr;
+    TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
-        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
     }
     else {
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
         g.release();
     }
     tr->set_file_format_version(get_file_format_version());
-    return TransactionRef(tr, TransactionDeleter);
+    return tr;
 }
 
 TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
-    Transaction* tr;
+    TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
-        tr = new Transaction(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
     }
     else {
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
         g.release();
     }
     tr->set_file_format_version(get_file_format_version());
-    return TransactionRef(tr, TransactionDeleter);
+    return tr;
 }
 
 Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB::TransactStage stage)
@@ -2666,11 +2379,11 @@ TransactionRef DB::start_write(bool nonblocking)
         m_write_transaction_open = true;
     }
     ReadLockInfo read_lock;
-    Transaction* tr;
+    TransactionRef tr;
     try {
         grab_read_lock(read_lock, VersionID());
         ReadLockGuard g(*this, read_lock);
-        tr = new Transaction(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
+        tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         version_type current_version = read_lock.m_version;
         m_alloc.init_mapping_management(current_version);
@@ -2685,7 +2398,7 @@ TransactionRef DB::start_write(bool nonblocking)
         throw;
     }
 
-    return TransactionRef(tr, TransactionDeleter);
+    return tr;
 }
 
 Obj Transaction::import_copy_of(const Obj& original)

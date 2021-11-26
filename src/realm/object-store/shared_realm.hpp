@@ -26,6 +26,10 @@
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/sync/subscriptions.hpp>
+#endif
+
 #include <memory>
 
 namespace realm {
@@ -273,7 +277,14 @@ public:
     static std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
 
     std::shared_ptr<SyncSession> sync_session() const;
+
+    // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
+    // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
+    // sync mode if they aren't already.
+    const sync::SubscriptionSet get_latest_subscription_set();
+    const sync::SubscriptionSet get_active_subscription_set();
 #endif
+
     // Returns a frozen Realm for the given Realm. This Realm can be accessed from any thread.
     static SharedRealm get_frozen_realm(Config config, VersionID version);
 
@@ -303,6 +314,7 @@ public:
     {
         return m_schema_version;
     }
+
 
     void begin_transaction();
     void commit_transaction();

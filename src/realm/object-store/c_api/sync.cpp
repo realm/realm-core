@@ -40,8 +40,8 @@ static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::normal) == RLM_S
 static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_SYNC_CLIENT_RECONNECT_MODE_TESTING);
 
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Manual) == RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
-static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::SeamlessLoss) ==
-              RLM_SYNC_SESSION_RESYNC_MODE_SEAMLESS_LOSS);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::DiscardLocal) ==
+              RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
 
 static_assert(realm_sync_session_stop_policy_e(SyncSessionStopPolicy::Immediately) ==
               RLM_SYNC_SESSION_STOP_POLICY_IMMEDIATELY);
@@ -137,7 +137,9 @@ static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changeset_header_
               RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_HEADER_SYNTAX);
 static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changeset_size) ==
               RLM_SYNC_ERR_CONNECTION_BAD_CHANGESET_SIZE);
-static_assert(realm_sync_errno_connection_e(ProtocolError::bad_changesets) == RLM_SYNC_ERR_CONNECTION_BAD_CHANGESETS);
+static_assert(realm_sync_errno_connection_e(ProtocolError::switch_to_flx_sync) ==
+              RLM_SYNC_ERR_CONNECTION_SWITCH_TO_FLX_SYNC);
+static_assert(realm_sync_errno_connection_e(ProtocolError::switch_to_pbs) == RLM_SYNC_ERR_CONNECTION_SWITCH_TO_PBS);
 
 static_assert(realm_sync_errno_session_e(ProtocolError::session_closed) == RLM_SYNC_ERR_SESSION_SESSION_CLOSED);
 static_assert(realm_sync_errno_session_e(ProtocolError::other_session_error) ==

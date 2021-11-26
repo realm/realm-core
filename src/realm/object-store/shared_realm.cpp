@@ -42,6 +42,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
@@ -179,6 +180,16 @@ std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 std::shared_ptr<SyncSession> Realm::sync_session() const
 {
     return m_coordinator->sync_session();
+}
+
+const sync::SubscriptionSet Realm::get_latest_subscription_set()
+{
+    return m_coordinator->sync_session()->get_flx_subscription_store()->get_latest();
+}
+
+const sync::SubscriptionSet Realm::get_active_subscription_set()
+{
+    return m_coordinator->sync_session()->get_flx_subscription_store()->get_active();
 }
 #endif
 
@@ -809,6 +820,10 @@ bool Realm::do_refresh()
     // Frozen Realms never change.
     if (is_frozen()) {
         return false;
+    }
+
+    if (m_config.immutable()) {
+        throw std::logic_error("Can't refresh a read-only Realm.");
     }
 
     // can't be any new changes if we're in a write transaction

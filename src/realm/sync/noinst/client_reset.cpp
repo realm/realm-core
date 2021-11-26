@@ -811,7 +811,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     BinaryData recovered_changeset;
     sync::SaltedVersion fresh_server_version = {0, 0};
 
-    if (db_remote) { // seamless_loss mode
+    if (db_remote) { // 'discard local' mode
         auto wt_remote = db_remote->start_write();
         auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
         sync::version_type current_version_remote = wt_remote->get_version();

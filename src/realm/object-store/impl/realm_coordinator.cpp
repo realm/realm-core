@@ -108,10 +108,16 @@ void RealmCoordinator::create_sync_session()
                 REALM_ASSERT(path != m_config.path);
                 REALM_ASSERT(m_config.sync_config);
                 auto copy_config = m_config;
+                copy_config.schema = util::none;
+                copy_config.realm_data = BinaryData{};
+                copy_config.audit_factory = {};
                 copy_config.path = path;
-                // Do not use seamless loss mode on the fresh Realm. Use manual mode so that
+                // Do not use 'discard local' mode on the fresh Realm. Use manual mode so that
                 // any error during the download is propagated back to the original session.
                 // This prevents a cycle if the fresh copy itself experiences a client reset.
+                // To make this change and not have it affect the actual sync session, an explicit
+                // copy must be made of the sync config because it is a shared pointer.
+                copy_config.sync_config = std::make_shared<SyncConfig>(*m_config.sync_config);
                 copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
                 std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
                 REALM_ASSERT(rc);
@@ -335,12 +341,20 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
+        // Creating ExternalCommitHelper with mutex locked creates a potential deadlock
+        // as the commit helper calls back on the Realm::on_change (not in the constructor,
+        // but the thread sanitizer warns anyway)
+        realm_lock.unlock_unchecked();
+        std::unique_ptr<ExternalCommitHelper> notifier;
         try {
-            m_notifier = std::make_unique<ExternalCommitHelper>(*this);
+            notifier = std::make_unique<ExternalCommitHelper>(*this);
         }
         catch (std::system_error const& ex) {
             throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
         }
+        realm_lock.lock_unchecked();
+        if (!m_notifier)
+            m_notifier = std::move(notifier);
     }
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
@@ -640,6 +654,7 @@ RealmCoordinator::~RealmCoordinator()
 
 void RealmCoordinator::unregister_realm(Realm* realm)
 {
+    util::CheckedLockGuard lock(m_realm_mutex);
     // Normally results notifiers are cleaned up by the background worker thread
     // but if that's disabled we need to ensure that any notifiers from this
     // Realm get cleaned up
@@ -648,7 +663,6 @@ void RealmCoordinator::unregister_realm(Realm* realm)
         clean_up_dead_notifiers();
     }
     {
-        util::CheckedLockGuard lock(m_realm_mutex);
         auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [=](auto& notifier) {
             return notifier.expired() || notifier.is_for_realm(realm);
         });

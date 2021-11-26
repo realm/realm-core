@@ -1862,10 +1862,6 @@ const char* to_lead_cstr(RealmDurability level)
             return "Full   ";
         case RealmDurability::MemOnly:
             return "MemOnly";
-#ifndef _WIN32
-        case RealmDurability::Async:
-            return "Async  ";
-#endif
     }
     return nullptr;
 }
@@ -1877,10 +1873,6 @@ const char* to_ident_cstr(RealmDurability level)
             return "Full";
         case RealmDurability::MemOnly:
             return "MemOnly";
-#ifndef _WIN32
-        case RealmDurability::Async:
-            return "Async";
-#endif
     }
     return nullptr;
 }

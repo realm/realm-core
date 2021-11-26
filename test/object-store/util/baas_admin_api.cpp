@@ -696,22 +696,22 @@ AppCreateConfig default_app_config(const std::string& base_url)
         true,
     };
 
-    return AppCreateConfig{
-        "test",
-        base_url,
-        "unique_user@domain.com",
-        "password",
-        "mongodb://localhost:26000",
-        db_name,
-        std::move(default_schema),
-        std::move(partition_key),
-        true,
-        std::move(funcs),
-        std::move(user_pass_config),
-        std::string{"authFunc"},
-        true,
-        true,
-    };
+    return AppCreateConfig{"test",
+                           base_url,
+                           "unique_user@domain.com",
+                           "password",
+                           "mongodb://localhost:26000",
+                           db_name,
+                           std::move(default_schema),
+                           std::move(partition_key),
+                           true,
+                           AppCreateConfig::SyncMode::PBS,
+                           std::move(funcs),
+                           std::move(user_pass_config),
+                           std::string{"authFunc"},
+                           true,
+                           true,
+                           true};
 }
 
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
@@ -733,12 +733,13 @@ AppCreateConfig minimal_app_config(const std::string& base_url, const std::strin
         util::format("test_data_%1_%2", name, id.to_string()),
         schema,
         std::move(partition_key),
-        true,                        // dev_mode_enabled
-        {},                          // no functions
-        std::move(user_pass_config), // enable basic user/pass auth
-        util::none,                  // disable custom auth
-        true,                        // enable api key auth
-        true,                        // enable anonymous auth
+        true,                           // dev_mode_enabled
+        AppCreateConfig::SyncMode::PBS, // default to PBS
+        {},                             // no functions
+        std::move(user_pass_config),    // enable basic user/pass auth
+        util::none,                     // disable custom auth
+        true,                           // enable api key auth
+        true,                           // enable anonymous auth
     };
 }
 
@@ -813,35 +814,58 @@ AppSession create_app(const AppCreateConfig& config)
     auto secrets = app["secrets"];
     secrets.post_json({{"name", "BackingDB_uri"}, {"value", config.mongo_uri}});
     secrets.post_json({{"name", "gcm"}, {"value", "gcm"}});
+    secrets.post_json({{"name", "customTokenKey"}, {"value", "My_very_confidential_secretttttt"}});
+
+    if (config.enable_custom_token_auth) {
+        auth_providers.post_json(
+            {{"type", "custom-token"},
+             {"config",
+              {
+                  {"audience", nlohmann::json::array()},
+                  {"signingAlgorithm", "HS256"},
+                  {"useJWKURI", false},
+              }},
+             {"secret_config", {{"signingKeys", nlohmann::json::array({"customTokenKey"})}}},
+             {"disabled", false},
+             {"metadata_fields",
+              {{{"required", false}, {"name", "user_data.name"}, {"field_name", "name"}},
+               {{"required", true}, {"name", "user_data.occupation"}, {"field_name", "occupation"}},
+               {{"required", true}, {"name", "my_metadata.name"}, {"field_name", "anotherName"}}}}});
+    }
 
     auto services = app["services"];
     static const std::string mongo_service_name = "BackingDB";
 
-    auto create_mongo_service_resp = services.post_json({
+    nlohmann::json mongo_service_def = {
         {"name", mongo_service_name},
         {"type", "mongodb"},
-        {"config",
-         {
-             {"uri", config.mongo_uri},
-             {"sync",
-              {
-                  {"state", "enabled"},
-                  {"database_name", config.mongo_dbname},
-                  {"partition",
-                   {
-                       {"key", config.partition_key.name},
-                       {"type", property_type_to_bson_type_str(config.partition_key.type)},
-                       {"required", !is_nullable(config.partition_key.type)},
-                       {"permissions",
-                        {
-                            {"read", true},
-                            {"write", true},
-                        }},
-                   }},
-              }},
-         }},
-    });
+        {"config", {{"uri", config.mongo_uri}}},
+    };
+    switch (config.sync_mode) {
+        case AppCreateConfig::SyncMode::PBS:
+            mongo_service_def["config"]["sync"] = nlohmann::json{
+                {"state", "enabled"},
+                {"database_name", config.mongo_dbname},
+                {"partition",
+                 {
+                     {"key", config.partition_key.name},
+                     {"type", property_type_to_bson_type_str(config.partition_key.type)},
+                     {"required", !is_nullable(config.partition_key.type)},
+                     {"permissions",
+                      {
+                          {"read", true},
+                          {"write", true},
+                      }},
+                 }},
+            };
+            break;
+        case AppCreateConfig::SyncMode::FLX:
+            mongo_service_def["config"]["sync_query"] =
+                nlohmann::json{{"state", "enabled"}, {"database_name", config.mongo_dbname}};
+            break;
+    }
 
+    auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
     auto rules = services[mongo_service_id]["rules"];
 

@@ -174,7 +174,6 @@ public:
                                     std::vector<UploadChangeset>& uploadable_changesets,
                                     version_type& locked_server_version) const;
 
-
     /// \brief Integrate a sequence of changesets received from the server using
     /// a single Realm transaction.
     ///
@@ -211,7 +210,8 @@ public:
     /// transaction.
     bool integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                      const RemoteChangeset* changesets, std::size_t num_changesets,
-                                     VersionInfo& new_version, IntegrationError& integration_error, util::Logger&,
+                                     VersionInfo& new_version, IntegrationError& integration_error,
+                                     DownloadBatchState download_type, util::Logger&,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,

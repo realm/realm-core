@@ -35,6 +35,7 @@
 #include <realm/table_cluster_tree.hpp>
 #include <realm/keys.hpp>
 #include <realm/global_key.hpp>
+#include <realm/index_string.hpp>
 
 // Only set this to one when testing the code paths that exercise object ID
 // hash collisions. It artificially limits the "optimistic" local ID to use
@@ -51,7 +52,6 @@ class BinaryColumy;
 class TableView;
 class Group;
 class SortDescriptor;
-class StringIndex;
 class TableView;
 template <class>
 class Columns;
@@ -391,7 +391,7 @@ public:
         report_invalid_key(col);
         if (!has_search_index(col))
             return nullptr;
-        return m_index_accessors[col.get_index().val];
+        return m_index_accessors[col.get_index().val].get();
     }
     template <class T>
     ObjKey find_first(ColKey col_key, T value) const;
@@ -668,7 +668,7 @@ private:
     Array m_index_refs;                             // 5th slot in m_top
     Array m_opposite_table;                         // 7th slot in m_top
     Array m_opposite_column;                        // 8th slot in m_top
-    std::vector<StringIndex*> m_index_accessors;
+    std::vector<std::unique_ptr<StringIndex>> m_index_accessors;
     ColKey m_primary_key_col;
     Replication* const* m_repl;
     static Replication* g_dummy_replication;
@@ -971,8 +971,8 @@ public:
         return link(backlink_col_key);
     }
 
-    Subexpr* column(const std::string&);
-    Subexpr* subquery(Query subquery);
+    std::unique_ptr<Subexpr> column(const std::string&);
+    std::unique_ptr<Subexpr> subquery(Query subquery);
 
     template <class T>
     inline Columns<T> column(ColKey col_key)
@@ -1040,9 +1040,9 @@ private:
     void add(ColKey ck);
 
     template <class T>
-    Subexpr* create_subexpr(ColKey col_key)
+    std::unique_ptr<Subexpr> create_subexpr(ColKey col_key)
     {
-        return new Columns<T>(col_key, m_base_table, m_link_cols, m_comparison_type);
+        return std::make_unique<Columns<T>>(col_key, m_base_table, m_link_cols, m_comparison_type);
     }
 };
 
