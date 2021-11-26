@@ -1735,6 +1735,25 @@ realm_dictionary_add_notification_callback(realm_object_t*, void* userdata, real
 RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_class_key_t target_table, const char* query_string,
                                          size_t num_args, const realm_value_t* args);
 
+
+/**
+ * Parse a query string and append it to an existing query via logical &&.
+ * The query string applies to the same table and Realm as the existing query.
+ *
+ * If the query failed to parse, the parser error is available from
+ * `realm_get_last_error()`.
+ *
+ * @param query_string A zero-terminated string in the Realm Query Language,
+ *                     optionally containing argument placeholders (`$0`, `$1`,
+ *                     etc.).
+ * @param num_args The number of arguments for this query.
+ * @param args A pointer to a list of argument values.
+ * @return A non-null pointer if the query was successfully parsed and no
+ *         exception occurred.
+ */
+RLM_API realm_query_t* realm_query_append_query(const realm_query_t*, const char* query_string, size_t num_args,
+                                                const realm_value_t* args);
+
 /**
  * Parse a query string and bind it to a list.
  *
