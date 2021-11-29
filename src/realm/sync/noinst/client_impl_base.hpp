@@ -962,6 +962,8 @@ private:
 
     bool m_upload_completion_notification_requested = false;
 
+    bool m_is_flx_sync_session = false;
+
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;

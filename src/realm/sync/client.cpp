@@ -745,6 +745,7 @@ void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch
 
 SubscriptionStore* SessionImpl::get_or_create_flx_subscription_store()
 {
+    m_is_flx_sync_session = true;
     return m_wrapper.get_or_create_flx_subscription_store();
 }
 
@@ -1292,7 +1293,7 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state, const Se
     if (state == ConnectionState::connected && m_sess) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.is_flx_sync_connection()) {
-            get_or_create_flx_subscription_store();
+            m_sess->get_or_create_flx_subscription_store();
         }
     }
 
