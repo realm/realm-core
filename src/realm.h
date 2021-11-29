@@ -76,7 +76,7 @@ typedef bool (*realm_should_compact_on_launch_func_t)(void* userdata, uint64_t t
 typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_AUTOMATIC,
     RLM_SCHEMA_MODE_IMMUTABLE,
-    RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE,
+    RLM_SCHEMA_MODE_READ_ONLY,
     RLM_SCHEMA_MODE_RESET_FILE,
     RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED,
     RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT,

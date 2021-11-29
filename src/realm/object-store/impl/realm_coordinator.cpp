@@ -167,11 +167,11 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
         throw std::logic_error("Realms opened in immutable mode do not use a migration function");
-    if (config.schema_mode == SchemaMode::ReadOnlyAlternative && config.migration_function)
+    if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
         throw std::logic_error("Realms opened in read-only mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.initialization_function)
         throw std::logic_error("Realms opened in immutable mode do not use an initialization function");
-    if (config.schema_mode == SchemaMode::ReadOnlyAlternative && config.initialization_function)
+    if (config.schema_mode == SchemaMode::ReadOnly && config.initialization_function)
         throw std::logic_error("Realms opened in read-only mode do not use an initialization function");
     if (config.schema && config.schema_version == ObjectStore::NotVersioned)
         throw std::logic_error("A schema version must be specified when the schema is specified");

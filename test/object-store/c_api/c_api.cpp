@@ -404,7 +404,7 @@ TEST_CASE("C API (non-database)") {
             };
             check_mode(RLM_SCHEMA_MODE_AUTOMATIC);
             check_mode(RLM_SCHEMA_MODE_IMMUTABLE);
-            check_mode(RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE);
+            check_mode(RLM_SCHEMA_MODE_READ_ONLY);
             check_mode(RLM_SCHEMA_MODE_RESET_FILE);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED);
