@@ -847,7 +847,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
 SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
 {
-    std::call_once(m_flx_subscription_store_init_flag, [&] {
+    std::call_once(m_flx_subscription_store_init_flag, [this] {
         std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
         m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
             REALM_ASSERT(m_initiated);
