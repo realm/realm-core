@@ -20,6 +20,7 @@
 #define REALM_ARRAY_STRING_SHORT_HPP
 
 #include <realm/array.hpp>
+#include <realm/string_data.hpp>
 
 namespace realm {
 

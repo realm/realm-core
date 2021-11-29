@@ -27,6 +27,7 @@
 #include <realm/table_view.hpp>
 #include <realm/table_tpl.hpp>
 #include <realm/set.hpp>
+#include <realm/array_integer_tpl.hpp>
 
 #include <algorithm>
 

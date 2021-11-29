@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/array_decimal128.hpp>
+#include <realm/mixed.hpp>
 
 namespace realm {
 
@@ -87,5 +88,11 @@ size_t ArrayDecimal128::find_first(Decimal128 value, size_t start, size_t end) c
     }
     return realm::npos;
 }
+
+Mixed ArrayDecimal128::get_any(size_t ndx) const
+{
+    return Mixed(get(ndx));
+}
+
 
 } // namespace realm

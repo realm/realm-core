@@ -19,7 +19,7 @@
 #ifndef REALM_OBJ_HPP
 #define REALM_OBJ_HPP
 
-#include <realm/array.hpp>
+#include <realm/node.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/keys.hpp>
 #include <realm/mixed.hpp>
@@ -387,7 +387,7 @@ private:
     ColKey spec_ndx2colkey(size_t col_ndx);
     size_t colkey2spec_ndx(ColKey);
     bool ensure_writeable();
-    void sync(Array& arr);
+    void sync(Node& arr);
     int_fast64_t bump_content_version();
     void bump_both_versions();
     template <class T>

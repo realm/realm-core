@@ -201,20 +201,6 @@ inline std::pair<int64_t, int64_t> get_two(const char* data, size_t width, size_
 }
 
 
-template <int width>
-inline void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
-{
-    v0 = to_ref(get_direct<width>(data, ndx + 0));
-    v1 = to_ref(get_direct<width>(data, ndx + 1));
-    v2 = to_ref(get_direct<width>(data, ndx + 2));
-}
-
-inline void get_three(const char* data, size_t width, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
-{
-    REALM_TEMPEX(get_three, width, (data, ndx, v0, v1, v2));
-}
-
-
 // Lower/upper bound in sorted sequence
 // ------------------------------------
 //
