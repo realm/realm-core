@@ -731,6 +731,7 @@ void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
     logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
     m_pending_query_message = true;
+    ensure_enlisted_to_send();
 }
 
 void SessionImpl::on_flx_sync_error(int64_t version, std::string_view err_msg)

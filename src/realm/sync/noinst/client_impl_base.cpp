@@ -1743,7 +1743,7 @@ void Session::send_ident_message()
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = m_ident;
 
-    if (m_conn.is_flx_sync_connection()) {
+    if (m_is_flx_sync_session) {
         auto active_query = get_or_create_flx_subscription_store()->get_active().to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
