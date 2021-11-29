@@ -260,7 +260,7 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(con
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.object_class_name() == table_name && sub.query_string() == query_str);
+        return (sub.name().empty() && sub.object_class_name() == table_name && sub.query_string() == query_str);
     });
 
     std::string_view name;
