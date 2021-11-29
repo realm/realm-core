@@ -38,6 +38,7 @@ constexpr static std::string_view c_flx_sub_sets_version_field("version");
 constexpr static std::string_view c_flx_sub_sets_error_str_field("error");
 constexpr static std::string_view c_flx_sub_sets_subscriptions_field("subscriptions");
 
+constexpr static std::string_view c_flx_sub_id_field("id");
 constexpr static std::string_view c_flx_sub_created_at_field("created_at");
 constexpr static std::string_view c_flx_sub_updated_at_field("updated_at");
 constexpr static std::string_view c_flx_sub_name_field("name");
@@ -60,6 +61,11 @@ Subscription::Subscription(const SubscriptionSet* parent, Obj obj)
 const SubscriptionStore* Subscription::store() const
 {
     return m_parent->m_mgr;
+}
+
+ObjectId Subscription::id() const
+{
+    return m_obj.get<ObjectId>(store()->m_sub_keys->id);
 }
 
 Timestamp Subscription::created_at() const
@@ -199,10 +205,11 @@ void SubscriptionSet::clear()
     m_sub_list.remove_all_target_rows();
 }
 
-void SubscriptionSet::insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name,
+void SubscriptionSet::insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                                       StringData object_class_name, StringData query_str)
 {
     auto new_sub = m_sub_list.create_and_insert_linked_object(m_sub_list.is_empty() ? 0 : m_sub_list.size());
+    new_sub.set(m_mgr->m_sub_keys->id, id);
     new_sub.set(m_mgr->m_sub_keys->created_at, created_at);
     new_sub.set(m_mgr->m_sub_keys->updated_at, updated_at);
     new_sub.set(m_mgr->m_sub_keys->name, name);
@@ -231,7 +238,7 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign_imp
         return {it, false};
     }
 
-    insert_sub_impl(now, now, name, object_class_name, query_str);
+    insert_sub_impl(ObjectId::gen(), now, now, name, object_class_name, query_str);
 
     return {iterator(this, LnkLst::iterator(&m_sub_list, m_sub_list.size() - 1)), true};
 }
@@ -312,7 +319,7 @@ SubscriptionSet SubscriptionSet::make_mutable_copy() const
 
     SubscriptionSet new_set_obj(m_mgr, std::move(new_tr), sub_sets->create_object_with_primary_key(Mixed{new_pk}));
     for (const auto& sub : *this) {
-        new_set_obj.insert_sub_impl(sub.created_at(), sub.updated_at(), sub.name(), sub.object_class_name(),
+        new_set_obj.insert_sub_impl(sub.id(), sub.created_at(), sub.updated_at(), sub.name(), sub.object_class_name(),
                                     sub.query_string());
     }
 
@@ -411,12 +418,13 @@ SubscriptionStore::SubscriptionStore(DBRef db)
 
         auto schema_metadata = tr->add_table(c_flx_metadata_table);
         auto version_col = schema_metadata->add_column(type_Int, c_flx_meta_schema_version_field);
-        schema_metadata->create_object().set(version_col, int64_t(1));
+        schema_metadata->create_object().set(version_col, int64_t(2));
 
         auto sub_sets_table =
             tr->add_table_with_primary_key(c_flx_subscription_sets_table, type_Int, c_flx_sub_sets_version_field);
         auto subs_table = tr->add_embedded_table(c_flx_subscriptions_table);
         m_sub_keys->table = subs_table->get_key();
+        m_sub_keys->id = subs_table->add_column(type_ObjectId, c_flx_sub_id_field);
         m_sub_keys->created_at = subs_table->add_column(type_Timestamp, c_flx_sub_created_at_field);
         m_sub_keys->updated_at = subs_table->add_column(type_Timestamp, c_flx_sub_updated_at_field);
         m_sub_keys->name = subs_table->add_column(type_String, c_flx_sub_name_field, true);
@@ -451,7 +459,7 @@ SubscriptionStore::SubscriptionStore(DBRef db)
         auto version_obj = schema_metadata->get_object(0);
         auto version = version_obj.get<int64_t>(
             lookup_and_validate_column(schema_metadata, c_flx_meta_schema_version_field, type_Int));
-        if (version != 1) {
+        if (version != 2) {
             throw std::runtime_error("Invalid schema version for flexible sync metadata");
         }
 
@@ -470,6 +478,7 @@ SubscriptionStore::SubscriptionStore(DBRef db)
             throw std::runtime_error("Flexible Sync subscriptions table should be an embedded object");
         }
         m_sub_keys->table = subs->get_key();
+        m_sub_keys->id = lookup_and_validate_column(subs, c_flx_sub_id_field, type_ObjectId);
         m_sub_keys->created_at = lookup_and_validate_column(subs, c_flx_sub_created_at_field, type_Timestamp);
         m_sub_keys->updated_at = lookup_and_validate_column(subs, c_flx_sub_updated_at_field, type_Timestamp);
         m_sub_keys->query_str = lookup_and_validate_column(subs, c_flx_sub_query_str_field, type_String);
