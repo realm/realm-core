@@ -296,7 +296,6 @@ enum class ClientImpl::ConnectionTerminationReason {
     server_said_try_again_later,       ///< Client received ERROR message with try_again=yes
     server_said_do_not_reconnect,      ///< Client received ERROR message with try_again=no
     pong_timeout,                      ///< Client did not receive PONG after PING
-    switch_wire_protocols,             ///< Client should reconnect with a different wire protocols
 
     /// The application requested a feature that is unavailable in the
     /// negotiated protocol version.
@@ -397,7 +396,6 @@ public:
     ConnectionState get_state() const noexcept;
     SyncServerMode get_sync_server_mode() const noexcept;
     bool is_flx_sync_connection() const noexcept;
-    void force_flx_sync_mode();
 
     void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
                              const std::string& signed_access_token);
@@ -724,8 +722,6 @@ public:
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
-
-    void force_flx_sync_mode();
 
     /// \brief Announce that a new access token is available.
     ///
@@ -1317,7 +1313,6 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::pong_timeout:
         case ConnectionTerminationReason::missing_protocol_feature:
         case ConnectionTerminationReason::http_tunnel_failed:
-        case ConnectionTerminationReason::switch_wire_protocols:
             break;
     }
     return false;
@@ -1395,6 +1390,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}
     , m_ident{ident}
+    , m_is_flx_sync_session(conn.is_flx_sync_connection())
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)

@@ -40,6 +40,33 @@ public:
 
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
 
+    template <typename Func>
+    void do_with_new_realm(Func&& func)
+    {
+        auto sync_mgr = make_sync_manager();
+        auto creds = create_user_and_log_in(sync_mgr.app());
+
+        SyncTestFile config(sync_mgr.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
+        func(Realm::get_shared_realm(config));
+    }
+
+    template <typename Func>
+    void load_initial_data(Func&& func)
+    {
+        do_with_new_realm([&](SharedRealm realm) {
+            {
+                auto subs = realm->get_latest_subscription_set().make_mutable_copy();
+                for (const auto& table : realm->schema()) {
+                    Query query_for_table(realm->read_group().get_table(table.table_key));
+                    subs.insert_or_assign(query_for_table);
+                }
+                subs.commit();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            }
+            func(realm);
+        });
+    }
+
     TestSyncManager make_sync_manager();
 
     const Schema& schema() const
@@ -92,59 +119,33 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 TestSyncManager FLXSyncTestHarness::make_sync_manager()
 {
     TestSyncManager::Config smc(m_app_config);
+    smc.verbose_sync_client_logging = true;
     return TestSyncManager(std::move(smc), {});
 }
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     FLXSyncTestHarness harness("basic_flx_connect");
-    auto sync_manager = harness.make_sync_manager();
-    auto app = sync_manager.app();
 
     auto foo_obj_id = ObjectId::gen();
     auto bar_obj_id = ObjectId::gen();
-    {
-        auto creds = create_user_and_log_in(app);
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", foo_obj_id},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", bar_obj_id},
+                                         {"queryable_str_field", std::string{"bar"}},
+                                         {"queryable_int_field", static_cast<int64_t>(10)},
+                                         {"non_queryable_field", std::string{"non queryable 2"}}}));
 
-        SyncTestFile config(app, bson::Bson{}, harness.schema());
-        auto realm = Realm::get_shared_realm(config);
-
-        {
-            auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            auto table = realm->read_group().get_table("class_TopLevel");
-            Query new_query_a(table);
-            auto col_key = table->get_column_key("queryable_str_field");
-            new_query_a.equal(col_key, "foo");
-            new_subs.insert_or_assign(new_query_a);
-            Query new_query_b(table);
-            new_query_b.equal(col_key, "bar");
-            new_subs.insert_or_assign(new_query_b);
-            new_subs.commit();
-            new_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-        }
-
-        {
-            CppContext c(realm);
-            realm->begin_transaction();
-            Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{{"_id", foo_obj_id},
-                                             {"queryable_str_field", std::string{"foo"}},
-                                             {"queryable_int_field", static_cast<int64_t>(5)},
-                                             {"non_queryable_field", std::string{"non queryable 1"}}}));
-            Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{{"_id", bar_obj_id},
-                                             {"queryable_str_field", std::string{"bar"}},
-                                             {"queryable_int_field", static_cast<int64_t>(10)},
-                                             {"non_queryable_field", std::string{"non queryable 2"}}}));
-
-            realm->commit_transaction();
-            wait_for_upload(*realm);
-        }
-    }
-    {
-        auto creds = create_user_and_log_in(app);
-
-        SyncTestFile config(app, bson::Bson{}, harness.schema());
-        auto realm = Realm::get_shared_realm(config);
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    });
+    harness.do_with_new_realm([&](SharedRealm realm) {
         auto table = realm->read_group().get_table("class_TopLevel");
         Query new_query_a(table);
         auto col_key = table->get_column_key("queryable_str_field");
@@ -165,7 +166,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             CHECK(obj.is_valid());
             CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
         }
-    }
+    });
 }
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {

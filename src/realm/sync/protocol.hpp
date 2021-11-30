@@ -40,7 +40,7 @@ constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
     return "com.mongodb.realm-query-sync/";
 }
 
-enum class SyncServerMode { PBS, FLXDiscovered, FLXRequested };
+enum class SyncServerMode { PBS, FLX };
 
 /// Supported protocol envelopes:
 ///

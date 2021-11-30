@@ -126,6 +126,9 @@ enum class SyncSessionStopPolicy {
 };
 
 struct SyncConfig {
+    struct FLXSyncEnabled {
+    };
+
     struct ProxyConfig {
         using port_type = sync::port_type;
         enum class Type { HTTP, HTTPS } type;
@@ -137,6 +140,7 @@ struct SyncConfig {
 
     std::shared_ptr<SyncUser> user;
     std::string partition_value;
+    bool flx_sync_requested = false;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
     bool client_validate_ssl = true;
@@ -162,6 +166,7 @@ struct SyncConfig {
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, FLXSyncEnabled);
 };
 
 } // namespace realm

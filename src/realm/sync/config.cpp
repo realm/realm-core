@@ -81,6 +81,13 @@ SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
 {
 }
 
+SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, FLXSyncEnabled)
+    : user(std::move(user))
+    , partition_value()
+    , flx_sync_requested(true)
+{
+}
+
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
 {
     switch (err) {

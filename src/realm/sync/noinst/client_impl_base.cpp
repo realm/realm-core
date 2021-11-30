@@ -306,14 +306,16 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
     auto i = headers.find("Sec-WebSocket-Protocol");
     if (i != headers.end()) {
         std::string_view value = i->second;
-        std::string_view prefix =
+        std::string_view expected_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
+
         // FIXME: Use std::string_view::begins_with() in C++20.
-        bool begins_with =
-            (value.size() >= prefix.size() && std::equal(value.data(), value.data() + prefix.size(), prefix.data()));
-        if (begins_with) {
+        auto prefix_matches = [&](std::string_view other) {
+            return value.size() >= other.size() && (value.substr(0, other.size()) == other);
+        };
+        if (prefix_matches(expected_prefix)) {
             util::MemoryInputStream in;
-            in.set_buffer(value.data() + prefix.size(), value.data() + value.size());
+            in.set_buffer(value.data() + expected_prefix.size(), value.data() + value.size());
             in.imbue(std::locale::classic());
             in.unsetf(std::ios_base::skipws);
             int value_2 = 0;
@@ -530,10 +532,6 @@ void Connection::initiate_reconnect_wait()
                     // such a way the that problem goes away.
                     delay = 3600000L; // 1 hour
                     record_delay_as_zero = true;
-                    break;
-                case ConnectionTerminationReason::switch_wire_protocols:
-                    // If we're switching wire protocols, we should reconnect immediately.
-                    delay = 0;
                     break;
             }
 
@@ -1108,22 +1106,6 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, String
         m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_do_not_reconnect;
     }
 
-    if (error_code == ProtocolError::switch_to_flx_sync) {
-        m_sync_mode = SyncServerMode::FLXDiscovered;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::switch_wire_protocols;
-    }
-    else if (error_code == ProtocolError::switch_to_pbs) {
-        // If FLX sync is explicitly requested on the client side, but the server only speaks the PBS protocol
-        // then the server is misconfigured and we should not try to reconnect immediately.
-        if (m_sync_mode == SyncServerMode::FLXRequested) {
-            m_reconnect_info.m_reason = ConnectionTerminationReason::missing_protocol_feature;
-        }
-        else {
-            m_sync_mode = SyncServerMode::PBS;
-            m_reconnect_info.m_reason = ConnectionTerminationReason::switch_wire_protocols;
-        }
-    }
-
     // When the server asks us to reconnect later, it is important to make the
     // reconnect delay start at the time of the reception of the ERROR message,
     // rather than at the initiation of the connection, as is usually the
@@ -1194,21 +1176,6 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
 bool Connection::is_flx_sync_connection() const noexcept
 {
     return m_sync_mode != SyncServerMode::PBS;
-}
-
-void Connection::force_flx_sync_mode()
-{
-    auto old_sync_mode = SyncServerMode::FLXRequested;
-    std::swap(m_sync_mode, old_sync_mode);
-    if (old_sync_mode != SyncServerMode::PBS) {
-        return;
-    }
-    if (get_state() != ConnectionState::connected) {
-        return;
-    }
-    logger.debug("Forcing sync connection into FLX sync mode");
-    m_reconnect_info.m_reason = ConnectionTerminationReason::switch_wire_protocols;
-    involuntary_disconnect(make_error_code(ProtocolError::switch_to_flx_sync), false, nullptr);
 }
 
 void Connection::receive_pong(milliseconds_type timestamp)
@@ -1659,11 +1626,7 @@ void Session::complete_deactivation()
     logger.debug("Deactivation completed"); // Throws
 }
 
-void Session::force_flx_sync_mode()
-{
-    m_is_flx_sync_session = true;
-    m_conn.force_flx_sync_mode();
-}
+
 // Called by the associated Connection object when this session is granted an
 // opportunity to send a message.
 //
