@@ -38,6 +38,7 @@ class SubscriptionStore;
 // send to the server in a QUERY or IDENT message.
 class Subscription {
 public:
+    Subscription();
     // Returns the timestamp of when this subscription was originally created.
     Timestamp created_at() const;
 
@@ -56,7 +57,6 @@ public:
 protected:
     friend class SubscriptionSet;
 
-    Subscription() = default;
     Subscription(const SubscriptionSet* parent, Obj obj);
 
 private:
@@ -70,6 +70,10 @@ private:
 // single QUERY or IDENT message to be sent to the server.
 class SubscriptionSet {
 public:
+    // Results can be either be backed by nothing, a thin wrapper around a table,
+    // or a wrapper around a query and a sort order which creates and updates
+    // the tableview as needed
+    SubscriptionSet();
     enum class State : int64_t {
         Uncommitted = 0,
         Pending,

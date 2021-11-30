@@ -51,6 +51,8 @@ inline std::string_view to_string_view(StringData in) noexcept
 
 } // namespace
 
+Subscription::Subscription() = default;
+
 Subscription::Subscription(const SubscriptionSet* parent, Obj obj)
     : m_parent(parent)
     , m_obj(std::move(obj))
@@ -86,6 +88,8 @@ std::string_view Subscription::query_string() const
 {
     return to_string_view(m_obj.get<StringData>(store()->m_sub_keys->query_str));
 }
+
+SubscriptionSet::SubscriptionSet() = default;
 
 SubscriptionSet::iterator::iterator(const SubscriptionSet* parent, LnkLst::iterator it)
     : m_parent(parent)
