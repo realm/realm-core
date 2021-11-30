@@ -859,7 +859,6 @@ AppSession create_app(const AppCreateConfig& config)
               {"defaultRoles",
                nlohmann::json::array(
                    {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}})}
-
              }}};
     }
     else {
