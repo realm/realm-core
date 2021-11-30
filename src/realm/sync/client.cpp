@@ -873,8 +873,8 @@ SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
                 return; // Already finalized
 
             const auto& sub_store = self->m_flx_subscription_store;
-            self->m_flx_latest_version = sub_store->get_latest().version();
-            self->m_flx_active_version = sub_store->get_active().version();
+            std::tie(self->m_flx_active_version, self->m_flx_latest_version) =
+                sub_store->get_active_and_latest_versions();
 
             if (self->m_flx_latest_version > self->m_flx_active_version) {
                 self->m_sess->on_new_flx_subscription_set(self->m_flx_latest_version);

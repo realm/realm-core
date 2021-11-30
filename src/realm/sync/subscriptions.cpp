@@ -561,6 +561,30 @@ const SubscriptionSet SubscriptionStore::get_active() const
     return SubscriptionSet(this, std::move(tr), res.get(0));
 }
 
+std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
+{
+    auto tr = m_db->start_read();
+    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    if (sub_sets->is_empty()) {
+        return {0, 0};
+    }
+
+    auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
+    DescriptorOrdering descriptor_ordering;
+    descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
+    descriptor_ordering.append_limit(LimitDescriptor{1});
+    auto res = sub_sets->where()
+                   .equal(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .find_all(descriptor_ordering);
+
+    if (res.is_empty()) {
+        return {0, latest_id};
+    }
+
+    auto active_id = res.get(0).get_primary_key();
+    return {active_id.get_int(), latest_id};
+}
+
 SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();

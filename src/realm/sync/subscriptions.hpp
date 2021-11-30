@@ -275,6 +275,10 @@ public:
     // zero.
     const SubscriptionSet get_active() const;
 
+    // Returns the version number of the current active and latest subscription sets. This function guarantees
+    // that the versions will be read from the same underlying transaction and will thus be consistent.
+    std::pair<int64_t, int64_t> get_active_and_latest_versions() const;
+
     // To be used internally by the sync client. This returns a mutable view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_mutable_by_version(int64_t version_id);
