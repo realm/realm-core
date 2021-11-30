@@ -211,26 +211,28 @@ TEST_CASE("sync: client reset", "[client reset]") {
         const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
         size_t before_callback_invoctions = 0;
         size_t after_callback_invocations = 0;
-        local_config.sync_config->notify_before_client_reset = [&](SharedRealm local, SharedRealm remote) {
+        std::mutex mtx;
+        local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+            std::lock_guard<std::mutex> lock(mtx);
             ++before_callback_invoctions;
-            REQUIRE(local);
-            REQUIRE(local->is_frozen());
-            REQUIRE(local->read_group().get_table("class_object"));
-            REQUIRE(local->config().path == local_config.path);
-
-            REQUIRE(remote);
-            REQUIRE(remote->is_frozen());
-            REQUIRE(remote->read_group().get_table("class_object"));
-            REQUIRE(remote->config().path == fresh_path);
-
+            REQUIRE(before);
+            REQUIRE(before->is_frozen());
+            REQUIRE(before->read_group().get_table("class_object"));
+            REQUIRE(before->config().path == local_config.path);
             REQUIRE(util::File::exists(local_config.path));
-            REQUIRE(util::File::exists(fresh_path));
         };
-        local_config.sync_config->notify_after_client_reset = [&](SharedRealm local) {
+        local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after) {
+            std::lock_guard<std::mutex> lock(mtx);
             ++after_callback_invocations;
-            REQUIRE(local);
-            REQUIRE(local->read_group().get_table("class_object"));
-            REQUIRE(local->config().path == local_config.path);
+            REQUIRE(before);
+            REQUIRE(before->is_frozen());
+            REQUIRE(before->read_group().get_table("class_object"));
+            REQUIRE(before->config().path == local_config.path);
+            REQUIRE(after);
+            REQUIRE(!after->is_frozen());
+            REQUIRE(after->read_group().get_table("class_object"));
+            REQUIRE(after->config().path == local_config.path);
+            REQUIRE(after->current_transaction_version() > before->current_transaction_version());
         };
 
         Results results;
@@ -357,6 +359,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 auto realm = Realm::get_shared_realm(local_config);
                 timed_sleeping_wait_for(
                     [&]() -> bool {
+                        std::lock_guard<std::mutex> lock(mtx);
                         realm->begin_transaction();
                         TableRef table = get_table(*realm, "object");
                         REQUIRE(table);
@@ -372,8 +375,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             if (session) {
                 session->shutdown_and_wait();
             }
-            REQUIRE(before_callback_invoctions == 1);
-            REQUIRE(after_callback_invocations == 1);
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                REQUIRE(before_callback_invoctions == 1);
+                REQUIRE(after_callback_invocations == 1);
+            }
         }
 
         SECTION("failing to download a fresh copy results in an error") {
@@ -970,6 +976,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
+    config2.schema = config.schema;
 
     Results results;
     Object object;
@@ -1462,6 +1469,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
+    config2.schema = schema;
 
     // The following can be used to perform the client reset proper, but these tests
     // are only intended to check the transfer_group logic for different types,
@@ -1664,7 +1672,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
     }
 }
 
-TEST_CASE("client reset with embedded object", "[client reset][embedded objects]") {
+TEST_CASE("client reset with embedded object", "[client reset][discard local][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1673,12 +1681,15 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
     config.cache = false;
     config.automatic_change_notifications = false;
     config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+
+    ObjectSchema shared_class = {"object",
+                                 {
+                                     {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                     {"value", PropertyType::Int},
+                                 }};
+
     config.schema = Schema{
-        {"object",
-         {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
-             {"value", PropertyType::Int},
-         }},
+        shared_class,
         {"TopLevel",
          {
              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
@@ -1721,6 +1732,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
+    config2.schema = config.schema;
 
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
@@ -1959,6 +1971,42 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
         TopLevelContent remote = local;
         local.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
         reset_embedded_object(local, remote);
+    }
+    SECTION("server adds embedded object classes") {
+        SyncTestFile config2(init_sync_manager.app(), "default");
+        config2.schema = config.schema;
+        config.schema = Schema{shared_class};
+        test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        TopLevelContent remote_content;
+
+        test_reset
+            ->make_remote_changes([&](SharedRealm remote) {
+                TableRef table = get_table(*remote, "TopLevel");
+                auto obj = table->create_object_with_primary_key(pk_val);
+                REQUIRE(table->size() == 1);
+                set_content(obj, remote_content);
+            })
+            ->on_post_reset([&](SharedRealm local) {
+                TableRef table = get_table(*local, "TopLevel");
+                REQUIRE(table->size() == 1);
+                Obj obj = *table->begin();
+                check_content(obj, remote_content);
+            })
+            ->run();
+    }
+    SECTION("client adds embedded object classes") {
+        SyncTestFile config2(init_sync_manager.app(), "default");
+        config2.schema = Schema{shared_class};
+        test_reset = reset_utils::make_fake_local_client_reset(config, config2);
+        TopLevelContent local_content;
+        test_reset->make_local_changes([&](SharedRealm local) {
+            TableRef table = get_table(*local, "TopLevel");
+            auto obj = table->create_object_with_primary_key(pk_val);
+            REQUIRE(table->size() == 1);
+            set_content(obj, local_content);
+        });
+        REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
+                                               "{EmbeddedObject, EmbeddedObject2, TopLevel}");
     }
 }
 

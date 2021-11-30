@@ -16,6 +16,16 @@
  *
  **************************************************************************/
 
+#include <realm/array_with_find.hpp>
+#include <realm/utilities.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/column_integer.hpp>
+#include <realm/bplustree.hpp>
+#include <realm/query_conditions.hpp>
+#include <realm/array_integer.hpp>
+#include <realm/array_key.hpp>
+#include <realm/impl/array_writer.hpp>
+
 #include <array>
 #include <cstring> // std::memcpy
 #include <iomanip>
@@ -31,17 +41,6 @@
 #include <intrin.h>
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
-
-#include <realm/utilities.hpp>
-#include <realm/array.hpp>
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/column_integer.hpp>
-#include <realm/bplustree.hpp>
-#include <realm/query_conditions.hpp>
-#include <realm/index_string.hpp>
-#include <realm/array_integer.hpp>
-#include <realm/array_key.hpp>
-#include <realm/impl/array_writer.hpp>
 
 
 // Header format (8 bytes):
@@ -369,16 +368,6 @@ void Array::move(Array& dst, size_t ndx)
     truncate(ndx);
 }
 
-void Array::add_to_column(IntegerColumn* column, int64_t value)
-{
-    column->add(value);
-}
-
-void Array::add_to_column(KeyColumn* column, int64_t value)
-{
-    column->add(ObjKey(value));
-}
-
 void Array::set(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
@@ -573,49 +562,6 @@ void Array::set_all_to_zero()
 }
 
 
-size_t Array::first_set_bit(unsigned int v) const
-{
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-    unsigned long ul;
-    // Just 10% faster than MultiplyDeBruijnBitPosition method, on Core i7
-    _BitScanForward(&ul, v);
-    return ul;
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-    return __builtin_clz(v);
-#else
-    int r;
-    static const int MultiplyDeBruijnBitPosition[32] = {0,  1,  28, 2,  29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4,  8,
-                                                        31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6,  11, 5,  10, 9};
-
-    r = MultiplyDeBruijnBitPosition[(uint32_t((v & -int(v)) * 0x077CB531U)) >> 27];
-    return r;
-#endif
-}
-
-size_t Array::first_set_bit64(int64_t v) const
-{
-#if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-    unsigned long ul;
-    _BitScanForward64(&ul, v);
-    return ul;
-
-#elif 0 && !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-    return __builtin_clzll(v);
-#else
-    unsigned int v0 = unsigned(v);
-    unsigned int v1 = unsigned(uint64_t(v) >> 32);
-    size_t r;
-
-    if (v0 != 0)
-        r = first_set_bit(v0);
-    else
-        r = first_set_bit(v1) + 32;
-
-    return r;
-#endif
-}
-
-
 namespace {
 
 template <size_t width>
@@ -702,98 +648,6 @@ size_t find_zero(uint64_t v)
 } // namespace
 
 
-template <bool find_max, size_t w>
-bool Array::minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
-{
-    size_t best_index = 0;
-
-    if (end == size_t(-1))
-        end = m_size;
-    REALM_ASSERT_11(start, <, m_size, &&, end, <=, m_size, &&, start, <, end);
-
-    if (m_size == 0)
-        return false;
-
-    if (w == 0) {
-        if (return_ndx)
-            *return_ndx = best_index;
-        result = 0;
-        return true;
-    }
-
-    int64_t m = get<w>(start);
-    ++start;
-
-#if 0 // We must now return both value AND index of result. SSE does not support finding index, so we've disabled it
-#ifdef REALM_COMPILER_SSE
-    if (sseavx<42>()) {
-        // Test manually until 128 bit aligned
-        for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
-            if (find_max ? get<w>(start) > m : get<w>(start) < m) {
-                m = get<w>(start);
-                best_index = start;
-            }
-        }
-
-        if ((w == 8 || w == 16 || w == 32) && end - start > 2 * sizeof (__m128i) * 8 / no0(w)) {
-            __m128i* data = reinterpret_cast<__m128i*>(m_data + start * w / 8);
-            __m128i state = data[0];
-            char state2[sizeof (state)];
-
-            size_t chunks = (end - start) * w / 8 / sizeof (__m128i);
-            for (size_t t = 0; t < chunks; t++) {
-                if (w == 8)
-                    state = find_max ? _mm_max_epi8(data[t], state) : _mm_min_epi8(data[t], state);
-                else if (w == 16)
-                    state = find_max ? _mm_max_epi16(data[t], state) : _mm_min_epi16(data[t], state);
-                else if (w == 32)
-                    state = find_max ? _mm_max_epi32(data[t], state) : _mm_min_epi32(data[t], state);
-
-                start += sizeof (__m128i) * 8 / no0(w);
-            }
-
-            // Todo: prevent taking address of 'state' to make the compiler keep it in SSE register in above loop (vc2010/gcc4.6)
-
-            // We originally had declared '__m128i state2' and did an 'state2 = state' assignment. When we read from state2 through int16_t, int32_t or int64_t in GetUniversal(),
-            // the compiler thinks it cannot alias state2 and hence reorders the read and assignment.
-
-            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64
-            // read access from char-array (OK aliasing).
-            memcpy(&state2, &state, sizeof state);
-            for (size_t t = 0; t < sizeof (__m128i) * 8 / no0(w); ++t) {
-                int64_t v = get_universal<w>(reinterpret_cast<char*>(&state2), t);
-                if (find_max ? v > m : v < m) {
-                    m = v;
-                }
-            }
-        }
-    }
-#endif
-#endif
-
-    for (; start < end; ++start) {
-        const int64_t v = get<w>(start);
-        if (find_max ? v > m : v < m) {
-            m = v;
-            best_index = start;
-        }
-    }
-
-    result = m;
-    if (return_ndx)
-        *return_ndx = best_index;
-    return true;
-}
-
-bool Array::maximum(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
-{
-    REALM_TEMPEX2(return minmax, true, m_width, (result, start, end, return_ndx));
-}
-
-bool Array::minimum(int64_t& result, size_t start, size_t end, size_t* return_ndx) const
-{
-    REALM_TEMPEX2(return minmax, false, m_width, (result, start, end, return_ndx));
-}
 
 int64_t Array::sum(size_t start, size_t end) const
 {
@@ -1276,6 +1130,14 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
+// This is the one installed into the m_vtable->finder slots.
+template <class cond, size_t bitwidth>
+bool Array::find_vtable(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
+{
+    return static_cast<const ArrayWithFind*>(this)->find_optimized<cond, bitwidth>(value, start, end, baseindex,
+                                                                                   state, nullptr);
+}
+
 
 template <size_t width>
 struct Array::VTableForWidth {
@@ -1502,50 +1364,11 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 }
 
 
-void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
-{
-    REALM_ASSERT_3(begin, <=, size());
-    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
-
-    if (end == npos)
-        end = m_size;
-
-    QueryStateFindAll state(*result);
-    REALM_TEMPEX2(find_optimized, Equal, m_width, (value, begin, end, col_offset, &state, nullptr));
-
-    return;
-}
-
-
-bool Array::find(int cond, int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const
-{
-    if (cond == cond_Equal) {
-        return find<Equal>(value, start, end, baseindex, state, nullptr);
-    }
-    if (cond == cond_NotEqual) {
-        return find<NotEqual>(value, start, end, baseindex, state, nullptr);
-    }
-    if (cond == cond_Greater) {
-        return find<Greater>(value, start, end, baseindex, state, nullptr);
-    }
-    if (cond == cond_Less) {
-        return find<Less>(value, start, end, baseindex, state, nullptr);
-    }
-    if (cond == cond_None) {
-        return find<None>(value, start, end, baseindex, state, nullptr);
-    }
-    else if (cond == cond_LeftNotNull) {
-        return find<NotNull>(value, start, end, baseindex, state, nullptr);
-    }
-    REALM_ASSERT_DEBUG(false);
-    return false;
-}
-
-
 size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    return find_first<Equal>(value, start, end);
+    return static_cast<const ArrayWithFind*>(this)->find_first<Equal>(value, start, end);
 }
+
 
 int_fast64_t Array::get(const char* header, size_t ndx) noexcept
 {
@@ -1563,12 +1386,17 @@ std::pair<int64_t, int64_t> Array::get_two(const char* header, size_t ndx) noexc
     return std::make_pair(p.first, p.second);
 }
 
-
-void Array::get_three(const char* header, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept
+bool QueryStateCount::match(size_t, Mixed) noexcept
 {
-    const char* data = get_data_from_header(header);
-    uint_least8_t width = get_width_from_header(header);
-    ::get_three(data, width, ndx, v0, v1, v2);
+    ++m_match_count;
+    return (m_limit > m_match_count);
+}
+
+bool QueryStateFindFirst::match(size_t index, Mixed) noexcept
+{
+    m_match_count++;
+    m_state = index;
+    return false;
 }
 
 template <>

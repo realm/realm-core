@@ -60,8 +60,8 @@ class SessionWrapper;
 struct ClientReset {
     bool discard_local = false;
     DBRef fresh_copy;
-    util::UniqueFunction<void(std::string local, std::string remote)> notify_before_client_reset;
-    util::UniqueFunction<void(std::string local)> notify_after_client_reset;
+    util::UniqueFunction<void(std::string path)> notify_before_client_reset;
+    util::UniqueFunction<void(std::string path, VersionID before_version)> notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.

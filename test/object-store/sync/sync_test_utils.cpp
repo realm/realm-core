@@ -285,7 +285,6 @@ struct FakeLocalClientReset : public TestClientReset {
         }
 
         {
-            m_remote_config.schema = m_local_config.schema;
             auto realm2 = Realm::get_shared_realm(m_remote_config);
             realm2->begin_transaction();
             if (m_on_setup) {

@@ -23,6 +23,8 @@
 #include <realm/array_integer.hpp>
 #include <realm/array_ref.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/array_integer_tpl.hpp>
+#include <realm/query_conditions.hpp>
 
 #include "test.hpp"
 

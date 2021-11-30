@@ -78,6 +78,8 @@ public:
         : m_is_null(true)
     {
     }
+    Timestamp(const Timestamp&) = default;
+
     template <typename C = std::chrono::system_clock, typename D = typename C::duration>
     Timestamp(std::chrono::time_point<C, D> tp)
         : m_is_null(false)
@@ -90,6 +92,8 @@ public:
         : Timestamp(null{})
     {
     }
+
+    Timestamp& operator=(const Timestamp& rhs) = default;
 
     bool is_null() const
     {
@@ -179,7 +183,6 @@ public:
         }
         return *this > rhs || *this == rhs;
     }
-    Timestamp& operator=(const Timestamp& rhs) = default;
 
     size_t hash() const noexcept;
 

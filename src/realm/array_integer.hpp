@@ -31,6 +31,7 @@ public:
     using value_type = int64_t;
 
     using Array::add;
+    using Array::find_first;
     using Array::get;
     using Array::insert;
     using Array::move;
@@ -67,8 +68,9 @@ public:
     {
         return false;
     }
+    template <class cond, class Callback>
+    bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
 };
-
 
 class ArrayIntNull : public Array, public ArrayPayload {
 public:
@@ -121,15 +123,10 @@ public:
 
     void move(size_t begin, size_t end, size_t dest_begin);
 
-    bool find(int cond, value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
-
-    // This is the one installed into the m_finder slots.
-    template <class cond, size_t bitwidth>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryStateBase* state) const;
+    bool find(int cond, value_type value, size_t start, size_t end, QueryStateBase* state) const;
 
     template <class cond, class Callback>
-    bool find(value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-              Callback callback) const;
+    bool find(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
 
     // Wrappers for backwards compatibility and for simple use without
     // setting up state initialization etc
@@ -151,11 +148,10 @@ private:
     bool can_use_as_null(int64_t value) const;
 
     template <class Callback>
-    bool find_impl(int cond, value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
+    bool find_impl(int cond, value_type value, size_t start, size_t end, QueryStateBase* state,
                    Callback callback) const;
     template <class cond, class Callback>
-    bool find_impl(value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-                   Callback callback) const;
+    bool find_impl(value_type value, size_t start, size_t end, QueryStateBase* state, Callback callback) const;
 };
 
 
@@ -274,110 +270,6 @@ inline void ArrayIntNull::move(size_t begin, size_t end, size_t dest_begin)
     Array::move(begin + 1, end + 1, dest_begin + 1);
 }
 
-inline bool ArrayIntNull::find(int cond, value_type value, size_t start, size_t end, size_t baseindex,
-                               QueryStateBase* state) const
-{
-    return find_impl(cond, value, start, end, baseindex, state, nullptr);
-}
-
-template <class cond, class Callback>
-inline bool ArrayIntNull::find(value_type value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-                               Callback callback) const
-{
-    return find_impl<cond, Callback>(value, start, end, baseindex, state, callback);
-}
-
-template <class Callback>
-inline bool ArrayIntNull::find_impl(int cond, value_type value, size_t start, size_t end, size_t baseindex,
-                                    QueryStateBase* state, Callback callback) const
-{
-    switch (cond) {
-        case cond_Equal:
-            return find_impl<Equal>(value, start, end, baseindex, state, callback);
-        case cond_NotEqual:
-            return find_impl<NotEqual>(value, start, end, baseindex, state, callback);
-        case cond_Greater:
-            return find_impl<Greater>(value, start, end, baseindex, state, callback);
-        case cond_Less:
-            return find_impl<Less>(value, start, end, baseindex, state, callback);
-        case cond_None:
-            return find_impl<None>(value, start, end, baseindex, state, callback);
-        case cond_LeftNotNull:
-            return find_impl<NotNull>(value, start, end, baseindex, state, callback);
-    }
-    REALM_ASSERT_DEBUG(false);
-    return false;
-}
-
-template <class cond, class Callback>
-bool ArrayIntNull::find_impl(value_type opt_value, size_t start, size_t end, size_t baseindex, QueryStateBase* state,
-                             Callback callback) const
-{
-    int64_t null_value = Array::get(0);
-    bool find_null = !bool(opt_value);
-    int64_t value;
-
-    size_t end2 = (end == npos ? size() : end) + 1;
-    size_t start2 = start + 1;
-    size_t baseindex2 = baseindex - 1;
-
-    if constexpr (std::is_same_v<cond, Equal>) {
-        if (find_null) {
-            value = null_value;
-        }
-        else {
-            if (*opt_value == null_value) {
-                // If the value to search for is equal to the null value, the value cannot be in the array
-                return true;
-            }
-            else {
-                value = *opt_value;
-            }
-        }
-
-        // Fall back to plain Array find.
-        return Array::find<cond>(value, start2, end2, baseindex2, state, callback);
-    }
-    else {
-        cond c;
-
-        if (opt_value) {
-            value = *opt_value;
-        }
-        else {
-            value = null_value;
-        }
-
-        for (size_t i = start2; i < end2; ++i) {
-            int64_t v = Array::get(i);
-            bool value_is_null = (v == null_value);
-            if (c(v, value, value_is_null, find_null)) {
-                util::Optional<int64_t> v2 = value_is_null ? util::none : util::make_optional(v);
-                if (!Array::find_action(i + baseindex2, v2, state, callback)) {
-                    return false; // tell caller to stop aggregating/search
-                }
-            }
-        }
-        return true; // tell caller to continue aggregating/search (on next array leafs)
-    }
-}
-
-template <class cond>
-size_t ArrayIntNull::find_first(value_type value, size_t start, size_t end) const
-{
-    QueryStateFindFirst state;
-    find_impl<cond>(value, start, end, 0, &state, nullptr);
-
-    if (state.match_count() > 0)
-        return to_size_t(state.m_state);
-    else
-        return not_found;
-}
-
-inline size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t end) const
-{
-    return find_first<Equal>(value, begin, end);
-}
 } // namespace realm
 
 #endif // REALM_ARRAY_INTEGER_HPP

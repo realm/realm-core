@@ -152,6 +152,27 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         // By marking version 2 as complete version 1 will get superceded and removed.
         CHECK_THROW(store.get_mutable_by_version(1), KeyNotFound);
     }
+
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        // This is just to create a unique name for this sub so we can verify that the iterator returned by
+        // insert_or_assign is pointing to the subscription that was just created.
+        std::string new_sub_name = ObjectId::gen().to_string();
+        auto&& [inserted_it, inserted] = set.insert_or_assign(new_sub_name, query_a);
+        CHECK(inserted);
+        CHECK_EQUAL(inserted_it->name(), new_sub_name);
+        CHECK_EQUAL(set.size(), 2);
+        auto it = set.begin();
+        CHECK_EQUAL(it->name(), "b sub");
+        it = set.erase(it);
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 1);
+        CHECK_EQUAL(it->name(), new_sub_name);
+        it = set.erase(it);
+        CHECK_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 0);
+    }
 }
 
 TEST(Sync_SubscriptionStoreUpdateExisting)
@@ -165,18 +186,32 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
     Query query_b(read_tr->get_table(fixture.a_table_key));
     query_b.equal(fixture.foo_col, "Realm");
+    ObjectId id_of_inserted;
+    auto sub_name = ObjectId::gen().to_string();
     {
         auto out = store.get_latest().make_mutable_copy();
-        auto read_tr = fixture.db->start_read();
-        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        auto [it, inserted] = out.insert_or_assign(sub_name, query_a);
         CHECK(inserted);
         CHECK_NOT_EQUAL(it, out.end());
+        id_of_inserted = it->id();
+        CHECK_NOT_EQUAL(id_of_inserted, ObjectId{});
 
-        std::tie(it, inserted) = out.insert_or_assign("a sub", query_b);
+        std::tie(it, inserted) = out.insert_or_assign(sub_name, query_b);
         CHECK(!inserted);
         CHECK_NOT_EQUAL(it, out.end());
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_b.get_description());
+        CHECK_EQUAL(it->id(), id_of_inserted);
+        out.commit();
+    }
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        auto it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
+            return sub.id() == id_of_inserted;
+        });
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(it->name(), sub_name);
     }
 }
 

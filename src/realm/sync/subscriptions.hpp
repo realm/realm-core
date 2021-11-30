@@ -39,6 +39,9 @@ class SubscriptionStore;
 class Subscription {
 public:
     Subscription();
+    // Returns the unique ID for this subscription.
+    ObjectId id() const;
+
     // Returns the timestamp of when this subscription was originally created.
     Timestamp created_at() const;
 
@@ -245,8 +248,8 @@ protected:
     std::pair<iterator, bool> insert_or_assign_impl(iterator it, StringData name, StringData object_class_name,
                                                     StringData query_str);
 
-    void insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name, StringData object_class_name,
-                         StringData query_str);
+    void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
+                         StringData object_class_name, StringData query_str);
 
     void process_notifications();
 
@@ -287,6 +290,7 @@ private:
 protected:
     struct SubscriptionKeys {
         TableKey table;
+        ColKey id;
         ColKey created_at;
         ColKey updated_at;
         ColKey name;
