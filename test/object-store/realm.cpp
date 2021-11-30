@@ -1197,52 +1197,50 @@ TEST_CASE("SharedRealm: async_writes") {
         REQUIRE(observer.array_change(0, col) == IndexSet{0, 1, 2});
         realm->m_binding_context.release();
     }
+
     SECTION("begin_transaction() from within did_change()") {
         struct Context : public BindingContext {
-            Context(SharedRealm r)
-                : m_realm(r)
-            {
-            }
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
             {
-                m_realm->begin_transaction();
-                auto table = m_realm->read_group().get_table("class_object");
+                auto r = realm.lock();
+                r->begin_transaction();
+                auto table = r->read_group().get_table("class_object");
                 auto obj = table->create_object();
                 if (++change_count == 1) {
-                    m_realm->commit_transaction();
+                    r->commit_transaction();
                 }
                 else {
-                    m_realm->cancel_transaction();
+                    r->cancel_transaction();
                 }
             }
-            SharedRealm m_realm;
             int change_count = 0;
         };
 
-        realm->m_binding_context.reset(new Context(realm));
+        realm->m_binding_context.reset(new Context());
+        realm->m_binding_context->realm = realm;
 
         realm->begin_transaction();
         auto table = realm->read_group().get_table("class_object");
         auto obj = table->create_object();
-        realm->commit_transaction();
+        bool persisted = false;
+        realm->async_commit_transaction([&persisted]() {
+            persisted = true;
+        });
         REQUIRE(table->size() == 2);
+        REQUIRE(persisted);
     }
 
     SECTION("close realm from within did_change()") {
         struct Context : public BindingContext {
-            Context(SharedRealm r)
-                : m_realm(r)
-            {
-            }
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
             {
-                m_realm->close();
+                realm.lock()->close();
             }
-            SharedRealm m_realm;
         };
 
         auto r2 = Realm::get_shared_realm(config);
-        r2->m_binding_context.reset(new Context(r2));
+        r2->m_binding_context.reset(new Context());
+        r2->m_binding_context->realm = r2;
 
         r2->begin_transaction();
         auto table = r2->read_group().get_table("class_object");
@@ -1285,6 +1283,8 @@ private:
 };
 
 TEST_CASE("SharedRealm: async_writes_2") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     if (!util::EventLoop::has_implementation())
         return;
 

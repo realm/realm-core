@@ -701,31 +701,26 @@ public:
         return m_async_stage == AsyncState::Syncing;
     }
 
-    void wait_for_write_lock()
+    // Wait for any async operation to complete.
+    // Returns TRUE if async stage is Idle
+    bool wait_for_async_completion()
     {
-        std::unique_lock<std::mutex> lck(mtx);
-        if (m_async_stage == Transaction::AsyncState::Requesting) {
-            waiting_for_write_lock = true;
-            do {
-                cv.wait(lck);
-            } while (waiting_for_write_lock);
-        }
-    }
-
-    bool wait_for_sync()
-    {
-        bool did_wait = false;
         std::unique_lock<std::mutex> lck(mtx);
         if (m_async_stage == Transaction::AsyncState::Syncing) {
             waiting_for_sync = true;
             do {
                 cv.wait(lck);
             } while (waiting_for_sync);
-            did_wait = true;
+        }
+        else if (m_async_stage == Transaction::AsyncState::Requesting) {
+            waiting_for_write_lock = true;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_write_lock);
         }
         if (m_commit_exception)
             throw m_commit_exception;
-        return did_wait;
+        return m_async_stage == Transaction::AsyncState::Idle;
     }
 
     std::exception_ptr get_commit_exception()

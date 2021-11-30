@@ -91,7 +91,7 @@ Realm::~Realm()
 {
     if (m_transaction) {
         // Wait for potential syncing to finish
-        m_transaction->wait_for_sync();
+        m_transaction->wait_for_async_completion();
         call_completion_callbacks();
     }
 
@@ -860,14 +860,13 @@ void Realm::begin_transaction()
     if (is_in_transaction()) {
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
-    if (is_in_async_transaction()) {
-        // Wait until the write mutex is actually acquired
-        m_transaction->wait_for_write_lock();
-
-        // Wait for potential syncing to finish
-        if (m_transaction->wait_for_sync()) {
+    bool async_is_idle = true;
+    if (m_transaction) {
+        // Wait for any async operation to complete - that might be
+        // either to obtain the write lock or to wait for syncing to finish
+        async_is_idle = m_transaction->wait_for_async_completion();
+        if (async_is_idle)
             call_completion_callbacks();
-        }
     }
 
     // Any of the callbacks to user code below could drop the last remaining
@@ -878,9 +877,9 @@ void Realm::begin_transaction()
     read_group();
 
     // Request write lock asynchronously
-    if (!m_transaction->holds_write_mutex()) {
+    if (async_is_idle) {
         m_coordinator->async_request_write_mutex(m_transaction);
-        m_transaction->wait_for_write_lock();
+        m_transaction->wait_for_async_completion();
     }
 
     CountGuard sending_notifications(m_is_sending_notifications);
@@ -917,7 +916,7 @@ void Realm::commit_transaction()
     // Realm might have been closed
     if (m_transaction) {
         m_transaction->async_end();
-        m_transaction->wait_for_sync();
+        m_transaction->wait_for_async_completion();
         call_completion_callbacks();
         if (!m_is_running_async_writes)
             check_pending_write_requests();
@@ -1178,8 +1177,7 @@ void Realm::close()
 
     if (!m_config.immutable() && m_transaction) {
         // Wait for potential syncing to finish
-        m_transaction->async_end();
-        m_transaction->wait_for_sync();
+        m_transaction->wait_for_async_completion();
         call_completion_callbacks();
         transaction().close();
     }

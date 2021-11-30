@@ -2364,6 +2364,9 @@ void Transaction::end_read()
 
 void Transaction::do_end_read() noexcept
 {
+    async_end();
+    wait_for_async_completion();
+
     detach();
 
     REALM_ASSERT(!m_oldest_version_not_persisted);
@@ -2765,13 +2768,13 @@ void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
     if (m_async_stage == AsyncState::HasLock) {
         // Nothing to commit to disk - just release write lock
         m_async_stage = AsyncState::Idle;
-        get_db()->async_end_write();
+        db->async_end_write();
     }
     else if (m_async_stage == AsyncState::HasCommits) {
         m_async_stage = AsyncState::Syncing;
         m_commit_exception = std::exception_ptr();
         // get a callback on the helper thread, in which to sync to disk
-        get_db()->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
+        db->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
             // sync to disk:
             try {
                 DB::ReadLockInfo read_lock;
