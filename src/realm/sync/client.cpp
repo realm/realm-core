@@ -866,6 +866,10 @@ SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
         });
 
         m_client.get_service().post([self = util::bind_ptr<SessionWrapper>(this)] {
+            REALM_ASSERT(self->m_actualized);
+            if (REALM_UNLIKELY(!self->m_sess))
+                return; // Already finalized
+
             const auto& sub_store = self->m_flx_subscription_store;
             self->m_flx_latest_version = sub_store->get_latest().version();
             self->m_flx_active_version = sub_store->get_active().version();
@@ -1304,7 +1308,7 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state, const Se
     if (state == ConnectionState::connected && m_sess) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.is_flx_sync_connection()) {
-            m_sess->get_or_create_flx_subscription_store();
+            get_or_create_flx_subscription_store();
         }
     }
 

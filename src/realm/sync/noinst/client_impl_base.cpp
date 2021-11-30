@@ -1203,6 +1203,9 @@ void Connection::force_flx_sync_mode()
     if (old_sync_mode != SyncServerMode::PBS) {
         return;
     }
+    if (get_state() != ConnectionState::connected) {
+        return;
+    }
     logger.debug("Forcing sync connection into FLX sync mode");
     m_reconnect_info.m_reason = ConnectionTerminationReason::switch_wire_protocols;
     involuntary_disconnect(make_error_code(ProtocolError::switch_to_flx_sync), false, nullptr);
