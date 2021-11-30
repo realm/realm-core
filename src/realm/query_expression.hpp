@@ -3189,6 +3189,9 @@ public:
                 auto sz = links.size();
 
                 destination.init_for_links(m_columns_collection.m_link_map.only_unary_links(), sz);
+                if (sz == 0 && m_columns_collection.m_link_map.only_unary_links()) {
+                    set_value_for_empty_dictionary(destination, 0);
+                }
                 for (size_t t = 0; t < sz; t++) {
                     const Obj obj = m_columns_collection.m_link_map.get_target_table()->get_object(links[t]);
                     auto dict = obj.get_dictionary(m_columns_collection.m_column_key);
