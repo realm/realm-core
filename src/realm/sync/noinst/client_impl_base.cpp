@@ -1196,6 +1196,18 @@ bool Connection::is_flx_sync_connection() const noexcept
     return m_sync_mode != SyncServerMode::PBS;
 }
 
+void Connection::force_flx_sync_mode()
+{
+    auto old_sync_mode = SyncServerMode::FLXRequested;
+    std::swap(m_sync_mode, old_sync_mode);
+    if (old_sync_mode != SyncServerMode::PBS) {
+        return;
+    }
+    logger.debug("Forcing sync connection into FLX sync mode");
+    m_reconnect_info.m_reason = ConnectionTerminationReason::switch_wire_protocols;
+    involuntary_disconnect(make_error_code(ProtocolError::switch_to_flx_sync), false, nullptr);
+}
+
 void Connection::receive_pong(milliseconds_type timestamp)
 {
     logger.debug("Received: PONG(timestamp=%1)", timestamp);

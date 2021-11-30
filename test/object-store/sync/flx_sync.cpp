@@ -28,9 +28,33 @@
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 
 namespace realm::app {
-TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
-    const std::string base_url = get_base_url();
 
+class FLXSyncTestHarness {
+public:
+    struct ServerSchema {
+        Schema schema;
+        std::vector<std::string> queryable_fields;
+    };
+
+    static ServerSchema default_server_schema();
+
+    FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
+
+    TestSyncManager make_sync_manager();
+
+    const Schema& schema() const
+    {
+        return m_schema;
+    }
+
+private:
+    AppSession m_app_session;
+    app::App::Config m_app_config;
+    Schema m_schema;
+};
+
+FLXSyncTestHarness::ServerSchema FLXSyncTestHarness::default_server_schema()
+{
     Schema schema{
         ObjectSchema("TopLevel",
                      {
@@ -41,32 +65,47 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
                      }),
     };
 
-    auto server_app_config = minimal_app_config(base_url, "flx_connect", schema);
-    AppCreateConfig::FLXSyncConfig flx_config;
-    flx_config.queryable_fields["TopLevel"] = {"queryable_int_field", "queryable_str_field"};
-    server_app_config.flx_sync_config = std::move(flx_config);
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
+}
 
-    TestSyncManager::Config smc(app_config);
-    smc.verbose_sync_client_logging = true;
-    TestSyncManager sync_manager(std::move(smc), {});
+AppSession make_app_from_server_schema(const std::string& test_name,
+                                       const FLXSyncTestHarness::ServerSchema& server_schema)
+{
+    auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
+    AppCreateConfig::FLXSyncConfig flx_config;
+    for (const auto& table : server_schema.schema) {
+        flx_config.queryable_fields[table.name] = server_schema.queryable_fields;
+    }
+
+    server_app_config.flx_sync_config = std::move(flx_config);
+    return create_app(server_app_config);
+}
+
+
+FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema)
+    : m_app_session(make_app_from_server_schema(test_name, server_schema))
+    , m_app_config(get_config(instance_of<SynchronousTestTransport>, m_app_session))
+    , m_schema(std::move(server_schema.schema))
+{
+}
+
+TestSyncManager FLXSyncTestHarness::make_sync_manager()
+{
+    TestSyncManager::Config smc(m_app_config);
+    return TestSyncManager(std::move(smc), {});
+}
+
+TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("basic_flx_connect");
+    auto sync_manager = harness.make_sync_manager();
     auto app = sync_manager.app();
 
     auto foo_obj_id = ObjectId::gen();
     auto bar_obj_id = ObjectId::gen();
     {
         auto creds = create_user_and_log_in(app);
-        std::shared_ptr<SyncUser> user;
-        app->log_in_with_credentials(creds,
-                                     [&](std::shared_ptr<SyncUser> user_arg, util::Optional<app::AppError> error) {
-                                         REQUIRE_FALSE(error);
-                                         REQUIRE(user_arg);
-                                         user = std::move(user_arg);
-                                     });
-        REQUIRE(user);
 
-        SyncTestFile config(app, bson::Bson{}, schema);
+        SyncTestFile config(app, bson::Bson{}, harness.schema());
         auto realm = Realm::get_shared_realm(config);
 
         {
@@ -103,16 +142,8 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     }
     {
         auto creds = create_user_and_log_in(app);
-        std::shared_ptr<SyncUser> user;
-        app->log_in_with_credentials(creds,
-                                     [&](std::shared_ptr<SyncUser> user_arg, util::Optional<app::AppError> error) {
-                                         REQUIRE_FALSE(error);
-                                         REQUIRE(user_arg);
-                                         user = std::move(user_arg);
-                                     });
-        REQUIRE(user);
 
-        SyncTestFile config(app, bson::Bson{}, schema);
+        SyncTestFile config(app, bson::Bson{}, harness.schema());
         auto realm = Realm::get_shared_realm(config);
         auto table = realm->read_group().get_table("class_TopLevel");
         Query new_query_a(table);
@@ -156,20 +187,35 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     auto app = sync_manager.app();
 
     auto creds = create_user_and_log_in(app);
-    std::shared_ptr<SyncUser> user;
-    app->log_in_with_credentials(creds, [&](std::shared_ptr<SyncUser> user_arg, util::Optional<app::AppError> error) {
-        REQUIRE_FALSE(error);
-        REQUIRE(user_arg);
-        user = std::move(user_arg);
-    });
-    REQUIRE(user);
+    auto user = app->current_user();
 
     SyncTestFile config(app, bson::Bson{}, schema);
+
+    std::mutex sync_error_mutex;
+    util::Optional<SyncError> sync_error;
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
+        std::lock_guard<std::mutex> lk(sync_error_mutex);
+        sync_error = std::move(error);
+    };
     auto realm = Realm::get_shared_realm(config);
     CHECK(!wait_for_download(*realm));
     CHECK(!wait_for_upload(*realm));
 
     CHECK(!realm->sync_session()->has_flx_subscription_store());
+
+    auto latest_subs = realm->get_latest_subscription_set().make_mutable_copy();
+    auto table = realm->read_group().get_table("class_TopLevel");
+    Query new_query_a(table);
+    new_query_a.equal(table->get_column_key("_id"), ObjectId::gen());
+    latest_subs.insert_or_assign(std::move(new_query_a));
+    latest_subs.commit();
+
+    timed_wait_for([&] {
+        std::lock_guard<std::mutex> lk(sync_error_mutex);
+        return static_cast<bool>(sync_error);
+    });
+
+    CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
 }
 } // namespace realm::app
 

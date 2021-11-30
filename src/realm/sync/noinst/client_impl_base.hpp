@@ -395,7 +395,9 @@ public:
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
     ConnectionState get_state() const noexcept;
+    SyncServerMode get_sync_server_mode() const noexcept;
     bool is_flx_sync_connection() const noexcept;
+    void force_flx_sync_mode();
 
     void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
                              const std::string& signed_access_token);
@@ -1193,6 +1195,11 @@ inline ClientImpl& ClientImpl::Connection::get_client() noexcept
 inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 {
     return m_state;
+}
+
+inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
+{
+    return m_sync_mode;
 }
 
 inline auto ClientImpl::Connection::get_reconnect_info() const noexcept -> ReconnectInfo

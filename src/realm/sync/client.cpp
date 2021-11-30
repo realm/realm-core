@@ -729,9 +729,11 @@ void SessionImpl::on_resumed()
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
-    logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
     m_pending_query_message = true;
-    ensure_enlisted_to_send();
+    if (m_conn.get_state() == ConnectionState::connected) {
+        logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
+        ensure_enlisted_to_send();
+    }
 }
 
 void SessionImpl::on_flx_sync_error(int64_t version, std::string_view err_msg)
@@ -864,8 +866,17 @@ SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
             });
         });
 
-        m_flx_latest_version = m_flx_subscription_store->get_latest().version();
-        m_flx_active_version = m_flx_subscription_store->get_active().version();
+        m_client.get_service().post([self = util::bind_ptr<SessionWrapper>(this)] {
+            const auto& sub_store = self->m_flx_subscription_store;
+            self->m_flx_latest_version = sub_store->get_latest().version();
+            self->m_flx_active_version = sub_store->get_active().version();
+
+            self->m_sess->get_connection().force_flx_sync_mode();
+
+            if (self->m_flx_latest_version > self->m_flx_active_version) {
+                self->m_sess->on_new_flx_subscription_set(self->m_flx_latest_version);
+            }
+        });
     });
 
     return m_flx_subscription_store.get();

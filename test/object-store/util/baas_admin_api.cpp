@@ -379,7 +379,6 @@ app::Response AdminAPIEndpoint::post(std::string body) const
     req.method = app::HttpMethod::post;
     req.url = m_url;
     req.body = std::move(body);
-    std::cerr << req.body << std::endl;
     return do_request(std::move(req));
 }
 
