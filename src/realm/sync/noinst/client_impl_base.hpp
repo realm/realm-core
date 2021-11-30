@@ -725,6 +725,8 @@ public:
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
 
+    void force_flx_sync_mode();
+
     /// \brief Announce that a new access token is available.
     ///
     /// By calling this function, the application announces to the session

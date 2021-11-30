@@ -748,7 +748,6 @@ void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch
 
 SubscriptionStore* SessionImpl::get_or_create_flx_subscription_store()
 {
-    m_is_flx_sync_session = true;
     return m_wrapper.get_or_create_flx_subscription_store();
 }
 
@@ -871,7 +870,7 @@ SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
             self->m_flx_latest_version = sub_store->get_latest().version();
             self->m_flx_active_version = sub_store->get_active().version();
 
-            self->m_sess->get_connection().force_flx_sync_mode();
+            self->m_sess->force_flx_sync_mode();
 
             if (self->m_flx_latest_version > self->m_flx_active_version) {
                 self->m_sess->on_new_flx_subscription_set(self->m_flx_latest_version);

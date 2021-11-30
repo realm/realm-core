@@ -1656,7 +1656,11 @@ void Session::complete_deactivation()
     logger.debug("Deactivation completed"); // Throws
 }
 
-
+void Session::force_flx_sync_mode()
+{
+    m_is_flx_sync_session = true;
+    m_conn.force_flx_sync_mode();
+}
 // Called by the associated Connection object when this session is granted an
 // opportunity to send a message.
 //
