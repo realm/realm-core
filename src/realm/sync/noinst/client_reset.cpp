@@ -571,11 +571,15 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     if (!tables_to_remove.empty()) {
         std::string names_list;
         for (const std::string& table_name : tables_to_remove) {
-            names_list += table_name;
+            names_list += Group::table_name_to_class_name(table_name);
             names_list += ", ";
         }
+        if (names_list.size() > 2) {
+            // remove the final ", "
+            names_list = names_list.substr(0, names_list.size() - 2);
+        }
         throw ClientResetFailed(
-            util::format("Client reset cannot recover when tables have been removed: {%1}", names_list));
+            util::format("Client reset cannot recover when classes have been removed: {%1}", names_list));
     }
 
     // Create new tables in dst if needed.
@@ -588,11 +592,17 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         TableRef table_dst = group_dst.get_table(table_name);
         if (!table_dst) {
             // Create the table.
-            REALM_ASSERT(pk_col_src); // a sync table will have a pk
-            auto pk_col_src = table_src->get_primary_key_column();
-            DataType pk_type = DataType(pk_col_src.get_type());
-            StringData pk_col_name = table_src->get_column_name(pk_col_src);
-            group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
+            if (table_src->is_embedded()) {
+                REALM_ASSERT(!pk_col_src);
+                group_dst.add_embedded_table(table_name);
+            }
+            else {
+                REALM_ASSERT(pk_col_src); // a sync table will have a pk
+                auto pk_col_src = table_src->get_primary_key_column();
+                DataType pk_type = DataType(pk_col_src.get_type());
+                StringData pk_col_name = table_src->get_column_name(pk_col_src);
+                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
+            }
         }
     }
 
@@ -811,7 +821,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     BinaryData recovered_changeset;
     sync::SaltedVersion fresh_server_version = {0, 0};
 
-    if (db_remote) { // seamless_loss mode
+    if (db_remote) { // 'discard local' mode
         auto wt_remote = db_remote->start_write();
         auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
         sync::version_type current_version_remote = wt_remote->get_version();

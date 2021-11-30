@@ -258,7 +258,7 @@ Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
 
 ParserNode::~ParserNode() {}
 
-AtomPredNode::~AtomPredNode() {}
+QueryNode::~QueryNode() {}
 
 Query NotNode::visit(ParserDriver* drv)
 {
@@ -269,20 +269,11 @@ Query NotNode::visit(ParserDriver* drv)
     return {q};
 }
 
-Query ParensNode::visit(ParserDriver* drv)
-{
-    return pred->visit(drv);
-}
-
 Query OrNode::visit(ParserDriver* drv)
 {
-    if (and_preds.size() == 1) {
-        return and_preds[0]->visit(drv);
-    }
-
     Query q(drv->m_base_table);
     q.group();
-    for (auto it : and_preds) {
+    for (auto it : children) {
         q.Or();
         q.and_query(it->visit(drv));
     }
@@ -293,11 +284,8 @@ Query OrNode::visit(ParserDriver* drv)
 
 Query AndNode::visit(ParserDriver* drv)
 {
-    if (atom_preds.size() == 1) {
-        return atom_preds[0]->visit(drv);
-    }
     Query q(drv->m_base_table);
-    for (auto it : atom_preds) {
+    for (auto it : children) {
         q.and_query(it->visit(drv));
     }
     return q;
@@ -452,8 +440,7 @@ Query BetweenNode::visit(ParserDriver* drv)
     ValueNode max(limits->elements.at(1));
     RelationalNode cmp1(prop, CompareNode::GREATER, &min);
     RelationalNode cmp2(prop, CompareNode::LESS, &max);
-    AndNode and_node(&cmp1);
-    and_node.atom_preds.emplace_back(&cmp2);
+    AndNode and_node(&cmp1, &cmp2);
 
     return and_node.visit(drv);
 }
@@ -714,7 +701,7 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
     drv->m_mapping.remove_mapping(drv->m_base_table, variable_name);
     drv->m_base_table = previous_table;
 
-    return std::unique_ptr<Subexpr>(lc.subquery(sub));
+    return lc.subquery(sub);
 }
 
 std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
@@ -844,29 +831,29 @@ std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
 
 std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
-    Subexpr* ret = nullptr;
+    std::unique_ptr<Subexpr> ret;
     std::string explain_value_message = text;
     switch (type) {
         case Type::NUMBER: {
             if (hint == type_Decimal) {
-                ret = new Value<Decimal128>(Decimal128(text));
+                ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
             }
             else {
-                ret = new Value<int64_t>(strtoll(text.c_str(), nullptr, 0));
+                ret = std::make_unique<Value<int64_t>>(strtoll(text.c_str(), nullptr, 0));
             }
             break;
         }
         case Type::FLOAT: {
             switch (hint) {
                 case type_Float: {
-                    ret = new Value<float>(strtof(text.c_str(), nullptr));
+                    ret = std::make_unique<Value<float>>(strtof(text.c_str(), nullptr));
                     break;
                 }
                 case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128(text));
+                    ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
                     break;
                 default:
-                    ret = new Value<double>(strtod(text.c_str(), nullptr));
+                    ret = std::make_unique<Value<double>>(strtod(text.c_str(), nullptr));
                     break;
             }
             break;
@@ -876,16 +863,16 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             switch (hint) {
                 case type_Float: {
                     auto inf = std::numeric_limits<float>::infinity();
-                    ret = new Value<float>(negative ? -inf : inf);
+                    ret = std::make_unique<Value<float>>(negative ? -inf : inf);
                     break;
                 }
                 case type_Double: {
                     auto inf = std::numeric_limits<double>::infinity();
-                    ret = new Value<double>(negative ? -inf : inf);
+                    ret = std::make_unique<Value<double>>(negative ? -inf : inf);
                     break;
                 }
                 case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128(text));
+                    ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
                     break;
                 default:
                     throw InvalidQueryError(util::format("Infinity not supported for %1", get_data_type_name(hint)));
@@ -896,13 +883,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
         case Type::NAN_VAL: {
             switch (hint) {
                 case type_Float:
-                    ret = new Value<float>(type_punning<float>(0x7fc00000));
+                    ret = std::make_unique<Value<float>>(type_punning<float>(0x7fc00000));
                     break;
                 case type_Double:
-                    ret = new Value<double>(type_punning<double>(0x7ff8000000000000));
+                    ret = std::make_unique<Value<double>>(type_punning<double>(0x7ff8000000000000));
                     break;
                 case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128::nan("0"));
+                    ret = std::make_unique<Value<Decimal128>>(Decimal128::nan("0"));
                     break;
                 default:
                     REALM_UNREACHABLE();
@@ -914,28 +901,28 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             std::string str = text.substr(1, text.size() - 2);
             switch (hint) {
                 case type_Int:
-                    ret = new Value<int64_t>(string_to<int64_t>(str));
+                    ret = std::make_unique<Value<int64_t>>(string_to<int64_t>(str));
                     break;
                 case type_Float:
-                    ret = new Value<float>(string_to<float>(str));
+                    ret = std::make_unique<Value<float>>(string_to<float>(str));
                     break;
                 case type_Double:
-                    ret = new Value<double>(string_to<double>(str));
+                    ret = std::make_unique<Value<double>>(string_to<double>(str));
                     break;
                 case type_Decimal:
-                    ret = new Value<Decimal128>(Decimal128(str.c_str()));
+                    ret = std::make_unique<Value<Decimal128>>(Decimal128(str.c_str()));
                     break;
                 default:
                     if (hint == type_TypeOfValue) {
                         try {
-                            ret = new Value<TypeOfValue>(TypeOfValue(str));
+                            ret = std::make_unique<Value<TypeOfValue>>(TypeOfValue(str));
                         }
                         catch (const std::runtime_error& e) {
                             throw InvalidQueryArgError(e.what());
                         }
                     }
                     else {
-                        ret = new ConstantStringValue(str);
+                        ret = std::make_unique<ConstantStringValue>(str);
                     }
                     break;
             }
@@ -956,13 +943,13 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             decode_buffer.resize(*decoded_size); // truncate
 
             if (hint == type_String) {
-                ret = new ConstantStringValue(StringData(decode_buffer.data(), decode_buffer.size()));
+                ret = std::make_unique<ConstantStringValue>(StringData(decode_buffer.data(), decode_buffer.size()));
             }
             if (hint == type_Binary) {
-                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+                ret = std::make_unique<Value<BinaryData>>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
             if (hint == type_Mixed) {
-                ret = new Value<BinaryData>(BinaryData(decode_buffer.data(), decode_buffer.size()));
+                ret = std::make_unique<Value<BinaryData>>(BinaryData(decode_buffer.data(), decode_buffer.size()));
             }
             break;
         }
@@ -1004,48 +991,49 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     nanoseconds *= -1;
                 }
             }
-            ret = new Value<Timestamp>(get_timestamp_if_valid(seconds, nanoseconds));
+            ret = std::make_unique<Value<Timestamp>>(get_timestamp_if_valid(seconds, nanoseconds));
             break;
         }
         case Type::UUID_T:
-            ret = new Value<UUID>(UUID(text.substr(5, text.size() - 6)));
+            ret = std::make_unique<Value<UUID>>(UUID(text.substr(5, text.size() - 6)));
             break;
         case Type::OID:
-            ret = new Value<ObjectId>(ObjectId(text.substr(4, text.size() - 5).c_str()));
+            ret = std::make_unique<Value<ObjectId>>(ObjectId(text.substr(4, text.size() - 5).c_str()));
             break;
         case Type::LINK: {
-            ret = new Value<ObjKey>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
+            ret =
+                std::make_unique<Value<ObjKey>>(ObjKey(strtol(text.substr(1, text.size() - 1).c_str(), nullptr, 0)));
             break;
         }
         case Type::TYPED_LINK: {
             size_t colon_pos = text.find(":");
             auto table_key_val = uint32_t(strtol(text.substr(1, colon_pos - 1).c_str(), nullptr, 0));
             auto obj_key_val = strtol(text.substr(colon_pos + 1).c_str(), nullptr, 0);
-            ret = new Value<ObjLink>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
+            ret = std::make_unique<Value<ObjLink>>(ObjLink(TableKey(table_key_val), ObjKey(obj_key_val)));
             break;
         }
         case Type::NULL_VAL:
             if (hint == type_String) {
-                ret = new ConstantStringValue(StringData()); // Null string
+                ret = std::make_unique<ConstantStringValue>(StringData()); // Null string
             }
             else if (hint == type_Binary) {
-                ret = new Value<Binary>(BinaryData()); // Null string
+                ret = std::make_unique<Value<Binary>>(BinaryData()); // Null string
             }
             else {
-                ret = new Value<null>(realm::null());
+                ret = std::make_unique<Value<null>>(realm::null());
             }
             break;
         case Type::TRUE:
-            ret = new Value<Bool>(true);
+            ret = std::make_unique<Value<Bool>>(true);
             break;
         case Type::FALSE:
-            ret = new Value<Bool>(false);
+            ret = std::make_unique<Value<Bool>>(false);
             break;
         case Type::ARG: {
             size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
             if (drv->m_args.is_argument_null(arg_no)) {
                 explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
-                ret = new Value<null>(realm::null());
+                ret = std::make_unique<Value<null>>(realm::null());
             }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
@@ -1053,19 +1041,19 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     util::format("argument %1 of type '%2'", explain_value_message, get_data_type_name(type));
                 switch (type) {
                     case type_Int:
-                        ret = new Value<int64_t>(drv->m_args.long_for_argument(arg_no));
+                        ret = std::make_unique<Value<int64_t>>(drv->m_args.long_for_argument(arg_no));
                         break;
                     case type_String:
-                        ret = new ConstantStringValue(drv->m_args.string_for_argument(arg_no));
+                        ret = std::make_unique<ConstantStringValue>(drv->m_args.string_for_argument(arg_no));
                         break;
                     case type_Binary:
-                        ret = new ConstantBinaryValue(drv->m_args.binary_for_argument(arg_no));
+                        ret = std::make_unique<ConstantBinaryValue>(drv->m_args.binary_for_argument(arg_no));
                         break;
                     case type_Bool:
-                        ret = new Value<Bool>(drv->m_args.bool_for_argument(arg_no));
+                        ret = std::make_unique<Value<Bool>>(drv->m_args.bool_for_argument(arg_no));
                         break;
                     case type_Float:
-                        ret = new Value<float>(drv->m_args.float_for_argument(arg_no));
+                        ret = std::make_unique<Value<float>>(drv->m_args.float_for_argument(arg_no));
                         break;
                     case type_Double: {
                         // In realm-js all number type arguments are returned as double. If we don't cast to the
@@ -1078,50 +1066,50 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                                 int64_t int_val = int64_t(val);
                                 // Only return an integer if it precisely represents val
                                 if (double(int_val) == val)
-                                    ret = new Value<int64_t>(int_val);
+                                    ret = std::make_unique<Value<int64_t>>(int_val);
                                 else
-                                    ret = new Value<double>(val);
+                                    ret = std::make_unique<Value<double>>(val);
                                 break;
                             }
                             case type_Float:
-                                ret = new Value<float>(float(val));
+                                ret = std::make_unique<Value<float>>(float(val));
                                 break;
                             default:
-                                ret = new Value<double>(val);
+                                ret = std::make_unique<Value<double>>(val);
                                 break;
                         }
                         break;
                     }
                     case type_Timestamp: {
                         try {
-                            ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
+                            ret = std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
                         }
                         catch (const std::exception&) {
-                            ret = new Value<ObjectId>(drv->m_args.objectid_for_argument(arg_no));
+                            ret = std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
                         }
                         break;
                     }
                     case type_ObjectId: {
                         try {
-                            ret = new Value<ObjectId>(drv->m_args.objectid_for_argument(arg_no));
+                            ret = std::make_unique<Value<ObjectId>>(drv->m_args.objectid_for_argument(arg_no));
                         }
                         catch (const std::exception&) {
-                            ret = new Value<Timestamp>(drv->m_args.timestamp_for_argument(arg_no));
+                            ret = std::make_unique<Value<Timestamp>>(drv->m_args.timestamp_for_argument(arg_no));
                         }
                         break;
                     }
                     case type_Decimal:
-                        ret = new Value<Decimal128>(drv->m_args.decimal128_for_argument(arg_no));
+                        ret = std::make_unique<Value<Decimal128>>(drv->m_args.decimal128_for_argument(arg_no));
                         break;
                     case type_UUID:
-                        ret = new Value<UUID>(drv->m_args.uuid_for_argument(arg_no));
+                        ret = std::make_unique<Value<UUID>>(drv->m_args.uuid_for_argument(arg_no));
                         break;
                     case type_Link:
-                        ret = new Value<ObjKey>(drv->m_args.object_index_for_argument(arg_no));
+                        ret = std::make_unique<Value<ObjKey>>(drv->m_args.object_index_for_argument(arg_no));
                         break;
                     case type_TypedLink:
                         if (hint == type_Mixed || hint == type_Link || hint == type_TypedLink) {
-                            ret = new Value<ObjLink>(drv->m_args.objlink_for_argument(arg_no));
+                            ret = std::make_unique<Value<ObjLink>>(drv->m_args.objlink_for_argument(arg_no));
                             break;
                         }
                         explain_value_message =
@@ -1141,7 +1129,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             util::format("Unsupported comparison between property of type '%1' and constant value: %2",
                          get_data_type_name(hint), explain_value_message));
     }
-    return std::unique_ptr<Subexpr>{ret};
+    return ret;
 }
 
 LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
@@ -1305,7 +1293,7 @@ std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(
     return {std::move(left), std::move(right)};
 }
 
-Subexpr* ParserDriver::column(LinkChain& link_chain, std::string identifier)
+std::unique_ptr<Subexpr> ParserDriver::column(LinkChain& link_chain, std::string identifier)
 {
     identifier = m_mapping.translate(link_chain, identifier);
 
@@ -1420,10 +1408,11 @@ Query Table::query(const std::string& query_string, query_parser::Arguments& arg
 {
     ParserDriver driver(m_own_ref, args, mapping);
     driver.parse(query_string);
+    driver.result->canonicalize();
     return driver.result->visit(&driver).set_ordering(driver.ordering->visit(&driver));
 }
 
-Subexpr* LinkChain::column(const std::string& col)
+std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
 {
     auto col_key = m_current_table->get_column_key(col);
     if (!col_key) {
@@ -1541,11 +1530,11 @@ Subexpr* LinkChain::column(const std::string& col)
     return nullptr;
 }
 
-Subexpr* LinkChain::subquery(Query subquery)
+std::unique_ptr<Subexpr> LinkChain::subquery(Query subquery)
 {
     REALM_ASSERT(m_link_cols.size() > 0);
     auto col_key = m_link_cols.back();
-    return new SubQueryCount(subquery, Columns<Link>(col_key, m_base_table, m_link_cols).link_map());
+    return std::make_unique<SubQueryCount>(subquery, Columns<Link>(col_key, m_base_table, m_link_cols).link_map());
 }
 
 template <class T>

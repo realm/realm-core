@@ -404,7 +404,7 @@ TEST_CASE("C API (non-database)") {
             };
             check_mode(RLM_SCHEMA_MODE_AUTOMATIC);
             check_mode(RLM_SCHEMA_MODE_IMMUTABLE);
-            check_mode(RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE);
+            check_mode(RLM_SCHEMA_MODE_READ_ONLY);
             check_mode(RLM_SCHEMA_MODE_RESET_FILE);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED);
@@ -1527,6 +1527,21 @@ TEST_CASE("C API") {
                     size_t count2;
                     CHECK(checked(realm_query_count(q2.get(), &count2)));
                     CHECK(count == count2);
+                }
+                SECTION("realm_query_append_query") {
+                    auto q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(1)", 1, &arg));
+                    size_t count;
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 1);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "FALSEPREDICATE", 1, &arg));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 0);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(0)", 1, &arg));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 0);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(10)", 1, &arg));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 1);
                 }
             }
 

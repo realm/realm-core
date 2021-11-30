@@ -220,20 +220,6 @@ struct Mul {
     typedef T type;
 };
 
-// Unary operator
-template <class T>
-struct Pow {
-    T operator()(T v) const
-    {
-        return v * v;
-    }
-    static std::string description()
-    {
-        return "^";
-    }
-    typedef T type;
-};
-
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
 template <class T1, class T2, bool T1_is_int = std::numeric_limits<T1>::is_integer || std::is_same_v<T1, null>,
           bool T2_is_int = std::numeric_limits<T2>::is_integer || std::is_same_v<T2, null>,
@@ -264,13 +250,6 @@ struct OperatorOptionalAdapter {
             return util::none;
         return Operator()(left.template export_to_type<typename Operator::type>(),
                           right.template export_to_type<typename Operator::type>());
-    }
-
-    util::Optional<typename Operator::type> operator()(const Mixed& arg)
-    {
-        if (arg.is_null())
-            return util::none;
-        return Operator()(arg.template export_to_type<typename Operator::type>());
     }
 };
 
@@ -422,17 +401,6 @@ public:
             for (size_t i = 0; i < left.size(); i++) {
                 set(i, o(left[i], right_value));
             }
-        }
-    }
-
-    template <class TOperator>
-    REALM_FORCEINLINE void fun(const ValueBase& value)
-    {
-        init(value.m_from_link_list, value.size());
-
-        OperatorOptionalAdapter<TOperator> o;
-        for (size_t i = 0; i < value.size(); i++) {
-            set(i, o(value[i]));
         }
     }
 
@@ -1004,9 +972,7 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, Mixed>,
                  public Overloads<T, null> {
 public:
-    virtual ~Subexpr2() {}
-
-    DataType get_type() const final
+    DataType get_type() const override
     {
         return ColumnTypeTraits<T>::id;
     }
@@ -1139,7 +1105,7 @@ public:
     Query contains(const Subexpr2<Mixed>& col, bool case_sensitive = true);
     Query like(Mixed sd, bool case_sensitive = true);
     Query like(const Subexpr2<Mixed>& col, bool case_sensitive = true);
-    DataType get_type() const final
+    DataType get_type() const override
     {
         return type_Mixed;
     }
@@ -1338,13 +1304,6 @@ private:
 
     OwnedBinaryData m_buffer;
 };
-
-// Unary operators
-template <class T>
-UnaryOperator<Pow<T>> power(const Subexpr2<T>& left)
-{
-    return {left.clone()};
-}
 
 // Classes used for LinkMap (see below).
 struct LinkMapFunction {
@@ -2471,6 +2430,14 @@ public:
     {
     }
 
+    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
+            ExpressionComparisonType type = ExpressionComparisonType::Any)
+        : m_link_map(table, links)
+        , m_comparison_type(type)
+        , m_is_list(column_key.is_list())
+    {
+    }
+
     Query is_null()
     {
         if (m_link_map.get_nb_hops() > 1)
@@ -2567,14 +2534,6 @@ private:
     bool m_is_list;
     friend class Table;
     friend class LinkChain;
-
-    Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
-        : m_link_map(table, links)
-        , m_comparison_type(type)
-        , m_is_list(column_key.is_list())
-    {
-    }
 };
 
 template <typename T>
@@ -3192,6 +3151,11 @@ public:
     {
     }
 
+    DataType get_type() const override
+    {
+        return DataType(m_columns_collection.m_column_key.get_type());
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<CollectionColumnAggregate>(*this);
@@ -3317,10 +3281,10 @@ private:
             return dict_cluster.min();
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Average<Mixed>>) {
-            return dict_cluster.avg();
+            return dict_cluster.avg(nullptr, get_type());
         }
         else if constexpr (std::is_same_v<Operation, aggregate_operations::Sum<Mixed>>) {
-            return dict_cluster.sum();
+            return dict_cluster.sum(nullptr, get_type());
         }
         REALM_UNREACHABLE();
     }
@@ -3806,82 +3770,6 @@ private:
     Query m_query;
     LinkMap m_link_map;
 };
-
-template <class oper, class TLeft>
-class UnaryOperator : public Subexpr2<typename oper::type> {
-public:
-    UnaryOperator(std::unique_ptr<TLeft> left)
-        : m_left(std::move(left))
-    {
-    }
-
-    UnaryOperator(const UnaryOperator& other)
-        : m_left(other.m_left->clone())
-    {
-    }
-
-    UnaryOperator& operator=(const UnaryOperator& other)
-    {
-        if (this != &other) {
-            m_left = other.m_left->clone();
-        }
-        return *this;
-    }
-
-    UnaryOperator(UnaryOperator&&) noexcept = default;
-    UnaryOperator& operator=(UnaryOperator&&) noexcept = default;
-
-    // See comment in base class
-    void set_base_table(ConstTableRef table) override
-    {
-        m_left->set_base_table(table);
-    }
-
-    void set_cluster(const Cluster* cluster) override
-    {
-        m_left->set_cluster(cluster);
-    }
-
-    void collect_dependencies(std::vector<TableKey>& tables) const override
-    {
-        m_left->collect_dependencies(tables);
-    }
-
-    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
-    // and binds it to a Query at a later time
-    ConstTableRef get_base_table() const override
-    {
-        return m_left->get_base_table();
-    }
-
-    // destination = operator(left)
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<T> result;
-        Value<T> left;
-        m_left->evaluate(index, left);
-        result.template fun<oper>(left);
-        destination = result;
-    }
-
-    virtual std::string description(util::serializer::SerialisationState& state) const override
-    {
-        if (m_left) {
-            return m_left->description(state);
-        }
-        return "";
-    }
-
-    std::unique_ptr<Subexpr> clone() const override
-    {
-        return make_subexpr<UnaryOperator>(*this);
-    }
-
-private:
-    typedef typename oper::type T;
-    std::unique_ptr<TLeft> m_left;
-};
-
 
 template <class oper, class TLeft, class TRight>
 class Operator : public Subexpr2<typename oper::type> {

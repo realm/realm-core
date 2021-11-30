@@ -27,6 +27,7 @@
 #include <realm/table_view.hpp>
 #include <realm/table_tpl.hpp>
 #include <realm/set.hpp>
+#include <realm/array_integer_tpl.hpp>
 
 #include <algorithm>
 
@@ -1863,13 +1864,13 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     std::string description;
     if (root_node()) {
         if (m_view) {
-            throw SerialisationError("Serialisation of a query constrianed by a view is not currently supported");
+            throw SerialisationError("Serialisation of a query constrained by a view is not currently supported");
         }
         description = root_node()->describe_expression(state);
     }
     else {
         // An empty query returns all results and one way to indicate this
-        // is to serialise TRUEPREDICATE which is functionally equivilent
+        // is to serialise TRUEPREDICATE which is functionally equivalent
         description = "TRUEPREDICATE";
     }
     if (this->m_ordering) {

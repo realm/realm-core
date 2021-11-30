@@ -1631,9 +1631,9 @@ void File::set_encryption_key(const char* key)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (key) {
-        char* buffer = new char[64];
-        memcpy(buffer, key, 64);
-        m_encryption_key.reset(static_cast<const char*>(buffer));
+        auto buffer = std::make_unique<char[]>(64);
+        memcpy(buffer.get(), key, 64);
+        m_encryption_key = std::move(buffer);
     }
     else {
         m_encryption_key.reset();

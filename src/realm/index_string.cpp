@@ -28,6 +28,7 @@
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/column_integer.hpp>
+#include <realm/unicode.hpp>
 
 using namespace realm;
 using namespace realm::util;

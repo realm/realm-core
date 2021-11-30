@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#include <realm/array_integer.hpp>
+#include <realm/array_integer_tpl.hpp>
 #include <realm/impl/destroy_guard.hpp>
 #include <realm/column_integer.hpp>
 
@@ -167,6 +167,15 @@ void ArrayIntNull::find_all(IntegerColumn* result, value_type value, size_t col_
     }
 }
 
+bool ArrayIntNull::find(int cond, value_type value, size_t start, size_t end, QueryStateBase* state) const
+{
+    return find_impl(cond, value, start, end, state, nullptr);
+}
+
+size_t ArrayIntNull::find_first(value_type value, size_t begin, size_t end) const
+{
+    return find_first<Equal>(value, begin, end);
+}
 
 void ArrayIntNull::get_chunk(size_t ndx, value_type res[8]) const noexcept
 {

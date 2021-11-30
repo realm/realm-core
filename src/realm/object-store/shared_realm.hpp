@@ -27,6 +27,10 @@
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/sync/subscriptions.hpp>
+#endif
+
 #include <memory>
 #include <deque>
 
@@ -83,7 +87,6 @@ enum class SchemaMode : uint8_t {
     // version in the file, and all tables present in the file must
     // exactly match the specified schema, except for indexes. Tables
     // are allowed to be missing from the file.
-    // WARNING: This is the original ReadOnly mode.
     Immutable,
 
     // Open the Realm in read-only mode, transactions are not allowed to
@@ -95,10 +98,7 @@ enum class SchemaMode : uint8_t {
     // mode, sync Realm can be opened with ReadOnly mode. Changes
     // can be made to the Realm file through another writable Realm instance.
     // Thus, notifications are also allowed in this mode.
-    // FIXME: Rename this to ReadOnly
-    // WARNING: This is not the original ReadOnly mode. The original ReadOnly
-    // has been renamed to Immutable.
-    ReadOnlyAlternative,
+    ReadOnly,
 
     // If the schema version matches and the only schema changes are new
     // tables and indexes being added or removed, apply the changes to
@@ -211,10 +211,9 @@ public:
         {
             return schema_mode == SchemaMode::Immutable;
         }
-        // FIXME: Rename this to read_only().
-        bool read_only_alternative() const
+        bool read_only() const
         {
-            return schema_mode == SchemaMode::ReadOnlyAlternative;
+            return schema_mode == SchemaMode::ReadOnly;
         }
 
         // The following are intended for internal/testing purposes and
@@ -275,7 +274,14 @@ public:
     static std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
 
     std::shared_ptr<SyncSession> sync_session() const;
+
+    // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
+    // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
+    // sync mode if they aren't already.
+    const sync::SubscriptionSet get_latest_subscription_set();
+    const sync::SubscriptionSet get_active_subscription_set();
 #endif
+
     // Returns a frozen Realm for the given Realm. This Realm can be accessed from any thread.
     static SharedRealm get_frozen_realm(Config config, VersionID version);
 
@@ -305,6 +311,7 @@ public:
     {
         return m_schema_version;
     }
+
 
     void begin_transaction();
     void commit_transaction();

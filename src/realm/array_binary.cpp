@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/array_binary.hpp>
+#include <realm/mixed.hpp>
 
 using namespace realm;
 

@@ -66,7 +66,7 @@ inline std::string print_with_nan_check(T val)
         return "nan";
     }
     std::stringstream ss;
-    ss << val;
+    ss << std::setprecision(std::numeric_limits<T>::max_digits10) << val;
     return ss.str();
 }
 

@@ -290,10 +290,6 @@
 #define REALM_COOKIE_CHECK
 #endif
 
-#if !REALM_IOS && !REALM_WATCHOS && !REALM_TVOS && !defined(_WIN32) && !REALM_ANDROID
-// #define REALM_ASYNC_DAEMON FIXME Async commits not supported
-#endif
-
 // We're in i686 mode
 #if defined(__i386) || defined(__i386__) || defined(__i686__) || defined(_M_I86) || defined(_M_IX86)
 #define REALM_ARCHITECTURE_X86_32 1

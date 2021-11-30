@@ -288,8 +288,8 @@ bool ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                                 const std::uint_fast64_t* downloadable_bytes,
                                                 const RemoteChangeset* incoming_changesets,
                                                 std::size_t num_changesets, VersionInfo& version_info,
-                                                IntegrationError& integration_error, util::Logger& logger,
-                                                SyncTransactReporter* transact_reporter)
+                                                IntegrationError& integration_error, DownloadBatchState batch_state,
+                                                util::Logger& logger, SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(num_changesets != 0);
 
@@ -410,7 +410,11 @@ bool ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     REALM_ASSERT(!m_changeset_from_server);
     m_changeset_from_server = entry;
 
-    update_sync_progress(progress, downloadable_bytes); // Throws
+    // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
+    // synthetic server version that represents synthetic changesets generated from state on the server.
+    if (batch_state == DownloadBatchState::LastInBatch) {
+        update_sync_progress(progress, downloadable_bytes); // Throws
+    }
 
     version_type new_version = transact->commit_and_continue_as_read().version; // Throws
 

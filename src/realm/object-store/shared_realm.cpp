@@ -42,6 +42,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/impl/sync_file.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
+#include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/sync/config.hpp>
 #include <realm/sync/history.hpp>
@@ -187,6 +188,16 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
 {
     return m_coordinator->sync_session();
 }
+
+const sync::SubscriptionSet Realm::get_latest_subscription_set()
+{
+    return m_coordinator->sync_session()->get_flx_subscription_store()->get_latest();
+}
+
+const sync::SubscriptionSet Realm::get_active_subscription_set()
+{
+    return m_coordinator->sync_session()->get_flx_subscription_store()->get_active();
+}
 #endif
 
 void Realm::set_schema(Schema const& reference, Schema schema)
@@ -269,7 +280,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             if (version != m_schema_version)
                 throw InvalidSchemaVersionException(m_schema_version, version);
             REALM_FALLTHROUGH;
-        case SchemaMode::ReadOnlyAlternative:
+        case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             return false;
 
@@ -338,7 +349,7 @@ void Realm::set_schema_subset(Schema schema)
             break;
 
         case SchemaMode::Immutable:
-        case SchemaMode::ReadOnlyAlternative:
+        case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             break;
 
@@ -413,7 +424,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     if (migration_function && !additive) {
         auto wrapper = [&] {
             auto config = m_config;
-            config.schema_mode = SchemaMode::ReadOnlyAlternative;
+            config.schema_mode = SchemaMode::ReadOnly;
             config.schema = util::none;
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
@@ -518,7 +529,7 @@ void Realm::notify_schema_changed()
 
 static void check_can_create_write_transaction(const Realm* realm)
 {
-    if (realm->config().immutable() || realm->config().read_only_alternative()) {
+    if (realm->config().immutable() || realm->config().read_only()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
     if (realm->is_frozen()) {
@@ -958,7 +969,7 @@ bool Realm::compact()
     verify_thread();
     verify_open();
 
-    if (m_config.immutable() || m_config.read_only_alternative()) {
+    if (m_config.immutable() || m_config.read_only()) {
         throw InvalidTransactionException("Can't compact a read-only Realm");
     }
     if (is_in_transaction()) {
@@ -1069,6 +1080,10 @@ bool Realm::do_refresh()
     // Frozen Realms never change.
     if (is_frozen()) {
         return false;
+    }
+
+    if (m_config.immutable()) {
+        throw std::logic_error("Can't refresh a read-only Realm.");
     }
 
     // can't be any new changes if we're in a write transaction

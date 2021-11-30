@@ -2,6 +2,7 @@ set(REALM_SOURCES
     # slowest to compile first
     query.cpp
     array.cpp
+    array_with_find.cpp
 
     alloc.cpp
     alloc_slab.cpp
@@ -103,7 +104,6 @@ set(UTIL_SOURCES
     util/resource_limits.cpp
     util/substitute.cpp
     util/uri.cpp
-    util/websocket.cpp
 )
 
 set(REALM_INSTALL_HEADERS
@@ -123,6 +123,7 @@ set(REALM_INSTALL_HEADERS
     array_direct.hpp
     array_fixed_bytes.hpp
     array_integer.hpp
+    array_integer_tpl.hpp
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
@@ -239,7 +240,6 @@ set(REALM_INSTALL_HEADERS
     util/scope_exit.hpp
     util/serializer.hpp
     util/sha_crypto.hpp
-    util/shared_ptr.hpp
     util/string_buffer.hpp
     util/terminate.hpp
     util/thread.hpp

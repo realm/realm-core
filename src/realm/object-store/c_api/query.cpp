@@ -200,6 +200,22 @@ RLM_API realm_query_t* realm_query_parse(const realm_t* realm, realm_class_key_t
     });
 }
 
+RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_query, const char* query_string,
+                                                size_t num_args, const realm_value_t* args)
+{
+    return wrap_err([&]() {
+        auto realm = existing_query->weak_realm.lock();
+        auto table = existing_query->query.get_table();
+        DescriptorOrdering ordering;
+        Query query = parse_and_apply_query(realm, table, ordering, query_string, num_args, args);
+
+        Query combined = Query(existing_query->query).and_query(query);
+        auto ordering_copy = existing_query->ordering;
+        ordering_copy.append(ordering);
+        return new realm_query_t{std::move(query), std::move(ordering_copy), realm};
+    });
+}
+
 RLM_API realm_query_t* realm_query_parse_for_list(const realm_list_t* list, const char* query_string, size_t num_args,
                                                   const realm_value_t* args)
 {
@@ -227,7 +243,7 @@ RLM_API realm_query_t* realm_query_parse_for_results(const realm_results_t* resu
 RLM_API bool realm_query_count(const realm_query_t* query, size_t* out_count)
 {
     return wrap_err([&]() {
-        *out_count = query->query.count();
+        *out_count = Query(query->query).count(query->ordering);
         return true;
     });
 }

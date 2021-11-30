@@ -159,13 +159,12 @@ size_t encryption_transformer::encrypt_transform(const encryption_transformer::C
     else {
         util::File inputs(config.target_path);
         const size_t file_size = static_cast<size_t>(inputs.get_size());
-        char* buff = new char[file_size + 1];
-        inputs.read(buff, file_size);
-        std::string glob(buff, file_size);
+        auto buff = std::make_unique<char[]>(file_size + 1);
+        inputs.read(buff.get(), file_size);
+        std::string glob(buff.get(), file_size);
         std::istringstream ss{glob};
         using StrIt = std::istream_iterator<std::string>;
         paths = std::vector<std::string>{StrIt{ss}, StrIt{}};
-        delete[] buff;
     }
     if (config.verbose) {
         std::cout << "Will transform the following files: " << std::endl;

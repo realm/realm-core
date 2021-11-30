@@ -18,6 +18,7 @@
 
 #include <realm/bplustree.hpp>
 #include <realm/impl/destroy_guard.hpp>
+#include <realm/array_unsigned.hpp>
 
 using namespace realm;
 

@@ -152,6 +152,27 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         // By marking version 2 as complete version 1 will get superceded and removed.
         CHECK_THROW(store.get_mutable_by_version(1), KeyNotFound);
     }
+
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        // This is just to create a unique name for this sub so we can verify that the iterator returned by
+        // insert_or_assign is pointing to the subscription that was just created.
+        std::string new_sub_name = ObjectId::gen().to_string();
+        auto&& [inserted_it, inserted] = set.insert_or_assign(new_sub_name, query_a);
+        CHECK(inserted);
+        CHECK_EQUAL(inserted_it->name(), new_sub_name);
+        CHECK_EQUAL(set.size(), 2);
+        auto it = set.begin();
+        CHECK_EQUAL(it->name(), "b sub");
+        it = set.erase(it);
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 1);
+        CHECK_EQUAL(it->name(), new_sub_name);
+        it = set.erase(it);
+        CHECK_EQUAL(it, set.end());
+        CHECK_EQUAL(set.size(), 0);
+    }
 }
 
 TEST(Sync_SubscriptionStoreUpdateExisting)
@@ -165,19 +186,133 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
     Query query_b(read_tr->get_table(fixture.a_table_key));
     query_b.equal(fixture.foo_col, "Realm");
+    ObjectId id_of_inserted;
+    auto sub_name = ObjectId::gen().to_string();
     {
         auto out = store.get_latest().make_mutable_copy();
-        auto read_tr = fixture.db->start_read();
-        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        auto [it, inserted] = out.insert_or_assign(sub_name, query_a);
         CHECK(inserted);
         CHECK_NOT_EQUAL(it, out.end());
+        id_of_inserted = it->id();
+        CHECK_NOT_EQUAL(id_of_inserted, ObjectId{});
 
-        std::tie(it, inserted) = out.insert_or_assign("a sub", query_b);
+        std::tie(it, inserted) = out.insert_or_assign(sub_name, query_b);
         CHECK(!inserted);
         CHECK_NOT_EQUAL(it, out.end());
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_b.get_description());
+        CHECK_EQUAL(it->id(), id_of_inserted);
+        out.commit();
     }
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        auto it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
+            return sub.id() == id_of_inserted;
+        });
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(it->name(), sub_name);
+    }
+}
+
+TEST(Sync_SubscriptionStoreNotifications)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    SubscriptionStore store(fixture.db);
+
+    std::vector<util::Future<SubscriptionSet::State>> notification_futures;
+    auto sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
+    sub_set.commit();
+    sub_set = store.get_latest().make_mutable_copy();
+    notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
+    sub_set.commit();
+
+    // This should complete immediately because transitioning to the Pending state happens when you commit.
+    CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
+
+    // This should also return immediately with a ready future because the subset is in the correct state.
+    CHECK_EQUAL(store.get_mutable_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
+                SubscriptionSet::State::Pending);
+
+    // This should not be ready yet because we haven't updated its state.
+    CHECK_NOT(notification_futures[1].is_ready());
+
+    sub_set = store.get_mutable_by_version(2);
+    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
+    sub_set.commit();
+
+    // Now we should be able to get the future result because we updated the state.
+    CHECK_EQUAL(notification_futures[1].get(), SubscriptionSet::State::Bootstrapping);
+
+    // This should not be ready yet because we haven't updated its state.
+    CHECK_NOT(notification_futures[2].is_ready());
+
+    // Update the state to complete - skipping the bootstrapping phase entirely.
+    sub_set = store.get_mutable_by_version(3);
+    sub_set.update_state(SubscriptionSet::State::Complete);
+    sub_set.commit();
+
+    // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
+    // phase.
+    CHECK_EQUAL(notification_futures[2].get(), SubscriptionSet::State::Complete);
+
+    // Update one of the subscription sets to have an error state along with an error message.
+    std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
+    CHECK_NOT(notification_futures[3].is_ready());
+    sub_set = store.get_mutable_by_version(4);
+    sub_set.update_state(SubscriptionSet::State::Bootstrapping);
+    sub_set.update_state(SubscriptionSet::State::Error, error_msg);
+    sub_set.commit();
+
+    // This should return a non-OK Status with the error message we set on the subscription set.
+    auto err_res = notification_futures[3].get_no_throw();
+    CHECK_NOT(err_res.is_ok());
+    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+
+    // Getting a ready future on a set that's already in the error state should also return immediately with an error.
+    err_res = store.get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
+    CHECK_NOT(err_res.is_ok());
+    CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK_EQUAL(err_res.get_status().reason(), error_msg);
+
+    // When a higher version supercedes an older one - i.e. you send query sets for versions 5/6 and the server starts
+    // bootstrapping version 6 - we expect the notifications for both versions to be fulfilled when the latest one
+    // completes bootstrapping.
+    CHECK_NOT(notification_futures[4].is_ready());
+    CHECK_NOT(notification_futures[5].is_ready());
+
+    auto old_sub_set = store.get_by_version(5);
+
+    sub_set = store.get_mutable_by_version(6);
+    sub_set.update_state(SubscriptionSet::State::Complete);
+    sub_set.commit();
+
+    CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superceded);
+    CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
+
+    // Also check that new requests for the superceded sub set get filled immediately.
+    CHECK_EQUAL(old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get(),
+                SubscriptionSet::State::Superceded);
+
+    // Check that asking for a state change that is less than the current state of the sub set gets filled
+    // immediately.
+    CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
+                SubscriptionSet::State::Complete);
 }
 
 } // namespace realm::sync
