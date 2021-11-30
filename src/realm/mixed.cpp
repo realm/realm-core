@@ -372,22 +372,65 @@ int Mixed::compare_signed(const Mixed& b) const
     return compare(b);
 }
 
-template <class T>
-T Mixed::export_to_type() const noexcept
+template <>
+int64_t Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(get_type() == type_Int);
+    return int_val;
+}
+
+template <>
+float Mixed::export_to_type() const noexcept
 {
     REALM_ASSERT(m_type);
     switch (get_type()) {
         case type_Int:
-            return T(int_val);
+            return float(int_val);
         case type_Float:
-            return T(float_val);
-        case type_Double:
-            return T(double_val);
+            return float_val;
         default:
             REALM_ASSERT(false);
             break;
     }
-    return T();
+    return 0.;
+}
+
+template <>
+double Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    switch (get_type()) {
+        case type_Int:
+            return double(int_val);
+        case type_Float:
+            return double(float_val);
+        case type_Double:
+            return double_val;
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+    return 0.;
+}
+
+template <>
+Decimal128 Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    switch (get_type()) {
+        case type_Int:
+            return Decimal128(int_val);
+        case type_Float:
+            return Decimal128(float_val);
+        case type_Double:
+            return Decimal128(double_val);
+        case type_Decimal:
+            return decimal_val;
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+    return {};
 }
 
 template <>
@@ -523,8 +566,15 @@ Mixed Mixed::operator/(const Mixed& rhs) const
     if (!is_null() && !rhs.is_null()) {
         auto common_type = get_common_type(get_type(), rhs.get_type());
         switch (common_type) {
-            case type_Int:
-                return export_to_type<Int>() / rhs.export_to_type<Int>();
+            case type_Int: {
+                auto dividend = export_to_type<Int>();
+                auto divisor = rhs.export_to_type<Int>();
+                // We don't want to throw here. This is usually used as part of a query
+                // and in this case we would just expect a no match
+                if (divisor == 0)
+                    return dividend < 0 ? std::numeric_limits<int64_t>::min() : std::numeric_limits<int64_t>::max();
+                return dividend / divisor;
+            }
             case type_Float:
                 return export_to_type<float>() / rhs.export_to_type<float>();
             case type_Double:

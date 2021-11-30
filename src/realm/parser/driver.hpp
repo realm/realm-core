@@ -107,39 +107,6 @@ public:
     static constexpr int CONTAINS = 8;
     static constexpr int LIKE = 9;
     static constexpr int IN = 10;
-
-#ifdef REALM_DEBUG
-    static std::string to_string(int id)
-    {
-        switch (id) {
-            case 0:
-                return "==";
-            case 1:
-                return "!=";
-            case 2:
-                return ">";
-            case 3:
-                return "<";
-            case 4:
-                return ">=";
-            case 5:
-                return "<=";
-            case 6:
-                return " BEGINSWITH ";
-            case 7:
-                return " ENDSWITH ";
-            case 8:
-                return " CONTAINS ";
-            case 9:
-                return " LIKE ";
-            case 10:
-                return " IN ";
-            default:
-                break;
-        }
-        return "??";
-    }
-#endif
 };
 
 class ConstantNode : public ParserNode {

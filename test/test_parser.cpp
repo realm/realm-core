@@ -5146,6 +5146,7 @@ TEST(Parser_Arithmetic)
     verify_query(test_context, person, "2 * age + 5 == 55", 1);
     verify_query(test_context, person, "2 * (age - 5) == 70", 1);
     verify_query(test_context, person, "age / 3 == 14", 1);
+    verify_query(test_context, person, "age / 0 == 14", 0);
     verify_query(test_context, person, "age == (10 + 11)*2", 1);
     verify_query(test_context, person, "age > spouse.age + 1", 2);
 
