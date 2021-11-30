@@ -200,7 +200,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         std::move(new_subs).get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
         CHECK(realm->get_active_subscription_set().version() == 2);
-        CHECK(realm->get_latest_subscription_set().version() == 2);
+        CHECK(realm->get_latest_subscription_set().version() == 2); 
     });
 }
 
@@ -227,6 +227,36 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
 
     SyncTestFile config(app, bson::Bson{}, schema);
 
+    auto realm = Realm::get_shared_realm(config);
+    CHECK(!wait_for_download(*realm));
+    CHECK(!wait_for_upload(*realm));
+
+    CHECK(!realm->sync_session()->has_flx_subscription_store());
+}
+
+TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
+    const std::string base_url = get_base_url();
+
+    Schema schema{
+        ObjectSchema("TopLevel",
+                     {
+                         {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     }),
+    };
+
+    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", schema);
+    auto app_session = create_app(server_app_config);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+
+    TestSyncManager::Config smc(app_config);
+    TestSyncManager sync_manager(std::move(smc), {});
+    auto app = sync_manager.app();
+
+    auto creds = create_user_and_log_in(app);
+    auto user = app->current_user();
+
+    SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
+
     std::mutex sync_error_mutex;
     util::Optional<SyncError> sync_error;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
@@ -234,11 +264,6 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
         sync_error = std::move(error);
     };
     auto realm = Realm::get_shared_realm(config);
-    CHECK(!wait_for_download(*realm));
-    CHECK(!wait_for_upload(*realm));
-
-    CHECK(!realm->sync_session()->has_flx_subscription_store());
-
     auto latest_subs = realm->get_latest_subscription_set().make_mutable_copy();
     auto table = realm->read_group().get_table("class_TopLevel");
     Query new_query_a(table);

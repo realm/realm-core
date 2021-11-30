@@ -208,13 +208,6 @@ private:
     DBRef m_db;
     Replication* m_replication;
 
-    std::once_flag m_flx_subscription_store_init_flag;
-    mutable std::mutex m_flx_subscription_store_mutex;
-    std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
-    int64_t m_flx_active_version = 0;
-    int64_t m_flx_last_seen_version = 0;
-    int64_t m_flx_latest_version = 0;
-
     const bool m_flx_sync_requested;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
@@ -242,6 +235,12 @@ private:
     std::function<SyncTransactCallback> m_sync_transact_handler;
     std::function<ProgressHandler> m_progress_handler;
     std::function<ConnectionStateChangeListener> m_connection_state_change_listener;
+
+    std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
+    int64_t m_flx_active_version = 0;
+    int64_t m_flx_last_seen_version = 0;
+    int64_t m_flx_latest_version = 0;
+
 
     bool m_initiated = false;
 
@@ -314,6 +313,7 @@ private:
     void on_new_flx_subscription_set(int64_t new_version);
     void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
+    std::unique_ptr<SubscriptionStore> create_flx_subscription_store();
 
     void report_progress();
 
@@ -773,6 +773,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
+    , m_flx_subscription_store(create_flx_subscription_store())
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
@@ -799,8 +800,31 @@ inline ClientImpl& SessionWrapper::get_client() noexcept
 
 bool SessionWrapper::has_flx_subscription_store() const
 {
-    std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
     return static_cast<bool>(m_flx_subscription_store);
+}
+
+std::unique_ptr<SubscriptionStore> SessionWrapper::create_flx_subscription_store()
+{
+    if (!m_flx_sync_requested) {
+        return nullptr;
+    }
+    auto ret = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
+        REALM_ASSERT(m_initiated);
+
+        m_client.get_service().post([new_version, self = util::bind_ptr<SessionWrapper>(this)] {
+            REALM_ASSERT(self->m_actualized);
+            if (REALM_UNLIKELY(!self->m_sess))
+                return; // Already finalized
+            if (new_version <= self->m_flx_latest_version || !self->m_flx_subscription_store) {
+                return;
+            }
+            self->m_flx_latest_version = new_version;
+            self->m_sess->on_new_flx_subscription_set(new_version);
+        });
+    });
+
+    std::tie(m_flx_active_version, m_flx_latest_version) = ret->get_active_and_latest_versions();
+    return ret;
 }
 
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
@@ -850,38 +874,6 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
 SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
 {
-    std::call_once(m_flx_subscription_store_init_flag, [this] {
-        std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
-        m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
-            REALM_ASSERT(m_initiated);
-
-            m_client.get_service().post([new_version, self = util::bind_ptr<SessionWrapper>(this)] {
-                REALM_ASSERT(self->m_actualized);
-                if (REALM_UNLIKELY(!self->m_sess))
-                    return; // Already finalized
-                if (new_version <= self->m_flx_latest_version || !self->m_flx_subscription_store) {
-                    return;
-                }
-                self->m_flx_latest_version = new_version;
-                self->m_sess->on_new_flx_subscription_set(new_version);
-            });
-        });
-
-        m_client.get_service().post([self = util::bind_ptr<SessionWrapper>(this)] {
-            REALM_ASSERT(self->m_actualized);
-            if (REALM_UNLIKELY(!self->m_sess))
-                return; // Already finalized
-
-            const auto& sub_store = self->m_flx_subscription_store;
-            std::tie(self->m_flx_active_version, self->m_flx_latest_version) =
-                sub_store->get_active_and_latest_versions();
-
-            if (self->m_flx_latest_version > self->m_flx_active_version) {
-                self->m_sess->on_new_flx_subscription_set(self->m_flx_latest_version);
-            }
-        });
-    });
-
     return m_flx_subscription_store.get();
 }
 
