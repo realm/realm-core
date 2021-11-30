@@ -1898,7 +1898,7 @@ TEST(Table_Aggregates)
     auto str_col = table.add_column(type_String, "c_string");
     auto decimal_col = table.add_column(type_Decimal, "c_decimal");
     int64_t i_sum = 0;
-    double f_sum = 0;
+    float f_sum = 0;
     double d_sum = 0;
     Decimal128 decimal_sum(0);
 
@@ -1913,12 +1913,10 @@ TEST(Table_Aggregates)
     table.create_object().set_all(987654321, 11.0f, 12.0, "Goodbye", Decimal128(10.1));
     table.create_object().set_all(5, 4.0f, 3.0, "Hey", Decimal128("1.12e23"));
     i_sum += 1 + 987654321 + 5;
-    f_sum += double(1.1f) + double(11.0f) + double(4.0f);
+    f_sum += 1.1f + 11.0f + 4.0f;
     d_sum += 1.2 + 12.0 + 3.0;
     decimal_sum += Decimal128(8.9) + Decimal128(10.1) + Decimal128("1.12e23");
     double size = TBL_SIZE + 3;
-
-    double epsilon = std::numeric_limits<double>::epsilon();
 
     // count
     CHECK_EQUAL(1, table.count_int(int_col, 987654321));
@@ -1961,19 +1959,19 @@ TEST(Table_Aggregates)
     CHECK(ret);
     CHECK_EQUAL(Decimal128("1.12e23"), table.get_object(ret).get<Decimal128>(decimal_col));
     // sum
-    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(int_col)), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(float_col), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(double_col), 10 * epsilon);
+    CHECK_EQUAL(i_sum, table.sum_int(int_col));
+    CHECK_EQUAL(f_sum, table.sum_float(float_col));
+    CHECK_EQUAL(d_sum, table.sum_double(double_col));
     CHECK_EQUAL(decimal_sum, table.sum_decimal(decimal_col));
     // average
     size_t count = realm::npos;
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(int_col, &count), 10 * epsilon);
+    CHECK_EQUAL(i_sum / size, table.average_int(int_col, &count));
     CHECK_EQUAL(count, size);
     count = realm::npos;
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(float_col, &count), 10 * epsilon);
+    CHECK_EQUAL(f_sum / size, table.average_float(float_col, &count));
     CHECK_EQUAL(count, size);
     count = realm::npos;
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(double_col, &count), 10 * epsilon);
+    CHECK_EQUAL(d_sum / size, table.average_double(double_col, &count));
     CHECK_EQUAL(count, size);
     count = realm::npos;
     CHECK_EQUAL(decimal_sum / Decimal128(size), table.average_decimal(decimal_col, &count));

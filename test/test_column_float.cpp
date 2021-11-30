@@ -343,8 +343,6 @@ TEST(DoubleColumn_Delete)
 
 TEST(FloatColumn_SwapRows)
 {
-    auto epsilon = std::numeric_limits<float>::epsilon();
-
     // Normal case
     {
         FloatColumn c(Allocator::get_default());
@@ -355,14 +353,14 @@ TEST(FloatColumn_SwapRows)
         c.add(10.93f);
         c.add(5.0099f);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
+        CHECK_EQUAL(c.get(1), 30.221f);
+        CHECK_EQUAL(c.get(2), 10.93f);
         CHECK_EQUAL(c.size(), 4); // size should not change
 
         c.swap(1, 2);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.get(1), 10.93f);
+        CHECK_EQUAL(c.get(2), 30.221f);
         CHECK_EQUAL(c.size(), 4);
 
         c.destroy();
@@ -379,8 +377,8 @@ TEST(FloatColumn_SwapRows)
 
         c.swap(0, 1);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_EQUAL(c.get(0), 10.93f);
+        CHECK_EQUAL(c.get(1), 30.221f);
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();
@@ -397,8 +395,8 @@ TEST(FloatColumn_SwapRows)
 
         c.swap(1, 2);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.get(1), 10.93f);
+        CHECK_EQUAL(c.get(2), 30.221f);
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();
@@ -415,8 +413,8 @@ TEST(FloatColumn_SwapRows)
 
         c.swap(2, 1);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.get(1), 10.93f);
+        CHECK_EQUAL(c.get(2), 30.221f);
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();
@@ -425,8 +423,6 @@ TEST(FloatColumn_SwapRows)
 
 TEST(DoubleColumn_SwapRows)
 {
-    auto epsilon = std::numeric_limits<double>::epsilon();
-
     // Normal case
     {
         DoubleColumn c(Allocator::get_default());
@@ -437,14 +433,14 @@ TEST(DoubleColumn_SwapRows)
         c.add(10.93);
         c.add(5.0099);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 10.93, epsilon);
+        CHECK_EQUAL(c.get(1), 30.221);
+        CHECK_EQUAL(c.get(2), 10.93);
         CHECK_EQUAL(c.size(), 4); // size should not change
 
         c.swap(1, 2);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.get(1), 10.93);
+        CHECK_EQUAL(c.get(2), 30.221);
         CHECK_EQUAL(c.size(), 4);
 
         c.destroy();
@@ -461,8 +457,8 @@ TEST(DoubleColumn_SwapRows)
 
         c.swap(0, 1);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(0), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 30.221, epsilon);
+        CHECK_EQUAL(c.get(0), 10.93);
+        CHECK_EQUAL(c.get(1), 30.221);
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();
@@ -479,8 +475,8 @@ TEST(DoubleColumn_SwapRows)
 
         c.swap(1, 2);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.get(1), 10.93);
+        CHECK_EQUAL(c.get(2), 30.221);
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();
@@ -497,8 +493,8 @@ TEST(DoubleColumn_SwapRows)
 
         c.swap(2, 1);
 
-        CHECK_APPROXIMATELY_EQUAL(c.get(1), 10.93, epsilon);
-        CHECK_APPROXIMATELY_EQUAL(c.get(2), 30.221, epsilon);
+        CHECK_EQUAL(c.get(1), 10.93);
+        CHECK_EQUAL(c.get(2), 30.221);
         CHECK_EQUAL(c.size(), 3); // size should not change
 
         c.destroy();

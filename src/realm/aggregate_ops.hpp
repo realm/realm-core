@@ -198,7 +198,7 @@ private:
 template <typename T>
 class Average {
 public:
-    using ResultType = typename std::conditional<realm::is_any_v<T, Decimal128, Mixed>, Decimal128, double>::type;
+    using ResultType = typename realm::ColumnAverageType<T>;
 
     bool accumulate(T value)
     {

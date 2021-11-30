@@ -142,9 +142,9 @@ struct ColumnTypeTraits<ObjLink> {
 template <>
 struct ColumnTypeTraits<float> {
     using cluster_leaf_type = BasicArray<float>;
-    using sum_type = double;
+    using sum_type = float;
     using minmax_type = float;
-    using average_type = double;
+    using average_type = float;
     static constexpr const DataType id = type_Float;
     static constexpr const ColumnType column_id = col_type_Float;
     static constexpr const ColumnType real_column_type = col_type_Float;
@@ -153,9 +153,9 @@ struct ColumnTypeTraits<float> {
 template <>
 struct ColumnTypeTraits<util::Optional<float>> {
     using cluster_leaf_type = BasicArrayNull<float>;
-    using sum_type = double;
+    using sum_type = float;
     using minmax_type = float;
-    using average_type = double;
+    using average_type = float;
     static constexpr const DataType id = type_Float;
     static constexpr const ColumnType column_id = col_type_Float;
     static constexpr const ColumnType real_column_type = col_type_Float;

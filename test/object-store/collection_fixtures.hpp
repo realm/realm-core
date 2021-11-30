@@ -191,6 +191,7 @@ struct Bool : Base<PropertyType::Bool, bool> {
 };
 
 struct Float : Base<PropertyType::Float, float> {
+    using AvgType = float;
     static std::vector<float> values()
     {
         return {3.3f, 1.1f, 2.2f};
