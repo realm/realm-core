@@ -271,8 +271,9 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string_v
             throw std::logic_error("cannot set subscription set state to uncommitted");
 
         case State::Error:
-            if (old_state != State::Bootstrapping) {
-                throw std::logic_error("subscription set must be in Bootstrapping to update state to error");
+            if (old_state != State::Bootstrapping && old_state != State::Pending) {
+                throw std::logic_error(
+                    "subscription set must be in Bootstrapping or Pending to update state to error");
             }
             if (!error_str) {
                 throw std::logic_error("Must supply an error message when setting a subscription to the error state");
@@ -555,7 +556,6 @@ const SubscriptionSet SubscriptionStore::get_active() const
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        tr->close();
         return SubscriptionSet(this, std::move(tr), Obj{});
     }
     return SubscriptionSet(this, std::move(tr), res.get(0));

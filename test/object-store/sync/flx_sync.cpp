@@ -169,6 +169,41 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     });
 }
 
+TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_bad_query");
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto bad_col_key = table->get_column_key("non_queryable_field");
+        auto good_col_key = table->get_column_key("queryable_str_field");
+
+        Query new_query_a(table);
+        auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query_a.equal(bad_col_key, "bar");
+        new_subs.insert_or_assign(new_query_a);
+        new_subs.commit();
+        auto sub_res =
+            std::move(new_subs).get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+        CHECK(!sub_res.is_ok());
+        CHECK(sub_res.get_status().reason() ==
+              "Client provided query with bad syntax: invalid match expression for table "
+              "\"TopLevel\": key \"non_queryable_field\" is not a queryable field");
+
+        CHECK(realm->get_active_subscription_set().version() == 0);
+        CHECK(realm->get_latest_subscription_set().version() == 1);
+
+        Query new_query_b(table);
+        new_query_b.equal(good_col_key, "foo");
+        new_subs = realm->get_active_subscription_set().make_mutable_copy();
+        new_subs.insert_or_assign(new_query_b);
+        new_subs.commit();
+        std::move(new_subs).get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+
+        CHECK(realm->get_active_subscription_set().version() == 2);
+        CHECK(realm->get_latest_subscription_set().version() == 2);
+    });
+}
+
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {
     const std::string base_url = get_base_url();
 
