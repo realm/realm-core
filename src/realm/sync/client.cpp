@@ -811,15 +811,15 @@ std::unique_ptr<SubscriptionStore> SessionWrapper::create_flx_subscription_store
     auto ret = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
         REALM_ASSERT(m_initiated);
 
-        m_client.get_service().post([new_version, self = util::bind_ptr<SessionWrapper>(this)] {
-            REALM_ASSERT(self->m_actualized);
-            if (REALM_UNLIKELY(!self->m_sess))
+        m_client.get_service().post([new_version, this] {
+            REALM_ASSERT(m_actualized);
+            if (REALM_UNLIKELY(!m_sess))
                 return; // Already finalized
-            if (new_version <= self->m_flx_latest_version || !self->m_flx_subscription_store) {
+            if (new_version <= m_flx_latest_version || !m_flx_subscription_store) {
                 return;
             }
-            self->m_flx_latest_version = new_version;
-            self->m_sess->on_new_flx_subscription_set(new_version);
+            m_flx_latest_version = new_version;
+            m_sess->on_new_flx_subscription_set(new_version);
         });
     });
 

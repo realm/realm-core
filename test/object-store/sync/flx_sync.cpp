@@ -200,7 +200,7 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         std::move(new_subs).get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
         CHECK(realm->get_active_subscription_set().version() == 2);
-        CHECK(realm->get_latest_subscription_set().version() == 2); 
+        CHECK(realm->get_latest_subscription_set().version() == 2);
     });
 }
 
