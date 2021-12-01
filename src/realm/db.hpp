@@ -422,6 +422,11 @@ private:
             res->m_file_size = file_size;
             return res;
         }
+        void check() const noexcept
+        {
+            REALM_ASSERT_RELEASE_EX((m_top_ref & 7) == 0 && m_top_ref < m_file_size, m_version, m_reader_idx,
+                                    m_top_ref, m_file_size);
+        }
     };
     class ReadLockGuard;
 
@@ -960,8 +965,10 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     // Mark all managed space (beyond the attached file) as free.
     db->reset_free_space_tracking(); // Throws
 
+    m_read_lock.check();
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
+
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
     m_alloc.update_reader_view(file_size); // Throws
     update_allocator_wrappers(false);
