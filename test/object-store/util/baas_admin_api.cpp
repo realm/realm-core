@@ -858,8 +858,7 @@ AppSession create_app(const AppCreateConfig& config)
              {{"rules", nlohmann::json::object()},
               {"defaultRoles",
                nlohmann::json::array(
-                   {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}})}
-             }}};
+                   {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}})}}}};
     }
     else {
         mongo_service_def["config"]["sync"] = nlohmann::json{

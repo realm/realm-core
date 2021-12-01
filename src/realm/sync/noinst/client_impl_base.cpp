@@ -2290,18 +2290,17 @@ void Session::begin_resumption_delay()
     REALM_ASSERT(!m_try_again_activation_timer);
     m_try_again_activation_timer.emplace(m_conn.get_client().get_service());
     logger.debug("Will attempt to resume session after %1 milliseconds", m_try_again_activation_delay.count());
-    m_try_again_activation_timer->async_wait(m_try_again_activation_delay,
-                                             [this](std::error_code ec) {
-                                                 if (ec == util::error::operation_aborted) {
-                                                     return;
-                                                 }
+    m_try_again_activation_timer->async_wait(m_try_again_activation_delay, [this](std::error_code ec) {
+        if (ec == util::error::operation_aborted) {
+            return;
+        }
 
-                                                 m_try_again_activation_timer.reset();
-                                                 if (m_try_again_activation_delay < std::chrono::minutes{5}) {
-                                                    m_try_again_activation_delay *= 2;
-                                                 }
-                                                 cancel_resumption_delay();
-                                             });
+        m_try_again_activation_timer.reset();
+        if (m_try_again_activation_delay < std::chrono::minutes{5}) {
+            m_try_again_activation_delay *= 2;
+        }
+        cancel_resumption_delay();
+    });
 }
 
 void Session::clear_resumption_delay_state()
