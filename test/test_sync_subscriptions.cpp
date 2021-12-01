@@ -215,6 +215,40 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     }
 }
 
+TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    SubscriptionStore store(fixture.db);
+
+    auto read_tr = fixture.db->start_read();
+    Query query_a(read_tr->get_table("class_a"));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    {
+        auto out = store.get_latest().make_mutable_copy();
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        CHECK(inserted);
+        auto named_id = it->id();
+
+        std::tie(it, inserted) = out.insert_or_assign(query_a);
+        CHECK(inserted);
+        CHECK_NOT_EQUAL(it->id(), named_id);
+        CHECK_EQUAL(out.size(), 2);
+
+        std::tie(it, inserted) = out.insert_or_assign(query_b);
+        CHECK(inserted);
+        named_id = it->id();
+
+        std::tie(it, inserted) = out.insert_or_assign("b sub", query_b);
+        CHECK(inserted);
+        CHECK_NOT_EQUAL(it->id(), named_id);
+        CHECK_EQUAL(out.size(), 4);
+    }
+}
+
 TEST(Sync_SubscriptionStoreNotifications)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);

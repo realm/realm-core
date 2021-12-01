@@ -31,6 +31,7 @@
 * `SimulatedFailure` mmap handling was not thread-safe.
 * Rename SchemaMode::ReadOnlyAlternative to ReadOnly. ([#5070](https://github.com/realm/realm-core/issues/5070))
 * Subscriptions for FLX sync now have a unique ID ([#5054](https://github.com/realm/realm-core/pull/5054))
+* Assigning an anonymous subscription will no longer overwrite a named subscription ([#5076](https://github.com/realm/realm-core/pull/5076))
 
 ----------------------------------------------
 
