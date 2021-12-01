@@ -225,8 +225,8 @@ static inline SchemaMode from_capi(realm_schema_mode_e mode)
             return SchemaMode::Automatic;
         case RLM_SCHEMA_MODE_IMMUTABLE:
             return SchemaMode::Immutable;
-        case RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE:
-            return SchemaMode::ReadOnlyAlternative;
+        case RLM_SCHEMA_MODE_READ_ONLY:
+            return SchemaMode::ReadOnly;
         case RLM_SCHEMA_MODE_RESET_FILE:
             return SchemaMode::ResetFile;
         case RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED:
@@ -246,8 +246,8 @@ static inline realm_schema_mode_e to_capi(SchemaMode mode)
             return RLM_SCHEMA_MODE_AUTOMATIC;
         case SchemaMode::Immutable:
             return RLM_SCHEMA_MODE_IMMUTABLE;
-        case SchemaMode::ReadOnlyAlternative:
-            return RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE;
+        case SchemaMode::ReadOnly:
+            return RLM_SCHEMA_MODE_READ_ONLY;
         case SchemaMode::ResetFile:
             return RLM_SCHEMA_MODE_RESET_FILE;
         case SchemaMode::AdditiveDiscovered:

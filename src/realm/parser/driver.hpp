@@ -57,6 +57,7 @@ public:
         }
         children = newChildren;
     }
+
 private:
     virtual std::string get_operator() const = 0;
 };
