@@ -64,7 +64,8 @@ private:
 class AndNode : public LogicalNode {
 public:
     using LogicalNode::LogicalNode;
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
+
 private:
     std::string get_operator() const override
     {
@@ -75,7 +76,8 @@ private:
 class OrNode : public LogicalNode {
 public:
     using LogicalNode::LogicalNode;
-    Query visit(ParserDriver*);
+    Query visit(ParserDriver*) override;
+
 private:
     std::string get_operator() const override
     {

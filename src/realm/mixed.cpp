@@ -576,8 +576,10 @@ Mixed Mixed::operator/(const Mixed& rhs) const
                 return dividend / divisor;
             }
             case type_Float:
+                static_assert(std::numeric_limits<float>::is_iec559); // Infinity is supported
                 return export_to_type<float>() / rhs.export_to_type<float>();
             case type_Double:
+                static_assert(std::numeric_limits<double>::is_iec559); // Infinity is supported
                 return export_to_type<double>() / rhs.export_to_type<double>();
             case type_Decimal:
                 return export_to_type<Decimal128>() / rhs.export_to_type<Decimal128>();
