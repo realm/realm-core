@@ -94,7 +94,6 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         // Connection level errors
         case ProtocolError::connection_closed:
         case ProtocolError::other_error:
-        case ProtocolError::switch_to_flx_sync:
             // Not real errors, don't need to be reported to the binding.
             return SimplifiedProtocolError::ConnectionIssue;
         case ProtocolError::unknown_message:
@@ -119,6 +118,7 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::too_many_sessions:
         case ProtocolError::bad_query:
         case ProtocolError::switch_to_pbs:
+        case ProtocolError::switch_to_flx_sync:
             return SimplifiedProtocolError::UnexpectedInternalIssue;
         // Session errors
         case ProtocolError::session_closed:
