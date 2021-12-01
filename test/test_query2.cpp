@@ -3033,8 +3033,8 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 {
     Group group;
     TableRef table1 = group.add_table("table1");
-    auto col_int = table1->add_column(type_Int, "int");
-    auto col_dbl = table1->add_column(type_Double, "double");
+    table1->add_column(type_Int, "int");
+    table1->add_column(type_Double, "double");
 
     // table1
     // 0: 2 2.0
@@ -3047,7 +3047,7 @@ TEST_TYPES(Query_OperatorsOverLink, TestLinkList, TestLinkSet, TestDictionaryLin
 
     TEST_TYPE test_container;
     TableRef table2 = group.add_table("table2");
-    auto col_int2 = table2->add_column(type_Int, "int");
+    table2->add_column(type_Int, "int");
     ColKey col_linktest = test_container.add_link_column(table2, table1);
 
     // table2
