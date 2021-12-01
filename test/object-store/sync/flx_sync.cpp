@@ -119,7 +119,6 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 TestSyncManager FLXSyncTestHarness::make_sync_manager()
 {
     TestSyncManager::Config smc(m_app_config);
-    smc.verbose_sync_client_logging = true;
     return TestSyncManager(std::move(smc), {});
 }
 
@@ -232,6 +231,27 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     CHECK(!wait_for_upload(*realm));
 
     CHECK(!realm->sync_session()->has_flx_subscription_store());
+}
+
+TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("connect_to_flx_as_pbs");
+
+    auto tsm = harness.make_sync_manager();
+    create_user_and_log_in(tsm.app());
+    SyncTestFile config(tsm.app(), bson::Bson{}, harness.schema());
+    std::mutex sync_error_mutex;
+    util::Optional<SyncError> sync_error;
+    config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
+        std::lock_guard<std::mutex> lk(sync_error_mutex);
+        sync_error = std::move(error);
+    };
+    auto realm = Realm::get_shared_realm(config);
+    timed_wait_for([&] {
+        std::lock_guard<std::mutex> lk(sync_error_mutex);
+        return static_cast<bool>(sync_error);
+    });
+
+    CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_flx_sync));
 }
 
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {

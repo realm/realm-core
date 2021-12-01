@@ -1285,7 +1285,7 @@ void Connection::receive_query_error_message(int raw_error_code, std::string_vie
         return close_due_to_protocol_error(ClientError::bad_session_ident);                              // throws
     }
 
-    if (auto ec = session->receive_query_error_message(raw_error_code, message, query_version); ec) {
+    if (auto ec = session->receive_query_error_message(raw_error_code, message, query_version)) {
         close_due_to_protocol_error(ec);
     }
 }
@@ -2214,7 +2214,7 @@ std::error_code Session::receive_unbound_message()
 
 std::error_code Session::receive_query_error_message(int error_code, std::string_view message, int64_t query_version)
 {
-    logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_verison=%3)", message, error_code, query_version);
+    logger.info("Received QUERY_ERROR \"%1\" (error_code=%2, query_version=%3)", message, error_code, query_version);
     on_flx_sync_error(query_version, std::string_view(message.data(), message.size())); // throws
     return {};
 }
