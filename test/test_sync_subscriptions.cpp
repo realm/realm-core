@@ -229,7 +229,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
 
     {
         auto out = store.get_latest().make_mutable_copy();
-        auto [it, inserted ] = out.insert_or_assign("a sub", query_a);
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         auto named_id = it->id();
 
@@ -247,7 +247,6 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
         CHECK_NOT_EQUAL(it->id(), named_id);
         CHECK_EQUAL(out.size(), 4);
     }
-
 }
 
 TEST(Sync_SubscriptionStoreNotifications)
