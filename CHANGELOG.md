@@ -13,6 +13,7 @@
 * Change the exception message for calling refresh on an immutable Realm from "Continuous transaction through DB object without history information." to "Can't refresh a read-only Realm." ([#5061](https://github.com/realm/realm-core/issues/5061), old exception message was since 10.7.2 via https://github.com/realm/realm-core/pull/4688).
 * The client reset callbacks have changed so that the pre and post Realm state are passed to the 'after' callback and thee 'before' callback only has the local state. ([#5066](https://github.com/realm/realm-core/issues/5066), since 11.5.0).
 * In the C-API, query `count()` did not apply descriptors such as limit/distinct. ([#5073](https://github.com/realm/realm-core/issues/5073), since the beginning of the C-API in v10.4.0)
+* Queries of the form "link.collection.@sum = 0" where `link` is null matched when `collection` was a List or Set, but not a Dictionary (since the introduction of Dictionary).
  
 ### Breaking changes
 * None.
