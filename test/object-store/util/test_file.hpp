@@ -173,6 +173,7 @@ struct SyncTestFile : TestFile {
                  std::string user_name = "test");
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition, realm::Schema schema);
     SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
+    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
 };
 
 struct TestSyncManager {
