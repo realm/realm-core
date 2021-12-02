@@ -208,9 +208,7 @@ private:
     DBRef m_db;
     Replication* m_replication;
 
-    mutable std::mutex m_flx_subscription_store_mutex;
-    std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
-
+    const bool m_flx_sync_requested;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
     const port_type m_server_port;
@@ -237,6 +235,12 @@ private:
     std::function<SyncTransactCallback> m_sync_transact_handler;
     std::function<ProgressHandler> m_progress_handler;
     std::function<ConnectionStateChangeListener> m_connection_state_change_listener;
+
+    std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
+    int64_t m_flx_active_version = 0;
+    int64_t m_flx_last_seen_version = 0;
+    int64_t m_flx_latest_version = 0;
+
 
     bool m_initiated = false;
 
@@ -306,6 +310,10 @@ private:
     void on_suspended(std::error_code ec, StringData message, bool is_fatal);
     void on_resumed();
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
+    void on_new_flx_subscription_set(int64_t new_version);
+    void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
+    void on_flx_sync_error(int64_t version, std::string_view err_msg);
+    std::unique_ptr<SubscriptionStore> create_flx_subscription_store();
 
     void report_progress();
 
@@ -720,12 +728,37 @@ void SessionImpl::on_resumed()
 }
 
 
+void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
+{
+    m_pending_query_message = true;
+    if (m_conn.get_state() == ConnectionState::connected) {
+        logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
+        ensure_enlisted_to_send();
+    }
+}
+
+void SessionImpl::on_flx_sync_error(int64_t version, std::string_view err_msg)
+{
+    m_wrapper.on_flx_sync_error(version, err_msg);
+}
+
+void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch_state)
+{
+    m_wrapper.on_flx_sync_progress(version, batch_state);
+}
+
+SubscriptionStore* SessionImpl::get_or_create_flx_subscription_store()
+{
+    return m_wrapper.get_or_create_flx_subscription_store();
+}
+
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
     , m_replication(m_db->get_replication())
+    , m_flx_sync_requested(config.flx_sync_requested)
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -740,6 +773,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
+    , m_flx_subscription_store(create_flx_subscription_store())
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
@@ -766,18 +800,80 @@ inline ClientImpl& SessionWrapper::get_client() noexcept
 
 bool SessionWrapper::has_flx_subscription_store() const
 {
-    std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
     return static_cast<bool>(m_flx_subscription_store);
+}
+
+std::unique_ptr<SubscriptionStore> SessionWrapper::create_flx_subscription_store()
+{
+    if (!m_flx_sync_requested) {
+        return nullptr;
+    }
+    auto ret = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
+        REALM_ASSERT(m_initiated);
+
+        m_client.get_service().post([new_version, this] {
+            REALM_ASSERT(m_actualized);
+            if (REALM_UNLIKELY(!m_sess))
+                return; // Already finalized
+            if (new_version <= m_flx_latest_version || !m_flx_subscription_store) {
+                return;
+            }
+            m_flx_latest_version = new_version;
+            m_sess->on_new_flx_subscription_set(new_version);
+        });
+    });
+
+    std::tie(m_flx_active_version, m_flx_latest_version) = ret->get_active_and_latest_versions();
+    return ret;
+}
+
+void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
+{
+    REALM_ASSERT(m_flx_latest_version != 0);
+    REALM_ASSERT(m_flx_latest_version <= version);
+
+    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(version);
+    mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
+    mut_subs.commit();
+}
+
+void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
+{
+    // If this is called with a new version of zero, then there cannot be any subscriptions to update.
+    if (new_version == 0) {
+        return;
+    }
+
+    REALM_ASSERT(new_version >= m_flx_last_seen_version);
+    REALM_ASSERT(new_version >= m_flx_active_version);
+    SubscriptionSet::State new_state;
+    switch (batch_state) {
+        case DownloadBatchState::LastInBatch:
+            if (m_flx_active_version == new_version) {
+                return;
+            }
+
+            m_flx_last_seen_version = new_version;
+            m_flx_active_version = new_version;
+            new_state = SubscriptionSet::State::Complete;
+            break;
+        case DownloadBatchState::MoreToCome:
+            if (m_flx_last_seen_version == new_version) {
+                return;
+            }
+
+            m_flx_last_seen_version = new_version;
+            new_state = SubscriptionSet::State::Bootstrapping;
+            break;
+    }
+
+    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(new_version);
+    mut_subs.update_state(new_state);
+    mut_subs.commit();
 }
 
 SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
 {
-    std::lock_guard<std::mutex> lk(m_flx_subscription_store_mutex);
-    if (m_flx_subscription_store) {
-        return m_flx_subscription_store.get();
-    }
-
-    m_flx_subscription_store = std::make_unique<SubscriptionStore>(m_db);
     return m_flx_subscription_store.get();
 }
 
@@ -1017,7 +1113,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     REALM_ASSERT(!m_sess);
     m_db->claim_sync_agent();
 
-    SyncServerMode sync_mode = has_flx_subscription_store() ? SyncServerMode::FLXRequested : SyncServerMode::PBS;
+    SyncServerMode sync_mode = m_flx_sync_requested ? SyncServerMode::FLX : SyncServerMode::PBS;
 
     bool was_created = false;
     ClientImpl::Connection& conn = m_client.get_connection(

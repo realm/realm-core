@@ -132,6 +132,10 @@ struct AppCreateConfig {
         bool run_reset_function;
     };
 
+    struct FLXSyncConfig {
+        std::map<std::string, std::vector<std::string>> queryable_fields;
+    };
+
     std::string app_name;
     std::string base_url;
     std::string admin_username;
@@ -143,8 +147,7 @@ struct AppCreateConfig {
     Schema schema;
     Property partition_key;
     bool dev_mode_enabled;
-    enum class SyncMode { FLX, PBS };
-    SyncMode sync_mode = SyncMode::PBS;
+    util::Optional<FLXSyncConfig> flx_sync_config;
 
     std::vector<FunctionDef> functions;
 

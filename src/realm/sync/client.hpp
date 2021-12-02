@@ -305,6 +305,8 @@ public:
         using ClientReset = sync::ClientReset;
         util::Optional<ClientReset> client_reset_config;
 
+        bool flx_sync_requested = false;
+
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
 
         /// Set to true to cause the integration of the first received changeset
