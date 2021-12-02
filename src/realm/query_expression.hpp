@@ -3756,6 +3756,11 @@ public:
     Operator(Operator&&) noexcept = delete;
     Operator& operator=(Operator&&) noexcept = delete;
 
+    DataType get_type() const override
+    {
+        return m_left->get_type();
+    }
+
     // See comment in base class
     void set_base_table(ConstTableRef table) override
     {

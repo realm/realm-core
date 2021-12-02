@@ -347,6 +347,12 @@ std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
             left = m_left->visit(drv);
         }
     }
+    if (!Mixed::is_numeric(left->get_type(), right->get_type())) {
+        util::serializer::SerialisationState state("");
+        std::string op(&m_op, 1);
+        throw std::invalid_argument(util::format("Cannot perform '%1' operation on '%2' and '%3'", op,
+                                                 left->description(state), right->description(state)));
+    }
 
     switch (m_op) {
         case '+':

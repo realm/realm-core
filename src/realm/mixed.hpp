@@ -174,6 +174,12 @@ public:
         return _is_type(head, tail...);
     }
 
+    template <class... Tail>
+    static bool is_numeric(DataType head, Tail... tail) noexcept
+    {
+        return _is_numeric(head, tail...);
+    }
+
     static bool types_are_comparable(const Mixed& l, const Mixed& r);
     static bool data_types_are_comparable(DataType l_type, DataType r_type);
 
@@ -269,6 +275,15 @@ private:
     bool _is_type(DataType head, Tail... tail) const noexcept
     {
         return _is_type(head) || _is_type(tail...);
+    }
+    static bool _is_numeric(DataType type) noexcept
+    {
+        return type == type_Int || type == type_Float || type == type_Double || type == type_Decimal;
+    }
+    template <class... Tail>
+    static bool _is_numeric(DataType head, Tail... tail) noexcept
+    {
+        return _is_numeric(head) && _is_numeric(tail...);
     }
 };
 

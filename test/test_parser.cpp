@@ -5152,7 +5152,7 @@ TEST_TYPES(Parser_Arithmetic, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Dec
     verify_query(test_context, person, "age / number == 20", 1);
     verify_query(test_context, person, "age / number > 20", 3);
     verify_query(test_context, person, "age == (10 + 11)*2", 1);
-    verify_query(test_context, person, "age > spouse.age + 1", 2);
+    CHECK_THROW_ANY(verify_query(test_context, person, "age + spouse.name == 50", 2));
 
     std::vector<Mixed> args = {2, 50};
     verify_query_sub(test_context, person, "age * $0 == $1", args, 1);

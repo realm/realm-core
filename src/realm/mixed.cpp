@@ -190,9 +190,7 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     if (l_type == r_type)
         return true;
 
-    bool l_is_numeric = l_type == type_Int || l_type == type_Float || l_type == type_Double || l_type == type_Decimal;
-    bool r_is_numeric = r_type == type_Int || r_type == type_Float || r_type == type_Double || r_type == type_Decimal;
-    if (l_is_numeric && r_is_numeric) {
+    if (is_numeric(l_type, r_type)) {
         return true;
     }
     if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
@@ -375,6 +373,7 @@ int Mixed::compare_signed(const Mixed& b) const
 template <>
 int64_t Mixed::export_to_type() const noexcept
 {
+    // If the common type is Int, then both values must be Int
     REALM_ASSERT(get_type() == type_Int);
     return int_val;
 }
@@ -382,6 +381,7 @@ int64_t Mixed::export_to_type() const noexcept
 template <>
 float Mixed::export_to_type() const noexcept
 {
+    // If the common type is Float, then values must be either Int or Float
     REALM_ASSERT(m_type);
     switch (get_type()) {
         case type_Int:
@@ -398,6 +398,7 @@ float Mixed::export_to_type() const noexcept
 template <>
 double Mixed::export_to_type() const noexcept
 {
+    // If the common type is Double, then values must be either Int, Float or Double
     REALM_ASSERT(m_type);
     switch (get_type()) {
         case type_Int:
@@ -489,16 +490,10 @@ util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
 
 static DataType get_common_type(DataType t1, DataType t2)
 {
-    // FIXME: only a few types supported
-    if (t1 == t2)
-        return t1;
-    if (t1 == type_Decimal || t2 == type_Decimal)
-        return type_Decimal;
-    if (t1 == type_Double || t2 == type_Double)
-        return type_Double;
-    if (t1 == type_Float || t2 == type_Float)
-        return type_Float;
-    return type_Int;
+    // It might be by accident that this works, but it finds the most advanced type
+    DataType common = std::max(t1, t2);
+    REALM_ASSERT(Mixed::is_numeric(common));
+    return common;
 }
 
 Mixed Mixed::operator+(const Mixed& rhs) const
