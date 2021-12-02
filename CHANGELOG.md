@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Support arithmetric operations in query parser.
+* Support arithmetric operations in query parser. You can now say something like "(age * 2) + 5 > child.age".
 * Added `realm_query_append_query` to the C-API. ([#5067](https://github.com/realm/realm-core/issues/5067))
 
 ### Fixed
