@@ -12,6 +12,7 @@ org = tokens[tokens.size()-3]
 repo = tokens[tokens.size()-2]
 branch = tokens[tokens.size()-1]
 
+ctest_cmd = "ctest -VV"
 warningFilters = [
     excludeFile('/external/*'), // submodules and external libraries
     excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
@@ -275,7 +276,7 @@ def doCheckInDocker(Map options = [:]) {
                                     name: "linux-${options.buildType}-encrypt${options.enableEncryption}-BPNODESIZE_${options.maxBpNodeSize}",
                                     filters: warningFilters,
                                 )
-                                sh 'ctest --output-on-failure'
+                                sh "${ctest_cmd}"
                             }
                         } finally {
                             recordTests("Linux-${options.buildType}")
@@ -361,7 +362,7 @@ def doCheckSanity(Map options = [:]) {
                                 name: "linux-clang-${options.buildType}-${options.sanitizeMode}",
                                 filters: warningFilters,
                             )
-                            sh 'ctest --output-on-failure'
+                            sh "${ctest_cmd}"
                         }
 
                     } finally {
@@ -766,7 +767,7 @@ def doBuildMacOs(Map options = [:]) {
                     environment << 'CTEST_OUTPUT_ON_FAILURE=1'
                     dir("build-macosx-${buildType}") {
                         withEnv(environment) {
-                            sh 'ctest'
+                            sh "${ctest_cmd}"
                         }
                     }
                 } finally {
