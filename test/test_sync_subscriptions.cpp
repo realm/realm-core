@@ -219,7 +219,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db);
+    SubscriptionStore store(fixture.db, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
