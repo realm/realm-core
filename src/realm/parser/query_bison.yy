@@ -13,7 +13,6 @@
     class ParserDriver;
     class ConstantNode;
     class ListNode;
-    class PropertyNode;
     class PostOpNode;
     class AggrNode;
     class ExpressionNode;
@@ -26,7 +25,7 @@
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
-    class PropNode;
+    class PropertyNode;
     class SubqueryNode;
   }
   using namespace realm::query_parser;
@@ -114,12 +113,13 @@ using namespace realm::query_parser;
 %token <std::string> TYPE "@type"
 %token <std::string> KEY_VAL "key or value"
 %type  <bool> direction
-%type  <int> equality relational stringop
+%type  <int> equality relational stringop aggr_op
 %type  <ConstantNode*> constant primary_key
 %type  <ListNode*> list list_content
+%type  <AggrNode*> aggregate
+%type  <SubqueryNode*> subquery 
 %type  <PropertyNode*> prop
 %type  <PostOpNode*> post_op
-%type  <AggrNode*> aggr_op
 %type  <ValueNode*> value
 %type  <ExpressionNode*> expr
 %type  <TrueOrFalseNode*> boolexpr
@@ -128,9 +128,8 @@ using namespace realm::query_parser;
 %type  <PathNode*> path
 %type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
-%type  <SubqueryNode*> subquery
-%type  <std::string> path_elem id
-%type  <PropNode*> simple_prop
+%type  <std::string> id
+%type  <PropertyNode*> simple_prop
 
 %destructor { } <int>
 
@@ -183,21 +182,29 @@ expr
     | expr '-' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '-', $3); }
 
 value
-    : constant                  { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
-    | prop                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
-    | list                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
+    : constant                  { $$ = $1;}
+    | prop                      { $$ = $1;}
+    | list                      { $$ = $1;}
+    | aggregate                 { $$ = $1;}
+    | subquery                  { $$ = $1;}
 
 prop
-    : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
-    | path id '[' constant ']' post_op { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $4, $6); }
-    | comp_type path id post_op { $$ = drv.m_parse_nodes.create<PropNode>($2, $3, $4, ExpressionComparisonType($1)); }
-    | path BACKLINK post_op     { $$ = drv.m_parse_nodes.create<PropNode>($1, "@links", $3); }
-    | path id '.' aggr_op '.'  id   { $$ = drv.m_parse_nodes.create<LinkAggrNode>($1, $2, $4, $6); }
-    | path id '.' aggr_op       { $$ = drv.m_parse_nodes.create<ListAggrNode>($1, $2, $4); }
-    | subquery                  { $$ = $1; }
+    : path post_op              { $$ = drv.m_parse_nodes.create<PropertyNode>($1); $$->add_postop($2); }
+    | path '[' constant ']' post_op { $$ = drv.m_parse_nodes.create<PropertyNode>($1, $3); $$->add_postop($5); }
+    | comp_type path post_op    { $$ = drv.m_parse_nodes.create<PropertyNode>($2, ExpressionComparisonType($1)); $$->add_postop($3); }
+
+aggregate
+    : path aggr_op '.'  id      {
+                                    auto prop = drv.m_parse_nodes.create<PropertyNode>($1);
+                                    $$ = drv.m_parse_nodes.create<LinkAggrNode>(prop, $2, $4);
+                                }
+    | path aggr_op              {
+                                    auto prop = drv.m_parse_nodes.create<PropertyNode>($1);
+                                    $$ = drv.m_parse_nodes.create<ListAggrNode>(prop, $2);
+                                }
 
 simple_prop
-    : path id                   { $$ = drv.m_parse_nodes.create<PropNode>($1, $2); }
+    : path                      { $$ = drv.m_parse_nodes.create<PropertyNode>($1); }
 
 subquery
     : SUBQUERY '(' simple_prop ',' id ',' query ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
@@ -211,14 +218,14 @@ post_query
 distinct: DISTINCT '(' distinct_param ')' { $$ = $3; }
 
 distinct_param
-    : path id                   { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::DISTINCT); $$->add($1->path_elems, $2);}
-    | distinct_param ',' path id { $1->add($3->path_elems, $4); $$ = $1; }
+    : path                      { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::DISTINCT); $$->add($1);}
+    | distinct_param ',' path   { $1->add($3); $$ = $1; }
 
-sort: SORT '(' sort_param ')'    { $$ = $3; }
+sort: SORT '(' sort_param ')'   { $$ = $3; }
 
 sort_param
-    : path id direction         { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT); $$->add($1->path_elems, $2, $3);}
-    | sort_param ',' path id direction  { $1->add($3->path_elems, $4, $5); $$ = $1; }
+    : path direction            { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::SORT); $$->add($1, $2);}
+    | sort_param ',' path direction  { $1->add($3, $4); $$ = $1; }
 
 limit: LIMIT '(' NATURAL0 ')'   { $$ = drv.m_parse_nodes.create<DescriptorNode>(DescriptorNode::LIMIT, $3); }
 
@@ -277,10 +284,10 @@ post_op
     | '.' TYPE                  { $$ = drv.m_parse_nodes.create<PostOpNode>($2, PostOpNode::TYPE);}
 
 aggr_op
-    : MAX                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::MAX);}
-    | MIN                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::MIN);}
-    | SUM                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::SUM);}
-    | AVG                       { $$ = drv.m_parse_nodes.create<AggrNode>(AggrNode::AVG);}
+    : '.' MAX                   { $$ = int(AggrNode::MAX);}
+    | '.' MIN                   { $$ = int(AggrNode::MIN);}
+    | '.' SUM                   { $$ = int(AggrNode::SUM);}
+    | '.' AVG                   { $$ = int(AggrNode::AVG);}
 
 equality
     : EQUAL                     { $$ = CompareNode::EQUAL; }
@@ -300,15 +307,12 @@ stringop
     | LIKE                      { $$ = CompareNode::LIKE; }
 
 path
-    : %empty                    { $$ = drv.m_parse_nodes.create<PathNode>(); }
-    | path path_elem            { $1->add_element($2); $$ = $1; }
-
-path_elem
-    : id '.'                    { $$ = $1; }
+    : id                        { $$ = drv.m_parse_nodes.create<PathNode>($1); }
+    | path '.' id               { $1->add_element($3); $$ = $1; }
 
 id  
     : ID                        { $$ = $1; }
-    | BACKLINK '.' ID '.' ID    { $$ = std::string("@links.") + $3 + "." + $5; }
+    | BACKLINK                  { $$ = std::string("@links"); }
     | BEGINSWITH                { $$ = $1; }
     | ENDSWITH                  { $$ = $1; }
     | CONTAINS                  { $$ = $1; }

@@ -569,16 +569,16 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
         // It's a list!
-        util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropNode*>(prop->prop)->comp_type;
+        util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropertyNode*>(prop)->comp_type;
         if (cmp_type.value_or(ExpressionComparisonType::Any) != ExpressionComparisonType::All) {
             throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }
 
-    ValueNode min(limits->elements.at(0));
-    ValueNode max(limits->elements.at(1));
-    RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, &min);
-    RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, &max);
+    auto& min(limits->elements.at(0));
+    auto& max(limits->elements.at(1));
+    RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, min);
+    RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, max);
 
     Query q(drv->m_base_table);
     q.and_query(cmp1.visit(drv));
@@ -751,17 +751,18 @@ Query TrueOrFalseNode::visit(ParserDriver* drv)
     return q;
 }
 
-std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> PropertyNode::visit(ParserDriver* drv, DataType)
 {
     bool is_keys = false;
+    std::string identifier = path->path_elems.back();
     if (identifier[0] == '@') {
         if (identifier == "@values") {
-            identifier = path->path_elems.back();
             path->path_elems.pop_back();
+            identifier = path->path_elems.back();
         }
         else if (identifier == "@keys") {
-            identifier = path->path_elems.back();
             path->path_elems.pop_back();
+            identifier = path->path_elems.back();
             is_keys = true;
         }
         else if (identifier == "@links") {
@@ -772,8 +773,8 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
         }
     }
     try {
-        auto link_chain = path->visit(drv, comp_type);
-        std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
+        m_link_chain = path->visit(drv, comp_type);
+        std::unique_ptr<Subexpr> subexpr{drv->column(m_link_chain, identifier)};
         if (index) {
             if (auto s = dynamic_cast<Columns<Dictionary>*>(subexpr.get())) {
                 auto t = s->get_type();
@@ -795,11 +796,11 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
     }
     catch (const std::runtime_error& e) {
         // Is 'identifier' perhaps length operator?
-        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
+        if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 1) {
             // If 'length' is the operator, the last id in the path must be the name
             // of a list property
-            auto prop = path->path_elems.back();
             path->path_elems.pop_back();
+            auto& prop = path->path_elems.back();
             std::unique_ptr<Subexpr> subexpr{path->visit(drv, comp_type).column(prop)};
             if (auto list = dynamic_cast<ColumnListBase*>(subexpr.get())) {
                 if (auto length_expr = list->get_element_length())
@@ -812,7 +813,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
     return {};
 }
 
-std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv, DataType)
 {
     if (variable_name.size() < 2 || variable_name[0] != '$') {
         throw SyntaxError(util::format("The subquery variable '%1' is invalid. The variable must start with "
@@ -820,23 +821,24 @@ std::unique_ptr<Subexpr> SubqueryNode::visit(ParserDriver* drv)
                                        variable_name));
     }
     LinkChain lc = prop->path->visit(drv, prop->comp_type);
-    prop->identifier = drv->translate(lc, prop->identifier);
+    std::string identifier = prop->path->path_elems.back();
+    identifier = drv->translate(lc, identifier);
 
-    if (prop->identifier.find("@links") == 0) {
-        drv->backlink(lc, prop->identifier);
+    if (identifier.find("@links") == 0) {
+        drv->backlink(lc, identifier);
     }
     else {
-        ColKey col_key = lc.get_current_table()->get_column_key(prop->identifier);
+        ColKey col_key = lc.get_current_table()->get_column_key(identifier);
         if (col_key.is_list() && col_key.get_type() != col_type_LinkList) {
-            throw InvalidQueryError(util::format(
-                "A subquery can not operate on a list of primitive values (property '%1')", prop->identifier));
+            throw InvalidQueryError(
+                util::format("A subquery can not operate on a list of primitive values (property '%1')", identifier));
         }
         if (col_key.get_type() != col_type_LinkList) {
             throw InvalidQueryError(util::format("A subquery must operate on a list property, but '%1' is type '%2'",
-                                                 prop->identifier,
+                                                 identifier,
                                                  realm::get_data_type_name(DataType(col_key.get_type()))));
         }
-        lc.link(prop->identifier);
+        lc.link(identifier);
     }
     TableRef previous_table = drv->m_base_table;
     drv->m_base_table = lc.get_current_table().cast_away_const();
@@ -892,50 +894,48 @@ std::unique_ptr<Subexpr> PostOpNode::visit(ParserDriver*, Subexpr* subexpr)
     return {};
 }
 
-std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> LinkAggrNode::visit(ParserDriver* drv, DataType)
 {
-    auto link_chain = path->visit(drv);
-    auto subexpr = std::unique_ptr<Subexpr>(drv->column(link_chain, link));
+    auto subexpr = property->visit(drv);
     auto link_prop = dynamic_cast<Columns<Link>*>(subexpr.get());
     if (!link_prop) {
         throw InvalidQueryError(util::format("Operation '%1' cannot apply to property '%2' because it is not a list",
-                                             agg_op_type_to_str(aggr_op->type), link));
+                                             agg_op_type_to_str(type), property->identifier()));
     }
-    prop = drv->translate(link_chain, prop);
-    auto col_key = link_chain.get_current_table()->get_column_key(prop);
+    const LinkChain& link_chain = property->link_chain();
+    prop_name = drv->translate(link_chain, prop_name);
+    auto col_key = link_chain.get_current_table()->get_column_key(prop_name);
 
-    std::unique_ptr<Subexpr> sub_column;
     switch (col_key.get_type()) {
         case col_type_Int:
-            sub_column = link_prop->column<Int>(col_key).clone();
+            subexpr = link_prop->column<Int>(col_key).clone();
             break;
         case col_type_Float:
-            sub_column = link_prop->column<float>(col_key).clone();
+            subexpr = link_prop->column<float>(col_key).clone();
             break;
         case col_type_Double:
-            sub_column = link_prop->column<double>(col_key).clone();
+            subexpr = link_prop->column<double>(col_key).clone();
             break;
         case col_type_Decimal:
-            sub_column = link_prop->column<Decimal>(col_key).clone();
+            subexpr = link_prop->column<Decimal>(col_key).clone();
             break;
         case col_type_Timestamp:
-            sub_column = link_prop->column<Timestamp>(col_key).clone();
+            subexpr = link_prop->column<Timestamp>(col_key).clone();
             break;
         default:
             throw InvalidQueryError(util::format("collection aggregate not supported for type '%1'",
                                                  get_data_type_name(DataType(col_key.get_type()))));
     }
-    return aggr_op->visit(drv, sub_column.get());
+    return aggregate(subexpr.get());
 }
 
-std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv)
+std::unique_ptr<Subexpr> ListAggrNode::visit(ParserDriver* drv, DataType)
 {
-    auto link_chain = path->visit(drv);
-    std::unique_ptr<Subexpr> subexpr{drv->column(link_chain, identifier)};
-    return aggr_op->visit(drv, subexpr.get());
+    auto subexpr = property->visit(drv);
+    return aggregate(subexpr.get());
 }
 
-std::unique_ptr<Subexpr> AggrNode::visit(ParserDriver*, Subexpr* subexpr)
+std::unique_ptr<Subexpr> AggrNode::aggregate(Subexpr* subexpr)
 {
     std::unique_ptr<Subexpr> agg;
     if (auto list_prop = dynamic_cast<ColumnListBase*>(subexpr)) {
@@ -1359,7 +1359,9 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
 LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
-    for (const std::string& raw_path_elem : path_elems) {
+    auto end = path_elems.end() - 1;
+    for (auto it = path_elems.begin(); it != end; ++it) {
+        std::string& raw_path_elem = *it;
         auto path_elem = drv->translate(link_chain, raw_path_elem);
         if (path_elem.find("@links.") == 0) {
             drv->backlink(link_chain, path_elem);
@@ -1539,7 +1541,7 @@ void ParserDriver::backlink(LinkChain& link_chain, const std::string& identifier
     link_chain.backlink(*origin_table, origin_column);
 }
 
-std::string ParserDriver::translate(LinkChain& link_chain, const std::string& identifier)
+std::string ParserDriver::translate(const LinkChain& link_chain, const std::string& identifier)
 {
     return m_mapping.translate(link_chain, identifier);
 }

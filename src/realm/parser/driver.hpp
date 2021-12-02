@@ -113,7 +113,23 @@ public:
     static constexpr int TEXT = 11;
 };
 
-class ConstantNode : public ParserNode {
+class ExpressionNode : public ParserNode {
+public:
+    virtual bool is_constant()
+    {
+        return false;
+    }
+    virtual bool is_list()
+    {
+        return false;
+    }
+    virtual std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) = 0;
+};
+
+class ValueNode : public ExpressionNode {
+};
+
+class ConstantNode : public ValueNode {
 public:
     enum Type {
         NUMBER,
@@ -136,6 +152,7 @@ public:
     Type type;
     std::string text;
 
+
     ConstantNode(Type t, const std::string& str)
         : type(t)
         , text(str)
@@ -147,16 +164,20 @@ public:
         , m_comp_type(comp_type)
     {
     }
+    bool is_constant() final
+    {
+        return true;
+    }
     void add_table(std::string table_name)
     {
         target_table = table_name.substr(1, table_name.size() - 2);
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
     util::Optional<ExpressionComparisonType> m_comp_type;
     std::string target_table;
 };
 
-class ListNode : public ParserNode {
+class ListNode : public ValueNode {
 public:
     std::vector<ConstantNode*> elements;
 
@@ -164,6 +185,14 @@ public:
     ListNode(ConstantNode* elem)
     {
         elements.emplace_back(elem);
+    }
+    bool is_constant() final
+    {
+        return true;
+    }
+    bool is_list() final
+    {
+        return true;
     }
     void add_element(ConstantNode* elem)
     {
@@ -177,61 +206,6 @@ public:
 
 private:
     util::Optional<ExpressionComparisonType> m_comp_type;
-};
-
-class PropertyNode : public ParserNode {
-public:
-    virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
-};
-
-class ExpressionNode : public ParserNode {
-public:
-    virtual bool is_constant()
-    {
-        return false;
-    }
-    virtual bool is_list()
-    {
-        return false;
-    }
-    virtual std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) = 0;
-};
-
-class ValueNode : public ExpressionNode {
-public:
-    ConstantNode* constant = nullptr;
-    PropertyNode* prop = nullptr;
-    ListNode* list = nullptr;
-
-    ValueNode(ConstantNode* node)
-        : constant(node)
-    {
-    }
-    ValueNode(PropertyNode* node)
-        : prop(node)
-    {
-    }
-    ValueNode(ListNode* node)
-        : list(node)
-    {
-    }
-    bool is_constant() final
-    {
-        return constant != nullptr || list != nullptr;
-    }
-    bool is_list() final
-    {
-        return list != nullptr;
-    }
-
-    std::unique_ptr<Subexpr> visit(ParserDriver* drv, DataType type) override
-    {
-        if (prop)
-            return prop->visit(drv);
-        if (list)
-            return list->visit(drv, type);
-        return constant->visit(drv, type);
-    }
 };
 
 class OperationNode : public ExpressionNode {
@@ -315,13 +289,14 @@ public:
 
 class TrueOrFalseNode : public QueryNode {
 public:
-    bool true_or_false;
-
     TrueOrFalseNode(bool type)
         : true_or_false(type)
     {
     }
     Query visit(ParserDriver*);
+
+protected:
+    bool true_or_false;
 };
 
 class PostOpNode : public ParserNode {
@@ -337,106 +312,125 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
 };
 
-class AggrNode : public ParserNode {
-public:
-    enum Type { MAX, MIN, SUM, AVG };
-
-    Type type;
-
-    AggrNode(Type t)
-        : type(t)
-    {
-    }
-    std::unique_ptr<Subexpr> visit(ParserDriver*, Subexpr* subexpr);
-};
-
 class PathNode : public ParserNode {
 public:
     std::vector<std::string> path_elems;
 
+    PathNode(std::string first)
+    {
+        add_element(first);
+    }
     LinkChain visit(ParserDriver*, util::Optional<ExpressionComparisonType> = util::none);
     void add_element(const std::string& str)
     {
-        path_elems.push_back(str);
+        if (backlink) {
+            path_elems.back() = path_elems.back() + "." + str;
+            if (backlink == 2) {
+                backlink = 0;
+            }
+            else {
+                backlink++;
+            }
+        }
+        else {
+            if (str == "@links")
+                backlink = 1;
+            path_elems.push_back(str);
+        }
     }
+
+private:
+    int backlink = 0;
 };
 
-class ListAggrNode : public PropertyNode {
+class PropertyNode : public ValueNode {
 public:
     PathNode* path;
-    std::string identifier;
-    AggrNode* aggr_op;
-
-    ListAggrNode(PathNode* node, std::string id, AggrNode* aggr)
-        : path(node)
-        , identifier(id)
-        , aggr_op(aggr)
-    {
-    }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
-};
-
-class LinkAggrNode : public PropertyNode {
-public:
-    PathNode* path;
-    std::string link;
-    AggrNode* aggr_op;
-    std::string prop;
-
-    LinkAggrNode(PathNode* node, std::string id1, AggrNode* aggr, std::string id2)
-        : path(node)
-        , link(id1)
-        , aggr_op(aggr)
-        , prop(id2)
-    {
-    }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
-};
-
-class PropNode : public PropertyNode {
-public:
-    PathNode* path;
-    std::string identifier;
     util::Optional<ExpressionComparisonType> comp_type = util::none;
     PostOpNode* post_op = nullptr;
     ConstantNode* index = nullptr;
 
-    PropNode(PathNode* node, std::string id, ConstantNode* idx, PostOpNode* po_node)
-        : path(node)
-        , identifier(id)
-        , post_op(po_node)
+    PropertyNode(PathNode* path, ConstantNode* idx)
+        : path(path)
         , index(idx)
     {
     }
-    PropNode(PathNode* node, std::string id, PostOpNode* po_node,
-             util::Optional<ExpressionComparisonType> ct = util::none)
-        : path(node)
-        , identifier(id)
+    PropertyNode(PathNode* path, util::Optional<ExpressionComparisonType> ct = util::none)
+        : path(path)
         , comp_type(ct)
-        , post_op(po_node)
     {
     }
-    PropNode(PathNode* node, std::string id)
-        : path(node)
-        , identifier(id)
+    const std::string& identifier() const
     {
+        return path->path_elems.back();
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+    const LinkChain& link_chain() const
+    {
+        return m_link_chain;
+    }
+    void add_postop(PostOpNode* po)
+    {
+        post_op = po;
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) override;
+
+private:
+    LinkChain m_link_chain;
 };
 
-class SubqueryNode : public PropertyNode {
+class AggrNode : public ValueNode {
 public:
-    PropNode* prop = nullptr;
+    enum Type { MAX, MIN, SUM, AVG };
+
+protected:
+    PropertyNode* property;
+    Type type;
+
+    AggrNode(PropertyNode* node, int t)
+        : property(node)
+        , type(Type(t))
+    {
+    }
+    std::unique_ptr<Subexpr> aggregate(Subexpr*);
+};
+
+class ListAggrNode : public AggrNode {
+public:
+    ListAggrNode(PropertyNode* node, int t)
+        : AggrNode(node, t)
+    {
+    }
+
+protected:
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+};
+
+class LinkAggrNode : public AggrNode {
+public:
+    LinkAggrNode(PropertyNode* node, int t, std::string id)
+        : AggrNode(node, t)
+        , prop_name(id)
+    {
+    }
+
+protected:
+    std::string prop_name;
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
+};
+
+class SubqueryNode : public ValueNode {
+public:
+    PropertyNode* prop = nullptr;
     std::string variable_name;
     QueryNode* subquery = nullptr;
 
-    SubqueryNode(PropNode* node, std::string var_name, QueryNode* query)
+    SubqueryNode(PropertyNode* node, std::string var_name, QueryNode* query)
         : prop(node)
         , variable_name(var_name)
         , subquery(query)
     {
     }
-    std::unique_ptr<Subexpr> visit(ParserDriver*) override;
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
 };
 
 class DescriptorNode : public ParserNode {
@@ -461,14 +455,13 @@ public:
     {
         return type;
     }
-    void add(const std::vector<std::string>& path, const std::string& id)
+    void add(PathNode* path)
     {
-        columns.push_back(path);
-        columns.back().push_back(id);
+        columns.push_back(path->path_elems);
     }
-    void add(const std::vector<std::string>& path, const std::string& id, bool direction)
+    void add(PathNode* path, bool direction)
     {
-        add(path, id);
+        add(path);
         ascending.push_back(direction);
     }
 };
@@ -541,7 +534,7 @@ public:
     std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
     SubexprPtr column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
-    std::string translate(LinkChain&, const std::string&);
+    std::string translate(const LinkChain&, const std::string&);
 
 private:
     // The string being parsed.
