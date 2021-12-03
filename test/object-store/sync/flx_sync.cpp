@@ -252,6 +252,17 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
     CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_flx_sync));
 }
 
+TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("connect_to_flx_as_pbs");
+
+    auto tsm = harness.make_sync_manager();
+    create_user_and_log_in(tsm.app());
+    SyncTestFile config(tsm.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.sync_config->partition_value = "\"foobar\"";
+
+    CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
+}
+
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
     const std::string base_url = get_base_url();
 
