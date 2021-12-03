@@ -195,7 +195,7 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
     });
 }
 
-SubscriptionSet::const_iterator SubscriptionSet::erase(const_iterator it)
+SubscriptionSet::const_iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     m_sub_list.remove_target_row(it.m_sub_it.index());
     auto at_end = (it.m_sub_it.index() == m_sub_list.size());
@@ -203,7 +203,7 @@ SubscriptionSet::const_iterator SubscriptionSet::erase(const_iterator it)
                   : const_iterator(this, LnkLst::iterator(&m_sub_list, it.m_sub_it.index()));
 }
 
-void SubscriptionSet::clear()
+void MutableSubscriptionSet::clear()
 {
     m_sub_list.remove_all_target_rows();
 }
@@ -228,9 +228,9 @@ Subscription SubscriptionSet::subscription_from_iterator(LnkLst::iterator it) co
     return Subscription(this, m_sub_list.get_object(it.index()));
 }
 
-std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign_impl(iterator it, StringData name,
-                                                                                  StringData object_class_name,
-                                                                                  StringData query_str)
+std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_assign_impl(iterator it, StringData name,
+                                                                                         StringData object_class_name,
+                                                                                         StringData query_str)
 {
     auto now = Timestamp{std::chrono::system_clock::now()};
     if (it != end()) {
@@ -246,8 +246,8 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign_imp
     return {iterator(this, LnkLst::iterator(&m_sub_list, m_sub_list.size() - 1)), true};
 }
 
-std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(std::string_view name,
-                                                                             const Query& query)
+std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_assign(std::string_view name,
+                                                                                    const Query& query)
 {
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
@@ -258,7 +258,7 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(std
     return insert_or_assign_impl(it, name, table_name, query_str);
 }
 
-std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(const Query& query)
+std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_assign(const Query& query)
 {
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
@@ -270,7 +270,7 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(con
     return insert_or_assign_impl(it, name, table_name, query_str);
 }
 
-void SubscriptionSet::update_state(State new_state, util::Optional<std::string_view> error_str)
+void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::string_view> error_str)
 {
     auto old_state = state();
     switch (new_state) {
@@ -311,7 +311,7 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string_v
     }
 }
 
-SubscriptionSet SubscriptionSet::make_mutable_copy() const
+MutableSubscriptionSet SubscriptionSet::make_mutable_copy() const
 {
     auto new_tr = m_tr->duplicate();
     if (!new_tr->promote_to_write()) {
@@ -321,7 +321,8 @@ SubscriptionSet SubscriptionSet::make_mutable_copy() const
     auto sub_sets = new_tr->get_table(m_mgr->m_sub_set_keys->table);
     auto new_pk = sub_sets->maximum_int(sub_sets->get_primary_key_column()) + 1;
 
-    SubscriptionSet new_set_obj(m_mgr, std::move(new_tr), sub_sets->create_object_with_primary_key(Mixed{new_pk}));
+    MutableSubscriptionSet new_set_obj(m_mgr, std::move(new_tr),
+                                       sub_sets->create_object_with_primary_key(Mixed{new_pk}));
     for (const auto& sub : *this) {
         new_set_obj.insert_sub_impl(sub.id(), sub.created_at(), sub.updated_at(), sub.name(), sub.object_class_name(),
                                     sub.query_string());
@@ -356,7 +357,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     return std::move(future);
 }
 
-void SubscriptionSet::process_notifications()
+void MutableSubscriptionSet::process_notifications()
 {
     auto new_state = state();
     auto my_version = version();
@@ -392,7 +393,7 @@ void SubscriptionSet::process_notifications()
     }
 }
 
-void SubscriptionSet::commit()
+void MutableSubscriptionSet::commit()
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
         throw std::logic_error("SubscriptionSet is not in a commitable state");
@@ -594,11 +595,11 @@ std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() 
     return {active_id.get_int(), latest_id};
 }
 
-SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
+MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
-    return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
+    return MutableSubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }
 
 const SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
