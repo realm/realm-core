@@ -173,7 +173,7 @@ public:
                                 const SyncProgress& progress);
 
     void make_flx_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
-                                const SyncProgress& progress, std::string_view query_body);
+                                const SyncProgress& progress, int64_t query_version, std::string_view query_body);
 
     void make_query_change_message(OutputBuffer&, session_ident_type, int64_t version, std::string_view query_body);
 
