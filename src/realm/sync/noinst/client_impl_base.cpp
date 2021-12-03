@@ -1726,15 +1726,17 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_is_flx_sync_session) {
-        auto active_query = get_or_create_flx_subscription_store()->get_active().to_ext_json();
+        const auto active_query_set = get_or_create_flx_subscription_store()->get_active();
+        const auto active_query_body = active_query_set.to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
-                     "latest_server_version_salt=%6, query_size: %7 query: \"%8\")",
+                     "latest_server_version_salt=%6, query_version: %7 query_size: %8, query: \"%9\")",
                      m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
                      m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-                     m_progress.latest_server_version.salt, active_query.size(), active_query); // Throws
+                     m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
+                     active_query_body); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
-                                        active_query); // Throws
+                                        active_query_set.version(), active_query_body); // Throws
     }
     else {
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
