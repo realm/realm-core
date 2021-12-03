@@ -842,18 +842,13 @@ AppSession create_app(const AppCreateConfig& config)
         {"config", {{"uri", config.mongo_uri}}},
     };
     if (config.flx_sync_config) {
-        auto queryable_fields = nlohmann::json::object();
-        for (const auto& kv : config.flx_sync_config->queryable_fields) {
-            auto table = nlohmann::json::object();
-            for (const auto& field : kv.second) {
-                table[field] = {{"name", field}};
-            }
-            queryable_fields[kv.first] = table;
-        }
+        auto queryable_fields = nlohmann::json::array();
+        const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
+        std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
         mongo_service_def["config"]["sync_query"] = nlohmann::json{
             {"state", "enabled"},
             {"database_name", config.mongo_dbname},
-            {"queryable_fields", std::move(queryable_fields)},
+            {"queryable_fields_names", queryable_fields},
             {"permissions",
              {{"rules", nlohmann::json::object()},
               {"defaultRoles",

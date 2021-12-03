@@ -133,7 +133,7 @@ struct AppCreateConfig {
     };
 
     struct FLXSyncConfig {
-        std::map<std::string, std::vector<std::string>> queryable_fields;
+        std::vector<std::string> queryable_fields;
     };
 
     std::string app_name;
