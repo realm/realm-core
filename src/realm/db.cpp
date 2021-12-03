@@ -2364,6 +2364,9 @@ void Transaction::end_read()
 
 void Transaction::do_end_read() noexcept
 {
+    async_end();
+    wait_for_async_completion();
+
     detach();
 
     REALM_ASSERT(!m_oldest_version_not_persisted);
@@ -2759,41 +2762,47 @@ void DB::release_sync_agent()
     m_is_sync_agent = false;
 }
 
-void Transaction::async_request_sync_to_storage(util::UniqueFunction<void()> when_synchronized)
+void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
 {
     std::unique_lock<std::mutex> lck(mtx);
-    REALM_ASSERT(m_async_stage == AsyncState::HasCommits);
-    m_async_stage = AsyncState::Syncing;
-    m_commit_exception = std::exception_ptr();
-    // get a callback on the helper thread, in which to sync to disk
-    get_db()->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
-        // sync to disk:
-        try {
-            DB::ReadLockInfo read_lock;
-            db->grab_read_lock(read_lock, VersionID());
-            GroupWriter out(*this);
-            out.commit(read_lock.m_top_ref); // Throws
-            // we must release the write mutex before the callback, because the callback
-            // is allowed to re-request it.
-            db->release_read_lock(read_lock);
-            if (m_oldest_version_not_persisted) {
-                db->release_read_lock(*m_oldest_version_not_persisted);
-                m_oldest_version_not_persisted.reset();
-            }
-            db->do_end_write();
-        }
-        catch (...) {
-            m_commit_exception = std::current_exception();
-        }
-
-        std::unique_lock<std::mutex> lck(mtx);
+    if (m_async_stage == AsyncState::HasLock) {
+        // Nothing to commit to disk - just release write lock
         m_async_stage = AsyncState::Idle;
-        if (waiting_for_sync) {
-            waiting_for_sync = false;
-            cv.notify_one();
-        }
-        else if (cb) {
-            cb();
-        }
-    });
+        db->async_end_write();
+    }
+    else if (m_async_stage == AsyncState::HasCommits) {
+        m_async_stage = AsyncState::Syncing;
+        m_commit_exception = std::exception_ptr();
+        // get a callback on the helper thread, in which to sync to disk
+        db->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
+            // sync to disk:
+            try {
+                DB::ReadLockInfo read_lock;
+                db->grab_read_lock(read_lock, VersionID());
+                GroupWriter out(*this);
+                out.commit(read_lock.m_top_ref); // Throws
+                // we must release the write mutex before the callback, because the callback
+                // is allowed to re-request it.
+                db->release_read_lock(read_lock);
+                if (m_oldest_version_not_persisted) {
+                    db->release_read_lock(*m_oldest_version_not_persisted);
+                    m_oldest_version_not_persisted.reset();
+                }
+                db->do_end_write();
+            }
+            catch (...) {
+                m_commit_exception = std::current_exception();
+            }
+
+            std::unique_lock<std::mutex> lck(mtx);
+            m_async_stage = AsyncState::Idle;
+            if (waiting_for_sync) {
+                waiting_for_sync = false;
+                cv.notify_one();
+            }
+            else if (cb) {
+                cb();
+            }
+        });
+    }
 }

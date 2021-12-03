@@ -1197,6 +1197,56 @@ TEST_CASE("SharedRealm: async_writes") {
         REQUIRE(observer.array_change(0, col) == IndexSet{0, 1, 2});
         realm->m_binding_context.release();
     }
+
+    SECTION("begin_transaction() from within did_change()") {
+        struct Context : public BindingContext {
+            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+            {
+                auto r = realm.lock();
+                r->begin_transaction();
+                auto table = r->read_group().get_table("class_object");
+                auto obj = table->create_object();
+                if (++change_count == 1) {
+                    r->commit_transaction();
+                }
+                else {
+                    r->cancel_transaction();
+                }
+            }
+            int change_count = 0;
+        };
+
+        realm->m_binding_context.reset(new Context());
+        realm->m_binding_context->realm = realm;
+
+        realm->begin_transaction();
+        auto table = realm->read_group().get_table("class_object");
+        auto obj = table->create_object();
+        bool persisted = false;
+        realm->async_commit_transaction([&persisted]() {
+            persisted = true;
+        });
+        REQUIRE(table->size() == 2);
+        REQUIRE(persisted);
+    }
+
+    SECTION("close realm from within did_change()") {
+        struct Context : public BindingContext {
+            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+            {
+                realm.lock()->close();
+            }
+        };
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->m_binding_context.reset(new Context());
+        r2->m_binding_context->realm = r2;
+
+        r2->begin_transaction();
+        auto table = r2->read_group().get_table("class_object");
+        auto obj = table->create_object();
+        r2->commit_transaction();
+    }
 }
 
 class LooperDelegate {
@@ -1233,6 +1283,8 @@ private:
 };
 
 TEST_CASE("SharedRealm: async_writes_2") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     if (!util::EventLoop::has_implementation())
         return;
 
