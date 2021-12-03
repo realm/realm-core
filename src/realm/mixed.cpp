@@ -492,7 +492,6 @@ static DataType get_common_type(DataType t1, DataType t2)
 {
     // It might be by accident that this works, but it finds the most advanced type
     DataType common = std::max(t1, t2);
-    REALM_ASSERT(Mixed::is_numeric(common));
     return common;
 }
 

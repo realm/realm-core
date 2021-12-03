@@ -278,7 +278,8 @@ private:
     }
     static bool _is_numeric(DataType type) noexcept
     {
-        return type == type_Int || type == type_Float || type == type_Double || type == type_Decimal;
+        return type == type_Int || type == type_Float || type == type_Double || type == type_Decimal ||
+               type == type_Mixed;
     }
     template <class... Tail>
     static bool _is_numeric(DataType head, Tail... tail) noexcept
