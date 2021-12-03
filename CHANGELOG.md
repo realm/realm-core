@@ -22,6 +22,7 @@
 ### Internals
 * 'Obj TableView::get(size_t)' removed. Use 'TableView::get_object' instead.
 * Fix issue compiling in debug mode for iOS.
+* FLX sync now sends the query version in IDENT messages along with the query body ([#5093](https://github.com/realm/realm-core/pull/5093))
 
 ----------------------------------------------
 

@@ -43,12 +43,12 @@ void ClientProtocol::make_pbs_ident_message(OutputBuffer& out, session_ident_typ
 
 void ClientProtocol::make_flx_ident_message(OutputBuffer& out, session_ident_type session_ident,
                                             SaltedFileIdent client_file_ident, const SyncProgress& progress,
-                                            std::string_view query_body)
+                                            int64_t query_version, std::string_view query_body)
 {
     out << "ident " << session_ident << " " << client_file_ident.ident << " " << client_file_ident.salt << " "
         << progress.download.server_version << " " << progress.download.last_integrated_client_version << " "
         << progress.latest_server_version.version << " " << progress.latest_server_version.salt << " "
-        << query_body.size() << "\n"
+        << query_version << " " << query_body.size() << "\n"
         << query_body; // Throws
     REALM_ASSERT(!out.fail());
 }
