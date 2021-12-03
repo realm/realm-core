@@ -34,7 +34,6 @@
 
 namespace realm {
 class AsyncOpenTask;
-class AuditInterface;
 class BindingContext;
 class DB;
 class Group;
@@ -244,9 +243,6 @@ public:
         // configuration is not supplied.
         bool force_sync_history = false;
 
-        // A factory function which produces an audit implementation.
-        std::function<std::shared_ptr<AuditInterface>()> audit_factory;
-
         // Maximum number of active versions in the Realm file allowed before an exception
         // is thrown.
         uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
@@ -424,8 +420,6 @@ public:
     Realm(Realm&&) = delete;
     Realm& operator=(Realm&&) = delete;
     ~Realm();
-
-    AuditInterface* audit_context() const noexcept;
 
     template <typename... Args>
     auto import_copy_of(Args&&... args)

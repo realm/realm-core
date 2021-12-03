@@ -202,11 +202,6 @@ public:
     template <typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-    AuditInterface* audit_context() const noexcept
-    {
-        return m_audit_context.get();
-    }
-
 private:
     friend Realm::Internal;
     Realm::Config m_config;
@@ -238,8 +233,6 @@ private:
 #if REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
 #endif
-
-    std::shared_ptr<AuditInterface> m_audit_context;
 
     void open_db();
 

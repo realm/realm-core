@@ -20,7 +20,6 @@
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/results_notifier.hpp>
-#include <realm/object-store/audit.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
@@ -292,8 +291,6 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             // is actually being used.
             if (m_update_policy == UpdatePolicy::Auto)
                 m_table_view.sync_if_needed();
-            if (auto audit = m_realm->audit_context())
-                audit->record_query(m_realm->read_transaction_version(), m_table_view);
             return;
     }
 }

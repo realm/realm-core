@@ -22,7 +22,6 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/impl/transact_log_handler.hpp>
 
-#include <realm/object-store/audit.hpp>
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/object.hpp>
@@ -661,15 +660,7 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    if (auto audit = audit_context()) {
-        auto prev_version = transaction().get_version_of_current_transaction();
-        m_coordinator->commit_write(*this);
-        audit->record_write(prev_version, transaction().get_version_of_current_transaction());
-        // m_db->unpin_version(prev_version);
-    }
-    else {
-        m_coordinator->commit_write(*this);
-    }
+    m_coordinator->commit_write(*this);
     cache_new_schema();
 }
 
@@ -945,11 +936,6 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
             *did_delete_realm = false;
         }
     }
-}
-
-AuditInterface* Realm::audit_context() const noexcept
-{
-    return m_coordinator ? m_coordinator->audit_context() : nullptr;
 }
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)

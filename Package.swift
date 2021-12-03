@@ -422,7 +422,6 @@ let headers: [String] = [
     "realm/null.hpp",
     "realm/obj.hpp",
     "realm/obj_list.hpp",
-    "realm/object-store/audit.hpp",
     "realm/object-store/binding_callback_thread_observer.hpp",
     "realm/object-store/binding_context.hpp",
     "realm/object-store/c_api/conversion.hpp",

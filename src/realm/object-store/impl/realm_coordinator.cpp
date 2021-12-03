@@ -110,7 +110,6 @@ void RealmCoordinator::create_sync_session()
                 auto copy_config = m_config;
                 copy_config.schema = util::none;
                 copy_config.realm_data = BinaryData{};
-                copy_config.audit_factory = {};
                 copy_config.path = path;
                 // Do not use 'discard local' mode on the fresh Realm. Use manual mode so that
                 // any error during the download is propagated back to the original session.
@@ -336,7 +335,6 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
-    auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
@@ -360,9 +358,6 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     if (realm->config().sync_config)
         create_sync_session();
-
-    if (!m_audit_context && audit_factory)
-        m_audit_context = audit_factory();
 
     realm_lock.unlock_unchecked();
     if (schema) {
