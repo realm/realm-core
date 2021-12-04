@@ -3090,6 +3090,11 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
+    // to communicate effectively across processes we need to be ACID
+    if (get_disable_sync_to_disk()) {
+        return;
+    }
+
     const int write_process_count = 7;
     const int read_process_count = 3;
 
