@@ -2339,11 +2339,6 @@ TEST(Query_Null_Two_Columns)
     tv = (description != description).find_all();
     CHECK(equals(tv, {}));
 
-    // integer + null == null
-    // note: booleans can convert to 0 and 1 when compared agaist numeric values, like in c++
-    tv = table->query("Price + Shipping == Stock").find_all();
-    CHECK(equals(tv, {1}));
-
     // Test a few untested things
     tv = table->where().equal(col_rating, null()).find_all();
     CHECK(equals(tv, {2}));
