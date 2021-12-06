@@ -20,6 +20,7 @@
 #define REALM_METRICS_HPP
 
 #include <memory>
+#include <mutex>
 
 #include <realm/metrics/query_info.hpp>
 #include <realm/metrics/transaction_info.hpp>
@@ -38,11 +39,10 @@ public:
     ~Metrics() noexcept;
     size_t num_query_metrics() const;
     size_t num_transaction_metrics() const;
+    void add_query(QueryInfo&& info);
 
-    void add_query(QueryInfo info);
-    void add_transaction(TransactionInfo info);
-
-    void start_read_transaction();
+    void start_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                size_t num_decrypted_pages);
     void start_write_transaction();
     void end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
                               size_t num_decrypted_pages);
@@ -58,12 +58,19 @@ public:
     std::unique_ptr<QueryInfoList> take_queries();
     std::unique_ptr<TransactionInfoList> take_transactions();
 
+protected:
+    void add_transaction(TransactionInfo info);
+
 private:
+    void do_end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                 size_t num_decrypted_pages);
+    mutable std::mutex m_query_mutex;
     std::unique_ptr<QueryInfoList> m_query_info;
     std::unique_ptr<TransactionInfoList> m_transaction_info;
 
+    mutable std::mutex m_transaction_mutex;
     std::unique_ptr<TransactionInfo> m_pending_read;
-    std::unique_ptr<TransactionInfo> m_pending_write;
+    std::vector<std::unique_ptr<TransactionInfo>> m_pending_writes;
 
     size_t m_max_num_queries;
     size_t m_max_num_transactions;

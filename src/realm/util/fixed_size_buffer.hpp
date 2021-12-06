@@ -48,7 +48,7 @@ public:
     void insert(const T& val)
     {
         if (m_buffer.size() < m_size) {
-            m_buffer.emplace_back(val);
+            m_buffer.push_back(val);
         }
         else {
             m_buffer[m_oldest] = val;

@@ -1088,6 +1088,7 @@ Results Results::sort(SortDescriptor&& sort) const
     return Results(m_realm, do_get_query(), std::move(new_order));
 }
 
+
 Results Results::filter(Query&& q) const
 {
     if (m_descriptor_ordering.will_apply_limit())

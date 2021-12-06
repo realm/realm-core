@@ -36,18 +36,21 @@ Metrics::~Metrics() noexcept
 
 size_t Metrics::num_query_metrics() const
 {
+    std::lock_guard<std::mutex> guard(m_query_mutex);
     return m_query_info ? m_query_info->size() : 0;
 }
 
 size_t Metrics::num_transaction_metrics() const
 {
+    std::lock_guard<std::mutex> guard(m_transaction_mutex);
     return m_transaction_info ? m_transaction_info->size() : 0;
 }
 
-void Metrics::add_query(QueryInfo info)
+void Metrics::add_query(QueryInfo&& info)
 {
+    std::lock_guard<std::mutex> guard(m_query_mutex);
     REALM_ASSERT_DEBUG(m_query_info);
-    m_query_info->insert(info);
+    m_query_info->insert(std::move(info));
 }
 
 void Metrics::add_transaction(TransactionInfo info)
@@ -56,20 +59,29 @@ void Metrics::add_transaction(TransactionInfo info)
     m_transaction_info->insert(info);
 }
 
-void Metrics::start_read_transaction()
+void Metrics::start_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                     size_t num_decrypted_pages)
 {
-    REALM_ASSERT_DEBUG(!m_pending_read);
+    std::lock_guard<std::mutex> guard(m_transaction_mutex);
+    do_end_read_transaction(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
     m_pending_read = std::make_unique<TransactionInfo>(TransactionInfo::read_transaction);
 }
 
 void Metrics::start_write_transaction()
 {
-    REALM_ASSERT_DEBUG(!m_pending_write);
-    m_pending_write = std::make_unique<TransactionInfo>(TransactionInfo::write_transaction);
+    std::lock_guard<std::mutex> guard(m_transaction_mutex);
+    m_pending_writes.push_back(std::make_unique<TransactionInfo>(TransactionInfo::write_transaction));
 }
 
 void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
                                    size_t num_decrypted_pages)
+{
+    std::lock_guard<std::mutex> guard(m_transaction_mutex);
+    do_end_read_transaction(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
+}
+
+void Metrics::do_end_read_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
+                                      size_t num_decrypted_pages)
 {
     REALM_ASSERT_DEBUG(m_transaction_info);
     if (m_pending_read) {
@@ -83,12 +95,13 @@ void Metrics::end_read_transaction(size_t total_size, size_t free_space, size_t 
 void Metrics::end_write_transaction(size_t total_size, size_t free_space, size_t num_objects, size_t num_versions,
                                     size_t num_decrypted_pages)
 {
+    std::lock_guard<std::mutex> guard(m_transaction_mutex);
     REALM_ASSERT_DEBUG(m_transaction_info);
-    if (m_pending_write) {
-        m_pending_write->update_stats(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
-        m_pending_write->finish_timer();
-        add_transaction(*m_pending_write);
-        m_pending_write.reset(nullptr);
+    if (m_pending_writes.size() > 0) {
+        m_pending_writes[0]->update_stats(total_size, free_space, num_objects, num_versions, num_decrypted_pages);
+        m_pending_writes[0]->finish_timer();
+        add_transaction(*m_pending_writes[0]);
+        m_pending_writes.erase(m_pending_writes.begin());
     }
 }
 
@@ -97,8 +110,8 @@ std::unique_ptr<MetricTimer> Metrics::report_fsync_time(const Group& g)
     std::shared_ptr<Metrics> instance = g.get_metrics();
     if (instance) {
         REALM_ASSERT_DEBUG(instance->m_transaction_info);
-        if (instance->m_pending_write) {
-            return std::make_unique<MetricTimer>(instance->m_pending_write->m_fsync_time);
+        if (instance->m_pending_writes.size() > 0) {
+            return std::make_unique<MetricTimer>(instance->m_pending_writes[0]->m_fsync_time);
         }
     }
     return nullptr;
@@ -109,8 +122,8 @@ std::unique_ptr<MetricTimer> Metrics::report_write_time(const Group& g)
     std::shared_ptr<Metrics> instance = g.get_metrics();
     if (instance) {
         REALM_ASSERT_DEBUG(instance->m_transaction_info);
-        if (instance->m_pending_write) {
-            return std::make_unique<MetricTimer>(instance->m_pending_write->m_write_time);
+        if (instance->m_pending_writes.size() > 0) {
+            return std::make_unique<MetricTimer>(instance->m_pending_writes[0]->m_write_time);
         }
     }
     return nullptr;
@@ -120,6 +133,7 @@ std::unique_ptr<MetricTimer> Metrics::report_write_time(const Group& g)
 std::unique_ptr<Metrics::QueryInfoList> Metrics::take_queries()
 {
 
+    std::lock_guard<std::mutex> guard(m_query_mutex);
     std::unique_ptr<QueryInfoList> values = std::make_unique<QueryInfoList>(m_max_num_queries);
     values.swap(m_query_info);
     return values;
@@ -127,6 +141,7 @@ std::unique_ptr<Metrics::QueryInfoList> Metrics::take_queries()
 
 std::unique_ptr<Metrics::TransactionInfoList> Metrics::take_transactions()
 {
+    std::lock_guard<std::mutex> guard(m_transaction_mutex);
     std::unique_ptr<TransactionInfoList> values = std::make_unique<TransactionInfoList>(m_max_num_transactions);
     values.swap(m_transaction_info);
     return values;

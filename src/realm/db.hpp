@@ -454,6 +454,7 @@ private:
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
+    std::string m_partition;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.
@@ -532,7 +533,8 @@ private:
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
-    version_type do_commit(Transaction&);
+    void update_metrics(Transaction& transaction);
+    version_type do_commit(Transaction&, bool write_metrics = true);
     void do_end_write() noexcept;
 
     // make sure the given index is within the currently mapped area.
@@ -598,12 +600,12 @@ public:
     /// what will be needed.
     size_t get_commit_size() const;
 
-    DB::version_type commit();
+    DB::version_type commit(bool write_metrics = true);
     void rollback();
     void end_read();
 
     // Live transactions state changes, often taking an observer functor:
-    VersionID commit_and_continue_as_read();
+    VersionID commit_and_continue_as_read(bool write_metrics = true);
     template <class O>
     void rollback_and_continue_as_read(O* observer);
     void rollback_and_continue_as_read()
@@ -683,7 +685,6 @@ private:
 
     DB::ReadLockInfo m_read_lock;
     DB::TransactStage m_transact_stage = DB::transact_Ready;
-
     friend class DB;
     friend class DisableReplication;
 };

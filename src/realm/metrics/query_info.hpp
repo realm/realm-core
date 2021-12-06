@@ -24,6 +24,7 @@
 #include <sstream>
 
 #include <realm/array.hpp>
+#include <realm/timestamp.hpp>
 #include <realm/util/features.h>
 #include <realm/metrics/metric_timer.hpp>
 
@@ -47,12 +48,16 @@ public:
     };
 
     QueryInfo(const Query* query, QueryType type);
+    QueryInfo(QueryInfo&&);
+    QueryInfo(const QueryInfo&) = default;
     ~QueryInfo() noexcept;
+    QueryInfo& operator=(const QueryInfo&);
 
     std::string get_description() const;
     std::string get_table_name() const;
     QueryType get_type() const;
     nanosecond_storage_t get_query_time_nanoseconds() const;
+    Timestamp get_query_timestamp() const;
 
     static std::unique_ptr<MetricTimer> track(const Query* query, QueryType type);
     static QueryType type_from_action(Action action);

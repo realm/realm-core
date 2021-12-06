@@ -510,6 +510,12 @@ void RealmCoordinator::open_db()
         DBOptions options;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
+#if REALM_ENABLE_SYNC
+        if (m_config.sync_config) {
+            options.enable_metrics = true;
+            options.partition = std::string(bson::parse(m_config.sync_config->partition_value));
+        }
+#endif
 
         if (!m_config.fifo_files_fallback_path.empty()) {
             options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);

@@ -666,6 +666,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
 #if REALM_METRICS
     if (options.enable_metrics) {
         m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
+        m_partition = options.partition;
     }
 #endif // REALM_METRICS
 
@@ -1534,7 +1535,8 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
                 m_metrics->end_write_transaction(total_size, free_space, num_objects, num_available_versions,
                                                  num_decrypted_pages);
             }
-            m_metrics->start_read_transaction();
+            m_metrics->start_read_transaction(total_size, free_space, num_objects, num_available_versions,
+                                              num_decrypted_pages);
         }
         else if (stage == DB::transact_Writing) {
             if (m_transact_stage == DB::transact_Reading) {
@@ -1833,9 +1835,137 @@ void DB::do_end_write() noexcept
     m_writemutex.unlock();
 }
 
-
-Replication::version_type DB::do_commit(Transaction& transaction)
+std::string query_type_to_string(metrics::QueryInfo::QueryType t)
 {
+    switch (t) {
+        case metrics::QueryInfo::QueryType::type_Find:
+            return "find one";
+        case metrics::QueryInfo::QueryType::type_FindAll:
+            return "find all";
+        case metrics::QueryInfo::QueryType::type_Count:
+            return "count";
+        case metrics::QueryInfo::QueryType::type_Sum:
+            return "sum";
+        case metrics::QueryInfo::QueryType::type_Average:
+            return "average";
+        case metrics::QueryInfo::QueryType::type_Maximum:
+            return "maximum";
+        case metrics::QueryInfo::QueryType::type_Minimum:
+            return "minimum";
+        case metrics::QueryInfo::QueryType::type_Invalid:
+            return "invalid";
+    }
+    return "unknown";
+}
+
+std::string transaction_type_to_string(metrics::TransactionInfo::TransactionType t)
+{
+    switch (t) {
+        case metrics::TransactionInfo::read_transaction:
+            return "read";
+        case metrics::TransactionInfo::write_transaction:
+            return "write";
+    }
+    return "unknown";
+}
+
+void DB::update_metrics(Transaction& transaction)
+{
+    REALM_ASSERT(transaction.get_transact_stage() == DB::TransactStage::transact_Writing);
+    std::shared_ptr<Metrics> metrics = transaction.get_metrics();
+    const std::string partition_col_name = "realm_id";
+    if (metrics) {
+        if (std::unique_ptr<Metrics::QueryInfoList> queries = metrics->take_queries()) {
+            StringData table_name = "class_RealmQueryMetrics";
+            TableRef table = transaction.get_table(table_name);
+            ColKey col_type, col_table, col_description, col_time, col_partition, col_ts;
+            if (!table) {
+                table = transaction.add_table_with_primary_key(table_name, type_ObjectId, "_id");
+                col_type = table->add_column(type_String, "type");
+                col_table = table->add_column(type_String, "table");
+                col_description = table->add_column(type_String, "description");
+                col_time = table->add_column(type_Int, "time_ns");
+                col_partition = table->add_column(type_String, partition_col_name, true);
+                col_ts = table->add_column(type_Timestamp, "timestamp", true);
+            }
+            else {
+                col_type = table->get_column_key("type");
+                col_table = table->get_column_key("table");
+                col_description = table->get_column_key("description");
+                col_time = table->get_column_key("time_ns");
+                col_partition = table->get_column_key(partition_col_name);
+                col_ts = table->get_column_key("timestamp");
+            }
+            for (auto& q : *queries) {
+                std::string table_name = q.get_table_name();
+                std::string description = q.get_description();
+                std::string type = query_type_to_string(q.get_type());
+                FieldValues values = {{col_type, StringData{type}},
+                                      {col_table, StringData{table_name}},
+                                      {col_description, StringData{description}},
+                                      {col_time, q.get_query_time_nanoseconds()},
+                                      {col_partition, m_partition},
+                                      {col_ts, q.get_query_timestamp()}};
+                table->create_object_with_primary_key(ObjectId::gen(), std::move(values));
+            }
+            table->to_json(std::cout, 1, {});
+        }
+        if (std::unique_ptr<Metrics::TransactionInfoList> transactions = metrics->take_transactions()) {
+            StringData table_name = "class_RealmTransactionMetrics";
+            TableRef table = transaction.get_table(table_name);
+            ColKey col_type, col_time, col_fsync, col_write, col_disk, col_free, col_obj_count, col_versions,
+                col_pages, col_partition, col_ts;
+            if (!table) {
+                table = transaction.add_table_with_primary_key(table_name, type_ObjectId, "_id");
+                col_type = table->add_column(type_String, "type");
+                col_time = table->add_column(type_Int, "time_ns");
+                col_fsync = table->add_column(type_Int, "fsync_time_ns");
+                col_write = table->add_column(type_Int, "write_time_ns");
+                col_disk = table->add_column(type_Int, "disk_size");
+                col_free = table->add_column(type_Int, "free_space");
+                col_obj_count = table->add_column(type_Int, "total_objects");
+                col_versions = table->add_column(type_Int, "available_versions");
+                col_pages = table->add_column(type_Int, "decrypted_pages");
+                col_partition = table->add_column(type_String, partition_col_name, true);
+                col_ts = table->add_column(type_Timestamp, "timestamp", true);
+            }
+            else {
+                col_type = table->get_column_key("type");
+                col_time = table->get_column_key("time_ns");
+                col_fsync = table->get_column_key("fsync_time_ns");
+                col_write = table->get_column_key("write_time_ns");
+                col_disk = table->get_column_key("disk_size");
+                col_free = table->get_column_key("free_space");
+                col_obj_count = table->get_column_key("total_objects");
+                col_versions = table->get_column_key("available_versions");
+                col_pages = table->get_column_key("decrypted_pages");
+                col_partition = table->get_column_key(partition_col_name);
+                col_ts = table->get_column_key("timestamp");
+            }
+            for (auto& t : *transactions) {
+                FieldValues values = {{col_type, transaction_type_to_string(t.get_transaction_type())},
+                                      {col_time, t.get_transaction_time_nanoseconds()},
+                                      {col_fsync, t.get_fsync_time_nanoseconds()},
+                                      {col_write, t.get_write_time_nanoseconds()},
+                                      {col_disk, int64_t(t.get_disk_size())},
+                                      {col_free, int64_t(t.get_free_space())},
+                                      {col_obj_count, int64_t(t.get_total_objects())},
+                                      {col_versions, int64_t(t.get_num_available_versions())},
+                                      {col_pages, int64_t(t.get_num_decrypted_pages())},
+                                      {col_partition, m_partition},
+                                      {col_ts, t.get_transaction_timestamp()}};
+                table->create_object_with_primary_key(ObjectId::gen(), std::move(values));
+            }
+            table->to_json(std::cout, 1, {});
+        }
+    }
+}
+
+Replication::version_type DB::do_commit(Transaction& transaction, bool write_metrics)
+{
+    if (write_metrics) {
+        update_metrics(transaction);
+    }
     version_type current_version;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -1860,7 +1990,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 }
 
 
-VersionID Transaction::commit_and_continue_as_read()
+VersionID Transaction::commit_and_continue_as_read(bool write_metrics)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -1869,7 +1999,7 @@ VersionID Transaction::commit_and_continue_as_read()
 
     flush_accessors_for_commit();
 
-    DB::version_type version = db->do_commit(*this); // Throws
+    DB::version_type version = db->do_commit(*this, write_metrics); // Throws
 
     // advance read lock but dont update accessors:
     // As this is done under lock, along with the addition above of the newest commit,
@@ -2277,7 +2407,7 @@ size_t Transaction::get_commit_size() const
     return sz;
 }
 
-DB::version_type Transaction::commit()
+DB::version_type Transaction::commit(bool write_metrics)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2289,7 +2419,7 @@ DB::version_type Transaction::commit()
     // before committing, allow any accessors at group level or below to sync
     flush_accessors_for_commit();
 
-    DB::version_type new_version = db->do_commit(*this); // Throws
+    DB::version_type new_version = db->do_commit(*this, write_metrics); // Throws
 
     // We need to set m_read_lock in order for wait_for_change to work.
     // To set it, we grab a readlock on the latest available snapshot

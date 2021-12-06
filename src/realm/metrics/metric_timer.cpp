@@ -29,6 +29,7 @@ using namespace realm::metrics;
 
 MetricTimerResult::MetricTimerResult()
     : m_elapsed_nanoseconds(0)
+    , m_report_time(std::chrono::system_clock::now())
 {
 }
 
@@ -44,6 +45,7 @@ nanosecond_storage_t MetricTimerResult::get_elapsed_nanoseconds() const
 void MetricTimerResult::report_nanoseconds(nanosecond_storage_t time)
 {
     m_elapsed_nanoseconds = time;
+    m_report_time = std::chrono::system_clock::now();
 }
 
 

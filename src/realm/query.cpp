@@ -1647,12 +1647,12 @@ size_t Query::count() const
 
 TableView Query::find_all(const DescriptorOrdering& descriptor)
 {
-#if REALM_METRICS
-    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
-#endif
     if (descriptor.is_empty()) {
         return find_all();
     }
+#if REALM_METRICS
+    std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
+#endif
 
     const size_t default_start = 0;
     const size_t default_end = size_t(-1);

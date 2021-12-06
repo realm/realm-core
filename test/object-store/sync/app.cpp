@@ -2744,6 +2744,102 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
         }
     }
 }
+void create_dest_objects_from_file(realm::SharedRealm r, const std::string& path, const std::string& partition,
+                                   const std::string& valid_pk_name)
+{
+    CppContext c;
+    size_t words_added = 0;
+    util::File f(path);
+    constexpr size_t buffer_size = 50;
+    size_t begin = 0;
+    size_t bytes_read = buffer_size;
+    char buffer[buffer_size];
+    bool full_read = true;
+    while (full_read) {
+        bytes_read = f.read(&buffer[begin], buffer_size - begin);
+        full_read = bytes_read == (buffer_size - begin);
+        begin = 0;
+        for (size_t end = 1; end < buffer_size; ++end) {
+            char letter = buffer[end];
+            if ((letter > 'z' || letter < 'a') && letter != '-' && letter != '\'' && letter != '.' && letter != '(' &&
+                letter != ')') {
+                if (begin != end) {
+                    std::string word(&buffer[begin], end - begin);
+                    ++words_added;
+                    auto obj = Object::create(c, r, "dest",
+                                              util::Any(realm::AnyDict{{valid_pk_name, util::Any(ObjectId::gen())},
+                                                                       {"realm_id", std::string(partition)},
+                                                                       {"name", word}}),
+                                              CreatePolicy::ForceCreate);
+                }
+                begin = end + 1;
+            }
+        }
+        if (begin < buffer_size) {
+            memmove(&buffer, &buffer[begin], buffer_size - begin);
+            begin = buffer_size - begin;
+        }
+        else {
+            begin = 0;
+        }
+    }
+    std::cout << "added words: " << words_added << std::endl;
+}
+
+
+TEST_CASE("app: metrics POC", "[sync][app]") {
+    const std::string valid_pk_name = "_id";
+    const auto partition = "with an index"; // random_string(100);
+    Schema schema = {{"source",
+                      {{valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true},
+                       {"realm_id", PropertyType::String | PropertyType::Nullable},
+                       {"children", PropertyType::Array | PropertyType::Object, "dest"}}},
+                     {"dest",
+                      {{valid_pk_name, PropertyType::ObjectId | PropertyType::Nullable, true},
+                       {"realm_id", PropertyType::String | PropertyType::Nullable},
+                       {"name", PropertyType::String | PropertyType::Nullable, false, Property::IsIndexed(true)}}}};
+
+    app::App::Config config = get_config(instance_of<SynchronousTestTransport>);
+    config.app_id = "<your-atlas-realm-app-id-here>";
+    TestSyncManager sync_manager(config);
+    auto app = sync_manager.app();
+    app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                 [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
+                                     REQUIRE(user);
+                                     CHECK(!error);
+                                 });
+    CppContext c;
+    SECTION("integration testing") {
+        SyncTestFile config1(app, partition, schema); // uses the current user created above
+        auto r1 = realm::Realm::get_shared_realm(config1);
+        Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
+        {
+            REQUIRE(r1_source_objs.size() == 0);
+            r1->begin_transaction();
+            create_dest_objects_from_file(r1, "/Users/js//Documents/tools/wordlist.txt", partition, valid_pk_name);
+            r1->commit_transaction();
+            TableRef dest = r1->read_group().get_table("class_dest");
+            ColKey name_col = dest->get_column_key("name");
+            ColKey id_col = dest->get_column_key(valid_pk_name);
+            std::vector<Results> queries = {Results{r1, dest->where().contains(name_col, StringData("currant"))},
+                                            Results{r1, dest->where().ends_with(name_col, StringData("berry"))},
+                                            Results{r1, dest->where().equal(name_col, StringData("banana"))},
+                                            Results{r1, dest->where().begins_with(name_col, StringData("corn"))}};
+            for (auto& result : queries) {
+                std::cout << "results: " << std::endl;
+                for (size_t i = 0; i < result.size(); ++i) {
+                    std::cout << util::format("\t%1: '%2'\n", result.get(i).get<ObjectId>(id_col),
+                                              result.get(i).get<StringData>(name_col));
+                }
+            }
+
+            r1->refresh();
+            wait_for_upload(*r1);
+            r1->refresh();
+        }
+    }
+}
+
 
 #endif // REALM_ENABLE_AUTH_TESTS
 

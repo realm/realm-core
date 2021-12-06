@@ -123,6 +123,8 @@ struct DBOptions {
     /// List of versions for which backup files are automatically removed at specified age.
     BackupHandler::version_time_list_t to_be_deleted;
 
+    std::string partition;
+
     /// sys_tmp_dir will be used if the temp_dir is empty when creating DBOptions.
     /// It must be writable and allowed to create pipe/fifo file on it.
     /// set_sys_tmp_dir is not a thread-safe call and it is only supposed to be called once

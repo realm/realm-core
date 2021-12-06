@@ -23,6 +23,7 @@
 #include <string>
 
 #include <realm/metrics/metric_timer.hpp>
+#include <realm/timestamp.hpp>
 #include <realm/util/features.h>
 
 namespace realm {
@@ -47,6 +48,7 @@ public:
     size_t get_total_objects() const;
     size_t get_num_available_versions() const;
     size_t get_num_decrypted_pages() const;
+    Timestamp get_transaction_timestamp() const;
 
 private:
     MetricTimerResult m_transaction_time;

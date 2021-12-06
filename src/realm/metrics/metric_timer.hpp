@@ -36,9 +36,14 @@ public:
     ~MetricTimerResult();
     nanosecond_storage_t get_elapsed_nanoseconds() const;
     void report_nanoseconds(nanosecond_storage_t time);
+    std::chrono::time_point<std::chrono::system_clock> get_report_time() const
+    {
+        return m_report_time;
+    }
 
 protected:
     nanosecond_storage_t m_elapsed_nanoseconds;
+    std::chrono::time_point<std::chrono::system_clock> m_report_time;
 };
 
 

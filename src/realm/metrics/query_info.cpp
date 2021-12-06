@@ -44,6 +44,22 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
     static_cast<void>(query);
 #endif
 }
+QueryInfo::QueryInfo(QueryInfo&& other)
+    : m_description(std::move(other.m_description))
+    , m_table_name(std::move(other.m_table_name))
+    , m_type(other.m_type)
+    , m_query_time(std::move(other.m_query_time))
+{
+}
+
+QueryInfo& QueryInfo::operator=(const QueryInfo& other)
+{
+    m_description = other.m_description;
+    m_table_name = other.m_table_name;
+    m_type = other.m_type;
+    m_query_time = other.m_query_time;
+    return *this;
+}
 
 QueryInfo::~QueryInfo() noexcept
 {
@@ -72,6 +88,14 @@ nanosecond_storage_t QueryInfo::get_query_time_nanoseconds() const
     return 0;
 }
 
+Timestamp QueryInfo::get_query_timestamp() const
+{
+    if (m_query_time) {
+        return Timestamp{m_query_time->get_report_time()};
+    }
+    return Timestamp{realm::null{}};
+}
+
 std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type)
 {
 #if REALM_METRICS
@@ -92,10 +116,10 @@ std::unique_ptr<MetricTimer> QueryInfo::track(const Query* query, QueryType type
         return nullptr;
 
     QueryInfo info(query, type);
-    info.m_query_time = std::make_shared<MetricTimerResult>();
-    metrics->add_query(info);
-
-    return std::make_unique<MetricTimer>(info.m_query_time);
+    auto timer_dest = std::make_shared<MetricTimerResult>();
+    info.m_query_time = timer_dest;
+    metrics->add_query(std::move(info));
+    return std::make_unique<MetricTimer>(timer_dest);
 #else
     static_cast<void>(query);
     static_cast<void>(type);

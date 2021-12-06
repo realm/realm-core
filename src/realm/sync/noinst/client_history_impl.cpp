@@ -210,7 +210,8 @@ void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, boo
 
     // Note: This transaction produces an empty changeset. Empty changesets are
     // not uploaded to the server.
-    wt->commit(); // Throws
+    constexpr bool write_metrics = false;
+    wt->commit(write_metrics); // Throws
 }
 
 
@@ -416,7 +417,7 @@ bool ClientHistory::integrate_server_changesets(const SyncProgress& progress,
         update_sync_progress(progress, downloadable_bytes); // Throws
     }
 
-    version_type new_version = transact->commit_and_continue_as_read().version; // Throws
+    version_type new_version = transact->commit_and_continue_as_read(false).version; // Throws
 
     if (transact_reporter) {
         VersionID new_version_2 = transact->get_version_of_current_transaction();

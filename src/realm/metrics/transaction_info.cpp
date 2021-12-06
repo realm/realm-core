@@ -51,6 +51,11 @@ nanosecond_storage_t TransactionInfo::get_transaction_time_nanoseconds() const
     return m_transaction_time.get_elapsed_nanoseconds();
 }
 
+Timestamp TransactionInfo::get_transaction_timestamp() const
+{
+    return Timestamp{m_transaction_time.get_report_time()};
+}
+
 nanosecond_storage_t TransactionInfo::get_fsync_time_nanoseconds() const
 {
     if (m_fsync_time) {
