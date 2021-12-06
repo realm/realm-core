@@ -212,7 +212,7 @@ RLM_API realm_query_t* realm_query_append_query(const realm_query_t* existing_qu
         Query combined = Query(existing_query->query).and_query(query);
         auto ordering_copy = existing_query->ordering;
         ordering_copy.append(ordering);
-        return new realm_query_t{std::move(query), std::move(ordering_copy), realm};
+        return new realm_query_t{std::move(combined), std::move(ordering_copy), realm};
     });
 }
 

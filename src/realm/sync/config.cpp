@@ -81,14 +81,19 @@ SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
 {
 }
 
+SyncConfig::SyncConfig(std::shared_ptr<SyncUser> user, FLXSyncEnabled)
+    : user(std::move(user))
+    , partition_value()
+    , flx_sync_requested(true)
+{
+}
+
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
 {
     switch (err) {
         // Connection level errors
         case ProtocolError::connection_closed:
         case ProtocolError::other_error:
-        case ProtocolError::switch_to_flx_sync:
-        case ProtocolError::switch_to_pbs:
             // Not real errors, don't need to be reported to the binding.
             return SimplifiedProtocolError::ConnectionIssue;
         case ProtocolError::unknown_message:
@@ -111,11 +116,15 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::partial_sync_disabled:
         case ProtocolError::user_mismatch:
         case ProtocolError::too_many_sessions:
+        case ProtocolError::bad_query:
+        case ProtocolError::switch_to_pbs:
+        case ProtocolError::switch_to_flx_sync:
             return SimplifiedProtocolError::UnexpectedInternalIssue;
         // Session errors
         case ProtocolError::session_closed:
         case ProtocolError::other_session_error:
         case ProtocolError::disabled_session:
+        case ProtocolError::initial_sync_not_completed:
             // The binding doesn't need to be aware of these because they are strictly informational, and do not
             // represent actual errors.
             return SimplifiedProtocolError::SessionIssue;
@@ -137,6 +146,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::invalid_schema_change:
         case ProtocolError::server_file_deleted:
         case ProtocolError::user_blacklisted:
+        case ProtocolError::object_already_exists:
+        case ProtocolError::server_permissions_changed:
             return SimplifiedProtocolError::ClientResetRequested;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.

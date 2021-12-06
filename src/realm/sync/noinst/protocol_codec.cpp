@@ -53,6 +53,13 @@ void ClientProtocol::make_flx_ident_message(OutputBuffer& out, session_ident_typ
     REALM_ASSERT(!out.fail());
 }
 
+void ClientProtocol::make_query_change_message(OutputBuffer& out, session_ident_type session, int64_t version,
+                                               std::string_view query_body)
+{
+    out << "query " << session << " " << version << " " << query_body.size() << "\n" << query_body; // throws
+    REALM_ASSERT(!out.fail());
+}
+
 ClientProtocol::UploadMessageBuilder::UploadMessageBuilder(
     util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
     _impl::compression::CompressMemoryArena& compress_memory_arena)

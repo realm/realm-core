@@ -2137,6 +2137,7 @@ TransactionRef DB::start_read(VersionID version_id)
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
+        read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
         g.release();
     }
@@ -2156,6 +2157,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
+        read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
         g.release();
     }
@@ -2383,6 +2385,7 @@ TransactionRef DB::start_write(bool nonblocking)
     try {
         grab_read_lock(read_lock, VersionID());
         ReadLockGuard g(*this, read_lock);
+        read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         version_type current_version = read_lock.m_version;

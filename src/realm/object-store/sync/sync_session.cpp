@@ -521,6 +521,7 @@ void SyncSession::do_create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
+    session_config.flx_sync_requested = m_config.flx_sync_requested;
     {
         std::string sync_route = m_sync_manager->sync_route();
 

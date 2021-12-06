@@ -24,6 +24,7 @@
 #include "realm/query.hpp"
 #include "realm/timestamp.hpp"
 #include "realm/util/future.hpp"
+#include "realm/util/functional.hpp"
 #include "realm/util/optional.hpp"
 
 #include <list>
@@ -231,11 +232,14 @@ public:
     // If set to State::Complete, this will erase all subscription sets with a version less than this one's.
     //
     // This should be called internally within the sync client.
-    void update_state(State state, util::Optional<std::string> error_str = util::none);
+    void update_state(State state, util::Optional<std::string_view> error_str = util::none);
 
     // If this is a mutable subscription set that has not had its changes committed, this commits them and
     // continues the set's lifetime in a read-only transaction. Otherwise, this will throw.
     void commit();
+
+    // Returns this query set as extended JSON in a form suitable for transmitting to the server.
+    std::string to_ext_json() const;
 
 protected:
     friend class SubscriptionStore;
@@ -262,7 +266,7 @@ protected:
 // A SubscriptionStore manages the FLX metadata tables and the lifecycles of SubscriptionSets and Subscriptions.
 class SubscriptionStore {
 public:
-    explicit SubscriptionStore(DBRef db);
+    explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
 
     // Get the latest subscription created by calling update_latest(). Once bootstrapping is complete,
     // this and get_active() will return the same thing. If no SubscriptionSet has been set, then
@@ -270,7 +274,13 @@ public:
     const SubscriptionSet get_latest() const;
 
     // Gets the subscription set that has been acknowledged by the server as having finished bootstrapping.
+    // If no subscriptions have reached the complete stage, this returns an empty subscription with version
+    // zero.
     const SubscriptionSet get_active() const;
+
+    // Returns the version number of the current active and latest subscription sets. This function guarantees
+    // that the versions will be read from the same underlying transaction and will thus be consistent.
+    std::pair<int64_t, int64_t> get_active_and_latest_versions() const;
 
     // To be used internally by the sync client. This returns a mutable view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
@@ -320,6 +330,7 @@ protected:
     friend class Subscription;
     friend class SubscriptionSet;
 
+    util::UniqueFunction<void(int64_t)> m_on_new_subscription_set;
     std::unique_ptr<SubscriptionSetKeys> m_sub_set_keys;
     std::unique_ptr<SubscriptionKeys> m_sub_keys;
 

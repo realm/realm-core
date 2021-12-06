@@ -128,6 +128,14 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "Too many sessions in connection (BIND)";
         case ProtocolError::invalid_schema_change:
             return "Invalid schema change (UPLOAD)";
+        case ProtocolError::bad_query:
+            return "Client query is invalid/malformed (IDENT, QUERY)";
+        case ProtocolError::object_already_exists:
+            return "Client tried to create an object that already exists outside their view (UPLOAD)";
+        case ProtocolError::server_permissions_changed:
+            return "Server permissions for this file ident have changed since the last time it was used (IDENT)";
+        case ProtocolError::initial_sync_not_completed:
+            return "Client tried to open a session before initial sync is complete (BIND)";
     }
     return nullptr;
 }

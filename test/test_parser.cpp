@@ -4718,15 +4718,40 @@ TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal1
     dict.insert("1", values[0]);
     dict.insert("2", values[1]);
     dict.insert("3", values[2]);
+    auto empty_obj = table->create_object();
+
+    auto link_table = g.add_table("link");
+    auto link_col = link_table->add_column(*table, "link");
+    link_table->create_object().set(link_col, obj.get_key());
+    link_table->create_object().set(link_col, empty_obj.get_key());
+    link_table->create_object();
 
     Any arg = values[0];
     verify_query_sub(test_context, table, "dict.@min == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@min == $0", &arg, 1, 1);
     arg = values[2];
     verify_query_sub(test_context, table, "dict.@max == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@max == $0", &arg, 1, 1);
     arg = values[0] + values[1] + values[2];
     verify_query_sub(test_context, table, "dict.@sum == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@sum == $0", &arg, 1, 1);
     arg = (values[0] + values[1] + values[2]) / 3;
     verify_query_sub(test_context, table, "dict.@avg == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@avg == $0", &arg, 1, 1);
+
+    arg = Any();
+    verify_query_sub(test_context, table, "dict.@min == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@min == $0", &arg, 1, 2);
+    verify_query_sub(test_context, table, "dict.@max == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@max == $0", &arg, 1, 2);
+    verify_query_sub(test_context, table, "dict.@sum == $0", &arg, 1, 0);
+    verify_query_sub(test_context, link_table, "link.dict.@sum == $0", &arg, 1, 0);
+    verify_query_sub(test_context, table, "dict.@avg == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@avg == $0", &arg, 1, 2);
+
+    arg = type(0);
+    verify_query_sub(test_context, table, "dict.@sum == $0", &arg, 1, 1);
+    verify_query_sub(test_context, link_table, "link.dict.@sum == $0", &arg, 1, 2);
 }
 
 TEST_TYPES(Parser_Set, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Decimal128>, Prop<ObjectId>, Prop<Timestamp>,

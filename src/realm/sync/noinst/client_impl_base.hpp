@@ -22,6 +22,7 @@
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 
 namespace realm {
@@ -295,7 +296,6 @@ enum class ClientImpl::ConnectionTerminationReason {
     server_said_try_again_later,       ///< Client received ERROR message with try_again=yes
     server_said_do_not_reconnect,      ///< Client received ERROR message with try_again=no
     pong_timeout,                      ///< Client did not receive PONG after PING
-    switch_wire_protocols,             ///< Client should reconnect with a different wire protocols
 
     /// The application requested a feature that is unavailable in the
     /// negotiated protocol version.
@@ -394,6 +394,7 @@ public:
     connection_ident_type get_ident() const noexcept;
     const ServerEndpoint& get_server_endpoint() const noexcept;
     ConnectionState get_state() const noexcept;
+    SyncServerMode get_sync_server_mode() const noexcept;
     bool is_flx_sync_connection() const noexcept;
 
     void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
@@ -471,6 +472,8 @@ private:
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
     void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
+    void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
+                                     session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
     void receive_download_message(session_ident_type, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   int64_t query_version, DownloadBatchState batch_state, const ReceivedChangesets&);
@@ -714,6 +717,12 @@ public:
     /// or after initiation of deactivation.
     void request_download_completion_notification();
 
+    /// \brief Gets or creates the subscription store associated with this Session.
+    SubscriptionStore* get_or_create_flx_subscription_store();
+
+    /// \brief Callback for when a new subscription set has been created for FLX sync.
+    void on_new_flx_subscription_set(int64_t new_version);
+
     /// \brief Announce that a new access token is available.
     ///
     /// By calling this function, the application announces to the session
@@ -916,6 +925,12 @@ private:
     void on_resumed();
     //@}
 
+    void on_flx_sync_error(int64_t version, std::string_view err_msg);
+    void on_flx_sync_progress(int64_t verison, DownloadBatchState batch_state);
+
+    void begin_resumption_delay();
+    void clear_resumption_delay_state();
+
 private:
     Connection& m_conn;
     const session_ident_type m_ident;
@@ -929,6 +944,9 @@ private:
     State m_state = Unactivated;
 
     bool m_suspended = false;
+
+    util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
+    std::chrono::milliseconds m_try_again_activation_delay{1000};
 
     // Set to false when a new access token is available and needs to be
     // uploaded to the server. Set to true when uploading of the token has been
@@ -944,6 +962,8 @@ private:
 
     bool m_upload_completion_notification_requested = false;
 
+    bool m_is_flx_sync_session = false;
+
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
@@ -953,6 +973,9 @@ private:
     bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
     bool m_error_message_received;              // Session specific ERROR message received
     bool m_unbound_message_received;            // UNBOUND message received
+
+    // True when there is a new FLX sync query we need to send to the server.
+    bool m_pending_query_message = false;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1089,12 +1112,14 @@ private:
     void send_alloc_message();
     void send_refresh_message();
     void send_unbind_message();
+    void send_query_change_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_unbound_message();
     std::error_code receive_error_message(int error_code, StringData message, bool try_again);
+    std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
 
     void initiate_rebind();
     void reset_protocol_state() noexcept;
@@ -1168,6 +1193,11 @@ inline ClientImpl& ClientImpl::Connection::get_client() noexcept
 inline ConnectionState ClientImpl::Connection::get_state() const noexcept
 {
     return m_state;
+}
+
+inline SyncServerMode ClientImpl::Connection::get_sync_server_mode() const noexcept
+{
+    return m_sync_mode;
 }
 
 inline auto ClientImpl::Connection::get_reconnect_info() const noexcept -> ReconnectInfo
@@ -1283,7 +1313,6 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::pong_timeout:
         case ConnectionTerminationReason::missing_protocol_feature:
         case ConnectionTerminationReason::http_tunnel_failed:
-        case ConnectionTerminationReason::switch_wire_protocols:
             break;
     }
     return false;
@@ -1361,6 +1390,7 @@ inline ClientImpl::Session::Session(SessionWrapper& wrapper, Connection& conn, s
     : logger{make_logger_prefix(ident), conn.logger} // Throws
     , m_conn{conn}
     , m_ident{ident}
+    , m_is_flx_sync_session(conn.is_flx_sync_connection())
     , m_wrapper{wrapper}
 {
     if (get_client().m_disable_upload_activation_delay)
