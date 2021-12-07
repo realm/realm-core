@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -48,6 +48,7 @@
 * SubscriptionSet::erase now returns the correct itererator for the "next" subscription ([#5053](https://github.com/realm/realm-core/pull/5053))
 * SubscriptionSet::insert_or_assign now returns an iterator pointing to the correct subscription ([#5049](https://github.com/realm/realm-core/pull/5049))
 * `SimulatedFailure` mmap handling was not thread-safe.
+* The overloads for arithmetric operations removed.
 * Rename SchemaMode::ReadOnlyAlternative to ReadOnly. ([#5070](https://github.com/realm/realm-core/issues/5070))
 * Subscriptions for FLX sync now have a unique ID ([#5054](https://github.com/realm/realm-core/pull/5054))
 * Assigning an anonymous subscription will no longer overwrite a named subscription ([#5076](https://github.com/realm/realm-core/pull/5076))

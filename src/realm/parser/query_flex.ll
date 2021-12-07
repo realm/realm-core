@@ -32,12 +32,13 @@ blank   [ \t\r]
 {blank}+   ;
 \n+        ;
 
+"+"|"-"|"*"|"/"             return yytext[0];
 ("=="|"=")                  return yy::parser::make_EQUAL  ();
 ("in"|"IN")                 return yy::parser::make_IN  ();
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();
-[\[\],(){}\.]                     return yytext[0];
+[\[\],(){}\.]               return yytext[0];
 ("<="|"=<")                 return yy::parser::make_LESS_EQUAL ();
 (">="|"=>")                 return yy::parser::make_GREATER_EQUAL ();
 &&|(?i:and)                 return yy::parser::make_AND    ();
@@ -83,8 +84,8 @@ blank   [ \t\r]
 "$"{int}                    return yy::parser::make_ARG(yytext); 
 [+-]?{int}                  return yy::parser::make_NUMBER (yytext);
 "0"[xX]{hex}+               return yy::parser::make_NUMBER (yytext);
-[+-]?{int}{exp}?            return yy::parser::make_FLOAT (yytext);
-[+-]?(({int}"."{optint})|({optint}"."{int})){exp}? return yy::parser::make_FLOAT (yytext);
+[+-]?{int}{exp}?f?          return yy::parser::make_FLOAT (yytext);
+[+-]?(({int}"."{optint})|({optint}"."{int})){exp}?f? return yy::parser::make_FLOAT (yytext);
 ("B64\""[a-zA-Z0-9/\+=]*\")         return yy::parser::make_BASE64(yytext);
 (\"({char1}|{escape}|{unicode})*\") return yy::parser::make_STRING (yytext);
 ('({char2}|{escape}|{unicode})*')   return yy::parser::make_STRING (yytext);

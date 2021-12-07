@@ -16,7 +16,9 @@
     class PropertyNode;
     class PostOpNode;
     class AggrNode;
+    class ExpressionNode;
     class ValueNode;
+    class OperationNode;
     class TrueOrFalseNode;
     class OrNode;
     class AndNode;
@@ -117,6 +119,7 @@ using namespace realm::query_parser;
 %type  <PostOpNode*> post_op
 %type  <AggrNode*> aggr_op
 %type  <ValueNode*> value
+%type  <ExpressionNode*> expr
 %type  <TrueOrFalseNode*> boolexpr
 %type  <int> comp_type
 %type  <QueryNode*> query compare
@@ -137,6 +140,8 @@ using namespace realm::query_parser;
 
 %left OR;
 %left AND;
+%left '+' '-';
+%left '*' '/';
 %right NOT;
 
 final
@@ -151,13 +156,13 @@ query
     | boolexpr                  { $$ =$1; }
 
 compare
-    : value equality value      { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
-    | value equality CASE value {
+    : expr equality expr        { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
+    | expr equality CASE expr   {
                                     auto tmp = drv.m_parse_nodes.create<EqualityNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
                                 }
-    | value relational value    { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
+    | expr relational expr      { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
     | value stringop value      { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $3); }
     | value stringop CASE value {
                                     auto tmp = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $4);
@@ -166,9 +171,18 @@ compare
                                 }
     | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
 
+expr
+    : value                     { $$ = $1; }
+    | '(' expr ')'              { $$ = $2; }
+    | expr '*' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '*', $3); }
+    | expr '/' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '/', $3); }
+    | expr '+' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '+', $3); }
+    | expr '-' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '-', $3); }
+
 value
     : constant                  { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
     | prop                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
+
 
 prop
     : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }

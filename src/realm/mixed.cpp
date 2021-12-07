@@ -190,9 +190,7 @@ bool Mixed::data_types_are_comparable(DataType l_type, DataType r_type)
     if (l_type == r_type)
         return true;
 
-    bool l_is_numeric = l_type == type_Int || l_type == type_Float || l_type == type_Double || l_type == type_Decimal;
-    bool r_is_numeric = r_type == type_Int || r_type == type_Float || r_type == type_Double || r_type == type_Decimal;
-    if (l_is_numeric && r_is_numeric) {
+    if (is_numeric(l_type, r_type)) {
         return true;
     }
     if ((l_type == type_String && r_type == type_Binary) || (r_type == type_String && l_type == type_Binary)) {
@@ -372,27 +370,69 @@ int Mixed::compare_signed(const Mixed& b) const
     return compare(b);
 }
 
-template <class T>
-T Mixed::export_to_type() const noexcept
+template <>
+int64_t Mixed::export_to_type() const noexcept
 {
+    // If the common type is Int, then both values must be Int
+    REALM_ASSERT(get_type() == type_Int);
+    return int_val;
+}
+
+template <>
+float Mixed::export_to_type() const noexcept
+{
+    // If the common type is Float, then values must be either Int or Float
     REALM_ASSERT(m_type);
     switch (get_type()) {
         case type_Int:
-            return T(int_val);
+            return float(int_val);
         case type_Float:
-            return T(float_val);
-        case type_Double:
-            return T(double_val);
+            return float_val;
         default:
             REALM_ASSERT(false);
             break;
     }
-    return T();
+    return 0.;
 }
 
-template int64_t Mixed::export_to_type<int64_t>() const noexcept;
-template float Mixed::export_to_type<float>() const noexcept;
-template double Mixed::export_to_type<double>() const noexcept;
+template <>
+double Mixed::export_to_type() const noexcept
+{
+    // If the common type is Double, then values must be either Int, Float or Double
+    REALM_ASSERT(m_type);
+    switch (get_type()) {
+        case type_Int:
+            return double(int_val);
+        case type_Float:
+            return double(float_val);
+        case type_Double:
+            return double_val;
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+    return 0.;
+}
+
+template <>
+Decimal128 Mixed::export_to_type() const noexcept
+{
+    REALM_ASSERT(m_type);
+    switch (get_type()) {
+        case type_Int:
+            return Decimal128(int_val);
+        case type_Float:
+            return Decimal128(float_val);
+        case type_Double:
+            return Decimal128(double_val);
+        case type_Decimal:
+            return decimal_val;
+        default:
+            REALM_ASSERT(false);
+            break;
+    }
+    return {};
+}
 
 template <>
 util::Optional<int64_t> Mixed::get<util::Optional<int64_t>>() const noexcept
@@ -448,6 +488,101 @@ util::Optional<UUID> Mixed::get<util::Optional<UUID>>() const noexcept
     return get<UUID>();
 }
 
+static DataType get_common_type(DataType t1, DataType t2)
+{
+    // It might be by accident that this works, but it finds the most advanced type
+    DataType common = std::max(t1, t2);
+    return common;
+}
+
+Mixed Mixed::operator+(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() + rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() + rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() + rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() + rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+Mixed Mixed::operator-(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() - rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() - rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() - rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() - rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+Mixed Mixed::operator*(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int:
+                return export_to_type<Int>() * rhs.export_to_type<Int>();
+            case type_Float:
+                return export_to_type<float>() * rhs.export_to_type<float>();
+            case type_Double:
+                return export_to_type<double>() * rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() * rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
+
+Mixed Mixed::operator/(const Mixed& rhs) const
+{
+    if (!is_null() && !rhs.is_null()) {
+        auto common_type = get_common_type(get_type(), rhs.get_type());
+        switch (common_type) {
+            case type_Int: {
+                auto dividend = export_to_type<Int>();
+                auto divisor = rhs.export_to_type<Int>();
+                // We don't want to throw here. This is usually used as part of a query
+                // and in this case we would just expect a no match
+                if (divisor == 0)
+                    return dividend < 0 ? std::numeric_limits<int64_t>::min() : std::numeric_limits<int64_t>::max();
+                return dividend / divisor;
+            }
+            case type_Float:
+                static_assert(std::numeric_limits<float>::is_iec559); // Infinity is supported
+                return export_to_type<float>() / rhs.export_to_type<float>();
+            case type_Double:
+                static_assert(std::numeric_limits<double>::is_iec559); // Infinity is supported
+                return export_to_type<double>() / rhs.export_to_type<double>();
+            case type_Decimal:
+                return export_to_type<Decimal128>() / rhs.export_to_type<Decimal128>();
+            default:
+                break;
+        }
+    }
+    return {};
+}
 
 size_t Mixed::hash() const
 {
