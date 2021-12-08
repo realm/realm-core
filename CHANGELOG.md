@@ -7,7 +7,8 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * The release package was missing several headers (since 11.7.0).
- 
+* The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
+
 ### Breaking changes
 * None.
 
