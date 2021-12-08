@@ -652,6 +652,12 @@ private:
         void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
         void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
+        // fully update any process shared representation (e.g. buffer cache).
+        // other processes will be able to see changes, but a full platform crash
+        // may loose data
+        void flush();
+        // fully synchronize any underlying storage. After completion, a full platform
+        // crash will *not* have lost data.
         void sync();
 #if REALM_ENABLE_ENCRYPTION
         mutable util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
@@ -792,6 +798,7 @@ public:
     /// attached to a memory mapped file, has undefined behavior.
     void sync();
 
+    void flush();
     /// Check whether this Map instance is currently attached to a
     /// memory mapped file.
     bool is_attached() const noexcept;
@@ -1192,6 +1199,12 @@ template <class T>
 inline void File::Map<T>::sync()
 {
     MapBase::sync();
+}
+
+template <class T>
+inline void File::Map<T>::flush()
+{
+    MapBase::flush();
 }
 
 template <class T>

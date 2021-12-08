@@ -2950,10 +2950,9 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, bool* did_create)
 {
-    if (m_is_embedded)
-        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
-    REALM_ASSERT(primary_key_col);
+    if (m_is_embedded || !primary_key_col)
+        throw LogicError(LogicError::wrong_kind_of_table);
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
