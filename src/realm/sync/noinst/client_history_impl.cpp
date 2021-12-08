@@ -655,17 +655,17 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
     Array& root = m_arrays->root;
 
     // Progress must never decrease
-    REALM_ASSERT(progress.latest_server_version.version >=
-                 version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int()));
-    REALM_ASSERT(progress.download.server_version >=
-                 version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int()));
-    REALM_ASSERT(progress.download.last_integrated_client_version >=
-                 version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int()));
-    REALM_ASSERT(progress.upload.client_version >=
-                 version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int()));
+    REALM_ASSERT_RELEASE(progress.latest_server_version.version >=
+                         version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int()));
+    REALM_ASSERT_RELEASE(progress.download.server_version >=
+                         version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int()));
+    REALM_ASSERT_RELEASE(progress.download.last_integrated_client_version >=
+                         version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int()));
+    REALM_ASSERT_RELEASE(progress.upload.client_version >=
+                         version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int()));
     if (progress.upload.last_integrated_server_version > 0) {
-        REALM_ASSERT(progress.upload.last_integrated_server_version >=
-                     version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int()));
+        REALM_ASSERT_RELEASE(progress.upload.last_integrated_server_version >=
+                             version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int()));
     }
 
     auto uploaded_bytes = std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_uploaded_bytes_iip).get_as_int());
