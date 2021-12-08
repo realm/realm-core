@@ -284,6 +284,12 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
                                 string_for_property_type(prop.type), prop.object_type);
         return;
     }
+    if (is_set(prop.type) && it->is_embedded) {
+        exceptions.emplace_back("Set property '%1.%2' cannot contain embedded object type '%3'. Set semantics are "
+                                "not applicable to embedded objects.",
+                                object_name, prop.name, prop.object_type);
+        return;
+    }
     if (prop.type != PropertyType::LinkingObjects)
         return;
 
