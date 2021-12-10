@@ -108,6 +108,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
+        sync/impl/network_reachability.hpp
 
         util/bson/bson.hpp
         util/bson/min_key.hpp
@@ -134,6 +135,11 @@ if(REALM_ENABLE_SYNC)
         util/bson/bson.cpp
         util/bson/regular_expression.cpp)
     if(APPLE)
+
+        list(APPEND HEADERS
+            sync/impl/apple/network_reachability_observer.hpp
+            sync/impl/apple/system_configuration.hpp)
+
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
             sync/impl/apple/system_configuration.cpp)

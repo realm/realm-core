@@ -336,11 +336,11 @@ if(REALM_ENABLE_SYNC)
 
 	add_custom_command(TARGET SyncTests POST_BUILD
 	                   COMMAND ${CMAKE_COMMAND} -E copy_directory
-	                           ${CMAKE_SOURCE_DIR}/certificate-authority
+	                           ${PROJECT_SOURCE_DIR}/certificate-authority
 	                           $<TARGET_FILE_DIR:SyncTests>/../certificate-authority)
 
 	add_custom_command(TARGET SyncTests POST_BUILD
 	                   COMMAND ${CMAKE_COMMAND} -E copy_directory
-	                           ${CMAKE_SOURCE_DIR}/test/resources
+	                           ${PROJECT_SOURCE_DIR}/test/resources
 	                           $<TARGET_FILE_DIR:SyncTests>/resources)
 endif()
