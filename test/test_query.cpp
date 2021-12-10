@@ -636,18 +636,14 @@ TEST(Query_NextGenSyntaxMonkey0)
 
         tvpos = 0;
 
-        // with start and limit
-        size_t start = random.draw_int_mod(rows);
+        // with limit
         size_t limit = random.draw_int_mod(rows);
-        tv = q.find_all(start, size_t(-1), limit);
+        tv = q.find_all(limit);
         tvpos = 0;
-        size_t r = 0;
         for (Obj o : table) {
-            if (r >= start && tvpos < limit && o.get<Int>(col_int) > o.get<Float>(col_float) &&
-                o.get<String>(col_str) == "a") {
+            if (tvpos < limit && o.get<Int>(col_int) > o.get<Float>(col_float) && o.get<String>(col_str) == "a") {
                 tvpos++;
             }
-            r++;
         }
         CHECK_EQUAL(tvpos, tv.size());
     }
@@ -2664,8 +2660,6 @@ TEST(Query_Huge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        size_t start = random.draw_int_mod(3000);
-        size_t end = start + random.draw_int_mod(3000 - start);
         size_t limit;
         if (random.draw_bool())
             limit = random.draw_int_mod(5000);
@@ -2730,30 +2724,28 @@ TEST(Query_Huge)
             obj.set(col_str1, StringData(second));
             obj.set(col_int2, third);
 
-            if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
+            if ((limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
 
-            if ((row >= start && row < end && limit > res2) && ((first == "A" || second == "A") && third == 1))
+            if ((limit > res2) && ((first == "A" || second == "A") && third == 1))
                 res2++;
 
-            if ((row >= start && row < end && limit > res3) && (first == "A" && (second == "A" || third == 1)))
+            if ((limit > res3) && (first == "A" && (second == "A" || third == 1)))
                 res3++;
 
-            if ((row >= start && row < end && limit > res4) && (second == "A" && (first == "A" || third == 1)))
+            if ((limit > res4) && (second == "A" && (first == "A" || third == 1)))
                 res4++;
 
-            if ((row >= start && row < end && limit > res5) && (first == "A" || second == "A" || third == 1))
+            if ((limit > res5) && (first == "A" || second == "A" || third == 1))
                 res5++;
 
-            if ((row >= start && row < end && limit > res6) && (first != "A" && second == "A" && third == 1))
+            if ((limit > res6) && (first != "A" && second == "A" && third == 1))
                 res6++;
 
-            if ((row >= start && row < end && limit > res7) &&
-                (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1))
+            if ((limit > res7) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1))
                 res7++;
 
-            if ((row >= start && row < end && limit > res8) &&
-                (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2))
+            if ((limit > res8) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2))
                 res8++;
         }
 
@@ -2770,13 +2762,13 @@ TEST(Query_Huge)
                 tt.add_search_index(col_str1);
             }
 
-            v = tt.where().equal(col_str0, "A").equal(col_str1, "A").equal(col_int2, 1).find_all(start, end, limit);
+            v = tt.where().equal(col_str0, "A").equal(col_str1, "A").equal(col_int2, 1).find_all(limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().equal(col_str1, "A").equal(col_str0, "A").equal(col_int2, 1).find_all(start, end, limit);
+            v = tt.where().equal(col_str1, "A").equal(col_str0, "A").equal(col_int2, 1).find_all(limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().equal(col_int2, 1).equal(col_str1, "A").equal(col_str0, "A").find_all(start, end, limit);
+            v = tt.where().equal(col_int2, 1).equal(col_str1, "A").equal(col_str0, "A").find_all(limit);
             CHECK_EQUAL(res1, v.size());
 
             v = tt.where()
@@ -2786,7 +2778,7 @@ TEST(Query_Huge)
                     .equal(col_str1, "A")
                     .end_group()
                     .equal(col_int2, 1)
-                    .find_all(start, end, limit);
+                    .find_all(limit);
             CHECK_EQUAL(res2, v.size());
 
             v = tt.where()
@@ -2796,12 +2788,12 @@ TEST(Query_Huge)
                     .Or()
                     .equal(col_int2, 1)
                     .end_group()
-                    .find_all(start, end, limit);
+                    .find_all(limit);
             CHECK_EQUAL(res3, v.size());
 
             Query q =
                 tt.where().group().equal(col_str0, "A").Or().equal(col_int2, 1).end_group().equal(col_str1, "A");
-            v = q.find_all(start, end, limit);
+            v = q.find_all(limit);
             CHECK_EQUAL(res4, v.size());
 
             v = tt.where()
@@ -2811,37 +2803,27 @@ TEST(Query_Huge)
                     .equal(col_int2, 1)
                     .end_group()
                     .equal(col_str1, "A")
-                    .find_all(start, end, limit);
+                    .find_all(limit);
             CHECK_EQUAL(res4, v.size());
 
-            v = tt.where()
-                    .equal(col_str0, "A")
-                    .Or()
-                    .equal(col_str1, "A")
-                    .Or()
-                    .equal(col_int2, 1)
-                    .find_all(start, end, limit);
+            v = tt.where().equal(col_str0, "A").Or().equal(col_str1, "A").Or().equal(col_int2, 1).find_all(limit);
             CHECK_EQUAL(res5, v.size());
 
-            v = tt.where()
-                    .not_equal(col_str0, "A")
-                    .equal(col_str1, "A")
-                    .equal(col_int2, 1)
-                    .find_all(start, end, limit);
+            v = tt.where().not_equal(col_str0, "A").equal(col_str1, "A").equal(col_int2, 1).find_all(limit);
             CHECK_EQUAL(res6, v.size());
 
             v = tt.where()
                     .not_equal(col_str0, "longlonglonglonglonglonglong A")
                     .equal(col_str1, "A")
                     .equal(col_int2, 1)
-                    .find_all(start, end, limit);
+                    .find_all(limit);
             CHECK_EQUAL(res7, v.size());
 
             v = tt.where()
                     .not_equal(col_str0, "longlonglonglonglonglonglong A")
                     .equal(col_str1, "A")
                     .equal(col_int2, 2)
-                    .find_all(start, end, limit);
+                    .find_all(limit);
             CHECK_EQUAL(res8, v.size());
         }
     }
@@ -2861,22 +2843,19 @@ TEST(Query_OnTableView_where)
         size_t cnt0 = 0;
         size_t limit = random.draw_int_max(REALM_MAX_BPNODE_SIZE * 10);
 
-        size_t lbound = random.draw_int_mod(REALM_MAX_BPNODE_SIZE * 10);
-        size_t ubound = lbound + random.draw_int_mod(REALM_MAX_BPNODE_SIZE * 10 - lbound);
-
         for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 10; i++) {
             int v = random.draw_int_mod(3);
 
-            if (v == 1 && i >= lbound && i < ubound && cnt0 < limit)
+            if (v == 1 && cnt0 < limit)
                 cnt1++;
 
-            if (v != 0 && i >= lbound && i < ubound)
+            if (v != 0)
                 cnt0++;
 
             oti.create_object().set(col, v);
         }
 
-        TableView v = oti.where().not_equal(col, 0).find_all(lbound, ubound, limit);
+        TableView v = oti.where().not_equal(col, 0).find_all(limit);
         size_t cnt2 = oti.where(&v).equal(col, 1).count();
 
         CHECK_EQUAL(cnt1, cnt2);
@@ -3644,75 +3623,6 @@ TEST(Query_AggregateSingleCond)
     CHECK_EQUAL(9, s);
 }
 
-TEST(Query_FindAllRange1)
-{
-    Table ttt;
-    ttt.add_column(type_Int, "1");
-    auto col_str = ttt.add_column(type_String, "2");
-
-    ttt.create_object().set_all(1, "a");
-    ttt.create_object().set_all(4, "a");
-    ttt.create_object().set_all(7, "a");
-    ttt.create_object().set_all(10, "a");
-    ttt.create_object().set_all(1, "a");
-    ttt.create_object().set_all(4, "a");
-    ttt.create_object().set_all(7, "a");
-    ttt.create_object().set_all(10, "a");
-    ttt.create_object().set_all(1, "a");
-    ttt.create_object().set_all(4, "a");
-    ttt.create_object().set_all(7, "a");
-    ttt.create_object().set_all(10, "a");
-
-    Query q1 = ttt.where().equal(col_str, "a");
-    TableView tv1 = q1.find_all(4, 10);
-    CHECK_EQUAL(6, tv1.size());
-}
-
-
-TEST(Query_FindAllRangeOrMonkey2)
-{
-    const size_t ROWS = 20;
-    const size_t ITER = 100;
-
-    Random random(random_int<unsigned long>()); // Seed from slow global generator
-
-    for (size_t u = 0; u < ITER; u++) {
-        Table tit;
-        auto col_int0 = tit.add_column(type_Int, "1");
-        auto col_int1 = tit.add_column(type_Int, "2");
-
-        std::vector<ObjKey> a;
-        std::vector<ObjKey> keys;
-        size_t start = random.draw_int_max(ROWS);
-        size_t end = start + random.draw_int_max(ROWS - start);
-
-        if (end > ROWS)
-            end = ROWS;
-
-        for (size_t t = 0; t < ROWS; t++) {
-            int64_t r1 = random.draw_int_mod(10);
-            int64_t r2 = random.draw_int_mod(10);
-            tit.create_object().set_all(r1, r2).get_key();
-        }
-
-        Query q1 = tit.where().group().equal(col_int0, 3).Or().equal(col_int0, 7).end_group().greater(col_int1, 5);
-        TableView tv1 = q1.find_all(start, end);
-
-        auto it = tit.begin() + start;
-        auto e = tit.begin() + end;
-        while (it != e) {
-            if ((it->get<Int>(col_int0) == 3 || it->get<Int>(col_int0) == 7) && it->get<Int>(col_int1) > 5)
-                a.push_back(it->get_key());
-            ++it;
-        }
-
-        CHECK_EQUAL(a.size(), tv1.size());
-        for (size_t t = 0; t < a.size(); t++) {
-            CHECK_EQUAL(tv1.get_key(t), a[t]);
-        }
-    }
-}
-
 TEST(Query_FindAllRangeOr)
 {
     Table ttt;
@@ -3730,14 +3640,8 @@ TEST(Query_FindAllRangeOr)
     ttt.create_object().set_all(3, "b"); //
 
     Query q1 = ttt.where().group().greater(col_int, 1).Or().equal(col_str, "a").end_group().less(col_int, 3);
-    TableView tv1 = q1.find_all(1, 8);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
-
-    TableView  tv2 = q1.find_all(2, 8);
-    CHECK_EQUAL(3, tv2.size());
-
-    TableView  tv3 = q1.find_all(1, 7);
-    CHECK_EQUAL(3, tv3.size());
 }
 
 

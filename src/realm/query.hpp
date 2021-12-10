@@ -250,7 +250,7 @@ public:
 
     // Searching
     ObjKey find();
-    TableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
+    TableView find_all(size_t limit = size_t(-1));
 
     // Aggregates
     size_t count() const;
@@ -370,7 +370,7 @@ private:
     void aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end,
                             ArrayPayload* source_column) const;
 
-    void find_all(TableView& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
+    void do_find_all(TableView& tv, size_t limit) const;
     size_t do_count(size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 

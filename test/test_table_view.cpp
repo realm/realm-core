@@ -74,12 +74,12 @@ TEST(TableView_Json)
     table.create_object().set(col, 2);
     table.create_object().set(col, 3);
 
-    TableView v = table.where().find_all(1);
+    TableView v = table.where().find_all(2);
     std::stringstream ss;
     v.to_json(ss);
     const std::string json = ss.str();
     CHECK_EQUAL(true, json.length() > 0);
-    CHECK_EQUAL("[{\"_key\":1,\"first\":2},{\"_key\":2,\"first\":3}]", json);
+    CHECK_EQUAL("[{\"_key\":0,\"first\":1},{\"_key\":1,\"first\":2}]", json);
 }
 
 
@@ -412,8 +412,6 @@ TEST(TableView_Find)
 
     // TV where index in TV equals the index in the table
     TableView all = table.where().find_all();
-    // TV where index in TV is offset by one from the index in the table
-    TableView after_first = table.where().find_all(1);
 
     // Ensure the TVs have a detached ref to deal with
     obj3.remove();
@@ -434,21 +432,6 @@ TEST(TableView_Find)
     CHECK_EQUAL(1, all.find_first(col12, BinaryData("a", 1)));
     CHECK_EQUAL(1, all.find_first(col13, BinaryData("a", 1)));
 
-    CHECK_EQUAL(0, after_first.find_first<Int>(col0, 1));
-    CHECK_EQUAL(0, after_first.find_first(col1, util::Optional<int64_t>(1)));
-    CHECK_EQUAL(0, after_first.find_first(col2, false));
-    CHECK_EQUAL(0, after_first.find_first(col3, util::make_optional(false)));
-    CHECK_EQUAL(0, after_first.find_first(col4, 1.1f));
-    CHECK_EQUAL(0, after_first.find_first(col5, util::make_optional(1.1f)));
-    CHECK_EQUAL(0, after_first.find_first(col6, 1.1));
-    CHECK_EQUAL(0, after_first.find_first(col7, util::make_optional(1.1)));
-    CHECK_EQUAL(0, after_first.find_first(col8, Timestamp(1, 1)));
-    CHECK_EQUAL(0, after_first.find_first(col9, Timestamp(1, 1)));
-    CHECK_EQUAL(0, after_first.find_first(col10, StringData("a")));
-    CHECK_EQUAL(0, after_first.find_first(col11, StringData("a")));
-    CHECK_EQUAL(0, after_first.find_first(col12, BinaryData("a", 1)));
-    CHECK_EQUAL(0, after_first.find_first(col13, BinaryData("a", 1)));
-
     // Look for the values in the third row
     CHECK_EQUAL(2, all.find_first<Int>(col0, 2));
     CHECK_EQUAL(0, all.find_first(col1, util::Optional<int64_t>()));
@@ -465,21 +448,6 @@ TEST(TableView_Find)
     CHECK_EQUAL(2, all.find_first(col12, BinaryData("b", 1)));
     CHECK_EQUAL(0, all.find_first(col13, BinaryData()));
 
-    CHECK_EQUAL(1, after_first.find_first<Int>(col0, 2));
-    CHECK_EQUAL(1, after_first.find_first(col1, util::Optional<int64_t>()));
-    CHECK_EQUAL(1, after_first.find_first(col2, true));
-    CHECK_EQUAL(1, after_first.find_first(col3, util::Optional<bool>()));
-    CHECK_EQUAL(1, after_first.find_first(col4, 2.2f));
-    CHECK_EQUAL(1, after_first.find_first(col5, util::Optional<float>()));
-    CHECK_EQUAL(1, after_first.find_first(col6, 2.2));
-    CHECK_EQUAL(1, after_first.find_first(col7, util::Optional<double>()));
-    CHECK_EQUAL(1, after_first.find_first(col8, Timestamp(2, 2)));
-    CHECK_EQUAL(1, after_first.find_first(col9, Timestamp()));
-    CHECK_EQUAL(1, after_first.find_first(col10, StringData("b")));
-    CHECK_EQUAL(1, after_first.find_first(col11, StringData()));
-    CHECK_EQUAL(1, after_first.find_first(col12, BinaryData("b", 1)));
-    CHECK_EQUAL(1, after_first.find_first(col13, BinaryData()));
-
     // Look for values that aren't present
     CHECK_EQUAL(npos, all.find_first<Int>(col0, 5));
     CHECK_EQUAL(npos, all.find_first(col1, util::Optional<int64_t>(5)));
@@ -493,19 +461,6 @@ TEST(TableView_Find)
     CHECK_EQUAL(npos, all.find_first(col11, StringData("c")));
     CHECK_EQUAL(npos, all.find_first(col12, BinaryData("c", 1)));
     CHECK_EQUAL(npos, all.find_first(col13, BinaryData("c", 1)));
-
-    CHECK_EQUAL(npos, after_first.find_first<Int>(col0, 5));
-    CHECK_EQUAL(npos, after_first.find_first(col1, util::Optional<int64_t>(5)));
-    CHECK_EQUAL(npos, after_first.find_first(col4, 3.3f));
-    CHECK_EQUAL(npos, after_first.find_first(col5, util::make_optional(3.3f)));
-    CHECK_EQUAL(npos, after_first.find_first(col6, 3.3));
-    CHECK_EQUAL(npos, after_first.find_first(col7, util::make_optional(3.3)));
-    CHECK_EQUAL(npos, after_first.find_first(col8, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, after_first.find_first(col9, Timestamp(3, 3)));
-    CHECK_EQUAL(npos, after_first.find_first(col10, StringData("c")));
-    CHECK_EQUAL(npos, after_first.find_first(col11, StringData("c")));
-    CHECK_EQUAL(npos, after_first.find_first(col12, BinaryData("c", 1)));
-    CHECK_EQUAL(npos, after_first.find_first(col13, BinaryData("c", 1)));
 }
 
 
