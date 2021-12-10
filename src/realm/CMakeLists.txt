@@ -181,6 +181,7 @@ set(REALM_INSTALL_HEADERS
     sort_descriptor.hpp
     spec.hpp
     status.hpp
+    status_with.hpp
     string_data.hpp
     table.hpp
     table_cluster_tree.hpp
@@ -224,6 +225,7 @@ set(REALM_INSTALL_HEADERS
     util/fixed_size_buffer.hpp
     util/function_ref.hpp
     util/functional.hpp
+    util/future.hpp
     util/hex_dump.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
