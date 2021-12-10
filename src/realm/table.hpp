@@ -263,7 +263,7 @@ public:
     /// Create a number of objects with keys supplied
     void create_objects(const std::vector<ObjKey>& keys);
     /// Does the key refer to an object within the table?
-    bool is_valid(ObjKey key) const
+    bool is_valid(ObjKey key) const noexcept
     {
         return m_clusters.is_valid(key);
     }
@@ -272,6 +272,10 @@ public:
     {
         REALM_ASSERT(!key.is_unresolved());
         return m_clusters.get(key);
+    }
+    Obj try_get_object(ObjKey key) const noexcept
+    {
+        return m_clusters.try_get_obj(key);
     }
     Obj get_object(size_t ndx) const
     {

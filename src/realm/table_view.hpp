@@ -206,17 +206,19 @@ public:
         return m_table->is_valid(get_key(ndx));
     }
 
-    Obj get(size_t row_ndx) const
+    Obj get_object(size_t ndx) const final
     {
-        REALM_ASSERT(row_ndx < size());
-        ObjKey key(m_key_values.get(row_ndx));
+        REALM_ASSERT(ndx < size());
+        ObjKey key(m_key_values.get(ndx));
         REALM_ASSERT(key);
         return m_table->get_object(key);
     }
 
-    Obj get_object(size_t ndx) const final
+    Obj try_get_object(size_t ndx) const noexcept override
     {
-        return get(ndx);
+        REALM_ASSERT(ndx < size());
+        ObjKey key(m_key_values.get(ndx));
+        return m_table->try_get_object(key);
     }
 
     // Get the query used to create this TableView

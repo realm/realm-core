@@ -3274,13 +3274,13 @@ TEST(Query_LinksToDeletedOrMovedRow)
     TableView tvB = qB.find_all();
     CHECK_EQUAL(1, tvB.size());
     CHECK_EQUAL(keys[1], tvB[0].get<ObjKey>(col_link));
-    CHECK_EQUAL("B", tvB.get(0).get_linked_object(col_link).get<String>(col_name));
+    CHECK_EQUAL("B", tvB.get_object(0).get_linked_object(col_link).get<String>(col_name));
 
     // Row C should still be found
     TableView tvC = qC.find_all();
     CHECK_EQUAL(1, tvC.size());
     CHECK_EQUAL(keys[2], tvC[0].get<ObjKey>(col_link));
-    CHECK_EQUAL("C", tvC.get(0).get_linked_object(col_link).get<String>(col_name));
+    CHECK_EQUAL("C", tvC.get_object(0).get_linked_object(col_link).get<String>(col_name));
 }
 
 // Triggers bug in compare_relation()
@@ -3423,10 +3423,10 @@ TEST(Query_NegativeNumbers)
         id = -1;
         for (size_t i = 0; i < view.size(); ++i) {
             if (nullable == 0) {
-                CHECK_EQUAL(id, view.get(i).get<Optional<Int>>(c0));
+                CHECK_EQUAL(id, view.get_object(i).get<Optional<Int>>(c0));
             }
             else {
-                CHECK_EQUAL(id, view.get(i).get<Int>(c0));
+                CHECK_EQUAL(id, view.get_object(i).get<Int>(c0));
             }
             id--;
         }
@@ -4744,18 +4744,18 @@ TEST(Query_IntOnly)
 
     TableView tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get_key(), ObjKey(7));
-    CHECK_EQUAL(tv.get(1).get_key(), ObjKey(21));
+    CHECK_EQUAL(tv.get_object(0).get_key(), ObjKey(7));
+    CHECK_EQUAL(tv.get_object(1).get_key(), ObjKey(21));
 
     auto q1 = table.where(&tv).equal(c0, 2);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get(0).get_key(), ObjKey(21));
+    CHECK_EQUAL(tv1.get_object(0).get_key(), ObjKey(21));
 
     q1 = table.where(&tv).greater(c0, 5);
     tv1 = q1.find_all();
     CHECK_EQUAL(tv1.size(), 1);
-    CHECK_EQUAL(tv1.get(0).get_key(), ObjKey(7));
+    CHECK_EQUAL(tv1.get_object(0).get_key(), ObjKey(7));
 
     q = table.column<Int>(c0) == 19 && table.column<Int>(c1) == 9;
     key = q.find();
@@ -4763,14 +4763,14 @@ TEST(Query_IntOnly)
 
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
-    CHECK_EQUAL(tv.get(0).get_key(), ObjKey(19));
+    CHECK_EQUAL(tv.get_object(0).get_key(), ObjKey(19));
 
     // Two column expression
     q = table.column<Int>(c0) < table.column<Int>(c1);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get_key(), ObjKey(5));
-    CHECK_EQUAL(tv.get(1).get_key(), ObjKey(21));
+    CHECK_EQUAL(tv.get_object(0).get_key(), ObjKey(5));
+    CHECK_EQUAL(tv.get_object(1).get_key(), ObjKey(21));
 }
 
 TEST(Query_LinksTo)

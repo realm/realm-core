@@ -2092,21 +2092,21 @@ TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 
         TableView v = table->where().equal(col_str, spb).find_all();
         CHECK_EQUAL(v.size(), 1);
-        CHECK_EQUAL(v.get(0).get_key(), keys[0]);
+        CHECK_EQUAL(v.get_object(0).get_key(), keys[0]);
 
         v = table->where().equal(col_str, spc).find_all();
         CHECK_EQUAL(v.size(), 2);
-        CHECK_EQUAL(v.get(0).get_key(), keys[1]);
-        CHECK_EQUAL(v.get(1).get_key(), keys[2]);
+        CHECK_EQUAL(v.get_object(0).get_key(), keys[1]);
+        CHECK_EQUAL(v.get_object(1).get_key(), keys[2]);
 
         v = table->where().equal(col_str, spd).find_all();
         CHECK_EQUAL(v.size(), 0);
 
         v = table->where().equal(col_str, spe).find_all();
         CHECK_EQUAL(v.size(), 3);
-        CHECK_EQUAL(v.get(0).get_key(), keys[3]);
-        CHECK_EQUAL(v.get(1).get_key(), keys[4]);
-        CHECK_EQUAL(v.get(2).get_key(), keys[5]);
+        CHECK_EQUAL(v.get_object(0).get_key(), keys[3]);
+        CHECK_EQUAL(v.get_object(1).get_key(), keys[4]);
+        CHECK_EQUAL(v.get_object(2).get_key(), keys[5]);
     };
 
     std::string std_max(StringIndex::s_max_offset, 'a');
@@ -3572,18 +3572,18 @@ TEST(Query_FindAllContains2_2)
     Query q1 = ttt.where().contains(col_str, StringData("foO"), false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
-    CHECK_EQUAL(0, tv1.get(0).get<Int>(col_int));
-    CHECK_EQUAL(1, tv1.get(1).get<Int>(col_int));
-    CHECK_EQUAL(2, tv1.get(2).get<Int>(col_int));
-    CHECK_EQUAL(3, tv1.get(3).get<Int>(col_int));
-    CHECK_EQUAL(4, tv1.get(4).get<Int>(col_int));
-    CHECK_EQUAL(5, tv1.get(5).get<Int>(col_int));
+    CHECK_EQUAL(0, tv1.get_object(0).get<Int>(col_int));
+    CHECK_EQUAL(1, tv1.get_object(1).get<Int>(col_int));
+    CHECK_EQUAL(2, tv1.get_object(2).get<Int>(col_int));
+    CHECK_EQUAL(3, tv1.get_object(3).get<Int>(col_int));
+    CHECK_EQUAL(4, tv1.get_object(4).get<Int>(col_int));
+    CHECK_EQUAL(5, tv1.get_object(5).get<Int>(col_int));
     Query q2 = ttt.where().contains(col_str, StringData("foO"), true);
     TableView tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
-    CHECK_EQUAL(3, tv2.get(0).get<Int>(col_int));
-    CHECK_EQUAL(4, tv2.get(1).get<Int>(col_int));
-    CHECK_EQUAL(5, tv2.get(2).get<Int>(col_int));
+    CHECK_EQUAL(3, tv2.get_object(0).get<Int>(col_int));
+    CHECK_EQUAL(4, tv2.get_object(1).get<Int>(col_int));
+    CHECK_EQUAL(5, tv2.get_object(2).get<Int>(col_int));
 }
 
 TEST(Query_SumNewAggregates)
@@ -4744,7 +4744,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         CHECK(tv->is_in_sync());
         CHECK_EQUAL(tv->size(), results.size());
         for (size_t i = 0; i < tv->size(); ++i) {
-            CHECK_EQUAL(tv->get(i).get<String>(t1_str_col), results[i].first);
+            CHECK_EQUAL(tv->get_object(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv->get_key(i), results[i].second);
         }
     };
@@ -4766,7 +4766,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
 
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
+            CHECK_EQUAL(tv.get_object(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         auto tr = g->duplicate();
@@ -4802,7 +4802,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
+            CHECK_EQUAL(tv.get_object(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         auto tr = g->duplicate();
@@ -4816,7 +4816,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         tv.distinct(DistinctDescriptor({{t1_str_col}, {t1_int_col}}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
+            CHECK_EQUAL(tv.get_object(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         auto tr = g->duplicate();
@@ -4830,7 +4830,7 @@ TEST(Query_SortDistinctOrderThroughHandover)
         tv.sort(SortDescriptor({{t1_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get(i).get<String>(t1_str_col), results[i].first);
+            CHECK_EQUAL(tv.get_object(i).get<String>(t1_str_col), results[i].first);
             CHECK_EQUAL(tv.get_key(i), results[i].second);
         }
         auto tr = g->duplicate();
@@ -4864,7 +4864,7 @@ TEST(Query_CompoundDescriptors) {
         CHECK(tv->is_in_sync());
         CHECK_EQUAL(tv->size(), results.size());
         for (size_t i = 0; i < tv->size(); ++i) {
-            CHECK_EQUAL(tv->get(i).get<Int>(t1_int_col), results[i].first);
+            CHECK_EQUAL(tv->get_object(i).get<Int>(t1_int_col), results[i].first);
             CHECK_EQUAL(tv->get_key(i), results[i].second);
         }
     };
@@ -5265,7 +5265,7 @@ TEST(Query_Sort_And_Requery)
     CHECK_EQUAL(9, tv3[3].get<Int>(col_int));
 
     // Test that remove() maintains order
-    tv3.get(0).remove();
+    tv3.get_object(0).remove();
     tv3.sync_if_needed();
     // q5 and q3 should behave the same.
     Query q5 = table.where(&tv2).not_equal(col_str, "X");

@@ -2654,7 +2654,7 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-                CHECK(tv.get(row_ndx - 1).get<Int>(age_col) <= tv.get(row_ndx).get<Int>(age_col));
+                CHECK(tv.get_object(row_ndx - 1).get<Int>(age_col) <= tv.get_object(row_ndx).get<Int>(age_col));
             }
         };
         check_tv(get_sorted_view(people, "age > 0 SORT(age ASC)"));
@@ -2664,7 +2664,7 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-                CHECK(tv.get(row_ndx - 1).get<Int>(age_col) >= tv.get(row_ndx).get<Int>(age_col));
+                CHECK(tv.get_object(row_ndx - 1).get<Int>(age_col) >= tv.get_object(row_ndx).get<Int>(age_col));
             }
         };
         check_tv(get_sorted_view(people, "age > 0 SORT(age DESC)"));
@@ -2674,9 +2674,9 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 3);
-            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
-            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Adam");
-            CHECK_EQUAL(tv.get(2).get<String>(name_col), "Frank");
+            CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get_object(1).get<String>(name_col), "Adam");
+            CHECK_EQUAL(tv.get_object(2).get<String>(name_col), "Frank");
         };
         check_tv(get_sorted_view(people, "age > 0 SORT(age ASC, name DESC)"));
         check_tv(
@@ -2686,8 +2686,8 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-                ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
-                ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
+                ObjKey link_ndx1 = tv.get_object(row_ndx - 1).get<ObjKey>(account_col);
+                ObjKey link_ndx2 = tv.get_object(row_ndx).get<ObjKey>(account_col);
                 CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) <=
                       accounts->get_object(link_ndx2).get<double>(balance_col));
             }
@@ -2701,8 +2701,8 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-                ObjKey link_ndx1 = tv.get(row_ndx - 1).get<ObjKey>(account_col);
-                ObjKey link_ndx2 = tv.get(row_ndx).get<ObjKey>(account_col);
+                ObjKey link_ndx1 = tv.get_object(row_ndx - 1).get<ObjKey>(account_col);
+                ObjKey link_ndx2 = tv.get_object(row_ndx).get<ObjKey>(account_col);
                 CHECK(accounts->get_object(link_ndx1).get<double>(balance_col) >=
                       accounts->get_object(link_ndx2).get<double>(balance_col));
             }
@@ -2715,7 +2715,7 @@ TEST(Parser_SortAndDistinct)
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 2);
             for (size_t row_ndx = 1; row_ndx < tv.size(); ++row_ndx) {
-                CHECK(tv.get(row_ndx - 1).get<Int>(age_col) != tv.get(row_ndx).get<Int>(age_col));
+                CHECK(tv.get_object(row_ndx - 1).get<Int>(age_col) != tv.get_object(row_ndx).get<Int>(age_col));
             }
         };
         check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(age)"));
@@ -2725,9 +2725,9 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 3);
-            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
-            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
-            CHECK_EQUAL(tv.get(2).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Adam");
+            CHECK_EQUAL(tv.get_object(1).get<String>(name_col), "Frank");
+            CHECK_EQUAL(tv.get_object(2).get<String>(name_col), "Ben");
         };
         check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(age, account.balance)", mapping));
         check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(sol_rotations, holdings.funds)", mapping));
@@ -2736,7 +2736,7 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 1);
-            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Adam");
+            CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Adam");
         };
         check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(age) DISTINCT(account.balance)"));
         check_tv(get_sorted_view(people, "TRUEPREDICATE DISTINCT(sol_rotations) DISTINCT(holdings.funds)", mapping));
@@ -2745,8 +2745,8 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 2);
-            CHECK_EQUAL(tv.get(0).get<Int>(age_col), 28);
-            CHECK_EQUAL(tv.get(1).get<Int>(age_col), 30);
+            CHECK_EQUAL(tv.get_object(0).get<Int>(age_col), 28);
+            CHECK_EQUAL(tv.get_object(1).get<Int>(age_col), 30);
         };
         check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(age ASC) DISTINCT(age)"));
         check_tv(get_sorted_view(people, "TRUEPREDICATE SORT(sol_rotations ASC) DISTINCT(sol_rotations)", mapping));
@@ -2755,8 +2755,8 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 2);
-            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
-            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+            CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get_object(1).get<String>(name_col), "Frank");
         };
         check_tv(
             get_sorted_view(people, "TRUEPREDICATE SORT(name DESC) DISTINCT(age) SORT(name ASC) DISTINCT(name)"));
@@ -2769,8 +2769,8 @@ TEST(Parser_SortAndDistinct)
     {
         auto check_tv = [&](TableView tv) {
             CHECK_EQUAL(tv.size(), 2);
-            CHECK_EQUAL(tv.get(0).get<String>(name_col), "Ben");
-            CHECK_EQUAL(tv.get(1).get<String>(name_col), "Frank");
+            CHECK_EQUAL(tv.get_object(0).get<String>(name_col), "Ben");
+            CHECK_EQUAL(tv.get_object(1).get<String>(name_col), "Frank");
         };
         check_tv(get_sorted_view(people, "account.num_transactions > 10 SORT(name ASC)"));
         check_tv(get_sorted_view(people, "holdings.sum_of_actions > 10 SORT(nominal_identifier ASC)", mapping));
@@ -3843,7 +3843,7 @@ TEST(Parser_Object)
     verify_query(test_context, table, "link == NULL", 1); // vanilla base check
     verify_query(test_context, table, "link == O1", 2);
 
-    Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get(0));
+    Query q0 = table->where().and_query(table->column<Link>(link_col) == tv.get_object(0));
     std::string description = q0.get_description(); // shouldn't throw
     CHECK(description.find("O0") != std::string::npos);
 

@@ -1468,8 +1468,8 @@ TEST(TableView_DistinctOverNullLink)
     auto tv = origin->where().find_all();
     tv.distinct(DistinctDescriptor({{col_link, col_int}}));
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get_linked_object(col_link).get<Int>(col_int), 0);
-    CHECK_EQUAL(tv.get(1).get_linked_object(col_link).get<Int>(col_int), 1);
+    CHECK_EQUAL(tv.get_object(0).get_linked_object(col_link).get<Int>(col_int), 0);
+    CHECK_EQUAL(tv.get_object(1).get_linked_object(col_link).get<Int>(col_int), 1);
 }
 
 TEST(TableView_IsRowAttachedAfterClear)
@@ -2789,14 +2789,14 @@ TEST(TableView_RemoveColumnsAfterSort)
     table.create_object();
     table.remove_column(col_str0);
     auto tv = table.get_sorted_view(desc);
-    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
-    CHECK_EQUAL(tv.get(9).get<Int>(col_int), 0);
+    CHECK_EQUAL(tv.get_object(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get_object(9).get<Int>(col_int), 0);
 
     table.remove_column(col_str1);
     table.create_object();
     tv.sync_if_needed();
-    CHECK_EQUAL(tv.get(0).get<Int>(col_int), 9);
-    CHECK_EQUAL(tv.get(10).get<Int>(col_int), 0);
+    CHECK_EQUAL(tv.get_object(0).get<Int>(col_int), 9);
+    CHECK_EQUAL(tv.get_object(10).get<Int>(col_int), 0);
 }
 
 TEST(TableView_TimestampMaxRemoveRow)

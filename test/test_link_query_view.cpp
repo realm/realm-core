@@ -676,46 +676,46 @@ TEST(LinkList_SortLinkView)
     list_ptr->add(key0);
 
     tv = list_ptr->get_sorted_view(col_int);
-    CHECK_EQUAL(tv.get(0).get_key(), key0);
-    CHECK_EQUAL(tv.get(1).get_key(), key1);
-    CHECK_EQUAL(tv.get(2).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key2);
 
     // String
     tv = list_ptr->get_sorted_view(col_str1);
-    CHECK_EQUAL(tv.get(0).get_key(), key0);
-    CHECK_EQUAL(tv.get(1).get_key(), key2);
-    CHECK_EQUAL(tv.get(2).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key1);
 
     // Sort Timestamp column
     tv = list_ptr->get_sorted_view(col_date);
-    CHECK_EQUAL(tv.get(0).get_key(), key1);
-    CHECK_EQUAL(tv.get(1).get_key(), key0);
-    CHECK_EQUAL(tv.get(2).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key2);
 
     // Sort floats
     tv = list_ptr->get_sorted_view(col_float);
-    CHECK_EQUAL(tv.get(0).get_key(), key2);
-    CHECK_EQUAL(tv.get(1).get_key(), key1);
-    CHECK_EQUAL(tv.get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key0);
 
 
     // Sort descending
     tv = list_ptr->get_sorted_view(col_int, false);
-    CHECK_EQUAL(tv.get(0).get_key(), key2);
-    CHECK_EQUAL(tv.get(1).get_key(), key1);
-    CHECK_EQUAL(tv.get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key0);
 
     // Floats
     tv = list_ptr->get_sorted_view(col_float, false);
-    CHECK_EQUAL(tv.get(0).get_key(), key0);
-    CHECK_EQUAL(tv.get(1).get_key(), key2);
-    CHECK_EQUAL(tv.get(2).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key1);
 
     // Doubles
     tv = list_ptr->get_sorted_view(col_double, false);
-    CHECK_EQUAL(tv.get(0).get_key(), key1);
-    CHECK_EQUAL(tv.get(1).get_key(), key0);
-    CHECK_EQUAL(tv.get(2).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key2);
 
     // Test multi-column sorting
     std::vector<std::vector<ColKey>> v;
@@ -725,29 +725,29 @@ TEST(LinkList_SortLinkView)
     v.push_back({col_str2});
     v.push_back({col_str1});
     tv = list_ptr->get_sorted_view(SortDescriptor{v, a_false});
-    CHECK_EQUAL(tv.get(0).get_key(), key1);
-    CHECK_EQUAL(tv.get(1).get_key(), key2);
-    CHECK_EQUAL(tv.get(2).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key0);
 
     tv = list_ptr->get_sorted_view(SortDescriptor{v, a});
-    CHECK_EQUAL(tv.get(0).get_key(), key0);
-    CHECK_EQUAL(tv.get(1).get_key(), key2);
-    CHECK_EQUAL(tv.get(2).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key1);
 
     v.push_back({col_float});
     a.push_back(true);
 
     // The last added column should have no influence
     tv = list_ptr->get_sorted_view(SortDescriptor{v, a});
-    CHECK_EQUAL(tv.get(0).get_key(), key0);
-    CHECK_EQUAL(tv.get(1).get_key(), key2);
-    CHECK_EQUAL(tv.get(2).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key0);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(2).get_key(), key1);
 
     table1->remove_object(key0);
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 2);
-    CHECK_EQUAL(tv.get(0).get_key(), key2);
-    CHECK_EQUAL(tv.get(1).get_key(), key1);
+    CHECK_EQUAL(tv.get_object(0).get_key(), key2);
+    CHECK_EQUAL(tv.get_object(1).get_key(), key1);
 }
 
 TEST(Link_EmptySortedView)
