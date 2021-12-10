@@ -20,7 +20,7 @@
 -----------
 
 ### Internals
-* None.
+* Fix issue compiling in debug mode for iOS.
 
 ----------------------------------------------
 
