@@ -118,28 +118,14 @@ TEST(Query_Limit)
 
     Query q1 = ttt.where().equal(col_int, 2);
 
-    TableView tv1 = q1.find_all(0, size_t(-1), 2);
+    TableView tv1 = q1.find_all(2);
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
     CHECK_EQUAL(4, tv1[1].get<Int>(col_id));
 
-    TableView tv2 = q1.find_all(5, size_t(-1), 2);
-    CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(7, tv2[0].get<Int>(col_id));
-    CHECK_EQUAL(10, tv2[1].get<Int>(col_id));
-
-    TableView tv3 = q1.find_all(11, size_t(-1), 2);
-    CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(13, tv3[0].get<Int>(col_id));
-
-
     Query q2 = ttt.where();
-    TableView tv4 = q2.find_all(0, 5, 3);
+    TableView tv4 = q2.find_all(3);
     CHECK_EQUAL(3, tv4.size());
-
-    Query q3 = ttt.where();
-    TableView tv5 = q3.find_all(0, 3, 5);
-    CHECK_EQUAL(3, tv5.size());
 }
 
 
