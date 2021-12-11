@@ -20,7 +20,7 @@
 -----------
 
 ### Internals
-* None.
+* 'Obj TableView::get(size_t)' removed. Use 'TableView::get_object' instead.
 
 ----------------------------------------------
 
