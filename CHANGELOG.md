@@ -21,6 +21,7 @@
 
 ### Internals
 * 'Obj TableView::get(size_t)' removed. Use 'TableView::get_object' instead.
+* Fix issue compiling in debug mode for iOS.
 
 ----------------------------------------------
 
