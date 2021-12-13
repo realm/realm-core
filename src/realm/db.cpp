@@ -27,6 +27,9 @@
 #include <sstream>
 #include <type_traits>
 #include <random>
+#include <deque>
+#include <thread>
+#include <condition_variable>
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/group_writer.hpp>
@@ -1566,6 +1569,9 @@ void DB::release_all_read_locks() noexcept
 // directly.
 void DB::close(bool allow_open_read_transactions)
 {
+    // make helper thread terminate
+    m_commit_helper.reset();
+
     if (m_fake_read_lock_if_immutable) {
         if (!is_attached())
             return;
@@ -1643,7 +1649,137 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
 }
 
-bool DB::has_changed(TransactionRef tr)
+class DB::AsyncCommitHelper {
+public:
+    AsyncCommitHelper(DB* db)
+        : m_db(db)
+    {
+    }
+    ~AsyncCommitHelper()
+    {
+        {
+            std::unique_lock lg(m_mutex);
+            if (!m_running) {
+                return;
+            }
+            m_running = false;
+            m_changed.notify_one();
+        }
+        m_thread->join();
+    }
+    void start_thread()
+    {
+        {
+            std::unique_lock lg(m_mutex);
+            if (m_running) {
+                return;
+            }
+            m_running = true;
+            m_thread = std::make_unique<std::thread>([this]() {
+                main();
+            });
+        }
+    }
+    void begin_write(util::UniqueFunction<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_writes.emplace_back(std::move(fn));
+        m_changed.notify_one();
+    }
+
+    void end_write()
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_mx_release = true;
+        m_changed.notify_one();
+    }
+
+    void sync_to_disk(util::UniqueFunction<void()> fn)
+    {
+        std::unique_lock lg(m_mutex);
+        m_pending_sync.emplace(std::move(fn));
+        m_changed.notify_one();
+    }
+
+
+private:
+    DB* m_db;
+    std::unique_ptr<std::thread> m_thread;
+    std::mutex m_mutex;
+    std::condition_variable m_changed;
+    std::deque<util::UniqueFunction<void()>> m_pending_writes;
+    util::Optional<util::UniqueFunction<void()>> m_pending_sync;
+    bool m_pending_mx_release = false;
+    bool m_running = false;
+    bool m_has_write_mutex = false;
+
+    void main();
+};
+
+void DB::AsyncCommitHelper::main()
+{
+    std::unique_lock lg(m_mutex);
+    while (m_running) {
+#if 0 // Enable for testing purposes
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#endif
+        if (m_has_write_mutex) {
+            if (m_pending_sync) {
+                auto cb = std::move(m_pending_sync.value());
+                m_pending_sync.reset();
+                lg.unlock();
+                cb();
+                lg.lock();
+                m_has_write_mutex = false;
+                continue;
+            }
+            else if (m_pending_mx_release) {
+                m_db->do_end_write();
+                m_pending_mx_release = false;
+                m_has_write_mutex = false;
+                continue;
+            }
+        }
+        else {
+            // Waiting for write req
+            REALM_ASSERT(!m_pending_sync && !m_pending_mx_release);
+            if (!m_pending_writes.empty()) {
+                auto callback = std::move(m_pending_writes.front());
+                m_pending_writes.pop_front();
+                lg.unlock();
+                // acquire write mutex
+                m_db->do_begin_write();
+                callback();
+                lg.lock();
+                m_has_write_mutex = true;
+                continue;
+            }
+        }
+        m_changed.wait(lg);
+    }
+    if (m_has_write_mutex) {
+        m_db->do_end_write();
+    }
+}
+
+
+void DB::async_begin_write(util::UniqueFunction<void()> fn)
+{
+    m_commit_helper->start_thread();
+    m_commit_helper->begin_write(std::move(fn));
+}
+
+void DB::async_end_write()
+{
+    m_commit_helper->end_write();
+}
+
+void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
+{
+    m_commit_helper->sync_to_disk(std::move(fn));
+}
+
+bool DB::has_changed(TransactionRef& tr)
 {
     if (m_fake_read_lock_if_immutable)
         return false; // immutable doesn't change
@@ -1651,7 +1787,7 @@ bool DB::has_changed(TransactionRef tr)
     return changed;
 }
 
-bool DB::wait_for_change(TransactionRef tr)
+bool DB::wait_for_change(TransactionRef& tr)
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
     SharedInfo* info = m_file_map.get_addr();
@@ -1990,13 +2126,14 @@ void DB::do_end_write() noexcept
     m_pick_next_writer.notify_all();
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+
     m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
 }
 
 
-Replication::version_type DB::do_commit(Transaction& transaction)
+Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to_disk)
 {
     version_type current_version;
     {
@@ -2012,7 +2149,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
         new_version = repl->prepare_commit(current_version); // Throws
-        low_level_commit(new_version, transaction);          // Throws
+        low_level_commit(new_version, transaction, commit_to_disk); // Throws
         repl->finalize_commit();
     }
     else {
@@ -2022,7 +2159,7 @@ Replication::version_type DB::do_commit(Transaction& transaction)
 }
 
 
-VersionID Transaction::commit_and_continue_as_read()
+VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 {
     if (!is_attached())
         throw LogicError(LogicError::wrong_transact_state);
@@ -2031,7 +2168,7 @@ VersionID Transaction::commit_and_continue_as_read()
 
     flush_accessors_for_commit();
 
-    DB::version_type version = db->do_commit(*this); // Throws
+    DB::version_type version = db->do_commit(*this, commit_to_disk); // Throws
 
     // advance read lock but dont update accessors:
     // As this is done under lock, along with the addition above of the newest commit,
@@ -2043,10 +2180,38 @@ VersionID Transaction::commit_and_continue_as_read()
     // Grabbing the new lock before releasing the old one prevents m_transaction_count
     // from going shortly to zero
     db->grab_read_lock(new_read_lock, version_id); // Throws
-    db->release_read_lock(m_read_lock);
-    m_read_lock = new_read_lock;
 
-    db->do_end_write();
+    if (commit_to_disk || m_oldest_version_not_persisted) {
+        // Here we are either committing to disk or we are already
+        // holding on to an older version. In either case there is
+        // no need to hold onto this now historic version.
+        db->release_read_lock(m_read_lock);
+    }
+    else {
+        // We are not commiting to disk and there is no older
+        // version not persisted, so hold onto this one
+        m_oldest_version_not_persisted = m_read_lock;
+    }
+
+    if (commit_to_disk && m_oldest_version_not_persisted) {
+        // We are committing to disk so we can release the
+        // version we are holding on to
+        db->release_read_lock(*m_oldest_version_not_persisted);
+        m_oldest_version_not_persisted.reset();
+    }
+    m_read_lock = new_read_lock;
+    // We can be sure that m_read_lock != m_oldest_version_not_persisted
+    // because m_oldest_version_not_persisted is either equal to former m_read_lock
+    // or older and former m_read_lock is older than current m_read_lock
+    REALM_ASSERT(!m_oldest_version_not_persisted ||
+                 m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
+
+    if (m_async_stage == AsyncState::Idle) {
+        db->do_end_write();
+    }
+    else if (m_async_stage == AsyncState::HasLock) {
+        m_async_stage = AsyncState::HasCommits;
+    }
 
     // Remap file if it has grown, and update refs in underlying node structure
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
@@ -2119,7 +2284,7 @@ DB::version_type DB::get_version_of_latest_snapshot()
 }
 
 
-void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
+void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk)
 {
     SharedInfo* info = m_file_map.get_addr();
 
@@ -2176,7 +2341,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
-                out.commit(new_top_ref); // Throws
+                if (commit_to_disk)
+                    out.commit(new_top_ref); // Throws
                 break;
             case Durability::MemOnly:
                 // In Durability::MemOnly mode, we just use the file as backing for
@@ -2214,6 +2380,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction)
             r.filesize = new_file_size;
             r.version = new_version;
             r_info->readers.use_next();
+
             // REALM_ASSERT(m_alloc.matches_section_boundary(new_file_size));
             REALM_ASSERT(new_top_ref < new_file_size);
         }
@@ -2299,6 +2466,7 @@ TransactionRef DB::start_read(VersionID version_id)
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
+        read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
         g.release();
     }
@@ -2318,6 +2486,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
         ReadLockInfo read_lock;
         grab_read_lock(read_lock, version_id);
         ReadLockGuard g(*this, read_lock);
+        read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
         g.release();
     }
@@ -2359,8 +2528,14 @@ void Transaction::end_read()
 
 void Transaction::do_end_read() noexcept
 {
+    async_end();
+    wait_for_async_completion();
+
     detach();
+
+    REALM_ASSERT(!m_oldest_version_not_persisted);
     db->release_read_lock(m_read_lock);
+
     m_alloc.note_reader_end(this);
     set_transact_stage(DB::transact_Ready);
     // reset the std::shared_ptr to allow the DB object to release resources
@@ -2423,7 +2598,8 @@ void Transaction::rollback()
     if (m_transact_stage != DB::transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
     db->reset_free_space_tracking();
-    db->do_end_write();
+    if (!holds_write_mutex())
+        db->do_end_write();
 
     do_end_read();
 }
@@ -2516,12 +2692,6 @@ Transaction::~Transaction()
 }
 
 
-DB::VersionID Transaction::get_version_of_current_transaction()
-{
-    return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
-}
-
-
 TransactionRef DB::start_write(bool nonblocking)
 {
     if (m_fake_read_lock_if_immutable) {
@@ -2549,6 +2719,7 @@ TransactionRef DB::start_write(bool nonblocking)
     try {
         grab_read_lock(read_lock, VersionID());
         ReadLockGuard g(*this, read_lock);
+        read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
         tr->set_file_format_version(get_file_format_version());
         version_type current_version = read_lock.m_version;
@@ -2565,6 +2736,28 @@ TransactionRef DB::start_write(bool nonblocking)
     }
 
     return tr;
+}
+
+void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>& when_acquired)
+{
+    std::unique_lock<std::mutex> lck(tr->mtx);
+    REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
+    tr->m_async_stage = Transaction::AsyncState::Requesting;
+    std::weak_ptr<Transaction> weak_tr = tr;
+    async_begin_write([weak_tr, cb = std::move(when_acquired)]() {
+        if (auto tr = weak_tr.lock()) {
+            std::unique_lock<std::mutex> lck(tr->mtx);
+            tr->m_async_stage = Transaction::AsyncState::HasLock;
+            if (tr->waiting_for_write_lock) {
+                tr->waiting_for_write_lock = false;
+                tr->cv.notify_one();
+            }
+            else if (cb) {
+                cb();
+            }
+            tr.reset(); // Release pointer while lock is held
+        }
+    });
 }
 
 Obj Transaction::import_copy_of(const Obj& original)
@@ -2669,6 +2862,7 @@ std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPol
 inline DB::DB(const DBOptions& options)
     : m_key(options.encryption_key)
     , m_upgrade_callback(std::move(options.upgrade_callback))
+    , m_commit_helper(std::make_unique<AsyncCommitHelper>(this))
 {
 }
 
@@ -2735,4 +2929,49 @@ void DB::release_sync_agent()
     REALM_ASSERT(info->sync_agent_present);
     info->sync_agent_present = 0;
     m_is_sync_agent = false;
+}
+
+void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
+{
+    std::unique_lock<std::mutex> lck(mtx);
+    if (m_async_stage == AsyncState::HasLock) {
+        // Nothing to commit to disk - just release write lock
+        m_async_stage = AsyncState::Idle;
+        db->async_end_write();
+    }
+    else if (m_async_stage == AsyncState::HasCommits) {
+        m_async_stage = AsyncState::Syncing;
+        m_commit_exception = std::exception_ptr();
+        // get a callback on the helper thread, in which to sync to disk
+        db->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
+            // sync to disk:
+            try {
+                DB::ReadLockInfo read_lock;
+                db->grab_read_lock(read_lock, VersionID());
+                GroupWriter out(*this);
+                out.commit(read_lock.m_top_ref); // Throws
+                // we must release the write mutex before the callback, because the callback
+                // is allowed to re-request it.
+                db->release_read_lock(read_lock);
+                if (m_oldest_version_not_persisted) {
+                    db->release_read_lock(*m_oldest_version_not_persisted);
+                    m_oldest_version_not_persisted.reset();
+                }
+                db->do_end_write();
+            }
+            catch (...) {
+                m_commit_exception = std::current_exception();
+            }
+
+            std::unique_lock<std::mutex> lck(mtx);
+            m_async_stage = AsyncState::Idle;
+            if (waiting_for_sync) {
+                waiting_for_sync = false;
+                cv.notify_one();
+            }
+            else if (cb) {
+                cb();
+            }
+        });
+    }
 }

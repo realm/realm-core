@@ -350,6 +350,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
 
     SECTION("Double type") {
         static double epsilon = 0.000000001;
+        using std::abs;
 
         SECTION("+1.0") {
             run_corpus<double>("d", {"{\"d\" : {\"$numberDouble\": \"1\"}}", [](auto val) {

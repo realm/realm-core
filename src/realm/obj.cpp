@@ -1280,7 +1280,7 @@ bool Obj::ensure_writeable()
     return false;
 }
 
-REALM_FORCEINLINE void Obj::sync(Array& arr)
+REALM_FORCEINLINE void Obj::sync(Node& arr)
 {
     auto ref = arr.get_ref();
     if (arr.has_missing_parent_update()) {

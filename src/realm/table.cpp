@@ -2950,10 +2950,9 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 
 Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, bool* did_create)
 {
-    if (m_is_embedded)
-        throw LogicError(LogicError::wrong_kind_of_table);
     auto primary_key_col = get_primary_key_column();
-    REALM_ASSERT(primary_key_col);
+    if (m_is_embedded || !primary_key_col)
+        throw LogicError(LogicError::wrong_kind_of_table);
     DataType type = DataType(primary_key_col.get_type());
     REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
                  primary_key.get_type() == type);
@@ -2975,8 +2974,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         ObjKey object_key = global_to_local_object_id_hashed(object_id);
 
         ObjKey key = object_key.get_unresolved();
-        if (m_tombstones->is_valid(key)) {
-            auto existing_pk_value = m_tombstones->get(key).get_any(primary_key_col);
+        if (auto obj = m_tombstones->try_get_obj(key)) {
+            auto existing_pk_value = obj.get_any(primary_key_col);
 
             // If the primary key is the same, the object should be resurrected below
             if (existing_pk_value == primary_key) {
@@ -3028,8 +3027,8 @@ ObjKey Table::find_primary_key(Mixed primary_key) const
     ObjKey object_key = global_to_local_object_id_hashed(object_id);
 
     // Check if existing
-    if (m_clusters.is_valid(object_key)) {
-        auto existing_pk_value = m_clusters.get(object_key).get_any(primary_key_col);
+    if (auto obj = m_clusters.try_get_obj(object_key)) {
+        auto existing_pk_value = obj.get_any(primary_key_col);
 
         if (existing_pk_value == primary_key) {
             return object_key;

@@ -16,11 +16,13 @@
     class PropertyNode;
     class PostOpNode;
     class AggrNode;
+    class ExpressionNode;
     class ValueNode;
+    class OperationNode;
     class TrueOrFalseNode;
     class OrNode;
     class AndNode;
-    class AtomPredNode;
+    class QueryNode;
     class PathNode;
     class DescriptorOrderingNode;
     class DescriptorNode;
@@ -117,13 +119,12 @@ using namespace realm::query_parser;
 %type  <PostOpNode*> post_op
 %type  <AggrNode*> aggr_op
 %type  <ValueNode*> value
+%type  <ExpressionNode*> expr
 %type  <TrueOrFalseNode*> boolexpr
 %type  <int> comp_type
-%type  <OrNode*> pred
-%type  <AtomPredNode*> atom_pred
-%type  <AndNode*> and_pred
+%type  <QueryNode*> query compare
 %type  <PathNode*> path
-%type  <DescriptorOrderingNode*> pred_suffix
+%type  <DescriptorOrderingNode*> post_query
 %type  <DescriptorNode*> sort sort_param distinct distinct_param limit
 %type  <SubqueryNode*> subquery
 %type  <std::string> path_elem id
@@ -135,31 +136,33 @@ using namespace realm::query_parser;
 %printer { yyo << "<>"; } <>;
 
 %%
-%start query;
+%start final;
 
-%left AND;
 %left OR;
+%left AND;
+%left '+' '-';
+%left '*' '/';
 %right NOT;
 
+final
+    : query post_query { drv.result = $1; drv.ordering = $2; };
+
 query
-    : pred pred_suffix { drv.result = $1; drv.ordering = $2; };
+    : compare                   { $$ = $1; }
+    | query "||" query          { $$ = drv.m_parse_nodes.create<OrNode>($1, $3); }
+    | query "&&" query          { $$ = drv.m_parse_nodes.create<AndNode>($1, $3); }
+    | NOT query                 { $$ = drv.m_parse_nodes.create<NotNode>($2); }
+    | '(' query ')'             { $$ = $2; }
+    | boolexpr                  { $$ =$1; }
 
-pred
-    : and_pred                  { $$ = drv.m_parse_nodes.create<OrNode>($1); }
-    | pred "||" and_pred        { $1->and_preds.emplace_back($3); $$ = $1; }
-
-and_pred
-    : atom_pred                 { $$ = drv.m_parse_nodes.create<AndNode>($1); }
-    | and_pred "&&" atom_pred   { $1->atom_preds.emplace_back($3); $$ = $1; }
-
-atom_pred
-    : value equality value      { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
-    | value equality CASE value {
+compare
+    : expr equality expr        { $$ = drv.m_parse_nodes.create<EqualityNode>($1, $2, $3); }
+    | expr equality CASE expr   {
                                     auto tmp = drv.m_parse_nodes.create<EqualityNode>($1, $2, $4);
                                     tmp->case_sensitive = false;
                                     $$ = tmp;
                                 }
-    | value relational value    { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
+    | expr relational expr      { $$ = drv.m_parse_nodes.create<RelationalNode>($1, $2, $3); }
     | value stringop value      { $$ = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $3); }
     | value stringop CASE value {
                                     auto tmp = drv.m_parse_nodes.create<StringOpsNode>($1, $2, $4);
@@ -167,13 +170,19 @@ atom_pred
                                     $$ = tmp;
                                 }
     | value BETWEEN list        { $$ = drv.m_parse_nodes.create<BetweenNode>($1, $3); }
-    | NOT atom_pred             { $$ = drv.m_parse_nodes.create<NotNode>($2); }
-    | '(' pred ')'              { $$ = drv.m_parse_nodes.create<ParensNode>($2); }
-    | boolexpr                  { $$ =$1; }
+
+expr
+    : value                     { $$ = $1; }
+    | '(' expr ')'              { $$ = $2; }
+    | expr '*' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '*', $3); }
+    | expr '/' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '/', $3); }
+    | expr '+' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '+', $3); }
+    | expr '-' expr             { $$ = drv.m_parse_nodes.create<OperationNode>($1, '-', $3); }
 
 value
     : constant                  { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
     | prop                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
+
 
 prop
     : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
@@ -188,13 +197,13 @@ simple_prop
     : path id                   { $$ = drv.m_parse_nodes.create<PropNode>($1, $2); }
 
 subquery
-    : SUBQUERY '(' simple_prop ',' id ',' pred ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
+    : SUBQUERY '(' simple_prop ',' id ',' query ')' '.' SIZE   { $$ = drv.m_parse_nodes.create<SubqueryNode>($3, $5, $7); }
 
-pred_suffix
+post_query
     : %empty                    { $$ = drv.m_parse_nodes.create<DescriptorOrderingNode>();}
-    | pred_suffix sort          { $1->add_descriptor($2); $$ = $1; }
-    | pred_suffix distinct      { $1->add_descriptor($2); $$ = $1; }
-    | pred_suffix limit         { $1->add_descriptor($2); $$ = $1; }
+    | post_query sort           { $1->add_descriptor($2); $$ = $1; }
+    | post_query distinct       { $1->add_descriptor($2); $$ = $1; }
+    | post_query limit          { $1->add_descriptor($2); $$ = $1; }
 
 distinct: DISTINCT '(' distinct_param ')' { $$ = $3; }
 

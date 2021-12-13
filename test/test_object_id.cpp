@@ -375,7 +375,7 @@ TEST_TYPES(ObjectId_Query, WithIndex, WithoutIndex)
         auto tv = q1.find_all();
         tv.sort(col, true);
         for (int i = 0; i < 25; i++) {
-            CHECK_EQUAL(tv.get(i).get<int64_t>(col_int), i);
+            CHECK_EQUAL(tv.get_object(i).get<int64_t>(col_int), i);
         }
         Query q2 = table->column<ObjectId>(col_id) == alternative_id;
         // std::cout << q2.get_description() << std::endl;

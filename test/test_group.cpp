@@ -2022,7 +2022,7 @@ TEST(Group_ChangeIntPrimaryKeyValuesInMigration)
 
     TableView tv = table->where().find_all();
     for (size_t i = 0; i < tv.size(); ++i) {
-        Obj obj = tv.get(i);
+        Obj obj = tv.get_object(i);
         obj.set(pk_col, obj.get<int64_t>(value_col));
     }
     table->validate_primary_column();
@@ -2049,7 +2049,7 @@ TEST(Group_ChangeStringPrimaryKeyValuesInMigration)
 
     TableView tv = table->where().find_all();
     for (size_t i = 0; i < tv.size(); ++i) {
-        Obj obj = tv.get(i);
+        Obj obj = tv.get_object(i);
         obj.set(pk_col, obj.get<StringData>(value_col));
     }
     table->validate_primary_column();

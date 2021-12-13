@@ -38,6 +38,13 @@ public:
         auto state = ClusterTree::get(k);
         return Obj(get_table_ref(), state.mem, k, state.index);
     }
+    Obj try_get_obj(ObjKey k) const noexcept
+    {
+        if (auto state = ClusterTree::try_get(k)) {
+            return Obj(get_table_ref(), state.mem, k, state.index);
+        }
+        return {};
+    }
     Obj get(size_t ndx) const
     {
         ObjKey k;

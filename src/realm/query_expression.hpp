@@ -168,9 +168,8 @@ T minimum(T a, T b)
     return a < b ? a : b;
 }
 
-template <class T>
 struct Plus {
-    T operator()(T v1, T v2) const
+    Mixed operator()(Mixed v1, Mixed v2) const
     {
         return v1 + v2;
     }
@@ -178,12 +177,10 @@ struct Plus {
     {
         return "+";
     }
-    typedef T type;
 };
 
-template <class T>
 struct Minus {
-    T operator()(T v1, T v2) const
+    Mixed operator()(Mixed v1, Mixed v2) const
     {
         return v1 - v2;
     }
@@ -191,12 +188,10 @@ struct Minus {
     {
         return "-";
     }
-    typedef T type;
 };
 
-template <class T>
 struct Div {
-    T operator()(T v1, T v2) const
+    Mixed operator()(Mixed v1, Mixed v2) const
     {
         return v1 / v2;
     }
@@ -204,12 +199,10 @@ struct Div {
     {
         return "/";
     }
-    typedef T type;
 };
 
-template <class T>
 struct Mul {
-    T operator()(T v1, T v2) const
+    Mixed operator()(Mixed v1, Mixed v2) const
     {
         return v1 * v2;
     }
@@ -217,7 +210,6 @@ struct Mul {
     {
         return "*";
     }
-    typedef T type;
 };
 
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
@@ -240,17 +232,6 @@ struct Common<T1, T2, false, true, b> {
 template <class T1, class T2, bool b>
 struct Common<T1, T2, true, false, b> {
     typedef T2 type;
-};
-
-template <typename Operator>
-struct OperatorOptionalAdapter {
-    util::Optional<typename Operator::type> operator()(const Mixed& left, const Mixed& right)
-    {
-        if (left.is_null() || right.is_null())
-            return util::none;
-        return Operator()(left.template export_to_type<typename Operator::type>(),
-                          right.template export_to_type<typename Operator::type>());
-    }
 };
 
 class ValueBase {
@@ -365,9 +346,31 @@ public:
         return m_first + m_size;
     }
     template <class TOperator>
+    REALM_FORCEINLINE void fun_const(const ValueType& const_value, const ValueBase& right)
+    {
+        TOperator o;
+        // Operate on values one-by-one
+        size_t sz = right.size();
+        init(right.m_from_link_list, sz);
+        for (size_t i = 0; i < sz; i++) {
+            set(i, o(const_value, right[i]));
+        }
+    }
+    template <class TOperator>
+    REALM_FORCEINLINE void fun_const(const ValueBase& left, const ValueType& const_value)
+    {
+        TOperator o;
+        // Operate on values one-by-one
+        size_t sz = left.size();
+        init(left.m_from_link_list, sz);
+        for (size_t i = 0; i < sz; i++) {
+            set(i, o(left[i], const_value));
+        }
+    }
+    template <class TOperator>
     REALM_FORCEINLINE void fun(const ValueBase& left, const ValueBase& right)
     {
-        OperatorOptionalAdapter<TOperator> o;
+        TOperator o;
 
         if (!left.m_from_link_list && !right.m_from_link_list) {
             // Operate on values one-by-one (one value is one row; no links)
@@ -672,7 +675,7 @@ class Value;
 class ConstantMixedValue;
 template <class T>
 class Subexpr2;
-template <class oper, class TLeft = Subexpr, class TRight = Subexpr>
+template <class oper>
 class Operator;
 template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
@@ -817,63 +820,7 @@ Query create2(const Subexpr2<L>& left, const Subexpr2<R>& right)
 // For L = R = {int, int64_t, float, double, StringData, Timestamp}:
 template <class L, class R>
 class Overloads {
-    typedef typename Common<L, R>::type CommonType;
-
 public:
-    // Arithmetic, right side constant
-    friend Operator<Plus<CommonType>> operator+(const Subexpr2<L>& left, R right)
-    {
-        return {left.clone(), make_subexpr<Value<R>>(right)};
-    }
-    friend Operator<Minus<CommonType>> operator-(const Subexpr2<L>& left, R right)
-    {
-        return {left.clone(), make_subexpr<Value<R>>(right)};
-    }
-    friend Operator<Mul<CommonType>> operator*(const Subexpr2<L>& left, R right)
-    {
-        return {left.clone(), make_subexpr<Value<R>>(right)};
-    }
-    friend Operator<Div<CommonType>> operator/(const Subexpr2<L>& left, R right)
-    {
-        return {left.clone(), make_subexpr<Value<R>>(right)};
-    }
-
-    // Arithmetic, left side constant
-    friend Operator<Plus<CommonType>> operator+(R left, const Subexpr2<L>& right)
-    {
-        return {make_subexpr<Value<R>>(left), right.clone()};
-    }
-    friend Operator<Minus<CommonType>> operator-(R left, const Subexpr2<L>& right)
-    {
-        return {make_subexpr<Value<R>>(left), right.clone()};
-    }
-    friend Operator<Mul<CommonType>> operator*(R left, const Subexpr2<L>& right)
-    {
-        return {make_subexpr<Value<R>>(left), right.clone()};
-    }
-    friend Operator<Div<CommonType>> operator/(R left, const Subexpr2<L>& right)
-    {
-        return {make_subexpr<Value<R>>(left), right.clone()};
-    }
-
-    // Arithmetic, right side subexpression
-    friend Operator<Plus<CommonType>> operator+(const Subexpr2<L>& left, const Subexpr2<R>& right)
-    {
-        return {left.clone(), right.clone()};
-    }
-    friend Operator<Minus<CommonType>> operator-(const Subexpr2<L>& left, const Subexpr2<R>& right)
-    {
-        return {left.clone(), right.clone()};
-    }
-    friend Operator<Mul<CommonType>> operator*(const Subexpr2<L>& left, const Subexpr2<R>& right)
-    {
-        return {left.clone(), right.clone()};
-    }
-    friend Operator<Div<CommonType>> operator/(const Subexpr2<L>& left, const Subexpr2<R>& right)
-    {
-        return {left.clone(), right.clone()};
-    }
-
     // Compare, right side constant
     friend Query operator>(const Subexpr2<L>& left, R right)
     {
@@ -3189,6 +3136,9 @@ public:
                 auto sz = links.size();
 
                 destination.init_for_links(m_columns_collection.m_link_map.only_unary_links(), sz);
+                if (sz == 0 && m_columns_collection.m_link_map.only_unary_links()) {
+                    set_value_for_empty_dictionary(destination, 0);
+                }
                 for (size_t t = 0; t < sz; t++) {
                     const Obj obj = m_columns_collection.m_link_map.get_target_table()->get_object(links[t]);
                     auto dict = obj.get_dictionary(m_columns_collection.m_column_key);
@@ -3771,18 +3721,29 @@ private:
     LinkMap m_link_map;
 };
 
-template <class oper, class TLeft, class TRight>
-class Operator : public Subexpr2<typename oper::type> {
+template <class oper>
+class Operator : public Subexpr2<Mixed> {
 public:
-    Operator(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right)
+    Operator(std::unique_ptr<Subexpr> left, std::unique_ptr<Subexpr> right)
         : m_left(std::move(left))
         , m_right(std::move(right))
     {
+        m_left_is_const = m_left->has_constant_evaluation();
+        m_right_is_const = m_right->has_constant_evaluation();
+        if (m_left_is_const) {
+            m_const_value = m_left->get_mixed();
+        }
+        else if (m_right_is_const) {
+            m_const_value = m_right->get_mixed();
+        }
     }
 
     Operator(const Operator& other)
         : m_left(other.m_left->clone())
         , m_right(other.m_right->clone())
+        , m_left_is_const(other.m_left_is_const)
+        , m_right_is_const(other.m_right_is_const)
+        , m_const_value(other.m_const_value)
     {
     }
 
@@ -3795,8 +3756,13 @@ public:
         return *this;
     }
 
-    Operator(Operator&&) noexcept = default;
-    Operator& operator=(Operator&&) noexcept = default;
+    Operator(Operator&&) noexcept = delete;
+    Operator& operator=(Operator&&) noexcept = delete;
+
+    DataType get_type() const override
+    {
+        return m_left->get_type();
+    }
 
     // See comment in base class
     void set_base_table(ConstTableRef table) override
@@ -3832,15 +3798,25 @@ public:
         Value<T> result;
         Value<T> left;
         Value<T> right;
-        m_left->evaluate(index, left);
-        m_right->evaluate(index, right);
-        result.template fun<oper>(left, right);
+        if (m_left_is_const) {
+            m_right->evaluate(index, right);
+            result.template fun_const<oper>(m_const_value, right);
+        }
+        else if (m_right_is_const) {
+            m_left->evaluate(index, left);
+            result.template fun_const<oper>(left, m_const_value);
+        }
+        else {
+            m_left->evaluate(index, left);
+            m_right->evaluate(index, right);
+            result.template fun<oper>(left, right);
+        }
         destination = result;
     }
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        std::string s;
+        std::string s = "(";
         if (m_left) {
             s += m_left->description(state);
         }
@@ -3848,6 +3824,7 @@ public:
         if (m_right) {
             s += m_right->description(state);
         }
+        s += ")";
         return s;
     }
 
@@ -3857,9 +3834,11 @@ public:
     }
 
 private:
-    typedef typename oper::type T;
-    std::unique_ptr<TLeft> m_left;
-    std::unique_ptr<TRight> m_right;
+    std::unique_ptr<Subexpr> m_left;
+    std::unique_ptr<Subexpr> m_right;
+    bool m_left_is_const;
+    bool m_right_is_const;
+    Mixed m_const_value;
 };
 
 template <class TCond>

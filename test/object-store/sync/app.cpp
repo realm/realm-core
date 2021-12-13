@@ -2228,6 +2228,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     SECTION("Invalid refresh token") {
         auto app_session = get_runtime_app_session("");
+        std::mutex mtx;
         auto verify_error_on_sync_with_invalid_refresh_token = [&](std::shared_ptr<SyncUser> user,
                                                                    Realm::Config config) {
             REQUIRE(user);
@@ -2250,6 +2251,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                std::lock_guard<std::mutex> lock(mtx);
                 sync_error_handler_called.store(true);
                 REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
                 REQUIRE(error.message == "Unable to refresh the user access token.");
@@ -2262,12 +2264,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             {
                 std::atomic<bool> called{false};
                 session->wait_for_upload_completion([&](std::error_code err) {
+                    std::lock_guard<std::mutex> lock(mtx);
                     called.store(true);
                     REQUIRE(err == app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
                 });
                 timed_wait_for([&] {
                     return called.load();
                 });
+                std::lock_guard<std::mutex> lock(mtx);
                 REQUIRE(called);
             }
             timed_wait_for([&] {
@@ -2275,6 +2279,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
 
             // the failed refresh logs out the user
+            std::lock_guard<std::mutex> lock(mtx);
             REQUIRE(!user->is_logged_in());
         };
 
@@ -2421,10 +2426,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("too large sync message error handling") {
-        TestSyncManager::Config test_config = app_config;
-        // Too much log output seems to create problems on Evergreen CI
-        test_config.verbose_sync_client_logging = false;
-
+        TestSyncManager::Config test_config(app_config);
         TestSyncManager sync_manager(test_config, {});
         auto app = sync_manager.app();
         auto creds = create_user_and_log_in(sync_manager.app());

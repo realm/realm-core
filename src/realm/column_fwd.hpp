@@ -23,6 +23,7 @@
 
 namespace realm {
 
+struct ObjKey;
 class IntegerColumn;
 class IntegerColumnIterator;
 
@@ -38,6 +39,7 @@ class Optional;
 // Shortcuts, aka typedefs.
 using DoubleColumn = BPlusTree<double>;
 using FloatColumn = BPlusTree<float>;
+using KeyColumn = BPlusTree<ObjKey>;
 
 } // namespace realm
 

@@ -378,6 +378,29 @@ TEST_CASE("Schema") {
                 "Property 'object.array' of type 'array' has unknown object type 'invalid target'");
         }
 
+        SECTION("allows embedded objects in lists and dictionaries") {
+            Schema schema = {
+                {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+                {"object",
+                 {
+                     {"list", PropertyType::Object | PropertyType::Array, "target"},
+                     {"dictionary", PropertyType::Object | PropertyType::Dictionary | PropertyType::Nullable,
+                      "target"},
+                 }},
+            };
+            REQUIRE_NOTHROW(schema.validate());
+        }
+
+        SECTION("rejects embedded objects in sets") {
+            Schema schema = {
+                {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+                {"object", {{"set", PropertyType::Object | PropertyType::Set, "target"}}},
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                                      "Set property 'object.set' cannot contain embedded object type 'target'. Set "
+                                      "semantics are not applicable to embedded objects.");
+        }
+
         SECTION("rejects explicitly included embedded object orphans") {
             Schema schema = {{"target", {{"value", PropertyType::Int}}},
                              {"origin",

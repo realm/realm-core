@@ -18,12 +18,15 @@
 
 #include "realm/sync/subscriptions.hpp"
 
+#include "external/json/json.hpp"
+
 #include "realm/group.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
 #include "realm/sort_descriptor.hpp"
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
+#include "realm/util/flat_map.hpp"
 
 namespace realm::sync {
 namespace {
@@ -38,6 +41,7 @@ constexpr static std::string_view c_flx_sub_sets_version_field("version");
 constexpr static std::string_view c_flx_sub_sets_error_str_field("error");
 constexpr static std::string_view c_flx_sub_sets_subscriptions_field("subscriptions");
 
+constexpr static std::string_view c_flx_sub_id_field("id");
 constexpr static std::string_view c_flx_sub_created_at_field("created_at");
 constexpr static std::string_view c_flx_sub_updated_at_field("updated_at");
 constexpr static std::string_view c_flx_sub_name_field("name");
@@ -60,6 +64,11 @@ Subscription::Subscription(const SubscriptionSet* parent, Obj obj)
 const SubscriptionStore* Subscription::store() const
 {
     return m_parent->m_mgr;
+}
+
+ObjectId Subscription::id() const
+{
+    return m_obj.get<ObjectId>(store()->m_sub_keys->id);
 }
 
 Timestamp Subscription::created_at() const
@@ -199,10 +208,11 @@ void SubscriptionSet::clear()
     m_sub_list.remove_all_target_rows();
 }
 
-void SubscriptionSet::insert_sub_impl(Timestamp created_at, Timestamp updated_at, StringData name,
+void SubscriptionSet::insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                                       StringData object_class_name, StringData query_str)
 {
     auto new_sub = m_sub_list.create_and_insert_linked_object(m_sub_list.is_empty() ? 0 : m_sub_list.size());
+    new_sub.set(m_mgr->m_sub_keys->id, id);
     new_sub.set(m_mgr->m_sub_keys->created_at, created_at);
     new_sub.set(m_mgr->m_sub_keys->updated_at, updated_at);
     new_sub.set(m_mgr->m_sub_keys->name, name);
@@ -231,7 +241,7 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign_imp
         return {it, false};
     }
 
-    insert_sub_impl(now, now, name, object_class_name, query_str);
+    insert_sub_impl(ObjectId::gen(), now, now, name, object_class_name, query_str);
 
     return {iterator(this, LnkLst::iterator(&m_sub_list, m_sub_list.size() - 1)), true};
 }
@@ -253,14 +263,14 @@ std::pair<SubscriptionSet::iterator, bool> SubscriptionSet::insert_or_assign(con
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.object_class_name() == table_name && sub.query_string() == query_str);
+        return (sub.name().empty() && sub.object_class_name() == table_name && sub.query_string() == query_str);
     });
 
     std::string_view name;
     return insert_or_assign_impl(it, name, table_name, query_str);
 }
 
-void SubscriptionSet::update_state(State new_state, util::Optional<std::string> error_str)
+void SubscriptionSet::update_state(State new_state, util::Optional<std::string_view> error_str)
 {
     auto old_state = state();
     switch (new_state) {
@@ -268,15 +278,16 @@ void SubscriptionSet::update_state(State new_state, util::Optional<std::string> 
             throw std::logic_error("cannot set subscription set state to uncommitted");
 
         case State::Error:
-            if (old_state != State::Bootstrapping) {
-                throw std::logic_error("subscription set must be in Bootstrapping to update state to error");
+            if (old_state != State::Bootstrapping && old_state != State::Pending) {
+                throw std::logic_error(
+                    "subscription set must be in Bootstrapping or Pending to update state to error");
             }
             if (!error_str) {
                 throw std::logic_error("Must supply an error message when setting a subscription to the error state");
             }
 
             m_obj.set(m_mgr->m_sub_set_keys->state, static_cast<int64_t>(new_state));
-            m_obj.set(m_mgr->m_sub_set_keys->error_str, *error_str);
+            m_obj.set(m_mgr->m_sub_set_keys->error_str, StringData(error_str->data(), error_str->size()));
             break;
         case State::Bootstrapping:
         case State::Pending:
@@ -312,7 +323,7 @@ SubscriptionSet SubscriptionSet::make_mutable_copy() const
 
     SubscriptionSet new_set_obj(m_mgr, std::move(new_tr), sub_sets->create_object_with_primary_key(Mixed{new_pk}));
     for (const auto& sub : *this) {
-        new_set_obj.insert_sub_impl(sub.created_at(), sub.updated_at(), sub.name(), sub.object_class_name(),
+        new_set_obj.insert_sub_impl(sub.id(), sub.created_at(), sub.updated_at(), sub.name(), sub.object_class_name(),
                                     sub.query_string());
     }
 
@@ -392,10 +403,56 @@ void SubscriptionSet::commit()
     m_tr->commit_and_continue_as_read();
 
     process_notifications();
+
+    if (state() == State::Pending) {
+        m_mgr->m_on_new_subscription_set(version());
+    }
 }
 
-SubscriptionStore::SubscriptionStore(DBRef db)
+std::string SubscriptionSet::to_ext_json() const
+{
+    if (!m_obj.is_valid()) {
+        return "{}";
+    }
+
+    util::FlatMap<std::string, std::vector<std::string>> table_to_query;
+    for (const auto& sub : *this) {
+        std::string table_name(sub.object_class_name());
+        auto& queries_for_table = table_to_query.at(table_name);
+        auto query_it = std::find(queries_for_table.begin(), queries_for_table.end(), sub.query_string());
+        if (query_it != queries_for_table.end()) {
+            continue;
+        }
+        queries_for_table.emplace_back(sub.query_string());
+    }
+
+    // TODO this is pulling in a giant compile-time dependency. We should have a better way of escaping the
+    // query strings into a json object.
+    nlohmann::json output_json;
+    for (auto& table : table_to_query) {
+        // We want to make sure that the queries appear in some kind of canonical order so that if there are
+        // two subscription sets with the same subscriptions in different orders, the server doesn't have to
+        // waste a bunch of time re-running the queries for that table.
+        std::stable_sort(table.second.begin(), table.second.end());
+
+        bool is_first = true;
+        std::ostringstream obuf;
+        for (const auto& query_str : table.second) {
+            if (!is_first) {
+                obuf << " OR ";
+            }
+            is_first = false;
+            obuf << "(" << query_str << ")";
+        }
+        output_json[table.first] = obuf.str();
+    }
+
+    return output_json.dump();
+}
+
+SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
     : m_db(std::move(db))
+    , m_on_new_subscription_set(std::move(on_new_subscription_set))
     , m_sub_set_keys(std::make_unique<SubscriptionSetKeys>())
     , m_sub_keys(std::make_unique<SubscriptionKeys>())
 {
@@ -411,12 +468,13 @@ SubscriptionStore::SubscriptionStore(DBRef db)
 
         auto schema_metadata = tr->add_table(c_flx_metadata_table);
         auto version_col = schema_metadata->add_column(type_Int, c_flx_meta_schema_version_field);
-        schema_metadata->create_object().set(version_col, int64_t(1));
+        schema_metadata->create_object().set(version_col, int64_t(2));
 
         auto sub_sets_table =
             tr->add_table_with_primary_key(c_flx_subscription_sets_table, type_Int, c_flx_sub_sets_version_field);
         auto subs_table = tr->add_embedded_table(c_flx_subscriptions_table);
         m_sub_keys->table = subs_table->get_key();
+        m_sub_keys->id = subs_table->add_column(type_ObjectId, c_flx_sub_id_field);
         m_sub_keys->created_at = subs_table->add_column(type_Timestamp, c_flx_sub_created_at_field);
         m_sub_keys->updated_at = subs_table->add_column(type_Timestamp, c_flx_sub_updated_at_field);
         m_sub_keys->name = subs_table->add_column(type_String, c_flx_sub_name_field, true);
@@ -451,7 +509,7 @@ SubscriptionStore::SubscriptionStore(DBRef db)
         auto version_obj = schema_metadata->get_object(0);
         auto version = version_obj.get<int64_t>(
             lookup_and_validate_column(schema_metadata, c_flx_meta_schema_version_field, type_Int));
-        if (version != 1) {
+        if (version != 2) {
             throw std::runtime_error("Invalid schema version for flexible sync metadata");
         }
 
@@ -470,6 +528,7 @@ SubscriptionStore::SubscriptionStore(DBRef db)
             throw std::runtime_error("Flexible Sync subscriptions table should be an embedded object");
         }
         m_sub_keys->table = subs->get_key();
+        m_sub_keys->id = lookup_and_validate_column(subs, c_flx_sub_id_field, type_ObjectId);
         m_sub_keys->created_at = lookup_and_validate_column(subs, c_flx_sub_created_at_field, type_Timestamp);
         m_sub_keys->updated_at = lookup_and_validate_column(subs, c_flx_sub_updated_at_field, type_Timestamp);
         m_sub_keys->query_str = lookup_and_validate_column(subs, c_flx_sub_query_str_field, type_String);
@@ -506,10 +565,33 @@ const SubscriptionSet SubscriptionStore::get_active() const
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        tr->close();
-        return get_latest();
+        return SubscriptionSet(this, std::move(tr), Obj{});
     }
-    return SubscriptionSet(this, std::move(tr), res.get(0));
+    return SubscriptionSet(this, std::move(tr), res.get_object(0));
+}
+
+std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
+{
+    auto tr = m_db->start_read();
+    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    if (sub_sets->is_empty()) {
+        return {0, 0};
+    }
+
+    auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
+    DescriptorOrdering descriptor_ordering;
+    descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
+    descriptor_ordering.append_limit(LimitDescriptor{1});
+    auto res = sub_sets->where()
+                   .equal(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .find_all(descriptor_ordering);
+
+    if (res.is_empty()) {
+        return {0, latest_id};
+    }
+
+    auto active_id = res.get_object(0).get_primary_key();
+    return {active_id.get_int(), latest_id};
 }
 
 SubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)

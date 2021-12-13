@@ -167,11 +167,11 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
         throw std::logic_error("Realms opened in immutable mode do not use a migration function");
-    if (config.schema_mode == SchemaMode::ReadOnlyAlternative && config.migration_function)
+    if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
         throw std::logic_error("Realms opened in read-only mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.initialization_function)
         throw std::logic_error("Realms opened in immutable mode do not use an initialization function");
-    if (config.schema_mode == SchemaMode::ReadOnlyAlternative && config.initialization_function)
+    if (config.schema_mode == SchemaMode::ReadOnly && config.initialization_function)
         throw std::logic_error("Realms opened in read-only mode do not use an initialization function");
     if (config.schema && config.schema_version == ObjectStore::NotVersioned)
         throw std::logic_error("A schema version must be specified when the schema is specified");
@@ -341,12 +341,20 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
+        // Creating ExternalCommitHelper with mutex locked creates a potential deadlock
+        // as the commit helper calls back on the Realm::on_change (not in the constructor,
+        // but the thread sanitizer warns anyway)
+        realm_lock.unlock_unchecked();
+        std::unique_ptr<ExternalCommitHelper> notifier;
         try {
-            m_notifier = std::make_unique<ExternalCommitHelper>(*this);
+            notifier = std::make_unique<ExternalCommitHelper>(*this);
         }
         catch (std::system_error const& ex) {
             throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
         }
+        realm_lock.lock_unchecked();
+        if (!m_notifier)
+            m_notifier = std::move(notifier);
     }
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
@@ -646,6 +654,7 @@ RealmCoordinator::~RealmCoordinator()
 
 void RealmCoordinator::unregister_realm(Realm* realm)
 {
+    util::CheckedLockGuard lock(m_realm_mutex);
     // Normally results notifiers are cleaned up by the background worker thread
     // but if that's disabled we need to ensure that any notifiers from this
     // Realm get cleaned up
@@ -654,7 +663,6 @@ void RealmCoordinator::unregister_realm(Realm* realm)
         clean_up_dead_notifiers();
     }
     {
-        util::CheckedLockGuard lock(m_realm_mutex);
         auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [=](auto& notifier) {
             return notifier.expired() || notifier.is_for_realm(realm);
         });
@@ -732,7 +740,7 @@ void RealmCoordinator::wake_up_notifier_worker()
     }
 }
 
-void RealmCoordinator::commit_write(Realm& realm)
+void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
 {
     REALM_ASSERT(!m_config.immutable());
     REALM_ASSERT(realm.is_in_transaction());
@@ -744,7 +752,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         // perform a write and notify us before we get the chance to set the
         // skip version
         util::CheckedLockGuard l(m_notifier_mutex);
-        new_version = tr.commit_and_continue_as_read();
+        new_version = tr.commit_and_continue_as_read(commit_to_disk);
 
         // The skip version must always be the notifier transaction's current
         // version plus one, as we can only skip a prefix and not intermediate

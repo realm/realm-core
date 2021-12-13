@@ -285,7 +285,6 @@ struct FakeLocalClientReset : public TestClientReset {
         }
 
         {
-            m_remote_config.schema = m_local_config.schema;
             auto realm2 = Realm::get_shared_realm(m_remote_config);
             realm2->begin_transaction();
             if (m_on_setup) {
@@ -395,7 +394,7 @@ struct TestServerClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
-        wait_for_download(*realm);
+        wait_for_upload(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }

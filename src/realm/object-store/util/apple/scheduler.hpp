@@ -32,15 +32,46 @@ public:
     ~RunLoopScheduler();
 
     void notify() override;
-    void set_notify_callback(std::function<void()>) override;
+    void schedule_writes() override;
+    void schedule_completions() override;
+
+    void set_notify_callback(std::function<void()> fn) override
+    {
+        set_callback(m_notify_signal, fn);
+    }
+    void set_schedule_writes_callback(std::function<void()> fn) override
+    {
+        if (m_write_signal)
+            return; // danger!
+        set_callback(m_write_signal, fn);
+    }
+    void set_schedule_completions_callback(std::function<void()> fn) override
+    {
+        if (m_completion_signal)
+            return; // danger!
+        set_callback(m_completion_signal, fn);
+    }
 
     bool is_on_thread() const noexcept override;
     bool is_same_as(const Scheduler* other) const noexcept override;
     bool can_deliver_notifications() const noexcept override;
+    bool can_schedule_writes() const noexcept override
+    {
+        return true;
+    }
+    bool can_schedule_completions() const noexcept override
+    {
+        return true;
+    }
 
 private:
     CFRunLoopRef m_runloop;
-    CFRunLoopSourceRef m_signal = nullptr;
+    CFRunLoopSourceRef m_notify_signal = nullptr;
+    CFRunLoopSourceRef m_write_signal = nullptr;
+    CFRunLoopSourceRef m_completion_signal = nullptr;
+
+    void release(CFRunLoopSourceRef&);
+    void set_callback(CFRunLoopSourceRef&, std::function<void()>);
 };
 
 RunLoopScheduler::RunLoopScheduler(CFRunLoopRef run_loop)
@@ -51,20 +82,24 @@ RunLoopScheduler::RunLoopScheduler(CFRunLoopRef run_loop)
 
 RunLoopScheduler::~RunLoopScheduler()
 {
-    if (m_signal) {
-        CFRunLoopSourceInvalidate(m_signal);
-        CFRelease(m_signal);
-    }
+    release(m_notify_signal);
+    release(m_write_signal);
+    release(m_completion_signal);
     CFRelease(m_runloop);
 }
 
-void RunLoopScheduler::set_notify_callback(std::function<void()> callback)
+void RunLoopScheduler::release(CFRunLoopSourceRef& source)
 {
-    if (m_signal) {
-        CFRunLoopSourceInvalidate(m_signal);
-        CFRelease(m_signal);
-        m_signal = nullptr;
+    if (source) {
+        CFRunLoopSourceInvalidate(source);
+        CFRelease(source);
+        source = nullptr;
     }
+}
+
+void RunLoopScheduler::set_callback(CFRunLoopSourceRef& source, std::function<void()> callback)
+{
+    release(source);
 
     struct RefCountedRunloopCallback {
         std::function<void()> callback;
@@ -88,16 +123,40 @@ void RunLoopScheduler::set_notify_callback(std::function<void()> callback)
         }
     };
 
-    m_signal = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &ctx);
-    CFRunLoopAddSource(m_runloop, m_signal, kCFRunLoopDefaultMode);
+    source = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &ctx);
+    CFRunLoopAddSource(m_runloop, source, kCFRunLoopDefaultMode);
 }
 
 void RunLoopScheduler::notify()
 {
-    if (!m_signal)
+    if (!m_notify_signal)
         return;
 
-    CFRunLoopSourceSignal(m_signal);
+    CFRunLoopSourceSignal(m_notify_signal);
+    // Signalling the source makes it run the next time the runloop gets
+    // to it, but doesn't make the runloop start if it's currently idle
+    // waiting for events
+    CFRunLoopWakeUp(m_runloop);
+}
+
+void RunLoopScheduler::schedule_writes()
+{
+    if (!m_write_signal)
+        return;
+
+    CFRunLoopSourceSignal(m_write_signal);
+    // Signalling the source makes it run the next time the runloop gets
+    // to it, but doesn't make the runloop start if it's currently idle
+    // waiting for events
+    CFRunLoopWakeUp(m_runloop);
+}
+
+void RunLoopScheduler::schedule_completions()
+{
+    if (!m_completion_signal)
+        return;
+
+    CFRunLoopSourceSignal(m_completion_signal);
     // Signalling the source makes it run the next time the runloop gets
     // to it, but doesn't make the runloop start if it's currently idle
     // waiting for events

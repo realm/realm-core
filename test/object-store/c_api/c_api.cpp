@@ -404,7 +404,7 @@ TEST_CASE("C API (non-database)") {
             };
             check_mode(RLM_SCHEMA_MODE_AUTOMATIC);
             check_mode(RLM_SCHEMA_MODE_IMMUTABLE);
-            check_mode(RLM_SCHEMA_MODE_READ_ONLY_ALTERNATIVE);
+            check_mode(RLM_SCHEMA_MODE_READ_ONLY);
             check_mode(RLM_SCHEMA_MODE_RESET_FILE);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED);
@@ -1174,19 +1174,24 @@ TEST_CASE("C API") {
     SECTION("objects") {
         CPtr<realm_object_t> obj1;
         CPtr<realm_object_t> obj2;
+        auto int_val1 = rlm_int_val(123);
+        auto int_val2 = rlm_int_val(456);
         write([&]() {
             obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
             CHECK(obj1);
-            CHECK(checked(realm_set_value(obj1.get(), foo_int_key, rlm_int_val(123), false)));
+            CHECK(checked(realm_set_value(obj1.get(), foo_int_key, int_val1, false)));
             CHECK(checked(realm_set_value(obj1.get(), foo_str_key, rlm_str_val("Hello, World!"), false)));
             obj2 = cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(1)));
             CHECK(obj2);
+            CPtr<realm_object_t> obj3 = cptr_checked(realm_object_create(realm, class_foo.key));
+            CHECK(obj3);
+            CHECK(checked(realm_set_value(obj3.get(), foo_int_key, int_val2, false)));
         });
 
         size_t foo_count, bar_count;
         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &foo_count)));
         CHECK(checked(realm_get_num_objects(realm, class_bar.key, &bar_count)));
-        REQUIRE(foo_count == 1);
+        REQUIRE(foo_count == 2);
         REQUIRE(bar_count == 1);
 
         SECTION("realm_clone()") {
@@ -1197,7 +1202,7 @@ TEST_CASE("C API") {
         SECTION("native pointer mapping") {
             auto object = *static_cast<const realm::Object*>(_realm_object_get_native_ptr(obj1.get()));
             auto obj = object.obj();
-            CHECK(obj.get<int64_t>(realm::ColKey(foo_int_key)) == 123);
+            CHECK(obj.get<int64_t>(realm::ColKey(foo_int_key)) == int_val1.integer);
 
             auto obj1a = cptr_checked(_realm_object_from_native_copy(&object, sizeof(object)));
             CHECK(realm_equals(obj1.get(), obj1a.get()));
@@ -1209,7 +1214,7 @@ TEST_CASE("C API") {
             size_t num_foos, num_bars;
             CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_foos)));
             CHECK(checked(realm_get_num_objects(realm, class_bar.key, &num_bars)));
-            CHECK(num_foos == 1);
+            CHECK(num_foos == 2);
             CHECK(num_bars == 1);
 
             CHECK(checked(realm_get_num_objects(realm, class_bar.key, nullptr)));
@@ -1528,6 +1533,24 @@ TEST_CASE("C API") {
                     CHECK(checked(realm_query_count(q2.get(), &count2)));
                     CHECK(count == count2);
                 }
+                SECTION("realm_query_append_query") {
+                    auto q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(1)", 1, &arg));
+                    size_t count;
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 1);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "FALSEPREDICATE", 1, &arg));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 0);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(0)", 1, &arg));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 0);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "TRUEPREDICATE LIMIT(10)", 1, &arg));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 1);
+                    q2 = cptr_checked(realm_query_append_query(q.get(), "int == $0", 1, &int_val2));
+                    CHECK(checked(realm_query_count(q2.get(), &count)));
+                    CHECK(count == 0);
+                }
             }
 
             SECTION("realm_query_parse() errors") {
@@ -1712,10 +1735,12 @@ TEST_CASE("C API") {
                     CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
 
                     write([&]() {
-                        CHECK(checked(realm_results_delete_all(r.get())));
                         size_t num_objects;
                         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_objects)));
-                        CHECK(num_objects == 0);
+                        CHECK(num_objects == 2);
+                        CHECK(checked(realm_results_delete_all(r.get())));
+                        CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_objects)));
+                        CHECK(num_objects == 1);
                     });
                 }
 

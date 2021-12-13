@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <realm/array_timestamp.hpp>
+#include <realm/array_integer_tpl.hpp>
 
 using namespace realm;
 

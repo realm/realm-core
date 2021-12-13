@@ -126,6 +126,9 @@ enum class SyncSessionStopPolicy {
 };
 
 struct SyncConfig {
+    struct FLXSyncEnabled {
+    };
+
     struct ProxyConfig {
         using port_type = sync::port_type;
         enum class Type { HTTP, HTTPS } type;
@@ -137,6 +140,7 @@ struct SyncConfig {
 
     std::shared_ptr<SyncUser> user;
     std::string partition_value;
+    bool flx_sync_requested = false;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
     bool client_validate_ssl = true;
@@ -154,14 +158,15 @@ struct SyncConfig {
     // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
-    std::function<void(std::shared_ptr<Realm> local, std::shared_ptr<Realm> remote)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> local)> notify_after_client_reset;
+    std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
+    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
     std::function<void(const std::string&, std::function<void(DBRef, util::Optional<std::string>)>)>
         get_fresh_realm_for_path;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, FLXSyncEnabled);
 };
 
 } // namespace realm

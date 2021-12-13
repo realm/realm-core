@@ -33,7 +33,7 @@ TEST(Sync_SubscriptionStoreBasic)
     SHARED_GROUP_TEST_PATH(sub_store_path);
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        SubscriptionStore store(fixture.db);
+        SubscriptionStore store(fixture.db, [](int64_t) {});
         // Because there are no subscription sets yet, get_latest should point to an invalid object
         // and all the property accessors should return dummy values.
         auto latest = store.get_latest();
@@ -64,7 +64,7 @@ TEST(Sync_SubscriptionStoreBasic)
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        SubscriptionStore store(fixture.db);
+        SubscriptionStore store(fixture.db, [](int64_t) {});
 
         auto read_tr = fixture.db->start_read();
         Query query_a(read_tr->get_table(fixture.a_table_key));
@@ -89,7 +89,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db);
+    SubscriptionStore store(fixture.db, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -179,25 +179,73 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db);
+    SubscriptionStore store(fixture.db, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
     query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
     Query query_b(read_tr->get_table(fixture.a_table_key));
     query_b.equal(fixture.foo_col, "Realm");
+    ObjectId id_of_inserted;
+    auto sub_name = ObjectId::gen().to_string();
     {
         auto out = store.get_latest().make_mutable_copy();
-        auto read_tr = fixture.db->start_read();
-        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        auto [it, inserted] = out.insert_or_assign(sub_name, query_a);
         CHECK(inserted);
         CHECK_NOT_EQUAL(it, out.end());
+        id_of_inserted = it->id();
+        CHECK_NOT_EQUAL(id_of_inserted, ObjectId{});
 
-        std::tie(it, inserted) = out.insert_or_assign("a sub", query_b);
+        std::tie(it, inserted) = out.insert_or_assign(sub_name, query_b);
         CHECK(!inserted);
         CHECK_NOT_EQUAL(it, out.end());
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_b.get_description());
+        CHECK_EQUAL(it->id(), id_of_inserted);
+        out.commit();
+    }
+    {
+        auto set = store.get_latest().make_mutable_copy();
+        CHECK_EQUAL(set.size(), 1);
+        auto it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
+            return sub.id() == id_of_inserted;
+        });
+        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_EQUAL(it->name(), sub_name);
+    }
+}
+
+TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    SubscriptionStore store(fixture.db, [](int64_t) {});
+
+    auto read_tr = fixture.db->start_read();
+    Query query_a(read_tr->get_table("class_a"));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    {
+        auto out = store.get_latest().make_mutable_copy();
+        auto [it, inserted] = out.insert_or_assign("a sub", query_a);
+        CHECK(inserted);
+        auto named_id = it->id();
+
+        std::tie(it, inserted) = out.insert_or_assign(query_a);
+        CHECK(inserted);
+        CHECK_NOT_EQUAL(it->id(), named_id);
+        CHECK_EQUAL(out.size(), 2);
+
+        std::tie(it, inserted) = out.insert_or_assign(query_b);
+        CHECK(inserted);
+        named_id = it->id();
+
+        std::tie(it, inserted) = out.insert_or_assign("b sub", query_b);
+        CHECK(inserted);
+        CHECK_NOT_EQUAL(it->id(), named_id);
+        CHECK_EQUAL(out.size(), 4);
     }
 }
 
@@ -205,7 +253,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db);
+    SubscriptionStore store(fixture.db, [](int64_t) {});
 
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store.get_latest().make_mutable_copy();
@@ -261,7 +309,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_NOT(notification_futures[3].is_ready());
     sub_set = store.get_mutable_by_version(4);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    sub_set.update_state(SubscriptionSet::State::Error, error_msg);
+    sub_set.update_state(SubscriptionSet::State::Error, std::string_view(error_msg));
     sub_set.commit();
 
     // This should return a non-OK Status with the error message we set on the subscription set.

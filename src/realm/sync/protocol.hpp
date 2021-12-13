@@ -40,7 +40,7 @@ constexpr std::string_view get_flx_websocket_protocol_prefix() noexcept
     return "com.mongodb.realm-query-sync/";
 }
 
-enum class SyncServerMode { PBS, FLXDiscovered, FLXRequested };
+enum class SyncServerMode { PBS, FLX };
 
 /// Supported protocol envelopes:
 ///
@@ -242,6 +242,12 @@ enum class ProtocolError {
     user_mismatch                = 223, // User mismatch for client file identifier (IDENT)
     too_many_sessions            = 224, // Too many sessions in connection (BIND)
     invalid_schema_change        = 225, // Invalid schema change (UPLOAD)
+    bad_query                    = 226, // Client query is invalid/malformed (IDENT, QUERY)
+    object_already_exists        = 227, // Client tried to create an object that already exists outside their
+                                        // view (UPLOAD)
+    server_permissions_changed   = 228, // Server permissions for this file ident have changed since the last time it
+                                        // was used (IDENT)
+    initial_sync_not_completed   = 229, // Client tried to open a session before initial sync is complete (BIND)
 
     // clang-format on
 };

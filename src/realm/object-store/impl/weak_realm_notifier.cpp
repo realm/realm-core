@@ -51,6 +51,16 @@ void WeakRealmNotifier::bind_to_scheduler()
                 realm->notify();
             }
         });
+        m_scheduler->set_schedule_writes_callback([weak_realm = m_realm]() {
+            if (auto realm = weak_realm.lock()) {
+                realm->run_writes();
+            }
+        });
+        m_scheduler->set_schedule_completions_callback([weak_realm = m_realm]() {
+            if (auto realm = weak_realm.lock()) {
+                realm->run_async_completions();
+            }
+        });
     }
 }
 

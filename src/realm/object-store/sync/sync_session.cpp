@@ -521,6 +521,7 @@ void SyncSession::do_create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
+    session_config.flx_sync_requested = m_config.flx_sync_requested;
     {
         std::string sync_route = m_sync_manager->sync_route();
 
@@ -542,36 +543,33 @@ void SyncSession::do_create_sync_session()
     if (m_force_client_reset) {
         sync::Session::Config::ClientReset config;
         config.discard_local = (m_config.client_resync_mode == ClientResyncMode::DiscardLocal);
-        config.notify_after_client_reset = [this](std::string local_path) {
-            SharedRealm frozen_local;
-            if (!local_path.empty()) {
-                if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                    auto local_config = local_coordinator->get_config();
-                    local_config.scheduler = nullptr;
-                    frozen_local = local_coordinator->get_realm(local_config, VersionID());
-                }
+        config.notify_after_client_reset = [this](std::string local_path, VersionID previous_version) {
+            REALM_ASSERT(!local_path.empty());
+            SharedRealm frozen_before, active_after;
+            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+                auto local_config = local_coordinator->get_config();
+                active_after = local_coordinator->get_realm(local_config, util::none);
+                local_config.scheduler = nullptr;
+                frozen_before = local_coordinator->get_realm(local_config, previous_version);
+                REALM_ASSERT(active_after);
+                REALM_ASSERT(!active_after->is_frozen());
+                REALM_ASSERT(frozen_before);
+                REALM_ASSERT(frozen_before->is_frozen());
             }
-            m_config.notify_after_client_reset(frozen_local);
+            m_config.notify_after_client_reset(frozen_before, active_after);
         };
-        config.notify_before_client_reset = [this](std::string local_path, std::string remote_path) {
-            SharedRealm frozen_local, frozen_remote;
+        config.notify_before_client_reset = [this](std::string local_path) {
+            REALM_ASSERT(!local_path.empty());
+            SharedRealm frozen_local;
             Realm::Config local_config;
-            if (!local_path.empty()) {
-                if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                    local_config = local_coordinator->get_config();
-                    local_config.scheduler = nullptr;
-                    frozen_local = local_coordinator->get_realm(local_config, VersionID());
-                }
+            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+                local_config = local_coordinator->get_config();
+                local_config.scheduler = nullptr;
+                frozen_local = local_coordinator->get_realm(local_config, VersionID());
+                REALM_ASSERT(frozen_local);
+                REALM_ASSERT(frozen_local->is_frozen());
             }
-            if (!remote_path.empty() && frozen_local) {
-                Realm::Config remote_config;
-                remote_config.path = remote_path;
-                remote_config.force_sync_history = true;
-                remote_config.encryption_key = local_config.encryption_key;
-                auto remote_coordinator = RealmCoordinator::get_coordinator(remote_config);
-                frozen_remote = remote_coordinator->get_realm(remote_config, VersionID());
-            }
-            m_config.notify_before_client_reset(frozen_local, frozen_remote);
+            m_config.notify_before_client_reset(frozen_local);
         };
         config.fresh_copy = std::move(m_client_reset_fresh_copy);
         session_config.client_reset_config = std::move(config);
@@ -928,7 +926,7 @@ private:
 
 std::shared_ptr<SyncSession> SyncSession::external_reference()
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
+    util::CheckedLockGuard lock(m_external_reference_mutex);
 
     if (auto external_reference = m_external_reference.lock())
         return std::shared_ptr<SyncSession>(external_reference, this);
@@ -940,7 +938,7 @@ std::shared_ptr<SyncSession> SyncSession::external_reference()
 
 std::shared_ptr<SyncSession> SyncSession::existing_external_reference()
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
+    util::CheckedLockGuard lock(m_external_reference_mutex);
 
     if (auto external_reference = m_external_reference.lock())
         return std::shared_ptr<SyncSession>(external_reference, this);
@@ -950,13 +948,16 @@ std::shared_ptr<SyncSession> SyncSession::existing_external_reference()
 
 void SyncSession::did_drop_external_reference()
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
+    std::unique_lock<std::mutex> lock1(m_state_mutex);
+    {
+        util::CheckedLockGuard lock2(m_external_reference_mutex);
 
-    // If the session is being resurrected we should not close the session.
-    if (!m_external_reference.expired())
-        return;
+        // If the session is being resurrected we should not close the session.
+        if (!m_external_reference.expired())
+            return;
+    }
 
-    close(lock);
+    close(lock1);
 }
 
 uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,

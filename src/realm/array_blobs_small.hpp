@@ -19,7 +19,6 @@
 #ifndef REALM_ARRAY_BLOBS_SMALL_HPP
 #define REALM_ARRAY_BLOBS_SMALL_HPP
 
-#include <realm/binary_data.hpp>
 #include <realm/array_blob.hpp>
 #include <realm/exceptions.hpp>
 

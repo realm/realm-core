@@ -2,6 +2,7 @@ set(REALM_SOURCES
     # slowest to compile first
     query.cpp
     array.cpp
+    array_with_find.cpp
 
     alloc.cpp
     alloc_slab.cpp
@@ -122,6 +123,7 @@ set(REALM_INSTALL_HEADERS
     array_direct.hpp
     array_fixed_bytes.hpp
     array_integer.hpp
+    array_integer_tpl.hpp
     array_key.hpp
     array_list.hpp
     array_mixed.hpp
@@ -131,6 +133,7 @@ set(REALM_INSTALL_HEADERS
     array_timestamp.hpp
     array_typed_link.hpp
     array_unsigned.hpp
+    array_with_find.hpp
     binary_data.hpp
     bplustree.hpp
     chunked_binary.hpp
@@ -171,6 +174,7 @@ set(REALM_INSTALL_HEADERS
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
+    query_state.hpp
     query_value.hpp
     realm_nmmintrin.h
     replication.hpp
@@ -178,6 +182,7 @@ set(REALM_INSTALL_HEADERS
     sort_descriptor.hpp
     spec.hpp
     status.hpp
+    status_with.hpp
     string_data.hpp
     table.hpp
     table_cluster_tree.hpp
@@ -221,6 +226,7 @@ set(REALM_INSTALL_HEADERS
     util/fixed_size_buffer.hpp
     util/function_ref.hpp
     util/functional.hpp
+    util/future.hpp
     util/hex_dump.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp

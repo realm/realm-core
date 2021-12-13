@@ -135,7 +135,7 @@ public:
     // Delete object with given key
     void erase(ObjKey k, CascadeState& state);
     // Check if an object with given key exists
-    bool is_valid(ObjKey k) const;
+    bool is_valid(ObjKey k) const noexcept;
     // Lookup and return object
     ClusterNode::State get(ObjKey k) const;
     // Lookup and return object

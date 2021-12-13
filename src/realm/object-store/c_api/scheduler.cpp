@@ -107,7 +107,7 @@ struct CAPIScheduler : Scheduler {
         return false;
     }
 
-    bool is_same_as(const Scheduler* other) const noexcept
+    bool is_same_as(const Scheduler* other) const noexcept final
     {
         if (auto rhs = dynamic_cast<const CAPIScheduler*>(other)) {
             bool same_callbacks = m_free == rhs->m_free && m_notify == rhs->m_notify &&

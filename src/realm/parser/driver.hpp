@@ -24,57 +24,80 @@ public:
     virtual ~ParserNode();
 };
 
-class AtomPredNode : public ParserNode {
+class QueryNode : public ParserNode {
 public:
-    ~AtomPredNode() override;
+    ~QueryNode() override;
     virtual Query visit(ParserDriver*) = 0;
+    virtual void canonicalize() {}
 };
 
-class AndNode : public ParserNode {
+class LogicalNode : public QueryNode {
 public:
-    std::vector<AtomPredNode*> atom_preds;
-
-    AndNode(AtomPredNode* node)
+    std::vector<QueryNode*> children;
+    LogicalNode(QueryNode* left, QueryNode* right)
     {
-        atom_preds.emplace_back(node);
+        children.emplace_back(left);
+        children.emplace_back(right);
     }
-    Query visit(ParserDriver*);
-};
-
-class OrNode : public ParserNode {
-public:
-    std::vector<AndNode*> and_preds;
-
-    OrNode(AndNode* node)
+    void canonicalize() override
     {
-        and_preds.emplace_back(node);
+        std::vector<QueryNode*> newChildren;
+        auto& my_type = typeid(*this);
+        for (auto& child : children) {
+            child->canonicalize();
+            if (typeid(*child) == my_type) {
+                auto logical_node = static_cast<LogicalNode*>(child);
+                for (auto c : logical_node->children) {
+                    newChildren.push_back(c);
+                }
+            }
+            else {
+                newChildren.push_back(child);
+            }
+        }
+        children = newChildren;
     }
-    Query visit(ParserDriver*);
+
+private:
+    virtual std::string get_operator() const = 0;
 };
 
-class NotNode : public AtomPredNode {
+class AndNode : public LogicalNode {
 public:
-    AtomPredNode* atom_pred = nullptr;
+    using LogicalNode::LogicalNode;
+    Query visit(ParserDriver*) override;
 
-    NotNode(AtomPredNode* expr)
-        : atom_pred(expr)
+private:
+    std::string get_operator() const override
+    {
+        return " && ";
+    }
+};
+
+class OrNode : public LogicalNode {
+public:
+    using LogicalNode::LogicalNode;
+    Query visit(ParserDriver*) override;
+
+private:
+    std::string get_operator() const override
+    {
+        return " || ";
+    }
+};
+
+class NotNode : public QueryNode {
+public:
+    QueryNode* query = nullptr;
+
+    NotNode(QueryNode* q)
+        : query(q)
     {
     }
     Query visit(ParserDriver*) override;
 };
 
-class ParensNode : public AtomPredNode {
-public:
-    OrNode* pred = nullptr;
-
-    ParensNode(OrNode* expr)
-        : pred(expr)
-    {
-    }
-    Query visit(ParserDriver*) override;
-};
-
-class CompareNode : public AtomPredNode {
+class CompareNode : public QueryNode {
 public:
     static constexpr int EQUAL = 0;
     static constexpr int NOT_EQUAL = 1;
@@ -140,7 +163,16 @@ public:
     virtual std::unique_ptr<Subexpr> visit(ParserDriver*) = 0;
 };
 
-class ValueNode : public ParserNode {
+class ExpressionNode : public ParserNode {
+public:
+    virtual bool is_constant()
+    {
+        return false;
+    }
+    virtual std::unique_ptr<Subexpr> visit(ParserDriver*, DataType = type_Int) = 0;
+};
+
+class ValueNode : public ExpressionNode {
 public:
     ConstantNode* constant = nullptr;
     PropertyNode* prop = nullptr;
@@ -153,15 +185,49 @@ public:
         : prop(node)
     {
     }
+    bool is_constant() final
+    {
+        return constant != nullptr;
+    }
+    ConstantNode* get_constant()
+    {
+        REALM_ASSERT(is_constant());
+        return constant;
+    }
+
+    std::unique_ptr<Subexpr> visit(ParserDriver* drv, DataType type) override
+    {
+        if (prop)
+            return prop->visit(drv);
+        return constant->visit(drv, type);
+    }
+};
+
+class OperationNode : public ExpressionNode {
+public:
+    ExpressionNode* m_left;
+    ExpressionNode* m_right;
+    char m_op;
+    OperationNode(ExpressionNode* left, char op, ExpressionNode* right)
+        : m_left(left)
+        , m_right(right)
+        , m_op(op)
+    {
+    }
+    bool is_constant() final
+    {
+        return m_left->is_constant() && m_right->is_constant();
+    }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
 };
 
 class EqualityNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<ExpressionNode*> values;
     int op;
     bool case_sensitive = true;
 
-    EqualityNode(ValueNode* left, int t, ValueNode* right)
+    EqualityNode(ExpressionNode* left, int t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -172,10 +238,10 @@ public:
 
 class RelationalNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<ExpressionNode*> values;
     int op;
 
-    RelationalNode(ValueNode* left, int t, ValueNode* right)
+    RelationalNode(ExpressionNode* left, int t, ExpressionNode* right)
         : op(t)
     {
         values.emplace_back(left);
@@ -199,7 +265,7 @@ public:
 
 class StringOpsNode : public CompareNode {
 public:
-    std::vector<ValueNode*> values;
+    std::vector<ExpressionNode*> values;
     int op;
     bool case_sensitive = true;
 
@@ -212,7 +278,7 @@ public:
     Query visit(ParserDriver*) override;
 };
 
-class TrueOrFalseNode : public AtomPredNode {
+class TrueOrFalseNode : public QueryNode {
 public:
     bool true_or_false;
 
@@ -328,9 +394,9 @@ class SubqueryNode : public PropertyNode {
 public:
     PropNode* prop = nullptr;
     std::string variable_name;
-    OrNode* subquery = nullptr;
+    QueryNode* subquery = nullptr;
 
-    SubqueryNode(PropNode* node, std::string var_name, OrNode* query)
+    SubqueryNode(PropNode* node, std::string var_name, QueryNode* query)
         : prop(node)
         , variable_name(var_name)
         , subquery(query)
@@ -389,6 +455,7 @@ public:
 // Conducting the whole scanning and parsing of Calc++.
 class ParserDriver {
 public:
+    using SubexprPtr = std::unique_ptr<Subexpr>;
     class ParserNodeStore {
     public:
         template <typename T, typename... Args>
@@ -413,7 +480,7 @@ public:
     ~ParserDriver();
 
     util::serializer::SerialisationState m_serializer_state;
-    OrNode* result = nullptr;
+    QueryNode* result = nullptr;
     DescriptorOrderingNode* ordering = nullptr;
     TableRef m_base_table;
     Arguments& m_args;
@@ -439,8 +506,8 @@ public:
     Query simple_query(int op, ColKey col_key, T val, bool case_sensitive);
     template <class T>
     Query simple_query(int op, ColKey col_key, T val);
-    std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> cmp(const std::vector<ValueNode*>& values);
-    std::unique_ptr<Subexpr> column(LinkChain&, std::string);
+    std::pair<SubexprPtr, SubexprPtr> cmp(const std::vector<ExpressionNode*>& values);
+    SubexprPtr column(LinkChain&, std::string);
     void backlink(LinkChain&, const std::string&);
     std::string translate(LinkChain&, const std::string&);
 

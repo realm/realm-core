@@ -44,13 +44,6 @@ SyncClientTimeouts::SyncClientTimeouts()
 void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
                             const SyncClientConfig& config)
 {
-    util::CheckedLockGuard lock(m_mutex);
-    m_app = app;
-    m_sync_route = sync_route;
-    m_config = std::move(config);
-    if (m_sync_client)
-        return;
-
     struct UserCreationData {
         std::string identity;
         std::string refresh_token;
@@ -63,86 +56,96 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
 
     std::vector<UserCreationData> users_to_add;
     {
-        util::CheckedLockGuard lock(m_file_system_mutex);
-
-        // Set up the file manager.
-        if (m_file_manager) {
-            // Changing the base path for tests requires calling reset_for_testing()
-            // first, and otherwise isn't supported
-            REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
-        }
-        else {
-            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app->config().app_id);
-        }
-
-        // Set up the metadata manager, and perform initial loading/purging work.
-        if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
+        // Locking the mutex here ensures that it is released before locking m_user_mutex
+        util::CheckedLockGuard lock(m_mutex);
+        m_app = app;
+        m_sync_route = sync_route;
+        m_config = std::move(config);
+        if (m_sync_client)
             return;
-        }
 
-        bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
-        try {
-            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
-                                                                       m_config.custom_encryption_key);
-        }
-        catch (RealmFileException const&) {
-            if (m_config.reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
-                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
-                                                                           std::move(m_config.custom_encryption_key));
+        {
+            util::CheckedLockGuard lock(m_file_system_mutex);
+
+            // Set up the file manager.
+            if (m_file_manager) {
+                // Changing the base path for tests requires calling reset_for_testing()
+                // first, and otherwise isn't supported
+                REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
             }
             else {
-                throw;
+                m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app->config().app_id);
             }
-        }
 
-        REALM_ASSERT(m_metadata_manager);
-
-        // Perform our "on next startup" actions such as deleting Realm files
-        // which we couldn't delete immediately due to them being in use
-        std::vector<SyncFileActionMetadata> completed_actions;
-        SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
-        for (size_t i = 0; i < file_actions.size(); i++) {
-            auto file_action = file_actions.get(i);
-            if (run_file_action(file_action)) {
-                completed_actions.emplace_back(std::move(file_action));
+            // Set up the metadata manager, and perform initial loading/purging work.
+            if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
+                return;
             }
-        }
-        for (auto& action : completed_actions) {
-            action.remove();
-        }
 
-        // Load persisted users into the users map.
-        SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
-        for (size_t i = 0; i < users.size(); i++) {
-            auto user_data = users.get(i);
-            auto refresh_token = user_data.refresh_token();
-            auto access_token = user_data.access_token();
-            auto device_id = user_data.device_id();
-            if (!refresh_token.empty() && !access_token.empty()) {
-                users_to_add.push_back(UserCreationData{user_data.identity(), std::move(refresh_token),
-                                                        std::move(access_token), user_data.provider_type(),
-                                                        user_data.identities(), user_data.state(), device_id});
-            }
-        }
-
-        // Delete any users marked for death.
-        std::vector<SyncUserMetadata> dead_users;
-        SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
-        dead_users.reserve(users_to_remove.size());
-        for (size_t i = 0; i < users_to_remove.size(); i++) {
-            auto user = users_to_remove.get(i);
-            // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
-            // launches again, which might not be how some apps want to treat their data.)
+            bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
             try {
-                m_file_manager->remove_user_realms(user.identity(), user.realm_file_paths());
-                dead_users.emplace_back(std::move(user));
+                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
+                                                                           m_config.custom_encryption_key);
             }
-            catch (util::File::AccessError const&) {
-                continue;
+            catch (RealmFileException const&) {
+                if (m_config.reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
+                    m_metadata_manager = std::make_unique<SyncMetadataManager>(
+                        m_file_manager->metadata_path(), encrypt, std::move(m_config.custom_encryption_key));
+                }
+                else {
+                    throw;
+                }
             }
-        }
-        for (auto& user : dead_users) {
-            user.remove();
+
+            REALM_ASSERT(m_metadata_manager);
+
+            // Perform our "on next startup" actions such as deleting Realm files
+            // which we couldn't delete immediately due to them being in use
+            std::vector<SyncFileActionMetadata> completed_actions;
+            SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
+            for (size_t i = 0; i < file_actions.size(); i++) {
+                auto file_action = file_actions.get(i);
+                if (run_file_action(file_action)) {
+                    completed_actions.emplace_back(std::move(file_action));
+                }
+            }
+            for (auto& action : completed_actions) {
+                action.remove();
+            }
+
+            // Load persisted users into the users map.
+            SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
+            for (size_t i = 0; i < users.size(); i++) {
+                auto user_data = users.get(i);
+                auto refresh_token = user_data.refresh_token();
+                auto access_token = user_data.access_token();
+                auto device_id = user_data.device_id();
+                if (!refresh_token.empty() && !access_token.empty()) {
+                    users_to_add.push_back(UserCreationData{user_data.identity(), std::move(refresh_token),
+                                                            std::move(access_token), user_data.provider_type(),
+                                                            user_data.identities(), user_data.state(), device_id});
+                }
+            }
+
+            // Delete any users marked for death.
+            std::vector<SyncUserMetadata> dead_users;
+            SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
+            dead_users.reserve(users_to_remove.size());
+            for (size_t i = 0; i < users_to_remove.size(); i++) {
+                auto user = users_to_remove.get(i);
+                // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the
+                // app launches again, which might not be how some apps want to treat their data.)
+                try {
+                    m_file_manager->remove_user_realms(user.identity(), user.realm_file_paths());
+                    dead_users.emplace_back(std::move(user));
+                }
+                catch (util::File::AccessError const&) {
+                    continue;
+                }
+            }
+            for (auto& user : dead_users) {
+                user.remove();
+            }
         }
     }
     {
@@ -218,14 +221,14 @@ void SyncManager::reset_for_testing()
         m_current_user = nullptr;
     }
     {
-        util::CheckedLockGuard lock(m_mutex);
+        util::CheckedLockGuard lock1(m_mutex);
 
         // Stop the client. This will abort any uploads that inactive sessions are waiting for.
         if (m_sync_client)
             m_sync_client->stop();
 
         {
-            util::CheckedLockGuard lock(m_session_mutex);
+            util::CheckedLockGuard lock2(m_session_mutex);
             // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
             // prior to calling `reset_for_testing`.
             bool no_sessions = !do_has_existing_sessions();

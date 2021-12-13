@@ -46,6 +46,7 @@ public:
     char* translate(ref_type ref);
     void encryption_read_barrier(void* start_addr, size_t size);
     void encryption_write_barrier(void* start_addr, size_t size);
+    void flush();
     void sync();
     // return true if the specified range is fully visible through
     // the MapWindow
@@ -114,7 +115,6 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     if (aligned_ref != m_base_ref)
         return false;
     size_t window_size = get_window_size(f, start_ref, size);
-    m_map.sync();
     m_map.unmap();
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
     return true;
@@ -133,8 +133,14 @@ GroupWriter::MapWindow::~MapWindow()
     m_map.unmap(); /* Apparently no effect - how odd */
 }
 
+void GroupWriter::MapWindow::flush()
+{
+    m_map.flush();
+}
+
 void GroupWriter::MapWindow::sync()
 {
+    flush();
     m_map.sync();
 }
 
@@ -267,12 +273,12 @@ size_t GroupWriter::get_file_size() const noexcept
     return sz;
 }
 
-void GroupWriter::sync_all_mappings()
+void GroupWriter::flush_all_mappings()
 {
     if (m_durability == Durability::Unsafe)
         return;
     for (const auto& window : m_map_windows) {
-        window->sync();
+        window->flush();
     }
 }
 
@@ -292,8 +298,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        if (m_durability != Durability::Unsafe)
-            m_map_windows.back()->sync();
+        m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
     auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
@@ -932,9 +937,9 @@ void GroupWriter::commit(ref_type new_top_ref)
     // stable storage before flipping the slot selector
     window->encryption_write_barrier(&file_header.m_top_ref[slot_selector],
                                      sizeof(file_header.m_top_ref[slot_selector]));
+    flush_all_mappings();
     if (!disable_sync)
-        sync_all_mappings();
-
+        m_alloc.get_file().sync();
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);

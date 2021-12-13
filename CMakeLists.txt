@@ -334,7 +334,7 @@ install(EXPORT realm
         COMPONENT devel
 )
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake 
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
         DESTINATION lib/cmake/Realm
         COMPONENT devel
 )
