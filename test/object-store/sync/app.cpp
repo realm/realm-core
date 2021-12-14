@@ -2086,6 +2086,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             });
             // the failed refresh logs out the user
             REQUIRE(!user->is_logged_in());
+            REQUIRE(!app->current_user()->is_logged_in());
         }
 
         SECTION("Requests that receive an error are retried on a backoff") {
