@@ -578,7 +578,7 @@ TEST_TYPES(UUID_Query, WithIndex, WithoutIndex)
         CHECK_EQUAL(tv.size(), tv2.size());
         // check that sorting ascending vs descending is stable
         for (size_t i = 0; i < tv.size(); i++) {
-            CHECK_EQUAL(tv.get(i).get<UUID>(col), tv2.get(tv2.size() - i - 1).get<UUID>(col));
+            CHECK_EQUAL(tv.get_object(i).get<UUID>(col), tv2.get_object(tv2.size() - i - 1).get<UUID>(col));
         }
 
         Query q2 = table->column<UUID>(col_id) == uuid3;

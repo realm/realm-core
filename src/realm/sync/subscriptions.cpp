@@ -571,7 +571,7 @@ const SubscriptionSet SubscriptionStore::get_active() const
     if (res.is_empty()) {
         return SubscriptionSet(this, std::move(tr), Obj{});
     }
-    return SubscriptionSet(this, std::move(tr), res.get(0));
+    return SubscriptionSet(this, std::move(tr), res.get_object(0));
 }
 
 std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
@@ -594,7 +594,7 @@ std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() 
         return {0, latest_id};
     }
 
-    auto active_id = res.get(0).get_primary_key();
+    auto active_id = res.get_object(0).get_primary_key();
     return {active_id.get_int(), latest_id};
 }
 

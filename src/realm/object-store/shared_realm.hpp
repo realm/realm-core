@@ -22,6 +22,7 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm/util/optional.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
@@ -31,6 +32,7 @@
 #endif
 
 #include <memory>
+#include <deque>
 
 namespace realm {
 class AsyncOpenTask;
@@ -316,6 +318,51 @@ public:
     void cancel_transaction();
     bool is_in_transaction() const noexcept;
 
+    // Asynchronous (write)transaction.
+    // * 'the_write_block' is queued for execution on the scheduler
+    //   associated with the current realm. It will run after the write
+    //   mutex has been acquired.
+    // * If 'notify_only' is false, 'the_block' should end by calling commit_transaction(),
+    //   cancel_transaction() or async_commit_transaction().
+    // * If 'notify_only' is false, returning without one of these calls will be equivalent to calling
+    //   cancel_transaction().
+    // * If 'notify_only' is true, 'the_block' should only be used for signalling that
+    //   a write transaction can proceed, but must not itself call async_commit() or cancel_transaction()
+    // * The call returns immediately allowing the caller to proceed
+    //   while the write mutex is held by someone else.
+    // * Write blocks from multiple calls to async_transaction() will be
+    //   executed in order.
+    // * A later call to async_begin_transaction() will wait for any earlier write blocks.
+    using AsyncHandle = unsigned;
+    AsyncHandle async_begin_transaction(util::UniqueFunction<void()>&& the_block, bool notify_only = false);
+
+    // Asynchronous commit.
+    // * 'the_done_block' is queued for execution on the scheduler associated with
+    //   the current realm. It will run after the commit has reached stable storage.
+    // * The call returns immediately allowing the caller to proceed while
+    //   the I/O is performed on a dedicated background thread.
+    // * Callbacks to 'the_done_block' will occur in the order of async_commit()
+    // * If 'allow_grouping' is set, the next async_commit *may* run without an
+    //   intervening synchronization of stable storage.
+    // * Such a sequence of commits form a group. In case of a platform crash,
+    //   either none or all of the commits in a group will reach stable storage.
+    AsyncHandle async_commit_transaction(util::UniqueFunction<void()>&& the_done_block = nullptr,
+                                         bool allow_grouping = false);
+
+    // Cancel a queued code block (either for an async_transaction or for an async_commit)
+    // * Cancelling a commit will not abort the commit, it will only cancel the callback
+    //   informing of commit completion.
+    void async_cancel_transaction(AsyncHandle);
+
+    // Returns true when async transactiona has been created and the result of the last
+    // commit has not yet reached permanent storage.
+    bool is_in_async_transaction() const noexcept;
+
+    void set_async_error_handler(util::UniqueFunction<void(AsyncHandle, std::exception_ptr)>&& hndlr)
+    {
+        m_async_exception_handler = std::move(hndlr);
+    }
+
     // Returns a frozen copy for the current version of this Realm
     // If called from within a write transaction, the returned Realm will
     // reflect the state at the beginning of the write transaction. Any
@@ -365,6 +412,8 @@ public:
         return m_auto_refresh;
     }
     void notify();
+    void run_writes();
+    void run_async_completions();
 
     void invalidate();
 
@@ -520,6 +569,28 @@ private:
     Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
+    struct AsyncWriteDesc {
+        util::UniqueFunction<void()> writer;
+        bool notify_only;
+        unsigned handle;
+    };
+    std::deque<AsyncWriteDesc> m_async_write_q;
+    struct AsyncCommitDesc {
+        util::UniqueFunction<void()> when_completed;
+        unsigned handle;
+    };
+    std::vector<AsyncCommitDesc> m_async_commit_q;
+    unsigned m_async_commit_handle = 0;
+    bool m_is_running_async_writes = false;
+    bool m_notify_only = false;
+    bool m_is_running_async_commit_completions = false;
+    bool m_async_commit_barrier_requested = false;
+    util::UniqueFunction<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
+    void run_writes_on_proper_thread();
+    void run_async_completions_on_proper_thread();
+    void check_pending_write_requests();
+    void end_current_write();
+    void call_completion_callbacks();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

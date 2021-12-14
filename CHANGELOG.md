@@ -2,10 +2,36 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Added `realm_query_append_query` to the C-API. ([#5067](https://github.com/realm/realm-core/issues/5067))
+* Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
+* Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* The release package was missing several headers (since 11.7.0).
+* The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
+* Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* 'Obj TableView::get(size_t)' removed. Use 'TableView::get_object' instead.
+* Fix issue compiling in debug mode for iOS.
+* FLX sync now sends the query version in IDENT messages along with the query body ([#5093](https://github.com/realm/realm-core/pull/5093))
+
+----------------------------------------------
+
+# 11.7.0 Release notes
+
+### Enhancements
+* Added `realm_query_append_query` to the C-API. ([#5067](https://github.com/realm/realm-core/issues/5067))
+
+### Fixed
 * The client reset callbacks now pass out SharedRealm objects instead of TransactionRefs. ([#5048](https://github.com/realm/realm-core/issues/5048), since v11.5.0) 
 * A client reset in DiscardLocal mode would revert to Manual mode on the next restart of the session. ([#5050](https://github.com/realm/realm-core/issues/5050), since v11.5.0)
 * A client reset in DiscardLocal mode would assert if the server added embedded object tables. ([#5069](https://github.com/realm/realm-core/issues/5069), since v11.5.0)
@@ -13,11 +39,8 @@
 * Change the exception message for calling refresh on an immutable Realm from "Continuous transaction through DB object without history information." to "Can't refresh a read-only Realm." ([#5061](https://github.com/realm/realm-core/issues/5061), old exception message was since 10.7.2 via https://github.com/realm/realm-core/pull/4688).
 * The client reset callbacks have changed so that the pre and post Realm state are passed to the 'after' callback and thee 'before' callback only has the local state. ([#5066](https://github.com/realm/realm-core/issues/5066), since 11.5.0).
 * In the C-API, query `count()` did not apply descriptors such as limit/distinct. ([#5073](https://github.com/realm/realm-core/issues/5073), since the beginning of the C-API in v10.4.0)
-* Queries of the form "link.collection.@sum = 0" where `link` is null matched when `collection` was a List or Set, but not a Dictionary (since the introduction of Dictionary).
+* Queries of the form "link.collection.@sum = 0" where `link` is null matched when `collection` was a List or Set, but not a Dictionary ([#5080](https://github.com/realm/realm-core/pull/5080), since v11.0.0).
  
-### Breaking changes
-* None.
-
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
@@ -30,6 +53,7 @@
 * SubscriptionSet::erase now returns the correct itererator for the "next" subscription ([#5053](https://github.com/realm/realm-core/pull/5053))
 * SubscriptionSet::insert_or_assign now returns an iterator pointing to the correct subscription ([#5049](https://github.com/realm/realm-core/pull/5049))
 * `SimulatedFailure` mmap handling was not thread-safe.
+* The overloads for arithmetric operations removed.
 * Rename SchemaMode::ReadOnlyAlternative to ReadOnly. ([#5070](https://github.com/realm/realm-core/issues/5070))
 * Subscriptions for FLX sync now have a unique ID ([#5054](https://github.com/realm/realm-core/pull/5054))
 * Assigning an anonymous subscription will no longer overwrite a named subscription ([#5076](https://github.com/realm/realm-core/pull/5076))

@@ -54,7 +54,9 @@
     class PropertyNode;
     class PostOpNode;
     class AggrNode;
+    class ExpressionNode;
     class ValueNode;
+    class OperationNode;
     class TrueOrFalseNode;
     class OrNode;
     class AndNode;
@@ -440,43 +442,46 @@ namespace yy {
       // post_query
       char dummy4[sizeof (DescriptorOrderingNode*)];
 
+      // expr
+      char dummy5[sizeof (ExpressionNode*)];
+
       // list
       // list_content
-      char dummy5[sizeof (ListNode*)];
+      char dummy6[sizeof (ListNode*)];
 
       // path
-      char dummy6[sizeof (PathNode*)];
+      char dummy7[sizeof (PathNode*)];
 
       // post_op
-      char dummy7[sizeof (PostOpNode*)];
+      char dummy8[sizeof (PostOpNode*)];
 
       // simple_prop
-      char dummy8[sizeof (PropNode*)];
+      char dummy9[sizeof (PropNode*)];
 
       // prop
-      char dummy9[sizeof (PropertyNode*)];
+      char dummy10[sizeof (PropertyNode*)];
 
       // query
       // compare
-      char dummy10[sizeof (QueryNode*)];
+      char dummy11[sizeof (QueryNode*)];
 
       // subquery
-      char dummy11[sizeof (SubqueryNode*)];
+      char dummy12[sizeof (SubqueryNode*)];
 
       // boolexpr
-      char dummy12[sizeof (TrueOrFalseNode*)];
+      char dummy13[sizeof (TrueOrFalseNode*)];
 
       // value
-      char dummy13[sizeof (ValueNode*)];
+      char dummy14[sizeof (ValueNode*)];
 
       // direction
-      char dummy14[sizeof (bool)];
+      char dummy15[sizeof (bool)];
 
       // comp_type
       // equality
       // relational
       // stringop
-      char dummy15[sizeof (int)];
+      char dummy16[sizeof (int)];
 
       // "identifier"
       // "string"
@@ -505,7 +510,7 @@ namespace yy {
       // "key or value"
       // path_elem
       // id
-      char dummy16[sizeof (std::string)];
+      char dummy17[sizeof (std::string)];
     };
 
     /// The size of the largest semantic type.
@@ -620,7 +625,7 @@ namespace yy {
     {
       enum symbol_kind_type
       {
-        YYNTOKENS = 63, ///< Number of tokens.
+        YYNTOKENS = 67, ///< Number of tokens.
         SYM_YYEMPTY = -2,
         SYM_YYEOF = 0,                           // "end of file"
         SYM_YYerror = 1,                         // error
@@ -677,42 +682,47 @@ namespace yy {
         SYM_SIZE = 52,                           // "@size"
         SYM_TYPE = 53,                           // "@type"
         SYM_KEY_VAL = 54,                        // "key or value"
-        SYM_55_ = 55,                            // '('
-        SYM_56_ = 56,                            // ')'
-        SYM_57_ = 57,                            // '['
-        SYM_58_ = 58,                            // ']'
-        SYM_59_ = 59,                            // '.'
-        SYM_60_ = 60,                            // ','
-        SYM_61_ = 61,                            // '{'
-        SYM_62_ = 62,                            // '}'
-        SYM_YYACCEPT = 63,                       // $accept
-        SYM_final = 64,                          // final
-        SYM_query = 65,                          // query
-        SYM_compare = 66,                        // compare
-        SYM_value = 67,                          // value
-        SYM_prop = 68,                           // prop
-        SYM_simple_prop = 69,                    // simple_prop
-        SYM_subquery = 70,                       // subquery
-        SYM_post_query = 71,                     // post_query
-        SYM_distinct = 72,                       // distinct
-        SYM_distinct_param = 73,                 // distinct_param
-        SYM_sort = 74,                           // sort
-        SYM_sort_param = 75,                     // sort_param
-        SYM_limit = 76,                          // limit
-        SYM_direction = 77,                      // direction
-        SYM_list = 78,                           // list
-        SYM_list_content = 79,                   // list_content
-        SYM_constant = 80,                       // constant
-        SYM_boolexpr = 81,                       // boolexpr
-        SYM_comp_type = 82,                      // comp_type
-        SYM_post_op = 83,                        // post_op
-        SYM_aggr_op = 84,                        // aggr_op
-        SYM_equality = 85,                       // equality
-        SYM_relational = 86,                     // relational
-        SYM_stringop = 87,                       // stringop
-        SYM_path = 88,                           // path
-        SYM_path_elem = 89,                      // path_elem
-        SYM_id = 90                              // id
+        SYM_55_ = 55,                            // '+'
+        SYM_56_ = 56,                            // '-'
+        SYM_57_ = 57,                            // '*'
+        SYM_58_ = 58,                            // '/'
+        SYM_59_ = 59,                            // '('
+        SYM_60_ = 60,                            // ')'
+        SYM_61_ = 61,                            // '['
+        SYM_62_ = 62,                            // ']'
+        SYM_63_ = 63,                            // '.'
+        SYM_64_ = 64,                            // ','
+        SYM_65_ = 65,                            // '{'
+        SYM_66_ = 66,                            // '}'
+        SYM_YYACCEPT = 67,                       // $accept
+        SYM_final = 68,                          // final
+        SYM_query = 69,                          // query
+        SYM_compare = 70,                        // compare
+        SYM_expr = 71,                           // expr
+        SYM_value = 72,                          // value
+        SYM_prop = 73,                           // prop
+        SYM_simple_prop = 74,                    // simple_prop
+        SYM_subquery = 75,                       // subquery
+        SYM_post_query = 76,                     // post_query
+        SYM_distinct = 77,                       // distinct
+        SYM_distinct_param = 78,                 // distinct_param
+        SYM_sort = 79,                           // sort
+        SYM_sort_param = 80,                     // sort_param
+        SYM_limit = 81,                          // limit
+        SYM_direction = 82,                      // direction
+        SYM_list = 83,                           // list
+        SYM_list_content = 84,                   // list_content
+        SYM_constant = 85,                       // constant
+        SYM_boolexpr = 86,                       // boolexpr
+        SYM_comp_type = 87,                      // comp_type
+        SYM_post_op = 88,                        // post_op
+        SYM_aggr_op = 89,                        // aggr_op
+        SYM_equality = 90,                       // equality
+        SYM_relational = 91,                     // relational
+        SYM_stringop = 92,                       // stringop
+        SYM_path = 93,                           // path
+        SYM_path_elem = 94,                      // path_elem
+        SYM_id = 95                              // id
       };
     };
 
@@ -765,6 +775,10 @@ namespace yy {
 
       case symbol_kind::SYM_post_query: // post_query
         value.move< DescriptorOrderingNode* > (std::move (that.value));
+        break;
+
+      case symbol_kind::SYM_expr: // expr
+        value.move< ExpressionNode* > (std::move (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
@@ -910,6 +924,18 @@ namespace yy {
       {}
 #else
       basic_symbol (typename Base::kind_type t, const DescriptorOrderingNode*& v)
+        : Base (t)
+        , value (v)
+      {}
+#endif
+
+#if 201103L <= YY_CPLUSPLUS
+      basic_symbol (typename Base::kind_type t, ExpressionNode*&& v)
+        : Base (t)
+        , value (std::move (v))
+      {}
+#else
+      basic_symbol (typename Base::kind_type t, const ExpressionNode*& v)
         : Base (t)
         , value (v)
       {}
@@ -1119,6 +1145,10 @@ switch (yykind)
         value.template destroy< DescriptorOrderingNode* > ();
         break;
 
+      case symbol_kind::SYM_expr: // expr
+        value.template destroy< ExpressionNode* > ();
+        break;
+
       case symbol_kind::SYM_list: // list
       case symbol_kind::SYM_list_content: // list_content
         value.template destroy< ListNode* > ();
@@ -1294,6 +1324,10 @@ switch (yykind)
 #if !defined _MSC_VER || defined __clang__
         YY_ASSERT (tok == token::TOK_END
                    || (token::TOK_YYerror <= tok && tok <= token::TOK_NOT)
+                   || tok == 43
+                   || tok == 45
+                   || tok == 42
+                   || tok == 47
                    || (40 <= tok && tok <= 41)
                    || tok == 91
                    || tok == 93
@@ -2515,9 +2549,9 @@ switch (yykind)
     /// Constants.
     enum
     {
-      yylast_ = 296,     ///< Last index in yytable_.
-      yynnts_ = 28,  ///< Number of nonterminal symbols.
-      yyfinal_ = 38 ///< Termination state number.
+      yylast_ = 351,     ///< Last index in yytable_.
+      yynnts_ = 29,  ///< Number of nonterminal symbols.
+      yyfinal_ = 40 ///< Termination state number.
     };
 
 
@@ -2541,15 +2575,15 @@ switch (yykind)
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-      55,    56,     2,     2,    60,     2,    59,     2,     2,     2,
+      59,    60,    57,    55,    64,    56,    63,    58,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,    57,     2,    58,     2,     2,     2,     2,     2,     2,
+       2,    61,     2,    62,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,    61,     2,    62,     2,     2,     2,     2,
+       2,     2,     2,    65,     2,    66,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -2606,6 +2640,10 @@ switch (yykind)
 
       case symbol_kind::SYM_post_query: // post_query
         value.copy< DescriptorOrderingNode* > (YY_MOVE (that.value));
+        break;
+
+      case symbol_kind::SYM_expr: // expr
+        value.copy< ExpressionNode* > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::SYM_list: // list
@@ -2736,6 +2774,10 @@ switch (yykind)
 
       case symbol_kind::SYM_post_query: // post_query
         value.move< DescriptorOrderingNode* > (YY_MOVE (s.value));
+        break;
+
+      case symbol_kind::SYM_expr: // expr
+        value.move< ExpressionNode* > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::SYM_list: // list

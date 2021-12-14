@@ -384,9 +384,7 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
         case Mode::TableView:
             if (row_ndx >= m_table_view.size())
                 break;
-            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_obj_valid(row_ndx))
-                return Obj{};
-            return m_table_view.get(row_ndx);
+            return m_table_view.try_get_object(row_ndx);
     }
     return util::none;
 }

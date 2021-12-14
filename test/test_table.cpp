@@ -1340,13 +1340,13 @@ TEST_TYPES(Table_SortFloat, float, double, Decimal128)
     // nulls should appear first,
     // followed by nans, folllowed by the rest of the values in ascending order
     for (size_t i = 0; i < 300; ++i) {
-        CHECK(sorted.get(i).is_null(col));
+        CHECK(sorted.get_object(i).is_null(col));
     }
     for (size_t i = 300; i < 600; ++i) {
-        CHECK(realm::isnan(sorted.get(i).get<TEST_TYPE>(col)));
+        CHECK(realm::isnan(sorted.get_object(i).get<TEST_TYPE>(col)));
     }
     for (size_t i = 600; i + 1 < 900; ++i) {
-        CHECK_GREATER(sorted.get(i + 1).get<TEST_TYPE>(col), sorted.get(i).get<TEST_TYPE>(col));
+        CHECK_GREATER(sorted.get_object(i + 1).get<TEST_TYPE>(col), sorted.get_object(i).get<TEST_TYPE>(col));
     }
 }
 
@@ -1687,11 +1687,11 @@ TEST(Table_AutoEnumeration)
 
     auto tv = table.find_all_string(col_str, "eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", tv.get(0).get<String>(col_str));
-    CHECK_EQUAL("eftg", tv.get(1).get<String>(col_str));
-    CHECK_EQUAL("eftg", tv.get(2).get<String>(col_str));
-    CHECK_EQUAL("eftg", tv.get(3).get<String>(col_str));
-    CHECK_EQUAL("eftg", tv.get(4).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get_object(0).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get_object(1).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get_object(2).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get_object(3).get<String>(col_str));
+    CHECK_EQUAL("eftg", tv.get_object(4).get<String>(col_str));
 
     Obj obj = table.create_object();
     CHECK_EQUAL(0, obj.get<Int>(col_int));

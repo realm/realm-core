@@ -1699,7 +1699,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     // key is still there...
     CHECK(tv.get_key(0));
     // but no obj for that key...
-    CHECK_THROW(tv.get(0), realm::KeyNotFound);
+    CHECK_THROW(tv.get_object(0), realm::KeyNotFound);
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 0);
@@ -3521,9 +3521,9 @@ TEST(LangBindHelper_HandoverPartialQuery)
             TableView tv = qq2->greater(col0, 48).find_all();
             CHECK(tv.is_attached());
             CHECK_EQUAL(2, tv.size());
-            auto obj = tv.get(0);
+            auto obj = tv.get_object(0);
             CHECK_EQUAL(49, obj.get<int64_t>(col0));
-            obj = tv.get(1);
+            obj = tv.get_object(1);
             CHECK_EQUAL(50, obj.get<int64_t>(col0));
         }
     }
@@ -3589,7 +3589,7 @@ TEST(LangBindHelper_HandoverAccessors)
         CHECK(tv.is_attached());
         CHECK_EQUAL(100, tv.size());
         for (int i = 0; i < 100; ++i)
-            CHECK_EQUAL(i, tv.get(i).get<Int>(col));
+            CHECK_EQUAL(i, tv.get_object(i).get<Int>(col));
 
         reader = writer->duplicate();
         tv2 = reader->import_copy_of(tv, PayloadPolicy::Copy);
@@ -3854,8 +3854,8 @@ void handover_verifier(HandoverControl<Work>* control, TestContext& test_context
         CHECK(tv2->is_in_sync());
         CHECK_EQUAL(tv.size(), tv2->size());
         for (size_t k = 0; k < tv.size(); ++k) {
-            auto o = tv.get(k);
-            auto o2 = tv2->get(k);
+            auto o = tv.get_object(k);
+            auto o2 = tv2->get_object(k);
             CHECK_EQUAL(o.get<int64_t>(cols[0]), o2.get<int64_t>(cols[0]));
         }
         if (table->where().equal(cols[0], 0).count() >= 1)
@@ -3973,12 +3973,12 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK(tv2.is_attached());
             CHECK_EQUAL(100, tv1.size());
             for (int i = 0; i < 100; ++i) {
-                auto o = tv1.get(i);
+                auto o = tv1.get_object(i);
                 CHECK_EQUAL(i, o.get<int64_t>(col));
             }
             CHECK_EQUAL(100, tv2.size());
             for (int i = 0; i < 100; ++i) {
-                auto o = tv2.get(i);
+                auto o = tv2.get_object(i);
                 CHECK_EQUAL(i, o.get<int64_t>(col));
             }
             tr = group_w->duplicate();
@@ -3992,7 +3992,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             CHECK(tv_ov->is_attached());
             CHECK_EQUAL(100, tv_ov->size());
             for (int i = 0; i < 100; ++i) {
-                auto o = tv_ov->get(i);
+                auto o = tv_ov->get_object(i);
                 CHECK_EQUAL(i, o.get<int64_t>(col));
             }
         }

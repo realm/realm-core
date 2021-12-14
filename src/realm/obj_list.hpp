@@ -64,7 +64,7 @@ public:
     {
         return get_object(ndx);
     }
-    Obj try_get_object(size_t row_ndx) const
+    virtual Obj try_get_object(size_t row_ndx) const noexcept
     {
         REALM_ASSERT(row_ndx < size());
         return is_obj_valid(row_ndx) ? get_object(row_ndx) : Obj();

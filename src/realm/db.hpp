@@ -26,6 +26,7 @@
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/features.h>
+#include <realm/util/functional.hpp>
 #include <realm/util/interprocess_condvar.hpp>
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/version_id.hpp>
@@ -33,6 +34,7 @@
 #include <functional>
 #include <cstdint>
 #include <limits>
+#include <condition_variable>
 
 namespace realm {
 
@@ -199,7 +201,7 @@ public:
     /// and changes done by another thread in the same process as the caller.
     ///
     /// Has db been changed ?
-    bool has_changed(TransactionRef);
+    bool has_changed(TransactionRef&);
 
     /// The calling thread goes to sleep until the database is changed, or
     /// until wait_for_change_release() is called. After a call to
@@ -207,7 +209,7 @@ public:
     /// immediately. To restore the ability to wait for a change, a call to
     /// enable_wait_for_change() is required. Return true if the database has
     /// changed, false if it might have.
-    bool wait_for_change(TransactionRef);
+    bool wait_for_change(TransactionRef&);
 
     /// release any thread waiting in wait_for_change().
     void wait_for_change_release();
@@ -235,6 +237,10 @@ public:
     // an invalid TransactionRef is returned.
     TransactionRef start_write(bool nonblocking = false);
 
+    // ask for write mutex. Callback takes place when mutex has been acquired.
+    // callback may occur on ANOTHER THREAD. Must not be called if write mutex
+    // has already been acquired.
+    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>& when_acquired);
 
     // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed
@@ -401,11 +407,7 @@ protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
 private:
-    std::recursive_mutex m_mutex;
-    int m_transaction_count = 0;
-    SlabAlloc m_alloc;
-    std::unique_ptr<Replication> m_history;
-    Replication* m_replication = nullptr;
+    class AsyncCommitHelper;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -422,10 +424,20 @@ private:
             res->m_file_size = file_size;
             return res;
         }
+        void check() const noexcept
+        {
+            REALM_ASSERT_RELEASE_EX((m_top_ref & 7) == 0 && m_top_ref < m_file_size, m_version, m_reader_idx,
+                                    m_top_ref, m_file_size);
+        }
     };
     class ReadLockGuard;
 
     // Member variables
+    std::recursive_mutex m_mutex;
+    int m_transaction_count = 0;
+    SlabAlloc m_alloc;
+    std::unique_ptr<Replication> m_history;
+    Replication* m_replication = nullptr;
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
@@ -449,6 +461,7 @@ private:
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
     std::shared_ptr<metrics::Metrics> m_metrics;
+    std::unique_ptr<AsyncCommitHelper> m_commit_helper;
     bool m_is_sync_agent = false;
 
     /// Attach this DB instance to the specified database file.
@@ -527,7 +540,7 @@ private:
     /// return true if write transaction can commence, false otherwise.
     bool do_try_begin_write();
     void do_begin_write();
-    version_type do_commit(Transaction&);
+    version_type do_commit(Transaction&, bool commit_to_disk = true);
     void do_end_write() noexcept;
 
     // make sure the given index is within the currently mapped area.
@@ -535,7 +548,7 @@ private:
     bool grow_reader_mapping(uint_fast32_t index);
 
     // Must be called only by someone that has a lock on the write mutex.
-    void low_level_commit(uint_fast64_t new_version, Transaction& transaction);
+    void low_level_commit(uint_fast64_t new_version, Transaction& transaction, bool commit_to_disk = true);
 
     void do_async_commits();
 
@@ -554,6 +567,11 @@ private:
     }
 
     void close_internal(std::unique_lock<util::InterprocessMutex>, bool allow_open_read_transactions);
+
+    void async_begin_write(util::UniqueFunction<void()> fn);
+    void async_end_write();
+    void async_sync_to_disk(util::UniqueFunction<void()> fn);
+
     friend class Transaction;
 };
 
@@ -581,6 +599,19 @@ public:
     {
         return db->get_version_of_latest_snapshot();
     }
+    DB::VersionID get_oldest_version_not_persisted()
+    {
+        if (m_oldest_version_not_persisted) {
+            return VersionID(m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_reader_idx);
+        }
+        return {};
+    }
+    /// Get a version id which may be used to request a different transaction locked to specific version.
+    DB::VersionID get_version_of_current_transaction() const noexcept
+    {
+        return VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
+    }
+
     void close();
     bool is_attached()
     {
@@ -598,7 +629,7 @@ public:
     void end_read();
 
     // Live transactions state changes, often taking an observer functor:
-    VersionID commit_and_continue_as_read();
+    VersionID commit_and_continue_as_read(bool commit_to_disk = true);
     template <class O>
     void rollback_and_continue_as_read(O* observer);
     void rollback_and_continue_as_read()
@@ -626,6 +657,11 @@ public:
     {
         return m_transact_stage == DB::transact_Frozen;
     }
+    bool is_async() noexcept
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        return m_async_stage != AsyncState::Idle;
+    }
     TransactionRef duplicate();
 
     _impl::History* get_history() const;
@@ -649,12 +685,57 @@ public:
     /// Get the current transaction type
     DB::TransactStage get_transact_stage() const noexcept;
 
-    /// Get a version id which may be used to request a different transaction locked to specific version.
-    VersionID get_version_of_current_transaction();
-
     void upgrade_file_format(int target_file_format_version);
 
+    /// Task oriented/async interface for continuous transactions.
+    // true if this transaction already holds the write mutex
+    bool holds_write_mutex() const noexcept
+    {
+        return m_async_stage == AsyncState::HasLock || m_async_stage == AsyncState::HasCommits;
+    }
+
+    // request full synchronization to stable storage for all writes done since
+    // last sync - or just release write mutex.
+    // The write mutex is released after full synchronization.
+    void async_end(util::UniqueFunction<void()> when_synchronized = nullptr);
+
+    // true if sync to disk has been requested
+    bool is_synchronizing() noexcept
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        return m_async_stage == AsyncState::Syncing;
+    }
+
+    // Wait for any async operation to complete.
+    // Returns TRUE if async stage is Idle
+    bool wait_for_async_completion()
+    {
+        std::unique_lock<std::mutex> lck(mtx);
+        if (m_async_stage == Transaction::AsyncState::Syncing) {
+            waiting_for_sync = true;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_sync);
+        }
+        else if (m_async_stage == Transaction::AsyncState::Requesting) {
+            waiting_for_write_lock = true;
+            do {
+                cv.wait(lck);
+            } while (waiting_for_write_lock);
+        }
+        if (m_commit_exception)
+            throw m_commit_exception;
+        return m_async_stage == Transaction::AsyncState::Idle;
+    }
+
+    std::exception_ptr get_commit_exception()
+    {
+        return m_commit_exception;
+    }
+
 private:
+    enum class AsyncState { Idle, Requesting, HasLock, HasCommits, Syncing };
+
     DBRef get_db() const
     {
         return db;
@@ -677,6 +758,16 @@ private:
     mutable _impl::History* m_history = nullptr;
 
     DB::ReadLockInfo m_read_lock;
+    util::Optional<DB::ReadLockInfo> m_oldest_version_not_persisted;
+    std::exception_ptr m_commit_exception;
+
+    // Mutex is protecting access to members just below
+    std::mutex mtx;
+    std::condition_variable cv;
+    AsyncState m_async_stage = AsyncState::Idle;
+    bool waiting_for_write_lock = false;
+    bool waiting_for_sync = false;
+
     DB::TransactStage m_transact_stage = DB::transact_Ready;
 
     friend class DB;
@@ -892,14 +983,16 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
     if (m_transact_stage != DB::transact_Reading)
         throw LogicError(LogicError::wrong_transact_state);
 
-    if (nonblocking) {
-        bool succes = db->do_try_begin_write();
-        if (!succes) {
-            return false;
+    if (!holds_write_mutex()) {
+        if (nonblocking) {
+            bool succes = db->do_try_begin_write();
+            if (!succes) {
+                return false;
+            }
         }
-    }
-    else {
-        db->do_begin_write(); // Throws
+        else {
+            db->do_begin_write(); // Throws
+        }
     }
     try {
         Replication* repl = db->get_replication();
@@ -922,7 +1015,8 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
             create_empty_group(); // Throws
     }
     catch (...) {
-        db->do_end_write();
+        if (!holds_write_mutex())
+            db->do_end_write();
         m_history = nullptr;
         throw;
     }
@@ -960,14 +1054,17 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     // Mark all managed space (beyond the attached file) as free.
     db->reset_free_space_tracking(); // Throws
 
+    m_read_lock.check();
     ref_type top_ref = m_read_lock.m_top_ref;
     size_t file_size = m_read_lock.m_file_size;
+
     _impl::ReversedNoCopyInputStream reversed_in(reverser);
     m_alloc.update_reader_view(file_size); // Throws
     update_allocator_wrappers(false);
     advance_transact(top_ref, reversed_in, false); // Throws
 
-    db->do_end_write();
+    if (!holds_write_mutex())
+        db->do_end_write();
 
     m_history = nullptr;
     set_transact_stage(DB::transact_Reading);

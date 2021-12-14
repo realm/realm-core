@@ -262,10 +262,9 @@ QueryNode::~QueryNode() {}
 
 Query NotNode::visit(ParserDriver* drv)
 {
-    Query query = atom_pred->visit(drv);
     Query q = drv->m_base_table->where();
     q.Not();
-    q.and_query(query);
+    q.and_query(query->visit(drv));
     return {q};
 }
 
@@ -298,6 +297,76 @@ void verify_only_string_types(DataType type, const std::string& op_string)
             "Unsupported comparison operator '%1' against type '%2', right side must be a string or binary type",
             op_string, get_data_type_name(type)));
     }
+}
+
+std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
+{
+    std::unique_ptr<Subexpr> left;
+    std::unique_ptr<Subexpr> right;
+
+    auto left_is_constant = m_left->is_constant();
+    auto right_is_constant = m_right->is_constant();
+
+    if (left_is_constant && right_is_constant) {
+        right = m_right->visit(drv, type);
+        left = m_left->visit(drv, type);
+        auto v_left = left->get_mixed();
+        auto v_right = right->get_mixed();
+        Mixed result;
+        switch (m_op) {
+            case '+':
+                result = v_left + v_right;
+                break;
+            case '-':
+                result = v_left - v_right;
+                break;
+            case '*':
+                result = v_left * v_right;
+                break;
+            case '/':
+                result = v_left / v_right;
+                break;
+            default:
+                break;
+        }
+        return std::make_unique<Value<Mixed>>(result);
+    }
+
+    if (right_is_constant) {
+        // Take left first - it cannot be a constant
+        left = m_left->visit(drv);
+
+        right = m_right->visit(drv, left->get_type());
+    }
+    else {
+        right = m_right->visit(drv);
+        if (left_is_constant) {
+            left = m_left->visit(drv, right->get_type());
+        }
+        else {
+            left = m_left->visit(drv);
+        }
+    }
+    if (!Mixed::is_numeric(left->get_type(), right->get_type())) {
+        util::serializer::SerialisationState state("");
+        std::string op(&m_op, 1);
+        throw std::invalid_argument(util::format("Cannot perform '%1' operation on '%2' and '%3'", op,
+                                                 left->description(state), right->description(state)));
+    }
+
+    switch (m_op) {
+        case '+':
+            return std::make_unique<Operator<Plus>>(std::move(left), std::move(right));
+        case '-':
+            return std::make_unique<Operator<Minus>>(std::move(left), std::move(right));
+        case '*':
+            return std::make_unique<Operator<Mul>>(std::move(left), std::move(right));
+        case '/':
+            return std::make_unique<Operator<Div>>(std::move(left), std::move(right));
+        default:
+            break;
+    }
+    return {};
 }
 
 Query EqualityNode::visit(ParserDriver* drv)
@@ -844,17 +913,14 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             break;
         }
         case Type::FLOAT: {
-            switch (hint) {
-                case type_Float: {
-                    ret = std::make_unique<Value<float>>(strtof(text.c_str(), nullptr));
-                    break;
-                }
-                case type_Decimal:
-                    ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
-                    break;
-                default:
-                    ret = std::make_unique<Value<double>>(strtod(text.c_str(), nullptr));
-                    break;
+            if (hint == type_Float || text[text.size() - 1] == 'f') {
+                ret = std::make_unique<Value<float>>(strtof(text.c_str(), nullptr));
+            }
+            else if (hint == type_Decimal) {
+                ret = std::make_unique<Value<Decimal128>>(Decimal128(text));
+            }
+            else {
+                ret = std::make_unique<Value<double>>(strtod(text.c_str(), nullptr));
             }
             break;
         }
@@ -1260,40 +1326,38 @@ ParserDriver::~ParserDriver()
 }
 
 
-std::pair<std::unique_ptr<Subexpr>, std::unique_ptr<Subexpr>> ParserDriver::cmp(const std::vector<ValueNode*>& values)
+auto ParserDriver::cmp(const std::vector<ExpressionNode*>& values) -> std::pair<SubexprPtr, SubexprPtr>
 {
-    std::unique_ptr<Subexpr> left;
-    std::unique_ptr<Subexpr> right;
+    SubexprPtr left;
+    SubexprPtr right;
 
-    auto left_constant = values[0]->constant;
-    auto right_constant = values[1]->constant;
-    auto left_prop = values[0]->prop;
-    auto right_prop = values[1]->prop;
+    auto left_is_constant = values[0]->is_constant();
+    auto right_is_constant = values[1]->is_constant();
 
-    if (left_constant && right_constant) {
+    if (left_is_constant && right_is_constant) {
         throw InvalidQueryError("Cannot compare two constants");
     }
 
-    if (right_constant) {
+    if (right_is_constant) {
         // Take left first - it cannot be a constant
-        left = left_prop->visit(this);
-        right = right_constant->visit(this, left->get_type());
+        left = values[0]->visit(this);
+        right = values[1]->visit(this, left->get_type());
         verify_conditions(left.get(), right.get(), m_serializer_state);
     }
     else {
-        right = right_prop->visit(this);
-        if (left_constant) {
-            left = left_constant->visit(this, right->get_type());
+        right = values[1]->visit(this);
+        if (left_is_constant) {
+            left = values[0]->visit(this, right->get_type());
         }
         else {
-            left = left_prop->visit(this);
+            left = values[0]->visit(this);
         }
         verify_conditions(right.get(), left.get(), m_serializer_state);
     }
     return {std::move(left), std::move(right)};
 }
 
-std::unique_ptr<Subexpr> ParserDriver::column(LinkChain& link_chain, std::string identifier)
+auto ParserDriver::column(LinkChain& link_chain, std::string identifier) -> SubexprPtr
 {
     identifier = m_mapping.translate(link_chain, identifier);
 

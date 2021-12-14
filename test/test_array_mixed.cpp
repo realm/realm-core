@@ -196,7 +196,7 @@ TEST(Mixed_SortNumeric)
                            "5\n7.5\n34.8\n42\n42.125\n100\n"
                            "129.85\n256.25\n500\n10000\n\"Hello\"\n";
     for (size_t i = 0; i < sz; i++) {
-        Mixed val = tv.get(i).get<Mixed>(col_data);
+        Mixed val = tv.get_object(i).get<Mixed>(col_data);
         out << val << std::endl;
     }
     std::string actual = out.str();

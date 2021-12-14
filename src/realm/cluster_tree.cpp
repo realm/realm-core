@@ -911,7 +911,7 @@ ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
     return state;
 }
 
-bool ClusterTree::is_valid(ObjKey k) const
+bool ClusterTree::is_valid(ObjKey k) const noexcept
 {
     if (m_size == 0)
         return false;
@@ -930,7 +930,7 @@ ClusterNode::State ClusterTree::get(ObjKey k) const
 ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
 {
     ClusterNode::State state;
-    if (!m_root->try_get(k, state))
+    if (!(k && m_root->try_get(k, state)))
         state.index = realm::npos;
     return state;
 }
