@@ -499,6 +499,297 @@ void EmbeddedObjectConverter::process_pending()
     }
 }
 
+struct RecoverLocalChangesetsHandler : public InstructionApplier {
+
+    using Instruction = sync::Instruction;
+
+    const Transaction& remote;
+    Transaction& local;
+    util::Logger& logger;
+    const sync::Changeset* log;
+    // Map from table name to map from ObjectID to ObjectID.
+    std::map<std::string, std::map<ObjectId, ObjectId>> object_id_conversion;
+
+    // The recovery fails if there seems to be conflict between the
+    // instructions and state.
+    //
+    // After failure the processing stops and the client reset will
+    // drop all local changes.
+    //
+    // Failure is triggered by:
+    // 1. Destructive schema changes.
+    // 2. Creation of an already existing table with another type.
+    // 3. Creation of an already existing column with another type.
+    bool failed = false;
+
+    RecoverLocalChangesetsHandler(const Transaction& remote_wt, Transaction& local_wt, util::Logger& logger)
+        : InstructionApplier(local_wt)
+        , remote{remote_wt}
+        , local{local_wt}
+        , logger{logger}
+    {
+    }
+
+    void reset()
+    {
+        failed = false;
+    }
+
+    ObjectId convert_oid(StringData table_name, ObjectId oid)
+    {
+        auto search = object_id_conversion.find(table_name);
+        if (search == object_id_conversion.end())
+            return oid;
+        auto search_2 = search->second.find(oid);
+        if (search_2 == search->second.end())
+            return oid;
+        return search_2->second;
+    }
+
+    bool process_changeset(const ChunkedBinaryData& chunked_changeset)
+    {
+        if (chunked_changeset.size() == 0)
+            return true;
+
+        ChunkedBinaryInputStream in{chunked_changeset};
+        sync::Changeset parsed_changeset;
+        sync::parse_changeset(in, parsed_changeset); // Throws
+
+        log = &parsed_changeset;
+        InstructionApplier::begin_apply(parsed_changeset, &logger);
+        for (auto instr : parsed_changeset) {
+            if (!instr)
+                continue;
+            instr->visit(*this); // Throws
+            if (failed)
+                return false;
+        }
+        InstructionApplier::end_apply();
+        reset();
+        return true;
+    }
+
+    StringData get_string(sync::InternString intern_string) const
+    {
+        auto string_buffer_range = log->try_get_intern_string(intern_string);
+        REALM_ASSERT(string_buffer_range);
+        return log->get_string(*string_buffer_range);
+    }
+
+    StringData get_string(sync::StringBufferRange range) const
+    {
+        auto string = log->try_get_string(range);
+        REALM_ASSERT(string);
+        return *string;
+    }
+
+    std::string table_name_for_class(sync::InternString class_name_intern)
+    {
+        StringData class_name = get_string(class_name_intern);
+        std::stringstream ss;
+        ss << "class_" << class_name;
+        return ss.str();
+    }
+
+    void operator()(const Instruction::AddTable& instr)
+    {
+        std::string table_name = table_name_for_class(instr.table);
+        if (ConstTableRef remote_table = remote.get_table(table_name)) {
+            mpark::visit(
+                util::overload{
+                    [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
+                        REALM_ASSERT(is_valid_key_type(spec.type));
+                        ColKey pk_col = remote_table->get_primary_key_column();
+                        if (!pk_col) {
+                            logger.warn(
+                                "Table %1 has different types on client and server: embedded vs non-embedded)",
+                                table_name);
+                            failed = true;
+                        }
+                        else if (DataType(pk_col.get_type()) != get_data_type(spec.type)) {
+                            logger.warn("Table %1 has different primary key types on client and server", table_name);
+                            failed = true;
+                        }
+                        else if (pk_col.is_nullable() != spec.nullable) {
+                            logger.warn("Table %1 has different primary key type nullability on client and server",
+                                        table_name);
+                            failed = true;
+                        }
+                        else if (remote_table->get_column_name(pk_col) != get_string(spec.field)) {
+                            logger.warn("Table %1 has different types on client and server", table_name);
+                            failed = true;
+                        }
+                    },
+                    [&](const Instruction::AddTable::EmbeddedTable&) {
+                        if (remote_table->get_primary_key_column()) {
+                            logger.warn(
+                                "Table %1 has different types on client and server: embedded vs non-embedded)",
+                                table_name);
+                            failed = true;
+                        }
+                    },
+                },
+                instr.type);
+        }
+        else {
+            mpark::visit(util::overload{
+                             [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
+                                 REALM_ASSERT(is_valid_key_type(spec.type));
+                                 local.add_table_with_primary_key(table_name, get_data_type(spec.type),
+                                                                  get_string(spec.field), spec.nullable);
+                             },
+                             [&](const Instruction::AddTable::EmbeddedTable&) {
+                                 local.add_embedded_table(table_name);
+                             },
+                         },
+                         instr.type);
+        }
+    }
+
+    void operator()(const Instruction::EraseTable& instr)
+    {
+        // Destructive schema changes are not allowed by the resetting client.
+        static_cast<void>(instr);
+        logger.warn("Tables cannot be erased during client reset");
+        failed = true;
+        return;
+    }
+
+    void operator()(const Instruction::CreateObject& instr)
+    {
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::EraseObject& instr)
+    {
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::Update& instr)
+    {
+        // FIXME: only do this if the object exists in the remote Realm
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::AddInteger& instr)
+    {
+        // FIXME: only do this if the object exists in the remote Realm
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::Clear&)
+    {
+        // FIXME: what is the correct behaviour here?
+    }
+
+    void operator()(const Instruction::AddColumn& instr)
+    {
+        // FIXME: check for property compatability
+        //        StringData column_name = get_string(instr.field); // Throws
+        //        size_t col_ndx = selected_table->get_column_index(column_name);
+        //        if (col_ndx != npos) {
+        //            if (instr.type == type_Link || instr.type == type_LinkList) {
+        //                if (selected_table->get_column_type(col_ndx) != instr.type) {
+        //                    logger.warn("The column %1 in table %2 has incompatible "
+        //                                "type between client and server",
+        //                                column_name, selected_table->get_name());
+        //                    failed = true;
+        //                    return;
+        //                }
+        //                TableRef table_target = selected_table->get_link_target(col_ndx);
+        //                std::string target_name = table_name_for_class(instr.link_target_table);
+        //                if (table_target->get_name() != target_name) {
+        //                    logger.debug("Failed here, target_name = %1, name = %2", target_name,
+        //                    table_target->get_name()); logger.warn("The column %1 in table %2 has incompatible "
+        //                                "type between client and server",
+        //                                column_name, selected_table->get_name());
+        //                    failed = true;
+        //                    return;
+        //                }
+        //            }
+        //            else {
+        //                if (instr.container_type == sync::ContainerType::None) {
+        //                    if (selected_table->get_column_type(col_ndx) != instr.type) {
+        //                        logger.warn("The column %1 in table %2 has incompatible "
+        //                                    "type between client and server",
+        //                                    column_name, selected_table->get_name());
+        //                        failed = true;
+        //                        return;
+        //                    }
+        //                    if (selected_table->is_nullable(col_ndx) != instr.nullable) {
+        //                        logger.warn("The column %1 in table %2 has incompatible "
+        //                                    "type between client and server",
+        //                                    column_name, selected_table->get_name());
+        //                        failed = true;
+        //                        return;
+        //                    }
+        //                }
+        //                else {
+        //                    if (selected_table->get_column_type(col_ndx) != type_Table) {
+        //                        logger.warn("The column %1 in table %2 has incompatible "
+        //                                    "type between client and server",
+        //                                    column_name, selected_table->get_name());
+        //                        failed = true;
+        //                        return;
+        //                    }
+        //                    DescriptorRef subdesc = selected_table->get_subdescriptor(col_ndx);
+        //                    if (subdesc->get_column_type(0) != instr.type) {
+        //                        logger.warn("The column %1 in table %2 has incompatible "
+        //                                    "type between client and server",
+        //                                    column_name, selected_table->get_name());
+        //                        failed = true;
+        //                        return;
+        //                    }
+        //                    if (subdesc->is_nullable(col_ndx) != instr.nullable) {
+        //                        logger.warn("The column %1 in table %2 has incompatible "
+        //                                    "type between client and server",
+        //                                    column_name, selected_table->get_name());
+        //                        failed = true;
+        //                        return;
+        //                    }
+        //                }
+        //            }
+        //            return;
+        //        }
+    }
+
+    void operator()(const Instruction::EraseColumn& instr)
+    {
+        // Destructive schema changes are not allowed by the resetting client.
+        static_cast<void>(instr);
+        failed = true;
+        return;
+    }
+
+    void operator()(const Instruction::ArrayInsert& instr)
+    {
+        logger.debug("ArrayInsert");
+        // FIXME: only do this if the object exists in the remote Realm
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::ArrayMove& instr)
+    {
+        // FIXME: only do this if the object exists in the remote Realm
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::ArrayErase& instr)
+    {
+        InstructionApplier::operator()(instr);
+    }
+    void operator()(const Instruction::SetInsert& instr)
+    {
+        // FIXME: only do this if the object exists in the remote Realm
+        InstructionApplier::operator()(instr);
+    }
+    void operator()(const Instruction::SetErase& instr)
+    {
+        // FIXME: only do this if the object exists in the remote Realm
+        InstructionApplier::operator()(instr);
+    }
+};
+
 
 } // anonymous namespace
 
@@ -855,14 +1146,20 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         fresh_server_version = remote_progress.latest_server_version;
 
         transfer_group(*wt_remote, *wt_local, logger);
-    }
 
-    // FIXME: keep track of current version, and apply the recovered changes, then erase the history before the
-    // recovered changes
-    //    RecoverLocalChangesetsHandler handler{logger};
-    //        bool success = handler.process_changeset(local_changeset->changeset);
-    //        if (!success)
-    //            return false;
+        if (recover_local_changes) {
+            // FIXME: keep track of current version, and apply the recovered changes, then erase the history before
+            // the recovered changes
+            RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
+            // FIXME: it may be desirable to make these separate transactions
+            for (const auto& change : local_changes) {
+                bool success = handler.process_changeset(change);
+                // FIXME: should failure be fatal? Or should we attempt DiscardLocal mode only?
+                if (!success)
+                    throw ClientResetFailed("Unable to automatically recover local changes during client reset");
+            }
+        }
+    }
 
     history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                 recovered_changeset);
