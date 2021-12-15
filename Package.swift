@@ -722,6 +722,7 @@ let package = Package(
             cxxSettings: cxxSettings,
             linkerSettings: [
                 .linkedLibrary("z"),
+                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ]),
         .target(
             name: "RealmQueryParser",
