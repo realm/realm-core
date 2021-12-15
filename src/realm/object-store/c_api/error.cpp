@@ -86,8 +86,8 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
             m_err->message = m_message_buf.c_str();
         }
         catch (const std::bad_alloc&) {
-            // If we are unable to build the new error because we ran out of memory we should propagate the OOM condition
-            // and leaf the m_message_buf as it was.
+            // If we are unable to build the new error because we ran out of memory we should propagate the OOM
+            // condition and leaf the m_message_buf as it was.
             m_err->error = RLM_ERR_OUT_OF_MEMORY;
             m_err->message = "Out of memory while creating realm_error_t";
         }
