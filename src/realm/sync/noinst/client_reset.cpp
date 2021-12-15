@@ -499,6 +499,206 @@ void EmbeddedObjectConverter::process_pending()
     }
 }
 
+struct RecoverLocalChangesetsHandler : public InstructionApplier {
+
+    using Instruction = sync::Instruction;
+
+    Transaction& remote;
+    util::Logger& logger;
+    const sync::Changeset* log;
+
+    // The recovery fails if there seems to be conflict between the
+    // instructions and state.
+    //
+    // Failure is triggered by:
+    // 1. Destructive schema changes.
+    // 2. Creation of an already existing table with another type.
+    // 3. Creation of an already existing column with another type.
+
+    RecoverLocalChangesetsHandler(Transaction& remote_wt, util::Logger& logger)
+        : InstructionApplier(remote_wt)
+        , remote{remote_wt}
+        , logger{logger}
+    {
+    }
+
+    REALM_NORETURN void handle_error(const std::string& message) const
+    {
+        std::string full_message =
+            util::format("Unable to automatically recover local changes during client reset: '%1'", message);
+        logger.error(full_message.c_str());
+        throw realm::_impl::client_reset::ClientResetFailed(full_message);
+    }
+
+    void process_changeset(const ChunkedBinaryData& chunked_changeset)
+    {
+        if (chunked_changeset.size() == 0)
+            return;
+
+        ChunkedBinaryInputStream in{chunked_changeset};
+        sync::Changeset parsed_changeset;
+        sync::parse_changeset(in, parsed_changeset); // Throws
+
+        log = &parsed_changeset;
+        InstructionApplier::begin_apply(parsed_changeset, &logger);
+        for (auto instr : parsed_changeset) {
+            if (!instr)
+                continue;
+            instr->visit(*this); // Throws
+        }
+        InstructionApplier::end_apply();
+    }
+
+    StringData get_string(sync::InternString intern_string) const
+    {
+        auto string_buffer_range = log->try_get_intern_string(intern_string);
+        REALM_ASSERT(string_buffer_range);
+        return log->get_string(*string_buffer_range);
+    }
+
+    StringData get_string(sync::StringBufferRange range) const
+    {
+        auto string = log->try_get_string(range);
+        REALM_ASSERT(string);
+        return *string;
+    }
+
+    void operator()(const Instruction::AddTable& instr)
+    {
+        // Rely on InstructionApplier to validate existing tables
+        StringData class_name = get_string(instr.table);
+        try {
+            InstructionApplier::operator()(instr);
+        }
+        catch (const std::runtime_error& err) {
+            handle_error(util::format(
+                "While recovering from a client reset, an AddTable instruction for '%1' could not be applied: '%2'",
+                class_name, err.what()));
+        }
+    }
+
+    void operator()(const Instruction::EraseTable& instr)
+    {
+        // Destructive schema changes are not allowed by the resetting client.
+        static_cast<void>(instr);
+        StringData class_name = get_string(instr.table);
+        handle_error(util::format("Types cannot be erased during client reset recovery: '%1'", class_name));
+    }
+
+    void operator()(const Instruction::CreateObject& instr)
+    {
+        // This should always succeed.
+        InstructionApplier::operator()(instr);
+    }
+
+    void operator()(const Instruction::EraseObject& instr)
+    {
+        if (get_top_object(instr, "EraseObject")) {
+            InstructionApplier::operator()(instr);
+        }
+        // if the object doesn't exist, a local delete is a no-op.
+    }
+
+    void operator()(const Instruction::Update& instr)
+    {
+        if (get_top_object(instr, "Update")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local Update made to an object which no longer exists");
+        }
+    }
+
+    void operator()(const Instruction::AddInteger& instr)
+    {
+        if (get_top_object(instr, "AddInteger")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local AddInteger modification made to an object which no longer exists");
+        }
+    }
+
+    void operator()(const Instruction::Clear& instr)
+    {
+        if (get_top_object(instr, "Clear")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local Clear instruction made to an object which no longer exists");
+        }
+    }
+
+    void operator()(const Instruction::AddColumn& instr)
+    {
+        // Rather than duplicating a bunch of validation, use the existing type checking
+        // that happens when adding a preexisting column and if there is a problem catch
+        // the BadChangesetError and stop recovery
+        try {
+            InstructionApplier::operator()(instr);
+        }
+        catch (const BadChangesetError& err) {
+            handle_error(util::format(
+                "While recovering during client reset, an AddColumn instruction could not be applied: '%1'",
+                err.message()));
+        }
+    }
+
+    void operator()(const Instruction::EraseColumn& instr)
+    {
+        // Destructive schema changes are not allowed by the resetting client.
+        static_cast<void>(instr);
+        handle_error(util::format("Properties cannot be erased during client reset"));
+    }
+
+    void operator()(const Instruction::ArrayInsert& instr)
+    {
+        if (get_top_object(instr, "ArrayInsert")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local ArrayInsert made to an object which no longer exists");
+        }
+    }
+
+    void operator()(const Instruction::ArrayMove& instr)
+    {
+        if (get_top_object(instr, "ArrayMove")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local ArrayMove made to an object which no longer exists");
+        }
+    }
+
+    void operator()(const Instruction::ArrayErase& instr)
+    {
+        if (get_top_object(instr, "ArrayErase")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local ArrayErase made to an object which no longer exists");
+        }
+    }
+    void operator()(const Instruction::SetInsert& instr)
+    {
+        if (get_top_object(instr, "SetInsert")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local SetInsert made to an object which no longer exists");
+        }
+    }
+    void operator()(const Instruction::SetErase& instr)
+    {
+        if (get_top_object(instr, "SetErase")) {
+            InstructionApplier::operator()(instr);
+        }
+        else {
+            logger.warn("Discarding a local SetErase made to an object which no longer exists");
+        }
+    }
+};
 
 } // anonymous namespace
 
@@ -830,13 +1030,13 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         logger.debug("Local changesets to recover: %1", local_changes.size());
 
         // FIXME: this is for debugging only
-        for (const auto& change : local_changes) {
-            // Debug.
-            ChunkedBinaryInputStream in{change};
-            sync::Changeset log;
-            sync::parse_changeset(in, log); // Throws
-            log.print();
-        }
+        //        for (const auto& change : local_changes) {
+        //            // Debug.
+        //            ChunkedBinaryInputStream in{change};
+        //            sync::Changeset log;
+        //            sync::parse_changeset(in, log); // Throws
+        //            log.print();
+        //        }
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
@@ -854,20 +1054,29 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         history_remote->get_status(remote_version, remote_ident, remote_progress);
         fresh_server_version = remote_progress.latest_server_version;
 
+        if (recover_local_changes) {
+            // FIXME: keep track of current version, and apply the recovered changes, then erase the history before
+            // the recovered changes
+            RecoverLocalChangesetsHandler handler{*wt_remote, logger};
+            // FIXME: it may be desirable to make these separate transactions
+            for (const auto& change : local_changes) {
+                // FIXME: should failure be fatal? Or should we rollback and attempt DiscardLocal mode only?
+                handler.process_changeset(change); // throws on error
+            }
+            ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
+            REALM_ASSERT_RELEASE(client_repl);
+            ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
+            const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
+            recovered_changeset = {buffer.data(), buffer.size()};
+        }
+
         transfer_group(*wt_remote, *wt_local, logger);
     }
-
-    // FIXME: keep track of current version, and apply the recovered changes, then erase the history before the
-    // recovered changes
-    //    RecoverLocalChangesetsHandler handler{logger};
-    //        bool success = handler.process_changeset(local_changeset->changeset);
-    //        if (!success)
-    //            return false;
 
     history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                 recovered_changeset);
 
-    // Finally, the local Realm is committed.
+    // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
     wt_local->commit_and_continue_as_read();
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.debug("perform_client_reset_diff is done, old_version.version = %1, "

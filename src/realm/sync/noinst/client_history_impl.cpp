@@ -102,7 +102,6 @@ std::vector<ChunkedBinaryData> ClientHistory::get_local_changes(version_type cur
         SyncProgress local_progress;
         get_status(local_version, local_ident, local_progress);
         begin_version = local_progress.upload.client_version;
-        REALM_ASSERT(begin_version >= 1);
     }
 
     version_type end_version = m_sync_history_base_version + sync_history_size();
