@@ -1,3 +1,20 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright 2021 Realm Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
 
 #ifndef REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 #define REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
@@ -95,6 +112,12 @@ public:
     /// is called.
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                       SaltedVersion server_version, BinaryData uploadable_changeset);
+
+    /// get_local_changes returns a list of changes which have not been uploaded yet
+    /// greater than or equal to 'begin_version'. 'begin_version' must be at least 1.
+    ///
+    /// The history must be in a transaction when this function is called.
+    std::vector<ChunkedBinaryData> get_local_changes(version_type current_version) const;
 
     /// Get the version of the latest snapshot of the associated Realm, as well
     /// as the client file identifier and the synchronization progress as they

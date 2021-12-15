@@ -75,8 +75,8 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
         if (m_notify_after) {
             previous_state = m_db.start_frozen();
         }
-        local_version_ids =
-            client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger); // throws
+        local_version_ids = client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger,
+                                                                    !m_discard_local); // throws
 
         if (m_notify_after) {
             m_notify_after(local_path, previous_state->get_version_of_current_transaction());
