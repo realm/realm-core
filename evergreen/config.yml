@@ -187,6 +187,20 @@ functions:
     params:
       file_location: realm-core/${task_name}_results.json
 
+  "run hang analyzer":
+  - command: shell.exec
+    params:
+      working_dir: realm-core
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        python3 evergreen/hang_analyzer
+
+timeout:
+  - func: "run hang analyzer"
+
 tasks:
 - name: compile
   tags: [ "for_pull_requests" ]
