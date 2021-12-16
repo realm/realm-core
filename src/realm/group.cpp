@@ -1423,19 +1423,21 @@ void Group::update_refs(ref_type top_ref) noexcept
 
 bool Group::operator==(const Group& g) const
 {
-    auto keys_this = get_table_keys();
-    auto keys_g = g.get_table_keys();
-    size_t n = keys_this.size();
-    if (n != keys_g.size())
-        return false;
-    for (size_t i = 0; i < n; ++i) {
-        const StringData& table_name_1 = get_table_name(keys_this[i]);
-        const StringData& table_name_2 = g.get_table_name(keys_g[i]);
-        if (table_name_1 != table_name_2)
-            return false;
+    for (auto tk : get_table_keys()) {
+        const StringData& table_name = get_table_name(tk);
 
-        ConstTableRef table_1 = get_table(keys_this[i]);
-        ConstTableRef table_2 = g.get_table(keys_g[i]);
+        ConstTableRef table_1 = get_table(tk);
+        ConstTableRef table_2 = g.get_table(table_name);
+        if (!table_2)
+            return false;
+        if (table_1->get_primary_key_column().get_type() != table_2->get_primary_key_column().get_type()) {
+            return false;
+        }
+        if (table_1->is_embedded() != table_2->is_embedded())
+            return false;
+        if (table_1->is_embedded())
+            continue;
+
         if (*table_1 != *table_2)
             return false;
     }

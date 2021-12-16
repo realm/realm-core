@@ -8,12 +8,9 @@ GPATH
 GRTAGS
 GTAGS
 
-/cover_html
 /gcovr.xml
 /tmp
 doc/html
-/html
-coverage-*
 
 # CMake artifacts
 CMakeFiles
