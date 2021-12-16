@@ -565,56 +565,15 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::AddTable& instr)
     {
+        // Rely on InstructionApplier to validate existing tables
         StringData class_name = get_string(instr.table);
-        Group::TableNameBuffer buffer;
-        StringData table_name = Group::class_name_to_table_name(class_name, buffer);
-        if (ConstTableRef remote_table = remote.get_table(table_name)) {
-            mpark::visit(
-                util::overload{
-                    [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-                        REALM_ASSERT(is_valid_key_type(spec.type));
-                        ColKey pk_col = remote_table->get_primary_key_column();
-                        if (!pk_col) {
-                            handle_error(util::format(
-                                "Table %1 has different types on client and server: embedded vs non-embedded)",
-                                table_name));
-                        }
-                        else if (DataType(pk_col.get_type()) != get_data_type(spec.type)) {
-                            handle_error(util::format("Table %1 has different primary key types on client and server",
-                                                      table_name));
-                        }
-                        else if (pk_col.is_nullable() != spec.nullable) {
-                            handle_error(util::format(
-                                "Table %1 has different primary key type nullability on client and server",
-                                table_name));
-                        }
-                        else if (remote_table->get_column_name(pk_col) != get_string(spec.field)) {
-                            handle_error(
-                                util::format("Table %1 has different types on client and server", table_name));
-                        }
-                    },
-                    [&](const Instruction::AddTable::EmbeddedTable&) {
-                        if (remote_table->get_primary_key_column()) {
-                            handle_error(util::format(
-                                "Table %1 has different types on client and server: embedded vs non-embedded)",
-                                table_name));
-                        }
-                    },
-                },
-                instr.type);
+        try {
+            InstructionApplier::operator()(instr);
         }
-        else {
-            mpark::visit(util::overload{
-                             [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-                                 REALM_ASSERT(is_valid_key_type(spec.type));
-                                 remote.add_table_with_primary_key(table_name, get_data_type(spec.type),
-                                                                   get_string(spec.field), spec.nullable);
-                             },
-                             [&](const Instruction::AddTable::EmbeddedTable&) {
-                                 remote.add_embedded_table(table_name);
-                             },
-                         },
-                         instr.type);
+        catch (const std::runtime_error& err) {
+            handle_error(util::format(
+                "While recovering from a client reset, an AddTable instruction for '%1' could not be applied: '%2'",
+                class_name, err.what()));
         }
     }
 
