@@ -46,6 +46,7 @@ struct InstructionApplier {
     void end_apply() noexcept;
 
 protected:
+    util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&, const char* instr = "(unspecified)");
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;
@@ -92,7 +93,6 @@ private:
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
     ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&, const char* instr = "(unspecified)") const;
-    util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&, const char* instr = "(unspecified)");
 
     /// Resolve the path of an instruction, and invoke the callback in one of the following ways:
     ///

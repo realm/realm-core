@@ -249,7 +249,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         if (results.size() >= 1) {
             REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
 
-            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "object")->begin();
+            auto obj = results.get<Obj>(0);
             REQUIRE(obj.get<Int>("value") == 4);
             object = Object(realm, obj);
             object_token =
@@ -268,7 +268,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     SECTION("recovery") {
         local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
         std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
-        SECTION("modify") {
+        SECTION("modify an existing object") {
             test_reset
                 ->on_post_local_changes([&](SharedRealm realm) {
                     setup_listeners(realm);
@@ -293,6 +293,121 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     // make sure that the reset operation has cleaned up after itself
                     REQUIRE(util::File::exists(local_config.path));
                     REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+        SECTION("modify a deleted object") {
+            constexpr int64_t pk = -1;
+            test_reset
+                ->setup([&](SharedRealm realm) {
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    auto obj = create_object(*realm, "object", partition, {pk});
+                    auto col = obj.get_table()->get_column_key("value");
+                    obj.set(col, 100);
+                })
+                ->make_local_changes([&](SharedRealm realm) {
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 2);
+                    ObjKey key = table->get_objkey_from_primary_key(pk);
+                    REQUIRE(key);
+                    Obj obj = table->get_object(key);
+                    obj.set("value", 200);
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    auto table = get_table(*remote, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 2);
+                    ObjKey key = table->get_objkey_from_primary_key(pk);
+                    REQUIRE(key);
+                    table->remove_object(key);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 2);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(results.get<Obj>(1).get<Int>("value") == 200);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(object.obj().get<Int>("value") == 4);
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions, 1); // the deletion "wins"
+                    REQUIRE_INDICES(object_changes.modifications);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(local_config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+        SECTION("insert") {
+            int64_t new_value = 42;
+            test_reset
+                ->make_local_changes([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    int64_t different_pk = table->begin()->get_primary_key().get_int() + 1;
+                    auto obj = create_object(*realm, "object", partition, {different_pk});
+                    auto col = obj.get_table()->get_column_key("value");
+                    obj.set(col, new_value);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 2);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
+                    CHECK(results.size() == 2);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(results.get<Obj>(1).get<Int>("value") == new_value);
+                    CHECK(object.obj().get<Int>("value") == 4);
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.modifications);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(local_config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+        SECTION("delete") {
+            test_reset
+                ->make_local_changes([&](SharedRealm local) {
+                    auto table = get_table(*local, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    table->clear();
+                    REQUIRE(table->size() == 0);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 0);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 0);
+                    CHECK(!object.is_valid());
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
                 })
                 ->run();
         }
