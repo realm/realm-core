@@ -2716,25 +2716,32 @@ size_t Table::compute_aggregated_byte_size() const noexcept
     return stats_2.allocated;
 }
 
-
-bool Table::compare_objects(const Table& t) const
+bool Table::operator==(const Table& t) const
 {
     if (size() != t.size()) {
         return false;
     }
-
-    auto it1 = begin();
-    auto it2 = t.begin();
-    auto e = end();
-
-    while (it1 != e) {
-        if (*it1 == *it2) {
-            ++it1;
-            ++it2;
-        }
-        else {
+    // Check columns
+    for (auto ck : this->get_column_keys()) {
+        auto name = get_column_name(ck);
+        auto other_ck = t.get_column_key(name);
+        auto attrs = ck.get_attrs();
+        if (!other_ck || other_ck.get_attrs() != attrs) {
             return false;
         }
+    }
+    auto pk_col = get_primary_key_column();
+    for (auto o : *this) {
+        Obj other_o;
+        if (pk_col) {
+            auto pk = o.get_any(pk_col);
+            other_o = t.get_object_with_primary_key(pk);
+        }
+        else {
+            other_o = t.get_object(o.get_key());
+        }
+        if (!(other_o && o == other_o))
+            return false;
     }
 
     return true;
