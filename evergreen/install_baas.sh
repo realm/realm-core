@@ -275,7 +275,7 @@ echo "Starting stitch app server"
 [[ -f $WORK_PATH/baas_server.pid ]] && rm $WORK_PATH/baas_server.pid
 go build -o $WORK_PATH/baas_server cmd/server/main.go
 $WORK_PATH/baas_server \
-    --configFile=etc/configs/test_config.json 2>&1 > $WORK_PATH/baas_server.log &
+    --configFile=etc/configs/test_config.json --configFile=$BASE_PATH/config_overrides.json 2>&1 > $WORK_PATH/baas_server.log &
 echo $! > $WORK_PATH/baas_server.pid
 $BASE_PATH/wait_for_baas.sh $WORK_PATH/baas_server.pid
 
