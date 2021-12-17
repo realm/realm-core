@@ -202,7 +202,7 @@ functions:
         TOP_DIR=$(pwd)/realm-core
         mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
         ${python3|python3} -m venv venv
-  
+
         # venv creates its Scripts/activate file with CLRF endings, which
         # cygwin bash does not like. dos2unix it
         # (See https://bugs.python.org/issue32451)

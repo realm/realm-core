@@ -31,7 +31,7 @@ class HangAnalyzer(object):
         self.options = options
         self.root_logger = None
         self.interesting_processes = [
-            "mongod", "-tests", 
+            "mongod", "-tests",
         ]
         self.go_processes = []
         self.process_ids = []
