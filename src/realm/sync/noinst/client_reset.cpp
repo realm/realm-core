@@ -1030,13 +1030,13 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         logger.debug("Local changesets to recover: %1", local_changes.size());
 
         // FIXME: this is for debugging only
-        for (const auto& change : local_changes) {
-            // Debug.
-            ChunkedBinaryInputStream in{change};
-            sync::Changeset log;
-            sync::parse_changeset(in, log); // Throws
-            log.print();
-        }
+        //        for (const auto& change : local_changes) {
+        //            // Debug.
+        //            ChunkedBinaryInputStream in{change};
+        //            sync::Changeset log;
+        //            sync::parse_changeset(in, log); // Throws
+        //            log.print();
+        //        }
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
@@ -1063,18 +1063,16 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
                 // FIXME: should failure be fatal? Or should we rollback and attempt DiscardLocal mode only?
                 handler.process_changeset(change); // throws on error
             }
-            history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
-            std::vector<ChunkedBinaryData> applied_history =
-                history_remote->get_local_changes(wt_remote->get_version_of_current_transaction().version);
-            if (applied_history.size() != 0) {
-                REALM_ASSERT(applied_history.size() == 1);
-                recovered_changeset =
-                    applied_history.at(0).get_first_chunk(); // FIXME: verify this for large changesets
-            }
+            ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
+            REALM_ASSERT_RELEASE(client_repl);
+            ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
+            const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
+            recovered_changeset = {buffer.data(), buffer.size()};
         }
 
         transfer_group(*wt_remote, *wt_local, logger);
     }
+
     history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                 recovered_changeset);
 

@@ -411,6 +411,91 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 })
                 ->run();
         }
+
+        SECTION("added table") {
+            auto verify_changes = [](SharedRealm realm) {
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                auto table = get_table(*realm, "object2");
+                REQUIRE(table);
+                auto sorted = table->get_sorted_view(table->get_column_key("_id"));
+                REQUIRE(sorted.size() == 2);
+                REQUIRE(sorted.get_object(0).get_primary_key().get_int() == 1);
+                REQUIRE(sorted.get_object(1).get_primary_key().get_int() == 2);
+            };
+            make_reset(local_config, remote_config)
+                ->make_local_changes([&](SharedRealm local) {
+                    local->update_schema(
+                        {
+                            {"object2",
+                             {
+                                 {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+                                 {"realm_id", PropertyType::String | PropertyType::Nullable},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                    create_object(*local, "object2", partition, {1});
+                    create_object(*local, "object2", partition, {2});
+                })
+                ->on_post_reset([&](SharedRealm local) {
+                    verify_changes(local);
+                })
+                ->run();
+            auto remote = Realm::get_shared_realm(remote_config);
+            wait_for_upload(*remote);
+            wait_for_download(*remote);
+            verify_changes(remote);
+        }
+
+        SECTION("added property") {
+            const std::string new_property_value = "new property value";
+            auto verify_changes = [&](SharedRealm realm) {
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                auto table = get_table(*realm, "object");
+                REQUIRE(table);
+                ColKey col_int_array = table->get_column_key("array");
+                REQUIRE(col_int_array);
+                REQUIRE(col_int_array.is_list());
+                REQUIRE(col_int_array.get_type() == col_type_Int);
+                REQUIRE(col_int_array.is_nullable() == false);
+                ColKey col_link = table->get_column_key("link");
+                REQUIRE(col_link);
+                REQUIRE(col_link.is_collection() == false);
+                REQUIRE(col_link.get_type() == col_type_Link);
+                REQUIRE(table->get_link_target(col_link) == table);
+                ColKey col_string = table->get_column_key("value2");
+                REQUIRE(col_string);
+                REQUIRE(col_string.get_type() == col_type_String);
+                REQUIRE(col_string.is_nullable() == true);
+                REQUIRE(col_string.is_collection() == false);
+                REQUIRE(table->begin()->get_any(col_string).get_string() == new_property_value);
+            };
+            make_reset(local_config, remote_config)
+                ->make_local_changes([&](SharedRealm local) {
+                    local->update_schema(
+                        {
+                            {"object",
+                             {
+                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"value2", PropertyType::String | PropertyType::Nullable, Property::IsPrimary{false},
+                                  Property::IsIndexed{true}},
+                                 {"array", PropertyType::Int | PropertyType::Array},
+                                 {"link", PropertyType::Object | PropertyType::Nullable, "object"},
+                                 {"realm_id", PropertyType::String | PropertyType::Nullable},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                    auto table = ObjectStore::table_for_object_type(local->read_group(), "object");
+                    table->begin()->set(table->get_column_key("value2"), new_property_value);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    verify_changes(realm);
+                })
+                ->run();
+            auto remote = Realm::get_shared_realm(remote_config);
+            wait_for_upload(*remote);
+            wait_for_download(*remote);
+            verify_changes(remote);
+        }
     }
 
     SECTION("discard local") {
