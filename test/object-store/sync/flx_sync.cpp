@@ -82,17 +82,28 @@ private:
 
 FLXSyncTestHarness::ServerSchema FLXSyncTestHarness::default_server_schema()
 {
+    // Schema schema{
+    //     ObjectSchema("TopLevel",
+    //                  {
+    //                      {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+    //                      {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+    //                      {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+    //                      {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
+    //                  }),
+    // };
+
+    // return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
+
     Schema schema{
-        ObjectSchema("TopLevel",
+        ObjectSchema("Dog",
                      {
                          {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                         {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-                         {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-                         {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
+                         {"age", PropertyType::Int},
+                         {"name", PropertyType::String},
                      }),
     };
 
-    return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
+    return ServerSchema{std::move(schema), {"age", "name"}};
 }
 
 AppSession make_app_from_server_schema(const std::string& test_name,

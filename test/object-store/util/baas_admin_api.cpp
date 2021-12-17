@@ -927,42 +927,42 @@ AppSession create_app(const AppCreateConfig& config)
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
 
-    rules.post_json({
-        {"database", config.mongo_dbname},
-        {"collection", "UserData"},
-        {"roles",
-         {{
-             {"name", "default"},
-             {"apply_when", nlohmann::json::object()},
-             {"insert", true},
-             {"delete", true},
-             {"additional_fields", nlohmann::json::object()},
-         }}},
-        {"schema", nlohmann::json::object()},
-        {"relationships", nlohmann::json::object()},
-    });
+    // rules.post_json({
+    //     {"database", config.mongo_dbname},
+    //     {"collection", "UserData"},
+    //     {"roles",
+    //      {{
+    //          {"name", "default"},
+    //          {"apply_when", nlohmann::json::object()},
+    //          {"insert", true},
+    //          {"delete", true},
+    //          {"additional_fields", nlohmann::json::object()},
+    //      }}},
+    //     {"schema", nlohmann::json::object()},
+    //     {"relationships", nlohmann::json::object()},
+    // });
 
-    app["custom_user_data"].patch_json({
-        {"mongo_service_id", mongo_service_id},
-        {"enabled", true},
-        {"database_name", config.mongo_dbname},
-        {"collection_name", "UserData"},
-        {"user_id_field", "user_id"},
-    });
+    // app["custom_user_data"].patch_json({
+    //     {"mongo_service_id", mongo_service_id},
+    //     {"enabled", true},
+    //     {"database_name", config.mongo_dbname},
+    //     {"collection_name", "UserData"},
+    //     {"user_id_field", "user_id"},
+    // });
 
-    services.post_json({
-        {"name", "gcm"},
-        {"type", "gcm"},
-        {"config",
-         {
-             {"senderId", "gcm"},
-         }},
-        {"secret_config",
-         {
-             {"apiKey", "gcm"},
-         }},
-        {"version", 1},
-    });
+    // services.post_json({
+    //     {"name", "gcm"},
+    //     {"type", "gcm"},
+    //     {"config",
+    //      {
+    //          {"senderId", "gcm"},
+    //      }},
+    //     {"secret_config",
+    //      {
+    //          {"apiKey", "gcm"},
+    //      }},
+    //     {"version", 1},
+    // });
 
     return {client_app_id, app_id, session, config};
 }
