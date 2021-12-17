@@ -1454,13 +1454,11 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 size_t sz = cluster->node_size();
                 auto offset = cluster->get_offset();
                 auto key_values = cluster->get_key_array();
-                for (size_t i = 0; (i < sz); i++) {
+                for (size_t i = 0; (i < sz) && limit; i++) {
                     refs.add(ObjKey(key_values->get(i) + offset));
-                    // Stop if limit is reached
-                    if (--limit == 0)
-                        return true;
+                    --limit;
                 }
-                return false;
+                return limit == 0;
             };
 
             m_table->traverse_clusters(f);
@@ -1479,18 +1477,20 @@ void Query::do_find_all(TableView& ret, size_t limit) const
 
                 auto keys = node->index_based_keys();
                 for (auto key : keys) {
+                    if (limit == 0)
+                        break;
                     if (pn->m_children.empty()) {
                         // No more conditions - just add key
                         refs.add(key);
+                        limit--;
                     }
                     else {
                         auto obj = m_table->get_object(key);
                         if (eval_object(obj)) {
                             refs.add(key);
+                            limit--;
                         }
                     }
-                    if (--limit == 0)
-                        break;
                 }
                 return;
             }
@@ -1504,7 +1504,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 st.m_key_offset = cluster->get_offset();
                 st.m_key_values = cluster->get_key_array();
                 aggregate_internal(node, &st, 0, e, nullptr);
-                // Stop if limit or end is reached
+                // Stop if limit is reached
                 return st.match_count() == st.limit();
             };
 
