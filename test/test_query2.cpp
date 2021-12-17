@@ -96,25 +96,42 @@ TEST(Query_BigString)
 TEST(Query_Limit)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(type_Int, "id1");
+    auto col_int = ttt.add_column(type_Int, "id2");
+    ttt.add_column(type_String, "str");
 
     ttt.create_object().set_all(0, 1, "a");
-    ttt.create_object().set_all(1, 2, "a"); //
-    ttt.create_object().set_all(2, 3, "X");
-    ttt.create_object().set_all(3, 1, "a");
+    ttt.create_object().set_all(1, 2, "x"); //
+    ttt.create_object().set_all(2, 3, "a");
+    ttt.create_object().set_all(3, 1, "x");
     ttt.create_object().set_all(4, 2, "a"); //
-    ttt.create_object().set_all(5, 3, "X");
+    ttt.create_object().set_all(5, 3, "x");
     ttt.create_object().set_all(6, 1, "a");
-    ttt.create_object().set_all(7, 2, "a"); //
-    ttt.create_object().set_all(8, 3, "X");
-    ttt.create_object().set_all(9, 1, "a");
+    ttt.create_object().set_all(7, 2, "x"); //
+    ttt.create_object().set_all(8, 3, "a");
+    ttt.create_object().set_all(9, 1, "x");
     ttt.create_object().set_all(10, 2, "a"); //
-    ttt.create_object().set_all(11, 3, "X");
+    ttt.create_object().set_all(11, 3, "x");
     ttt.create_object().set_all(12, 1, "a");
-    ttt.create_object().set_all(13, 2, "a"); //
-    ttt.create_object().set_all(14, 3, "X");
+    ttt.create_object().set_all(13, 2, "x"); //
+    ttt.create_object().set_all(14, 3, "a");
+
+    auto q = ttt.where();
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 15);
+    tv = q.find_all(0);
+    CHECK_EQUAL(tv.size(), 0);
+    tv = q.find_all(1);
+    CHECK_EQUAL(tv.size(), 1);
+
+    q = ttt.query("id2 == 3 && str == 'a'");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv = q.find_all(2);
+    CHECK_EQUAL(tv.size(), 2);
+    ttt.add_search_index(col_int);
+    tv = q.find_all(2);
+    CHECK_EQUAL(tv.size(), 2);
 
     Query q1 = ttt.where().equal(col_int, 2);
 
