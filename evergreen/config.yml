@@ -766,6 +766,7 @@ buildvariants:
     fetch_missing_dependencies: On
     curl: "/opt/mongodbtoolchain/v3/bin/curl"
     run_tests_against_baas: On
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
   tasks:
   - name: compile_test_and_package
     distros:
