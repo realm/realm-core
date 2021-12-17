@@ -10,6 +10,8 @@
 * The release package was missing several headers (since 11.7.0).
 * The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
 * Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
+* Opening a Realm with a schema that has an orphaned embedded object type performed an extra empty write transaction (since v11.0.0).
+* Freezing a Realm with a schema that has orphaned embeeded object types threw a "Wrong transactional state" exception (since v11.5.0).
 
 ### Breaking changes
 * None.
