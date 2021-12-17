@@ -286,26 +286,43 @@ app::Response do_http_request(const app::Request& request)
      data. */
     curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
 
+    auto method = "GET";
+
     /* Now specify the POST data */
     if (request.method == app::HttpMethod::post) {
+        method = "POST";
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
     else if (request.method == app::HttpMethod::put) {
+        method = "PUT";
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
     else if (request.method == app::HttpMethod::patch) {
+        method = "PATCH";
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
     else if (request.method == app::HttpMethod::del) {
+        method = "DELETE";
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
     else if (request.method == app::HttpMethod::patch) {
+        method = "PATCH";
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PATCH");
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
     }
+
+    std::cerr << method << std::endl << request.url.c_str() << std::endl;
+
+    if (request.body.length() > 0) {
+        // std::cerr << request.body.c_str() << std::endl;
+        auto j = nlohmann::json::parse(request.body.c_str());
+        std::cerr << j.dump(2) << std::endl;
+    }
+
+    std::cerr << "-----" << std::endl;
 
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
