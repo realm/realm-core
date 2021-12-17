@@ -426,7 +426,7 @@ tasks:
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 20
+  exec_timeout_secs: 1800
   commands:
   - func: "compile"
   - func: "run tests"
