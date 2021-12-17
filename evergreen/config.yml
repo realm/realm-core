@@ -224,12 +224,6 @@ functions:
         fi
         python=python
 
-        if [ "Windows_NT" = "$OS" ]; then
-          export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
-        else
-          export PYTHONPATH="$PYTHONPATH:${workdir}/src"
-        fi
-
         echo "python set to $(which $python)"
 
         echo "Upgrading pip to 21.0.1"
@@ -242,11 +236,21 @@ functions:
 
         python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
 
-        python -m pip install -r $TOP_DIR/evergreen/hang_analyzer/requirements.txt || exit 1
+        REQUIREMENTS_PATH=$TOP_DIR/evergreen/hang_analyzer/requirements.txt
+        if [ "Windows_NT" = "$OS" ]; then
+          REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)
+        fi
+
+        python -m pip install -r $REQUIREMENTS_PATH || exit 1
 
         echo "Going to run hang analyzer"
 
-        python $TOP_DIR/evergreen/hang_analyzer
+        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
+        if [ "Windows_NT" = "$OS" ]; then
+          HANG_ANALYZER_PATH=$(cygpath -w $HANG_ANALYZER_PATH)
+        fi
+
+        python $HANG_ANALYZER_PATH
 
 timeout:
   - func: "run hang analyzer"
