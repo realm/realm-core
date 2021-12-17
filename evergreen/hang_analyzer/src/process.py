@@ -10,13 +10,6 @@ from distutils import spawn  # pylint: disable=no-name-in-module
 
 from . import pipe
 
-_IS_WINDOWS = (sys.platform == "win32")
-
-if _IS_WINDOWS:
-    import win32event
-    import win32api
-
-
 def call(args, logger):
     """Call subprocess on args list."""
     logger.info(str(args))
@@ -60,39 +53,12 @@ def signal_python(logger, pinfo):
 
     # On Windows, we set up an event object to wait on a signal. For Cygwin, we register
     # a signal handler to wait for the signal since it supports POSIX signals.
-    if _IS_WINDOWS:
-        logger.info("Calling SetEvent to signal python process %s with PID %d", pinfo.name,
-                    pinfo.pid)
-        signal_event_object(logger, pinfo.pid)
+    if sys.platform == "win32":
+        logger.debug("Signaling python is not supported on windows")
     else:
         logger.info("Sending signal SIGUSR1 to python process %s with PID %d", pinfo.name,
                     pinfo.pid)
         signal_process(logger, pinfo.pid, signal.SIGUSR1)
-
-
-def signal_event_object(logger, pid):
-    """Signal the Windows event object."""
-
-    # Use unique event_name created.
-    event_name = "Global\\Mongo_Python_" + str(pid)
-
-    try:
-        desired_access = win32event.EVENT_MODIFY_STATE
-        inherit_handle = False
-        task_timeout_handle = win32event.OpenEvent(desired_access, inherit_handle, event_name)
-    except win32event.error as err:
-        logger.info("Exception from win32event.OpenEvent with error: %s", err)
-        return
-
-    try:
-        win32event.SetEvent(task_timeout_handle)
-    except win32event.error as err:
-        logger.info("Exception from win32event.SetEvent with error: %s", err)
-    finally:
-        win32api.CloseHandle(task_timeout_handle)
-
-    logger.info("Waiting for process to report")
-    time.sleep(5)
 
 
 def signal_process(logger, pid, signalnum):

@@ -15,7 +15,6 @@ import signal
 import logging
 import platform
 import traceback
-from distro import linux_distribution
 
 from . import dumper
 from . import process_list
@@ -64,7 +63,6 @@ class HangAnalyzer(object):
 
         # Dump all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
-            print("going to dump {}", pinfo.name)
             process_logger = self._get_process_logger(pinfo)
             try:
                 dumpers.dbg.dump_info(
@@ -121,12 +119,15 @@ class HangAnalyzer(object):
             if sys.platform == "win32" or sys.platform == "cygwin":
                 distro = platform.win32_ver()
                 self.root_logger.info("Windows Distribution: %s", distro)
-            else:
+            elif sys.platform == "linux":
+                from distro import linux_distribution
                 distro = linux_distribution()
                 self.root_logger.info("Linux Distribution: %s", distro)
-
-        except AttributeError:
-            self.root_logger.warning("Cannot determine Linux distro since Python is too old")
+            elif sys.platform == "darwin":
+                mac_ver, _, mac_arch = platform.mac_ver()
+                self.root_logger.info("MacOS version: %s Architecture: %s", mac_ver, mac_arch)
+        except ImportError:
+            self.root_logger.warning("Cannot determine Linux distro without distro pip package")
 
         try:
             uid = os.getuid()

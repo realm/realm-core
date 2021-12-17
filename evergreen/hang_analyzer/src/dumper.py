@@ -229,24 +229,6 @@ class GDBDumper(Dumper):
 
         process.call([dbg, "--version"], logger)
 
-        script_dir = "buildscripts"
-        root_logger.info("dir %s", script_dir)
-
-        if not logger.mongo_process_filename:
-            raw_stacks_commands = []
-        else:
-            base, ext = os.path.splitext(logger.mongo_process_filename)
-            raw_stacks_filename = base + '_raw_stacks' + ext
-            raw_stacks_commands = [
-                'echo \\nWriting raw stacks to %s.\\n' % raw_stacks_filename,
-                # This sends output to log file rather than stdout until we turn logging off.
-                'set logging redirect on',
-                'set logging file ' + raw_stacks_filename,
-                'set logging on',
-                'thread apply all bt',
-                'set logging off',
-            ]
-
         cmds = [
             "set interactive-mode off",
             "set print thread-events off",  # Suppress GDB messages of threads starting/finishing.
@@ -254,7 +236,7 @@ class GDBDumper(Dumper):
             "info sharedlibrary",
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
-        ] + raw_stacks_commands + [
+            "thread apply all bt",
             # Lock the scheduler, before running commands, which execute code in the attached process.
             "set scheduler-locking on",
             dump_command,

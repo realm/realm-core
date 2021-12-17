@@ -190,13 +190,63 @@ functions:
   "run hang analyzer":
   - command: shell.exec
     params:
-      working_dir: realm-core
       shell: bash
       script: |-
         set -o errexit
         set -o verbose
 
-        python3 evergreen/hang_analyzer
+        if [[ ! -d realm-core ]]; then
+          echo "No source directory exists. Not running hang analyzer"
+        fi
+
+        TOP_DIR=$(pwd)/realm-core
+        mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
+        ${python3|python3} -m venv venv
+  
+        # venv creates its Scripts/activate file with CLRF endings, which
+        # cygwin bash does not like. dos2unix it
+        # (See https://bugs.python.org/issue32451)
+        if [ "Windows_NT" = "$OS" ]; then
+          dos2unix "venv/Scripts/activate"
+        fi
+
+        export VIRTUAL_ENV_DISABLE_PROMPT=yes
+
+        if [ "Windows_NT" = "$OS" ]; then
+          # Need to quote the path on Windows to preserve the separator.
+          . "venv/Scripts/activate" 2> /tmp/activate_error.log
+        else
+          . venv/bin/activate 2> /tmp/activate_error.log
+        fi
+        if [ $? -ne 0 ]; then
+          echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+          exit 1
+        fi
+        python=python
+
+        if [ "Windows_NT" = "$OS" ]; then
+          export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
+        else
+          export PYTHONPATH="$PYTHONPATH:${workdir}/src"
+        fi
+
+        echo "python set to $(which $python)"
+
+        echo "Upgrading pip to 21.0.1"
+
+        # ref: https://github.com/grpc/grpc/issues/25082#issuecomment-778392661
+        if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" == "Darwin" ]; then
+          export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+          export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+        fi
+
+        python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
+
+        python -m pip install -r $TOP_DIR/evergreen/hang_analyzer/requirements.txt || exit 1
+
+        echo "Going to run hang analyzer"
+
+        python $TOP_DIR/evergreen/hang_analyzer
 
 timeout:
   - func: "run hang analyzer"
@@ -372,7 +422,7 @@ tasks:
 
 - name: core-tests
   tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 1800
+  exec_timeout_secs: 20
   commands:
   - func: "compile"
   - func: "run tests"
@@ -513,6 +563,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - .test_suite
@@ -528,6 +580,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - "!.disabled_on_windows .test_suite"
@@ -541,6 +595,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - "!.disabled_on_windows .test_suite"
@@ -553,6 +609,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - .test_suite
@@ -565,6 +623,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - object-store-tests
@@ -578,6 +638,8 @@ task_groups:
     vars:
       cmake_build_type: "Release"
       target_to_build: "benchmarks"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - .benchmark
 
@@ -592,6 +654,8 @@ task_groups:
       target_to_build: CoreTests
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - long-running-core-tests
 
@@ -810,6 +874,7 @@ buildvariants:
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     build_zlib: On
+    python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_and_package_windows
     distros:
@@ -830,6 +895,7 @@ buildvariants:
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     build_zlib: On
+    python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_windows
     distros:

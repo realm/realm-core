@@ -23,7 +23,7 @@ parser.add_option('-s', '--max-core-dumps-size', dest='max_core_dumps_size', def
                   help='Maximum total size of core dumps to keep in megabytes')
 parser.add_option(
     '-o', '--debugger-output', dest='debugger_output', action="append",
-    choices=['file', 'stdout'], default='stdout',
+    choices=['file', 'stdout'], default=['stdout'],
     help="If 'stdout', then the debugger's output is written to the Python"
     " process's stdout. If 'file', then the debugger's output is written"
     " to a file named debugger_<process>_<pid>.log for each process it"
