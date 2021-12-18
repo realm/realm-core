@@ -414,16 +414,6 @@ RLM_API realm_async_error_t* realm_get_last_error_as_async_error(void);
 
 #if defined(__cplusplus)
 /**
- * Rethrow the last exception.
- *
- * Note: This function does not have C linkage, because throwing across language
- * boundaries is undefined behavior. When called from C code, this should result
- * in a linker error. When called from C++, `std::rethrow_exception` will be
- * called to propagate the exception unchanged.
- */
-RLM_EXPORT void realm_rethrow_last_error(void);
-
-/**
  * Invoke a function that may throw an exception, and report that exception as
  * part of the C API error handling mechanism.
  *

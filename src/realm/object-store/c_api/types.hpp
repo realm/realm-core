@@ -3,6 +3,7 @@
 
 #include <realm.h>
 #include <realm/object-store/c_api/conversion.hpp>
+#include <realm/object-store/c_api/error.hpp>
 
 #include <realm/util/to_string.hpp>
 
@@ -118,22 +119,27 @@ struct WrapC {
 } // namespace realm::c_api
 
 struct realm_async_error : realm::c_api::WrapC {
-    std::exception_ptr ep;
+    realm::c_api::ErrorStorage error_storage;
+
+    explicit realm_async_error(const realm::c_api::ErrorStorage& storage)
+        : error_storage(storage)
+    {
+    }
 
     explicit realm_async_error(std::exception_ptr ep)
-        : ep(std::move(ep))
+        : error_storage(std::move(ep))
     {
     }
 
     realm_async_error* clone() const override
     {
-        return new realm_async_error{ep};
+        return new realm_async_error(*this);
     }
 
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_async_error_t*>(&other)) {
-            return ep == ptr->ep;
+            return error_storage == ptr->error_storage;
         }
         return false;
     }
