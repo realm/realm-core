@@ -778,6 +778,7 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
     use_system_openssl: On
     fetch_missing_dependencies: On
   tasks:
