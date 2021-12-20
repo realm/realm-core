@@ -546,8 +546,16 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
 
         // Attempt to make a nicer filename which will ease debugging when
         // locating files in the filesystem.
-        std::string file_name =
-            (custom_file_name) ? custom_file_name.value() : string_from_partition(config.partition_value);
+        auto file_name = [&]() -> std::string {
+            if (custom_file_name) {
+                return *custom_file_name;
+            }
+            if (config.flx_sync_requested) {
+                REALM_ASSERT_DEBUG(config.partition_value.empty());
+                return "flx_sync_default";
+            }
+            return string_from_partition(config.partition_value);
+        }();
         path = m_file_manager->realm_file_path(user->identity(), user->local_identity(), file_name,
                                                config.partition_value);
     }

@@ -185,6 +185,14 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
 
+#if REALM_ENABLE_SYNC
+    if (config.sync_config) {
+        if (config.sync_config->flx_sync_requested && !config.sync_config->partition_value.empty()) {
+            throw std::logic_error("Cannot specify a partition value when flexible sync is enabled");
+        }
+    }
+#endif
+
     bool no_existing_realm =
         std::all_of(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [](auto& notifier) {
             return notifier.expired();
@@ -231,6 +239,10 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
                                                 config.path);
+            }
+            if (m_config.sync_config->flx_sync_requested != config.sync_config->flx_sync_requested) {
+                throw MismatchedConfigException(
+                    "Realm at path '%1' already opened in a different synchronization mode", config.path);
             }
         }
 #endif
