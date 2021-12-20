@@ -1002,25 +1002,29 @@ void Realm::write_copy(StringData path, BinaryData key)
     }
 }
 
-void Realm::write_copy(const Config& config)
+void Realm::export_to(const Config& config)
 {
     std::string new_location = config.path;
     BinaryData encryption_key(config.encryption_key.data(), config.encryption_key.size());
-    if (config.sync_config) {
+    if (util::File::exists(new_location)) {
+        auto destination_realm = Realm::get_shared_realm(config);
+        destination_realm->begin_transaction();
+        auto destination = destination_realm->transaction_ref();
+        m_transaction->copy_to(destination);
+        destination_realm->commit_transaction();
+    }
+    else {
+        write_copy(new_location, encryption_key);
+        if (config.sync_config) {
 #if REALM_ENABLE_SYNC
-        if (util::File::exists(new_location)) {
-            throw std::runtime_error("not implemented");
-        }
-        else {
-            write_copy(new_location, encryption_key);
             DBOptions options;
             if (encryption_key.size()) {
                 options.encryption_key = encryption_key.data();
             }
             auto db = DB::create(make_in_realm_history(), new_location, options);
             db->create_new_history(sync::make_client_replication());
-        }
 #endif
+        }
     }
 }
 

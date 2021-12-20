@@ -4,7 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
 * Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
-* Support synthesizing client history on local realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
+* Support exporting data from a local realm to a synchonized realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

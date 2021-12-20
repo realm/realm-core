@@ -425,7 +425,11 @@ public:
     // be written. This is to be sure that the file can be used as a stating point for a newly
     // installed application. The function will throw if there are pending uploads.
     void write_copy(StringData path, BinaryData encryption_key);
-    void write_copy(const Config& config);
+    // Will export data to a file that is supposed to be opened with a sync configuration.
+    // If the file is already existing, data will be copied over object per object. If the file
+    // does not exist, the local realm file will exported to the new location and if the configuration
+    // object contains a sync part, a sync history will be synthesized
+    void export_to(const Config& config);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;
