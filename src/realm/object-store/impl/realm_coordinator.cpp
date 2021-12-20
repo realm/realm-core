@@ -1271,5 +1271,5 @@ bool RealmCoordinator::compact()
 
 void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_overwrite)
 {
-    return m_db->write_copy(path, key.data(), allow_overwrite);
+    m_db->write_copy(path, key.data(), allow_overwrite);
 }

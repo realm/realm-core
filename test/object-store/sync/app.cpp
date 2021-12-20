@@ -1606,6 +1606,7 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
         local_realm->commit_transaction();
     }
 
+    /* Create a synced realm and upload some data */
     auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
     auto app_session = create_app(server_app_config);
     auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
@@ -1632,13 +1633,25 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     r1->commit_transaction();
     CHECK(!wait_for_upload(*r1));
 
+    /* Copy local realm data over in a synced one*/
     create_user_and_log_in(app);
     auto user2 = app->current_user();
     REQUIRE(user1 != user2);
 
     SyncTestFile config2(user1, partition, schema);
-    local_realm->write_copy(config2);
-    auto r2 = Realm::get_shared_realm(config2);
+
+    SharedRealm r2;
+    SECTION("Copy before connecting to server") {
+        local_realm->export_to(config2);
+        r2 = Realm::get_shared_realm(config2);
+    }
+
+    SECTION("Open synced realm first") {
+        r2 = Realm::get_shared_realm(config2);
+        CHECK(!wait_for_download(*r2));
+        local_realm->export_to(config2);
+        CHECK(!wait_for_upload(*r2));
+    }
 
     CHECK(!wait_for_download(*r2));
     advance_and_notify(*r2);
