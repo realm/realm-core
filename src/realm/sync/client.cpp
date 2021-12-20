@@ -1078,8 +1078,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    util::bind_ptr<SessionWrapper> self{this};
-    auto handler = [self = std::move(self), token = std::move(signed_access_token)] {
+    m_client.get_service().post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized
@@ -1087,13 +1086,11 @@ void SessionWrapper::refresh(std::string signed_access_token)
         SessionImpl& sess = *self->m_sess;
         ClientImpl::Connection& conn = sess.get_connection();
         // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(self->m_http_request_path_prefix, self->m_virt_path,
-                                 self->m_signed_access_token); // Throws
-        sess.new_access_token_available();                     // Throws
-        sess.cancel_resumption_delay();                        // Throws
-        conn.cancel_reconnect_delay();                         // Throws
-    };
-    m_client.get_service().post(std::move(handler)); // Throws
+        conn.update_connect_info(self->m_http_request_path_prefix, self->m_signed_access_token); // Throws
+        sess.new_access_token_available();                                                       // Throws
+        sess.cancel_resumption_delay();                                                          // Throws
+        conn.cancel_reconnect_delay();                                                           // Throws
+    });
 }
 
 
@@ -1122,8 +1119,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
         was_created); // Throws
     try {
         // FIXME: This only makes sense when each session uses a separate connection.
-        conn.update_connect_info(m_http_request_path_prefix, m_virt_path,
-                                 m_signed_access_token); // Throws
+        conn.update_connect_info(m_http_request_path_prefix, m_signed_access_token);      // Throws
         std::unique_ptr<SessionImpl> sess_2 = std::make_unique<SessionImpl>(*this, conn); // Throws
         SessionImpl& sess = *sess_2;
         sess.logger.detail("Binding '%1' to '%2'", m_db->get_path(), m_virt_path);       // Throws
@@ -1394,11 +1390,9 @@ inline const ServerEndpoint& ClientImpl::Connection::get_server_endpoint() const
 }
 
 inline void ClientImpl::Connection::update_connect_info(const std::string& http_request_path_prefix,
-                                                        const std::string& realm_virt_path,
                                                         const std::string& signed_access_token)
 {
     m_http_request_path_prefix = http_request_path_prefix; // Throws (copy)
-    m_realm_virt_path = realm_virt_path;                   // Throws (copy)
     m_signed_access_token = signed_access_token;           // Throws (copy)
 }
 

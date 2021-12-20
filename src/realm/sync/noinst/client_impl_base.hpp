@@ -64,7 +64,6 @@ public:
     using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
-    using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
     /// Per-server endpoint information used to determine reconnect delays.
     class ReconnectInfo {
@@ -122,11 +121,9 @@ public:
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
     // @{
-    /// These call stop(), run(), and report_event_loop_metrics() on the service
-    /// object (get_service()) respectively.
+    /// These call stop() and run() on the service object (get_service()) respectively.
     void stop() noexcept;
     void run();
-    void report_event_loop_metrics(std::function<EventLoopMetricsHandler>);
     // @}
 
     const std::string& get_user_agent_string() const noexcept;
@@ -279,12 +276,9 @@ static_assert(ClientImpl::get_oldest_supported_protocol_version() <= get_current
 /// terminated. This is used to determinte the delay until the next connection
 /// initiation attempt.
 enum class ClientImpl::ConnectionTerminationReason {
-    resolve_operation_failed,          ///< Failure during resolve operation (DNS)
-    connect_operation_failed,          ///< Failure during TCP connect operation
+    connect_operation_failed,          ///< Failure during connect operation
     closed_voluntarily,                ///< Voluntarily closed or connection operation canceled
-    premature_end_of_input,            ///< Premature end of input (before ERROR message was received)
     read_or_write_error,               ///< Read/write error after successful TCP connect operation
-    http_tunnel_failed,                ///< Failure to establish HTTP tunnel with proxy
     ssl_certificate_rejected,          ///< Client rejected the SSL certificate of the server
     ssl_protocol_violation,            ///< A violation of the SSL protocol
     websocket_protocol_violation,      ///< A violation of the WebSocket protocol
@@ -378,15 +372,11 @@ public:
     int get_negotiated_protocol_version() noexcept;
 
     // Overriding methods in util::websocket::EZObserver
-    void websocket_handshake_completion_handler(const util::HTTPHeaders&) override;
-    void websocket_tcp_connect_error_handler(std::error_code) override;
-    void websocket_resolve_error_handler(std::error_code) override;
-    void websocket_http_tunnel_error_handler(std::error_code) override;
+    void websocket_handshake_completion_handler(const std::string& protocol) override;
+    void websocket_connect_error_handler(std::error_code) override;
     void websocket_ssl_handshake_error_handler(std::error_code) override;
-    void websocket_read_error_handler(std::error_code) override;
-    void websocket_write_error_handler(std::error_code) override;
-    void websocket_handshake_error_handler(std::error_code, const util::HTTPHeaders*,
-                                           const std::string_view*) override;
+    void websocket_read_or_write_error_handler(std::error_code) override;
+    void websocket_handshake_error_handler(std::error_code, const std::string_view*) override;
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
@@ -397,8 +387,7 @@ public:
     SyncServerMode get_sync_server_mode() const noexcept;
     bool is_flx_sync_connection() const noexcept;
 
-    void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
-                             const std::string& signed_access_token);
+    void update_connect_info(const std::string& http_request_path_prefix, const std::string& signed_access_token);
 
     void resume_active_sessions();
 
@@ -458,8 +447,7 @@ private:
     void handle_message_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
-    void read_error(std::error_code);
-    void write_error(std::error_code);
+    void read_or_write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code);
     void close_due_to_missing_protocol_feature();
     void close_due_to_client_side_error(std::error_code, bool is_fatal);
@@ -487,7 +475,6 @@ private:
     void one_less_active_unsuspended_session();
 
     OutputBuffer& get_output_buffer() noexcept;
-    ConnectionTerminationReason determine_connection_termination_reason(std::error_code) noexcept;
     Session* get_session(session_ident_type) const noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
@@ -600,7 +587,6 @@ private:
     const std::map<std::string, std::string> m_custom_http_headers;
 
     std::string m_http_request_path_prefix;
-    std::string m_realm_virt_path;
     std::string m_signed_access_token;
 };
 
@@ -1137,11 +1123,6 @@ private:
 
 // Implementation
 
-inline void ClientImpl::report_event_loop_metrics(std::function<EventLoopMetricsHandler> handler)
-{
-    m_service.report_event_loop_metrics(std::move(handler)); // Throws
-}
-
 inline const std::string& ClientImpl::get_user_agent_string() const noexcept
 {
     return m_user_agent_string;
@@ -1296,9 +1277,7 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
     switch (reason) {
         case ConnectionTerminationReason::closed_voluntarily:
             return true;
-        case ConnectionTerminationReason::resolve_operation_failed:
         case ConnectionTerminationReason::connect_operation_failed:
-        case ConnectionTerminationReason::premature_end_of_input:
         case ConnectionTerminationReason::read_or_write_error:
         case ConnectionTerminationReason::ssl_certificate_rejected:
         case ConnectionTerminationReason::ssl_protocol_violation:
@@ -1312,7 +1291,6 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::server_said_do_not_reconnect:
         case ConnectionTerminationReason::pong_timeout:
         case ConnectionTerminationReason::missing_protocol_feature:
-        case ConnectionTerminationReason::http_tunnel_failed:
             break;
     }
     return false;

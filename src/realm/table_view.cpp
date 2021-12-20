@@ -92,8 +92,6 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy mode)
         src.m_last_seen_versions.clear();
     }
     m_descriptor_ordering = src.m_descriptor_ordering;
-    m_start = src.m_start;
-    m_end = src.m_end;
     m_limit = src.m_limit;
 }
 
@@ -599,7 +597,7 @@ void TableView::do_sync()
 
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
-        m_query.find_all(*const_cast<TableView*>(this), m_start, m_end, m_limit);
+        m_query.do_find_all(*const_cast<TableView*>(this), m_limit);
     }
 
     do_sort(m_descriptor_ordering);

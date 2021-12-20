@@ -1428,21 +1428,18 @@ ObjKey Query::find()
     }
 }
 
-void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) const
+void Query::do_find_all(TableView& ret, size_t limit) const
 {
     if (limit == 0)
         return;
-
-    REALM_ASSERT_3(begin, <=, m_table->size());
 
     init();
 
     bool has_cond = has_conditions();
 
     if (m_view) {
-        if (end == size_t(-1))
-            end = m_view->size();
-        for (size_t t = begin; t < end && ret.size() < limit; t++) {
+        size_t sz = m_view->size();
+        for (size_t t = 0; t < sz && ret.size() < limit; t++) {
             const Obj obj = m_view->try_get_object(t);
             if (eval_object(obj)) {
                 ret.m_key_values.add(obj.get_key());
@@ -1450,31 +1447,18 @@ void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) con
         }
     }
     else {
-        if (end == size_t(-1))
-            end = m_table->size();
         if (!has_cond) {
             KeyColumn& refs = ret.m_key_values;
 
-            auto f = [&begin, &end, &limit, &refs](const Cluster* cluster) {
-                size_t e = cluster->node_size();
-                if (begin < e) {
-                    if (e > end) {
-                        e = end;
-                    }
-                    auto offset = cluster->get_offset();
-                    auto key_values = cluster->get_key_array();
-                    for (size_t i = begin; (i < e) && limit; i++) {
-                        refs.add(ObjKey(key_values->get(i) + offset));
-                        --limit;
-                    }
-                    begin = 0;
+            auto f = [&limit, &refs](const Cluster* cluster) {
+                size_t sz = cluster->node_size();
+                auto offset = cluster->get_offset();
+                auto key_values = cluster->get_key_array();
+                for (size_t i = 0; (i < sz) && limit; i++) {
+                    refs.add(ObjKey(key_values->get(i) + offset));
+                    --limit;
                 }
-                else {
-                    begin -= e;
-                }
-                end -= e;
-                // Stop if end is reached
-                return (end == 0) || (limit == 0);
+                return limit == 0;
             };
 
             m_table->traverse_clusters(f);
@@ -1484,9 +1468,6 @@ void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) con
             auto best = find_best_node(pn);
             auto node = pn->m_children[best];
             if (node->has_search_index()) {
-                // translate begin/end limiters into corresponding keys
-                auto begin_key = (begin >= m_table->size()) ? ObjKey() : m_table->get_object(begin).get_key();
-                auto end_key = (end >= m_table->size()) ? ObjKey() : m_table->get_object(end).get_key();
                 KeyColumn& refs = ret.m_key_values;
 
                 // The node having the search index can be removed from the query as we know that
@@ -1498,10 +1479,6 @@ void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) con
                 for (auto key : keys) {
                     if (limit == 0)
                         break;
-                    if (begin_key && key < begin_key)
-                        continue;
-                    if (end_key && !(key < end_key))
-                        continue;
                     if (pn->m_children.empty()) {
                         // No more conditions - just add key
                         refs.add(key);
@@ -1521,24 +1498,14 @@ void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) con
             node = pn;
             QueryStateFindAll<KeyColumn> st(ret.m_key_values, limit);
 
-            auto f = [&begin, &end, &node, &st, this](const Cluster* cluster) {
+            auto f = [&node, &st, this](const Cluster* cluster) {
                 size_t e = cluster->node_size();
-                if (begin < e) {
-                    if (e > end) {
-                        e = end;
-                    }
-                    node->set_cluster(cluster);
-                    st.m_key_offset = cluster->get_offset();
-                    st.m_key_values = cluster->get_key_array();
-                    aggregate_internal(node, &st, begin, e, nullptr);
-                    begin = 0;
-                }
-                else {
-                    begin -= e;
-                }
-                end -= e;
-                // Stop if limit or end is reached
-                return end == 0 || st.match_count() == st.limit();
+                node->set_cluster(cluster);
+                st.m_key_offset = cluster->get_offset();
+                st.m_key_values = cluster->get_key_array();
+                aggregate_internal(node, &st, 0, e, nullptr);
+                // Stop if limit is reached
+                return st.match_count() == st.limit();
             };
 
             m_table->traverse_clusters(f);
@@ -1546,13 +1513,13 @@ void Query::find_all(TableView& ret, size_t begin, size_t end, size_t limit) con
     }
 }
 
-TableView Query::find_all(size_t start, size_t end, size_t limit)
+TableView Query::find_all(size_t limit)
 {
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
 
-    TableView ret(m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, limit);
     if (m_ordering) {
         ret.apply_descriptor_ordering(*m_ordering);
     }
@@ -1654,8 +1621,6 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         return find_all();
     }
 
-    const size_t default_start = 0;
-    const size_t default_end = size_t(-1);
     const size_t default_limit = size_t(-1);
 
     bool only_limit = true;
@@ -1672,10 +1637,10 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         }
     }
     if (only_limit) {
-        return find_all(default_start, default_end, min_limit);
+        return find_all(min_limit);
     }
 
-    TableView ret(m_table, *this, default_start, default_end, default_limit);
+    TableView ret(m_table, *this, default_limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret;
 }
@@ -1690,8 +1655,6 @@ size_t Query::count(const DescriptorOrdering& descriptor)
     if (bool(min_limit) && *min_limit == 0)
         return 0;
 
-    const size_t start = 0;
-    const size_t end = m_table->size();
     size_t limit = size_t(-1);
 
     if (!descriptor.will_apply_distinct()) {
@@ -1701,7 +1664,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         return do_count(limit);
     }
 
-    TableView ret(m_table, *this, start, end, limit);
+    TableView ret(m_table, *this, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }

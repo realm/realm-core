@@ -96,50 +96,53 @@ TEST(Query_BigString)
 TEST(Query_Limit)
 {
     Table ttt;
-    auto col_id = ttt.add_column(type_Int, "id");
-    auto col_int = ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    auto col_id = ttt.add_column(type_Int, "id1");
+    auto col_int = ttt.add_column(type_Int, "id2");
+    ttt.add_column(type_String, "str");
 
     ttt.create_object().set_all(0, 1, "a");
-    ttt.create_object().set_all(1, 2, "a"); //
-    ttt.create_object().set_all(2, 3, "X");
-    ttt.create_object().set_all(3, 1, "a");
+    ttt.create_object().set_all(1, 2, "x"); //
+    ttt.create_object().set_all(2, 3, "a");
+    ttt.create_object().set_all(3, 1, "x");
     ttt.create_object().set_all(4, 2, "a"); //
-    ttt.create_object().set_all(5, 3, "X");
+    ttt.create_object().set_all(5, 3, "x");
     ttt.create_object().set_all(6, 1, "a");
-    ttt.create_object().set_all(7, 2, "a"); //
-    ttt.create_object().set_all(8, 3, "X");
-    ttt.create_object().set_all(9, 1, "a");
+    ttt.create_object().set_all(7, 2, "x"); //
+    ttt.create_object().set_all(8, 3, "a");
+    ttt.create_object().set_all(9, 1, "x");
     ttt.create_object().set_all(10, 2, "a"); //
-    ttt.create_object().set_all(11, 3, "X");
+    ttt.create_object().set_all(11, 3, "x");
     ttt.create_object().set_all(12, 1, "a");
-    ttt.create_object().set_all(13, 2, "a"); //
-    ttt.create_object().set_all(14, 3, "X");
+    ttt.create_object().set_all(13, 2, "x"); //
+    ttt.create_object().set_all(14, 3, "a");
+
+    auto q = ttt.where();
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 15);
+    tv = q.find_all(0);
+    CHECK_EQUAL(tv.size(), 0);
+    tv = q.find_all(1);
+    CHECK_EQUAL(tv.size(), 1);
+
+    q = ttt.query("id2 == 3 && str == 'a'");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv = q.find_all(2);
+    CHECK_EQUAL(tv.size(), 2);
+    ttt.add_search_index(col_int);
+    tv = q.find_all(2);
+    CHECK_EQUAL(tv.size(), 2);
 
     Query q1 = ttt.where().equal(col_int, 2);
 
-    TableView tv1 = q1.find_all(0, size_t(-1), 2);
+    TableView tv1 = q1.find_all(2);
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1[0].get<Int>(col_id));
     CHECK_EQUAL(4, tv1[1].get<Int>(col_id));
 
-    TableView tv2 = q1.find_all(5, size_t(-1), 2);
-    CHECK_EQUAL(2, tv2.size());
-    CHECK_EQUAL(7, tv2[0].get<Int>(col_id));
-    CHECK_EQUAL(10, tv2[1].get<Int>(col_id));
-
-    TableView tv3 = q1.find_all(11, size_t(-1), 2);
-    CHECK_EQUAL(1, tv3.size());
-    CHECK_EQUAL(13, tv3[0].get<Int>(col_id));
-
-
     Query q2 = ttt.where();
-    TableView tv4 = q2.find_all(0, 5, 3);
+    TableView tv4 = q2.find_all(3);
     CHECK_EQUAL(3, tv4.size());
-
-    Query q3 = ttt.where();
-    TableView tv5 = q3.find_all(0, 3, 5);
-    CHECK_EQUAL(3, tv5.size());
 }
 
 

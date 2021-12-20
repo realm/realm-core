@@ -100,9 +100,7 @@ AppSession make_app_from_server_schema(const std::string& test_name,
 {
     auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
     AppCreateConfig::FLXSyncConfig flx_config;
-    for (const auto& table : server_schema.schema) {
-        flx_config.queryable_fields[table.name] = server_schema.queryable_fields;
-    }
+    flx_config.queryable_fields = server_schema.queryable_fields;
 
     server_app_config.flx_sync_config = std::move(flx_config);
     return create_app(server_app_config);

@@ -301,21 +301,18 @@ void Connection::cancel_reconnect_delay()
 }
 
 
-void Connection::websocket_handshake_completion_handler(const HTTPHeaders& headers)
+void Connection::websocket_handshake_completion_handler(const std::string& protocol)
 {
-    auto i = headers.find("Sec-WebSocket-Protocol");
-    if (i != headers.end()) {
-        std::string_view value = i->second;
+    if (!protocol.empty()) {
         std::string_view expected_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
-
         // FIXME: Use std::string_view::begins_with() in C++20.
         auto prefix_matches = [&](std::string_view other) {
-            return value.size() >= other.size() && (value.substr(0, other.size()) == other);
+            return protocol.size() >= other.size() && (protocol.substr(0, other.size()) == other);
         };
         if (prefix_matches(expected_prefix)) {
             util::MemoryInputStream in;
-            in.set_buffer(value.data() + expected_prefix.size(), value.data() + value.size());
+            in.set_buffer(protocol.data() + expected_prefix.size(), protocol.data() + protocol.size());
             in.imbue(std::locale::classic());
             in.unsetf(std::ios_base::skipws);
             int value_2 = 0;
@@ -331,7 +328,7 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
                 }
             }
         }
-        logger.error("Bad protocol info from server: '%1'", value); // Throws
+        logger.error("Bad protocol info from server: '%1'", protocol); // Throws
     }
     else {
         logger.error("Missing protocol info from server"); // Throws
@@ -342,20 +339,13 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
 }
 
 
-void Connection::websocket_read_error_handler(std::error_code ec)
+void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 {
-    read_error(ec); // Throws
+    read_or_write_error(ec); // Throws
 }
 
 
-void Connection::websocket_write_error_handler(std::error_code ec)
-{
-    write_error(ec); // Throws
-}
-
-
-void Connection::websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                                   const std::string_view* body)
+void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
 {
     bool is_fatal;
     if (ec == util::websocket::Error::bad_response_3xx_redirection ||
@@ -413,7 +403,7 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_error(ec);
+        read_or_write_error(ec);
         return bool(m_websocket);
     }
 
@@ -490,16 +480,13 @@ void Connection::initiate_reconnect_wait()
             switch (*m_reconnect_info.m_reason) {
                 case ConnectionTerminationReason::closed_voluntarily:
                 case ConnectionTerminationReason::read_or_write_error:
-                case ConnectionTerminationReason::premature_end_of_input:
                 case ConnectionTerminationReason::pong_timeout:
                     // Minimum delay after successful connect operation
                     delay = min_delay;
                     break;
-                case ConnectionTerminationReason::resolve_operation_failed:
                 case ConnectionTerminationReason::connect_operation_failed:
                 case ConnectionTerminationReason::http_response_says_nonfatal_error:
                 case ConnectionTerminationReason::sync_connect_timeout:
-                case ConnectionTerminationReason::http_tunnel_failed:
                     // The last attempt at establishing a connection failed. In
                     // this case, the reconnect delay will increase with the
                     // number of consecutive failures.
@@ -1000,32 +987,12 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 }
 
 
-void Connection::websocket_resolve_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::resolve_operation_failed;
-    logger.error("Failed to resolve '%1:%2': %3", m_address, m_port, ec.message()); // Throws
-    // FIXME: Should some DNS lookup errors be considered fatal (persistent)?
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec, is_fatal, custom_message); // Throws
-}
-
-
-void Connection::websocket_tcp_connect_error_handler(std::error_code ec)
+void Connection::websocket_connect_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-    logger.error("Failed to connect to '%1:%2': All endpoints failed", m_address, m_port); // Throws
-    // FIXME: Should some TCP connect errors be considered fatal (persistent)?
     bool is_fatal = false;
     StringData* custom_message = nullptr;
     involuntary_disconnect(ec, is_fatal, custom_message); // Throws
-}
-
-void Connection::websocket_http_tunnel_error_handler(std::error_code ec)
-{
-    logger.error("Failed to establish HTTP tunnel: %1", ec.message());
-    m_reconnect_info.m_reason = ConnectionTerminationReason::http_tunnel_failed;
-    close_due_to_client_side_error(ClientError::http_tunnel_failed, true); // Throws
 }
 
 void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
@@ -1043,7 +1010,7 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
         is_fatal = true;
     }
     else {
-        m_reconnect_info.m_reason = determine_connection_termination_reason(ec);
+        m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
         ec2 = ec;
         is_fatal = false;
     }
@@ -1051,20 +1018,10 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
 }
 
 
-void Connection::read_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec)
 {
-    m_reconnect_info.m_reason = determine_connection_termination_reason(ec);
-    logger.error("Reading failed: %1", ec.message()); // Throws
-    bool is_fatal = false;                            // A read error is most likely not a persistent problem
-    close_due_to_client_side_error(ec, is_fatal);     // Throws
-}
-
-
-void Connection::write_error(std::error_code ec)
-{
-    m_reconnect_info.m_reason = determine_connection_termination_reason(ec);
-    logger.error("Writing failed: %1", ec.message()); // Throws
-    bool is_fatal = false;                            // A write error is most likely not a persistent problem
+    m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
+    bool is_fatal = false;
     close_due_to_client_side_error(ec, is_fatal);     // Throws
 }
 
@@ -1410,19 +1367,6 @@ void Connection::enlist_to_send(Session* sess)
 }
 
 
-auto Connection::determine_connection_termination_reason(std::error_code ec) noexcept -> ConnectionTerminationReason
-{
-    if (ec == util::MiscExtErrors::premature_end_of_input)
-        return ConnectionTerminationReason::premature_end_of_input;
-
-    // FIXME: We need to identify SSL protocol violations here (by inspecting
-    // the error code), and return
-    // ConnectionTerminationReason::ssl_protocol_violation in those cases.
-
-    return ConnectionTerminationReason::read_or_write_error;
-}
-
-
 void Session::cancel_resumption_delay()
 {
     REALM_ASSERT(m_state == Active);
@@ -1726,15 +1670,17 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_is_flx_sync_session) {
-        auto active_query = get_or_create_flx_subscription_store()->get_active().to_ext_json();
+        const auto active_query_set = get_or_create_flx_subscription_store()->get_active();
+        const auto active_query_body = active_query_set.to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
-                     "latest_server_version_salt=%6, query_size: %7 query: \"%8\")",
+                     "latest_server_version_salt=%6, query_version: %7 query_size: %8, query: \"%9\")",
                      m_client_file_ident.ident, m_client_file_ident.salt, m_progress.download.server_version,
                      m_progress.download.last_integrated_client_version, m_progress.latest_server_version.version,
-                     m_progress.latest_server_version.salt, active_query.size(), active_query); // Throws
+                     m_progress.latest_server_version.salt, active_query_set.version(), active_query_body.size(),
+                     active_query_body); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
-                                        active_query); // Throws
+                                        active_query_set.version(), active_query_body); // Throws
     }
     else {
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
