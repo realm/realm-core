@@ -1387,73 +1387,71 @@ void Session::cancel_resumption_delay()
 }
 
 
-bool Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
+void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
-                                   IntegrationError& error, DownloadBatchState download_batch_state)
+                                   DownloadBatchState download_batch_state)
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
         if (download_batch_state != DownloadBatchState::LastInBatch) {
-            logger.error("received empty download message that was not the last in batch");
-            return false;
+            throw IntegrationException(IntegrationException::invalid_batch_state,
+                                       "received empty download message that was not the last in batch");
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
-        return true;
+        return;
     }
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
-    bool success = history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets,
-                                                       version_info, error, download_batch_state, logger,
-                                                       get_transact_reporter()); // Throws
-    if (REALM_LIKELY(success)) {
-        if (num_changesets == 1) {
-            logger.debug("1 remote changeset integrated, producing client version %1",
-                         version_info.sync_version.version); // Throws
-        }
-        else {
-            logger.debug("%2 remote changesets integrated, producing client version %1",
-                         version_info.sync_version.version, num_changesets); // Throws
-        }
+    history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
+                                        download_batch_state, logger, get_transact_reporter()); // Throws
+    if (num_changesets == 1) {
+        logger.debug("1 remote changeset integrated, producing client version %1",
+                     version_info.sync_version.version); // Throws
     }
-    return success;
+    else {
+        logger.debug("%2 remote changesets integrated, producing client version %1",
+                     version_info.sync_version.version, num_changesets); // Throws
+    }
 }
 
 
-void Session::on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                       IntegrationError error, DownloadBatchState batch_state)
+void Session::on_integration_failure(const IntegrationException& error, DownloadBatchState batch_state)
 {
     REALM_ASSERT(m_state == Active);
-
-    if (REALM_LIKELY(success)) {
-        REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
-        m_download_batch_state = batch_state;
-        if (m_download_batch_state != DownloadBatchState::LastInBatch) {
-            return;
-        }
-        m_download_progress = download_progress;
-        do_recognize_sync_version(client_version); // Allows upload process to resume
-        check_for_download_completion();           // Throws
-
-        // Since the deactivation process has not been initiated, the UNBIND
-        // message cannot have been sent unless an ERROR message was received.
-        REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_error_message_received)
-            ensure_enlisted_to_send(); // Throws
-        return;
-    }
-
     if (batch_state == DownloadBatchState::LastInBatch) {
         m_progress.download = m_download_progress;
     }
-    switch (error) {
-        case IntegrationError::bad_origin_file_ident:
+    logger.error("Failed to integrate downloaded changesets: %1", error.what());
+    switch (error.code()) {
+        case IntegrationException::bad_origin_file_ident:
             m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);
             return;
-        case IntegrationError::bad_changeset:
+        default:
             break;
     }
     m_conn.close_due_to_protocol_error(ClientError::bad_changeset);
+}
+
+void Session::on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
+                                       DownloadBatchState batch_state)
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
+    m_download_batch_state = batch_state;
+    if (m_download_batch_state != DownloadBatchState::LastInBatch) {
+        return;
+    }
+    m_download_progress = download_progress;
+    do_recognize_sync_version(client_version); // Allows upload process to resume
+    check_for_download_completion();           // Throws
+
+    // Since the deactivation process has not been initiated, the UNBIND
+    // message cannot have been sent unless an ERROR message was received.
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received) {
+        ensure_enlisted_to_send(); // Throws
+    }
 }
 
 

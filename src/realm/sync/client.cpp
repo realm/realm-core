@@ -672,31 +672,27 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const ReceivedChangesets& changesets)
 {
-    bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
-    if (REALM_LIKELY(!simulate_integration_error)) {
-        bool success;
+    try {
+        bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
+        if (simulate_integration_error) {
+            throw IntegrationException(IntegrationException::bad_changeset, "simulated failure");
+        }
         version_type client_version;
-        IntegrationError error = {};
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
             ClientReplication& repl = access_realm(); // Throws
-            success = integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info, error,
-                                           batch_state); // Throws
+            integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
+                                 batch_state); // Throws
             client_version = version_info.realm_version;
         }
         else {
             // Fake it for "dry run" mode
-            success = true;
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(success, client_version, m_progress.download, error, batch_state); // Throws
+        on_changesets_integrated(client_version, m_progress.download, batch_state); // Throws
     }
-    else {
-        bool success = false;
-        version_type client_version = 0;                 // Dummy
-        DownloadCursor download_progress = {0, 0};       // Dummy
-        IntegrationError error = IntegrationError::bad_changeset;
-        on_changesets_integrated(success, client_version, download_progress, error, batch_state); // Throws
+    catch (const IntegrationException& e) {
+        on_integration_failure(e, batch_state);
     }
     m_wrapper.on_sync_progress(); // Throws
 }
