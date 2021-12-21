@@ -1268,11 +1268,6 @@ inline bool Table::is_group_level() const noexcept
     return bool(get_parent_group());
 }
 
-inline bool Table::operator==(const Table& t) const
-{
-    return m_spec == t.m_spec && compare_objects(t); // Throws
-}
-
 inline bool Table::operator!=(const Table& t) const
 {
     return !(*this == t); // Throws

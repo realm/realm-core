@@ -10,6 +10,7 @@
 * The release package was missing several headers (since 11.7.0).
 * The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
 * Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
+* SyncManager::path_for_realm now returns a default path when FLX sync is enabled ([#5088](https://github.com/realm/realm-core/pull/5088))
 
 ### Breaking changes
 * None.
@@ -23,6 +24,7 @@
 * 'Obj TableView::get(size_t)' removed. Use 'TableView::get_object' instead.
 * Fix issue compiling in debug mode for iOS.
 * FLX sync now sends the query version in IDENT messages along with the query body ([#5093](https://github.com/realm/realm-core/pull/5093))
+* Errors in C API no longer store or expose a std::exception_ptr. The comparison of realm_async_error_t now compares error code vs object identity. ([#5064](https://github.com/realm/realm-core/pull/5064))
 
 ----------------------------------------------
 

@@ -16,7 +16,10 @@ template <class T>
 T checked(T x)
 {
     if (!x) {
-        realm_rethrow_last_error();
+        realm_error_t err_info;
+        if (realm_get_last_error(&err_info)) {
+            FAIL(err_info.message);
+        }
     }
     return x;
 }
@@ -269,22 +272,6 @@ TEST_CASE("C API (non-database)") {
         CHECK(realm_get_last_error(&err));
         CHECK(err.error == RLM_ERR_OTHER_EXCEPTION);
         CHECK(std::string{err.message} == "Synthetic error");
-        realm_clear_last_error();
-    }
-
-    SECTION("realm_rethrow_last_error() lossless") {
-        struct SyntheticException {
-        };
-
-        auto synthetic = []() {
-            throw SyntheticException{};
-        };
-
-        CHECK(!realm_wrap_exceptions(synthetic));
-        realm_error_t err;
-        CHECK(realm_get_last_error(&err));
-        CHECK(err.error == RLM_ERR_UNKNOWN);
-        CHECK_THROWS_AS(realm_rethrow_last_error(), SyntheticException);
         realm_clear_last_error();
     }
 

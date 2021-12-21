@@ -1,12 +1,11 @@
 #ifndef REALM_OBJECT_STORE_C_API_UTIL_HPP
 #define REALM_OBJECT_STORE_C_API_UTIL_HPP
 
+#include <realm/object-store/c_api/error.hpp>
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::c_api {
-
-void set_last_exception(std::exception_ptr eptr);
 
 template <class F>
 inline auto wrap_err(F&& f) noexcept -> decltype(f())
