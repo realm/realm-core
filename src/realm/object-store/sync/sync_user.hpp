@@ -75,74 +75,47 @@ struct SyncUserProfile {
     // The full name of the user.
     util::Optional<std::string> name() const
     {
-        if (m_data.find("name") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("name"));
+        return get_field("name");
     }
     // The email address of the user.
     util::Optional<std::string> email() const
     {
-        if (m_data.find("email") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("email"));
+        return get_field("email");
     }
     // A URL to the user's profile picture.
     util::Optional<std::string> picture_url() const
     {
-        if (m_data.find("picture_url") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("picture_url"));
+        return get_field("picture_url");
     }
     // The first name of the user.
     util::Optional<std::string> first_name() const
     {
-        if (m_data.find("first_name") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("first_name"));
+        return get_field("first_name");
     }
     // The last name of the user.
     util::Optional<std::string> last_name() const
     {
-        if (m_data.find("last_name") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("last_name"));
+        return get_field("last_name");
     }
     // The gender of the user.
     util::Optional<std::string> gender() const
     {
-        if (m_data.find("gender") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("gender"));
+        return get_field("gender");
     }
     // The birthdate of the user.
     util::Optional<std::string> birthday() const
     {
-        if (m_data.find("birthday") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("birthday"));
+        return get_field("birthday");
     }
     // The minimum age of the user.
     util::Optional<std::string> min_age() const
     {
-        if (m_data.find("min_age") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("min_age"));
+        return get_field("min_age");
     }
     // The maximum age of the user.
     util::Optional<std::string> max_age() const
     {
-        if (m_data.find("max_age") == m_data.end()) {
-            return util::none;
-        }
-        return static_cast<std::string>(m_data.at("max_age"));
+        return get_field("max_age");
     }
 
     bson::Bson operator[](const std::string& key) const
@@ -150,7 +123,7 @@ struct SyncUserProfile {
         return m_data.at(key);
     }
 
-    bson::BsonDocument data() const
+    const bson::BsonDocument& data() const
     {
         return m_data;
     }
@@ -163,6 +136,15 @@ struct SyncUserProfile {
 
 private:
     bson::BsonDocument m_data;
+
+    util::Optional<std::string> get_field(const char* name) const
+    {
+        auto it = m_data.find(name);
+        if (it == m_data.end()) {
+            return util::none;
+        }
+        return static_cast<std::string>((*it).second);
+    }
 };
 
 // A struct that represents an identity that a `User` is linked to
