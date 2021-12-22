@@ -974,8 +974,9 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 
 } // anonymous namespace
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                  std::vector<ColKey>& followed, JSONOutputMode output_mode) const
+                  std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
 {
+    followed.push_back(get_link());
     size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
     StringData name = "_key";
     bool prefixComma = false;
@@ -1004,18 +1005,13 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         TableRef target_table;
         std::string open_str;
         std::string close_str;
-        bool is_embedded = false;
-        bool dont_follow_link = false;
-        if (!is_embedded && output_mode == output_mode_json) {
-            dont_follow_link =
-                (link_depth == 0) ||
-                (link_depth == not_found && std::find(followed.begin(), followed.end(), ck) != followed.end());
-        }
         ColKey pk_col_key;
         if (type == col_type_Link) {
             target_table = get_target_table(ck);
-            is_embedded = target_table->is_embedded();
             pk_col_key = target_table->get_primary_key_column();
+            bool is_embedded = target_table->is_embedded();
+            bool link_depth_reached = !is_embedded && (link_depth == 0);
+
             if (output_mode == output_mode_xjson_plus) {
                 open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
                 if (ck.is_list())
@@ -1024,12 +1020,11 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     open_str += "Set";
                 else if (ck.is_dictionary())
                     open_str += "Dictionary";
-                else if (is_embedded)
-                    open_str += "Obj";
                 open_str += "\": ";
                 close_str += "}";
             }
-            if (dont_follow_link || output_mode == output_mode_xjson_plus) {
+
+            if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
                 open_str += "{ \"table\": \"" + std::string(get_target_table(ck)->get_name()) + "\", ";
                 open_str += ((is_embedded || ck.is_dictionary()) ? "\"value" : "\"key");
                 if (ck.is_collection())
@@ -1051,12 +1046,13 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             }
         }
 
-        auto print_value = [&](TableRef tt, Mixed key, Mixed val) {
+        auto print_value = [&](Mixed key, Mixed val) {
             if (!key.is_null()) {
                 out_mixed(out, key, output_mode);
                 out << ":";
             }
             if (val.is_type(type_Link, type_TypedLink)) {
+                TableRef tt = target_table;
                 auto obj_key = val.get<ObjKey>();
                 std::string table_info;
                 std::string table_info_close;
@@ -1078,16 +1074,25 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     out << table_info_close;
                 }
                 else {
+                    ObjLink link(tt->get_key(), obj_key);
                     if (obj_key.is_unresolved()) {
                         out << "null";
+                        return;
                     }
-                    else if (dont_follow_link) {
-                        out << table_info << obj_key.value << table_info_close;
+                    if (!tt->is_embedded()) {
+                        if (link_depth == 0) {
+                            out << table_info << obj_key.value << table_info_close;
+                            return;
+                        }
+                        if ((link_depth == realm::npos &&
+                             std::find(followed.begin(), followed.end(), link) != followed.end())) {
+                            // We have detected a cycle in links
+                            out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << "}";
+                            return;
+                        }
                     }
-                    else {
-                        followed.push_back(ck);
-                        tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
-                    }
+
+                    tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
                 }
             }
             else {
@@ -1104,7 +1109,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             for (size_t i = 0; i < sz; i++) {
                 if (i > 0)
                     out << ",";
-                print_value(target_table, Mixed{}, list->get_any(i));
+                print_value(Mixed{}, list->get_any(i));
             }
             out << "]";
             out << close_str;
@@ -1120,7 +1125,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 if (!first)
                     out << ",";
                 first = false;
-                print_value(target_table, it.first, it.second);
+                print_value(it.first, it.second);
             }
             out << "}";
             out << close_str;
@@ -1129,7 +1134,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             auto val = get_any(ck);
             if (!val.is_null()) {
                 out << open_str;
-                print_value(target_table, Mixed{}, val);
+                print_value(Mixed{}, val);
                 out << close_str;
             }
             else {
@@ -1138,6 +1143,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         }
     }
     out << "}";
+    followed.pop_back();
 }
 
 std::string Obj::to_string() const

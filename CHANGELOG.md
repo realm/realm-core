@@ -7,9 +7,10 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* The release package was missing several headers (since 11.7.0).
+* The release package was missing several headers (since v11.7.0).
 * The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
 * Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
+* Having links in a property of Mixed type would lead to ill-formed JSON output when serializing the database. ([#5125](https://github.com/realm/realm-core/issues/5125), since v11.0.0)
 
 ### Breaking changes
 * None.
@@ -24,7 +25,7 @@
 * Fix issue compiling in debug mode for iOS.
 * FLX sync now sends the query version in IDENT messages along with the query body ([#5093](https://github.com/realm/realm-core/pull/5093))
 * Errors in C API no longer store or expose a std::exception_ptr. The comparison of realm_async_error_t now compares error code vs object identity. ([#5064](https://github.com/realm/realm-core/pull/5064))
-
+* The JSON output is slightly changed in the event of link cycles. Nobody is expected to rely on that.
 ----------------------------------------------
 
 # 11.7.0 Release notes
