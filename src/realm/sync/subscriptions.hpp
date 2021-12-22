@@ -241,6 +241,9 @@ public:
     // Returns this query set as extended JSON in a form suitable for transmitting to the server.
     std::string to_ext_json() const;
 
+    // Get the SubscriptionStore this SubscriptionSet belongs to.
+    const SubscriptionStore* get_subscription_store() const noexcept;
+
 protected:
     friend class SubscriptionStore;
     friend class Subscription;

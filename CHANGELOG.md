@@ -25,6 +25,7 @@
 * Fix issue compiling in debug mode for iOS.
 * FLX sync now sends the query version in IDENT messages along with the query body ([#5093](https://github.com/realm/realm-core/pull/5093))
 * Errors in C API no longer store or expose a std::exception_ptr. The comparison of realm_async_error_t now compares error code vs object identity. ([#5064](https://github.com/realm/realm-core/pull/5064))
+* `get_subscription_store()` accessor added to FLX `SubscriptionSet` ([#5122](https://github.com/realm/realm-core/pull/5122/))
 
 ----------------------------------------------
 
