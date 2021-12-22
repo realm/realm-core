@@ -241,6 +241,10 @@ public:
     // Returns this query set as extended JSON in a form suitable for transmitting to the server.
     std::string to_ext_json() const;
 
+    // Returns an updated version of this version of the SubscriptionSet. Useful for updating the instance
+    // when the state of the SubscriptionSet has changed.
+    SubscriptionSet get_updated_version();
+
 protected:
     friend class SubscriptionStore;
     friend class Subscription;

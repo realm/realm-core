@@ -450,6 +450,11 @@ std::string SubscriptionSet::to_ext_json() const
     return output_json.dump();
 }
 
+SubscriptionSet SubscriptionSet::get_updated_version()
+{
+    return m_mgr->get_by_version(version());
+}
+
 SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
     : m_db(std::move(db))
     , m_on_new_subscription_set(std::move(on_new_subscription_set))
