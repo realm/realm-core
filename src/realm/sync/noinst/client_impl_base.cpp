@@ -1395,7 +1395,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
         if (download_batch_state != DownloadBatchState::LastInBatch) {
-            throw IntegrationException(IntegrationException::invalid_batch_state,
+            throw IntegrationException(ClientError::bad_progress,
                                        "received empty download message that was not the last in batch");
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
@@ -1423,14 +1423,7 @@ void Session::on_integration_failure(const IntegrationException& error, Download
         m_progress.download = m_download_progress;
     }
     logger.error("Failed to integrate downloaded changesets: %1", error.what());
-    switch (error.code()) {
-        case IntegrationException::bad_origin_file_ident:
-            m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);
-            return;
-        default:
-            break;
-    }
-    m_conn.close_due_to_protocol_error(ClientError::bad_changeset);
+    m_conn.close_due_to_protocol_error(error.code());
 }
 
 void Session::on_changesets_integrated(version_type client_version, DownloadCursor download_progress,

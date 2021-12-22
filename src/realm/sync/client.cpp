@@ -675,7 +675,7 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
     try {
         bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
         if (simulate_integration_error) {
-            throw IntegrationException(IntegrationException::bad_changeset, "simulated failure");
+            throw IntegrationException(ClientError::bad_changeset, "simulated failure");
         }
         version_type client_version;
         if (REALM_LIKELY(!get_client().is_dry_run())) {

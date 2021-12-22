@@ -368,11 +368,11 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
         }
     }
     catch (BadChangesetError& e) {
-        throw IntegrationException(IntegrationException::bad_changeset,
+        throw IntegrationException(ClientError::bad_changeset,
                                    util::format("Failed to parse, or apply received changeset: %1", e.what()));
     }
     catch (TransformError& e) {
-        throw IntegrationException(IntegrationException::bad_changeset,
+        throw IntegrationException(ClientError::bad_changeset,
                                    util::format("Failed to transform received changeset: %1", e.what()));
     }
 
@@ -653,29 +653,26 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
     // Progress must never decrease
     if (progress.latest_server_version.version <
         version_type(root.get_as_ref_or_tagged(s_progress_latest_server_version_iip).get_as_int())) {
-        throw IntegrationException(IntegrationException::decreasing_progress,
-                                   "latest server version cannot decrease");
+        throw IntegrationException(ClientError::bad_progress, "latest server version cannot decrease");
     }
     if (progress.download.server_version <
         version_type(root.get_as_ref_or_tagged(s_progress_download_server_version_iip).get_as_int())) {
-        throw IntegrationException(IntegrationException::decreasing_progress,
-                                   "server version of download cursor cannot decrease");
+        throw IntegrationException(ClientError::bad_progress, "server version of download cursor cannot decrease");
     }
     if (progress.download.last_integrated_client_version <
         version_type(root.get_as_ref_or_tagged(s_progress_download_client_version_iip).get_as_int())) {
-        throw IntegrationException(IntegrationException::decreasing_progress,
+        throw IntegrationException(ClientError::bad_progress,
                                    "last integrated client version of download cursor cannot decrease");
     }
     if (progress.upload.client_version <
         version_type(root.get_as_ref_or_tagged(s_progress_upload_client_version_iip).get_as_int())) {
-        throw IntegrationException(IntegrationException::decreasing_progress,
-                                   "client version of upload cursor cannot decrease");
+        throw IntegrationException(ClientError::bad_progress, "client version of upload cursor cannot decrease");
     }
     const auto last_integrated_server_version = progress.upload.last_integrated_server_version;
     if (last_integrated_server_version > 0 &&
         last_integrated_server_version <
             version_type(root.get_as_ref_or_tagged(s_progress_upload_server_version_iip).get_as_int())) {
-        throw IntegrationException(IntegrationException::decreasing_progress,
+        throw IntegrationException(ClientError::bad_progress,
                                    "last integrated server version of upload cursor cannot decrease");
     }
 

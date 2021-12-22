@@ -3,11 +3,11 @@
 #define REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 
 #include <realm/util/optional.hpp>
+#include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/array_integer.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 class ClientReplication;
 // As new schema versions come into existence, describe them here.
@@ -52,19 +52,19 @@ class IntegrationException : public std::runtime_error {
 public:
     enum IntegrationError { bad_origin_file_ident, bad_changeset, decreasing_progress, invalid_batch_state };
 
-    IntegrationException(IntegrationError code, const std::string& msg)
+    IntegrationException(ClientError code, const std::string& msg)
         : std::runtime_error(msg)
         , m_error(code)
     {
     }
 
-    IntegrationError code() const noexcept
+    ClientError code() const noexcept
     {
         return m_error;
     }
 
 private:
-    IntegrationError m_error;
+    ClientError m_error;
 };
 
 class ClientHistory final : public _impl::History, public TransformHistory {
@@ -510,7 +510,6 @@ inline auto ClientHistory::get_transformer() -> Transformer&
 /// realm::DB objects.
 std::unique_ptr<ClientReplication> make_client_replication();
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
