@@ -845,7 +845,7 @@ AppSession create_app(const AppCreateConfig& config)
         auto queryable_fields = nlohmann::json::array();
         const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
         std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
-        mongo_service_def["config"]["sync_query"] = nlohmann::json{
+        mongo_service_def["config"]["flexible_sync"] = nlohmann::json{
             {"state", "enabled"},
             {"database_name", config.mongo_dbname},
             {"queryable_fields_names", queryable_fields},
