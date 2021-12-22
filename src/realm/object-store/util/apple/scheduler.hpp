@@ -37,19 +37,19 @@ public:
 
     void set_notify_callback(std::function<void()> fn) override
     {
-        set_callback(m_notify_signal, fn);
+        set_callback(m_notify_signal, std::move(fn));
     }
-    void set_schedule_writes_callback(std::function<void()> fn) override
+    void set_schedule_writes_callback(util::UniqueFunction<void()> fn) override
     {
         if (m_write_signal)
             return; // danger!
-        set_callback(m_write_signal, fn);
+        set_callback(m_write_signal, std::move(fn));
     }
-    void set_schedule_completions_callback(std::function<void()> fn) override
+    void set_schedule_completions_callback(util::UniqueFunction<void()> fn) override
     {
         if (m_completion_signal)
             return; // danger!
-        set_callback(m_completion_signal, fn);
+        set_callback(m_completion_signal, std::move(fn));
     }
 
     bool is_on_thread() const noexcept override;
@@ -71,7 +71,7 @@ private:
     CFRunLoopSourceRef m_completion_signal = nullptr;
 
     void release(CFRunLoopSourceRef&);
-    void set_callback(CFRunLoopSourceRef&, std::function<void()>);
+    void set_callback(CFRunLoopSourceRef&, util::UniqueFunction<void()>);
 };
 
 RunLoopScheduler::RunLoopScheduler(CFRunLoopRef run_loop)
@@ -97,12 +97,12 @@ void RunLoopScheduler::release(CFRunLoopSourceRef& source)
     }
 }
 
-void RunLoopScheduler::set_callback(CFRunLoopSourceRef& source, std::function<void()> callback)
+void RunLoopScheduler::set_callback(CFRunLoopSourceRef& source, util::UniqueFunction<void()> callback)
 {
     release(source);
 
     struct RefCountedRunloopCallback {
-        std::function<void()> callback;
+        util::UniqueFunction<void()> callback;
         std::atomic<size_t> ref_count;
     };
 

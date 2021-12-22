@@ -18,7 +18,7 @@ public:
         initiate_resolve();
     }
 
-    void async_write_binary(const char* data, size_t size, std::function<void()>&& handler) override
+    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) override
     {
         m_websocket.async_write_binary(data, size, std::move(handler));
     }
@@ -115,10 +115,10 @@ void EZSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHand
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
-        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
+        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, std::move(handler)); // Throws
     }
     else {
-        m_socket->async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
+        m_socket->async_read(buffer, size, m_read_ahead_buffer, std::move(handler)); // Throws
     }
 }
 
@@ -127,10 +127,10 @@ void EZSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, 
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
-        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
+        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler)); // Throws
     }
     else {
-        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
+        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler)); // Throws
     }
 }
 
@@ -139,10 +139,10 @@ void EZSocketImpl::async_write(const char* data, std::size_t size, WriteCompleti
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
-        m_ssl_stream->async_write(data, size, handler); // Throws
+        m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
     }
     else {
-        m_socket->async_write(data, size, handler); // Throws
+        m_socket->async_write(data, size, std::move(handler)); // Throws
     }
 }
 

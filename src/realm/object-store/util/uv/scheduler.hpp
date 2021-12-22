@@ -60,7 +60,7 @@ public:
         return true;
     }
 
-    uv_async_t* add_callback(std::function<void()> fn)
+    uv_async_t* add_callback(util::UniqueFunction<void()> fn)
     {
         auto the_handle = new uv_async_t;
         the_handle->data = new Data{std::move(fn), {false}};
@@ -110,7 +110,7 @@ public:
     {
         return true;
     }
-    void set_schedule_writes_callback(std::function<void()> fn) override
+    void set_schedule_writes_callback(util::UniqueFunction<void()> fn) override
     {
         if (m_write_handle && m_write_handle->data) {
             return; // danger!
@@ -119,7 +119,7 @@ public:
         }
         m_write_handle = add_callback(std::move(fn));
     }
-    void set_schedule_completions_callback(std::function<void()> fn) override
+    void set_schedule_completions_callback(util::UniqueFunction<void()> fn) override
     {
         if (m_completion_handle && m_completion_handle->data) {
             return; // danger!
@@ -129,7 +129,7 @@ public:
         m_completion_handle = add_callback(std::move(fn));
     }
 
-    bool set_timeout_callback(uint64_t timeout, std::function<void()> fn) override
+    bool set_timeout_callback(uint64_t timeout, util::UniqueFunction<void()> fn) override
     {
         if (!m_timer || !m_timer->data) {
             auto m_timer = new uv_timer_t;
@@ -150,7 +150,7 @@ public:
 
 private:
     struct Data {
-        std::function<void()> callback;
+        util::UniqueFunction<void()> callback;
         std::atomic<bool> close_requested;
     };
     uv_async_t* m_notification_handle = nullptr;

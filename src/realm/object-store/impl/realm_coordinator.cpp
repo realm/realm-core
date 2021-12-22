@@ -100,7 +100,7 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
     m_config.sync_config->get_fresh_realm_for_path =
-        [&](const std::string& path, std::function<void(DBRef, util::Optional<std::string>)> callback) {
+        [&](const std::string& path, util::UniqueFunction<void(DBRef, util::Optional<std::string>)> callback) {
             try {
                 // Get a fully downloaded Realm using the current configuration but changing the
                 // on disk path to the one provided. The current sync session is not affected.
@@ -122,7 +122,7 @@ void RealmCoordinator::create_sync_session()
                 std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
                 REALM_ASSERT(rc);
                 auto task = rc->get_synchronized_realm(copy_config);
-                task->start([callback, path](ThreadSafeReference, std::exception_ptr err) {
+                task->start([callback = std::move(callback), path](ThreadSafeReference, std::exception_ptr err) {
                     try {
                         if (err) {
                             std::rethrow_exception(err);

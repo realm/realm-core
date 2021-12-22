@@ -36,7 +36,7 @@
 using namespace realm;
 using namespace realm::_impl;
 
-using SessionWaiterPointer = void (sync::Session::*)(std::function<void(std::error_code)>);
+using SessionWaiterPointer = void (sync::Session::*)(util::UniqueFunction<void(std::error_code)>);
 
 constexpr const char SyncError::c_original_file_path_key[];
 constexpr const char SyncError::c_recovery_file_path_key[];
@@ -178,7 +178,8 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::er
     }
 }
 
-std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
+util::UniqueFunction<void(util::Optional<app::AppError>)>
+SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
 {
     return [session](util::Optional<app::AppError> error) {
         auto session_user = session->user();
@@ -650,7 +651,7 @@ void SyncSession::do_create_sync_session()
     });
 }
 
-void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
+void SyncSession::set_sync_transact_callback(util::UniqueFunction<sync::Session::SyncTransactCallback> callback)
 {
     std::lock_guard l(m_state_mutex);
     m_sync_transact_callback = std::move(callback);
@@ -808,7 +809,7 @@ void SyncSession::initiate_access_token_refresh()
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
-                                          std::function<void(std::error_code)> callback,
+                                          util::UniqueFunction<void(std::error_code)> callback,
                                           _impl::SyncProgressNotifier::NotifierType direction)
 {
     bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
@@ -837,19 +838,19 @@ void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
     });
 }
 
-void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
+void SyncSession::wait_for_upload_completion(util::UniqueFunction<void(std::error_code)>&& callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     add_completion_callback(lock, std::move(callback), ProgressDirection::upload);
 }
 
-void SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
+void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     add_completion_callback(lock, std::move(callback), ProgressDirection::download);
 }
 
-uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback> notifier,
+uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,
                                                  ProgressDirection direction, bool is_streaming)
 {
     return m_progress_notifier.register_callback(std::move(notifier), direction, is_streaming);
@@ -860,9 +861,9 @@ void SyncSession::unregister_progress_notifier(uint64_t token)
     m_progress_notifier.unregister_callback(token);
 }
 
-uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateChangeCallback> callback)
+uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateChangeCallback>&& callback)
 {
-    return m_connection_change_notifier.add_callback(callback);
+    return m_connection_change_notifier.add_callback(std::move(callback));
 }
 
 void SyncSession::unregister_connection_change_callback(uint64_t token)
@@ -979,7 +980,7 @@ void SyncSession::did_drop_external_reference()
 uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
-    std::function<void()> invocation;
+    util::UniqueFunction<void()> invocation;
     uint64_t token_value = 0;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -1017,7 +1018,7 @@ void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, ui
     if (download_version == 0)
         return;
 
-    std::vector<std::function<void()>> invocations;
+    std::vector<util::UniqueFunction<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded, snapshot_version};
@@ -1039,8 +1040,8 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
     m_local_transaction_version = snapshot_version;
 }
 
-std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress,
-                                                                               bool& is_expired)
+util::UniqueFunction<void()>
+SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;

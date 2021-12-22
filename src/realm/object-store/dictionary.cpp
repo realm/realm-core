@@ -276,7 +276,7 @@ public:
         : m_dict(dict)
         , m_prev_rt(static_cast<Transaction*>(dict.get_table()->get_parent_group())->duplicate())
         , m_prev_dict(static_cast<realm::Dictionary*>(m_prev_rt->import_copy_of(dict).release()))
-        , m_cb(cb)
+        , m_cb(std::move(cb))
     {
     }
 
@@ -327,7 +327,7 @@ private:
 
 NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array) &
 {
-    return add_notification_callback(NotificationHandler(dict(), cb), key_path_array);
+    return add_notification_callback(NotificationHandler(dict(), std::move(cb)), key_path_array);
 }
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const

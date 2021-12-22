@@ -6,9 +6,10 @@
 #include <random>
 #include <stdexcept>
 
-#include <realm/util/optional.hpp>
-#include <realm/util/file.hpp>
 #include <realm/util/backtrace.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/functional.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
 
@@ -106,7 +107,7 @@ template <class H>
 void find_realm_files(const std::string& root_dir, H handler)
 {
     StringData realm_suffix = ".realm";
-    std::function<void(const std::string&, const std::string&)> scan_dir;
+    util::UniqueFunction<void(const std::string&, const std::string&)> scan_dir;
     scan_dir = [&](const std::string& real_path, const std::string& virt_path) {
         util::DirScanner ds{real_path}; // Throws
         std::string name;

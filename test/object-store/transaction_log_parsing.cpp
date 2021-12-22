@@ -2102,7 +2102,7 @@ TEST_CASE("DeepChangeChecker singular links", "[notifications]") {
         }
 
         SECTION("link chains are tracked for column: " + column_name) {
-            auto verify_changes_for = [&](auto& checker, std::function<bool(size_t)> pred) {
+            auto verify_changes_for = [&](auto& checker, util::FunctionRef<bool(size_t)> pred) {
                 // Check in random orders to make sure that the caching doesn't affect
                 // the results
                 std::vector<size_t> indices(20);

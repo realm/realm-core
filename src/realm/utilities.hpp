@@ -43,6 +43,7 @@ typedef SSIZE_T ssize_t;
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
@@ -74,7 +75,7 @@ typedef SSIZE_T ssize_t;
 
 namespace realm {
 
-using StringCompareCallback = std::function<bool(const char* string1, const char* string2)>;
+using StringCompareCallback = util::UniqueFunction<bool(const char* string1, const char* string2)>;
 
 extern signed char sse_support;
 extern signed char avx_support;

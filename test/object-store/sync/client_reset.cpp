@@ -169,8 +169,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
         // There is a race in the test code of the sync test server where somehow the
         // remote Realm is also reset sometimes. We ignore it as it shouldn't affect the result.
     };
-    auto make_reset = [&](Realm::Config config_local,
-                          Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
+    auto make_reset = [&](const Realm::Config& config_local,
+                          const Realm::Config& config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
         return reset_utils::make_test_server_client_reset(config_local, config_remote, sync_manager);
     };
 #endif

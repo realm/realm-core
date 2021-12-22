@@ -38,7 +38,7 @@ namespace realm {
 namespace util {
 namespace {
 
-std::function<std::shared_ptr<Scheduler>()> s_factory = &Scheduler::make_platform_default;
+util::UniqueFunction<std::shared_ptr<Scheduler>()> s_factory = &Scheduler::make_platform_default;
 
 class FrozenScheduler : public util::Scheduler {
 public:
@@ -72,8 +72,8 @@ public:
     {
         return false;
     }
-    void set_schedule_writes_callback(std::function<void()>) override {}
-    void set_schedule_completions_callback(std::function<void()>) override {}
+    void set_schedule_writes_callback(util::UniqueFunction<void()>) override {}
+    void set_schedule_completions_callback(util::UniqueFunction<void()>) override {}
 
 private:
     VersionID m_version;
@@ -82,7 +82,7 @@ private:
 
 Scheduler::~Scheduler() = default;
 
-void Scheduler::set_default_factory(std::function<std::shared_ptr<Scheduler>()> factory)
+void Scheduler::set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()> factory)
 {
     s_factory = std::move(factory);
 }

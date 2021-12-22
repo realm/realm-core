@@ -506,7 +506,8 @@ public:
     };
 
     bool has_cascade_notification_handler() const noexcept;
-    void set_cascade_notification_handler(std::function<void(const CascadeNotification&)> new_handler) noexcept;
+    void
+    set_cascade_notification_handler(util::UniqueFunction<void(const CascadeNotification&)> new_handler) noexcept;
 
     //@}
 
@@ -528,7 +529,7 @@ public:
     /// without registering a new one.
 
     bool has_schema_change_notification_handler() const noexcept;
-    void set_schema_change_notification_handler(std::function<void()> new_handler) noexcept;
+    void set_schema_change_notification_handler(util::UniqueFunction<void()> new_handler) noexcept;
 
     //@}
 
@@ -660,8 +661,8 @@ private:
     const bool m_is_shared;
     static std::optional<int> fake_target_file_format;
 
-    std::function<void(const CascadeNotification&)> m_notify_handler;
-    std::function<void()> m_schema_change_handler;
+    util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
+    util::UniqueFunction<void()> m_schema_change_handler;
     std::shared_ptr<metrics::Metrics> m_metrics;
     size_t m_total_rows;
 
@@ -1108,7 +1109,7 @@ inline bool Group::has_cascade_notification_handler() const noexcept
 }
 
 inline void
-Group::set_cascade_notification_handler(std::function<void(const CascadeNotification&)> new_handler) noexcept
+Group::set_cascade_notification_handler(util::UniqueFunction<void(const CascadeNotification&)> new_handler) noexcept
 {
     m_notify_handler = std::move(new_handler);
 }
@@ -1124,7 +1125,7 @@ inline bool Group::has_schema_change_notification_handler() const noexcept
     return !!m_schema_change_handler;
 }
 
-inline void Group::set_schema_change_notification_handler(std::function<void()> new_handler) noexcept
+inline void Group::set_schema_change_notification_handler(util::UniqueFunction<void()> new_handler) noexcept
 {
     m_schema_change_handler = std::move(new_handler);
 }

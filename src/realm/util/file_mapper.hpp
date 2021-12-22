@@ -23,8 +23,7 @@
 #include <realm/utilities.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
-
-#include <functional>
+#include <realm/util/functional.hpp>
 
 namespace realm {
 namespace util {
@@ -52,7 +51,7 @@ public:
     // must return the target load (also in bytes). Returns no_match if no
     // target can be set
     static constexpr int64_t no_match = -1;
-    virtual std::function<int64_t()> current_target_getter(size_t load) = 0;
+    virtual util::UniqueFunction<int64_t()> current_target_getter(size_t load) = 0;
     virtual void report_target_result(int64_t) = 0;
 };
 

@@ -214,8 +214,8 @@ public:
     // Then there is one call for each object on that path, starting with the top level object
     // The embedded object itself is not considered part of the path.
     // Note: You should never provide the path_index for calls to traverse_path.
-    using Visitor = std::function<void(const Obj&, ColKey, Mixed)>;
-    using PathSizer = std::function<void(size_t)>;
+    using Visitor = util::FunctionRef<void(const Obj&, ColKey, Mixed)>;
+    using PathSizer = util::FunctionRef<void(size_t)>;
     void traverse_path(Visitor v, PathSizer ps, size_t path_index = 0) const;
 
     template <typename U>

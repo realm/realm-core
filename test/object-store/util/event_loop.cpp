@@ -73,10 +73,10 @@ struct EventLoop::Impl {
     static std::unique_ptr<Impl> main();
 
     // Run the event loop until the given return predicate returns true
-    void run_until(std::function<bool()> predicate);
+    void run_until(util::FunctionRef<bool()> predicate);
 
     // Schedule execution of the given function on the event loop.
-    void perform(std::function<void()>);
+    void perform(util::UniqueFunction<void()>);
 
     ~Impl();
 
@@ -84,7 +84,7 @@ private:
 #if REALM_USE_UV
     Impl(uv_loop_t* loop);
 
-    std::vector<std::function<void()>> m_pending_work;
+    std::vector<util::UniqueFunction<void()>> m_pending_work;
     std::mutex m_mutex;
     uv_loop_t* m_loop;
     uv_async_t m_perform_work;
@@ -111,12 +111,12 @@ EventLoop::EventLoop(std::unique_ptr<Impl> impl)
 
 EventLoop::~EventLoop() = default;
 
-void EventLoop::run_until(std::function<bool()> predicate)
+void EventLoop::run_until(util::FunctionRef<bool()> predicate)
 {
     return m_impl->run_until(std::move(predicate));
 }
 
-void EventLoop::perform(std::function<void()> function)
+void EventLoop::perform(util::UniqueFunction<void()> function)
 {
     return m_impl->perform(std::move(function));
 }
@@ -138,7 +138,7 @@ EventLoop::Impl::Impl(uv_loop_t* loop)
 {
     m_perform_work.data = this;
     uv_async_init(uv_default_loop(), &m_perform_work, [](uv_async_t* handle) {
-        std::vector<std::function<void()>> pending_work;
+        std::vector<util::UniqueFunction<void()>> pending_work;
         {
             Impl& self = *static_cast<Impl*>(handle->data);
             std::lock_guard<std::mutex> lock(self.m_mutex);
@@ -171,7 +171,7 @@ struct IdleHandler {
     }
 };
 
-void EventLoop::Impl::run_until(std::function<bool()> predicate)
+void EventLoop::Impl::run_until(util::FunctionRef<bool()> predicate)
 {
     if (predicate())
         return;
@@ -180,7 +180,7 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
     observer.idle->data = &predicate;
 
     uv_idle_start(observer.idle, [](uv_idle_t* handle) {
-        auto& predicate = *static_cast<std::function<bool()>*>(handle->data);
+        auto& predicate = *static_cast<util::FunctionRef<bool()>*>(handle->data);
         if (predicate()) {
             uv_stop(handle->loop);
         }
@@ -190,7 +190,7 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
     uv_idle_stop(observer.idle);
 }
 
-void EventLoop::Impl::perform(std::function<void()> f)
+void EventLoop::Impl::perform(util::UniqueFunction<void()> f)
 {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -213,12 +213,12 @@ std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
 
 EventLoop::Impl::~Impl() = default;
 
-void EventLoop::Impl::run_until(std::function<bool()> predicate)
+void EventLoop::Impl::run_until(util::FunctionRef<bool()> predicate)
 {
     REALM_ASSERT(m_loop.get() == CFRunLoopGetCurrent());
 
     auto callback = [](CFRunLoopObserverRef, CFRunLoopActivity, void* info) {
-        if ((*static_cast<std::function<bool()>*>(info))()) {
+        if ((*static_cast<util::FunctionRef<bool()>*>(info))()) {
             CFRunLoopStop(CFRunLoopGetCurrent());
         }
     };
@@ -238,8 +238,9 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
     CFRunLoopRemoveObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
 }
 
-void EventLoop::Impl::perform(std::function<void()> f)
+void EventLoop::Impl::perform(util::UniqueFunction<void()> func)
 {
+    __block auto f = std::move(func);
     CFRunLoopPerformBlock(m_loop.get(), kCFRunLoopDefaultMode, ^{
       f();
     });
@@ -257,11 +258,11 @@ std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
     return nullptr;
 }
 EventLoop::Impl::~Impl() = default;
-void EventLoop::Impl::run_until(std::function<bool()>)
+void EventLoop::Impl::run_until(util::FunctionRef<bool()>)
 {
     printf("WARNING: there is no event loop implementation and nothing is happening.\n");
 }
-void EventLoop::Impl::perform(std::function<void()>)
+void EventLoop::Impl::perform(util::UniqueFunction<void()>)
 {
     printf("WARNING: there is no event loop implementation and nothing is happening.\n");
 }
