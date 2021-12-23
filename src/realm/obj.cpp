@@ -1021,7 +1021,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                 else if (ck.is_dictionary())
                     open_str += "Dictionary";
                 open_str += "\": ";
-                close_str += "}";
+                close_str += " }";
             }
 
             if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
@@ -1037,11 +1037,11 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
             if (output_mode == output_mode_xjson_plus) {
                 if (ck.is_set()) {
                     open_str = "{ \"$set\": ";
-                    close_str = "}";
+                    close_str = " }";
                 }
                 else if (ck.is_dictionary()) {
                     open_str = "{ \"$dictionary\": ";
-                    close_str = "}";
+                    close_str = " }";
                 }
             }
         }
@@ -1062,11 +1062,11 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                     pk_col_key = tt->get_primary_key_column();
                     if (output_mode == output_mode_xjson_plus) {
                         table_info = std::string("{ \"$link\": ");
-                        table_info_close = "}";
+                        table_info_close = " }";
                     }
 
                     table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
-                    table_info_close += "}";
+                    table_info_close += " }";
                 }
                 if (pk_col_key && output_mode != output_mode_json) {
                     out << table_info;
@@ -1087,7 +1087,7 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
                         if ((link_depth == realm::npos &&
                              std::find(followed.begin(), followed.end(), link) != followed.end())) {
                             // We have detected a cycle in links
-                            out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << "}";
+                            out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
                             return;
                         }
                     }
