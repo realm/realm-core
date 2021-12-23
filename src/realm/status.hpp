@@ -38,11 +38,13 @@ public:
     static inline Status OK();
 
     /*
-     * You can construct a Status from strings, C strings, and StringData's.
+     * You can construct a Status from anything that can construct a std::string.
      */
-    Status(ErrorCodes::Error code, StringData reason);
-    Status(ErrorCodes::Error code, const std::string& reason);
-    Status(ErrorCodes::Error code, const char* reason);
+    template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string, Reason>, int> = 0>
+    Status(ErrorCodes::Error code, Reason&& reason)
+        : m_error(ErrorInfo::create(code, std::string{reason}))
+    {
+    }
 
     /*
      * Copying a Status is just copying an intrusive pointer - i.e. very cheap. Moving them is similarly cheap.
@@ -72,7 +74,8 @@ private:
         const ErrorCodes::Error m_code;
         const std::string m_reason;
 
-        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, StringData reason);
+        static util::bind_ptr<ErrorInfo> create(
+                ErrorCodes::Error code, std::string reason);
 
     protected:
         template <typename>
@@ -91,7 +94,7 @@ private:
         }
 
     private:
-        ErrorInfo(ErrorCodes::Error code, StringData reason);
+        ErrorInfo(ErrorCodes::Error code, std::string reason);
     };
 
     util::bind_ptr<ErrorInfo> m_error = {};

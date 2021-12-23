@@ -1,0 +1,37 @@
+error_categories:
+  - generic_error
+
+error_codes:
+  - { code: 0, name: OK }
+  - { code: 1, name: UnknownError, categories: [ generic_error ] }
+  - { code: 2, name: RuntimeError, categories: [ generic_error ] }
+  - { code: 3, name: LogicError, categories: [ generic_error ] }
+  - { code: 4, name: BrokenPromise }
+  - { code: 5, name: InvalidArgument, categories: [ generic_error ] }
+  - { code: 6, name: OutOfMemory }
+  - { code: 7, name: NoSuchTable }
+  - { code: 8, name: NoSuchObject }
+  - { code: 9, name: CrossTableLinkTarget }
+  - { code: 10, name: UnsupportedFileFormatVersion }
+  - { code: 11, name: MultipleSyncAgents }
+  - { code: 12, name: AddressSpaceExhausted }
+  - { code: 13, name: OutOfDiskSpace }
+  - { code: 14, name: KeyNotFound }
+  - { code: 15, name: ColumnNotFound }
+  - { code: 16, name: ColumnExistsAlready }
+  - { code: 17, name: KeyAlreadyUsed }
+  - { code: 18, name: SerializationError }
+  - { code: 19, name: InvalidPathError }
+  - { code: 20, name: DuplicatePrimaryKeyValue }
+  - { code: 21, name: InvalidQueryString }
+  - { code: 22, name: InvalidQuery }
+  - { code: 23, name: NotInATransaction }
+  - { code: 24, name: WrongThread }
+  - { code: 25, name: InvalidatedObject }
+  - { code: 26, name: InvalidProperty }
+  - { code: 27, name: MissingPrimaryKey }
+  - { code: 28, name: UnexpectedPrimaryKey }
+  - { code: 29, name: WrongPrimaryKeyType }
+  - { code: 30, name: ModifyPrimaryKey }
+  - { code: 31, name: ReadOnlyProperty }
+  - { code: 32, name: PropertyNotNullable }

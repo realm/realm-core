@@ -54,6 +54,12 @@ public:
         : m_ptr(nullptr)
     {
     }
+
+    constexpr bind_ptr(nullptr_t) noexcept
+        : m_ptr(nullptr)
+    {
+    }
+
     ~bind_ptr() noexcept
     {
         unbind();
