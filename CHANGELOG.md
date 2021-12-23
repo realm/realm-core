@@ -10,6 +10,7 @@
 * The release package was missing several headers (since v11.7.0).
 * The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
 * Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
+* SyncManager::path_for_realm now returns a default path when FLX sync is enabled ([#5088](https://github.com/realm/realm-core/pull/5088))
 * Having links in a property of Mixed type would lead to ill-formed JSON output when serializing the database. ([#5125](https://github.com/realm/realm-core/issues/5125), since v11.0.0)
 
 ### Breaking changes
