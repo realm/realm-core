@@ -24,8 +24,8 @@ namespace realm {
 namespace {
 // You can think of this namespace as a compile-time map<ErrorCodes::Error, ErrorExtraInfoParser*>.
 namespace parsers {
-}  // namespace parsers
-}  // namespace
+} // namespace parsers
+} // namespace
 
 
 StringData ErrorCodes::error_string(Error code)
@@ -175,7 +175,8 @@ ErrorCodes::Error ErrorCodes::from_string(StringData name)
     return UnknownError;
 }
 
-std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code) {
+std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code)
+{
     return stream << ErrorCodes::error_string(code);
 }
 

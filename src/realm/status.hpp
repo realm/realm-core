@@ -74,8 +74,7 @@ private:
         const ErrorCodes::Error m_code;
         const std::string m_reason;
 
-        static util::bind_ptr<ErrorInfo> create(
-                ErrorCodes::Error code, std::string reason);
+        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string reason);
 
     protected:
         template <typename>

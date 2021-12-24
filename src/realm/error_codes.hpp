@@ -96,15 +96,13 @@ public:
     static bool is_generic_error(Error code);
     template <typename ErrorContainer>
     static bool is_generic_error(const ErrorContainer& object);
-
-    static bool can_have_extra_info(Error code);
-    static bool must_have_extra_info(Error code);
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);
 
 template <ErrorCategory category, typename ErrorContainer>
-inline bool ErrorCodes::is_a(const ErrorContainer& object) {
+inline bool ErrorCodes::is_a(const ErrorContainer& object)
+{
     return is_a<category>(object.code());
 }
 
@@ -112,12 +110,14 @@ inline bool ErrorCodes::is_a(const ErrorContainer& object) {
 template <>
 bool ErrorCodes::is_a<ErrorCategory::generic_error>(Error code);
 
-inline bool ErrorCodes::is_generic_error(Error code) {
+inline bool ErrorCodes::is_generic_error(Error code)
+{
     return is_a<ErrorCategory::generic_error>(code);
 }
 
 template <typename ErrorContainer>
-inline bool ErrorCodes::is_generic_error(const ErrorContainer& object) {
+inline bool ErrorCodes::is_generic_error(const ErrorContainer& object)
+{
     return is_a<ErrorCategory::generic_error>(object.code());
 }
 
@@ -210,43 +210,24 @@ struct ErrorCategoriesForImpl {
 
 template <>
 struct ErrorCategoriesForImpl<ErrorCodes::UnknownError> {
-    using type = CategoryList<
-        ErrorCategory::generic_error
-        >;
+    using type = CategoryList<ErrorCategory::generic_error>;
 };
 template <>
 struct ErrorCategoriesForImpl<ErrorCodes::RuntimeError> {
-    using type = CategoryList<
-        ErrorCategory::generic_error
-        >;
+    using type = CategoryList<ErrorCategory::generic_error>;
 };
 template <>
 struct ErrorCategoriesForImpl<ErrorCodes::LogicError> {
-    using type = CategoryList<
-        ErrorCategory::generic_error
-        >;
+    using type = CategoryList<ErrorCategory::generic_error>;
 };
 template <>
 struct ErrorCategoriesForImpl<ErrorCodes::InvalidArgument> {
-    using type = CategoryList<
-        ErrorCategory::generic_error
-        >;
+    using type = CategoryList<ErrorCategory::generic_error>;
 };
 
 template <ErrorCodes::Error code>
 using ErrorCategoriesFor = typename ErrorCategoriesForImpl<code>::type;
 
-//
-// ErrorExtraInfoFor
-//
-
-template <ErrorCodes::Error code>
-struct ErrorExtraInfoForImpl {};
-
-
-template <ErrorCodes::Error code>
-using ErrorExtraInfoFor = typename ErrorExtraInfoForImpl<code>::type;
-
-}  // namespace error_details
+} // namespace error_details
 
 } // namespace realm

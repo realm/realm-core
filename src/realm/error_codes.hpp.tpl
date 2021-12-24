@@ -87,7 +87,8 @@ public:
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);
 
 template <ErrorCategory category, typename ErrorContainer>
-inline bool ErrorCodes::is_a(const ErrorContainer& object) {
+inline bool ErrorCodes::is_a(const ErrorContainer& object)
+{
     return is_a<category>(object.code());
 }
 
@@ -96,12 +97,14 @@ inline bool ErrorCodes::is_a(const ErrorContainer& object) {
 template <>
 bool ErrorCodes::is_a<ErrorCategory::$cat.name>(Error code);
 
-inline bool ErrorCodes::is_${cat.name}(Error code) {
+inline bool ErrorCodes::is_${cat.name}(Error code)
+{
     return is_a<ErrorCategory::$cat.name>(code);
 }
 
 template <typename ErrorContainer>
-inline bool ErrorCodes::is_${cat.name}(const ErrorContainer& object) {
+inline bool ErrorCodes::is_${cat.name}(const ErrorContainer& object)
+{
     return is_a<ErrorCategory::$cat.name>(object.code());
 }
 
@@ -134,7 +137,8 @@ struct ErrorCategoriesForImpl {
 //#for $ec in $codes:
 //#if $ec.categories
 template <>
-struct ErrorCategoriesForImpl<ErrorCodes::$ec.name> {
+struct ErrorCategoriesForImpl<ErrorCodes::$ec.name>
+{
     using type = CategoryList<
         //#for $i, $cat in enumerate($ec.categories)
         //#set $comma = '' if i == len($ec.categories) - 1 else ', '
