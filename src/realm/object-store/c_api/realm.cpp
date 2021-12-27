@@ -57,6 +57,15 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
     });
 }
 
+RLM_API bool realm_delete_files(const char* realm_file_path)
+{
+    return wrap_err([&]() {
+        bool did_delete;
+        Realm::delete_files(realm_file_path, &did_delete);
+        return did_delete;
+    });
+}
+
 RLM_API realm_t* _realm_from_native_ptr(const void* pshared_ptr, size_t n)
 {
     REALM_ASSERT_RELEASE(n == sizeof(SharedRealm));
