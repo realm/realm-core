@@ -862,14 +862,15 @@ RLM_API realm_t* realm_open(const realm_config_t* config);
  * could be the result and checking for a single process state is not possible here.
  *
  * @param realm_file_path The path to the Realm file. All files will be derived from this.
- *
- * @return true if the primary Realm file was deleted.
+ * @param[out] did_delete_realm If non-null, set to true if the primary Realm file was deleted.
+ * 
+ * @return true if no error occurred.
  *
  * @throws RLM_ERR_FILE_PERMISSION_DENIED if the operation was not permitted.
  * @throws RLM_ERR_FILE_ACCESS_ERROR for any other error while trying to delete the file or folder.
  * @throws RLM_ERR_DELETE_OPENED_REALM if the function was called on an open Realm.
  */
-RLM_API bool realm_delete_files(const char* realm_file_path);
+RLM_API bool realm_delete_files(const char* realm_file_path, bool* did_delete_realm);
 
 /**
  * Create a `realm_t` object from a thread-safe reference to the same realm.

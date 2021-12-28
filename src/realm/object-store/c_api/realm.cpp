@@ -57,12 +57,11 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
     });
 }
 
-RLM_API bool realm_delete_files(const char* realm_file_path)
+RLM_API bool realm_delete_files(const char* realm_file_path, bool* did_delete_realm)
 {
     return wrap_err([&]() {
-        bool did_delete;
-        Realm::delete_files(realm_file_path, &did_delete);
-        return did_delete;
+        Realm::delete_files(realm_file_path, did_delete_realm);
+        return true;
     });
 }
 
