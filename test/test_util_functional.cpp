@@ -2,6 +2,7 @@
 
 #ifdef TEST_UTIL_FUNCTIONAL
 
+#include <functional>
 #include <type_traits>
 
 #include "realm/util/functional.hpp"
@@ -54,6 +55,40 @@ TEST(Util_UniqueFunction)
     func_moved();
     CHECK(function_called);
     CHECK(func_moved);
+
+    auto noexcept_fn = [](auto&& func) {
+        static_assert(std::is_nothrow_invocable_r_v<void, decltype(func)>);
+        static_cast<void>(func);
+    };
+
+    noexcept_fn([]() noexcept {});
+
+    UniqueFunction<void() noexcept> fn = []() noexcept {};
+    noexcept_fn(std::move(fn));
+
+    UniqueFunction<int(int)> swap_a([](int a) {
+        return a * a;
+    });
+    UniqueFunction<int(int)> swap_b;
+    CHECK(swap_a);
+    CHECK(!swap_b);
+
+    std::swap(swap_a, swap_b);
+
+    CHECK(swap_b);
+    CHECK(!swap_b);
+
+    UniqueFunction<int(int) noexcept> swap_a_noexcept([](int a) noexcept {
+        return a * a;
+    });
+    UniqueFunction<int(int) noexcept> swap_b_noexcept;
+    CHECK(swap_a);
+    CHECK(!swap_b);
+
+    std::swap(swap_a_noexcept, swap_b_noexcept);
+
+    CHECK(swap_b_noexcept);
+    CHECK(!swap_b_noexcept);
 }
 
 } // namespace

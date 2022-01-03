@@ -6,6 +6,7 @@
 #include <type_traits>
 
 #include "realm/util/features.h"
+#include "realm/util/functional.hpp"
 #include "realm/util/future.hpp"
 #include "realm/utilities.hpp"
 
@@ -213,6 +214,24 @@ TEST(Future_Success_getAsync)
                 CHECK(sw.is_ok());
                 outside.emplace_value(sw.get_value());
             });
+            CHECK_EQUAL(std::move(pf.future).get(), 1);
+        });
+}
+
+TEST(Future_Success_getAsync_UniqueFunction)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [&](Future<int>&& fut) {
+            auto pf = make_promise_future<int>();
+            UniqueFunction<void(StatusWith<int>) noexcept> cb = [outside = std::move(pf.promise),
+                                                                 this](StatusWith<int> sw) mutable noexcept {
+                CHECK(sw.is_ok());
+                outside.emplace_value(sw.get_value());
+            };
+            std::move(fut).get_async(std::move(cb));
             CHECK_EQUAL(std::move(pf.future).get(), 1);
         });
 }

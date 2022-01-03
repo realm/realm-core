@@ -27,9 +27,6 @@
 
 namespace realm::util {
 
-template <typename Function>
-class UniqueFunction;
-
 /**
  * A `UniqueFunction` is a move-only, type-erased functor object similar to `std::function`.
  * It is useful in situations where a functor cannot be wrapped in `std::function` objects because
@@ -37,136 +34,133 @@ class UniqueFunction;
  * `std::unique_ptr` by move.  The interface of `UniqueFunction` is nearly identical to
  * `std::function`, except that it is not copyable.
  */
+template <typename Function>
+class UniqueFunction;
+
+template <typename Function>
+class UniqueFunctionBase;
+
 template <typename RetType, typename... Args>
-class UniqueFunction<RetType(Args...)> {
-private:
-    // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
-    // aggregate.
-    struct TagTypeBase {
-    protected:
-        TagTypeBase() = default;
-    };
-    // `TagType` is used as a placeholder type in parameter lists for `enable_if` clauses.  They
-    // have to be real parameters, not template parameters, due to MSVC limitations.
-    class TagType : TagTypeBase {
-        TagType() = default;
-        friend UniqueFunction;
-    };
-
+class UniqueFunctionBase<RetType(Args...)> {
 public:
-    using result_type = RetType;
+    ~UniqueFunctionBase() noexcept = default;
+    UniqueFunctionBase() = default;
 
-    ~UniqueFunction() noexcept = default;
-    UniqueFunction() = default;
+    UniqueFunctionBase(UniqueFunctionBase&&) noexcept = default;
+    UniqueFunctionBase& operator=(UniqueFunctionBase&&) noexcept = default;
 
-    UniqueFunction(const UniqueFunction&) = delete;
-    UniqueFunction& operator=(const UniqueFunction&) = delete;
+    UniqueFunctionBase(std::nullptr_t) noexcept {}
+    UniqueFunctionBase& operator=(std::nullptr_t) noexcept
+    {
+        m_impl.reset();
+        return *this;
+    }
 
-    UniqueFunction(UniqueFunction&&) noexcept = default;
-    UniqueFunction& operator=(UniqueFunction&&) noexcept = default;
-
-    void swap(UniqueFunction& that) noexcept
+    void swap(UniqueFunctionBase& that) noexcept
     {
         using std::swap;
-        swap(this->impl, that.impl);
+        swap(m_impl, that.m_impl);
     }
 
-    friend void swap(UniqueFunction& a, UniqueFunction& b) noexcept
+    friend void swap(UniqueFunctionBase& lhs, UniqueFunctionBase& rhs)
     {
-        a.swap(b);
-    }
-
-    template <typename Functor>
-    /* implicit */
-    UniqueFunction(
-        Functor&& functor,
-        // The remaining arguments here are only for SFINAE purposes to enable this ctor when our
-        // requirements are met.  They must be concrete parameters not template parameters to work
-        // around bugs in some compilers that we presently use.  We may be able to revisit this
-        // design after toolchain upgrades for C++17.
-        std::enable_if_t<std::is_invocable_r<RetType, Functor, Args...>::value, TagType> = make_tag(),
-        std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = make_tag(),
-        std::enable_if_t<!std::is_same<std::decay_t<Functor>, UniqueFunction>::value, TagType> = make_tag())
-        : impl(make_impl(std::forward<Functor>(functor)))
-    {
-    }
-
-    UniqueFunction(std::nullptr_t) noexcept {}
-
-    RetType operator()(Args... args) const
-    {
-        REALM_ASSERT(static_cast<bool>(*this));
-        return impl->call(std::forward<Args>(args)...);
+        lhs.swap(rhs);
     }
 
     explicit operator bool() const noexcept
     {
-        return static_cast<bool>(this->impl);
+        return static_cast<bool>(m_impl);
     }
 
-    // Needed to make `std::is_convertible<mongo::UniqueFunction<...>, std::function<...>>` be
-    // `std::false_type`.  `mongo::UniqueFunction` objects are not convertible to any kind of
-    // `std::function` object, since the latter requires a copy constructor, which the former does
-    // not provide.  If you see a compiler error which references this line, you have tried to
-    // assign a `UniqueFunction` object to a `std::function` object which is impossible -- please
-    // check your variables and function signatures.
-    //
-    // NOTE: This is not quite able to disable all `std::function` conversions on MSVC, at this
-    // time.
-    template <typename Signature>
-    operator std::function<Signature>() const = delete;
-
-private:
-    // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
-    // a static member function that initializes that default parameter.
-    static TagType make_tag()
-    {
-        return {};
-    }
-
-    struct Impl {
+protected:
+    class Impl {
+    public:
         virtual ~Impl() noexcept = default;
+
         virtual RetType call(Args&&... args) = 0;
+
+        template <typename Functor>
+        static auto make(Functor&& functor)
+        {
+            struct SpecificImpl : Impl {
+                explicit SpecificImpl(Functor&& func)
+                    : f(std::forward<Functor>(func))
+                {
+                }
+
+                RetType call(Args&&... args) override
+                {
+                    if constexpr (std::is_void_v<RetType>) {
+                        f(std::forward<Args>(args)...);
+                    }
+                    else {
+                        return f(std::forward<Args>(args)...);
+                    }
+                }
+
+                std::decay_t<Functor> f;
+            };
+
+            return std::make_unique<SpecificImpl>(std::forward<Functor>(functor));
+        }
     };
 
-    // These overload helpers are needed to squelch problems in the `T ()` -> `void ()` case.
-    template <typename Functor>
-    static void call_regular_void(const std::true_type is_void, Functor& f, Args&&... args)
+    explicit UniqueFunctionBase(std::unique_ptr<Impl> impl)
+        : m_impl(std::move(impl))
     {
-        // The result of this call is not cast to void, to help preserve detection of
-        // `[[nodiscard]]` violations.
-        static_cast<void>(is_void);
-        f(std::forward<Args>(args)...);
     }
 
+    std::unique_ptr<Impl> m_impl;
+};
+
+template <typename RetType, typename... Args>
+class UniqueFunction<RetType(Args...)> : public UniqueFunctionBase<RetType(Args...)> {
     template <typename Functor>
-    static RetType call_regular_void(const std::false_type is_not_void, Functor& f, Args&&... args)
+    constexpr static bool is_functor =
+        !std::is_same_v<std::decay_t<Functor>, UniqueFunction> && std::is_invocable_r_v<RetType, Functor, Args...>;
+
+public:
+    using Base = UniqueFunctionBase<RetType(Args...)>;
+
+    using Base::Base;
+    using Base::operator=;
+
+    template <typename Functor, std::enable_if_t<is_functor<Functor>, int> = 0,
+              std::enable_if_t<std::is_move_constructible<Functor>::value, int> = 0>
+    UniqueFunction(Functor&& functor)
+        : Base(Base::Impl::make(std::forward<Functor>(functor)))
     {
-        static_cast<void>(is_not_void);
-        return f(std::forward<Args>(args)...);
     }
 
-    template <typename Functor>
-    static auto make_impl(Functor&& functor)
+    RetType operator()(Args... args) const
     {
-        struct SpecificImpl : Impl {
-            explicit SpecificImpl(Functor&& func)
-                : f(std::forward<Functor>(func))
-            {
-            }
+        return Base::m_impl->call(std::forward<Args>(args)...);
+    }
+};
 
-            RetType call(Args&&... args) override
-            {
-                return call_regular_void(std::is_void<RetType>(), f, std::forward<Args>(args)...);
-            }
+template <typename RetType, typename... Args>
+class UniqueFunction<RetType(Args...) noexcept> : public UniqueFunctionBase<RetType(Args...)> {
+    template <typename Functor>
+    constexpr static bool is_noexcept_functor = !std::is_same_v<std::decay_t<Functor>, UniqueFunction> &&
+                                                std::is_nothrow_invocable_r_v<RetType, Functor, Args...>;
 
-            std::decay_t<Functor> f;
-        };
+public:
+    using Base = UniqueFunctionBase<RetType(Args...)>;
 
-        return std::make_unique<SpecificImpl>(std::forward<Functor>(functor));
+    using Base::Base;
+    using Base::operator=;
+
+    template <typename Functor, std::enable_if_t<is_noexcept_functor<Functor>, int> = 0,
+              std::enable_if_t<std::is_move_constructible<Functor>::value, int> = 0>
+    UniqueFunction(Functor&& functor)
+        : Base(Base::Impl::make(std::forward<Functor>(functor)))
+    {
     }
 
-    std::unique_ptr<Impl> impl;
+    RetType operator()(Args... args) const noexcept
+    {
+        return Base::m_impl->call(std::forward<Args>(args)...);
+    }
 };
 
 /**
@@ -188,6 +182,18 @@ struct UFDeductionHelper<Ret (Class::*)(Args...) const> : TypeIdentity<Ret(Args.
 template <typename Class, typename Ret, typename... Args>
 struct UFDeductionHelper<Ret (Class::*)(Args...) const&> : TypeIdentity<Ret(Args...)> {
 };
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...) noexcept> : TypeIdentity<Ret(Args...)> {
+};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...)& noexcept> : TypeIdentity<Ret(Args...)> {
+};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...) const noexcept> : TypeIdentity<Ret(Args...)> {
+};
+template <typename Class, typename Ret, typename... Args>
+struct UFDeductionHelper<Ret (Class::*)(Args...) const& noexcept> : TypeIdentity<Ret(Args...)> {
+};
 
 /**
  * Deduction guides for UniqueFunction<Sig> that pluck the signature off of function pointers and
@@ -197,6 +203,9 @@ template <typename Ret, typename... Args>
 UniqueFunction(Ret (*)(Args...)) -> UniqueFunction<Ret(Args...)>;
 template <typename T, typename Sig = typename UFDeductionHelper<decltype(&T::operator())>::type>
 UniqueFunction(T) -> UniqueFunction<Sig>;
+
+template <typename Ret, typename... Args>
+UniqueFunction(Ret (*)(Args...) noexcept) -> UniqueFunction<Ret(Args...) noexcept>;
 
 template <typename Signature>
 bool operator==(const UniqueFunction<Signature>& lhs, std::nullptr_t) noexcept
