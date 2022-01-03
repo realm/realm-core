@@ -56,16 +56,17 @@ TEST(Util_UniqueFunction)
     CHECK(function_called);
     CHECK(func_moved);
 
+    // Check that we can construct noexcept UniqueFunction's that std::is_nothrow_invocable_r_v will be true for
+    // (this is what Future's expect for their get_async callbacks).
     auto noexcept_fn = [](auto&& func) {
         static_assert(std::is_nothrow_invocable_r_v<void, decltype(func)>);
-        static_cast<void>(func);
+        func();
     };
-
-    noexcept_fn([]() noexcept {});
 
     UniqueFunction<void() noexcept> fn = []() noexcept {};
     noexcept_fn(std::move(fn));
 
+    // Check that std::swap works.
     UniqueFunction<int(int)> swap_a([](int a) {
         return a * a;
     });
@@ -76,19 +77,20 @@ TEST(Util_UniqueFunction)
     std::swap(swap_a, swap_b);
 
     CHECK(swap_b);
-    CHECK(!swap_b);
+    CHECK(!swap_a);
 
+    // Check that std::swap works on noexcept UniqueFunction's
     UniqueFunction<int(int) noexcept> swap_a_noexcept([](int a) noexcept {
         return a * a;
     });
     UniqueFunction<int(int) noexcept> swap_b_noexcept;
-    CHECK(swap_a);
-    CHECK(!swap_b);
+    CHECK(swap_a_noexcept);
+    CHECK(!swap_b_noexcept);
 
     std::swap(swap_a_noexcept, swap_b_noexcept);
 
     CHECK(swap_b_noexcept);
-    CHECK(!swap_b_noexcept);
+    CHECK(!swap_a_noexcept);
 }
 
 } // namespace
