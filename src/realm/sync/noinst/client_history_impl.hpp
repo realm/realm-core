@@ -50,8 +50,6 @@ constexpr int get_client_history_schema_version() noexcept
 
 class IntegrationException : public std::runtime_error {
 public:
-    enum IntegrationError { bad_origin_file_ident, bad_changeset, decreasing_progress, invalid_batch_state };
-
     IntegrationException(ClientError code, const std::string& msg)
         : std::runtime_error(msg)
         , m_error(code)

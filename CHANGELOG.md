@@ -35,6 +35,7 @@
 * The JSON output is slightly changed in the event of link cycles. Nobody is expected to rely on that.
 * Future::get_async() no longer requires its callback to be marked noexcept. ([#5130](https://github.com/realm/realm-core/pull/5130))
 * SubscriptionSet no longer holds any database resources. ([#5150](https://github.com/realm/realm-core/pull/5150))
+* ClientHistoryImpl::integrate_server_changesets now throws instead of returning a boolean to indicate success ([#5118](https://github.com/realm/realm-core/pull/5118))
 
 ----------------------------------------------
 
