@@ -311,6 +311,11 @@ MutableSubscriptionSet SubscriptionSet::make_mutable_copy() const
     return m_mgr->make_mutable_copy(*this);
 }
 
+void SubscriptionSet::refresh()
+{
+    *this = m_mgr->get_by_version(version());
+}
+
 util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
 {
     // If we've already reached the desired state, or if the subscription is in an error state,
@@ -373,7 +378,7 @@ void MutableSubscriptionSet::process_notifications()
     }
 }
 
-void MutableSubscriptionSet::commit()
+SubscriptionSet MutableSubscriptionSet::commit() &&
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
         throw std::logic_error("SubscriptionSet is not in a commitable state");
@@ -381,13 +386,20 @@ void MutableSubscriptionSet::commit()
     if (state() == State::Uncommitted) {
         update_state(State::Pending, util::none);
     }
+
+    const auto flx_version = version();
     m_tr->commit_and_continue_as_read();
+    auto old_tr = std::move(m_tr);
+    m_tr = old_tr->freeze();
+    m_obj = m_tr->import_copy_of(m_obj);
 
     process_notifications();
 
     if (state() == State::Pending) {
-        m_mgr->m_on_new_subscription_set(version());
+        m_mgr->m_on_new_subscription_set(flx_version);
     }
+
+    return m_mgr->get_by_version_impl(flx_version, m_tr->get_version_of_current_transaction());
 }
 
 std::string SubscriptionSet::to_ext_json() const
@@ -518,7 +530,7 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
     }
 }
 
-const SubscriptionSet SubscriptionStore::get_latest() const
+SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
@@ -531,7 +543,7 @@ const SubscriptionSet SubscriptionStore::get_latest() const
     return SubscriptionSet(this, std::move(tr), std::move(latest_obj));
 }
 
-const SubscriptionSet SubscriptionStore::get_active() const
+SubscriptionSet SubscriptionStore::get_active() const
 {
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
@@ -583,9 +595,15 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
     return MutableSubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }
 
-const SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
+SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
 {
-    auto tr = m_db->start_frozen();
+    return get_by_version_impl(version_id, util::none);
+}
+
+SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
+                                                       util::Optional<DB::VersionID> db_version) const
+{
+    auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
     return SubscriptionSet(this, std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }

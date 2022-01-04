@@ -196,6 +196,10 @@ public:
     // Returns this query set as extended JSON in a form suitable for transmitting to the server.
     std::string to_ext_json() const;
 
+    // Reloads the state of this SubscriptionSet so that it reflects the latest state from synchronizing with the
+    // server. This will invalidate all iterators.
+    void refresh();
+
 protected:
     friend class SubscriptionStore;
 
@@ -253,9 +257,12 @@ public:
     // This should be called internally within the sync client.
     void update_state(State state, util::Optional<std::string_view> error_str = util::none);
 
-    // If this is a mutable subscription set that has not had its changes committed, this commits them and
-    // continues the set's lifetime in a read-only transaction. Otherwise, this will throw.
-    void commit();
+    // This commits any changes to the subscription set and returns an this subscription set as an immutable view
+    // from after the commit.
+    //
+    // This must be called as an r-value, like this:
+    //     auto sub_set = std::move(mut_sub_set).commit();
+    SubscriptionSet commit() &&;
 
 protected:
     friend class SubscriptionStore;
@@ -263,6 +270,9 @@ protected:
     using SubscriptionSet::SubscriptionSet;
 
 private:
+    // To refresh a MutableSubscriptionSet, you should call commit() and call refresh() on its return value.
+    void refresh() = delete;
+
     std::pair<iterator, bool> insert_or_assign_impl(iterator it, StringData name, StringData object_class_name,
                                                     StringData query_str);
 
@@ -277,12 +287,12 @@ public:
     // Get the latest subscription created by calling update_latest(). Once bootstrapping is complete,
     // this and get_active() will return the same thing. If no SubscriptionSet has been set, then
     // this returns an empty SubscriptionSet that you can clone() in order to mutate.
-    const SubscriptionSet get_latest() const;
+    SubscriptionSet get_latest() const;
 
     // Gets the subscription set that has been acknowledged by the server as having finished bootstrapping.
     // If no subscriptions have reached the complete stage, this returns an empty subscription with version
     // zero.
-    const SubscriptionSet get_active() const;
+    SubscriptionSet get_active() const;
 
     // Returns the version number of the current active and latest subscription sets. This function guarantees
     // that the versions will be read from the same underlying transaction and will thus be consistent.
@@ -294,7 +304,7 @@ public:
 
     // To be used internally by the sync client. This returns a read-only view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
-    const SubscriptionSet get_by_version(int64_t version_id) const;
+    SubscriptionSet get_by_version(int64_t version_id) const;
 
 private:
     DBRef m_db;
@@ -333,6 +343,7 @@ protected:
 
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
 
+    SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
 
     friend class MutableSubscriptionSet;

@@ -189,12 +189,12 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
     return m_coordinator->sync_session();
 }
 
-const sync::SubscriptionSet Realm::get_latest_subscription_set()
+sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
     return m_coordinator->sync_session()->get_flx_subscription_store()->get_latest();
 }
 
-const sync::SubscriptionSet Realm::get_active_subscription_set()
+sync::SubscriptionSet Realm::get_active_subscription_set()
 {
     return m_coordinator->sync_session()->get_flx_subscription_store()->get_active();
 }

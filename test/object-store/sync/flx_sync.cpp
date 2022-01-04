@@ -55,12 +55,12 @@ public:
     {
         do_with_new_realm([&](SharedRealm realm) {
             {
-                auto subs = realm->get_latest_subscription_set().make_mutable_copy();
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
                 for (const auto& table : realm->schema()) {
                     Query query_for_table(realm->read_group().get_table(table.table_key));
-                    subs.insert_or_assign(query_for_table);
+                    mut_subs.insert_or_assign(query_for_table);
                 }
-                subs.commit();
+                auto subs = std::move(mut_subs).commit();
                 subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
             }
             func(realm);
@@ -151,8 +151,8 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
             new_query_a.equal(col_key, "foo");
             new_subs.insert_or_assign(new_query_a);
-            new_subs.commit();
-            new_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            auto subs = std::move(new_subs).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
         {
@@ -178,9 +178,8 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
         new_query_a.equal(bad_col_key, "bar");
         new_subs.insert_or_assign(new_query_a);
-        new_subs.commit();
-        auto sub_res =
-            std::move(new_subs).get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
+        auto subs = std::move(new_subs).commit();
+        auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
         CHECK(!sub_res.is_ok());
         CHECK(sub_res.get_status().reason() ==
               "Client provided query with bad syntax: invalid match expression for table "
@@ -193,8 +192,8 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         new_query_b.equal(good_col_key, "foo");
         new_subs = realm->get_active_subscription_set().make_mutable_copy();
         new_subs.insert_or_assign(new_query_b);
-        new_subs.commit();
-        std::move(new_subs).get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        subs = std::move(new_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
         CHECK(realm->get_active_subscription_set().version() == 2);
         CHECK(realm->get_latest_subscription_set().version() == 2);
@@ -298,7 +297,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
     Query new_query_a(table);
     new_query_a.equal(table->get_column_key("_id"), ObjectId::gen());
     latest_subs.insert_or_assign(std::move(new_query_a));
-    latest_subs.commit();
+    std::move(latest_subs).commit();
 
     timed_wait_for([&] {
         std::lock_guard<std::mutex> lk(sync_error_mutex);
