@@ -389,9 +389,6 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
 
     const auto flx_version = version();
     m_tr->commit_and_continue_as_read();
-    auto old_tr = std::move(m_tr);
-    m_tr = old_tr->freeze();
-    m_obj = m_tr->import_copy_of(m_obj);
 
     process_notifications();
 
