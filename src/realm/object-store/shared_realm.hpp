@@ -199,8 +199,8 @@ public:
     // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
     // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
     // sync mode if they aren't already.
-    sync::SubscriptionSet get_latest_subscription_set();
-    sync::SubscriptionSet get_active_subscription_set();
+    const sync::SubscriptionSet get_latest_subscription_set();
+    const sync::SubscriptionSet get_active_subscription_set();
 #endif
 
     // Returns a frozen Realm for the given Realm. This Realm can be accessed from any thread.
