@@ -58,17 +58,13 @@ public:
     // Returns a stringified version of the query associated with this subscription.
     std::string_view query_string() const;
 
-protected:
+private:
     friend class SubscriptionSet;
     friend class MutableSubscriptionSet;
 
-    Subscription() = default;
-    Subscription(const SubscriptionSet* parent, Obj obj);
+    Subscription(const SubscriptionStore* parent, Obj obj);
 
-private:
-    const SubscriptionStore* store() const;
-
-    const SubscriptionSet* m_parent = nullptr;
+    const SubscriptionStore* m_store = nullptr;
     Obj m_obj;
 };
 
@@ -202,7 +198,6 @@ public:
 
 protected:
     friend class SubscriptionStore;
-    friend class Subscription;
 
     void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                          StringData object_class_name, StringData query_str);
@@ -263,7 +258,6 @@ public:
     void commit();
 
 protected:
-    friend class SubscriptionSet;
     friend class SubscriptionStore;
 
     using SubscriptionSet::SubscriptionSet;
@@ -338,6 +332,8 @@ protected:
     };
 
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
+
+    MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
 
     friend class MutableSubscriptionSet;
     friend class Subscription;
