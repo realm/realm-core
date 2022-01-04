@@ -667,11 +667,14 @@ public:
      * This ends the Future continuation chain by calling a callback on completion. Use this to
      * escape back into a callback-based API.
      *
-     * The callback must not throw since it is called from a noexcept context.
+     * The callback must not throw since it is called from a noexcept context. The callback must take a
+     * StatusOrStatusWith as its argument and have a return type of void.
      */
     template <typename Func> // StatusOrStatusWith<T> -> void
     void get_async(Func&& func) && noexcept
     {
+        static_assert(std::is_void_v<std::invoke_result_t<Func, StatusOrStatusWith<FakeVoidToVoid<T>>>>);
+
         return general_impl(
             // on ready success:
             [&](T&& val) {
