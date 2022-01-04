@@ -863,6 +863,7 @@ RLM_API realm_t* realm_open(const realm_config_t* config);
  *
  * @param realm_file_path The path to the Realm file. All files will be derived from this.
  * @param[out] did_delete_realm If non-null, set to true if the primary Realm file was deleted.
+ *                              Discard value if the function returns an error.
  * 
  * @return true if no error occurred.
  *
