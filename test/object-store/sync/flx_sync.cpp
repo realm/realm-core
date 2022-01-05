@@ -157,11 +157,11 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     harness.do_with_new_realm([&](SharedRealm realm) {
         auto table = realm->read_group().get_table("class_TopLevel");
         auto col_key = table->get_column_key("queryable_str_field");
+        Query query_foo(table);
+        query_foo.equal(col_key, "foo");
         {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            Query new_query_a(table);
-            new_query_a.equal(col_key, "foo");
-            new_subs.insert_or_assign(new_query_a);
+            new_subs.insert_or_assign(query_foo);
             auto subs = std::move(new_subs).commit();
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
@@ -180,8 +180,8 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             Query new_query_bar(table);
             new_query_bar.equal(col_key, "bar");
             mut_subs.insert_or_assign(new_query_bar);
-            mut_subs.commit();
-            mut_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            auto subs = std::move(mut_subs).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
         {
@@ -192,12 +192,14 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-            mut_subs.clear();
+            auto it = mut_subs.find(query_foo);
+            CHECK(it != mut_subs.end());
+            mut_subs.erase(it);
             Query new_query_bar(table);
             new_query_bar.equal(col_key, "bar");
             mut_subs.insert_or_assign(new_query_bar);
-            mut_subs.commit();
-            mut_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            auto subs = std::move(mut_subs).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
         {
@@ -212,13 +214,13 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
-            mut_subs.commit();
-            mut_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            auto subs = std::move(mut_subs).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
         {
             realm->refresh();
-            Results results(realm, new_query_a);
+            Results results(realm, table);
             CHECK(results.size() == 0);
         }
     });
