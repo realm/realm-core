@@ -4352,7 +4352,7 @@ TEST(Shared_WriteTo)
         baa.set("bool", true);
     }
     tr->commit_and_continue_as_read();
-    tr->to_json(std::cout);
+    // tr->to_json(std::cout);
 
 
     // Create remote db
@@ -4373,6 +4373,7 @@ TEST(Shared_WriteTo)
         auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
         foos->add_column_list(type_Mixed, "list_of_any", true);
 
+        baas->create_object_with_primary_key(333);
         auto baa = baas->create_object_with_primary_key(666);
         auto obj = baa.create_and_set_linked_object(baas->get_column_key("embedded"));
         obj.set("float", 99.f);
@@ -4386,21 +4387,76 @@ TEST(Shared_WriteTo)
     auto dest = db2->start_write();
     tr->copy_to(dest);
     dest->commit_and_continue_as_read();
-    // dest->to_json(std::cout);
-    auto baas = dest->get_table("class_Baa");
+
+    // The difference between the two realms should now be that the remote db has an
+    // extra baa object with pk 333.
+    CHECK_NOT(*tr == *dest);
+    tr->promote_to_write();
+    // So if we add this to the local realm, they should match
+    tr->get_table("class_Baa")->create_object_with_primary_key(333);
+    tr->commit_and_continue_as_read();
+    CHECK(*tr == *dest);
+}
+
+TEST(Shared_WriteToFail)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+
+    DBRef db1 = DB::create(make_in_realm_history(), path1);
+    auto tr = db1->start_write();
+
+    // First create the local realm
+    {
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+
+        foos->add_column(type_String, "classification");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+
+        /* Create local objects */
+        auto foo = foos->create_object_with_primary_key("anders.andk@andeby.io").set("classification", "Duck");
+        auto any_list = foo.get_list<Mixed>("list_of_any");
+        any_list.add(Mixed(17));
+        any_list.add(Mixed("Hello"));
+    }
+    tr->commit_and_continue_as_read();
+    // tr->to_json(std::cout);
+
+    ColKey col_fail;
+    // Create remote db
+    DBRef db2 = DB::create(make_in_realm_history(), path2);
+    {
+        auto wt = db2->start_write();
+        auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
+        col_fail = foos->add_column(type_Int, "classification");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+        wt->commit();
+    }
+
+    auto dest = db2->start_write();
+    std::string message;
+
+    CHECK_THROW_ANY_GET_MESSAGE(tr->copy_to(dest), message);
+    CHECK_EQUAL(message, "Incompatible property: class_Foo::classification");
+
     auto foos = dest->get_table("class_Foo");
-    CHECK_EQUAL(baas->size(), 2);
-    CHECK_EQUAL(foos->size(), 3);
-    Obj baa666 = baas->get_object_with_primary_key(666);
-    Obj baa999 = baas->get_object_with_primary_key(999);
-    CHECK_EQUAL(baa666.get_backlink_count(), 1);
-    CHECK_EQUAL(baa999.get_backlink_count(), 1);
-    Obj foo123 = foos->get_object_with_primary_key("123");
-    Obj foo456 = foos->get_object_with_primary_key("456");
-    Obj foo789 = foos->get_object_with_primary_key("789");
-    CHECK_EQUAL(foo123.get_backlink_count(), 2);
-    CHECK_EQUAL(foo456.get_backlink_count(), 2);
-    CHECK_EQUAL(foo789.get_backlink_count(), 0);
+    foos->remove_column(col_fail);
+    col_fail = foos->add_column(type_String, "classification", true); // Now nullable
+    dest->commit();
+    dest = db2->start_write();
+
+    CHECK_THROW_ANY_GET_MESSAGE(tr->copy_to(dest), message);
+    CHECK_EQUAL(message, "Incompatible property: class_Foo::classification");
+
+    foos = dest->get_table("class_Foo");
+    foos->remove_column(col_fail);
+    col_fail = foos->add_column(type_String, "classification");
+    dest->commit();
+    dest = db2->start_write();
+    tr->copy_to(dest);
+    dest->commit_and_continue_as_read();
+
+    CHECK(*tr == *dest);
 }
 
 #endif // TEST_SHARED
