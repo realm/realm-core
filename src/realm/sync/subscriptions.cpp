@@ -460,6 +460,10 @@ std::string SubscriptionSet::to_ext_json() const
         queries_for_table.emplace_back(sub.query_string());
     }
 
+    if (table_to_query.empty()) {
+        return "{}";
+    }
+
     // TODO this is pulling in a giant compile-time dependency. We should have a better way of escaping the
     // query strings into a json object.
     nlohmann::json output_json;

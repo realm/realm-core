@@ -156,11 +156,10 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
     harness.do_with_new_realm([&](SharedRealm realm) {
         auto table = realm->read_group().get_table("class_TopLevel");
-        Query new_query_a(table);
         auto col_key = table->get_column_key("queryable_str_field");
-        new_query_a.equal(col_key, "foo");
         {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            Query new_query_a(table);
             new_query_a.equal(col_key, "foo");
             new_subs.insert_or_assign(new_query_a);
             auto subs = std::move(new_subs).commit();
@@ -169,11 +168,58 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         {
             realm->refresh();
-            Results results(realm, new_query_a);
+            Results results(realm, table);
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
             CHECK(obj.is_valid());
             CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
+        }
+
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            Query new_query_bar(table);
+            new_query_bar.equal(col_key, "bar");
+            mut_subs.insert_or_assign(new_query_bar);
+            mut_subs.commit();
+            mut_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        {
+            realm->refresh();
+            Results results(realm, Query(table));
+            CHECK(results.size() == 2);
+        }
+
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            Query new_query_bar(table);
+            new_query_bar.equal(col_key, "bar");
+            mut_subs.insert_or_assign(new_query_bar);
+            mut_subs.commit();
+            mut_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        {
+            realm->refresh();
+            Results results(realm, Query(table));
+            CHECK(results.size() == 1);
+            auto obj = results.get<Obj>(0);
+            CHECK(obj.is_valid());
+            CHECK(obj.get<ObjectId>("_id") == bar_obj_id);
+        }
+
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.commit();
+            mut_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        {
+            realm->refresh();
+            Results results(realm, new_query_a);
+            CHECK(results.size() == 0);
         }
     });
 }
