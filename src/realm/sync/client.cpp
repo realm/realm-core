@@ -241,7 +241,6 @@ private:
     int64_t m_flx_last_seen_version = 0;
     int64_t m_flx_latest_version = 0;
 
-
     bool m_initiated = false;
 
     // Set to true when this session wrapper is actualized (or when it is
@@ -730,7 +729,6 @@ void SessionImpl::on_resumed()
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
-    m_pending_query_message = true;
     if (m_conn.get_state() == ConnectionState::connected) {
         logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
         ensure_enlisted_to_send();
@@ -803,6 +801,15 @@ bool SessionWrapper::has_flx_subscription_store() const
     return static_cast<bool>(m_flx_subscription_store);
 }
 
+void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
+{
+    if (new_version <= m_flx_latest_version || !m_flx_subscription_store) {
+        return;
+    }
+    m_flx_latest_version = new_version;
+    m_sess->on_new_flx_subscription_set(new_version);
+}
+
 std::unique_ptr<SubscriptionStore> SessionWrapper::create_flx_subscription_store()
 {
     if (!m_flx_sync_requested) {
@@ -815,11 +822,7 @@ std::unique_ptr<SubscriptionStore> SessionWrapper::create_flx_subscription_store
             REALM_ASSERT(m_actualized);
             if (REALM_UNLIKELY(!m_sess))
                 return; // Already finalized
-            if (new_version <= m_flx_latest_version || !m_flx_subscription_store) {
-                return;
-            }
-            m_flx_latest_version = new_version;
-            m_sess->on_new_flx_subscription_set(new_version);
+            on_new_flx_subscription_set(new_version);
         });
     });
 
@@ -839,20 +842,11 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
 
 void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
 {
-    // If this is called with a new version of zero, then there cannot be any subscriptions to update.
-    if (new_version == 0) {
-        return;
-    }
-
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
     SubscriptionSet::State new_state;
     switch (batch_state) {
         case DownloadBatchState::LastInBatch:
-            if (m_flx_active_version == new_version) {
-                return;
-            }
-
             m_flx_last_seen_version = new_version;
             m_flx_active_version = new_version;
             new_state = SubscriptionSet::State::Complete;
@@ -867,9 +861,11 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             break;
     }
 
-    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(new_version);
-    mut_subs.update_state(new_state);
-    std::move(mut_subs).commit();
+    if (new_version != 0) {
+        auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(new_version);
+        mut_subs.update_state(new_state);
+        std::move(mut_subs).commit();
+    }
 }
 
 SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()

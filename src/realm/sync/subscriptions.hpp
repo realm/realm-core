@@ -72,12 +72,32 @@ private:
 // single QUERY or IDENT message to be sent to the server.
 class SubscriptionSet {
 public:
+    /*
+     * State diagram:
+     *
+     *                    ┌───────────┬─────────►Error─────────┐
+     *                    │           │                        │
+     *                    │           │                        ▼
+     *   Uncommitted──►Pending──►Bootstrapping──►Complete───►Superceded
+     *                    │                                    ▲
+     *                    │                                    │
+     *                    └────────────────────────────────────┘
+     *
+     */
     enum class State : int64_t {
+        // This subscription set has not been persisted and has not been sent to the server. This state is only valid
+        // for MutableSubscriptionSets
         Uncommitted = 0,
+        // The subscription set has been persisted locally but has not been acknowledged by the server yet.
         Pending,
+        // The server is currently sending the initial state that represents this subscription set to the client.
         Bootstrapping,
+        // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
+        // An error occurred while processing this subscription set on the server. Check error_str() for details.
         Error,
+        // The server responded to a later subscription set to this one and this one has been trimmed from the
+        // local storage of subscription sets.
         Superceded,
     };
 
@@ -306,6 +326,14 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
+    struct PendingSubscription {
+        int64_t query_version;
+        DB::version_type snapshot_version;
+    };
+
+    util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
+                                                                 DB::version_type after_client_version) const;
+
 private:
     DBRef m_db;
 
@@ -322,6 +350,7 @@ protected:
 
     struct SubscriptionSetKeys {
         TableKey table;
+        ColKey snapshot_version;
         ColKey state;
         ColKey error_str;
         ColKey subscriptions;

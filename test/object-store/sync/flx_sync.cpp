@@ -34,6 +34,7 @@ public:
     struct ServerSchema {
         Schema schema;
         std::vector<std::string> queryable_fields;
+        bool dev_mode_enabled = false;
     };
 
     static ServerSchema default_server_schema();
@@ -41,12 +42,13 @@ public:
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
 
     template <typename Func>
-    void do_with_new_realm(Func&& func)
+    void do_with_new_realm(Func&& func, util::Optional<Schema> schema_for_realm = util::none)
     {
         auto sync_mgr = make_sync_manager();
         auto creds = create_user_and_log_in(sync_mgr.app());
 
-        SyncTestFile config(sync_mgr.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
+        SyncTestFile config(sync_mgr.app()->current_user(), schema_for_realm.value_or(schema()),
+                            SyncConfig::FLXSyncEnabled{});
         func(Realm::get_shared_realm(config));
     }
 
@@ -99,6 +101,7 @@ AppSession make_app_from_server_schema(const std::string& test_name,
                                        const FLXSyncTestHarness::ServerSchema& server_schema)
 {
     auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
+    server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
     AppCreateConfig::FLXSyncConfig flx_config;
     flx_config.queryable_fields = server_schema.queryable_fields;
 
@@ -117,6 +120,7 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 TestSyncManager FLXSyncTestHarness::make_sync_manager()
 {
     TestSyncManager::Config smc(m_app_config);
+    smc.verbose_sync_client_logging = true;
     return TestSyncManager(std::move(smc), {});
 }
 
@@ -198,6 +202,25 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         CHECK(realm->get_active_subscription_set().version() == 2);
         CHECK(realm->get_latest_subscription_set().version() == 2);
     });
+}
+
+TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]") {
+    FLXSyncTestHarness::ServerSchema server_schema;
+    auto default_schema = FLXSyncTestHarness::default_server_schema();
+    server_schema.queryable_fields = default_schema.queryable_fields;
+    server_schema.dev_mode_enabled = true;
+    server_schema.schema = Schema{};
+
+    FLXSyncTestHarness harness("flx_dev_mode", server_schema);
+
+    harness.do_with_new_realm(
+        [&](SharedRealm realm) {
+            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+            new_query.insert_or_assign(Query(realm->read_group().get_table("class_TopLevel")));
+            std::move(new_query).commit();
+            new_query.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        },
+        default_schema.schema);
 }
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {

@@ -912,7 +912,7 @@ private:
     //@}
 
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    void on_flx_sync_progress(int64_t verison, DownloadBatchState batch_state);
+    void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
     void begin_resumption_delay();
     void clear_resumption_delay_state();
@@ -961,7 +961,8 @@ private:
     bool m_unbound_message_received;            // UNBOUND message received
 
     // True when there is a new FLX sync query we need to send to the server.
-    bool m_pending_query_message = false;
+    util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
+    int64_t m_last_sent_flx_query_version = 0;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
