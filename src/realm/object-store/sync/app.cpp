@@ -19,6 +19,7 @@
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/util/base64.hpp>
+#include <realm/util/function_ref.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
@@ -775,6 +776,50 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
         m_sync_manager->remove_user(user->identity());
         return completion_block({});
     }
+}
+
+void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Optional<AppError>)> fn)
+{
+    if (!user || user->state() == SyncUser::State::Removed) {
+        return fn(
+                AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
+    }
+
+    auto users = m_sync_manager->all_users();
+
+    auto it = std::find(users.begin(), users.end(), user);
+
+    if (it == users.end()) {
+        return fn(
+                AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+    }
+
+    std::string route = util::format("%1/auth/session", m_base_route);
+
+    Request req;
+    req.method = HttpMethod::del;
+    req.url = route;
+    req.timeout_ms = m_request_timeout_ms;
+    req.uses_refresh_token = true;
+    req.headers = get_request_headers();
+    req.headers.insert({"Authorization", util::format("Bearer %1", user->refresh_token())});
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        req.url = util::format("%1/auth/delete", m_base_route);
+    }
+
+    do_request(req,
+               [anchor = shared_from_this(), fn = std::move(fn), this, &user](Response response) {
+        if (auto error = AppUtils::check_for_errors(response)) {
+            // In the event of an error, we still want to give the user
+            // the chance to be able to delete the user data.
+            fn(error);
+        } else {
+            anchor->emit_change_to_subscribers(*anchor);
+            m_sync_manager->remove_user(user->identity());
+            fn(error);
+        }
+    });
 }
 
 void App::link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
