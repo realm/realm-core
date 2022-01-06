@@ -233,7 +233,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         auto queryable_int_field = table->get_column_key("queryable_int_field");
         auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
         new_query.insert_or_assign(Query(table));
-        new_query.commit();
+        std::move(new_query).commit();
 
         auto foo_obj_id = ObjectId::gen();
         auto bar_obj_id = ObjectId::gen();
@@ -258,7 +258,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
             mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
-            mut_subs.commit();
+            std::move(mut_subs).commit();
         }
 
         {
@@ -273,7 +273,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
             mut_subs.insert_or_assign(Query(table).greater_equal(queryable_int_field, static_cast<int64_t>(10)));
-            mut_subs.commit();
+            std::move(mut_subs).commit();
         }
 
         Results results(realm, table);
