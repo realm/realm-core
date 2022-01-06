@@ -58,7 +58,7 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK_EQUAL(it->name(), "a sub");
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_a.get_description());
-        out.commit();
+        std::move(out).commit();
     }
 
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
@@ -106,7 +106,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_NOT_EQUAL(it, out.end());
 
         out.update_state(SubscriptionSet::State::Complete);
-        out.commit();
+        std::move(out).commit();
     }
 
     // Clone the completed set and update it to have a new query.
@@ -115,7 +115,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         CHECK_EQUAL(new_set.version(), 2);
         new_set.clear();
         new_set.insert_or_assign("b sub", query_b);
-        new_set.commit();
+        std::move(new_set).commit();
     }
 
     // There should now be two subscription sets, version 1 is complete with query a and version 2 is pending with
@@ -139,7 +139,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     {
         auto latest_mutable = store.get_mutable_by_version(2);
         latest_mutable.update_state(SubscriptionSet::State::Complete);
-        latest_mutable.commit();
+        std::move(latest_mutable).commit();
     }
 
     // There should now only be one set, version 2, that is complete. Trying to get version 1 should throw an error.
@@ -202,7 +202,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_b.get_description());
         CHECK_EQUAL(it->id(), id_of_inserted);
-        out.commit();
+        std::move(out).commit();
     }
     {
         auto set = store.get_latest().make_mutable_copy();
@@ -258,22 +258,17 @@ TEST(Sync_SubscriptionStoreNotifications)
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
     auto sub_set = store.get_latest().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
-    sub_set.commit();
-    sub_set = store.get_latest().make_mutable_copy();
+    sub_set = std::move(sub_set).commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set.commit();
-    sub_set = store.get_latest().make_mutable_copy();
+    sub_set = std::move(sub_set).commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
-    sub_set.commit();
-    sub_set = store.get_latest().make_mutable_copy();
+    sub_set = std::move(sub_set).commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set.commit();
-    sub_set = store.get_latest().make_mutable_copy();
+    sub_set = std::move(sub_set).commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set.commit();
-    sub_set = store.get_latest().make_mutable_copy();
+    sub_set = std::move(sub_set).commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Complete));
-    sub_set.commit();
+    std::move(sub_set).commit();
 
     // This should complete immediately because transitioning to the Pending state happens when you commit.
     CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
@@ -287,7 +282,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     sub_set = store.get_mutable_by_version(2);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
-    sub_set.commit();
+    std::move(sub_set).commit();
 
     // Now we should be able to get the future result because we updated the state.
     CHECK_EQUAL(notification_futures[1].get(), SubscriptionSet::State::Bootstrapping);
@@ -298,7 +293,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Update the state to complete - skipping the bootstrapping phase entirely.
     sub_set = store.get_mutable_by_version(3);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    sub_set.commit();
+    std::move(sub_set).commit();
 
     // Now we should be able to get the future result because we updated the state and skipped the bootstrapping
     // phase.
@@ -307,10 +302,17 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Update one of the subscription sets to have an error state along with an error message.
     std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
     CHECK_NOT(notification_futures[3].is_ready());
+    auto old_sub_set = store.get_by_version(4);
     sub_set = store.get_mutable_by_version(4);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     sub_set.update_state(SubscriptionSet::State::Error, std::string_view(error_msg));
-    sub_set.commit();
+    std::move(sub_set).commit();
+
+    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Pending);
+    CHECK(old_sub_set.error_str().is_null());
+    old_sub_set.refresh();
+    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Error);
+    CHECK_EQUAL(old_sub_set.error_str(), error_msg);
 
     // This should return a non-OK Status with the error message we set on the subscription set.
     auto err_res = notification_futures[3].get_no_throw();
@@ -330,11 +332,11 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_NOT(notification_futures[4].is_ready());
     CHECK_NOT(notification_futures[5].is_ready());
 
-    auto old_sub_set = store.get_by_version(5);
+    old_sub_set = store.get_by_version(5);
 
     sub_set = store.get_mutable_by_version(6);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    sub_set.commit();
+    std::move(sub_set).commit();
 
     CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superceded);
     CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);

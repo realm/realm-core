@@ -15,7 +15,7 @@
 * SyncManager::path_for_realm now returns a default path when FLX sync is enabled ([#5088](https://github.com/realm/realm-core/pull/5088))
 
 ### Breaking changes
-* None.
+* FLX SubscriptionSet type split into SubscriptionSet and MutableSubscriptionSet to add type safety ([#5092](https://github.com/realm/realm-core/pull/5092))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
