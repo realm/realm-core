@@ -223,6 +223,70 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
         default_schema.schema);
 }
 
+TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_offline_writes");
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto sync_session = realm->sync_session();
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto queryable_int_field = table->get_column_key("queryable_int_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table));
+        new_query.commit();
+
+        auto foo_obj_id = ObjectId::gen();
+        auto bar_obj_id = ObjectId::gen();
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", foo_obj_id},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", bar_obj_id},
+                                         {"queryable_str_field", std::string{"bar"}},
+                                         {"queryable_int_field", static_cast<int64_t>(10)},
+                                         {"non_queryable_field", std::string{"non queryable 2"}}}));
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        sync_session->close();
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+            mut_subs.commit();
+        }
+
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 15);
+            realm->commit_transaction();
+        }
+
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.insert_or_assign(Query(table).greater_equal(queryable_int_field, static_cast<int64_t>(10)));
+            mut_subs.commit();
+        }
+
+        Results results(realm, table);
+        realm->begin_transaction();
+        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+        foo_obj.set<int64_t>(queryable_int_field, 0);
+        realm->commit_transaction();
+
+        sync_session->revive_if_needed();
+        wait_for_upload(*realm);
+    });
+}
+
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {
     const std::string base_url = get_base_url();
 

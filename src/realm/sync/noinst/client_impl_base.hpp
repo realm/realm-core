@@ -704,7 +704,7 @@ public:
     void request_download_completion_notification();
 
     /// \brief Gets or creates the subscription store associated with this Session.
-    SubscriptionStore* get_or_create_flx_subscription_store();
+    SubscriptionStore* get_flx_subscription_store();
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);

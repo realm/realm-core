@@ -3950,7 +3950,7 @@ TEST(Sync_UploadDownloadProgress_1)
             client.run();
         });
 
-        Session session(client, db);
+        Session session(client, db, nullptr);
 
         int number_of_handler_calls = 0;
 
@@ -4230,7 +4230,7 @@ TEST(Sync_UploadDownloadProgress_3)
     Session::Config config;
     config.service_identifier = "/realm-sync";
 
-    Session session(client, db, std::move(config));
+    Session session(client, db, nullptr, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -4538,7 +4538,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session{new Session{client, db, std::move(session_config)}};
+    std::unique_ptr<Session> session{new Session{client, db, nullptr, std::move(session_config)}};
 
     util::Mutex mutex;
 
@@ -4586,8 +4586,8 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     config.reconnect_mode = ReconnectMode::testing;
     config.tcp_no_delay = true;
     Client client{config};
-    Session session_1{client, db};
-    Session session_2{client, db};
+    Session session_1{client, db, nullptr};
+    Session session_2{client, db, nullptr};
     session_1.bind("realm://foo/bar", "blablabla");
     session_2.bind("realm://foo/bar", "blablabla");
     CHECK_THROW(client.run(), MultipleSyncAgents);
@@ -5855,7 +5855,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, std::move(session_config)};
+        Session session{client, db, nullptr, std::move(session_config)};
 
         auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
             if (state == ConnectionState::disconnected) {

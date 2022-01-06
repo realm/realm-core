@@ -1622,7 +1622,7 @@ void Session::send_message()
         }
 
         REALM_ASSERT(m_is_flx_sync_session);
-        m_pending_flx_sub_set = get_or_create_flx_subscription_store()->get_next_pending_version(
+        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
             m_last_sent_flx_query_version, m_upload_progress.client_version);
 
         if (!m_pending_flx_sub_set) {
@@ -1686,7 +1686,7 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_is_flx_sync_session) {
-        const auto active_query_set = get_or_create_flx_subscription_store()->get_active();
+        const auto active_query_set = get_flx_subscription_store()->get_active();
         const auto active_query_body = active_query_set.to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
@@ -1727,7 +1727,7 @@ void Session::send_query_change_message()
         return;
     }
 
-    auto sub_store = get_or_create_flx_subscription_store();
+    auto sub_store = get_flx_subscription_store();
     auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
     logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
@@ -1759,12 +1759,12 @@ void Session::send_upload_message()
     auto target_upload_version = m_upload_target_version;
     if (m_is_flx_sync_session) {
         if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
-            m_pending_flx_sub_set = get_or_create_flx_subscription_store()->get_next_pending_version(
+            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
                 m_last_sent_flx_query_version, m_upload_progress.client_version);
         }
         if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
             logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
-                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->snapshot_version);
+                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
             target_upload_version = m_pending_flx_sub_set->snapshot_version;
         }
     }
