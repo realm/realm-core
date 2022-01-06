@@ -252,7 +252,7 @@ std::shared_ptr<sync::SubscriptionStore> SyncSession::make_flx_subscription_stor
 
     return std::make_shared<sync::SubscriptionStore>(m_db, [this](int64_t new_version) {
         std::lock_guard<std::mutex> lk(m_state_mutex);
-        if (m_state != State::Active) {
+        if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
             return;
         }
         m_session->on_new_flx_sync_subscription(new_version);

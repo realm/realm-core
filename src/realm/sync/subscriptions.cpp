@@ -385,7 +385,7 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         throw std::logic_error("SubscriptionSet is not in a commitable state");
     }
     if (state() == State::Uncommitted) {
-        m_obj.set(m_mgr->m_sub_set_keys->snapshot_version, static_cast<int64_t>(m_tr->get_version() + 1));
+        m_obj.set(m_mgr->m_sub_set_keys->snapshot_version, static_cast<int64_t>(m_tr->get_version()));
         update_state(State::Pending, util::none);
     }
 

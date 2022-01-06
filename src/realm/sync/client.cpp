@@ -776,7 +776,10 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
 
-    std::tie(m_flx_active_version, m_flx_latest_version) = m_flx_subscription_store->get_active_and_latest_versions();
+    if (m_flx_subscription_store) {
+        std::tie(m_flx_active_version, m_flx_latest_version) =
+            m_flx_subscription_store->get_active_and_latest_versions();
+    }
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -814,6 +817,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
             return; // Already finalized
         }
 
+        m_sess->recognize_sync_version(m_db->get_version_of_latest_snapshot());
         m_flx_latest_version = new_version;
         m_sess->on_new_flx_subscription_set(new_version);
     });

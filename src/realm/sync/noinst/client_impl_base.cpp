@@ -1617,11 +1617,14 @@ void Session::send_message()
         return send_mark_message(); // Throws
 
     auto check_pending_flx_version = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return false;
+        }
+
         if (!m_allow_upload) {
             return false;
         }
 
-        REALM_ASSERT(m_is_flx_sync_session);
         m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
             m_last_sent_flx_query_version, m_upload_progress.client_version);
 
