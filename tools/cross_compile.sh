@@ -9,7 +9,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "Usage: ${SCRIPT} -t <build_type> -o <target_os> [-a <android_abi>]"
     echo ""
     echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
@@ -41,9 +41,9 @@ while getopts ":o:a:t:v:" opt; do
             BUILD_TYPE=${OPTARG}
             [ "${BUILD_TYPE}" == "Debug" ] ||
             [ "${BUILD_TYPE}" == "MinSizeDebug" ] ||
+            [ "${BUILD_TYPE}" == "MinSizeRel" ] ||
             [ "${BUILD_TYPE}" == "Release" ] || usage
             ;;
-        v) VERSION=${OPTARG};;
         *) usage;;
     esac
 done
@@ -63,19 +63,20 @@ if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
 fi
 
 if [ "${OS}" == "android" ]; then
+    if [[ ${ARCH} == *"64"* ]]; then
+        ANDROID_VERSION=21
+    else
+        ANDROID_VERSION=14
+    fi
     mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
     cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
-    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \
-          -D CMAKE_INSTALL_PREFIX=install \
+    cmake -D CMAKE_SYSTEM_NAME=Android \
+          -D CMAKE_SYSTEM_VERSION=${ANDROID_VERSION} \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D ANDROID_ABI="${ARCH}" \
-          -D REALM_ENABLE_ENCRYPTION=1 \
-          -D REALM_VERSION="${VERSION}" \
-          -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
+          -D CMAKE_ANDROID_ARCH_ABI="${ARCH}" \
           ..
 
-    make -j "${CORES}" -l "${CORES}" VERBOSE=1
-    make package
+    make package -j "${CORES}" -l "${CORES}" CoreTests VERBOSE=1
 else
     mkdir -p "build-${OS}-${BUILD_TYPE}"
     cd "build-${OS}-${BUILD_TYPE}" || exit 1
@@ -85,37 +86,29 @@ else
         tvos) SDK="appletv";;
     esac
 
-    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
-
     cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
-          -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_NO_TESTS=1 \
-          -D REALM_VERSION="${VERSION}" \
           -G Xcode ..
 
     xcodebuild -sdk "${SDK}os" \
                -configuration "${BUILD_TYPE}" \
+               -target Core \
                ONLY_ACTIVE_ARCH=NO
     xcodebuild -sdk "${SDK}simulator" \
                -configuration "${BUILD_TYPE}" \
+               -target Core \
                ONLY_ACTIVE_ARCH=NO
+
+    if [ "${BUILD_TYPE}" = "Release" ]; then
+      suffix="-${OS}"
+    else
+      suffix="-${OS}-dbg"
+    fi
+
     mkdir -p "src/realm/${BUILD_TYPE}"
     lipo -create \
          -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
          "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
-    xcodebuild -sdk "${SDK}os" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    xcodebuild -sdk "${SDK}simulator" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    mkdir -p install/lib
-    cp "src/realm/${BUILD_TYPE}/librealm${suffix}.a" install/lib
-    cd install || exit 1
-    tar -cvzf "realm-core-${BUILD_TYPE}-${VERSION}-${SDK}os.tar.gz" lib include
-    mv ./*.tar.gz ..
+    cpack -C "${BUILD_TYPE}"
 fi

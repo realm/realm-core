@@ -49,8 +49,8 @@ jobWrapper {
       }
 
       stage('check') {
-          parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
-                               checkLinuxDebug     : doBuildInDocker('Debug'),
+          parallelExecutors = [checkLinuxRelease   : doBuildOnCentos6('Release'),
+                               checkLinuxDebug     : doBuildOnCentos6('Debug'),
                                buildMacOsDebug     : doBuildMacOs('Debug'),
                                buildMacOsRelease   : doBuildMacOs('Release'),
                                buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
@@ -63,23 +63,19 @@ jobWrapper {
                                buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
                                buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
                                buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
-                               packageGeneric      : doBuildPackage('generic', 'tgz'),
-                               packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-                               packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                               packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
                                threadSanitizer     : doBuildInDocker('Debug', 'thread'),
                                addressSanitizer    : doBuildInDocker('Debug', 'address'),
                                coverage            : doBuildCoverage()
               ]
 
           androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
-          androidBuildTypes = ['Debug', 'Release']
+          androidBuildTypes = ['Debug', 'MinSizeRel']
 
           for (def i = 0; i < androidAbis.size(); i++) {
               def abi = androidAbis[i]
               for (def j = 0; j < androidBuildTypes.size(); j++) {
                   def buildType = androidBuildTypes[j]
-                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+                  parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'MinSizeRel')
               }
           }
 
@@ -101,48 +97,9 @@ jobWrapper {
           parallel parallelExecutors
       }
 
-      stage('Aggregate') {
-          parallel (
-            cocoa: {
-                  node('docker') {
-                      getArchive()
-                      for (int i = 0; i < cocoaStashes.size(); i++) {
-                          unstash name:cocoaStashes[i]
-                      }
-                      sh 'tools/build-cocoa.sh'
-                      archiveArtifacts('realm-core-cocoa*.tar.xz')
-                      if(gitTag) {
-                          def stashName = 'cocoa'
-                          stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
-                          publishingStashes << stashName
-                      }
-                  }
-              },
-            android: {
-                  node('docker') {
-                      getArchive()
-                      for (int i = 0; i < androidStashes.size(); i++) {
-                          unstash name:androidStashes[i]
-                      }
-                      sh 'tools/build-android.sh'
-                      archiveArtifacts('realm-core-android*.tar.gz')
-                      if(gitTag) {
-                          def stashName = 'android'
-                          stash includes: 'realm-core-android*.tar.gz', name: stashName
-                          publishingStashes << stashName
-                      }
-                  }
-              }
-          )
-      }
-
       if (gitTag) {
-          stage('publish-packages') {
+          stage('Publish') {
               parallel(
-                  generic: doPublishGeneric(),
-                  centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                  centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                  ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
                   others: doPublishLocalArtifacts()
               )
           }
@@ -183,7 +140,7 @@ def doBuildInDocker(String buildType, String sanitizeMode='') {
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=${buildType} ${sanitizeFlags} -G Ninja ..
                         """
-                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        runAndCollectWarnings(script: "cd build-dir && ninja CoreTests")
                         sh """
                            cd build-dir/test
                            ./realm-tests
@@ -202,7 +159,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     return {
         node('docker') {
             getArchive()
-            def stashName = "android___${abi}___${buildType}"
+            def stashName = "android-${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
@@ -210,7 +167,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType}")
                         dir(buildDir) {
                             archiveArtifacts('realm-*.tar.gz')
                         }
@@ -223,12 +180,15 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
-                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType}")
                             dir(buildDir) {
                                 archiveArtifacts('realm-*.tar.gz')
                             }
                             stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
                             androidStashes << stashName
+                            if (gitTag) {
+                                publishingStashes << stashName
+                            } 
                             try {
                                 sh '''
                                    cd $(find . -type d -maxdepth 1 -name build-android*)
@@ -257,12 +217,54 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     }
 }
 
+def doBuildOnCentos6(String buildType) {
+    return {
+        node('docker') {
+            getArchive()
+
+            def stashName = "Linux___${buildType}"
+            def image = docker.build('centos6:snapshot', '-f tools/docker/centos6.Dockerfile .')
+            withEnv(environment()) {
+                image.inside {
+                    try {
+                        sh """
+                            mkdir build-dir
+                            cd build-dir
+                            cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
+                            cmake --build . --target CoreTests 2>errors.log
+                            cmake --build . --target check
+                            cmake --build . --target package
+                        """
+                    } finally {
+                        recordTests(stashName)
+                    }
+                }
+            }
+
+            dir('build-dir') {
+                archiveArtifacts('realm-*.tar.gz')
+                stash includes:'realm-*.tar.gz', name:stashName
+                androidStashes << stashName
+                if (gitTag) {
+                    publishingStashes << stashName
+                }
+            }
+        }
+    }
+}
+
 def doBuildWindows(String buildType, boolean isUWP, String platform) {
-    def cmakeDefinitions;
+    def cmakeSystemName
+    def cmakeSystemVersion
+    def target
     if (isUWP) {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0 -DREALM_BUILD_LIB_ONLY=1'
+      cmakeSystemName = 'WindowsStore'
+      cmakeSystemVersion = '10.0'
+      target = 'Core'
     } else {
-      cmakeDefinitions = '-DCMAKE_SYSTEM_VERSION=8.1'
+      cmakeSystemName = 'Windows'
+      cmakeSystemVersion = '8.1'
+      target = 'CoreTests'
     }
 
     return {
@@ -270,14 +272,14 @@ def doBuildWindows(String buildType, boolean isUWP, String platform) {
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
+                bat "\"${tool 'cmake'}\" -D CMAKE_SYSTEM_NAME=${cmakeSystemName} -D CMAKE_SYSTEM_VERSION=${cmakeSystemVersion} -D CMAKE_GENERATOR_PLATFORM=${platform} -D CMAKE_BUILD_TYPE=${buildType} .."
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
-                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType}")
+                    runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: "\"${tool 'cmake'}\" --build . --config ${buildType} --target ${target}")
                 }
-                bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
+                bat "\"${tool 'cmake'}\" --build . --config ${buildType} --target package"
                 archiveArtifacts('*.tar.gz')
                 if (gitTag) {
-                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                    def stashName = "${cmakeSystemName}-${platform}___${buildType}"
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -316,7 +318,7 @@ def buildDiffCoverage() {
                         cmake -D CMAKE_BUILD_TYPE=Debug \
                               -D REALM_COVERAGE=ON \
                               -G Ninja ..
-                        ninja
+                        ninja realm-tests
                         cd test
                         ./realm-tests
                         gcovr --filter=\'.*src/realm.*\' -x >gcovr.xml
@@ -356,7 +358,7 @@ def buildPerformance() {
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('docker && brix && exclusive') {
-      getSourceArchive()
+      getArchive()
 
       def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
@@ -405,7 +407,6 @@ def doBuildMacOs(String buildType) {
                                     rm -rf *
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                                          -D REALM_VERSION=${gitDescribeVersion} \\
                                           -G Xcode ..
                                 """
                         }
@@ -418,9 +419,8 @@ def doBuildMacOs(String buildType) {
                                        ONLY_ACTIVE_ARCH=NO
                             """)
                 }
+                archiveArtifacts("*.tar.gz")
             }
-            archiveArtifacts("build-macos-${buildType}/*.tar.gz")
-
             def stashName = "macos___${buildType}"
             stash includes:"build-macos-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
@@ -439,12 +439,14 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     timeout(time: 15, unit: 'MINUTES') {
                         runAndCollectWarnings(parser:'clang', script: """
                                 rm -rf build-*
-                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                                tools/cross_compile.sh -o ${sdk} -t ${buildType}
                             """)
                     }
                 }
             }
-            archiveArtifacts("build-${sdk}-${buildType}/*.tar.gz")
+            dir("build-${sdk}-${buildType}") {
+                archiveArtifacts("*.tar.gz")
+            }
             def stashName = "${sdk}___${buildType}"
             stash includes:"build-${sdk}-${buildType}/*.tar.gz", name:stashName
             cocoaStashes << stashName
@@ -465,7 +467,7 @@ def doBuildCoverage() {
           mkdir build
           cd build
           cmake -G Ninja -D REALM_COVERAGE=ON ..
-          ninja
+          ninja CoreTests
           cd ..
           lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
           cd build/test
@@ -515,75 +517,19 @@ def readGitTag() {
     return sh(returnStdout: true, script: command).trim()
 }
 
-def doBuildPackage(distribution, fileType) {
-    return {
-        node('docker') {
-            getSourceArchive()
-
-            docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
-                env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
-                withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
-                    sh "sh packaging/package.sh ${distribution}"
-                }
-            }
-
-            dir('packaging/out') {
-                archiveArtifacts artifacts: "${distribution}/*.${fileType}"
-                stash includes: "${distribution}/*.${fileType}", name: "packages-${distribution}"
-            }
-        }
-    }
-}
-
-def doPublish(distribution, fileType, distroName, distroVersion) {
-    return {
-        node {
-            getSourceArchive()
-            packaging = load './packaging/publish.groovy'
-
-            dir('packaging/out') {
-                unstash "packages-${distribution}"
-                dir(distribution) {
-                    packaging.uploadPackages('sync-devel', fileType, distroName, distroVersion, "*.${fileType}")
-                }
-            }
-        }
-    }
-}
-
-def doPublishGeneric() {
-    return {
-        node {
-            getArchive()
-            dir('packaging/out') {
-                unstash 'packages-generic'
-                def files = findFiles(glob: '**/*.tgz')
-                for (file in files) {
-                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                    rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/linux/${file.name}"
-                }
-            }
-
-        }
-    }
-}
-
 def doPublishLocalArtifacts() {
     return {
         node('docker') {
             deleteDir()
             dir('temp') {
-                withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
-                    for(publishingStash in publishingStashes) {
-                        unstash name: publishingStash
-                        def path = publishingStash.replaceAll('___', '/')
-                        def files = findFiles(glob: '**')
-                        for (file in files) {
-                            rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
-                            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                        }
-                        deleteDir()
+                for(publishingStash in publishingStashes) {
+                    unstash name: publishingStash
+                    def files = findFiles(glob: '**')
+                    for (file in files) {
+                        rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${file.name}"
+                        rlmS3Put file: file.path, path: "downloads/core/${file.name}"
                     }
+                    deleteDir()
                 }
             }
         }

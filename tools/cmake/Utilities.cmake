@@ -4,6 +4,10 @@ else()
     set(REALM_UTILITIES 1)
 endif()
 
+if(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(LINUX ON)
+endif()
+
 macro(check_generator _generator)
     string(COMPARE EQUAL "${CMAKE_GENERATOR}" "${_generator}" _is_correct_generator)
     if(NOT _is_correct_generator)
@@ -47,4 +51,36 @@ macro(set_target_xcode_attributes _target)
             XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelWithDebInfo "3"
             XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
     )
+endmacro()
+
+macro(get_package_file_name _PACKAGE_NAME _PACKAGE_VERSION)
+    if(NOT DEFINED CMAKE_BUILD_TYPE)
+        message(WARNING "In order to generate the proper package name CMAKE_BUILD_TYPE must be set also on multi-configuration generators")
+    endif()
+
+    if(ANDROID)
+        set(REALM_OS "Android-${CMAKE_ANDROID_ARCH_ABI}")
+    elseif(LINUX)
+        set(REALM_OS "Linux-${CMAKE_SYSTEM_PROCESSOR}")
+    elseif(WIN32)
+        set(REALM_OS "${CMAKE_SYSTEM_NAME}-${CMAKE_GENERATOR_PLATFORM}")
+    elseif(APPLE)
+        if(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "macosx")
+            set(REALM_OS Darwin)
+        elseif(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "iphoneos")
+            set(REALM_OS iphoneos)
+        elseif(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "watchos")
+            set(REALM_OS watchos)
+        elseif(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "tvos")
+            set(REALM_OS tvos)
+        else()
+            set(REALM_OS Darwin)
+        endif()
+    endif()
+
+    set("${_PACKAGE_NAME}_FILE_NAME"
+        "${_PACKAGE_NAME}-${CMAKE_BUILD_TYPE}-${_PACKAGE_VERSION}-${REALM_OS}"
+    )
+    set("${_PACKAGE_NAME}_URL_PATH"
+        "${_PACKAGE_VERSION}")
 endmacro()

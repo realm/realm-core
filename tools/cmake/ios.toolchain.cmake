@@ -6,7 +6,9 @@ fix_xcode_try_compile()
 
 set_common_xcode_attributes()
 
-set(REALM_SKIP_SHARED_LIB ON)
+set(CMAKE_DEBUG_POSTFIX "-ios-dbg")
+set(CMAKE_MINSIZEDEBUG_POSTFIX "-ios-dbg")
+set(CMAKE_RELEASE_POSTFIX "-ios")
 
 set(CMAKE_OSX_SYSROOT "iphoneos")
 
