@@ -570,6 +570,19 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm->schema() == subset_schema);
         REQUIRE(frozen_schema == subset_schema);
     }
+
+    SECTION("freeze with orphaned embedded tables") {
+        auto schema = Schema{
+            {"object1", {{"value", PropertyType::Int}}},
+            {"object2", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+        };
+        config.schema = schema;
+        config.schema_mode = SchemaMode::AdditiveDiscovered;
+        auto realm = Realm::get_shared_realm(config);
+        realm->read_group();
+        auto frozen_realm = realm->freeze();
+        REQUIRE(frozen_realm->schema() == schema);
+    }
 }
 
 #if REALM_ENABLE_SYNC

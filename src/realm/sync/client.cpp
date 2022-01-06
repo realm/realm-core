@@ -834,7 +834,7 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
 
     auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(version);
     mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
-    mut_subs.commit();
+    std::move(mut_subs).commit();
 }
 
 void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
@@ -869,7 +869,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
 
     auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(new_version);
     mut_subs.update_state(new_state);
-    mut_subs.commit();
+    std::move(mut_subs).commit();
 }
 
 SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()

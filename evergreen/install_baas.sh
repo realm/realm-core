@@ -223,17 +223,27 @@ fi
 mkdir mongodb-dbpath
 
 function cleanup() {
+    BAAS_PID=""
+    MONGOD_PID=""
     if [[ -f $WORK_PATH/baas_server.pid ]]; then
-        PIDS_TO_KILL="$(< $WORK_PATH/baas_server.pid)"
+        BAAS_PID="$(< $WORK_PATH/baas_server.pid)"
     fi
 
     if [[ -f $WORK_PATH/mongod.pid ]]; then
-        PIDS_TO_KILL="$(< $WORK_PATH/mongod.pid) $PIDS_TO_KILL"
+        MONGOD_PID="$(< $WORK_PATH/mongod.pid)"
     fi
 
-    if [[ -n "$PIDS_TO_KILL" ]]; then
-        echo "Killing $PIDS_TO_KILL"
-        kill $PIDS_TO_KILL
+    if [[ -n "$BAAS_PID" ]]; then
+        echo "Stopping baas $BAAS_PID"
+        kill $BAAS_PID
+        echo "Waiting for baas to stop"
+        wait $BAAS_PID
+    fi
+
+
+    if [[ -n "$MONGOD_PID" ]]; then
+        echo "Killing mongod $MONGOD_PID"
+        kill $MONGOD_PID
         echo "Waiting for processes to exit"
         wait
     fi
