@@ -3811,7 +3811,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, db, std::move(session_config));
+    Session session(client, db, nullptr, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
