@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <realm/string_data.hpp>
+#include <string>
 
 namespace realm {
 
@@ -35,9 +35,16 @@ public:
         RuntimeError = 2,
         LogicError = 3,
         BrokenPromise = 4,
+        NoSuchTable = 5,
+        MaximumFileSizeExceeded = 6,
+        ColumnNotFound = 7,
+        KeyNotFound = 9,
+        KeyAlreadyUsed = 10,
+        DuplicatePrimaryKeyValue = 11,
+        InvalidPath = 12,
     };
 
-    static StringData error_string(Error code);
+    static std::string_view error_string(Error code);
 };
 
 } // namespace realm

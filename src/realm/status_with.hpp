@@ -65,12 +65,7 @@ class REALM_NODISCARD StatusWith {
 public:
     using value_type = T;
 
-    StatusWith(ErrorCodes::Error code, StringData reason)
-        : m_status(code, reason)
-    {
-    }
-
-    StatusWith(ErrorCodes::Error code, const std::string& reason)
+    StatusWith(ErrorCodes::Error code, std::string_view reason)
         : m_status(code, reason)
     {
     }

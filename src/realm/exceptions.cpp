@@ -22,19 +22,11 @@
 
 using namespace realm;
 
-DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string obj_type, std::string prop)
-    : logic_error(util::format("Primary key property '%1.%2' has duplicate values after migration.", obj_type, prop))
-    , m_object_type(obj_type)
-    , m_property(prop)
-{
-}
-
-
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)
-const char* LogicError::message() const noexcept
+const char* LogicError::message(ErrorKind kind) noexcept
 {
-    switch (m_kind) {
+    switch (kind) {
         case string_too_big:
             return "String too big";
         case binary_too_big:

@@ -327,7 +327,8 @@ void LinkChain::add(ColKey ck)
     }
     else {
         // Only last column in link chain is allowed to be non-link
-        throw std::runtime_error(util::format("%1.%2 is not an object reference property",
+        throw ExceptionForStatus(ErrorCodes::LogicError,
+                                 util::format("%1.%2 is not an object reference property",
                                               m_current_table->get_name(), m_current_table->get_column_name(ck)));
     }
     m_link_cols.push_back(ck);
@@ -1559,7 +1560,8 @@ bool Table::migrate_objects()
         std::unique_ptr<BPlusTree<int64_t>> list_acc;
 
         if (!(col_ndx < col_refs.size())) {
-            throw std::runtime_error(
+            throw ExceptionForStatus(
+                ErrorCodes::LogicError,
                 util::format("Objects in '%1' corrupted by previous upgrade attempt", get_name()));
         }
 
@@ -3589,7 +3591,8 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValueException(get_name(), get_column_name(col));
+        throw DuplicatePrimaryKeyValueException(util::format(
+            "Primary key property '%1.%2' has duplicate values after migration.", get_name(), get_column_name(col)));
     }
 }
 
@@ -3654,7 +3657,8 @@ void Table::change_nullability(ColKey key_from, ColKey key_to, bool throw_on_nul
         for (size_t i = 0; i < sz; i++) {
             if (from_nullability && from_arr.is_null(i)) {
                 if (throw_on_null) {
-                    throw std::runtime_error(util::format("Objects in '%1' has null value(s) in property '%2'",
+                    throw ExceptionForStatus(ErrorCodes::LogicError,
+                                             util::format("Objects in '%1' has null value(s) in property '%2'",
                                                           get_name(), get_column_name(key_from)));
                 }
                 else {
@@ -3702,7 +3706,8 @@ void Table::change_nullability_list(ColKey key_from, ColKey key_to, bool throw_o
                     }
                     else {
                         if (throw_on_null) {
-                            throw std::runtime_error(
+                            throw ExceptionForStatus(
+                                ErrorCodes::LogicError,
                                 util::format("Objects in '%1' has null value(s) in list property '%2'", get_name(),
                                              get_column_name(key_from)));
                         }

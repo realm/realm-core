@@ -24,7 +24,7 @@
 
 namespace realm {
 
-Status::Status(ErrorCodes::Error code, StringData reason)
+Status::Status(ErrorCodes::Error code, std::string_view reason)
     : m_error(ErrorInfo::create(code, reason))
 {
     // OK status should be created by calling Status::OK() - which is a special case that doesn't allocate
@@ -32,24 +32,19 @@ Status::Status(ErrorCodes::Error code, StringData reason)
     REALM_ASSERT(code != ErrorCodes::OK);
 }
 
-Status::Status(ErrorCodes::Error code, const std::string& reason)
-    : Status(code, StringData(reason))
-{
-}
-
 Status::Status(ErrorCodes::Error code, const char* reason)
-    : Status(code, StringData(reason, std::char_traits<char>::length(reason)))
+    : Status(code, std::string_view(reason, std::char_traits<char>::length(reason)))
 {
 }
 
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, StringData reason)
+Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, std::string_view reason)
     : m_refs(0)
     , m_code(code)
     , m_reason(reason)
 {
 }
 
-util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, StringData reason)
+util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, std::string_view reason)
 {
     return util::bind_ptr<Status::ErrorInfo>(new ErrorInfo(code, reason));
 }

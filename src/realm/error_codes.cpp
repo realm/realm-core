@@ -20,7 +20,7 @@
 
 namespace realm {
 
-StringData ErrorCodes::error_string(Error code)
+std::string_view ErrorCodes::error_string(Error code)
 {
     switch (code) {
         case ErrorCodes::OK:
@@ -31,6 +31,20 @@ StringData ErrorCodes::error_string(Error code)
             return "LogicError";
         case ErrorCodes::BrokenPromise:
             return "BrokenPromise";
+        case ErrorCodes::NoSuchTable:
+            return "NoSuchTable";
+        case ErrorCodes::MaximumFileSizeExceeded:
+            return "MaximumFileSizeExceeded";
+        case ErrorCodes::ColumnNotFound:
+            return "ColumnNotFound";
+        case ErrorCodes::KeyNotFound:
+            return "KeyNotFound";
+        case ErrorCodes::KeyAlreadyUsed:
+            return "KeyAlreadyUsed";
+        case ErrorCodes::DuplicatePrimaryKeyValue:
+            return "DuplicatePrimaryKeyValue";
+        case ErrorCodes::InvalidPath:
+            return "InvalidPath";
         case ErrorCodes::UnknownError:
         default:
             return "UnknownError";

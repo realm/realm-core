@@ -24,7 +24,6 @@
 #include <string>
 
 #include "realm/error_codes.hpp"
-#include "realm/string_data.hpp"
 #include "realm/util/bind_ptr.hpp"
 #include "realm/util/features.h"
 
@@ -38,10 +37,9 @@ public:
     static inline Status OK();
 
     /*
-     * You can construct a Status from strings, C strings, and StringData's.
+     * You can construct a Status from strings, C strings
      */
-    Status(ErrorCodes::Error code, StringData reason);
-    Status(ErrorCodes::Error code, const std::string& reason);
+    Status(ErrorCodes::Error code, std::string_view reason);
     Status(ErrorCodes::Error code, const char* reason);
 
     /*
@@ -56,7 +54,7 @@ public:
     inline bool is_ok() const noexcept;
     inline const std::string& reason() const noexcept;
     inline ErrorCodes::Error code() const noexcept;
-    inline StringData code_string() const noexcept;
+    inline std::string_view code_string() const noexcept;
 
     /*
      * This class is marked nodiscard so that we always handle errors. If there is a place where we need
@@ -72,7 +70,7 @@ private:
         const ErrorCodes::Error m_code;
         const std::string m_reason;
 
-        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, StringData reason);
+        static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string_view reason);
 
     protected:
         template <typename>
@@ -91,7 +89,7 @@ private:
         }
 
     private:
-        ErrorInfo(ErrorCodes::Error code, StringData reason);
+        ErrorInfo(ErrorCodes::Error code, std::string_view reason);
     };
 
     util::bind_ptr<ErrorInfo> m_error = {};
@@ -119,12 +117,12 @@ public:
         return m_status.code();
     }
 
-    StringData code_string() const noexcept
+    std::string_view code_string() const noexcept
     {
         return m_status.code_string();
     }
 
-    ExceptionForStatus(ErrorCodes::Error err, StringData str)
+    ExceptionForStatus(ErrorCodes::Error err, std::string_view str)
         : m_status(err, str)
     {
     }
@@ -213,7 +211,7 @@ inline ErrorCodes::Error Status::code() const noexcept
     return m_error ? m_error->m_code : ErrorCodes::OK;
 }
 
-inline StringData Status::code_string() const noexcept
+inline std::string_view Status::code_string() const noexcept
 {
     return ErrorCodes::error_string(code());
 }

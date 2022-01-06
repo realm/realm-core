@@ -322,7 +322,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // we can return a ready future immediately.
     auto cur_state = state();
     if (cur_state == State::Error) {
-        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
+        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, std::string_view(error_str())});
     }
     else if (cur_state >= notify_when) {
         return util::Future<State>::make_ready(cur_state);
@@ -367,7 +367,7 @@ void MutableSubscriptionSet::process_notifications()
 
     for (auto& req : to_finish) {
         if (new_state == State::Error && req.version == my_version) {
-            req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
+            req.promise.set_error({ErrorCodes::RuntimeError, std::string_view(error_str())});
         }
         else if (req.version < my_version) {
             req.promise.emplace_value(State::Superceded);

@@ -24,6 +24,7 @@
 #include <realm/util/features.h>
 #include <realm/util/backtrace.hpp>
 #include <realm/util/to_string.hpp>
+#include <realm/status.hpp>
 
 namespace realm {
 
@@ -117,76 +118,55 @@ public:
 };
 
 /// Thrown when a key can not by found
-class KeyNotFound : public std::runtime_error {
+class KeyNotFound : public ExceptionForStatus {
 public:
     KeyNotFound(const std::string& msg)
-        : std::runtime_error(msg)
+        : ExceptionForStatus(ErrorCodes::KeyNotFound, msg)
     {
     }
 };
 
 /// Thrown when a column can not by found
-class ColumnNotFound : public std::runtime_error {
+class ColumnNotFound : public ExceptionForStatus {
 public:
     ColumnNotFound()
-        : std::runtime_error("Column not found")
-    {
-    }
-};
-
-/// Thrown when a column key is already used
-class ColumnAlreadyExists : public std::runtime_error {
-public:
-    ColumnAlreadyExists()
-        : std::runtime_error("Column already exists")
+        : ExceptionForStatus(ErrorCodes::ColumnNotFound, "Column not found")
     {
     }
 };
 
 /// Thrown when a key is already existing when trying to create a new object
-class KeyAlreadyUsed : public std::runtime_error {
+class KeyAlreadyUsed : public ExceptionForStatus {
 public:
     KeyAlreadyUsed(const std::string& msg)
-        : std::runtime_error(msg)
+        : ExceptionForStatus(ErrorCodes::KeyAlreadyUsed, msg)
     {
     }
 };
 
-// SerialisationError intentionally does not inherit ExceptionWithBacktrace
-// because the query-based-sync permissions queries generated on the server
-// use a LinksToNode which is not currently serialisable (this limitation can
-// be lifted in core 6 given stable ids). Coupled with query metrics which
-// serialize all queries, the capturing of the stack for these frequent
-// permission queries shows up in performance profiles.
-class SerialisationError : public std::runtime_error {
+class SerialisationError : public ExceptionForStatus {
 public:
-    SerialisationError(const std::string& msg);
-    /// runtime_error::what() returns the msg provided in the constructor.
+    SerialisationError(const std::string& msg)
+        : ExceptionForStatus(ErrorCodes::LogicError, msg)
+    {
+    }
 };
 
 // thrown when a user constructed link path is not a valid input
-class InvalidPathError : public std::runtime_error {
+class InvalidPathError : public ExceptionForStatus {
 public:
-    InvalidPathError(const std::string& msg);
-    /// runtime_error::what() returns the msg provided in the constructor.
+    InvalidPathError(const std::string& msg)
+        : ExceptionForStatus(ErrorCodes::InvalidPath, msg)
+    {
+    }
 };
 
-class DuplicatePrimaryKeyValueException : public std::logic_error {
+class DuplicatePrimaryKeyValueException : public ExceptionForStatus {
 public:
-    DuplicatePrimaryKeyValueException(std::string object_type, std::string property);
-
-    std::string const& object_type() const
+    DuplicatePrimaryKeyValueException(std::string_view msg)
+        : ExceptionForStatus(ErrorCodes::DuplicatePrimaryKeyValue, msg)
     {
-        return m_object_type;
     }
-    std::string const& property() const
-    {
-        return m_property;
-    }
-
-private:
-    std::string m_object_type;
-    std::string m_property;
 };
 
 
@@ -219,7 +199,7 @@ private:
 /// exception being thrown. The whole point of properly documenting "Undefined
 /// Behaviour" cases is to help the user know what the limits are, without
 /// constraining the database to handle every and any use-case thrown at it.
-class LogicError : public ExceptionWithBacktrace<std::exception> {
+class LogicError : public ExceptionForStatus {
 public:
     enum ErrorKind {
         string_too_big,
@@ -317,10 +297,16 @@ public:
         collection_type_mismatch
     };
 
-    LogicError(ErrorKind message);
+    LogicError(ErrorKind kind)
+        : ExceptionForStatus(ErrorCodes::LogicError, message(kind))
+    {
+    }
 
-    const char* message() const noexcept override;
-    ErrorKind kind() const noexcept;
+    static const char* message(ErrorKind kind) noexcept;
+    ErrorKind kind() const noexcept
+    {
+        return m_kind;
+    }
 
 private:
     ErrorKind m_kind;
@@ -379,27 +365,6 @@ inline OutOfDiskSpace::OutOfDiskSpace(const std::string& msg)
     : std::runtime_error(msg)
 {
 }
-
-inline SerialisationError::SerialisationError(const std::string& msg)
-    : std::runtime_error(msg)
-{
-}
-
-inline InvalidPathError::InvalidPathError(const std::string& msg)
-    : runtime_error(msg)
-{
-}
-
-inline LogicError::LogicError(LogicError::ErrorKind k)
-    : m_kind(k)
-{
-}
-
-inline LogicError::ErrorKind LogicError::kind() const noexcept
-{
-    return m_kind;
-}
-
 
 } // namespace realm
 
