@@ -120,7 +120,6 @@ FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchem
 TestSyncManager FLXSyncTestHarness::make_sync_manager()
 {
     TestSyncManager::Config smc(m_app_config);
-    smc.verbose_sync_client_logging = true;
     return TestSyncManager(std::move(smc), {});
 }
 
