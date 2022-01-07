@@ -350,6 +350,9 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
                 SubscriptionSet::State::Complete);
 
+    // Check that if a subscription set gets updated to a new state and the SubscriptionSet returned by commit() is
+    // not explicitly refreshed (i.e. is reading from a snapshot from before the state change), that it can still
+    // return a ready future.
     auto mut_set = store.get_latest().make_mutable_copy();
     auto waitable_set = std::move(mut_set).commit();
 
@@ -359,8 +362,9 @@ TEST(Sync_SubscriptionStoreNotifications)
         std::move(mut_set).commit();
     }
 
-    waitable_set.get_state_change_notification(SubscriptionSet::State::Complete).get();
-    waitable_set.get_state_change_notification(SubscriptionSet::State::Complete).get();
+    auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
+    CHECK(fut.is_ready());
+    CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
 } // namespace realm::sync
