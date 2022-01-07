@@ -349,6 +349,18 @@ TEST(Sync_SubscriptionStoreNotifications)
     // immediately.
     CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
                 SubscriptionSet::State::Complete);
+
+    auto mut_set = store.get_latest().make_mutable_copy();
+    auto waitable_set = std::move(mut_set).commit();
+
+    {
+        mut_set = store.get_mutable_by_version(waitable_set.version());
+        mut_set.update_state(SubscriptionSet::State::Complete);
+        std::move(mut_set).commit();
+    }
+
+    waitable_set.get_state_change_notification(SubscriptionSet::State::Complete).get();
+    waitable_set.get_state_change_notification(SubscriptionSet::State::Complete).get();
 }
 
 } // namespace realm::sync
