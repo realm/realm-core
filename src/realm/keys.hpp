@@ -175,6 +175,22 @@ inline std::ostream& operator<<(std::ostream& os, ColKey ck)
     return os;
 }
 
+// Keys inside a dictionary are not directly representable by ColKey,
+// a DictionaryKey represents a key within a dictionary column of some table.
+// For example, consider a table with a dictionary column "dict" with string keys,
+// dict["foo"] can be referenced by a DictionaryKey{get_column_key("dict"), "foo"}.
+struct DictionaryKey {
+    ColKey parent_key;
+    // FIXME: This should probably be a Mixed instead of hardcoding the string key type.
+    const char* child_key;
+};
+
+inline std::ostream& operator<<(std::ostream& os, DictionaryKey ck)
+{
+    os << "DictionaryKey(" << ck.parent_key.value << ", " << ck.child_key << ")";
+    return os;
+}
+
 struct ObjKey {
     constexpr ObjKey() noexcept
         : value(-1)

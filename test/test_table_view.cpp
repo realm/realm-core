@@ -837,7 +837,7 @@ TEST(TableView_MultiColSort)
 
     TableView tv = table.where().find_all();
 
-    std::vector<std::vector<ColKey>> v = {{col_int}, {col_float}};
+    std::vector<std::vector<SortableColumnKey>> v = {{col_int}, {col_float}};
     std::vector<bool> a = {true, true};
 
     tv.sort(SortDescriptor{v, a});
@@ -1083,7 +1083,7 @@ TEST(TableView_SortOverLink)
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv[0].get<Int>(col_int), 2);
     CHECK_EQUAL(tv[1].get<Int>(col_int), 3);
-    std::vector<std::vector<ColKey>> v = {{col_link, col_str}};
+    std::vector<std::vector<SortableColumnKey>> v = {{col_link, col_str}};
     std::vector<bool> a = {true};
     tv.sort(SortDescriptor{v, a});
     CHECK_EQUAL(tv[0].get<Int>(col_int), 3);
@@ -1141,7 +1141,7 @@ TEST(TableView_SortOverMultiLink)
     CHECK_EQUAL(tv[2].get<Int>(col_int), 29);
     CHECK_EQUAL(tv[3].get<Int>(col_int), 30);
 
-    std::vector<std::vector<ColKey>> v = {{col_link1, col_link2, col_str}};
+    std::vector<std::vector<SortableColumnKey>> v = {{col_link1, col_link2, col_str}};
     std::vector<bool> a = {true};
     tv.sort(SortDescriptor{v, a});
     CHECK_EQUAL(tv.size(), 4);
@@ -1203,7 +1203,7 @@ struct DistinctDirect {
 
     SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<SortableColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({col});
         return SortDescriptor(column_indices, ascending);
@@ -1211,7 +1211,7 @@ struct DistinctDirect {
 
     DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<SortableColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({col});
         return DistinctDescriptor(column_indices);
@@ -1244,7 +1244,7 @@ struct DistinctOverLink {
 
     SortDescriptor get_sort(std::initializer_list<ColKey> columns, std::vector<bool> ascending = {}) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<SortableColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({m_col_link, col});
         return SortDescriptor(column_indices, ascending);
@@ -1252,7 +1252,7 @@ struct DistinctOverLink {
 
     DistinctDescriptor get_distinct(std::initializer_list<ColKey> columns) const
     {
-        std::vector<std::vector<ColKey>> column_indices;
+        std::vector<std::vector<SortableColumnKey>> column_indices;
         for (ColKey col : columns)
             column_indices.push_back({m_col_link, col});
         return DistinctDescriptor(column_indices);

@@ -718,7 +718,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get_object(2).get_key(), key2);
 
     // Test multi-column sorting
-    std::vector<std::vector<ColKey>> v;
+    std::vector<std::vector<SortableColumnKey>> v;
     std::vector<bool> a = {true, true};
     std::vector<bool> a_false = {false, false};
 

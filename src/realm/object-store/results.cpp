@@ -1007,7 +1007,7 @@ TableView Results::get_tableview()
     REALM_COMPILER_HINT_UNREACHABLE();
 }
 
-static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schema, const ObjectSchema* object_schema)
+static std::vector<SortableColumnKey> parse_keypath(StringData keypath, Schema const& schema, const ObjectSchema* object_schema)
 {
     auto check = [&](bool condition, const char* fmt, auto... args) {
         if (!condition) {
@@ -1023,7 +1023,7 @@ static std::vector<ColKey> parse_keypath(StringData keypath, Schema const& schem
     const char* end = keypath.data() + keypath.size();
     check(begin != end, "missing property name");
 
-    std::vector<ColKey> indices;
+    std::vector<SortableColumnKey> indices;
     while (begin != end) {
         auto sep = std::find(begin, end, '.');
         check(sep != begin && sep + 1 != end, "missing property name");
@@ -1064,7 +1064,7 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
         return sort({{{}}, {keypaths[0].second}});
     }
 
-    std::vector<std::vector<ColKey>> column_keys;
+    std::vector<std::vector<SortableColumnKey>> column_keys;
     std::vector<bool> ascending;
     column_keys.reserve(keypaths.size());
     ascending.reserve(keypaths.size());
@@ -1139,7 +1139,7 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
         return distinct(DistinctDescriptor({{ColKey()}}));
     }
 
-    std::vector<std::vector<ColKey>> column_keys;
+    std::vector<std::vector<SortableColumnKey>> column_keys;
     column_keys.reserve(keypaths.size());
     for (auto& keypath : keypaths)
         column_keys.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));

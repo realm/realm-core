@@ -21,8 +21,147 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/list.hpp>
+#include <realm/object-store/dictionary.hpp>
+#include <realm/data_type.hpp>
 
 using namespace realm;
+
+template <class... Ts>
+struct overload : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overload(Ts...) -> overload<Ts...>;
+
+// FIXME: We manually specialize std::variant_size<> and std::variant_alternative<> for our SortableColumnKey struct to workaround a GCC bug with inheriting variants.
+// See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90943 and https://stackoverflow.com/questions/51309467/using-stdvisit-on-a-class-inheriting-from-stdvariant-libstdc-vs-libc for more information.
+// The bug is fixed in GCC 12, but still perists in GCC 8.5.
+namespace std{
+    template<>
+    struct variant_size<SortableColumnKey> : variant_size<SortableColumnKeyVariant> {
+    };
+
+    template<std::size_t I>
+    struct variant_alternative<I, SortableColumnKey> :  variant_alternative<I,SortableColumnKeyVariant> {
+    };
+}
+
+
+ConstTableRef SortableColumnKey::get_target_table(const Table* table) const
+{
+    return std::visit(overload{
+        [table](ColKey col_key) {
+            ConstTableRef target_table;
+            if (table->get_column_type(col_key) == type_Link) {
+                target_table = table->get_link_target(col_key);
+            }
+            return target_table;
+        },
+        [table](DictionaryKey dict_key) {
+            REALM_ASSERT(dict_key.parent_key.get_type() == col_type_Link);
+            return table->get_link_target(dict_key.parent_key);
+        }
+    }, *this);
+}
+
+std::string SortableColumnKey::get_description(const Table* table) const
+{
+    return std::visit(overload{
+        [table](ColKey col_key) -> std::string {
+            return table->get_column_name(col_key);
+        },
+        [table](DictionaryKey dict_key) {
+            std::string description = table->get_column_name(dict_key.parent_key);
+            description += "['";
+            description += dict_key.child_key;
+            description += "']";
+            return description;
+        }
+    }, *this);
+}
+
+bool SortableColumnKey::is_collection() const
+{
+    return std::visit(overload{
+        [](ColKey col_key) {
+            return col_key.is_collection();
+        },
+        [](DictionaryKey) {
+            // Dictionaries cannot hold collections as values
+            return false;
+        }
+    }, *this);
+}
+
+bool SortableColumnKey::is_valid_sort_key() const
+{
+    return std::visit(overload{
+        [](ColKey col_key) {
+            return !col_key.is_collection();
+        },
+        [](DictionaryKey dict_key) {
+            // Dictionaries of links cannot be used as sort keys
+            return dict_key.parent_key.is_dictionary() && dict_key.parent_key.get_type() != col_type_Link;
+        }
+    }, *this);
+}
+
+void SortableColumnKey::check_column(const Table* table) const {
+    std::visit(overload{
+        [table](ColKey col_key) {
+            table->check_column(col_key);
+            if (col_key.get_type() != col_type_Link) {
+                // Only last column in link chain is allowed to be non-link
+                throw LogicError(LogicError::type_mismatch);
+            }
+        },
+        [table](DictionaryKey dict_key) {
+            if (!dict_key.parent_key.is_dictionary() || dict_key.parent_key.get_type() != col_type_Link) {
+                // Only last column in link chain is allowed to be non-link
+                throw LogicError(LogicError::type_mismatch);
+            }
+        }
+    }, *this);
+}
+
+bool SortableColumnKey::is_null(const Obj& obj) const {
+    return std::visit(overload{
+        [&obj](ColKey col_key) {
+            return obj.is_null(col_key);
+        },
+        [&obj, this](DictionaryKey) {
+            auto value = try_get_value(obj);
+            return value ? value->is_null() : true;
+        }
+    }, *this);
+}
+
+ObjKey SortableColumnKey::get_link_target(const Obj& obj) const {
+    return std::visit(overload{
+        [&obj](ColKey col_key) {
+            return obj.get<ObjKey>(col_key);
+        },
+        [&obj, this](DictionaryKey) {
+            auto value = try_get_value(obj);
+            REALM_ASSERT(value);
+            return value->get<ObjKey>();
+        }
+    }, *this);
+}
+
+util::Optional<Mixed> SortableColumnKey::try_get_value(const Obj& obj) const {
+    return std::visit(overload{
+        [&obj](ColKey col_key) -> util::Optional<Mixed> {
+            return obj.get_any(col_key);
+        },
+        [&obj, this](DictionaryKey dict_key) {
+            REALM_ASSERT(dict_key.child_key);
+            // Not all objects need have this specific sort key in their dictionary.
+            const auto dictionary = obj.get_dictionary(dict_key.parent_key);
+            return dictionary.try_get(dict_key.child_key);
+        }
+    }, *this);
+}
 
 LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
     : column_key(col_key)
@@ -31,7 +170,7 @@ LinkPathPart::LinkPathPart(ColKey col_key, ConstTableRef source)
 }
 
 
-ColumnsDescriptor::ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys)
+ColumnsDescriptor::ColumnsDescriptor(std::vector<std::vector<SortableColumnKey>> column_keys)
     : m_column_keys(std::move(column_keys))
 {
 }
@@ -49,11 +188,8 @@ void ColumnsDescriptor::collect_dependencies(const Table* table, std::vector<Tab
         if (sz > 1) {
             const Table* t = table;
             for (size_t i = 0; i < sz - 1; i++) {
-                ColKey col = columns[i];
-                ConstTableRef target_table;
-                if (t->get_column_type(col) == type_Link) {
-                    target_table = t->get_link_target(col);
-                }
+                const auto& col = columns[i];
+                ConstTableRef target_table = col.get_target_table(t);
                 if (!target_table)
                     return;
                 table_keys.push_back(target_table->get_key());
@@ -70,12 +206,11 @@ std::string DistinctDescriptor::get_description(ConstTableRef attached_table) co
         const size_t chain_size = m_column_keys[i].size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
-            ColKey col_key = m_column_keys[i][j];
-            StringData col_name = cur_link_table->get_column_name(col_key);
-            description += std::string(col_name);
+            const auto& col_key = m_column_keys[i][j];
+            description += col_key.get_description(cur_link_table.unchecked_ptr());
             if (j < chain_size - 1) {
                 description += ".";
-                cur_link_table = cur_link_table->get_link_target(col_key);
+                cur_link_table = col_key.get_target_table(cur_link_table.unchecked_ptr());
             }
         }
         if (i < m_column_keys.size() - 1) {
@@ -93,12 +228,11 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
         const size_t chain_size = m_column_keys[i].size();
         ConstTableRef cur_link_table = attached_table;
         for (size_t j = 0; j < chain_size; ++j) {
-            ColKey col_key = m_column_keys[i][j];
-            StringData col_name = cur_link_table->get_column_name(col_key);
-            description += std::string(col_name);
+            const auto& col_key = m_column_keys[i][j];
+            description += col_key.get_description(cur_link_table.unchecked_ptr());
             if (j < chain_size - 1) {
                 description += ".";
-                cur_link_table = cur_link_table->get_link_target(col_key);
+                cur_link_table = col_key.get_target_table(cur_link_table.unchecked_ptr());
             }
         }
         description += " ";
@@ -118,7 +252,7 @@ std::string SortDescriptor::get_description(ConstTableRef attached_table) const
     return description;
 }
 
-SortDescriptor::SortDescriptor(std::vector<std::vector<ColKey>> column_keys, std::vector<bool> ascending)
+SortDescriptor::SortDescriptor(std::vector<std::vector<SortableColumnKey>> column_keys, std::vector<bool> ascending)
     : ColumnsDescriptor(std::move(column_keys))
     , m_ascending(std::move(ascending))
 {
@@ -149,7 +283,7 @@ void SortDescriptor::merge(SortDescriptor&& other, MergeMode mode)
                        other.m_ascending.begin(), other.m_ascending.end());
 }
 
-BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_lists,
+BaseDescriptor::Sorter::Sorter(std::vector<std::vector<SortableColumnKey>> const& column_lists,
                                std::vector<bool> const& ascending, Table const& root_table, const IndexPairs& indexes)
 {
     REALM_ASSERT(!column_lists.empty());
@@ -162,7 +296,7 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         auto sz = columns.size();
         REALM_ASSERT_EX(!columns.empty(), i);
 
-        if (columns.empty() || columns.back().is_collection()) {
+        if (columns.empty() || !columns.back().is_valid_sort_key()) {
             throw LogicError(LogicError::type_mismatch);
         }
 
@@ -174,12 +308,8 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         std::vector<const Table*> tables = {&root_table};
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
-            tables[j]->check_column(columns[j]);
-            if (columns[j].get_type() != col_type_Link) {
-                // Only last column in link chain is allowed to be non-link
-                throw LogicError(LogicError::type_mismatch);
-            }
-            tables[j + 1] = tables[j]->get_link_target(columns[j]).unchecked_ptr();
+            columns[j].check_column(tables[j]);
+            tables[j + 1] = columns[j].get_target_table(tables[j]).unchecked_ptr();
         }
 
         m_columns.emplace_back(tables.back(), columns.back(), ascending[i]);
@@ -195,11 +325,12 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
             for (size_t j = 0; j + 1 < sz; ++j) {
                 const Obj obj = tables[j]->get_object(translated_key);
                 // type was checked when creating the ColumnsDescriptor
-                if (obj.is_null(columns[j])) {
+                if (columns[j].is_null(obj)) {
                     is_null[index_in_view] = true;
                     break;
                 }
-                translated_key = obj.get<ObjKey>(columns[j]);
+                // translated_key = obj.get<ObjKey>(columns[j]);
+                translated_key = columns[j].get_link_target(obj);
             }
             translated_keys[index_in_view] = translated_key;
         }
@@ -326,13 +457,19 @@ bool BaseDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
             ObjCache& cache_j = m_cache[t - 1][key_j.value & 0xFF];
 
             if (cache_i.key != key_i) {
-                cache_i.value = m_columns[t].table->get_object(key_i).get_any(m_columns[t].col_key);
+                const auto& obj = m_columns[t].table->get_object(key_i);
+                const auto& col_key = m_columns[t].col_key;
+
+                cache_i.value = col_key.try_get_value(obj).value_or(Mixed());
                 cache_i.key = key_i;
             }
             Mixed val_i = cache_i.value;
 
             if (cache_j.key != key_j) {
-                cache_j.value = m_columns[t].table->get_object(key_j).get_any(m_columns[t].col_key);
+                const auto& obj = m_columns[t].table->get_object(key_j);
+                const auto& col_key = m_columns[t].col_key;
+
+                cache_j.value = col_key.try_get_value(obj).value_or(Mixed());
                 cache_j.key = key_j;
             }
 
@@ -353,7 +490,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
         return;
 
     auto& col = m_columns[0];
-    ColKey ck = col.col_key;
+    const auto& ck = col.col_key;
     for (size_t i = 0; i < v.size(); i++) {
         IndexPair& index = v[i];
         ObjKey key = index.key_for_object;
@@ -368,7 +505,8 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
             }
         }
 
-        index.cached_value = col.table->get_object(key).get_any(ck);
+        const auto obj = col.table->get_object(key);
+        index.cached_value = ck.try_get_value(obj).value_or(Mixed());
     }
 }
 

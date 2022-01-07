@@ -20,6 +20,7 @@
 #define REALM_SORT_DESCRIPTOR_HPP
 
 #include <vector>
+#include <variant>
 #include <unordered_set>
 #include <realm/cluster.hpp>
 #include <realm/mixed.hpp>
@@ -31,6 +32,31 @@ class ConstTableRef;
 class Group;
 
 enum class DescriptorType { Sort, Distinct, Limit };
+
+using SortableColumnKeyVariant = std::variant<ColKey, DictionaryKey>;
+
+// A key wrapper to be used for sorting,
+// it supports normal column keys as well as dictionary keys.
+// FIXME: Implement sorting by indexed elements of an array. They should be similar to dictionary keys.
+struct SortableColumnKey : SortableColumnKeyVariant {
+    using variant::variant;
+
+    ConstTableRef get_target_table(const Table* table) const;
+
+    std::string get_description(const Table* table) const;
+
+    bool is_collection() const;
+
+    void check_column(const Table* table) const;
+
+    util::Optional<Mixed> try_get_value(const Obj& obj) const;
+
+    bool is_null(const Obj& obj) const;
+
+    ObjKey get_link_target(const Obj& obj) const;
+
+    bool is_valid_sort_key() const;
+};
 
 struct LinkPathPart {
     // Constructor for forward links
@@ -72,7 +98,7 @@ public:
     };
     class Sorter {
     public:
-        Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
+        Sorter(std::vector<std::vector<SortableColumnKey>> const& columns, std::vector<bool> const& ascending,
                Table const& root_table, const IndexPairs& indexes);
         Sorter()
         {
@@ -96,7 +122,7 @@ public:
 
     private:
         struct SortColumn {
-            SortColumn(const Table* t, ColKey c, bool a)
+            SortColumn(const Table* t, SortableColumnKey c, bool a)
                 : table(t)
                 , col_key(c)
                 , ascending(a)
@@ -106,7 +132,7 @@ public:
             std::vector<ObjKey> translated_keys;
 
             const Table* table;
-            ColKey col_key;
+            SortableColumnKey col_key;
             bool ascending;
         };
         std::vector<SortColumn> m_columns;
@@ -145,7 +171,7 @@ public:
     // supported), and the final is any column type that can be sorted on.
     // `column_keys` must be non-empty, and each vector within it must also
     // be non-empty.
-    ColumnsDescriptor(std::vector<std::vector<ColKey>> column_keys);
+    ColumnsDescriptor(std::vector<std::vector<SortableColumnKey>> column_keys);
 
     // returns whether this descriptor is valid and can be used for sort or distinct
     bool is_valid() const noexcept override
@@ -155,13 +181,13 @@ public:
     void collect_dependencies(const Table* table, std::vector<TableKey>& table_keys) const override;
 
 protected:
-    std::vector<std::vector<ColKey>> m_column_keys;
+    std::vector<std::vector<SortableColumnKey>> m_column_keys;
 };
 
 class DistinctDescriptor : public ColumnsDescriptor {
 public:
     DistinctDescriptor() = default;
-    DistinctDescriptor(std::vector<std::vector<ColKey>> column_keys)
+    DistinctDescriptor(std::vector<std::vector<SortableColumnKey>> column_keys)
         : ColumnsDescriptor(std::move(column_keys))
     {
     }
@@ -186,7 +212,7 @@ public:
     // See ColumnsDescriptor for restrictions on `column_keys`.
     // The sort order can be specified by using `ascending` which must either be
     // empty or have one entry for each column index chain.
-    SortDescriptor(std::vector<std::vector<ColKey>> column_indices, std::vector<bool> ascending = {});
+    SortDescriptor(std::vector<std::vector<SortableColumnKey>> column_indices, std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
     std::unique_ptr<BaseDescriptor> clone() const override;

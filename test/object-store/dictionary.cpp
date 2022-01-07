@@ -1325,3 +1325,193 @@ TEST_CASE("dictionary aggregate", "[dictionary]") {
     auto sum = res.sum("intCol");
     REQUIRE(*sum == 16);
 }
+
+TEST_CASE("dictionary sort by keyPath value", "[dictionary]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"DictionaryObject",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"s1", PropertyType::Int},
+             {"intDictionary", PropertyType::Dictionary | PropertyType::Int | PropertyType::Nullable},
+         }},
+    };
+
+    auto r = Realm::get_shared_realm(config);
+    CppContext ctx(r);
+
+    r->begin_transaction();
+
+    auto table = r->read_group().get_table("class_DictionaryObject");
+    auto col_id = table->get_column_key("_id");
+    auto col_s1 = table->get_column_key("s1");
+    auto col_dict = table->get_column_key("intDictionary");
+
+    /*SECTION("sort by dict field '0'") {
+        // FIXME: Implement sorting by dict field keyPath
+        auto sorted = all_values.sort({{"intDictionary['0']", false}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 1);
+    }*/
+
+    SECTION("sort by dict field 'a' using ColKey ascending") {
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(0)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(0)}, {"b", INT64_C(1)}, {"c", INT64_C(2)}}}}});
+
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(2)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(3)}, {"b", INT64_C(4)}, {"c", INT64_C(5)}}}}});
+
+        Results all_values(r, table->where());
+
+        DictionaryKey child_col_a{};
+        child_col_a.parent_key = col_dict;
+        child_col_a.child_key = "a";
+
+        auto sorted = all_values.sort({std::vector<std::vector<SortableColumnKey>>{{child_col_a}}, std::vector<bool>{true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 2);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey descending") {
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(0)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(0)}, {"b", INT64_C(1)}, {"c", INT64_C(2)}}}}});
+
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(2)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(3)}, {"b", INT64_C(4)}, {"c", INT64_C(5)}}}}});
+
+        Results all_values(r, table->where());
+        DictionaryKey child_col_a{};
+        child_col_a.parent_key = col_dict;
+        child_col_a.child_key = "a";
+
+        auto sorted = all_values.sort({std::vector<std::vector<SortableColumnKey>>{{child_col_a}}, std::vector<bool>{false}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 0);
+    }
+
+    SECTION("sort by dict using multiple ColKey descending") {
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(0)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(0)}, {"b", INT64_C(1)}, {"c", INT64_C(2)}}}}});
+
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(2)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(3)}, {"b", INT64_C(4)}, {"c", INT64_C(5)}}}}});
+
+        Results all_values(r, table->where());
+        DictionaryKey child_col_a{};
+        child_col_a.parent_key = col_dict;
+        child_col_a.child_key = "a";
+
+        auto sorted = all_values.sort({std::vector<std::vector<SortableColumnKey>>{{col_s1},{child_col_a}}, std::vector<bool>{false, false}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 2);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 0);
+    }
+
+    SECTION("sort by dict using multiple ColKey ascending") {
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(0)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(0)}, {"b", INT64_C(1)}, {"c", INT64_C(2)}}}}});
+
+        Object::create(
+            ctx, r, *r->schema().find("DictionaryObject"),
+            Any{AnyDict{{"_id", INT64_C(2)},
+                        {"s1", INT64_C(10)},
+                        {"intDictionary", AnyDict{{"a", INT64_C(3)}, {"b", INT64_C(4)}, {"c", INT64_C(5)}}}}});
+
+        Results all_values(r, table->where());
+        DictionaryKey child_col_a{};
+        child_col_a.parent_key = col_dict;
+        child_col_a.child_key = "a";
+
+        auto sorted = all_values.sort({std::vector<std::vector<SortableColumnKey>>{{col_s1},{child_col_a}}, std::vector<bool>{false, true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
+        REQUIRE(sorted.get(1).get<Int>(col_id) == 2);
+    }
+
+    r->commit_transaction();
+}
+
+TEST_CASE("dictionary sort by linked object value", "[dictionary]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"},
+                    {"id", PropertyType::Int}}},
+        {"target", {{"value", PropertyType::Int}}},
+        };
+
+    auto r = Realm::get_shared_realm(config);
+
+    auto table = r->read_group().get_table("class_object");
+    auto target = r->read_group().get_table("class_target");
+    ColKey id_value = table->get_column_key("id");
+    ColKey col_value = target->get_column_key("value");
+
+    r->begin_transaction();
+    Obj obj1 = table->create_object().set(id_value, 100);
+    Obj obj2 = table->create_object().set(id_value, 200);
+    Obj target_obj1 = target->create_object().set(col_value, 100);
+    Obj target_obj2 = target->create_object().set(col_value, 200);
+
+    ColKey col = table->get_column_key("value");
+
+    CppContext ctx(r);
+
+    object_store::Dictionary dict1(r, obj1, col);
+    dict1.insert("key_a", Mixed{ObjLink(target->get_key(), target_obj1.get_key())});
+
+    object_store::Dictionary dict2(r, obj2, col);
+    dict2.insert("key_a", Mixed{ObjLink(target->get_key(), target_obj2.get_key())});
+    r->commit_transaction();
+
+    SECTION("sort by dict field 'a' using ColKey ascending") {
+        Results all_values(r, table->where());
+
+        DictionaryKey child_col_a{};
+        child_col_a.parent_key = col;
+        child_col_a.child_key = "key_a";
+
+        auto sorted = all_values.sort({std::vector<std::vector<SortableColumnKey>>{{child_col_a,col_value}}, std::vector<bool>{true}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 100);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 200);
+    }
+
+    SECTION("sort by dict field 'a' using ColKey descending") {
+        Results all_values(r, table->where());
+
+        DictionaryKey child_col_a{};
+        child_col_a.parent_key = col;
+        child_col_a.child_key = "key_a";
+
+        auto sorted = all_values.sort({std::vector<std::vector<SortableColumnKey>>{{child_col_a,col_value}}, std::vector<bool>{false}});
+        REQUIRE(sorted.size() == 2);
+        REQUIRE(sorted.get(0).get<Int>(id_value) == 200);
+        REQUIRE(sorted.get(1).get<Int>(id_value) == 100);
+    }
+}
