@@ -34,6 +34,7 @@ public:
     struct ServerSchema {
         Schema schema;
         std::vector<std::string> queryable_fields;
+        bool dev_mode_enabled = false;
     };
 
     static ServerSchema default_server_schema();
@@ -41,12 +42,13 @@ public:
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
 
     template <typename Func>
-    void do_with_new_realm(Func&& func)
+    void do_with_new_realm(Func&& func, util::Optional<Schema> schema_for_realm = util::none)
     {
         auto sync_mgr = make_sync_manager();
         auto creds = create_user_and_log_in(sync_mgr.app());
 
-        SyncTestFile config(sync_mgr.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
+        SyncTestFile config(sync_mgr.app()->current_user(), schema_for_realm.value_or(schema()),
+                            SyncConfig::FLXSyncEnabled{});
         func(Realm::get_shared_realm(config));
     }
 
@@ -99,6 +101,7 @@ AppSession make_app_from_server_schema(const std::string& test_name,
                                        const FLXSyncTestHarness::ServerSchema& server_schema)
 {
     auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
+    server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
     AppCreateConfig::FLXSyncConfig flx_config;
     flx_config.queryable_fields = server_schema.queryable_fields;
 
@@ -198,6 +201,219 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         CHECK(realm->get_active_subscription_set().version() == 2);
         CHECK(realm->get_latest_subscription_set().version() == 2);
     });
+}
+
+TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]") {
+    FLXSyncTestHarness::ServerSchema server_schema;
+    auto default_schema = FLXSyncTestHarness::default_server_schema();
+    server_schema.queryable_fields = default_schema.queryable_fields;
+    server_schema.dev_mode_enabled = true;
+    server_schema.schema = Schema{};
+
+    FLXSyncTestHarness harness("flx_dev_mode", server_schema);
+    auto foo_obj_id = ObjectId::gen();
+    auto bar_obj_id = ObjectId::gen();
+    harness.do_with_new_realm(
+        [&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_TopLevel");
+            // auto queryable_str_field = table->get_column_key("queryable_str_field");
+            // auto queryable_int_field = table->get_column_key("queryable_int_field");
+            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+            new_query.insert_or_assign(Query(table));
+            std::move(new_query).commit();
+
+            CppContext c(realm);
+            realm->begin_transaction();
+            Object::create(c, realm, "TopLevel",
+                           util::Any(AnyDict{{"_id", foo_obj_id},
+                                             {"queryable_str_field", std::string{"foo"}},
+                                             {"queryable_int_field", static_cast<int64_t>(5)},
+                                             {"non_queryable_field", std::string{"non queryable 1"}}}));
+            Object::create(c, realm, "TopLevel",
+                           util::Any(AnyDict{{"_id", bar_obj_id},
+                                             {"queryable_str_field", std::string{"bar"}},
+                                             {"queryable_int_field", static_cast<int64_t>(10)},
+                                             {"non_queryable_field", std::string{"non queryable 2"}}}));
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+        },
+        default_schema.schema);
+
+    harness.do_with_new_realm(
+        [&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_TopLevel");
+            auto queryable_int_field = table->get_column_key("queryable_int_field");
+            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+            new_query.insert_or_assign(Query(table).greater_equal(queryable_int_field, int64_t(5)));
+            auto subs = std::move(new_query).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+            wait_for_download(*realm);
+            Results results(realm, table);
+
+            realm->refresh();
+            CHECK(results.size() == 2);
+            CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+            CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
+        },
+        default_schema.schema);
+}
+
+TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_offline_writes");
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto sync_session = realm->sync_session();
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto queryable_int_field = table->get_column_key("queryable_int_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table));
+        std::move(new_query).commit();
+
+        auto foo_obj_id = ObjectId::gen();
+        auto bar_obj_id = ObjectId::gen();
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", foo_obj_id},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", bar_obj_id},
+                                         {"queryable_str_field", std::string{"bar"}},
+                                         {"queryable_int_field", static_cast<int64_t>(10)},
+                                         {"non_queryable_field", std::string{"non queryable 2"}}}));
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        sync_session->close();
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+            std::move(mut_subs).commit();
+        }
+
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 15);
+            realm->commit_transaction();
+        }
+
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.insert_or_assign(Query(table).greater_equal(queryable_int_field, static_cast<int64_t>(10)));
+            std::move(mut_subs).commit();
+        }
+
+        Results results(realm, table);
+        realm->begin_transaction();
+        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+        foo_obj.set<int64_t>(queryable_int_field, 0);
+        realm->commit_transaction();
+
+        sync_session->revive_if_needed();
+        wait_for_upload(*realm);
+
+        realm->refresh();
+        CHECK(results.size() == 2);
+        CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+        CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
+    });
+}
+
+TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_offline_writes");
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto queryable_int_field = table->get_column_key("queryable_int_field");
+        auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+        new_query.insert_or_assign(Query(table));
+        std::move(new_query).commit();
+
+        auto foo_obj_id = ObjectId::gen();
+        auto bar_obj_id = ObjectId::gen();
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", foo_obj_id},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", bar_obj_id},
+                                         {"queryable_str_field", std::string{"bar"}},
+                                         {"queryable_int_field", static_cast<int64_t>(10)},
+                                         {"non_queryable_field", std::string{"non queryable 2"}}}));
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+            std::move(mut_subs).commit();
+        }
+
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 15);
+            realm->commit_transaction();
+        }
+
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            mut_subs.clear();
+            mut_subs.insert_or_assign(Query(table).greater_equal(queryable_int_field, static_cast<int64_t>(10)));
+            std::move(mut_subs).commit();
+        }
+
+        Results results(realm, table);
+        realm->begin_transaction();
+        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+        foo_obj.set<int64_t>(queryable_int_field, 0);
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+
+        realm->refresh();
+        CHECK(results.size() == 2);
+        CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+        CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
+    });
+}
+
+
+TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_bad_query");
+
+    auto sync_mgr = harness.make_sync_manager();
+    auto creds = create_user_and_log_in(sync_mgr.app());
+
+    SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.persist();
+
+    auto orig_realm = Realm::get_shared_realm(config);
+    auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
+    mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
+    std::move(mut_subs).commit();
+    orig_realm->close();
+
+    auto new_realm = Realm::get_shared_realm(config);
+    auto latest_subs = new_realm->get_latest_subscription_set();
+    CHECK(latest_subs.size() == 1);
+    latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 }
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {

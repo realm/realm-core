@@ -40,6 +40,7 @@ constexpr static std::string_view c_flx_sub_sets_state_field("state");
 constexpr static std::string_view c_flx_sub_sets_version_field("version");
 constexpr static std::string_view c_flx_sub_sets_error_str_field("error");
 constexpr static std::string_view c_flx_sub_sets_subscriptions_field("subscriptions");
+constexpr static std::string_view c_flx_sub_sets_snapshot_version_field("snapshot_version");
 
 constexpr static std::string_view c_flx_sub_id_field("id");
 constexpr static std::string_view c_flx_sub_created_at_field("created_at");
@@ -384,6 +385,7 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         throw std::logic_error("SubscriptionSet is not in a commitable state");
     }
     if (state() == State::Uncommitted) {
+        m_obj.set(m_mgr->m_sub_set_keys->snapshot_version, static_cast<int64_t>(m_tr->get_version()));
         update_state(State::Pending, util::none);
     }
 
@@ -473,6 +475,8 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
 
         m_sub_set_keys->table = sub_sets_table->get_key();
         m_sub_set_keys->state = sub_sets_table->add_column(type_Int, c_flx_sub_sets_state_field);
+        m_sub_set_keys->snapshot_version =
+            sub_sets_table->add_column(type_Int, c_flx_sub_sets_snapshot_version_field);
         m_sub_set_keys->error_str = sub_sets_table->add_column(type_String, c_flx_sub_sets_error_str_field, true);
         m_sub_set_keys->subscriptions =
             sub_sets_table->add_column_list(*subs_table, c_flx_sub_sets_subscriptions_field);
@@ -507,6 +511,8 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         auto sub_sets = tr->get_table(m_sub_set_keys->table);
         m_sub_set_keys->state = lookup_and_validate_column(sub_sets, c_flx_sub_sets_state_field, type_Int);
         m_sub_set_keys->error_str = lookup_and_validate_column(sub_sets, c_flx_sub_sets_error_str_field, type_String);
+        m_sub_set_keys->snapshot_version =
+            lookup_and_validate_column(sub_sets, c_flx_sub_sets_snapshot_version_field, type_Int);
         m_sub_set_keys->subscriptions =
             lookup_and_validate_column(sub_sets, c_flx_sub_sets_subscriptions_field, type_LinkList);
         if (!m_sub_set_keys->subscriptions) {
@@ -583,6 +589,33 @@ std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() 
 
     auto active_id = res.get_object(0).get_primary_key();
     return {active_id.get_int(), latest_id};
+}
+
+util::Optional<SubscriptionStore::PendingSubscription>
+SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::version_type after_client_version) const
+{
+    auto tr = m_db->start_read();
+    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    if (sub_sets->is_empty()) {
+        return util::none;
+    }
+
+    DescriptorOrdering descriptor_ordering;
+    descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {true}});
+    auto res = sub_sets->where()
+                   .greater(sub_sets->get_primary_key_column(), last_query_version)
+                   .equal(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Pending))
+                   .greater_equal(m_sub_set_keys->snapshot_version, static_cast<int64_t>(after_client_version))
+                   .find_all(descriptor_ordering);
+
+    if (res.is_empty()) {
+        return util::none;
+    }
+
+    auto obj = res.get_object(0);
+    auto query_version = obj.get_primary_key().get_int();
+    auto snapshot_version = obj.get<int64_t>(m_sub_set_keys->snapshot_version);
+    return PendingSubscription{query_version, static_cast<DB::version_type>(snapshot_version)};
 }
 
 MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)

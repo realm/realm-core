@@ -305,8 +305,6 @@ public:
         using ClientReset = sync::ClientReset;
         util::Optional<ClientReset> client_reset_config;
 
-        bool flx_sync_requested = false;
-
         util::Optional<SyncConfig::ProxyConfig> proxy_config;
 
         /// Set to true to cause the integration of the first received changeset
@@ -321,7 +319,7 @@ public:
     /// Note that the session is not fully activated until you call bind().
     /// Also note that if you call set_sync_transact_callback(), it must be
     /// done before calling bind().
-    Session(Client&, std::shared_ptr<DB>, Config&& = {});
+    Session(Client&, std::shared_ptr<DB>, std::shared_ptr<SubscriptionStore>, Config&& = {});
 
     /// This leaves the right-hand side session object detached. See "Thread
     /// safety" section under detach().
@@ -710,11 +708,7 @@ public:
     /// thread, and by multiple threads concurrently.
     void cancel_reconnect_delay();
 
-    /// \brief Gets or creates the subscription store for this session.
-    ///
-    /// Calling this will enable FLX sync for this Session if it has not already been enabled.
-    SubscriptionStore* get_flx_subscription_store();
-    bool has_flx_subscription_store() const;
+    void on_new_flx_sync_subscription(int64_t new_version);
 
 private:
     SessionWrapper* m_impl = nullptr;

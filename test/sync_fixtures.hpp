@@ -647,7 +647,7 @@ public:
         //  connections, while the MongoDB/Stitch-based Sync server does not.
         config.service_identifier = "/realm-sync";
 
-        Session session{*m_clients[client_index], std::move(db), std::move(config)};
+        Session session{*m_clients[client_index], std::move(db), nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }

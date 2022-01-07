@@ -1616,16 +1616,35 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
-    if (m_pending_query_message) {
+    auto check_pending_flx_version = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return false;
+        }
+
+        if (!m_allow_upload) {
+            return false;
+        }
+
+        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
+            m_last_sent_flx_query_version, m_upload_progress.client_version);
+
+        if (!m_pending_flx_sub_set) {
+            return false;
+        }
+
+        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+    };
+
+    if (check_pending_flx_version()) {
         return send_query_change_message(); // throws
     }
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
     if (m_allow_upload && m_download_batch_state == DownloadBatchState::LastInBatch &&
-        (m_upload_target_version > m_upload_progress.client_version))
-        send_upload_message(); // Throws
-    return;
+        (m_upload_target_version > m_upload_progress.client_version)) {
+        return send_upload_message(); // Throws
+    }
 }
 
 
@@ -1670,7 +1689,7 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_is_flx_sync_session) {
-        const auto active_query_set = get_or_create_flx_subscription_store()->get_active();
+        const auto active_query_set = get_flx_subscription_store()->get_active();
         const auto active_query_body = active_query_set.to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
@@ -1704,13 +1723,15 @@ void Session::send_query_change_message()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_pending_query_message);
+    REALM_ASSERT(m_pending_flx_sub_set);
+    REALM_ASSERT(m_pending_flx_sub_set->query_version > m_last_sent_flx_query_version);
 
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
         return;
     }
 
-    auto latest_sub_set = get_or_create_flx_subscription_store()->get_latest();
+    auto sub_store = get_flx_subscription_store();
+    auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
     logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
                  latest_queries.size(), latest_queries);
@@ -1720,7 +1741,10 @@ void Session::send_query_change_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     protocol.make_query_change_message(out, session_ident, latest_sub_set.version(), latest_queries);
     m_conn.initiate_write_message(out, this);
-    m_pending_query_message = false;
+
+    m_last_sent_flx_query_version = latest_sub_set.version();
+    m_pending_flx_sub_set =
+        sub_store->get_next_pending_version(m_last_sent_flx_query_version, m_pending_flx_sub_set->snapshot_version);
 
     enlist_to_send(); // throws
 }
@@ -1735,11 +1759,24 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
+    auto target_upload_version = m_upload_target_version;
+    if (m_is_flx_sync_session) {
+        if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
+            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
+                m_last_sent_flx_query_version, m_upload_progress.client_version);
+        }
+        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
+            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
+            target_upload_version = m_pending_flx_sub_set->snapshot_version;
+        }
+    }
+
     const ClientReplication& repl = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
-    repl.get_history().find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
+    repl.get_history().find_uploadable_changesets(m_upload_progress, target_upload_version, uploadable_changesets,
                                                   locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
@@ -2087,9 +2124,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    if (query_version != 0) {
-        on_flx_sync_progress(query_version, batch_state);
-    }
+    on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
