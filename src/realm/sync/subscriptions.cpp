@@ -319,23 +319,46 @@ void SubscriptionSet::refresh()
 
 util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notification(State notify_when) const
 {
-    // If we've already reached the desired state, or if the subscription is in an error state,
-    // we can return a ready future immediately.
-    auto cur_state = state();
-    if (cur_state == State::Error) {
-        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, error_str()});
-    }
-    else if (cur_state >= notify_when) {
-        return util::Future<State>::make_ready(cur_state);
-    }
-
-    std::lock_guard<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
-
+    std::unique_lock<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
     // If we've already been superceded by another version getting completed, then we should skip registering
     // a notification because it may never fire.
     if (m_mgr->m_min_outstanding_version > version()) {
         return util::Future<State>::make_ready(State::Superceded);
     }
+
+    // Begin by blocking process_notifications from starting to fill futures. No matter the outcome, we'll
+    // unblock process_notifications() at the end of this function via the guard we construct below.
+    m_mgr->m_outstanding_requests++;
+    auto guard = util::make_scope_exit([&]() noexcept {
+        if (!lk.owns_lock()) {
+            lk.lock();
+        }
+        --m_mgr->m_outstanding_requests;
+        m_mgr->m_pending_notifications_cv.notify_one();
+    });
+    lk.unlock();
+
+    State cur_state = state();
+    StringData err_str = error_str();
+
+    // If there have been writes to the database since this SubscriptionSet was created, we need to fetch
+    // the updated version from the DB to know the true current state and maybe return a ready future.
+    if (m_tr->get_version() < m_mgr->m_db->get_version_of_latest_snapshot()) {
+        auto refreshed_self = m_mgr->get_by_version(version());
+        cur_state = refreshed_self.state();
+        err_str = refreshed_self.error_str();
+    }
+    // If we've already reached the desired state, or if the subscription is in an error state,
+    // we can return a ready future immediately.
+    if (cur_state == State::Error) {
+        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, err_str});
+    }
+    else if (cur_state >= notify_when) {
+        return util::Future<State>::make_ready(cur_state);
+    }
+
+    // Otherwise put in a new request to be filled in by process_notifications().
+    lk.lock();
 
     // Otherwise, make a promise/future pair and add it to the list of pending notifications.
     auto [promise, future] = util::make_promise_future<State>();
@@ -350,6 +373,9 @@ void MutableSubscriptionSet::process_notifications()
 
     std::list<SubscriptionStore::NotificationRequest> to_finish;
     std::unique_lock<std::mutex> lk(m_mgr->m_pending_notifications_mutex);
+    m_mgr->m_pending_notifications_cv.wait(lk, [&] {
+        return m_mgr->m_outstanding_requests == 0;
+    });
     for (auto it = m_mgr->m_pending_notifications.begin(); it != m_mgr->m_pending_notifications.end();) {
         if ((it->version == my_version && (new_state == State::Error || new_state >= it->notify_when)) ||
             (new_state == State::Complete && it->version < my_version)) {

@@ -384,6 +384,8 @@ protected:
     std::unique_ptr<SubscriptionKeys> m_sub_keys;
 
     mutable std::mutex m_pending_notifications_mutex;
+    mutable std::condition_variable m_pending_notifications_cv;
+    mutable int64_t m_outstanding_requests = 0;
     mutable int64_t m_min_outstanding_version = 0;
     mutable std::list<NotificationRequest> m_pending_notifications;
 };
