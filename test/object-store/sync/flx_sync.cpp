@@ -26,6 +26,7 @@
 #include "util/test_file.hpp"
 
 #include "realm/object-store/impl/object_accessor_impl.hpp"
+#include "realm/sync/protocol.hpp"
 
 namespace realm::app {
 
@@ -167,6 +168,54 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
         }
     });
+}
+
+TEST_CASE("flx: uploading an object that is out-of-view results in a client reset", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_bad_query");
+
+    auto sync_mgr = harness.make_sync_manager();
+    auto creds = create_user_and_log_in(sync_mgr.app());
+
+    SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
+    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+    config.sync_config->error_handler = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>,
+                                                                                    SyncError err) {
+        error_promise->emplace_value(std::move(err));
+    };
+
+    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    // TODO(RCORE-912) When DiscardLocal is supported with FLX sync we should remove this check in favor of the
+    // tests for DiscardLocal.
+    CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
+
+    config.sync_config->client_resync_mode = ClientResyncMode::Manual;
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    auto queryable_str_field = table->get_column_key("queryable_str_field");
+    auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+    new_query.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+    std::move(new_query).commit();
+
+    CppContext c(realm);
+    realm->begin_transaction();
+    Object::create(c, realm, "TopLevel",
+                   util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                     {"queryable_str_field", std::string{"foo"}},
+                                     {"queryable_int_field", static_cast<int64_t>(5)},
+                                     {"non_queryable_field", std::string{"non queryable 1"}}}));
+    Object::create(c, realm, "TopLevel",
+                   util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                     {"queryable_str_field", std::string{"bar"}},
+                                     {"queryable_int_field", static_cast<int64_t>(10)},
+                                     {"non_queryable_field", std::string{"non queryable 2"}}}));
+    realm->commit_transaction();
+
+    auto sync_error = std::move(error_future).get();
+    CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::write_not_allowed));
+    CHECK(sync_error.is_session_level_protocol_error());
+    CHECK(sync_error.is_client_reset_requested());
 }
 
 TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][app]") {

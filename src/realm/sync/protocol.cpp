@@ -136,6 +136,9 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "Server permissions for this file ident have changed since the last time it was used (IDENT)";
         case ProtocolError::initial_sync_not_completed:
             return "Client tried to open a session before initial sync is complete (BIND)";
+        case ProtocolError::write_not_allowed:
+            return "Client attempted a write that is disallowed by permissions, or modifies an object outside the "
+                   "current query - requires client reset";
     }
     return nullptr;
 }

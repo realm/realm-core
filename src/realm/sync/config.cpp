@@ -148,6 +148,7 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::user_blacklisted:
         case ProtocolError::object_already_exists:
         case ProtocolError::server_permissions_changed:
+        case ProtocolError::write_not_allowed:
             return SimplifiedProtocolError::ClientResetRequested;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
