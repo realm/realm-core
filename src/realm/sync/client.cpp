@@ -724,7 +724,7 @@ void SessionImpl::on_resumed()
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
-    if (m_conn.get_state() == ConnectionState::connected) {
+    if (m_state == State::Active && m_ident_message_sent && !m_error_message_received) {
         logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
         ensure_enlisted_to_send();
     }
