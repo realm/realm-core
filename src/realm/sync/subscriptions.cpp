@@ -55,9 +55,9 @@ Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
     : m_id(obj.get<ObjectId>(parent->m_sub_keys->id))
     , m_created_at(obj.get<Timestamp>(parent->m_sub_keys->created_at))
     , m_updated_at(obj.get<Timestamp>(parent->m_sub_keys->updated_at))
-    , m_name(static_cast<std::string_view>(obj.get<StringData>(parent->m_sub_keys->name)))
-    , m_object_class_name(static_cast<std::string_view>(obj.get<StringData>(parent->m_sub_keys->object_class_name)))
-    , m_query_string(static_cast<std::string_view>(obj.get<StringData>(parent->m_sub_keys->query_str)))
+    , m_name(obj.get<String>(parent->m_sub_keys->name))
+    , m_object_class_name(obj.get<String>(parent->m_sub_keys->object_class_name))
+    , m_query_string(obj.get<String>(parent->m_sub_keys->query_str))
 {
 }
 
@@ -445,7 +445,7 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
 
 std::string SubscriptionSet::to_ext_json() const
 {
-    if (!m_subs.empty()) {
+    if (m_subs.empty()) {
         return "{}";
     }
 
