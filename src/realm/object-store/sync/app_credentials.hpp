@@ -21,7 +21,7 @@
 
 #include <realm/object-store/util/tagged_string.hpp>
 
-#include <functional>
+#include <memory>
 #include <string>
 
 namespace realm {
@@ -129,19 +129,21 @@ struct AppCredentials {
     std::string provider_as_string() const;
 
     // The serialized payload
+    bson::BsonDocument serialize_as_bson() const;
     std::string serialize_as_json() const;
 
     AppCredentials() = default;
-    AppCredentials(const AppCredentials&) = default;
+    AppCredentials(const AppCredentials&);
     AppCredentials(AppCredentials&&) = default;
-    AppCredentials& operator=(AppCredentials const&) = default;
+    AppCredentials& operator=(AppCredentials const&);
     AppCredentials& operator=(AppCredentials&&) = default;
 
 private:
-    AppCredentials(AuthProvider provider, std::function<std::string()> factory);
+    AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload);
+    AppCredentials(AuthProvider provider, std::initializer_list<std::pair<const char*, bson::Bson>>);
     // The name of the identity provider which generated the credentials token.
     AuthProvider m_provider;
-    std::function<std::string()> m_payload_factory;
+    std::unique_ptr<bson::BsonDocument> m_payload;
 };
 
 } // namespace app
