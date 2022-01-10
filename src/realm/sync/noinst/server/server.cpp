@@ -2797,7 +2797,7 @@ public:
         return true;
     }
 
-    bool receive_refresh_message(std::string signed_user_token, ProtocolError&)
+    bool receive_refresh_message(std::string signed_user_token)
     {
         // Protocol state must be AllocatingIdent, SendIdent, WaitForIdent, or WaitForUnbind.
         REALM_ASSERT(!unbind_message_received());
@@ -5609,10 +5609,7 @@ void SyncConnection::receive_refresh_message(session_ident_type session_ident, s
         return;
     }
 
-    ProtocolError error;
-    bool success = sess.receive_refresh_message(std::move(signed_user_token), error); // Throws
-    if (REALM_UNLIKELY(!success))                                                     // Throws
-        protocol_error(error, &sess);                                                 // Throws
+    sess.receive_refresh_message(std::move(signed_user_token)); // Throws
 }
 
 
