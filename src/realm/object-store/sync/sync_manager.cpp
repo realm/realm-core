@@ -464,22 +464,21 @@ void SyncManager::delete_user(const std::string& user_id)
     if (!user)
         return;
 
-    auto user_identity = user->identity();
     // Deletion should happen immediately, not when we do the cleanup
     // task on next launch.
     m_users.erase(it);
     user->detach_from_sync_manager();
 
+    if (m_current_user && m_current_user->identity() == user->identity())
+        m_current_user = nullptr;
+
     util::CheckedLockGuard fs_lock(m_file_system_mutex);
     if (!m_metadata_manager)
         return;
 
-    if (m_current_user && m_current_user->identity() == user_identity)
-        m_current_user = nullptr;
-
     for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
         auto metadata = m_metadata_manager->all_unmarked_users().get(i);
-        if (user_identity == metadata.identity()) {
+        if (user->identity() == metadata.identity()) {
             metadata.remove();
         }
     }
