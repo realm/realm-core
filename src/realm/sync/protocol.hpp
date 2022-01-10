@@ -248,6 +248,8 @@ enum class ProtocolError {
     server_permissions_changed   = 228, // Server permissions for this file ident have changed since the last time it
                                         // was used (IDENT)
     initial_sync_not_completed   = 229, // Client tried to open a session before initial sync is complete (BIND)
+    write_not_allowed            = 230, // Client attempted a write that is disallowed by permissions, or modifies an
+                                        // object outside the current query - requires client reset (UPLOAD)
 
     // clang-format on
 };
