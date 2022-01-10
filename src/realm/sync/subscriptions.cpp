@@ -202,7 +202,7 @@ MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
     return m_subs.end();
 }
 
-SubscriptionSet::iterator MutableSubscriptionSet::erase(iterator it)
+MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     return m_subs.erase(it);
 }
