@@ -63,9 +63,14 @@ private:
     friend class MutableSubscriptionSet;
 
     Subscription(const SubscriptionStore* parent, Obj obj);
+    Subscription(std::string name, std::string object_class_name, std::string query_str);
 
-    const SubscriptionStore* m_store = nullptr;
-    Obj m_obj;
+    ObjectId m_id;
+    Timestamp m_created_at;
+    Timestamp m_updated_at;
+    std::string m_name;
+    std::string m_object_class_name;
+    std::string m_query_string;
 };
 
 // SubscriptionSets contain a set of unique queries by either name or Query object that will be constructed into a
@@ -127,57 +132,8 @@ public:
         return o;
     }
 
-    class iterator {
-    public:
-        using difference_type = size_t;
-        using value_type = Subscription;
-        using pointer = value_type*;
-        using reference = value_type&;
-        using iterator_category = std::input_iterator_tag;
-
-        bool operator!=(const iterator& other) const
-        {
-            return (m_parent != other.m_parent) || (m_sub_it != other.m_sub_it);
-        }
-
-        bool operator==(const iterator& other) const
-        {
-            return (m_parent == other.m_parent && m_sub_it == other.m_sub_it);
-        }
-
-        reference operator*() const noexcept
-        {
-            return m_cur_sub;
-        }
-
-        pointer operator->() const noexcept
-        {
-            return &m_cur_sub;
-        }
-
-        // used in tests.
-        inline friend std::ostream& operator<<(std::ostream& o, const iterator& it)
-        {
-            o << "SubscriptionSet::iterator(" << std::hex << it.m_parent << ", " << std::dec << it.m_sub_it.index()
-              << ")";
-            return o;
-        }
-
-        iterator& operator++();
-        iterator operator++(int);
-
-    private:
-        friend class SubscriptionSet;
-        friend class MutableSubscriptionSet;
-
-        iterator(const SubscriptionSet* parent, LnkLst::iterator it);
-
-        const SubscriptionSet* m_parent;
-        LnkLst::iterator m_sub_it;
-        mutable Subscription m_cur_sub;
-    };
-
-    using const_iterator = const iterator;
+    using iterator = std::vector<Subscription>::iterator;
+    using const_iterator = std::vector<Subscription>::const_iterator;
 
     // This will make a copy of this subscription set with the next available version number and return it as
     // a mutable SubscriptionSet to be updated. The new SubscriptionSet's state will be Uncommitted. This
@@ -223,23 +179,27 @@ public:
 protected:
     friend class SubscriptionStore;
 
-    void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
-                         StringData object_class_name, StringData query_str);
-
     explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
 
-    Subscription subscription_from_iterator(LnkLst::iterator it) const;
+    void load_from_database(TransactionRef tr, Obj obj);
 
     const SubscriptionStore* m_mgr;
-    TransactionRef m_tr;
-    Obj m_obj;
-    LnkLst m_sub_list;
+
+    DB::version_type m_cur_version = 0;
+    int64_t m_version = 0;
+    State m_state = State::Uncommitted;
+    std::string m_error_str;
+    DB::version_type m_snapshot_version;
+    std::vector<Subscription> m_subs;
 };
 
 class MutableSubscriptionSet : public SubscriptionSet {
 public:
     // Erases all subscriptions in the subscription set.
     void clear();
+
+    iterator begin();
+    iterator end();
 
     // Inserts a new subscription into the set if one does not exist already - returns an iterator to the
     // subscription and a bool that is true if a new subscription was actually created. The SubscriptionSet
@@ -266,7 +226,7 @@ public:
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
     // this will throw.
-    const_iterator erase(const_iterator it);
+    iterator erase(iterator it);
 
     // Updates the state of the transaction and optionally updates its error information.
     //
@@ -287,16 +247,25 @@ public:
 protected:
     friend class SubscriptionStore;
 
-    using SubscriptionSet::SubscriptionSet;
+    MutableSubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
+
+    void insert_sub(const Subscription& sub);
 
 private:
     // To refresh a MutableSubscriptionSet, you should call commit() and call refresh() on its return value.
     void refresh() = delete;
 
-    std::pair<iterator, bool> insert_or_assign_impl(iterator it, StringData name, StringData object_class_name,
-                                                    StringData query_str);
+    std::pair<iterator, bool> insert_or_assign_impl(iterator it, std::string name, std::string object_class_name,
+                                                    std::string query_str);
+
+    void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
+                         StringData object_class_name, StringData query_str);
 
     void process_notifications();
+
+    TransactionRef m_tr;
+    Obj m_obj;
+    State m_old_state;
 };
 
 // A SubscriptionStore manages the FLX metadata tables and the lifecycles of SubscriptionSets and Subscriptions.
