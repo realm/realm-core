@@ -229,7 +229,7 @@ public:
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
     // this will throw.
-    iterator erase(iterator it);
+    iterator erase(const_iterator it);
 
     // Updates the state of the transaction and optionally updates its error information.
     //

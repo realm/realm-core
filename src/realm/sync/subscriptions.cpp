@@ -202,7 +202,7 @@ MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
     return m_subs.end();
 }
 
-SubscriptionSet::iterator MutableSubscriptionSet::erase(iterator it)
+MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     return m_subs.erase(it);
 }
@@ -458,6 +458,10 @@ std::string SubscriptionSet::to_ext_json() const
             continue;
         }
         queries_for_table.emplace_back(sub.query_string());
+    }
+
+    if (table_to_query.empty()) {
+        return "{}";
     }
 
     // TODO this is pulling in a giant compile-time dependency. We should have a better way of escaping the
