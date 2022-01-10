@@ -4,6 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
 * Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
+* FLX sync now properly handles write_not_allowed client reset errors ([#5147](https://github.com/realm/realm-core/pull/5147))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -32,6 +33,7 @@
 * Errors in C API no longer store or expose a std::exception_ptr. The comparison of realm_async_error_t now compares error code vs object identity. ([#5064](https://github.com/realm/realm-core/pull/5064))
 * The JSON output is slightly changed in the event of link cycles. Nobody is expected to rely on that.
 * Future::get_async() no longer requires its callback to be marked noexcept. ([#5130](https://github.com/realm/realm-core/pull/5130))
+* SubscriptionSet no longer holds any database resources. ([#5150](https://github.com/realm/realm-core/pull/5150))
 
 ----------------------------------------------
 
