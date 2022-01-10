@@ -536,35 +536,6 @@ TEST(Sync_WaitForSessionTerminations)
 }
 
 
-TEST(Sync_AuthFailure)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_authentication, ec);
-            did_fail = true;
-            fixture.stop();
-        };
-        fixture.set_client_side_error_handler(std::move(error_handler));
-        fixture.start();
-
-        Session session = fixture.make_session(db);
-        std::string wrong_signed_user_token{g_signed_test_user_token};
-        wrong_signed_user_token[0] = 'a';
-        fixture.bind_session(session, "/test", wrong_signed_user_token);
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
 TEST(Sync_TokenWithoutExpirationAllowed)
 {
     bool did_fail = false;
@@ -625,181 +596,6 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK_NOT(did_fail);
-}
-
-
-TEST(Sync_UnexpiredTokenValidAndExpires)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-
-        fixture.set_fake_token_expiration_time(2999999999); // One second before the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
-TEST(Sync_RefreshExpiredToken)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-
-        fixture.set_fake_token_expiration_time(2999999999); // One second before the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-        session.refresh(g_signed_test_user_token_expiration_unspecified);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK_NOT(did_fail);
-}
-
-
-TEST(Sync_RefreshChangeUserNotAllowed)
-{
-    TEST_DIR(dir);
-    TEST_CLIENT_DB(db);
-    ClientServerFixture fixture(dir, test_context);
-
-    BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::bad_authentication, ec);
-        fixture.stop();
-        bowl.add_stone();
-    };
-    fixture.set_client_side_error_handler(error_handler);
-    fixture.start();
-
-    Session session = fixture.make_session(db);
-    fixture.bind_session(session, "/test", g_user_0_path_test_token);
-    session.wait_for_download_complete_or_client_stopped();
-
-    // Change user
-    session.refresh(g_user_1_path_test_token);
-    bowl.get_stone();
-}
-
-
-TEST(Sync_CannotBindWithExpiredToken)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
-TEST(Sync_CannotRefreshWithExpiredToken)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_unspecified);
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-        session.refresh(g_signed_test_user_token_expiration_specified);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
-TEST(Sync_CanRefreshTokenAfterExpirationError)
-{
-    // Note: A failure in this test is expected to cause an indefinite hang in
-    // the final call to
-    // Session::wait_for_download_complete_or_client_stopped().
-
-    TEST_DIR(dir);
-    TEST_CLIENT_DB(db);
-    ClientServerFixture fixture(dir, test_context);
-
-    BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::token_expired, ec);
-        bowl.add_stone();
-    };
-
-    fixture.set_client_side_error_handler(error_handler);
-    fixture.start();
-
-    fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-
-    Session session = fixture.make_session(db);
-    fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-    bowl.get_stone();
-    session.refresh(g_signed_test_user_token_expiration_unspecified);
-    session.wait_for_download_complete_or_client_stopped();
 }
 
 
@@ -3454,31 +3250,22 @@ TEST(Sync_RefreshRightAfterBind)
 TEST(Sync_Permissions)
 {
     TEST_CLIENT_DB(db_valid);
-    TEST_CLIENT_DB(db_invalid);
 
     bool did_see_error_for_valid = false;
-    bool did_see_error_for_invalid = false;
 
     TEST_DIR(server_dir);
 
     // FIXME: This could use a single client, but the fixture doesn't really
     // make it easier to deal with session-level errors without disrupting other
     // sessions.
-    MultiClientServerFixture fixture{2, 1, server_dir, test_context};
-    fixture.set_client_side_error_handler(0, [&](std::error_code, bool, const std::string& message) {
+    ClientServerFixture fixture{server_dir, test_context};
+    fixture.set_client_side_error_handler([&](std::error_code, bool, const std::string& message) {
         CHECK_EQUAL("", message);
         did_see_error_for_valid = true;
     });
-    fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::permission_denied, ec);
-        did_see_error_for_invalid = true;
-        fixture.get_client(1).stop();
-    });
     fixture.start();
 
-    Session session_valid = fixture.make_bound_session(0, db_valid, 0, "/valid", g_signed_test_user_token_for_path);
-    Session session_invalid =
-        fixture.make_bound_session(1, db_invalid, 0, "/invalid", g_signed_test_user_token_for_path);
+    Session session_valid = fixture.make_bound_session(db_valid, "/valid", g_signed_test_user_token_for_path);
 
     // Insert some dummy data
     WriteTransaction wt_valid{db_valid};
@@ -3486,13 +3273,7 @@ TEST(Sync_Permissions)
     session_valid.nonsync_transact_notify(wt_valid.commit());
     session_valid.wait_for_upload_complete_or_client_stopped();
 
-    WriteTransaction wt_invalid{db_invalid};
-    wt_invalid.add_table("class_b");
-    session_invalid.nonsync_transact_notify(wt_invalid.commit());
-    session_invalid.wait_for_upload_complete_or_client_stopped();
-
     CHECK_NOT(did_see_error_for_valid);
-    CHECK(did_see_error_for_invalid);
 }
 
 
