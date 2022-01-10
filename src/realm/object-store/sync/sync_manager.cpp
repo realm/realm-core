@@ -459,7 +459,7 @@ void SyncManager::delete_user(const std::string& user_id)
     auto it = std::find_if(m_users.begin(), m_users.end(), [&user_id](auto& user) {
         return user->identity() == user_id;
     });
-    auto user = it == m_users.end() ? nullptr : *it;;
+    auto user = it == m_users.end() ? nullptr : *it;
 
     if (!user)
         return;
