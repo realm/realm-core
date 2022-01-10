@@ -154,7 +154,7 @@ public:
 
 
     /// Construct empty view, ready for addition of row indices.
-    TableView(ConstTableRef parent);
+    explicit TableView(ConstTableRef parent);
     TableView(ConstTableRef parent, Query& query, size_t limit);
     TableView(ConstTableRef parent, ColKey column, const Obj& obj);
     TableView(ConstTableRef parent, LinkCollectionPtr collection);

@@ -1342,6 +1342,13 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 {
 }
 
+
+Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, ConstTableRef table,
+                                                                        const char* operation)
+    : UnsupportedColumnTypeException(column, *table, operation)
+{
+}
+
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
                                                                         const char* operation)
     : UnsupportedColumnTypeException(column, *tv.get_target_table(), operation)
