@@ -1645,7 +1645,6 @@ void Session::send_bind_message()
 
     session_ident_type session_ident = m_ident;
     const std::string& path = get_virt_path();
-    const std::string& signed_access_token = get_signed_access_token();
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
 
@@ -1653,8 +1652,10 @@ void Session::send_bind_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
-    protocol.make_bind_message(protocol_version, out, session_ident, path, signed_access_token,
-                               need_client_file_ident, is_subserver);   // Throws
+    // Discard the token since it's ignored by the server.
+    std::string empty_access_token{};
+    protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
+                               is_subserver);                           // Throws
     m_conn.initiate_write_message(out, this);                           // Throws
 
     m_bind_message_sent = true;
@@ -1897,8 +1898,9 @@ void Session::send_refresh_message()
     REALM_ASSERT(!m_unbind_message_sent);
     REALM_ASSERT(!m_access_token_sent);
 
-    const std::string& signed_access_token = get_signed_access_token();
-    std::size_t signed_access_token_size = signed_access_token.size();
+    // Discard the token since it's ignored by the server.
+    std::string empty_access_token{};
+    std::size_t signed_access_token_size = empty_access_token.size();
 
     logger.debug("Sending: REFRESH(signed_user_token_size=%1)",
                  signed_access_token_size); // Throws
@@ -1906,8 +1908,8 @@ void Session::send_refresh_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     OutputBuffer& out = m_conn.get_output_buffer();
     session_ident_type session_ident = get_ident();
-    protocol.make_refresh_message(out, session_ident, signed_access_token); // Throws
-    m_conn.initiate_write_message(out, this);                               // Throws
+    protocol.make_refresh_message(out, session_ident, empty_access_token); // Throws
+    m_conn.initiate_write_message(out, this);                              // Throws
 
     m_access_token_sent = true;
 
