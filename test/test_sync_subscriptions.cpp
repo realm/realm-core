@@ -343,6 +343,8 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Also check that new requests for the superceded sub set get filled immediately.
     CHECK_EQUAL(old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get(),
                 SubscriptionSet::State::Superceded);
+    old_sub_set.refresh();
+    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Superceded);
 
     // Check that asking for a state change that is less than the current state of the sub set gets filled
     // immediately.

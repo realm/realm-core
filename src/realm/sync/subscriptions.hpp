@@ -178,7 +178,10 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    struct SupercededTag {
+    };
 
+    explicit SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupercededTag);
     explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
 
     void load_from_database(TransactionRef tr, Obj obj);
