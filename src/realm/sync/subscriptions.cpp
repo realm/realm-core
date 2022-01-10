@@ -310,6 +310,7 @@ void SubscriptionSet::refresh()
     auto refreshed_self = m_mgr->get_by_version(version());
     m_state = refreshed_self.m_state;
     m_error_str = refreshed_self.m_error_str;
+    m_cur_version = refreshed_self.m_cur_version;
     *this = m_mgr->get_by_version(version());
 }
 
