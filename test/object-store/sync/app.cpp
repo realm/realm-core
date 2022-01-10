@@ -3557,6 +3557,7 @@ TEST_CASE("app: delete anonymous user", "[sync][app]") {
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
         CHECK(app->sync_manager()->all_users().empty());
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
             CHECK(error->message == "User has already been removed");
@@ -3579,6 +3580,39 @@ TEST_CASE("app: delete anonymous user", "[sync][app]") {
         // check both handles are no longer valid
         CHECK(user_a->state() == SyncUser::State::Removed);
         CHECK(user_b->state() == SyncUser::State::Removed);
+    }
+}
+
+TEST_CASE("app: delete user with credentials", "[sync][app]") {
+    TestSyncManager tsm(get_config(), {});
+    auto app = tsm.app();
+
+    SECTION("log in, log out and delete") {
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        auto user = log_in(app, app::AppCredentials::username_password("email", "pass"));
+
+        CHECK(user->state() == SyncUser::State::LoggedIn);
+
+        app->log_out(user, [&](Optional<app::AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+
+        CHECK(user->state() == SyncUser::State::LoggedOut);
+
+        app->delete_user(user, [&](Optional<app::AppError> error) {
+            REQUIRE_FALSE(error);
+        });
+        CHECK(app->sync_manager()->all_users().size() == 0);
+
+        util::Optional<app::AppError> error;
+        app->delete_user(user, [&](Optional<app::AppError> err) {
+            error = err;
+        });
+        CHECK(error->error_code.value() > 0);
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(user->state() == SyncUser::State::Removed);
     }
 }
 

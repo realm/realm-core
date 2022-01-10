@@ -778,11 +778,11 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
     }
 }
 
-void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Optional<AppError>)> fn)
+void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Optional<AppError>)> completion_block)
 {
     if (!user || user->state() == SyncUser::State::Removed) {
-        return fn(
-                AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
+        return completion_block(
+            AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
     }
 
     auto users = m_sync_manager->all_users();
@@ -790,8 +790,8 @@ void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Opt
     auto it = std::find(users.begin(), users.end(), user);
 
     if (it == users.end()) {
-        return fn(
-                AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+        return completion_block(
+            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
     }
 
     std::string route = util::format("%1/auth/session", m_base_route);
@@ -809,15 +809,15 @@ void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Opt
     }
 
     do_request(req,
-               [anchor = shared_from_this(), fn = std::move(fn), this, &user](Response response) {
+               [anchor = shared_from_this(), completion_block = std::move(completion_block), this, &user](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
             // In the event of an error, we still want to give the user
             // the chance to be able to delete the user data.
-            fn(error);
+            completion_block(error);
         } else {
             anchor->emit_change_to_subscribers(*anchor);
-            m_sync_manager->remove_user(user->identity());
-            fn(error);
+            m_sync_manager->delete_user(user->identity());
+            completion_block(error);
         }
     });
 }

@@ -452,6 +452,39 @@ void SyncManager::remove_user(const std::string& user_id)
     }
 }
 
+void SyncManager::delete_user(const std::string& user_id)
+{
+    util::CheckedLockGuard lock(m_user_mutex);
+    auto user = get_user_for_identity(user_id);
+    if (!user)
+        return;
+
+    util::CheckedLockGuard fs_lock(m_file_system_mutex);
+    if (!m_metadata_manager)
+        return;
+
+    if (m_current_user && m_current_user->identity() == user_id)
+        m_current_user = nullptr;
+
+    // Deletion should happen immediately, not when we do the cleanup
+    // task on next launch.
+    m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
+                                 [&user_id](auto& user) {
+        bool should_remove = (user->identity() == user_id);
+        if (should_remove) {
+            user->detach_from_sync_manager();
+        }
+        return should_remove;
+    }), m_users.end());
+
+    for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
+        auto metadata = m_metadata_manager->all_unmarked_users().get(i);
+        if (user->identity() == metadata.identity()) {
+            metadata.remove();
+        }
+    }
+}
+
 SyncManager::~SyncManager()
 {
     // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
