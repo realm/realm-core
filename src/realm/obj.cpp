@@ -661,6 +661,8 @@ ObjKey Obj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 
 std::vector<ObjKey> Obj::get_all_backlinks(ColKey backlink_col) const
 {
+    update_if_needed();
+
     get_table()->report_invalid_key(backlink_col);
     Allocator& alloc = get_alloc();
     Array fields(alloc);
