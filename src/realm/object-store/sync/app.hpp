@@ -33,8 +33,8 @@
 
 namespace realm {
 namespace util {
-    template <typename Signature>
-    class FunctionRef;
+template <typename Signature>
+class FunctionRef;
 }
 class SyncUser;
 class SyncSession;

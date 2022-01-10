@@ -808,13 +808,14 @@ void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Opt
         req.url = util::format("%1/auth/delete", m_base_route);
     }
 
-    do_request(req,
-               [anchor = shared_from_this(), completion_block = std::move(completion_block), this, &user](Response response) {
+    do_request(req, [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
+                     &user](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
             // In the event of an error, we still want to give the user
             // the chance to be able to delete the user data.
             completion_block(error);
-        } else {
+        }
+        else {
             anchor->emit_change_to_subscribers(*anchor);
             m_sync_manager->delete_user(user->identity());
             completion_block(error);

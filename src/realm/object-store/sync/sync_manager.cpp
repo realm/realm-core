@@ -470,12 +470,13 @@ void SyncManager::delete_user(const std::string& user_id)
     // task on next launch.
     m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
                                  [&user_id](auto& user) {
-        bool should_remove = (user->identity() == user_id);
-        if (should_remove) {
-            user->detach_from_sync_manager();
-        }
-        return should_remove;
-    }), m_users.end());
+                                     bool should_remove = (user->identity() == user_id);
+                                     if (should_remove) {
+                                         user->detach_from_sync_manager();
+                                     }
+                                     return should_remove;
+                                 }),
+                  m_users.end());
 
     for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
         auto metadata = m_metadata_manager->all_unmarked_users().get(i);
