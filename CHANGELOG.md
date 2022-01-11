@@ -27,6 +27,7 @@
 * Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
 * Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
 * FLX sync now properly handles write_not_allowed client reset errors ([#5147](https://github.com/realm/realm-core/pull/5147))
+* `realm_delete_files` added to the C API, equivalent to `Realm::delete_files`. ([#5127](https://github.com/realm/realm-core/pull/5127))
 
 ### Fixed
 * The release package was missing several headers (since v11.7.0).
