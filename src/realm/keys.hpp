@@ -182,7 +182,7 @@ inline std::ostream& operator<<(std::ostream& os, ColKey ck)
 struct DictionaryKey {
     ColKey parent_key;
     // FIXME: This should probably be a Mixed instead of hardcoding the string key type.
-    const char* child_key;
+    std::string child_key;
 };
 
 inline std::ostream& operator<<(std::ostream& os, DictionaryKey ck)

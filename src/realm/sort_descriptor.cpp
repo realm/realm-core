@@ -155,7 +155,7 @@ util::Optional<Mixed> SortableColumnKey::try_get_value(const Obj& obj) const {
             return obj.get_any(col_key);
         },
         [&obj, this](DictionaryKey dict_key) {
-            REALM_ASSERT(dict_key.child_key);
+            REALM_ASSERT(!dict_key.child_key.empty());
             // Not all objects need have this specific sort key in their dictionary.
             const auto dictionary = obj.get_dictionary(dict_key.parent_key);
             return dictionary.try_get(dict_key.child_key);
