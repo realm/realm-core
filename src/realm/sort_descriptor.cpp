@@ -24,32 +24,13 @@
 #include <realm/object-store/dictionary.hpp>
 #include <realm/data_type.hpp>
 
+#include <realm/util/overload.hpp>
+
 using namespace realm;
-
-template <class... Ts>
-struct overload : Ts... {
-    using Ts::operator()...;
-};
-template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
-
-// FIXME: We manually specialize std::variant_size<> and std::variant_alternative<> for our SortableColumnKey struct to workaround a GCC bug with inheriting variants.
-// See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90943 and https://stackoverflow.com/questions/51309467/using-stdvisit-on-a-class-inheriting-from-stdvariant-libstdc-vs-libc for more information.
-// The bug is fixed in GCC 12, but still perists in GCC 8.5.
-namespace std{
-    template<>
-    struct variant_size<SortableColumnKey> : variant_size<SortableColumnKeyVariant> {
-    };
-
-    template<std::size_t I>
-    struct variant_alternative<I, SortableColumnKey> :  variant_alternative<I,SortableColumnKeyVariant> {
-    };
-}
-
 
 ConstTableRef SortableColumnKey::get_target_table(const Table* table) const
 {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [table](ColKey col_key) {
             ConstTableRef target_table;
             if (table->get_column_type(col_key) == type_Link) {
@@ -66,7 +47,7 @@ ConstTableRef SortableColumnKey::get_target_table(const Table* table) const
 
 std::string SortableColumnKey::get_description(const Table* table) const
 {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [table](ColKey col_key) -> std::string {
             return table->get_column_name(col_key);
         },
@@ -82,7 +63,7 @@ std::string SortableColumnKey::get_description(const Table* table) const
 
 bool SortableColumnKey::is_collection() const
 {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [](ColKey col_key) {
             return col_key.is_collection();
         },
@@ -95,7 +76,7 @@ bool SortableColumnKey::is_collection() const
 
 bool SortableColumnKey::is_valid_sort_key() const
 {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [](ColKey col_key) {
             return !col_key.is_collection();
         },
@@ -107,7 +88,7 @@ bool SortableColumnKey::is_valid_sort_key() const
 }
 
 void SortableColumnKey::check_column(const Table* table) const {
-    std::visit(overload{
+    mpark::visit(util::overload{
         [table](ColKey col_key) {
             table->check_column(col_key);
             if (col_key.get_type() != col_type_Link) {
@@ -125,7 +106,7 @@ void SortableColumnKey::check_column(const Table* table) const {
 }
 
 bool SortableColumnKey::is_null(const Obj& obj) const {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [&obj](ColKey col_key) {
             return obj.is_null(col_key);
         },
@@ -137,7 +118,7 @@ bool SortableColumnKey::is_null(const Obj& obj) const {
 }
 
 ObjKey SortableColumnKey::get_link_target(const Obj& obj) const {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [&obj](ColKey col_key) {
             return obj.get<ObjKey>(col_key);
         },
@@ -150,7 +131,7 @@ ObjKey SortableColumnKey::get_link_target(const Obj& obj) const {
 }
 
 util::Optional<Mixed> SortableColumnKey::try_get_value(const Obj& obj) const {
-    return std::visit(overload{
+    return mpark::visit(util::overload{
         [&obj](ColKey col_key) -> util::Optional<Mixed> {
             return obj.get_any(col_key);
         },

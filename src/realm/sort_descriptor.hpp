@@ -20,8 +20,8 @@
 #define REALM_SORT_DESCRIPTOR_HPP
 
 #include <vector>
-#include <variant>
 #include <unordered_set>
+#include <external/mpark/variant.hpp>
 #include <realm/cluster.hpp>
 #include <realm/mixed.hpp>
 
@@ -33,7 +33,7 @@ class Group;
 
 enum class DescriptorType { Sort, Distinct, Limit };
 
-using SortableColumnKeyVariant = std::variant<ColKey, DictionaryKey>;
+using SortableColumnKeyVariant = mpark::variant<ColKey, DictionaryKey>;
 
 // A key wrapper to be used for sorting,
 // it supports normal column keys as well as dictionary keys.
