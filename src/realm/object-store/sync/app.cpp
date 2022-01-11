@@ -778,7 +778,7 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
     }
 }
 
-void App::delete_user(std::shared_ptr<SyncUser> user, util::FunctionRef<void(Optional<AppError>)> completion_block)
+void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block)
 {
     if (!user || user->state() == SyncUser::State::Removed) {
         return completion_block(
