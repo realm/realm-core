@@ -128,7 +128,7 @@ if (MSVC)
 endif()
 
 # Resources required for running the tests
-file(GLOB REQUIRED_TEST_FILES
+file(GLOB REQUIRED_TEST_FILES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
      "*.json"
      "*.realm"
      "expect_string.txt")

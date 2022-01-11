@@ -63,21 +63,46 @@ private:
     friend class MutableSubscriptionSet;
 
     Subscription(const SubscriptionStore* parent, Obj obj);
+    Subscription(std::string name, std::string object_class_name, std::string query_str);
 
-    const SubscriptionStore* m_store = nullptr;
-    Obj m_obj;
+    ObjectId m_id;
+    Timestamp m_created_at;
+    Timestamp m_updated_at;
+    std::string m_name;
+    std::string m_object_class_name;
+    std::string m_query_string;
 };
 
 // SubscriptionSets contain a set of unique queries by either name or Query object that will be constructed into a
 // single QUERY or IDENT message to be sent to the server.
 class SubscriptionSet {
 public:
+    /*
+     * State diagram:
+     *
+     *                    ┌───────────┬─────────►Error─────────┐
+     *                    │           │                        │
+     *                    │           │                        ▼
+     *   Uncommitted──►Pending──►Bootstrapping──►Complete───►Superceded
+     *                    │                                    ▲
+     *                    │                                    │
+     *                    └────────────────────────────────────┘
+     *
+     */
     enum class State : int64_t {
+        // This subscription set has not been persisted and has not been sent to the server. This state is only valid
+        // for MutableSubscriptionSets
         Uncommitted = 0,
+        // The subscription set has been persisted locally but has not been acknowledged by the server yet.
         Pending,
+        // The server is currently sending the initial state that represents this subscription set to the client.
         Bootstrapping,
+        // This subscription set is the active subscription set that is currently being synchronized with the server.
         Complete,
+        // An error occurred while processing this subscription set on the server. Check error_str() for details.
         Error,
+        // The server responded to a later subscription set to this one and this one has been trimmed from the
+        // local storage of subscription sets.
         Superceded,
     };
 
@@ -107,57 +132,8 @@ public:
         return o;
     }
 
-    class iterator {
-    public:
-        using difference_type = size_t;
-        using value_type = Subscription;
-        using pointer = value_type*;
-        using reference = value_type&;
-        using iterator_category = std::input_iterator_tag;
-
-        bool operator!=(const iterator& other) const
-        {
-            return (m_parent != other.m_parent) || (m_sub_it != other.m_sub_it);
-        }
-
-        bool operator==(const iterator& other) const
-        {
-            return (m_parent == other.m_parent && m_sub_it == other.m_sub_it);
-        }
-
-        reference operator*() const noexcept
-        {
-            return m_cur_sub;
-        }
-
-        pointer operator->() const noexcept
-        {
-            return &m_cur_sub;
-        }
-
-        // used in tests.
-        inline friend std::ostream& operator<<(std::ostream& o, const iterator& it)
-        {
-            o << "SubscriptionSet::iterator(" << std::hex << it.m_parent << ", " << std::dec << it.m_sub_it.index()
-              << ")";
-            return o;
-        }
-
-        iterator& operator++();
-        iterator operator++(int);
-
-    private:
-        friend class SubscriptionSet;
-        friend class MutableSubscriptionSet;
-
-        iterator(const SubscriptionSet* parent, LnkLst::iterator it);
-
-        const SubscriptionSet* m_parent;
-        LnkLst::iterator m_sub_it;
-        mutable Subscription m_cur_sub;
-    };
-
-    using const_iterator = const iterator;
+    using iterator = std::vector<Subscription>::iterator;
+    using const_iterator = std::vector<Subscription>::const_iterator;
 
     // This will make a copy of this subscription set with the next available version number and return it as
     // a mutable SubscriptionSet to be updated. The new SubscriptionSet's state will be Uncommitted. This
@@ -202,24 +178,31 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    struct SupercededTag {
+    };
 
-    void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
-                         StringData object_class_name, StringData query_str);
-
+    explicit SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupercededTag);
     explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
 
-    Subscription subscription_from_iterator(LnkLst::iterator it) const;
+    void load_from_database(TransactionRef tr, Obj obj);
 
     const SubscriptionStore* m_mgr;
-    TransactionRef m_tr;
-    Obj m_obj;
-    LnkLst m_sub_list;
+
+    DB::version_type m_cur_version = 0;
+    int64_t m_version = 0;
+    State m_state = State::Uncommitted;
+    std::string m_error_str;
+    DB::version_type m_snapshot_version;
+    std::vector<Subscription> m_subs;
 };
 
 class MutableSubscriptionSet : public SubscriptionSet {
 public:
     // Erases all subscriptions in the subscription set.
     void clear();
+
+    iterator begin();
+    iterator end();
 
     // Inserts a new subscription into the set if one does not exist already - returns an iterator to the
     // subscription and a bool that is true if a new subscription was actually created. The SubscriptionSet
@@ -246,7 +229,7 @@ public:
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
     // this will throw.
-    const_iterator erase(const_iterator it);
+    iterator erase(const_iterator it);
 
     // Updates the state of the transaction and optionally updates its error information.
     //
@@ -267,16 +250,25 @@ public:
 protected:
     friend class SubscriptionStore;
 
-    using SubscriptionSet::SubscriptionSet;
+    MutableSubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
+
+    void insert_sub(const Subscription& sub);
 
 private:
     // To refresh a MutableSubscriptionSet, you should call commit() and call refresh() on its return value.
     void refresh() = delete;
 
-    std::pair<iterator, bool> insert_or_assign_impl(iterator it, StringData name, StringData object_class_name,
-                                                    StringData query_str);
+    std::pair<iterator, bool> insert_or_assign_impl(iterator it, std::string name, std::string object_class_name,
+                                                    std::string query_str);
+
+    void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
+                         StringData object_class_name, StringData query_str);
 
     void process_notifications();
+
+    TransactionRef m_tr;
+    Obj m_obj;
+    State m_old_state;
 };
 
 // A SubscriptionStore manages the FLX metadata tables and the lifecycles of SubscriptionSets and Subscriptions.
@@ -306,6 +298,14 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
+    struct PendingSubscription {
+        int64_t query_version;
+        DB::version_type snapshot_version;
+    };
+
+    util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
+                                                                 DB::version_type after_client_version) const;
+
 private:
     DBRef m_db;
 
@@ -322,6 +322,7 @@ protected:
 
     struct SubscriptionSetKeys {
         TableKey table;
+        ColKey snapshot_version;
         ColKey state;
         ColKey error_str;
         ColKey subscriptions;
@@ -355,6 +356,8 @@ protected:
     std::unique_ptr<SubscriptionKeys> m_sub_keys;
 
     mutable std::mutex m_pending_notifications_mutex;
+    mutable std::condition_variable m_pending_notifications_cv;
+    mutable int64_t m_outstanding_requests = 0;
     mutable int64_t m_min_outstanding_version = 0;
     mutable std::list<NotificationRequest> m_pending_notifications;
 };

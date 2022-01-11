@@ -37,9 +37,9 @@ TEST(Sync_SubscriptionStoreBasic)
         // Because there are no subscription sets yet, get_latest should point to an invalid object
         // and all the property accessors should return dummy values.
         auto latest = store.get_latest();
-        CHECK_EQUAL(latest.begin(), latest.end());
+        CHECK(latest.begin() == latest.end());
         CHECK_EQUAL(latest.size(), 0);
-        CHECK_EQUAL(latest.find("a sub"), latest.end());
+        CHECK(latest.find("a sub") == latest.end());
         CHECK_EQUAL(latest.version(), 0);
         CHECK(latest.error_str().is_null());
         CHECK_EQUAL(latest.state(), SubscriptionSet::State::Uncommitted);
@@ -54,7 +54,7 @@ TEST(Sync_SubscriptionStoreBasic)
         query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
         auto&& [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
-        CHECK_NOT_EQUAL(it, out.end());
+        CHECK_NOT(it == out.end());
         CHECK_EQUAL(it->name(), "a sub");
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_a.get_description());
@@ -74,14 +74,14 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK_EQUAL(set.version(), 1);
         CHECK_EQUAL(set.size(), 1);
         auto it = set.find(query_a);
-        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_NOT(it == set.end());
         CHECK_EQUAL(it->name(), "a sub");
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_a.get_description());
 
         // Make sure we can't get a subscription set that doesn't exist.
         auto it_end = set.find("b subs");
-        CHECK_EQUAL(it_end, set.end());
+        CHECK(it_end == set.end());
     }
 }
 
@@ -100,10 +100,9 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     // Create a new subscription set, insert a subscription into it, and mark it as complete.
     {
         auto out = store.get_latest().make_mutable_copy();
-        auto read_tr = fixture.db->start_read();
         auto&& [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
-        CHECK_NOT_EQUAL(it, out.end());
+        CHECK_NOT(it == out.end());
 
         out.update_state(SubscriptionSet::State::Complete);
         std::move(out).commit();
@@ -166,11 +165,11 @@ TEST(Sync_SubscriptionStoreStateUpdates)
         auto it = set.begin();
         CHECK_EQUAL(it->name(), "b sub");
         it = set.erase(it);
-        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_NOT(it == set.end());
         CHECK_EQUAL(set.size(), 1);
         CHECK_EQUAL(it->name(), new_sub_name);
         it = set.erase(it);
-        CHECK_EQUAL(it, set.end());
+        CHECK(it == set.end());
         CHECK_EQUAL(set.size(), 0);
     }
 }
@@ -192,13 +191,13 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
         auto out = store.get_latest().make_mutable_copy();
         auto [it, inserted] = out.insert_or_assign(sub_name, query_a);
         CHECK(inserted);
-        CHECK_NOT_EQUAL(it, out.end());
+        CHECK_NOT(it == out.end());
         id_of_inserted = it->id();
         CHECK_NOT_EQUAL(id_of_inserted, ObjectId{});
 
         std::tie(it, inserted) = out.insert_or_assign(sub_name, query_b);
         CHECK(!inserted);
-        CHECK_NOT_EQUAL(it, out.end());
+        CHECK_NOT(it == out.end());
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_b.get_description());
         CHECK_EQUAL(it->id(), id_of_inserted);
@@ -210,7 +209,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
         auto it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
             return sub.id() == id_of_inserted;
         });
-        CHECK_NOT_EQUAL(it, set.end());
+        CHECK_NOT(it == set.end());
         CHECK_EQUAL(it->name(), sub_name);
     }
 }
@@ -344,11 +343,29 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Also check that new requests for the superceded sub set get filled immediately.
     CHECK_EQUAL(old_sub_set.get_state_change_notification(SubscriptionSet::State::Complete).get(),
                 SubscriptionSet::State::Superceded);
+    old_sub_set.refresh();
+    CHECK_EQUAL(old_sub_set.state(), SubscriptionSet::State::Superceded);
 
     // Check that asking for a state change that is less than the current state of the sub set gets filled
     // immediately.
     CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
                 SubscriptionSet::State::Complete);
+
+    // Check that if a subscription set gets updated to a new state and the SubscriptionSet returned by commit() is
+    // not explicitly refreshed (i.e. is reading from a snapshot from before the state change), that it can still
+    // return a ready future.
+    auto mut_set = store.get_latest().make_mutable_copy();
+    auto waitable_set = std::move(mut_set).commit();
+
+    {
+        mut_set = store.get_mutable_by_version(waitable_set.version());
+        mut_set.update_state(SubscriptionSet::State::Complete);
+        std::move(mut_set).commit();
+    }
+
+    auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
+    CHECK(fut.is_ready());
+    CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
 } // namespace realm::sync

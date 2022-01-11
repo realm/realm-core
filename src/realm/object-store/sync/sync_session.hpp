@@ -304,6 +304,7 @@ private:
     // }
 
     std::shared_ptr<SyncManager> sync_manager() const;
+    std::shared_ptr<sync::SubscriptionStore> make_flx_subscription_store();
 
     static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
 
@@ -318,6 +319,7 @@ private:
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+    void handle_new_flx_sync_query(int64_t version);
 
     void set_sync_transact_callback(std::function<TransactionCallback>);
     void nonsync_transact_notify(VersionID::version_type);
@@ -351,6 +353,7 @@ private:
 
     SyncConfig m_config;
     std::shared_ptr<DB> m_db;
+    std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
     bool m_force_client_reset = false;
     DBRef m_client_reset_fresh_copy;
     _impl::SyncClient& m_client;

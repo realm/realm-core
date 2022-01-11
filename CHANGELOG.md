@@ -1,13 +1,33 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
-* Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
-* Add ability to delete a sync user from a MongoDB Realm app.
+* Add ability to delete a sync user from a MongoDB Realm app. (PR [#5153](https://github.com/realm/realm-core/pull/5153))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 11.8.0 Release notes
+
+### Enhancements
+* Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
+* Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
+* FLX sync now properly handles write_not_allowed client reset errors ([#5147](https://github.com/realm/realm-core/pull/5147))
+
+### Fixed
 * The release package was missing several headers (since v11.7.0).
 * The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
 * Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
@@ -15,6 +35,9 @@
 * Freezing a Realm with a schema that has orphaned embeeded object types threw a "Wrong transactional state" exception (since v11.5.0).
 * SyncManager::path_for_realm now returns a default path when FLX sync is enabled ([#5088](https://github.com/realm/realm-core/pull/5088))
 * Having links in a property of Mixed type would lead to ill-formed JSON output when serializing the database. ([#5125](https://github.com/realm/realm-core/issues/5125), since v11.0.0)
+* FLX sync QUERY messages are now ordered with UPLOAD messages ([#5135](https://github.com/realm/realm-core/pull/5135))
+* Fixed race condition when waiting for state change notifications on FLX subscription sets that may have caused a hang ([#5146](https://github.com/realm/realm-core/pull/5146))
+* SubscriptionSet::to_ext_json() now handles empty subscription sets correctly ([#5134](https://github.com/realm/realm-core/pull/5134))
 
 ### Breaking changes
 * FLX SubscriptionSet type split into SubscriptionSet and MutableSubscriptionSet to add type safety ([#5092](https://github.com/realm/realm-core/pull/5092))
@@ -31,6 +54,8 @@
 * Errors in C API no longer store or expose a std::exception_ptr. The comparison of realm_async_error_t now compares error code vs object identity. ([#5064](https://github.com/realm/realm-core/pull/5064))
 * The JSON output is slightly changed in the event of link cycles. Nobody is expected to rely on that.
 * Future::get_async() no longer requires its callback to be marked noexcept. ([#5130](https://github.com/realm/realm-core/pull/5130))
+* SubscriptionSet no longer holds any database resources. ([#5150](https://github.com/realm/realm-core/pull/5150))
+* ClientHistoryImpl::integrate_server_changesets now throws instead of returning a boolean to indicate success ([#5118](https://github.com/realm/realm-core/pull/5118))
 
 ----------------------------------------------
 

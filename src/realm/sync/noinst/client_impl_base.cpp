@@ -1387,73 +1387,64 @@ void Session::cancel_resumption_delay()
 }
 
 
-bool Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
+void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
-                                   IntegrationError& error, DownloadBatchState download_batch_state)
+                                   DownloadBatchState download_batch_state)
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
         if (download_batch_state != DownloadBatchState::LastInBatch) {
-            logger.error("received empty download message that was not the last in batch");
-            return false;
+            throw IntegrationException(ClientError::bad_progress,
+                                       "received empty download message that was not the last in batch");
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
-        return true;
+        return;
     }
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
-    bool success = history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets,
-                                                       version_info, error, download_batch_state, logger,
-                                                       get_transact_reporter()); // Throws
-    if (REALM_LIKELY(success)) {
-        if (num_changesets == 1) {
-            logger.debug("1 remote changeset integrated, producing client version %1",
-                         version_info.sync_version.version); // Throws
-        }
-        else {
-            logger.debug("%2 remote changesets integrated, producing client version %1",
-                         version_info.sync_version.version, num_changesets); // Throws
-        }
+    history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
+                                        download_batch_state, logger, get_transact_reporter()); // Throws
+    if (num_changesets == 1) {
+        logger.debug("1 remote changeset integrated, producing client version %1",
+                     version_info.sync_version.version); // Throws
     }
-    return success;
+    else {
+        logger.debug("%2 remote changesets integrated, producing client version %1",
+                     version_info.sync_version.version, num_changesets); // Throws
+    }
 }
 
 
-void Session::on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                       IntegrationError error, DownloadBatchState batch_state)
+void Session::on_integration_failure(const IntegrationException& error, DownloadBatchState batch_state)
 {
     REALM_ASSERT(m_state == Active);
-
-    if (REALM_LIKELY(success)) {
-        REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
-        m_download_batch_state = batch_state;
-        if (m_download_batch_state != DownloadBatchState::LastInBatch) {
-            return;
-        }
-        m_download_progress = download_progress;
-        do_recognize_sync_version(client_version); // Allows upload process to resume
-        check_for_download_completion();           // Throws
-
-        // Since the deactivation process has not been initiated, the UNBIND
-        // message cannot have been sent unless an ERROR message was received.
-        REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_error_message_received)
-            ensure_enlisted_to_send(); // Throws
-        return;
-    }
-
     if (batch_state == DownloadBatchState::LastInBatch) {
         m_progress.download = m_download_progress;
     }
-    switch (error) {
-        case IntegrationError::bad_origin_file_ident:
-            m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);
-            return;
-        case IntegrationError::bad_changeset:
-            break;
+    logger.error("Failed to integrate downloaded changesets: %1", error.what());
+    m_conn.close_due_to_protocol_error(error.code());
+}
+
+void Session::on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
+                                       DownloadBatchState batch_state)
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
+    m_download_batch_state = batch_state;
+    if (m_download_batch_state != DownloadBatchState::LastInBatch) {
+        return;
     }
-    m_conn.close_due_to_protocol_error(ClientError::bad_changeset);
+    m_download_progress = download_progress;
+    do_recognize_sync_version(client_version); // Allows upload process to resume
+    check_for_download_completion();           // Throws
+
+    // Since the deactivation process has not been initiated, the UNBIND
+    // message cannot have been sent unless an ERROR message was received.
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received) {
+        ensure_enlisted_to_send(); // Throws
+    }
 }
 
 
@@ -1616,16 +1607,35 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
-    if (m_pending_query_message) {
+    auto check_pending_flx_version = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return false;
+        }
+
+        if (!m_allow_upload) {
+            return false;
+        }
+
+        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
+            m_last_sent_flx_query_version, m_upload_progress.client_version);
+
+        if (!m_pending_flx_sub_set) {
+            return false;
+        }
+
+        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+    };
+
+    if (check_pending_flx_version()) {
         return send_query_change_message(); // throws
     }
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
     if (m_allow_upload && m_download_batch_state == DownloadBatchState::LastInBatch &&
-        (m_upload_target_version > m_upload_progress.client_version))
-        send_upload_message(); // Throws
-    return;
+        (m_upload_target_version > m_upload_progress.client_version)) {
+        return send_upload_message(); // Throws
+    }
 }
 
 
@@ -1670,7 +1680,7 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_is_flx_sync_session) {
-        const auto active_query_set = get_or_create_flx_subscription_store()->get_active();
+        const auto active_query_set = get_flx_subscription_store()->get_active();
         const auto active_query_body = active_query_set.to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
@@ -1704,13 +1714,15 @@ void Session::send_query_change_message()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_pending_query_message);
+    REALM_ASSERT(m_pending_flx_sub_set);
+    REALM_ASSERT(m_pending_flx_sub_set->query_version > m_last_sent_flx_query_version);
 
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
         return;
     }
 
-    auto latest_sub_set = get_or_create_flx_subscription_store()->get_latest();
+    auto sub_store = get_flx_subscription_store();
+    auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
     logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
                  latest_queries.size(), latest_queries);
@@ -1720,7 +1732,10 @@ void Session::send_query_change_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     protocol.make_query_change_message(out, session_ident, latest_sub_set.version(), latest_queries);
     m_conn.initiate_write_message(out, this);
-    m_pending_query_message = false;
+
+    m_last_sent_flx_query_version = latest_sub_set.version();
+    m_pending_flx_sub_set =
+        sub_store->get_next_pending_version(m_last_sent_flx_query_version, m_pending_flx_sub_set->snapshot_version);
 
     enlist_to_send(); // throws
 }
@@ -1735,11 +1750,24 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
+    auto target_upload_version = m_upload_target_version;
+    if (m_is_flx_sync_session) {
+        if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
+            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
+                m_last_sent_flx_query_version, m_upload_progress.client_version);
+        }
+        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
+            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
+            target_upload_version = m_pending_flx_sub_set->snapshot_version;
+        }
+    }
+
     const ClientReplication& repl = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
-    repl.get_history().find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
+    repl.get_history().find_uploadable_changesets(m_upload_progress, target_upload_version, uploadable_changesets,
                                                   locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
@@ -2087,9 +2115,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    if (query_version != 0) {
-        on_flx_sync_progress(query_version, batch_state);
-    }
+    on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
