@@ -479,7 +479,9 @@ void SyncManager::delete_user(const std::string& user_id)
     for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
         auto metadata = m_metadata_manager->all_unmarked_users().get(i);
         if (user->identity() == metadata.identity()) {
+            m_file_manager->remove_user_realms(metadata.identity(), metadata.realm_file_paths());
             metadata.remove();
+            break;
         }
     }
 }
