@@ -974,8 +974,10 @@ void out_mixed(std::ostream& out, const Mixed& val, JSONOutputMode output_mode)
 
 } // anonymous namespace
 void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                  std::vector<ColKey>& followed, JSONOutputMode output_mode) const
+                  std::vector<ObjLink>& followed, JSONOutputMode output_mode) const
 {
+    followed.push_back(get_link());
+    size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
     StringData name = "_key";
     bool prefixComma = false;
     if (renames.count(name))
@@ -990,6 +992,8 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
     for (auto ck : col_keys) {
         name = m_table->get_column_name(ck);
         auto type = ck.get_type();
+        if (type == col_type_LinkList)
+            type = col_type_Link;
         if (renames.count(name))
             name = renames.at(name);
 
@@ -998,228 +1002,148 @@ void Obj::to_json(std::ostream& out, size_t link_depth, const std::map<std::stri
         out << "\"" << name << "\":";
         prefixComma = true;
 
-        if (ck.is_list() || ck.is_set()) {
-            if (type == col_type_LinkList)
-                type = col_type_Link;
-            if (type == col_type_Link) {
-                TableRef target_table = get_target_table(ck);
-                auto primary_key_coll = target_table->get_primary_key_column();
-                auto ll = get_collection_ptr(ck);
-                auto sz = ll->size();
+        TableRef target_table;
+        std::string open_str;
+        std::string close_str;
+        ColKey pk_col_key;
+        if (type == col_type_Link) {
+            target_table = get_target_table(ck);
+            pk_col_key = target_table->get_primary_key_column();
+            bool is_embedded = target_table->is_embedded();
+            bool link_depth_reached = !is_embedded && (link_depth == 0);
 
-                if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
-                    out << "[";
-                    for (size_t i = 0; i < sz; i++) {
-                        if (i > 0)
-                            out << ",";
-                        auto link = ll->get_any(i).get<ObjKey>();
-                        out_mixed_xjson(out, target_table->get_object(link).get_any(primary_key_coll));
-                    }
-                    out << "]";
+            if (output_mode == output_mode_xjson_plus) {
+                open_str = std::string("{ ") + (is_embedded ? "\"$embedded" : "\"$link");
+                if (ck.is_list())
+                    open_str += "List";
+                else if (ck.is_set())
+                    open_str += "Set";
+                else if (ck.is_dictionary())
+                    open_str += "Dictionary";
+                open_str += "\": ";
+                close_str += " }";
+            }
+
+            if ((link_depth_reached && output_mode != output_mode_xjson) || output_mode == output_mode_xjson_plus) {
+                open_str += "{ \"table\": \"" + std::string(get_target_table(ck)->get_name()) + "\", ";
+                open_str += ((is_embedded || ck.is_dictionary()) ? "\"value" : "\"key");
+                if (ck.is_collection())
+                    open_str += "s";
+                open_str += "\": ";
+                close_str += "}";
+            }
+        }
+        else {
+            if (output_mode == output_mode_xjson_plus) {
+                if (ck.is_set()) {
+                    open_str = "{ \"$set\": ";
+                    close_str = " }";
                 }
-                else if (output_mode == output_mode_xjson_plus && !target_table->is_embedded() && primary_key_coll) {
-                    if (ck.is_set()) {
-                        out << "{ \"$linkSet\": { \"table\": \"" << get_target_table(ck)->get_name()
-                            << "\", \"keys\": [";
-                    }
-                    else {
-                        out << "{ \"$linkList\": { \"table\": \"" << get_target_table(ck)->get_name()
-                            << "\", \"keys\": [";
+                else if (ck.is_dictionary()) {
+                    open_str = "{ \"$dictionary\": ";
+                    close_str = " }";
+                }
+            }
+        }
+
+        auto print_value = [&](Mixed key, Mixed val) {
+            if (!key.is_null()) {
+                out_mixed(out, key, output_mode);
+                out << ":";
+            }
+            if (val.is_type(type_Link, type_TypedLink)) {
+                TableRef tt = target_table;
+                auto obj_key = val.get<ObjKey>();
+                std::string table_info;
+                std::string table_info_close;
+                if (!tt) {
+                    // It must be a typed link
+                    tt = m_table->get_parent_group()->get_table(val.get_link().get_table_key());
+                    pk_col_key = tt->get_primary_key_column();
+                    if (output_mode == output_mode_xjson_plus) {
+                        table_info = std::string("{ \"$link\": ");
+                        table_info_close = " }";
                     }
 
-                    for (size_t i = 0; i < sz; i++) {
-                        if (i > 0)
-                            out << ",";
-                        auto link = ll->get_any(i).get<ObjKey>();
-                        out_mixed_xjson(out, target_table->get_object(link).get_any(primary_key_coll));
-                    }
-                    out << "]}}";
+                    table_info += std::string("{ \"table\": \"") + std::string(tt->get_name()) + "\", \"key\": ";
+                    table_info_close += " }";
                 }
-                else if (!target_table->is_embedded() &&
-                         ((link_depth == 0) || (link_depth == not_found &&
-                                                std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
-                    out << "{\"table\": \"" << target_table->get_name() << "\", \"keys\": [";
-                    for (size_t i = 0; i < sz; i++) {
-                        if (i > 0)
-                            out << ",";
-                        auto link = ll->get_any(i).get<ObjKey>();
-                        out << link.value;
-                    }
-                    out << "]}";
+                if (pk_col_key && output_mode != output_mode_json) {
+                    out << table_info;
+                    out_mixed_xjson(out, tt->get_primary_key(obj_key));
+                    out << table_info_close;
                 }
                 else {
-
-                    if (output_mode == output_mode_xjson_plus) {
-                        if (ck.is_set()) {
-                            out << "{ \"$embeddedSet\": { \"table\": \"" << get_target_table(ck)->get_name()
-                                << "\", \"values\": ";
+                    ObjLink link(tt->get_key(), obj_key);
+                    if (obj_key.is_unresolved()) {
+                        out << "null";
+                        return;
+                    }
+                    if (!tt->is_embedded()) {
+                        if (link_depth == 0) {
+                            out << table_info << obj_key.value << table_info_close;
+                            return;
                         }
-                        else {
-                            out << "{ \"$embeddedList\": { \"table\": \"" << get_target_table(ck)->get_name()
-                                << "\", \"values\": ";
+                        if ((link_depth == realm::npos &&
+                             std::find(followed.begin(), followed.end(), link) != followed.end())) {
+                            // We have detected a cycle in links
+                            out << "{ \"table\": \"" << tt->get_name() << "\", \"key\": " << obj_key.value << " }";
+                            return;
                         }
                     }
 
-                    out << "[";
-                    for (size_t i = 0; i < sz; i++) {
-                        if (i > 0)
-                            out << ",";
-                        followed.push_back(ck);
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        auto link = ll->get_any(i).get<ObjKey>();
-                        target_table->get_object(link).to_json(out, new_depth, renames, followed, output_mode);
-                    }
-                    out << "]";
-
-                    if (output_mode == output_mode_xjson_plus) {
-                        out << "}}";
-                    }
+                    tt->get_object(obj_key).to_json(out, new_depth, renames, followed, output_mode);
                 }
             }
             else {
-                auto list = this->get_collection_ptr(ck);
-                auto sz = list->size();
-
-                if (output_mode == output_mode_xjson_plus && ck.is_set()) {
-                    out << "{ \"$set\": ";
-                }
-
-                out << "[";
-                for (size_t i = 0; i < sz; i++) {
-                    if (i > 0)
-                        out << ",";
-
-                    out_mixed(out, list->get_any(i), output_mode);
-                }
-                out << "]";
-
-                if (output_mode == output_mode_xjson_plus && ck.is_set()) {
-                    out << "}";
-                }
+                out_mixed(out, val, output_mode);
             }
+        };
+
+        if (ck.is_list() || ck.is_set()) {
+            auto list = get_collection_ptr(ck);
+            auto sz = list->size();
+
+            out << open_str;
+            out << "[";
+            for (size_t i = 0; i < sz; i++) {
+                if (i > 0)
+                    out << ",";
+                print_value(Mixed{}, list->get_any(i));
+            }
+            out << "]";
+            out << close_str;
         }
         else if (ck.get_attrs().test(col_attr_Dictionary)) {
             auto dict = get_dictionary(ck);
 
+            out << open_str;
             out << "{";
-            if (output_mode == output_mode_xjson_plus) {
-                if (type == col_type_Link) {
-                    if (get_target_table(ck)->is_embedded()) {
-                        out << "\"$embeddedDictionary\": { \"table\": \"" << get_target_table(ck)->get_name()
-                            << "\", \"values\": {";
-                    }
-                    else {
-                        out << "\"$linkDictionary\": { \"table\": \"" << get_target_table(ck)->get_name()
-                            << "\", \"values\": {";
-                    }
-                }
-                else {
-                    out << "\"$dictionary\": {";
-                }
-            }
 
             bool first = true;
             for (auto it : dict) {
                 if (!first)
                     out << ",";
                 first = false;
-                out_mixed(out, it.first, output_mode);
-                out << ":";
-
-                if (it.second.is_null()) {
-                    out << "null";
-                }
-                else if (it.second.is_type(type_TypedLink)) {
-                    auto obj_link = it.second.get<ObjLink>();
-                    auto obj_key = obj_link.get_obj_key();
-                    auto target_table = m_table->get_parent_group()->get_table(obj_link.get_table_key());
-                    auto primary_key_coll = target_table->get_primary_key_column();
-
-                    if (target_table->is_embedded()) {
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                        auto link = it.second.get<ObjKey>();
-                        target_table->get_object(link).to_json(out, new_depth, renames, followed, output_mode);
-                    }
-                    else if (primary_key_coll && output_mode == output_mode_xjson) {
-                        out_mixed_xjson(out, target_table->get_primary_key(obj_key));
-                    }
-                    else if (primary_key_coll && output_mode == output_mode_xjson_plus) {
-                        out_mixed_xjson(out, target_table->get_primary_key(obj_key));
-                    }
-                    else if (!obj_key.is_unresolved()) {
-                        if (link_depth == 0 || link_depth == not_found) {
-                            out << "{\"table\": \"" << target_table->get_name() << "\", \"key\": " << obj_key.value
-                                << "}";
-                        }
-                        else {
-                            auto obj = target_table->get_object(obj_key);
-                            size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-                            obj.to_json(out, new_depth, renames, followed, output_mode);
-                        }
-                    }
-                }
-                else {
-                    out_mixed(out, it.second, output_mode);
-                }
+                print_value(it.first, it.second);
             }
             out << "}";
-            if (output_mode == output_mode_xjson_plus) {
-                out << "}";
-                if (type == col_type_Link) {
-                    out << "}";
-                }
-            }
+            out << close_str;
         }
         else {
-            if (type == col_type_Link) {
-                TableRef target_table = get_target_table(ck);
-                auto k = get<ObjKey>(ck);
-                if (k) {
-                    auto obj = get_linked_object(ck);
-                    auto primary_key_coll = target_table->get_primary_key_column();
-
-                    if (output_mode == output_mode_xjson && !target_table->is_embedded() && primary_key_coll) {
-                        out_mixed_xjson(out, obj.get_any(primary_key_coll));
-                    }
-                    else if (output_mode == output_mode_xjson_plus && !target_table->is_embedded() &&
-                             primary_key_coll) {
-                        out << "{ \"$link\": { \"table\": \"" << get_target_table(ck)->get_name() << "\", \"key\": ";
-                        out_mixed_xjson(out, obj.get_any(primary_key_coll));
-                        out << "}}";
-                    }
-                    else if (!target_table->is_embedded() &&
-                             ((link_depth == 0) ||
-                              (link_depth == not_found &&
-                               std::find(followed.begin(), followed.end(), ck) != followed.end()))) {
-                        out << "{\"table\": \"" << get_target_table(ck)->get_name()
-                            << "\", \"key\": " << obj.get_key().value << "}";
-                    }
-                    else {
-                        followed.push_back(ck);
-                        size_t new_depth = link_depth == not_found ? not_found : link_depth - 1;
-
-                        if (output_mode == output_mode_xjson_plus) {
-                            out << "{ \"$embeddedObj\": { \"table\": \"" << get_target_table(ck)->get_name()
-                                << "\", \"value\": ";
-                        }
-
-                        obj.to_json(out, new_depth, renames, followed, output_mode);
-
-                        if (output_mode == output_mode_xjson_plus) {
-                            out << "}}";
-                        }
-                    }
-                }
-                else {
-                    out << "null";
-                }
+            auto val = get_any(ck);
+            if (!val.is_null()) {
+                out << open_str;
+                print_value(Mixed{}, val);
+                out << close_str;
             }
             else {
-                out_mixed(out, get_any(ck), output_mode);
+                out << "null";
             }
         }
     }
     out << "}";
+    followed.pop_back();
 }
 
 std::string Obj::to_string() const

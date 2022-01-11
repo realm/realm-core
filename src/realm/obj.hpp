@@ -178,11 +178,11 @@ public:
     bool evaluate(T func) const;
 
     void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
-                 std::vector<ColKey>& followed, JSONOutputMode output_mode) const;
+                 std::vector<ObjLink>& followed, JSONOutputMode output_mode) const;
     void to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
                  JSONOutputMode output_mode = output_mode_json) const
     {
-        std::vector<ColKey> followed;
+        std::vector<ObjLink> followed;
         to_json(out, link_depth, renames, followed, output_mode);
     }
 

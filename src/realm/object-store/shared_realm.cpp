@@ -189,12 +189,12 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
     return m_coordinator->sync_session();
 }
 
-const sync::SubscriptionSet Realm::get_latest_subscription_set()
+sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
     return m_coordinator->sync_session()->get_flx_subscription_store()->get_latest();
 }
 
-const sync::SubscriptionSet Realm::get_active_subscription_set()
+sync::SubscriptionSet Realm::get_active_subscription_set()
 {
     return m_coordinator->sync_session()->get_flx_subscription_store()->get_active();
 }
@@ -241,7 +241,7 @@ void Realm::read_schema_from_group_if_needed()
         }
     }
     else {
-        ObjectStore::verify_valid_external_changes(m_schema.compare(schema));
+        ObjectStore::verify_valid_external_changes(m_schema.compare(schema, m_config.schema_mode));
         m_schema.copy_keys_from(schema);
     }
     notify_schema_changed();
@@ -259,7 +259,7 @@ bool Realm::reset_file(Schema& schema, std::vector<SchemaChange>& required_chang
 
     m_schema = ObjectStore::schema_from_group(read_group());
     m_schema_version = ObjectStore::get_schema_version(read_group());
-    required_changes = m_schema.compare(schema);
+    required_changes = m_schema.compare(schema, m_config.schema_mode);
     m_coordinator->clear_schema_cache_and_set_schema_version(m_schema_version);
     return false;
 }
@@ -341,7 +341,7 @@ void Realm::set_schema_subset(Schema schema)
     REALM_ASSERT(m_dynamic_schema);
     REALM_ASSERT(m_schema_version != ObjectStore::NotVersioned);
 
-    std::vector<SchemaChange> changes = m_schema.compare(schema);
+    std::vector<SchemaChange> changes = m_schema.compare(schema, m_config.schema_mode);
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
         case SchemaMode::ResetFile:
@@ -381,7 +381,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
     bool was_in_read_transaction = is_in_read_transaction();
     Schema actual_schema = get_full_schema();
-    std::vector<SchemaChange> required_changes = actual_schema.compare(schema);
+    std::vector<SchemaChange> required_changes = actual_schema.compare(schema, m_config.schema_mode);
 
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
         if (!was_in_read_transaction)
@@ -407,7 +407,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         // us with nothing to do if someone else initialized the schema on disk
         if (m_new_schema) {
             actual_schema = *m_new_schema;
-            required_changes = actual_schema.compare(schema);
+            required_changes = actual_schema.compare(schema, m_config.schema_mode);
             if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
                 cancel_transaction();
                 cache_new_schema();
@@ -514,7 +514,7 @@ void Realm::translate_schema_error()
     auto new_schema = ObjectStore::schema_from_group(*m_coordinator->begin_read());
 
     // Should always throw
-    ObjectStore::verify_valid_external_changes(m_schema.compare(new_schema, true));
+    ObjectStore::verify_valid_external_changes(m_schema.compare(new_schema, m_config.schema_mode, true));
 
     // Something strange happened so just rethrow the old exception
     throw;

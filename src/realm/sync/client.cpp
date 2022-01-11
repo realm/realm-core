@@ -167,14 +167,14 @@ ErrorCategoryImpl g_error_category;
 // in ClientImpl::Connection.
 class SessionWrapper final : public util::AtomicRefCountBase, public SyncTransactReporter {
 public:
-    SessionWrapper(ClientImpl&, DBRef db, Session::Config);
+    SessionWrapper(ClientImpl&, DBRef db, std::shared_ptr<SubscriptionStore>, Session::Config);
     ~SessionWrapper() noexcept;
 
     ClientReplication& get_replication() noexcept;
     ClientImpl& get_client() noexcept;
 
     bool has_flx_subscription_store() const;
-    SubscriptionStore* get_or_create_flx_subscription_store();
+    SubscriptionStore* get_flx_subscription_store();
 
     void set_sync_transact_handler(std::function<SyncTransactCallback>);
     void set_progress_handler(std::function<ProgressHandler>);
@@ -203,12 +203,13 @@ public:
     // Overriding member function in SyncTransactReporter
     void report_sync_transact(VersionID, VersionID) override final;
 
+    void on_new_flx_subscription_set(int64_t new_version);
+
 private:
     ClientImpl& m_client;
     DBRef m_db;
     Replication* m_replication;
 
-    const bool m_flx_sync_requested;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_server_address;
     const port_type m_server_port;
@@ -236,11 +237,10 @@ private:
     std::function<ProgressHandler> m_progress_handler;
     std::function<ConnectionStateChangeListener> m_connection_state_change_listener;
 
-    std::unique_ptr<SubscriptionStore> m_flx_subscription_store;
+    std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
     int64_t m_flx_latest_version = 0;
-
 
     bool m_initiated = false;
 
@@ -310,10 +310,8 @@ private:
     void on_suspended(std::error_code ec, StringData message, bool is_fatal);
     void on_resumed();
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
-    void on_new_flx_subscription_set(int64_t new_version);
     void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    std::unique_ptr<SubscriptionStore> create_flx_subscription_store();
 
     void report_progress();
 
@@ -674,31 +672,27 @@ util::Optional<ClientReset>& SessionImpl::get_client_reset_config() noexcept
 void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_bytes, DownloadBatchState batch_state,
                                                 const ReceivedChangesets& changesets)
 {
-    bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
-    if (REALM_LIKELY(!simulate_integration_error)) {
-        bool success;
+    try {
+        bool simulate_integration_error = (m_wrapper.m_simulate_integration_error && !changesets.empty());
+        if (simulate_integration_error) {
+            throw IntegrationException(ClientError::bad_changeset, "simulated failure");
+        }
         version_type client_version;
-        IntegrationError error = {};
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
             ClientReplication& repl = access_realm(); // Throws
-            success = integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info, error,
-                                           batch_state); // Throws
+            integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
+                                 batch_state); // Throws
             client_version = version_info.realm_version;
         }
         else {
             // Fake it for "dry run" mode
-            success = true;
             client_version = m_last_version_available + 1;
         }
-        on_changesets_integrated(success, client_version, m_progress.download, error, batch_state); // Throws
+        on_changesets_integrated(client_version, m_progress.download, batch_state); // Throws
     }
-    else {
-        bool success = false;
-        version_type client_version = 0;                 // Dummy
-        DownloadCursor download_progress = {0, 0};       // Dummy
-        IntegrationError error = IntegrationError::bad_changeset;
-        on_changesets_integrated(success, client_version, download_progress, error, batch_state); // Throws
+    catch (const IntegrationException& e) {
+        on_integration_failure(e, batch_state);
     }
     m_wrapper.on_sync_progress(); // Throws
 }
@@ -730,7 +724,6 @@ void SessionImpl::on_resumed()
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
-    m_pending_query_message = true;
     if (m_conn.get_state() == ConnectionState::connected) {
         logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
         ensure_enlisted_to_send();
@@ -747,18 +740,18 @@ void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch
     m_wrapper.on_flx_sync_progress(version, batch_state);
 }
 
-SubscriptionStore* SessionImpl::get_or_create_flx_subscription_store()
+SubscriptionStore* SessionImpl::get_flx_subscription_store()
 {
-    return m_wrapper.get_or_create_flx_subscription_store();
+    return m_wrapper.get_flx_subscription_store();
 }
 
 // ################ SessionWrapper ################
 
-SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config config)
+SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
+                               Session::Config config)
     : m_client{client}
     , m_db(std::move(db))
     , m_replication(m_db->get_replication())
-    , m_flx_sync_requested(config.flx_sync_requested)
     , m_protocol_envelope{config.protocol_envelope}
     , m_server_address{std::move(config.server_address)}
     , m_server_port{config.server_port}
@@ -773,11 +766,16 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, Session::Config con
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
-    , m_flx_subscription_store(create_flx_subscription_store())
+    , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);
     REALM_ASSERT(m_db->get_replication());
     REALM_ASSERT(dynamic_cast<ClientReplication*>(m_db->get_replication()));
+
+    if (m_flx_subscription_store) {
+        std::tie(m_flx_active_version, m_flx_latest_version) =
+            m_flx_subscription_store->get_active_and_latest_versions();
+    }
 }
 
 SessionWrapper::~SessionWrapper() noexcept
@@ -803,28 +801,22 @@ bool SessionWrapper::has_flx_subscription_store() const
     return static_cast<bool>(m_flx_subscription_store);
 }
 
-std::unique_ptr<SubscriptionStore> SessionWrapper::create_flx_subscription_store()
+void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
 {
-    if (!m_flx_sync_requested) {
-        return nullptr;
+    if (!m_initiated) {
+        return;
     }
-    auto ret = std::make_unique<SubscriptionStore>(m_db, [this](int64_t new_version) {
-        REALM_ASSERT(m_initiated);
 
-        m_client.get_service().post([new_version, this] {
-            REALM_ASSERT(m_actualized);
-            if (REALM_UNLIKELY(!m_sess))
-                return; // Already finalized
-            if (new_version <= m_flx_latest_version || !m_flx_subscription_store) {
-                return;
-            }
-            m_flx_latest_version = new_version;
-            m_sess->on_new_flx_subscription_set(new_version);
-        });
+    m_client.get_service().post([new_version, this] {
+        REALM_ASSERT(m_actualized);
+        if (REALM_UNLIKELY(!m_sess)) {
+            return; // Already finalized
+        }
+
+        m_sess->recognize_sync_version(m_db->get_version_of_latest_snapshot());
+        m_flx_latest_version = new_version;
+        m_sess->on_new_flx_subscription_set(new_version);
     });
-
-    std::tie(m_flx_active_version, m_flx_latest_version) = ret->get_active_and_latest_versions();
-    return ret;
 }
 
 void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg)
@@ -832,27 +824,18 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
     REALM_ASSERT(m_flx_latest_version != 0);
     REALM_ASSERT(m_flx_latest_version <= version);
 
-    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(version);
+    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(version);
     mut_subs.update_state(SubscriptionSet::State::Error, err_msg);
-    mut_subs.commit();
+    std::move(mut_subs).commit();
 }
 
 void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
 {
-    // If this is called with a new version of zero, then there cannot be any subscriptions to update.
-    if (new_version == 0) {
-        return;
-    }
-
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
     SubscriptionSet::State new_state;
     switch (batch_state) {
         case DownloadBatchState::LastInBatch:
-            if (m_flx_active_version == new_version) {
-                return;
-            }
-
             m_flx_last_seen_version = new_version;
             m_flx_active_version = new_version;
             new_state = SubscriptionSet::State::Complete;
@@ -867,12 +850,14 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             break;
     }
 
-    auto mut_subs = get_or_create_flx_subscription_store()->get_mutable_by_version(new_version);
-    mut_subs.update_state(new_state);
-    mut_subs.commit();
+    if (new_version != 0) {
+        auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
+        mut_subs.update_state(new_state);
+        std::move(mut_subs).commit();
+    }
 }
 
-SubscriptionStore* SessionWrapper::get_or_create_flx_subscription_store()
+SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 {
     return m_flx_subscription_store.get();
 }
@@ -1110,7 +1095,7 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     REALM_ASSERT(!m_sess);
     m_db->claim_sync_agent();
 
-    SyncServerMode sync_mode = m_flx_sync_requested ? SyncServerMode::FLX : SyncServerMode::PBS;
+    SyncServerMode sync_mode = m_flx_subscription_store ? SyncServerMode::FLX : SyncServerMode::PBS;
 
     bool was_created = false;
     ClientImpl::Connection& conn = m_client.get_connection(
@@ -1296,7 +1281,7 @@ void SessionWrapper::on_connection_state_changed(ConnectionState state, const Se
     if (state == ConnectionState::connected && m_sess) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.is_flx_sync_connection()) {
-            get_or_create_flx_subscription_store();
+            get_flx_subscription_store();
         }
     }
 
@@ -1486,10 +1471,11 @@ bool Client::decompose_server_url(const std::string& url, ProtocolEnvelope& prot
 }
 
 
-Session::Session(Client& client, DBRef db, Config&& config)
+Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store, Config&& config)
 {
     util::bind_ptr<SessionWrapper> sess;
-    sess.reset(new SessionWrapper{*client.m_impl, std::move(db), std::move(config)}); // Throws
+    sess.reset(
+        new SessionWrapper{*client.m_impl, std::move(db), std::move(flx_sub_store), std::move(config)}); // Throws
     // The reference count passed back to the application is implicitly
     // owned by a naked pointer. This is done to avoid exposing
     // implementation details through the header file (that is, through the
@@ -1588,14 +1574,9 @@ void Session::abandon() noexcept
     SessionWrapper::abandon(std::move(wrapper));
 }
 
-bool Session::has_flx_subscription_store() const
+void Session::on_new_flx_sync_subscription(int64_t new_version)
 {
-    return m_impl->has_flx_subscription_store();
-}
-
-SubscriptionStore* Session::get_flx_subscription_store()
-{
-    return m_impl->get_or_create_flx_subscription_store();
+    m_impl->on_new_flx_subscription_set(new_version);
 }
 
 const std::error_category& client_error_category() noexcept

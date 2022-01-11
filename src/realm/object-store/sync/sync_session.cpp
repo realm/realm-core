@@ -231,6 +231,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
 SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, SyncManager* sync_manager)
     : m_config(std::move(config))
     , m_db(std::move(db))
+    , m_flx_subscription_store(make_flx_subscription_store())
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -241,6 +242,21 @@ std::shared_ptr<SyncManager> SyncSession::sync_manager() const
     std::lock_guard<std::mutex> lk(m_state_mutex);
     REALM_ASSERT(m_sync_manager);
     return m_sync_manager->shared_from_this();
+}
+
+std::shared_ptr<sync::SubscriptionStore> SyncSession::make_flx_subscription_store()
+{
+    if (!m_config.flx_sync_requested) {
+        return nullptr;
+    }
+
+    return std::make_shared<sync::SubscriptionStore>(m_db, [this](int64_t new_version) {
+        std::lock_guard<std::mutex> lk(m_state_mutex);
+        if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
+            return;
+        }
+        m_session->on_new_flx_sync_subscription(new_version);
+    });
 }
 
 void SyncSession::detach_from_sync_manager()
@@ -521,7 +537,7 @@ void SyncSession::do_create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
-    session_config.flx_sync_requested = m_config.flx_sync_requested;
+
     {
         std::string sync_route = m_sync_manager->sync_route();
 
@@ -576,7 +592,7 @@ void SyncSession::do_create_sync_session()
         m_force_client_reset = false;
     }
 
-    m_session = m_client.make_session(m_db, std::move(session_config));
+    m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
@@ -875,12 +891,12 @@ std::string const& SyncSession::path() const
 
 sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
 {
-    return m_session->get_flx_subscription_store();
+    return m_flx_subscription_store.get();
 }
 
 bool SyncSession::has_flx_subscription_store() const
 {
-    return m_session->has_flx_subscription_store();
+    return static_cast<bool>(m_flx_subscription_store);
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)
