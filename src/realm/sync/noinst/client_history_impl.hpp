@@ -3,11 +3,11 @@
 #define REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 
 #include <realm/util/optional.hpp>
+#include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/array_integer.hpp>
 
-namespace realm {
-namespace sync {
+namespace realm::sync {
 
 class ClientReplication;
 // As new schema versions come into existence, describe them here.
@@ -48,6 +48,23 @@ constexpr int get_client_history_schema_version() noexcept
     return 11;
 }
 
+class IntegrationException : public std::runtime_error {
+public:
+    IntegrationException(ClientError code, const std::string& msg)
+        : std::runtime_error(msg)
+        , m_error(code)
+    {
+    }
+
+    ClientError code() const noexcept
+    {
+        return m_error;
+    }
+
+private:
+    ClientError m_error;
+};
+
 class ClientHistory final : public _impl::History, public TransformHistory {
 public:
     using version_type = sync::version_type;
@@ -71,7 +88,6 @@ public:
         ~SyncTransactReporter() {}
     };
 
-    enum class IntegrationError { bad_origin_file_ident, bad_changeset };
 
     /// set_client_reset_adjustments() is used by client reset to adjust the
     /// content of the history compartment. The shared group associated with
@@ -208,10 +224,9 @@ public:
     /// \param transact_reporter An optional callback which will be called with the
     /// version immediately processing the sync transaction and that of the sync
     /// transaction.
-    bool integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+    void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                      const RemoteChangeset* changesets, std::size_t num_changesets,
-                                     VersionInfo& new_version, IntegrationError& integration_error,
-                                     DownloadBatchState download_type, util::Logger&,
+                                     VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
@@ -493,7 +508,6 @@ inline auto ClientHistory::get_transformer() -> Transformer&
 /// realm::DB objects.
 std::unique_ptr<ClientReplication> make_client_replication();
 
-} // namespace sync
-} // namespace realm
+} // namespace realm::sync
 
 #endif // REALM_NOINST_CLIENT_HISTORY_IMPL_HPP

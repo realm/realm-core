@@ -172,7 +172,7 @@ public:
 
     ~TableView() {}
 
-    TableRef get_parent() noexcept
+    TableRef get_parent() const noexcept
     {
         return m_table.cast_away_const();
     }

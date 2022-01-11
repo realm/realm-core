@@ -598,7 +598,6 @@ private:
 class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    using IntegrationError = ClientHistory::IntegrationError;
 
     util::PrefixLogger logger;
 
@@ -759,9 +758,8 @@ public:
     /// This function is thread-safe, but if called from a thread other than the
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
-    bool integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, IntegrationError&,
-                              DownloadBatchState last_in_batch);
+    void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -773,8 +771,10 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                  IntegrationError error, DownloadBatchState batch_state);
+    void on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
+                                  DownloadBatchState batch_state);
+
+    void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
 
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
