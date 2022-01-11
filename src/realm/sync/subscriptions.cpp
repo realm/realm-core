@@ -88,6 +88,9 @@ Timestamp Subscription::updated_at() const
 
 std::string_view Subscription::name() const
 {
+    if (m_name.empty()) {
+        return std::string_view{};
+    }
     return m_name;
 }
 
