@@ -453,8 +453,7 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
     }
     catch (IncompatibleHistories const& ex) {
         RealmFileException::Kind error_kind = RealmFileException::Kind::BadHistoryError;
-        throw RealmFileException(error_kind, ex.get_path(),
-                                 util::format("Unable to open realm: %1.", ex.what()),
+        throw RealmFileException(error_kind, ex.get_path(), util::format("Unable to open realm: %1.", ex.what()),
                                  ex.what());
     }
     catch (util::File::AccessError const& ex) {
