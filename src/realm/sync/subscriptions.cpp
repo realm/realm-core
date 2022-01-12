@@ -526,6 +526,10 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         m_sub_set_keys->error_str = sub_sets_table->add_column(type_String, c_flx_sub_sets_error_str_field, true);
         m_sub_set_keys->subscriptions =
             sub_sets_table->add_column_list(*subs_table, c_flx_sub_sets_subscriptions_field);
+
+        auto zero_sub = sub_sets_table->create_object_with_primary_key(Mixed{int64_t(0)});
+        zero_sub.set(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Pending));
+        zero_sub.set(m_sub_set_keys->snapshot_version, tr->get_version());
         tr->commit();
         return true;
     };

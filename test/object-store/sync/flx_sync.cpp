@@ -155,6 +155,14 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     });
 
     harness.do_with_new_realm([&](SharedRealm realm) {
+        wait_for_download(*realm);
+        {
+            auto empty_subs = realm->get_latest_subscription_set();
+            CHECK(empty_subs.size() == 0);
+            CHECK(empty_subs.version() == 0);
+            empty_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
         auto table = realm->read_group().get_table("class_TopLevel");
         auto col_key = table->get_column_key("queryable_str_field");
         Query query_foo(table);
@@ -166,6 +174,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
+        wait_for_download(*realm);
         {
             realm->refresh();
             Results results(realm, table);

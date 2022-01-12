@@ -850,11 +850,9 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             break;
     }
 
-    if (new_version != 0) {
-        auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
-        mut_subs.update_state(new_state);
-        std::move(mut_subs).commit();
-    }
+    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
+    mut_subs.update_state(new_state);
+    std::move(mut_subs).commit();
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()
