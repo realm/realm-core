@@ -7,7 +7,6 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * UserIdentity metadata table grows indefinitely. ([#5152](https://github.com/realm/realm-core/issues/5152), since v10.0.0)
-* Add `IncompatibleHistories` case when translating file exceptions (since v6.0.0).
  
 ### Breaking changes
 * None.
@@ -18,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add `IncompatibleHistories` case when translating file exceptions (since v6.0.0).
 
 ----------------------------------------------
 
