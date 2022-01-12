@@ -87,7 +87,10 @@ void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType typ
             table->add_column_dictionary(type, name, col_key.is_nullable(), key_type);
         }
         else {
-            table->add_column(type, name, col_key.is_nullable());
+            auto new_col_key = table->add_column(type, name, col_key.is_nullable());
+            if (t->has_search_index(col_key)) {
+                table->add_search_index(new_col_key);
+            }
         }
     }
 }

@@ -4301,7 +4301,8 @@ TEST(Shared_WriteTo)
         baas->add_column(type_Mixed, "any", true);
         baas->add_column(*foos, "link");
 
-        foos->add_column(type_String, "str");
+        auto col_str = foos->add_column(type_String, "str");
+        foos->add_search_index(col_str);
         foos->add_column_list(*embedded, "list_of_embedded");
         foos->add_column_list(type_Mixed, "list_of_any", true);
         foos->add_column_list(*baas, "link_list");
