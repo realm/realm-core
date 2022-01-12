@@ -1643,6 +1643,108 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"origin",
+         {{valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target",
+         {{valid_pk_name, PropertyType::String, Property::IsPrimary{true}},
+          {"value", PropertyType::Int},
+          {"name", PropertyType::String}}},
+        {"other_origin",
+         {{valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
+        {"other_target",
+         {{valid_pk_name, PropertyType::UUID, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
+    };
+
+    /*             Create local realm             */
+    TestFile local_config;
+    local_config.cache = true;
+    local_config.schema_version = 1;
+    local_config.schema = schema;
+    auto local_realm = Realm::get_shared_realm(local_config);
+    {
+        auto origin = local_realm->read_group().get_table("class_origin");
+        auto target = local_realm->read_group().get_table("class_target");
+        auto other_origin = local_realm->read_group().get_table("class_other_origin");
+        auto other_target = local_realm->read_group().get_table("class_other_target");
+
+        local_realm->begin_transaction();
+        auto o = target->create_object_with_primary_key("Foo").set("name", "Egon");
+        origin->create_object_with_primary_key(47).set("link", o.get_key());
+        other_target->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
+        other_origin->create_object_with_primary_key(ObjectId::gen());
+        local_realm->commit_transaction();
+    }
+
+    /* Create a synced realm and upload some data */
+    auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
+    auto app_session = create_app(server_app_config);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    auto partition = random_string(100);
+    TestSyncManager sync_manager(app_config, {});
+    auto app = sync_manager.app();
+
+    create_user_and_log_in(app);
+    auto user1 = app->current_user();
+    SyncTestFile config1(user1, partition, schema);
+
+    auto r1 = Realm::get_shared_realm(config1);
+
+    auto origin = r1->read_group().get_table("class_origin");
+    auto target = r1->read_group().get_table("class_target");
+    auto other_origin = r1->read_group().get_table("class_other_origin");
+    auto other_target = r1->read_group().get_table("class_other_target");
+
+    r1->begin_transaction();
+    auto o = target->create_object_with_primary_key("Baa").set("name", "Børge");
+    origin->create_object_with_primary_key(47).set("link", o.get_key());
+    other_target->create_object_with_primary_key(UUID("01234567-89ab-cdef-edcb-a98765432101"));
+    other_origin->create_object_with_primary_key(ObjectId::gen());
+    r1->commit_transaction();
+    CHECK(!wait_for_upload(*r1));
+
+    /* Copy local realm data over in a synced one*/
+    create_user_and_log_in(app);
+    auto user2 = app->current_user();
+    REQUIRE(user1 != user2);
+
+    SyncTestFile config2(user1, partition, schema);
+
+    SharedRealm r2;
+    SECTION("Copy before connecting to server") {
+        local_realm->export_to(config2);
+        r2 = Realm::get_shared_realm(config2);
+    }
+
+    SECTION("Open synced realm first") {
+        r2 = Realm::get_shared_realm(config2);
+        CHECK(!wait_for_download(*r2));
+        local_realm->export_to(config2);
+        CHECK(!wait_for_upload(*r2));
+    }
+
+    CHECK(!wait_for_download(*r2));
+    advance_and_notify(*r2);
+    Group& g = r2->read_group();
+    // g.to_json(std::cout);
+    REQUIRE(g.get_table("class_origin")->size() == 1);
+    REQUIRE(g.get_table("class_target")->size() == 2);
+    REQUIRE(g.get_table("class_other_origin")->size() == 2);
+    REQUIRE(g.get_table("class_other_target")->size() == 2);
+
+    CHECK(!wait_for_upload(*r2));
+    CHECK(!wait_for_download(*r1));
+    advance_and_notify(*r1);
+    // r1->read_group().to_json(std::cout);
+}
+
 TEST_CASE("app: set new embedded object", "[sync][app]") {
     std::string base_url = get_base_url();
     const std::string valid_pk_name = "_id";

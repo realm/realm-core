@@ -448,9 +448,9 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
     }
 }
 
-void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value)
+void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value, size_t prior_size)
 {
-    Replication::list_insert(list, ndx, value);
+    Replication::list_insert(list, ndx, value, prior_size);
 
     if (!value.is_null()) {
         // If link is unresolved, it should not be communicated.
@@ -463,11 +463,10 @@ void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed 
     }
 
     if (select_collection(list)) {
-        auto sz = uint32_t(list.size());
         Instruction::ArrayInsert instr;
         populate_path_instr(instr, list, uint32_t(ndx));
         instr.value = as_payload(list, value);
-        instr.prior_size = sz;
+        instr.prior_size = uint32_t(prior_size);
         emit(instr);
     }
 }

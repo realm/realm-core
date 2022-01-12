@@ -661,6 +661,8 @@ ObjKey Obj::get_backlink(ColKey backlink_col, size_t backlink_ndx) const
 
 std::vector<ObjKey> Obj::get_all_backlinks(ColKey backlink_col) const
 {
+    update_if_needed();
+
     get_table()->report_invalid_key(backlink_col);
     Allocator& alloc = get_alloc();
     Array fields(alloc);
@@ -727,7 +729,8 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
         });
     }
     else {
-        ps(path_length);
+        if (ps)
+            ps(path_length);
     }
 }
 
@@ -1256,8 +1259,6 @@ Obj& Obj::set_any(ColKey col_key, Mixed value, bool is_default)
         set_null(col_key);
     }
     else {
-        auto col_type = col_key.get_type();
-        REALM_ASSERT(value.get_type() == DataType(col_type) || col_type == col_type_Mixed);
         switch (col_key.get_type()) {
             case col_type_Int:
                 if (col_key.get_attrs().test(col_attr_Nullable)) {

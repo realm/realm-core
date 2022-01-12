@@ -1,11 +1,11 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Support exporting data from a local realm to a synchonized realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
 * Add ability to delete a sync user from a MongoDB Realm app. (PR [#5153](https://github.com/realm/realm-core/pull/5153))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* UserIdentity metadata table grows indefinitely. ([#5152](https://github.com/realm/realm-core/issues/5152), since v10.0.0)
  
 ### Breaking changes
 * None.
@@ -16,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* Add `IncompatibleHistories` case when translating file exceptions (since v6.0.0).
 
 ----------------------------------------------
 
@@ -26,6 +26,7 @@
 * Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
 * Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
 * FLX sync now properly handles write_not_allowed client reset errors ([#5147](https://github.com/realm/realm-core/pull/5147))
+* `realm_delete_files` added to the C API, equivalent to `Realm::delete_files`. ([#5127](https://github.com/realm/realm-core/pull/5127))
 
 ### Fixed
 * The release package was missing several headers (since v11.7.0).

@@ -267,6 +267,7 @@ public:
         PropertyType property_type;
 
         UnsupportedColumnTypeException(ColKey column, Table const& table, const char* operation);
+        UnsupportedColumnTypeException(ColKey column, ConstTableRef table, const char* operation);
         UnsupportedColumnTypeException(ColKey column, TableView const& tv, const char* operation);
     };
 

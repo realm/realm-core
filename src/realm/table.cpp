@@ -2726,6 +2726,9 @@ bool Table::operator==(const Table& t) const
         auto name = get_column_name(ck);
         auto other_ck = t.get_column_key(name);
         auto attrs = ck.get_attrs();
+        if (has_search_index(ck) != t.has_search_index(other_ck))
+            return false;
+
         if (!other_ck || other_ck.get_attrs() != attrs) {
             return false;
         }

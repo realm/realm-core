@@ -37,6 +37,7 @@
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/replication.hpp>
 #include <realm/set.hpp>
+#include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/features.h>
@@ -45,6 +46,7 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
+#include "impl/copy_replication.hpp"
 
 #ifndef _WIN32
 #include <sys/wait.h>
@@ -1205,6 +1207,182 @@ void DB::open(Replication& repl, const std::string& file, const DBOptions option
 
     bool no_create = false;
     open(file, no_create, options); // Throws
+}
+
+namespace {
+
+using ColInfo = std::vector<std::pair<ColKey, Table*>>;
+
+ColInfo get_col_info(const Table* table)
+{
+    std::vector<std::pair<ColKey, Table*>> cols;
+    if (table) {
+        for (auto col : table->get_column_keys()) {
+            Table* embedded_table = nullptr;
+            if (auto target_table = table->get_opposite_table(col)) {
+                if (target_table->is_embedded())
+                    embedded_table = target_table.unchecked_ptr();
+            }
+            cols.emplace_back(col, embedded_table);
+        }
+    }
+    return cols;
+}
+
+void generate_properties_for_obj(Replication& repl, const Obj& obj, const ColInfo& cols)
+{
+    for (auto elem : cols) {
+        auto col = elem.first;
+        auto embedded_table = elem.second;
+        auto cols_2 = get_col_info(embedded_table);
+        auto update_embedded = [&](Mixed val) {
+            REALM_ASSERT(val.is_type(type_Link, type_TypedLink));
+            Obj embedded_obj = embedded_table->get_object(val.get<ObjKey>());
+            generate_properties_for_obj(repl, embedded_obj, cols_2);
+        };
+
+        if (col.is_list()) {
+            auto list = obj.get_listbase_ptr(col);
+            auto sz = list->size();
+            repl.list_clear(*list);
+            for (size_t n = 0; n < sz; n++) {
+                auto val = list->get_any(n);
+                repl.list_insert(*list, n, val, n);
+                if (embedded_table) {
+                    update_embedded(val);
+                }
+            }
+        }
+        else if (col.is_set()) {
+            auto set = obj.get_setbase_ptr(col);
+            auto sz = set->size();
+            for (size_t n = 0; n < sz; n++) {
+                repl.set_insert(*set, n, set->get_any(n));
+                // Sets cannot have embedded objects
+            }
+        }
+        else if (col.is_dictionary()) {
+            auto dict = obj.get_dictionary(col);
+            size_t n = 0;
+            for (auto [key, value] : dict) {
+                repl.dictionary_insert(dict, n++, key, value);
+                if (embedded_table) {
+                    update_embedded(value);
+                }
+            }
+        }
+        else {
+            auto val = obj.get_any(col);
+            repl.set(obj.get_table().unchecked_ptr(), col, obj.get_key(), val);
+            if (embedded_table) {
+                update_embedded(val);
+            }
+        }
+    }
+}
+
+} // namespace
+
+void Transaction::replicate(Transaction* dest, Replication& repl) const
+{
+    // We should only create entries for public tables
+    std::vector<TableKey> public_table_keys;
+    for (auto tk : get_table_keys()) {
+        if (table_is_public(tk))
+            public_table_keys.push_back(tk);
+    }
+
+    // Create tables
+    for (auto tk : public_table_keys) {
+        auto table = get_table(tk);
+        auto table_name = table->get_name();
+        if (!table->is_embedded()) {
+            auto pk_col = table->get_primary_key_column();
+            if (!pk_col)
+                throw std::runtime_error(
+                    util::format("Class '%1' must have a primary key", Group::table_name_to_class_name(table_name)));
+            auto pk_name = table->get_column_name(pk_col);
+            if (pk_name != "_id")
+                throw std::runtime_error(
+                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
+                                 Group::table_name_to_class_name(table_name), pk_name));
+            repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
+                                            pk_col.is_nullable());
+        }
+        else {
+            repl.add_class(tk, table_name, true);
+        }
+    }
+    // Create columns
+    for (auto tk : public_table_keys) {
+        auto table = get_table(tk);
+        auto pk_col = table->get_primary_key_column();
+        auto cols = table->get_column_keys();
+        for (auto col : cols) {
+            if (col == pk_col)
+                continue;
+            repl.insert_column(table.unchecked_ptr(), col, DataType(col.get_type()), table->get_column_name(col),
+                               table->get_opposite_table(col).unchecked_ptr());
+        }
+    }
+    dest->commit_and_continue_writing();
+    // Now the schema should be in place - create the objects
+#ifdef REALM_DEBUG
+    constexpr int number_of_objects_to_create_before_committing = 100;
+#else
+    constexpr int number_of_objects_to_create_before_committing = 1000;
+#endif
+    auto n = number_of_objects_to_create_before_committing;
+    for (auto tk : public_table_keys) {
+        auto table = get_table(tk);
+        if (table->is_embedded())
+            continue;
+        // std::cout << "Table: " << table->get_name() << std::endl;
+        auto pk_col = table->get_primary_key_column();
+        auto cols = get_col_info(table.unchecked_ptr());
+        for (auto o : *table) {
+            auto obj_key = o.get_key();
+            Mixed pk = o.get_any(pk_col);
+            // std::cout << "    Object: " << pk << std::endl;
+            repl.create_object_with_primary_key(table.unchecked_ptr(), obj_key, pk);
+            generate_properties_for_obj(repl, o, cols);
+            if (--n == 0) {
+                dest->commit_and_continue_writing();
+                n = number_of_objects_to_create_before_committing;
+            }
+        }
+    }
+}
+
+
+void Transaction::copy_to(TransactionRef dest) const
+{
+    impl::CopyReplication repl(dest);
+    replicate(dest.get(), repl);
+}
+
+void DB::create_new_history(Replication& repl)
+{
+    Replication* old_repl = get_replication();
+    try {
+        repl.initialize(*this);
+        set_replication(&repl);
+
+        auto tr = start_write();
+        tr->clear_history();
+        tr->replicate(tr.get(), repl);
+        tr->commit();
+    }
+    catch (...) {
+        set_replication(old_repl);
+        throw;
+    }
+}
+
+void DB::create_new_history(std::unique_ptr<Replication> repl)
+{
+    create_new_history(*repl);
+    m_history = std::move(repl);
 }
 
 
@@ -2503,6 +2681,10 @@ void Transaction::commit_and_continue_writing()
     db->grab_read_lock(lock_after_commit, version_id);
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
+    if (Replication* repl = db->get_replication()) {
+        bool history_updated = false;
+        repl->initiate_transact(*this, lock_after_commit.m_version, history_updated); // Throws
+    }
 
     bool writable = true;
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable); // Throws

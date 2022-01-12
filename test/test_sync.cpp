@@ -24,6 +24,7 @@
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
+#include <realm/history.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/history.hpp>
@@ -7319,6 +7320,101 @@ TEST(Sync_BundledRealmFile)
 
     // Now we can
     db->write_copy(path.c_str());
+}
+
+TEST(Sync_UpgradeToClientHistory)
+{
+    SHARED_GROUP_TEST_PATH(db1_path);
+    SHARED_GROUP_TEST_PATH(db2_path);
+    auto db_1 = DB::create(make_in_realm_history(), db1_path);
+    auto db_2 = DB::create(make_in_realm_history(), db2_path);
+    {
+        auto tr = db_1->start_write();
+
+        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto col_float = embedded->add_column(type_Float, "float");
+        auto col_additional = embedded->add_column_dictionary(*embedded, "additional");
+
+        auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto col_list = baas->add_column_list(type_Int, "list");
+        auto col_set = baas->add_column_set(type_Int, "set");
+        auto col_dict = baas->add_column_dictionary(type_Int, "dictionary");
+        auto col_child = baas->add_column(*embedded, "child");
+
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+        auto col_str = foos->add_column(type_String, "str");
+        auto col_children = foos->add_column_list(*embedded, "children");
+
+        auto foobaas = tr->add_table_with_primary_key("class_FooBaa", type_ObjectId, "_id");
+        auto col_time = foobaas->add_column(type_Timestamp, "time");
+
+        auto col_link = baas->add_column(*foos, "link");
+
+        auto foo = foos->create_object_with_primary_key("123").set(col_str, "Hello");
+        auto children = foo.get_linklist(col_children);
+        children.create_and_insert_linked_object(0);
+        auto baa = baas->create_object_with_primary_key(999).set(col_link, foo.get_key());
+        auto obj = baa.create_and_set_linked_object(col_child);
+        obj.set(col_float, 42.f);
+        auto additional = obj.get_dictionary(col_additional);
+        additional.create_and_insert_linked_object("One").set(col_float, 1.f);
+        additional.create_and_insert_linked_object("Two").set(col_float, 2.f);
+        additional.create_and_insert_linked_object("Three").set(col_float, 3.f);
+
+        auto list = baa.get_list<Int>(col_list);
+        list.add(1);
+        list.add(2);
+        list.add(3);
+        auto set = baa.get_set<Int>(col_set);
+        set.insert(4);
+        set.insert(5);
+        set.insert(6);
+        auto dict = baa.get_dictionary(col_dict);
+        dict.insert("key7", 7);
+        dict.insert("key8", 8);
+        dict.insert("key9", 9);
+
+        for (int i = 0; i < 100; i++) {
+            foobaas->create_object_with_primary_key(ObjectId::gen()).set(col_time, Timestamp(::time(nullptr), i));
+        }
+
+        tr->commit();
+    }
+    {
+        auto tr = db_2->start_write();
+        auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+        auto col_str = foos->add_column(type_String, "str");
+        auto col_link = baas->add_column(*foos, "link");
+
+        auto foo = foos->create_object_with_primary_key("123").set(col_str, "Goodbye");
+        auto baa = baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
+
+        tr->commit();
+    }
+
+    db_1->create_new_history(make_client_replication());
+    db_2->create_new_history(make_client_replication());
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
+        auto foos = tr.get_group().get_table("class_Foo");
+        auto foo = foos->create_object_with_primary_key("456");
+    });
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    // db_2->start_read()->to_json(std::cout);
 }
 
 // This test is extracted from ClientReset_ThreeClients

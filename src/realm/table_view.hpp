@@ -154,10 +154,10 @@ public:
 
 
     /// Construct empty view, ready for addition of row indices.
-    TableView(ConstTableRef parent);
-    TableView(ConstTableRef parent, Query& query, size_t limit);
+    explicit TableView(ConstTableRef parent);
+    TableView(Query& query, size_t limit);
     TableView(ConstTableRef parent, ColKey column, const Obj& obj);
-    TableView(ConstTableRef parent, LinkCollectionPtr collection);
+    TableView(LinkCollectionPtr&& collection);
 
     /// Copy constructor.
     TableView(const TableView&);
@@ -172,7 +172,7 @@ public:
 
     ~TableView() {}
 
-    TableRef get_parent() noexcept
+    TableRef get_parent() const noexcept
     {
         return m_table.cast_away_const();
     }
@@ -461,8 +461,8 @@ inline TableView::TableView(ConstTableRef parent)
     }
 }
 
-inline TableView::TableView(ConstTableRef parent, Query& query, size_t lim)
-    : m_table(parent)
+inline TableView::TableView(Query& query, size_t lim)
+    : m_table(query.get_table())
     , m_query(query)
     , m_limit(lim)
 {
@@ -482,8 +482,8 @@ inline TableView::TableView(ConstTableRef src_table, ColKey src_column_key, cons
     }
 }
 
-inline TableView::TableView(ConstTableRef parent, LinkCollectionPtr collection)
-    : m_table(parent) // Throws
+inline TableView::TableView(LinkCollectionPtr&& collection)
+    : m_table(collection->get_target_table()) // Throws
     , m_collection_source(std::move(collection))
 {
     REALM_ASSERT(m_collection_source);

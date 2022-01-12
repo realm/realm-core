@@ -1852,6 +1852,18 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
     }
 }
 
+void Group::clear_history()
+{
+    bool has_history = (m_top.is_attached() && m_top.size() > s_hist_type_ndx);
+    if (has_history) {
+        auto hist_ref = m_top.get_as_ref(s_hist_ref_ndx);
+        Array::destroy_deep(hist_ref, m_top.get_alloc());
+        m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(Replication::hist_None)); // Throws
+        m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(0));                   // Throws
+        m_top.set(s_hist_ref_ndx, 0);                                                 // Throws
+    }
+}
+
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 class MemUsageVerifier : public Array::MemUsageHandler {

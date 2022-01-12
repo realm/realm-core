@@ -36,6 +36,7 @@ set(REALM_SOURCES
     db.cpp
     group_writer.cpp
     history.cpp
+    impl/copy_replication.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
     impl/transact_log.cpp
