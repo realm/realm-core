@@ -1519,7 +1519,7 @@ TableView Query::find_all(size_t limit)
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
 
-    TableView ret(m_table, *this, limit);
+    TableView ret(*this, limit);
     if (m_ordering) {
         ret.apply_descriptor_ordering(*m_ordering);
     }
@@ -1640,7 +1640,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         return find_all(min_limit);
     }
 
-    TableView ret(m_table, *this, default_limit);
+    TableView ret(*this, default_limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret;
 }
@@ -1664,7 +1664,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         return do_count(limit);
     }
 
-    TableView ret(m_table, *this, limit);
+    TableView ret(*this, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }
