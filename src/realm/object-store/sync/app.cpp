@@ -780,9 +780,9 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
 
 void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block)
 {
-    if (!user || user->state() == SyncUser::State::Removed) {
-        return completion_block(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
+        return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                                         "User must be logged in to be deleted."));
     }
 
     auto users = m_sync_manager->all_users();
@@ -809,7 +809,7 @@ void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
     }
 
     do_request(req, [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
-                     &user](Response response) {
+                     identitiy = user->identity()](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
             // In the event of an error, we still want to give the user
             // the chance to be able to delete the user data.
@@ -817,7 +817,7 @@ void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
         }
         else {
             anchor->emit_change_to_subscribers(*anchor);
-            m_sync_manager->delete_user(user->identity());
+            m_sync_manager->delete_user(identitiy);
             completion_block(error);
         }
     });
