@@ -1,0 +1,29 @@
+[
+  {
+    "_key": 0,
+    "link": {
+      "_key": 9,
+      "str1": "String_9",
+      "sub": {
+        "_key": 8,
+        "str1": "String_8",
+        "sub": {
+          "_key": 7,
+          "str1": "String_7",
+          "sub": {
+            "_key": 6,
+            "str1": "String_6",
+            "sub": {
+              "_key": 5,
+              "str1": "String_5",
+              "sub": {
+                "key": 4,
+                "table": "foo"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+]

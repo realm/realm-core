@@ -27,10 +27,6 @@
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
 
-#if REALM_ENABLE_SYNC
-#include <realm/sync/subscriptions.hpp>
-#endif
-
 #include <memory>
 #include <deque>
 
@@ -52,6 +48,10 @@ class SyncSession;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
+namespace sync {
+class SubscriptionSet;
+}
+
 namespace util {
 class Scheduler;
 }
@@ -62,85 +62,6 @@ class CollectionNotifier;
 class RealmCoordinator;
 class RealmFriend;
 } // namespace _impl
-
-// How to handle update_schema() being called on a file which has
-// already been initialized with a different schema
-enum class SchemaMode : uint8_t {
-    // If the schema version has increased, automatically apply all
-    // changes, then call the migration function.
-    //
-    // If the schema version has not changed, verify that the only
-    // changes are to add new tables and add or remove indexes, and then
-    // apply them if so. Does not call the migration function.
-    //
-    // This mode does not automatically remove tables which are not
-    // present in the schema that must be manually done in the migration
-    // function, to support sharing a Realm file between processes using
-    // different class subsets.
-    //
-    // This mode allows using schemata with different subsets of tables
-    // on different threads, but the tables which are shared must be
-    // identical.
-    Automatic,
-
-    // Open the file in immutable mode. Schema version must match the
-    // version in the file, and all tables present in the file must
-    // exactly match the specified schema, except for indexes. Tables
-    // are allowed to be missing from the file.
-    Immutable,
-
-    // Open the Realm in read-only mode, transactions are not allowed to
-    // be performed on the Realm instance. The schema of the existing Realm
-    // file won't be changed through this Realm instance. Extra tables and
-    // extra properties are allowed in the existing Realm schema. The
-    // difference of indexes is allowed as well. Other schema differences
-    // than those will cause an exception. This is different from Immutable
-    // mode, sync Realm can be opened with ReadOnly mode. Changes
-    // can be made to the Realm file through another writable Realm instance.
-    // Thus, notifications are also allowed in this mode.
-    ReadOnly,
-
-    // If the schema version matches and the only schema changes are new
-    // tables and indexes being added or removed, apply the changes to
-    // the existing file.
-    // Otherwise delete the file and recreate it from scratch.
-    // The migration function is not used.
-    //
-    // This mode allows using schemata with different subsets of tables
-    // on different threads, but the tables which are shared must be
-    // identical.
-    ResetFile,
-
-    // The only changes allowed are to add new tables, add columns to
-    // existing tables, and to add or remove indexes from existing
-    // columns. Extra tables not present in the schema are ignored.
-    // Indexes are only added to or removed from existing columns if the
-    // schema version is greater than the existing one (and unlike other
-    // modes, the schema version is allowed to be less than the existing
-    // one).
-    // The migration function is not used.
-    // This should be used when including discovered user classes.
-    // Previously called Additive.
-    //
-    // This mode allows updating the schema with additive changes even
-    // if the Realm is already open on another thread.
-    AdditiveDiscovered,
-
-    // The same additive properties as AdditiveDiscovered, except
-    // in this mode, all classes in the schema have been explicitly
-    // included by the user. This means that stricter schema checks are
-    // run such as throwing an error when an embedded object type which
-    // is not linked from any top level object types is included.
-    AdditiveExplicit,
-
-    // Verify that the schema version has increased, call the migraiton
-    // function, and then verify that the schema now matches.
-    // The migration function is mandatory for this mode.
-    //
-    // This mode requires that all threads and processes which open a
-    // file use identical schemata.
-    Manual
-};
 
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
@@ -278,8 +199,8 @@ public:
     // Returns the latest/active subscription set for a FLX-sync enabled realm. If FLX sync is not currently
     // enabled for this realm, calling this will cause future connections to the server to be opened in FLX
     // sync mode if they aren't already.
-    const sync::SubscriptionSet get_latest_subscription_set();
-    const sync::SubscriptionSet get_active_subscription_set();
+    sync::SubscriptionSet get_latest_subscription_set();
+    sync::SubscriptionSet get_active_subscription_set();
 #endif
 
     // Returns a frozen Realm for the given Realm. This Realm can be accessed from any thread.

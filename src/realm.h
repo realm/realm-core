@@ -220,6 +220,11 @@ typedef enum realm_errno {
     RLM_ERR_INVALID_QUERY_STRING,
     RLM_ERR_INVALID_QUERY,
 
+    RLM_ERR_FILE_ACCESS_ERROR,
+    RLM_ERR_FILE_PERMISSION_DENIED,
+
+    RLM_ERR_DELETE_OPENED_REALM,
+
     RLM_ERR_CALLBACK = 1000000, /**< A user-provided callback failed. */
 } realm_errno_e;
 
@@ -844,6 +849,29 @@ RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t*, void* userd
  * @return If successful, the Realm object. Otherwise, NULL.
  */
 RLM_API realm_t* realm_open(const realm_config_t* config);
+
+/**
+ * Deletes the following files for the given `realm_file_path` if they exist:
+ * - the Realm file itself
+ * - the .management folder
+ * - the .note file
+ * - the .log file
+ *
+ * The .lock file for this Realm cannot and will not be deleted as this is unsafe.
+ * If a different process / thread is accessing the Realm at the same time a corrupt state
+ * could be the result and checking for a single process state is not possible here.
+ *
+ * @param realm_file_path The path to the Realm file. All files will be derived from this.
+ * @param[out] did_delete_realm If non-null, set to true if the primary Realm file was deleted.
+ *                              Discard value if the function returns an error.
+ *
+ * @return true if no error occurred.
+ *
+ * @throws RLM_ERR_FILE_PERMISSION_DENIED if the operation was not permitted.
+ * @throws RLM_ERR_FILE_ACCESS_ERROR for any other error while trying to delete the file or folder.
+ * @throws RLM_ERR_DELETE_OPENED_REALM if the function was called on an open Realm.
+ */
+RLM_API bool realm_delete_files(const char* realm_file_path, bool* did_delete_realm);
 
 /**
  * Create a `realm_t` object from a thread-safe reference to the same realm.

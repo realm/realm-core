@@ -378,7 +378,7 @@ Obj LnkLst::create_and_set_linked_object(size_t ndx)
 
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
 {
-    TableView tv(get_target_table(), clone_linklist());
+    TableView tv(clone_linklist());
     tv.do_sync();
     tv.sort(std::move(order));
     return tv;

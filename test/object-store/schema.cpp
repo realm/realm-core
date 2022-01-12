@@ -997,61 +997,69 @@ TEST_CASE("Schema") {
         using namespace schema_change;
         using vec = std::vector<SchemaChange>;
         SECTION("add table") {
-            Schema schema1 = {{"object 1",
-                               {
-                                   {"int", PropertyType::Int},
-                               }}};
-            Schema schema2 = {{"object 1",
-                               {
-                                   {"int", PropertyType::Int},
-                               }},
-                              {"object 2",
-                               {
-                                   {"int", PropertyType::Int},
-                               }}};
+            Schema schema1 = {{"object 1", {{"int", PropertyType::Int}}}};
+            Schema schema2 = {
+                {"object 1", {{"int", PropertyType::Int}}},
+                {"object 2", {{"int", PropertyType::Int}}},
+            };
             auto obj = &*schema2.find("object 2");
             auto expected = vec{AddTable{obj}, AddInitialProperties{obj}};
             REQUIRE(schema1.compare(schema2) == expected);
         }
 
+        SECTION("add orphaned table") {
+            Schema schema1 = {{"object 1", {{"int", PropertyType::Int}}}};
+            Schema schema2 = {
+                {"object 1", {{"int", PropertyType::Int}}},
+                {"object 2", ObjectSchema::IsEmbedded{true}, {{"int", PropertyType::Int}}},
+            };
+
+            SECTION("AdditiveDiscovered") {
+                REQUIRE(schema1.compare(schema2, SchemaMode::AdditiveDiscovered).empty());
+            }
+            SECTION("Automatic") {
+                auto obj = &*schema2.find("object 2");
+                auto expected = vec{AddTable{obj}, AddInitialProperties{obj}};
+                REQUIRE(schema1.compare(schema2) == expected);
+            }
+        }
+
         SECTION("add property") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"int 1", PropertyType::Int},
-                               }}};
-            Schema schema2 = {{"object",
-                               {
-                                   {"int 1", PropertyType::Int},
-                                   {"int 2", PropertyType::Int},
-                               }}};
+            Schema schema1 = {{"object", {{"int 1", PropertyType::Int}}}};
+            Schema schema2 = {{"object", {{"int 1", PropertyType::Int}, {"int 2", PropertyType::Int}}}};
             REQUIRE(schema1.compare(schema2) ==
                     vec{(AddProperty{&*schema1.find("object"), &schema2.find("object")->persisted_properties[1]})});
         }
 
-        SECTION("remove property") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"int 1", PropertyType::Int},
-                                   {"int 2", PropertyType::Int},
-                               }}};
+        SECTION("add property to orphaned table") {
+            Schema schema1 = {{"object", ObjectSchema::IsEmbedded{true}, {{"int 1", PropertyType::Int}}}};
             Schema schema2 = {{"object",
-                               {
-                                   {"int 1", PropertyType::Int},
-                               }}};
+                               ObjectSchema::IsEmbedded{true},
+                               {{"int 1", PropertyType::Int}, {"int 2", PropertyType::Int}}}};
+
+            SECTION("AdditiveDiscovered") {
+                REQUIRE(
+                    schema1.compare(schema2, SchemaMode::AdditiveDiscovered) ==
+                    vec{(AddProperty{&*schema1.find("object"), &schema2.find("object")->persisted_properties[1]})});
+            }
+            SECTION("Automatic") {
+                REQUIRE(
+                    schema1.compare(schema2) ==
+                    vec{(AddProperty{&*schema1.find("object"), &schema2.find("object")->persisted_properties[1]})});
+            }
+        }
+
+        SECTION("remove property") {
+            Schema schema1 = {{"object", {{"int 1", PropertyType::Int}, {"int 2", PropertyType::Int}}}};
+            Schema schema2 = {{"object", {{"int 1", PropertyType::Int}}}};
             REQUIRE(
                 schema1.compare(schema2) ==
                 vec{(RemoveProperty{&*schema1.find("object"), &schema1.find("object")->persisted_properties[1]})});
         }
 
         SECTION("change property type") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"value", PropertyType::Int},
-                               }}};
-            Schema schema2 = {{"object",
-                               {
-                                   {"value", PropertyType::Double},
-                               }}};
+            Schema schema1 = {{"object", {{"value", PropertyType::Int}}}};
+            Schema schema2 = {{"object", {{"value", PropertyType::Double}}}};
             REQUIRE(
                 schema1.compare(schema2) ==
                 vec{(ChangePropertyType{&*schema1.find("object"), &schema1.find("object")->persisted_properties[0],
@@ -1060,32 +1068,14 @@ TEST_CASE("Schema") {
 
         SECTION("change link target") {
             Schema schema1 = {
-                {"object",
-                 {
-                     {"value", PropertyType::Object, "target 1"},
-                 }},
-                {"target 1",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-                {"target 2",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
+                {"object", {{"value", PropertyType::Object, "target 1"}}},
+                {"target 1", {{"value", PropertyType::Int}}},
+                {"target 2", {{"value", PropertyType::Int}}},
             };
             Schema schema2 = {
-                {"object",
-                 {
-                     {"value", PropertyType::Object, "target 2"},
-                 }},
-                {"target 1",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
-                {"target 2",
-                 {
-                     {"value", PropertyType::Int},
-                 }},
+                {"object", {{"value", PropertyType::Object, "target 2"}}},
+                {"target 1", {{"value", PropertyType::Int}}},
+                {"target 2", {{"value", PropertyType::Int}}},
             };
             REQUIRE(
                 schema1.compare(schema2) ==
@@ -1094,43 +1084,28 @@ TEST_CASE("Schema") {
         }
 
         SECTION("add index") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"int", PropertyType::Int},
-                               }}};
-            Schema schema2 = {{"object",
-                               {
-                                   {"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
-                               }}};
+            Schema schema1 = {{"object", {{"int", PropertyType::Int}}}};
+            Schema schema2 = {
+                {"object", {{"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}}}}};
             auto object_schema = &*schema1.find("object");
             REQUIRE(schema1.compare(schema2) ==
                     vec{(AddIndex{object_schema, &object_schema->persisted_properties[0]})});
         }
 
         SECTION("remove index") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
-                               }}};
-            Schema schema2 = {{"object",
-                               {
-                                   {"int", PropertyType::Int},
-                               }}};
+            Schema schema1 = {
+                {"object", {{"int", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}}}}};
+            Schema schema2 = {{"object", {{"int", PropertyType::Int}}}};
             auto object_schema = &*schema1.find("object");
             REQUIRE(schema1.compare(schema2) ==
                     vec{(RemoveIndex{object_schema, &object_schema->persisted_properties[0]})});
         }
 
         SECTION("add index and make nullable") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"int", PropertyType::Int},
-                               }}};
+            Schema schema1 = {{"object", {{"int", PropertyType::Int}}}};
             Schema schema2 = {{"object",
-                               {
-                                   {"int", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{false},
-                                    Property::IsIndexed{true}},
-                               }}};
+                               {{"int", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{false},
+                                 Property::IsIndexed{true}}}}};
             auto object_schema = &*schema1.find("object");
             REQUIRE(schema1.compare(schema2) ==
                     (vec{MakePropertyNullable{object_schema, &object_schema->persisted_properties[0]},
@@ -1138,15 +1113,9 @@ TEST_CASE("Schema") {
         }
 
         SECTION("add index and change type") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"value", PropertyType::Int},
-                               }}};
+            Schema schema1 = {{"object", {{"value", PropertyType::Int}}}};
             Schema schema2 = {
-                {"object",
-                 {
-                     {"value", PropertyType::Double, Property::IsPrimary{false}, Property::IsIndexed{true}},
-                 }}};
+                {"object", {{"value", PropertyType::Double, Property::IsPrimary{false}, Property::IsIndexed{true}}}}};
             REQUIRE(
                 schema1.compare(schema2) ==
                 vec{(ChangePropertyType{&*schema1.find("object"), &schema1.find("object")->persisted_properties[0],
@@ -1154,14 +1123,8 @@ TEST_CASE("Schema") {
         }
 
         SECTION("make nullable and change type") {
-            Schema schema1 = {{"object",
-                               {
-                                   {"value", PropertyType::Int},
-                               }}};
-            Schema schema2 = {{"object",
-                               {
-                                   {"value", PropertyType::Double | PropertyType::Nullable},
-                               }}};
+            Schema schema1 = {{"object", {{"value", PropertyType::Int}}}};
+            Schema schema2 = {{"object", {{"value", PropertyType::Double | PropertyType::Nullable}}}};
             REQUIRE(
                 schema1.compare(schema2) ==
                 vec{(ChangePropertyType{&*schema1.find("object"), &schema1.find("object")->persisted_properties[0],

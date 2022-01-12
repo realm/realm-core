@@ -139,12 +139,23 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         }
     }
 
+    // File exceptions:
+    catch (const util::File::PermissionDenied& ex) {
+        populate_error(ex, RLM_ERR_FILE_PERMISSION_DENIED);
+    }
+    catch (const util::File::AccessError& ex) {
+        populate_error(ex, RLM_ERR_FILE_ACCESS_ERROR);
+    }
+
     // Object Store exceptions:
     catch (const InvalidTransactionException& ex) {
         populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
     }
     catch (const IncorrectThreadException& ex) {
         populate_error(ex, RLM_ERR_WRONG_THREAD);
+    }
+    catch (const DeleteOnOpenRealmException& ex) {
+        populate_error(ex, RLM_ERR_DELETE_OPENED_REALM);
     }
     catch (const List::InvalidatedException& ex) {
         populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);

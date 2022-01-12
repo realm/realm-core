@@ -131,8 +131,9 @@ void ResultsNotifier::calculate_changes()
         m_previous_objs = std::move(next_objs);
     }
     else {
-        m_previous_objs.resize(m_run_tv.size());
-        for (size_t i = 0; i < m_run_tv.size(); ++i)
+        size_t sz = m_run_tv.size();
+        m_previous_objs.resize(sz);
+        for (size_t i = 0; i < sz; ++i)
             m_previous_objs[i] = m_run_tv.get_key(i);
     }
 }

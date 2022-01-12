@@ -163,6 +163,7 @@ void setup_multi_table(Table& table, size_t rows)
 
 bool json_test(std::string json, std::string expected_file, bool generate)
 {
+    // std::cout << json << std::endl;
     std::string file_name = get_test_resource_path();
     file_name += expected_file + ".json";
 
@@ -348,8 +349,9 @@ TEST(Json_LinkListCycle)
 
     // add some rows
     auto t10 = table1->create_object().set_all("hello");
-    table1->create_object().set_all("world");
+    auto t11 = table1->create_object().set_all("world");
 
+    table2->create_object().set_all("bar");
     auto t20 = table2->create_object().set_all("foo");
 
     auto col_link1 = table1->add_column_list(*table2, "linkA");
@@ -361,6 +363,7 @@ TEST(Json_LinkListCycle)
 
     auto links2 = t20.get_linklist(col_link2);
     links2.add(t10.get_key());
+    links2.add(t11.get_key());
 
     // create json
 
@@ -375,10 +378,6 @@ TEST(Json_LinkListCycle)
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle2", generate_all));
 
     ss.str("");
-    table1->to_json(ss, 0, no_renames);
-    CHECK(json_test(ss.str(), "expected_json_linklist_cycle3", generate_all));
-
-    ss.str("");
     table1->to_json(ss, 1, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle4", generate_all));
 
@@ -389,6 +388,42 @@ TEST(Json_LinkListCycle)
     ss.str("");
     table1->to_json(ss, 3, no_renames);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle6", generate_all));
+}
+
+TEST(Json_LinkListLong)
+{
+    Group group;
+
+    TableRef foos = group.add_table("foo");
+    TableRef bars = group.add_table("bar");
+
+    auto col_str = foos->add_column(type_String, "str1");
+    auto col_sub = foos->add_column(*foos, "sub");
+    auto col_link = bars->add_column(*foos, "link");
+
+    // add some rows
+    ObjKey prev;
+    for (int i = 0; i < 10; i++) {
+        std::string str = "String_" + util::to_string(i);
+        prev = foos->create_object().set(col_str, str).set(col_sub, prev).get_key();
+    }
+    bars->create_object().set(col_link, prev);
+
+    // create json
+
+    std::stringstream ss;
+
+    // Now try different link_depth arguments
+    bars->to_json(ss, 0, no_renames);
+    CHECK(json_test(ss.str(), "expected_json_linklist_long1", generate_all));
+
+    ss.str("");
+    bars->to_json(ss, -1, no_renames);
+    CHECK(json_test(ss.str(), "expected_json_linklist_long2", generate_all));
+
+    ss.str("");
+    bars->to_json(ss, 5, no_renames);
+    CHECK(json_test(ss.str(), "expected_json_linklist_long3", generate_all));
 }
 
 TEST(Json_LinkCycles)
@@ -479,13 +514,15 @@ TEST(Xjson_LinkList1)
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
-    table2->create_object_with_primary_key("t2o1").set(table2Coll, 400);
+    auto k20 = table2->create_object_with_primary_key("t2o1").set(table2Coll, 400).get_key();
     auto k21 = table2->create_object_with_primary_key("t2o2").set(table2Coll, 500).get_key();
     auto k22 = table2->create_object_with_primary_key("t2o3").set(table2Coll, 600).get_key();
 
     ColKey col_link2 = table1->add_column_list(*table2, "linkA");
+    ColKey col_link3 = table1->add_column(*table2, "linkB");
 
     // set some links
+    obj0.set(col_link3, k20);
     auto ll0 = obj0.get_linklist(col_link2); // Links to table 2
     ll0.add(k21);
 
@@ -606,10 +643,15 @@ TEST(Xjson_LinkDictionary1)
     ll1.insert("key2", k21);
     ll1.insert("key3", k22);
     ll1.insert("key4", k_unres);
+    ll1.insert("key5", Mixed{});
 
     std::stringstream ss;
 
     // Now try different link_depth arguments
+    table1->to_json(ss, 0, no_renames);
+    CHECK(json_test(ss.str(), "expected_json_linkdict1", generate_all));
+
+    ss.str("");
     table1->to_json(ss, 0, no_renames, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_linkdict1", generate_all));
 
@@ -622,6 +664,10 @@ TEST(Xjson_LinkDictionary1)
     m["str1"] = "STR1";
     m["linkA"] = "LINKA";
     m["table1"] = "TABLE1";
+    ss.str("");
+    table1->to_json(ss, 2, m);
+    CHECK(json_test(ss.str(), "expected_json_linkdict2", generate_all));
+
     ss.str("");
     table1->to_json(ss, 2, m, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_linkdict2", generate_all));
@@ -639,16 +685,16 @@ TEST(Xjson_DictionaryEmbeddedObject1)
     TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
     TableRef table2 = group.add_embedded_table("table2");
 
-    // add some more columns to table1 and table2
+    // add some columns to table1 and table2
     ColKey table1Coll = table1->add_column(type_Int, "int1");
+    ColKey col_obj = table1->add_column(*table2, "embedded");
+    ColKey col_dict = table1->add_column_dictionary(*table2, "linkA");
     table2->add_column(type_Int, "int2");
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
     auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
-
-    ColKey col_dict = table1->add_column_dictionary(*table2, "linkA");
 
     auto dict1 = obj0.get_dictionary(col_dict);
     dict1.create_and_insert_linked_object("key1").set("int2", 111);
@@ -657,14 +703,67 @@ TEST(Xjson_DictionaryEmbeddedObject1)
     dict2.create_and_insert_linked_object("key2").set("int2", 222);
     dict2.create_and_insert_linked_object("key3").set("int2", 333);
 
-    std::stringstream ss;
+    obj2.create_and_set_linked_object(col_obj).set("int2", 123);
 
+    std::stringstream ss;
+    table1->to_json(ss, 0, no_renames, output_mode_json);
+    CHECK(json_test(ss.str(), "expected_json_embeddeddict1", generate_all));
+
+    ss.str("");
     table1->to_json(ss, 0, no_renames, output_mode_xjson);
     CHECK(json_test(ss.str(), "expected_xjson_embeddeddict1", generate_all));
 
     ss.str("");
     table1->to_json(ss, 0, no_renames, output_mode_xjson_plus);
     CHECK(json_test(ss.str(), "expected_xjson_plus_embeddeddict1", generate_all));
+}
+
+TEST(Xjson_Mixed)
+{
+    Group group;
+
+    TableRef foos = group.add_table_with_primary_key("Foo", type_Int, "_id");
+    TableRef bars = group.add_table_with_primary_key("Bar", type_Int, "_id");
+
+    // add some more columns to table1 and table2
+    ColKey col_any = foos->add_column(type_Mixed, "any");
+    ColKey col_any_list = foos->add_column_list(type_Mixed, "any_list");
+    ColKey col_any_dict = foos->add_column_dictionary(type_Mixed, "any_dict");
+    ColKey col_int = bars->add_column(type_Int, "int");
+
+    // add some rows
+    for (int64_t i = 0; i < 10; i++) {
+        bars->create_object_with_primary_key(i).set(col_int, 100 * i);
+    }
+    auto obj = foos->create_object_with_primary_key(999);
+
+    auto it = bars->begin();
+    obj.set(col_any, Mixed(it->get_link()));
+
+    auto list = obj.get_list<Mixed>(col_any_list);
+    list.add(Mixed((++it)->get_link()));
+    list.add(Mixed((++it)->get_link()));
+
+    auto dict = obj.get_dictionary(col_any_dict);
+    dict.insert("key1", Mixed((++it)->get_link()));
+    dict.insert("key2", Mixed((++it)->get_link()));
+
+    std::stringstream ss;
+
+    foos->to_json(ss, 0, no_renames);
+    CHECK(json_test(ss.str(), "expected_json_mixed1", generate_all));
+
+    ss.str("");
+    foos->to_json(ss, realm::npos, no_renames);
+    CHECK(json_test(ss.str(), "expected_json_mixed2", generate_all));
+
+    ss.str("");
+    foos->to_json(ss, 0, no_renames, output_mode_xjson);
+    CHECK(json_test(ss.str(), "expected_xjson_mixed1", generate_all));
+
+    ss.str("");
+    foos->to_json(ss, 0, no_renames, output_mode_xjson_plus);
+    CHECK(json_test(ss.str(), "expected_xjson_plus_mixed1", generate_all));
 }
 
 TEST(Xjson_LinkCycles)

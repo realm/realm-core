@@ -182,6 +182,15 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
+
+    SECTION("should produce the FLX sync path when FLX sync is enabled") {
+        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
+        SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/flx_sync_default.realm";
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
+    }
 }
 
 TEST_CASE("sync_manager: user state management", "[sync]") {

@@ -1,0 +1,1 @@
+[{"_id":{"$numberLong":"999"},"any":{"key":{"$numberLong":"0"},"table":"Bar"},"any_dict":{"key1":{"key":{"$numberLong":"3"},"table":"Bar"},"key2":{"key":{"$numberLong":"4"},"table":"Bar"}},"any_list":[{"key":{"$numberLong":"1"},"table":"Bar"},{"key":{"$numberLong":"2"},"table":"Bar"}]}]

@@ -598,7 +598,6 @@ private:
 class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    using IntegrationError = ClientHistory::IntegrationError;
 
     util::PrefixLogger logger;
 
@@ -704,7 +703,7 @@ public:
     void request_download_completion_notification();
 
     /// \brief Gets or creates the subscription store associated with this Session.
-    SubscriptionStore* get_or_create_flx_subscription_store();
+    SubscriptionStore* get_flx_subscription_store();
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
@@ -759,9 +758,8 @@ public:
     /// This function is thread-safe, but if called from a thread other than the
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
-    bool integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, IntegrationError&,
-                              DownloadBatchState last_in_batch);
+    void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -773,8 +771,10 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                  IntegrationError error, DownloadBatchState batch_state);
+    void on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
+                                  DownloadBatchState batch_state);
+
+    void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
 
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
@@ -912,7 +912,7 @@ private:
     //@}
 
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    void on_flx_sync_progress(int64_t verison, DownloadBatchState batch_state);
+    void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
     void begin_resumption_delay();
     void clear_resumption_delay_state();
@@ -961,7 +961,8 @@ private:
     bool m_unbound_message_received;            // UNBOUND message received
 
     // True when there is a new FLX sync query we need to send to the server.
-    bool m_pending_query_message = false;
+    util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
+    int64_t m_last_sent_flx_query_version = 0;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
