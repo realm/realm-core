@@ -451,15 +451,17 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
                                  "in order to proceed.",
                                  ex.what());
     }
+    catch (IncompatibleHistories const& ex) {
+        RealmFileException::Kind error_kind = RealmFileException::Kind::BadHistoryError;
+        throw RealmFileException(error_kind, ex.get_path(), util::format("Unable to open realm: %1.", ex.what()),
+                                 ex.what());
+    }
     catch (util::File::AccessError const& ex) {
         // Errors for `open()` include the path, but other errors don't. We
         // don't want two copies of the path in the error, so strip it out if it
         // appears, and then include it in our prefix.
         std::string underlying = ex.what();
         RealmFileException::Kind error_kind = RealmFileException::Kind::AccessError;
-        // FIXME: Replace this with a proper specific exception type once Core adds support for it.
-        if (underlying == "Bad or incompatible history type")
-            error_kind = RealmFileException::Kind::BadHistoryError;
         auto pos = underlying.find(ex.get_path());
         if (pos != std::string::npos && pos > 0) {
             // One extra char at each end for the quotes

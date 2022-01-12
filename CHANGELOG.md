@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Add `IncompatibleHistories` case when translating file exceptions (since v6.0.0).
 
 ----------------------------------------------
 
