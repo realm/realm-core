@@ -182,6 +182,9 @@ public:
     // Removes a user
     void remove_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
+    // Permanently deletes a user.
+    void delete_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
+
     // Get the default path for a Realm for the given configuration.
     // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
     // If the file cannot be created at this location, for example due to path length restrictions,

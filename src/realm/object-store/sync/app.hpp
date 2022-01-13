@@ -32,7 +32,6 @@
 #include <mutex>
 
 namespace realm {
-
 class SyncUser;
 class SyncSession;
 class SyncManager;
@@ -280,6 +279,11 @@ public:
     /// @param user the user to remove
     /// @param completion_block Will return an error if the user is not found or the http request failed.
     void remove_user(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
+
+    /// Deletes a user and all its data from the server.
+    /// @param user The user to delete
+    /// @param completion_block Will return an error if the user is not found or the http request failed.
+    void delete_user(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
 
     // Get a provider client for the given class type.
     template <class T>

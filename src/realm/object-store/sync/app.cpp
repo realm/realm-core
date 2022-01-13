@@ -777,6 +777,47 @@ void App::remove_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
     }
 }
 
+void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block)
+{
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
+        return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                                         "User must be logged in to be deleted."));
+    }
+
+    auto users = m_sync_manager->all_users();
+
+    auto it = std::find(users.begin(), users.end(), user);
+
+    if (it == users.end()) {
+        return completion_block(
+            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+    }
+
+    std::string route = util::format("%1/auth/session", m_base_route);
+
+    Request req;
+    req.method = HttpMethod::del;
+    req.url = route;
+    req.timeout_ms = m_request_timeout_ms;
+    {
+        std::lock_guard<std::mutex> lock(*m_route_mutex);
+        req.url = util::format("%1/auth/delete", m_base_route);
+    }
+
+    do_authenticated_request(req, user,
+                             [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
+                              identitiy = user->identity()](Response response) {
+                                 if (auto error = AppUtils::check_for_errors(response)) {
+                                     completion_block(error);
+                                 }
+                                 else {
+                                     anchor->emit_change_to_subscribers(*anchor);
+                                     m_sync_manager->delete_user(identitiy);
+                                     completion_block(error);
+                                 }
+                             });
+}
+
 void App::link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
 {

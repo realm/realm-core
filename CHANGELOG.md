@@ -1,11 +1,10 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Support exporting data from a local realm to a synchonized realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
+* Add ability to delete a sync user from a MongoDB Realm app. (PR [#5153](https://github.com/realm/realm-core/pull/5153))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * UserIdentity metadata table grows indefinitely. ([#5152](https://github.com/realm/realm-core/issues/5152), since v10.0.0)
  
 ### Breaking changes

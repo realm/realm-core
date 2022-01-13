@@ -281,4 +281,19 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(sync_manager->all_users().size() == 1);
         REQUIRE(sync_manager->all_users()[0]->state() == SyncUser::State::LoggedIn);
     }
+
+    SECTION("properly deletes a user") {
+        const std::string identity = "test_identity_3";
+        const std::string refresh_token = ENCODE_FAKE_JWT("r-token-3");
+        const std::string access_token = ENCODE_FAKE_JWT("a-token-3");
+        const std::string provider_type = app::IdentityProviderAnonymous;
+        // Create the user and validate it.
+        auto user = sync_manager->get_user(identity, refresh_token, access_token, provider_type, dummy_device_id);
+        sync_manager->set_current_user(identity);
+        REQUIRE(sync_manager->get_current_user() == user);
+        REQUIRE(sync_manager->all_users().size() == 1);
+        sync_manager->delete_user(user->identity());
+        REQUIRE(sync_manager->all_users().size() == 0);
+        REQUIRE(sync_manager->get_current_user() == nullptr);
+    }
 }
