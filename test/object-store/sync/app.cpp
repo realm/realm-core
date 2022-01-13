@@ -760,26 +760,31 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
         CHECK(app->sync_manager()->all_users().size() == 0);
         CHECK(app->sync_manager()->get_current_user() == nullptr);
 
-        auto credentials = app::AppCredentials::username_password("email", "pass");
-        auto user = log_in(app, credentials);
+        auto credentials = create_user_and_log_in(app);
+        auto user = app->current_user();
 
+        CHECK(app->sync_manager()->get_current_user() == user);
         CHECK(user->state() == SyncUser::State::LoggedIn);
         app->delete_user(user, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(app->sync_manager()->all_users().size() == 0);
         });
         CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         app->log_in_with_credentials(credentials, [](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
             CHECK(!user);
             REQUIRE(error);
-            REQUIRE(error->error_code.value() == int(ServiceErrorCode::user_not_found));
+            REQUIRE(error->error_code.value() == int(ServiceErrorCode::invalid_email_password));
         });
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
 
         CHECK(app->sync_manager()->all_users().size() == 0);
         app->delete_user(user, [](Optional<app::AppError> err) {
             CHECK(err->error_code.value() > 0);
         });
+
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
         CHECK(app->sync_manager()->all_users().size() == 0);
         CHECK(user->state() == SyncUser::State::Removed);
     }

@@ -32,10 +32,6 @@
 #include <mutex>
 
 namespace realm {
-namespace util {
-template <typename Signature>
-class FunctionRef;
-}
 class SyncUser;
 class SyncSession;
 class SyncManager;

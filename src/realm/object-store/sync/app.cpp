@@ -19,7 +19,6 @@
 #include <realm/object-store/sync/app.hpp>
 
 #include <realm/util/base64.hpp>
-#include <realm/util/function_ref.hpp>
 #include <realm/util/uri.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/sync/app_utils.hpp>
@@ -800,19 +799,14 @@ void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
     req.method = HttpMethod::del;
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
-    req.uses_refresh_token = true;
-    req.headers = get_request_headers();
-    req.headers.insert({"Authorization", util::format("Bearer %1", user->refresh_token())});
     {
         std::lock_guard<std::mutex> lock(*m_route_mutex);
         req.url = util::format("%1/auth/delete", m_base_route);
     }
 
-    do_request(req, [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
-                     identitiy = user->identity()](Response response) {
+    do_authenticated_request(req, user, [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
+                                         identitiy = user->identity()](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
-            // In the event of an error, we still want to give the user
-            // the chance to be able to delete the user data.
             completion_block(error);
         }
         else {
