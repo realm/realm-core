@@ -633,6 +633,7 @@ public:
 
     // Live transactions state changes, often taking an observer functor:
     VersionID commit_and_continue_as_read(bool commit_to_disk = true) REQUIRES(!m_async_mutex);
+    void commit_and_continue_writing();
     template <class O>
     void rollback_and_continue_as_read(O* observer) REQUIRES(!m_async_mutex);
     void rollback_and_continue_as_read() REQUIRES(!m_async_mutex)
@@ -751,7 +752,6 @@ private:
     bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
     void set_transact_stage(DB::TransactStage stage) noexcept;
     void do_end_read() noexcept REQUIRES(!m_async_mutex);
-    void commit_and_continue_writing();
     void initialize_replication();
 
     void replicate(Transaction* dest, Replication& repl) const;

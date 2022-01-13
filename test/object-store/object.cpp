@@ -1729,9 +1729,9 @@ TEST_CASE("object") {
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "dictionary", util::Any(AnyDict({{"k1", "v1"s}, {"k2", "v2"s}})));
-        auto dict = any_cast<AnyDict&&>(obj.get_property_value<util::Any>(d, "dictionary"));
-        REQUIRE(util::any_cast<Mixed>(dict["k1"]) == "v1");
-        REQUIRE(util::any_cast<Mixed>(dict["k2"]) == "v2");
+        auto dict = any_cast<object_store::Dictionary&&>(obj.get_property_value<util::Any>(d, "dictionary"));
+        REQUIRE(dict.get_any("k1") == "v1");
+        REQUIRE(dict.get_any("k2") == "v2");
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));

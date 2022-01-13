@@ -64,6 +64,24 @@ public:
 private:
     VersionID m_version;
 };
+
+class DummyScheduler : public realm::util::Scheduler {
+public:
+    bool is_on_thread() const noexcept override
+    {
+        return true;
+    }
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        auto o = dynamic_cast<const DummyScheduler*>(other);
+        return (o != nullptr);
+    }
+    bool can_invoke() const noexcept override
+    {
+        return false;
+    }
+    void invoke(UniqueFunction<void()>&&) override {}
+};
 } // anonymous namespace
 
 void InvocationQueue::push(util::UniqueFunction<void()>&& fn)
@@ -120,6 +138,11 @@ std::shared_ptr<Scheduler> Scheduler::make_generic()
 std::shared_ptr<Scheduler> Scheduler::make_frozen(VersionID version)
 {
     return std::make_shared<FrozenScheduler>(version);
+}
+
+std::shared_ptr<Scheduler> Scheduler::make_dummy()
+{
+    return std::make_shared<DummyScheduler>();
 }
 
 #if REALM_PLATFORM_APPLE

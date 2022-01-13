@@ -242,7 +242,8 @@ public:
 
     // Retrieve or create user metadata.
     // Note: if `make_is_absent` is true and the user has been marked for deletion, it will be unmarked.
-    util::Optional<SyncUserMetadata> get_or_make_user_metadata(const std::string& identity, const std::string& url,
+    util::Optional<SyncUserMetadata> get_or_make_user_metadata(const std::string& identity,
+                                                               const std::string& provider_type,
                                                                bool make_if_absent = true) const;
 
     // Retrieve file action metadata.

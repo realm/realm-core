@@ -7,10 +7,11 @@ set(HEADERS
 )
 
 set(SOURCES
+    backup.cpp
     collection_change_indices.cpp
+    dictionary.cpp
     frozen_objects.cpp
     index_set.cpp
-    dictionary.cpp
     list.cpp
     main.cpp
     migrations.cpp
@@ -19,12 +20,11 @@ set(SOURCES
     primitive_list.cpp
     realm.cpp
     results.cpp
-    set.cpp
     schema.cpp
+    set.cpp
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
     uuid.cpp
-    backup.cpp
     c_api/c_api.cpp
     c_api/c_api.c
 
@@ -60,7 +60,9 @@ if(REALM_ENABLE_SYNC)
         sync/user.cpp
         sync/app.cpp
     )
-
+    if(APPLE)
+        list(APPEND SOURCES audit.cpp)
+    endif()
 endif()
 
 add_executable(ObjectStoreTests ${SOURCES} ${HEADERS})
@@ -112,8 +114,10 @@ endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+    target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
+endif()
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES

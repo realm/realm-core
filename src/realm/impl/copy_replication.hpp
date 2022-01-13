@@ -22,7 +22,7 @@
 #include <realm/replication.hpp>
 #include <realm/db.hpp>
 
-namespace realm::impl {
+namespace realm::_impl {
 
 class CopyReplication : public Replication {
 public:
@@ -83,6 +83,6 @@ private:
     std::map<const Table*, Table*> m_table_map;
 };
 
-} // namespace realm::impl
+} // namespace realm::_impl
 
 #endif /* REALM_COPY_REPLICATION_HPP */

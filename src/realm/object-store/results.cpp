@@ -261,6 +261,8 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             // just use that
             if (m_notifier && m_notifier->get_tableview(m_table_view)) {
                 m_mode = Mode::TableView;
+                if (auto audit = m_realm->audit_context())
+                    audit->record_query(m_realm->read_transaction_version(), m_table_view);
                 return;
             }
 
@@ -272,6 +274,8 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             if (m_update_policy != UpdatePolicy::AsyncOnly)
                 m_table_view = m_query.find_all(m_descriptor_ordering);
             m_mode = Mode::TableView;
+            if (auto audit = m_realm->audit_context())
+                audit->record_query(m_realm->read_transaction_version(), m_table_view);
 
             // Unless we're creating a snapshot, create an async notifier that'll
             // rerun this query in the background.

@@ -18,6 +18,7 @@
 
 #include <realm/object-store/set.hpp>
 
+#include <realm/object-store/audit.hpp>
 #include <realm/object-store/impl/list_notifier.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
@@ -245,7 +246,10 @@ Obj Set::get<Obj>(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     auto& set = as<Obj>();
-    return set.get_object(row_ndx);
+    auto obj = set.get_object(row_ndx);
+    if (auto audit = m_realm->audit_context())
+        audit->record_read(m_realm->read_transaction_version(), obj, set.get_obj(), set.get_col_key());
+    return obj;
 }
 
 template <>

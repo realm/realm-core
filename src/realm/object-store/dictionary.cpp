@@ -17,6 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/dictionary.hpp>
+
+#include <realm/object-store/audit.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
 
@@ -207,7 +209,11 @@ void Dictionary::remove_all()
 
 Obj Dictionary::get_object(StringData key)
 {
-    return dict().get_object(key);
+    auto& dictionary = dict();
+    auto obj = dictionary.get_object(key);
+    if (auto audit = m_realm->audit_context())
+        audit->record_read(m_realm->read_transaction_version(), obj, dictionary.get_obj(), dictionary.get_col_key());
+    return obj;
 }
 
 Mixed Dictionary::get_any(StringData key)

@@ -21,6 +21,7 @@
 
 #include <realm/object-store/object.hpp>
 
+#include <realm/object-store/audit.hpp>
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/dictionary.hpp>
@@ -210,7 +211,6 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
                                               : ctx.box(m_obj.get<ObjectId>(column));
         case PropertyType::Decimal:
             return ctx.box(m_obj.get<Decimal>(column));
-            //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::UUID:
             return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
                                               : ctx.box(m_obj.get<UUID>(column));
@@ -218,7 +218,10 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
             return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
-            return ctx.box(Object(m_realm, *linkObjectSchema, const_cast<Obj&>(m_obj).get_linked_object(column)));
+            auto linked = const_cast<Obj&>(m_obj).get_linked_object(column);
+            if (auto audit = m_realm->audit_context())
+                audit->record_read(m_realm->read_transaction_version(), linked, m_obj, column);
+            return ctx.box(Object(m_realm, *linkObjectSchema, linked));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);

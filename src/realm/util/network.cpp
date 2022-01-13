@@ -1848,6 +1848,22 @@ void Service::Descriptor::accept(Descriptor& desc, StreamProtocol protocol, Endp
         }
 #endif
         new_sock_fd.reset(ret);
+
+#if REALM_PLATFORM_APPLE
+        int optval = 1;
+        ret = ::setsockopt(new_sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
+        if (REALM_UNLIKELY(ret == -1)) {
+            // setsockopt() reports EINVAL if the other side disconnected while
+            // the connection was waiting in the listen queue.
+            int err = errno;
+            if (err == EINVAL) {
+                continue;
+            }
+            ec = make_basic_system_error_code(err);
+            return;
+        }
+#endif
+
         set_read_ready(true);
         break;
     }
@@ -1884,15 +1900,6 @@ void Service::Descriptor::accept(Descriptor& desc, StreamProtocol protocol, Endp
         bool value = !m_in_blocking_mode;
         if (::set_nonblock_flag(new_sock_fd, value, ec))
             return;
-    }
-#endif
-
-#if REALM_PLATFORM_APPLE
-    int optval = 1;
-    int ret = ::setsockopt(new_sock_fd, SOL_SOCKET, SO_NOSIGPIPE, &optval, sizeof optval);
-    if (REALM_UNLIKELY(ret == -1)) {
-        ec = make_basic_system_error_code(errno);
-        return;
     }
 #endif
 

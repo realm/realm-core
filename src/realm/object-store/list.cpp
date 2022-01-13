@@ -18,6 +18,7 @@
 
 #include <realm/object-store/list.hpp>
 
+#include <realm/object-store/audit.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
@@ -72,7 +73,10 @@ Obj List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     auto& list = as<Obj>();
-    return list.get_target_table()->get_object(list.get(row_ndx));
+    auto obj = list.get_target_table()->get_object(list.get(row_ndx));
+    if (auto audit = m_realm->audit_context())
+        audit->record_read(m_realm->read_transaction_version(), obj, list.get_obj(), list.get_col_key());
+    return obj;
 }
 
 template <typename T>
@@ -282,31 +286,18 @@ Results List::filter(Query q) const
     return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_coll_base), get_query().and_query(std::move(q)));
 }
 
-// The simpler definition of void_t below does not work in gcc 4.9 due to a bug
-// in that version of gcc (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64395)
-
-// template<class...> using VoidT = void;
-namespace _impl {
-template <class...>
-struct MakeVoid {
-    using type = void;
-};
-} // namespace _impl
-template <class... T>
-using VoidT = typename _impl::MakeVoid<T...>::type;
-
-template <class, class = VoidT<>>
+template <class, class = void>
 struct HasMinmaxType : std::false_type {
 };
 template <class T>
-struct HasMinmaxType<T, VoidT<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type {
+struct HasMinmaxType<T, std::void_t<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type {
 };
 
-template <class, class = VoidT<>>
+template <class, class = void>
 struct HasSumType : std::false_type {
 };
 template <class T>
-struct HasSumType<T, VoidT<typename ColumnTypeTraits<T>::sum_type>> : std::true_type {
+struct HasSumType<T, std::void_t<typename ColumnTypeTraits<T>::sum_type>> : std::true_type {
 };
 
 template <bool cond>
