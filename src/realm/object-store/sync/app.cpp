@@ -804,17 +804,18 @@ void App::delete_user(std::shared_ptr<SyncUser> user, std::function<void(Optiona
         req.url = util::format("%1/auth/delete", m_base_route);
     }
 
-    do_authenticated_request(req, user, [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
-                                         identitiy = user->identity()](Response response) {
-        if (auto error = AppUtils::check_for_errors(response)) {
-            completion_block(error);
-        }
-        else {
-            anchor->emit_change_to_subscribers(*anchor);
-            m_sync_manager->delete_user(identitiy);
-            completion_block(error);
-        }
-    });
+    do_authenticated_request(req, user,
+                             [anchor = shared_from_this(), completion_block = std::move(completion_block), this,
+                              identitiy = user->identity()](Response response) {
+                                 if (auto error = AppUtils::check_for_errors(response)) {
+                                     completion_block(error);
+                                 }
+                                 else {
+                                     anchor->emit_change_to_subscribers(*anchor);
+                                     m_sync_manager->delete_user(identitiy);
+                                     completion_block(error);
+                                 }
+                             });
 }
 
 void App::link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
