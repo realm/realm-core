@@ -724,6 +724,9 @@ void SessionImpl::on_resumed()
 
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
+    // If m_state == State::Active then we know that we haven't sent an UNBIND message and all we need to
+    // check is that we have completed the IDENT message handshake and have not yet received an ERROR
+    // message to call ensure_enlisted_to_send().
     if (m_state == State::Active && m_ident_message_sent && !m_error_message_received) {
         logger.trace("Requesting QUERY change message for new subscription set version %1", new_version);
         ensure_enlisted_to_send();
