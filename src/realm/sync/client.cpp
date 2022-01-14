@@ -638,12 +638,6 @@ const std::string& SessionImpl::get_virt_path() const noexcept
     return m_wrapper.m_virt_path;
 }
 
-
-const std::string& SessionImpl::get_signed_access_token() const noexcept
-{
-    return m_wrapper.m_signed_access_token;
-}
-
 const std::string& SessionImpl::get_realm_path() const noexcept
 {
     return m_wrapper.m_db->get_path();
@@ -1075,7 +1069,6 @@ void SessionWrapper::refresh(std::string signed_access_token)
         ClientImpl::Connection& conn = sess.get_connection();
         // FIXME: This only makes sense when each session uses a separate connection.
         conn.update_connect_info(self->m_http_request_path_prefix, self->m_signed_access_token); // Throws
-        sess.new_access_token_available();                                                       // Throws
         sess.cancel_resumption_delay();                                                          // Throws
         conn.cancel_reconnect_delay();                                                           // Throws
     });
