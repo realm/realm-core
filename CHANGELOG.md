@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 11.9.0 Release notes
 
 ### Enhancements
 * Support exporting data from a local realm to a synchonized realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
@@ -6,17 +6,10 @@
 
 ### Fixed
 * UserIdentity metadata table grows indefinitely. ([#5152](https://github.com/realm/realm-core/issues/5152), since v10.0.0)
+* Improved error messaging when opening a Realm with `IncompatibleHistories` when translating file exceptions ([#5161](https://github.com/realm/realm-core/pull/5161), since v6.0.0).
  
-### Breaking changes
-* None.
-
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
-
------------
-
-### Internals
-* Add `IncompatibleHistories` case when translating file exceptions (since v6.0.0).
 
 ----------------------------------------------
 
