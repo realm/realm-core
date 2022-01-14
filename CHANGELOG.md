@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
 
 ----------------------------------------------
 
@@ -107,6 +107,7 @@
 
 ### Internals
 * SubscriptionStore's should be initialized with an implict empty SubscriptionSet so users can wait for query version zero to finish synchronizing. ((#5166)[https://github.com/realm/realm-core/pull/5166])
+<<<<<<< HEAD
 * Fixed `Future::on_completion()` and added missing testing for it ((#5181)[https://github.com/realm/realm-core/pull/5181])
 * GenericNetworkTransport::send_request_to_server()'s signature has been changed to `void(Request&& request, util::UniqueFunction<void(const Response&)>&& completion)`. Subclasses implementing it will need to be updated.
 * `MongoClient` had a mixture of functions which took `void(Optional<T>, Optional<AppError>)` callbacks and functions which took `void(Optional<AppError>, Optional<T>)` callbacks. They now all have the error parameter last. Most of the error-first functions other than `call_function()` appear to have been unused.
