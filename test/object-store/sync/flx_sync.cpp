@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#if REALM_ENABLE_AUTH_TESTS && REALM_ENABLE_FLX_SYNC
+#if REALM_ENABLE_AUTH_TESTS
 
 #include <catch2/catch.hpp>
 

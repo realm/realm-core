@@ -77,12 +77,6 @@ create_coverage_target(generate-coverage ObjectStoreTests)
 
 add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
 
-if (REALM_ENABLE_FLX_SYNC)
-    target_compile_definitions(ObjectStoreTests PRIVATE
-        REALM_ENABLE_FLX_SYNC=1
-    )
-endif()
-
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)
 
