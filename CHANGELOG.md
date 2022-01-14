@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Sending a QUERY message may fail with `Assertion failed: !m_unbind_message_sent` ([#5149](https://github.com/realm/realm-core/pull/5149), since v11.8.0)
  
 ### Breaking changes
 * None.
