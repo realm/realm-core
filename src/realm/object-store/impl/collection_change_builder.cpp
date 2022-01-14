@@ -633,6 +633,13 @@ int64_t to_int64_t<ObjKey>(ObjKey val)
     return val.value;
 }
 
+void sort_row_info(std::vector<RowInfo>& info)
+{
+    std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
+        return lft.key < rgt.key;
+    });
+}
+
 template <typename T>
 std::vector<RowInfo> build_row_info(const std::vector<T>& rows)
 {
@@ -640,9 +647,7 @@ std::vector<RowInfo> build_row_info(const std::vector<T>& rows)
     info.reserve(rows.size());
     for (size_t i = 0; i < rows.size(); ++i)
         info.push_back({to_int64_t(rows[i]), IndexSet::npos, i});
-    std::sort(begin(info), end(info), [](auto& lft, auto& rgt) {
-        return lft.key < rgt.key;
-    });
+    sort_row_info(info);
     return info;
 }
 

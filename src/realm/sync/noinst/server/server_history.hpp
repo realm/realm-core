@@ -7,7 +7,6 @@
 #include <random>
 #include <string>
 #include <unordered_map>
-#include <set>
 
 #include <realm/util/buffer.hpp>
 #include <realm/util/logger.hpp>

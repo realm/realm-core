@@ -4,8 +4,6 @@
 #include <realm/table.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
-#include <set>
-
 using namespace realm;
 using namespace realm::sync;
 

@@ -18,7 +18,6 @@
 
 #include <new>
 #include <algorithm>
-#include <set>
 #include <fstream>
 
 #ifdef REALM_DEBUG

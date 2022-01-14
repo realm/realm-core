@@ -341,10 +341,10 @@ std::ostream& operator<<(std::ostream& os, GlobalID gid)
 
 void ChangesetIndex::print(std::ostream& os) const
 {
-    // FIXME: TODO
-    static_cast<void>(os);
+    auto print_ranges = [&](auto& subjects, const Ranges& ranges) {
+        std::sort(subjects.begin(), subjects.end());
+        subjects.erase(std::unique(subjects.begin(), subjects.end()), subjects.end());
 
-    auto print_ranges = [&](const auto& subjects, const Ranges& ranges) {
         os << "[";
         for (auto it = subjects.begin(); it != subjects.end();) {
             os << *it;
@@ -373,22 +373,22 @@ void ChangesetIndex::print(std::ostream& os) const
         }
     };
 
-    std::map<Ranges*, std::set<StringData>> schema_modifications;
-    std::map<Ranges*, std::set<GlobalID>> object_modifications;
+    std::map<Ranges*, std::vector<StringData>> schema_modifications;
+    std::map<Ranges*, std::vector<GlobalID>> object_modifications;
 
     for (auto& pair : m_schema_instructions) {
-        schema_modifications[&pair.second->ranges].insert(pair.first);
+        schema_modifications[&pair.second->ranges].push_back(pair.first);
     }
 
     for (auto& pair : m_object_instructions) {
         for (auto& pair2 : pair.second) {
-            object_modifications[&pair2.second->ranges].insert(GlobalID{pair.first, pair2.first});
+            object_modifications[&pair2.second->ranges].push_back(GlobalID{pair.first, pair2.first});
         }
     }
 
     if (schema_modifications.size()) {
         os << "SCHEMA MODIFICATIONS:\n";
-        for (const auto& pair : schema_modifications) {
+        for (auto& pair : schema_modifications) {
             print_ranges(pair.second, *pair.first);
             os << "\n";
         }
@@ -397,7 +397,7 @@ void ChangesetIndex::print(std::ostream& os) const
 
     if (object_modifications.size()) {
         os << "OBJECT MODIFICATIONS:\n";
-        for (const auto& pair : object_modifications) {
+        for (auto& pair : object_modifications) {
             print_ranges(pair.second, *pair.first);
             os << "\n";
         }
@@ -427,14 +427,16 @@ void ChangesetIndex::verify() const
     }
 
     // Collect all changesets
-    std::set<Changeset*> changesets;
+    std::vector<Changeset*> changesets;
     for (auto& cg : m_conflict_groups_owner) {
         check_ranges(cg.ranges);
 
         for (auto& ranges : cg.ranges) {
-            changesets.insert(ranges.first);
+            changesets.push_back(ranges.first);
         }
     }
+    std::sort(changesets.begin(), changesets.end(), std::less<>());
+    changesets.erase(std::unique(changesets.begin(), changesets.end()), changesets.end());
 
     // Run through all instructions in each changeset and check that
     // instructions are correctly covered by the index.

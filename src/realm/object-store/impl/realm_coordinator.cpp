@@ -891,6 +891,12 @@ void RealmCoordinator::on_change()
 }
 
 namespace {
+bool compare_notifier_versions(const std::shared_ptr<_impl::CollectionNotifier>& a,
+                               const std::shared_ptr<_impl::CollectionNotifier>& b)
+{
+    return a->version() < b->version();
+}
+
 class IncrementalChangeInfo {
 public:
     IncrementalChangeInfo(Transaction& sg, std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
@@ -899,19 +905,15 @@ public:
         if (notifiers.empty())
             return;
 
-        auto cmp = [&](auto&& lft, auto&& rgt) {
-            return lft->version() < rgt->version();
-        };
-
         // Sort the notifiers by their source version so that we can pull them
         // all forward to the latest version in a single pass over the transaction log
-        std::sort(notifiers.begin(), notifiers.end(), cmp);
+        std::sort(notifiers.begin(), notifiers.end(), compare_notifier_versions);
 
         // Preallocate the required amount of space in the vector so that we can
         // safely give out pointers to within the vector
         size_t count = 1;
         for (auto it = notifiers.begin(), next = it + 1; next != notifiers.end(); ++it, ++next) {
-            if (cmp(*it, *next))
+            if (compare_notifier_versions(*it, *next))
                 ++count;
         }
         m_info.reserve(count);
@@ -1065,9 +1067,7 @@ void RealmCoordinator::run_async_notifiers()
         // attaching A, then advancing to version 5 (letting A gather changes
         // from 2-5). We then attach C and advance to 7, then attach B and advance
         // to the latest.
-        std::sort(new_notifiers.begin(), new_notifiers.end(), [](auto& a, auto& b) {
-            return a->version() < b->version();
-        });
+        std::sort(new_notifiers.begin(), new_notifiers.end(), compare_notifier_versions);
         new_notifier_transaction = m_db->start_read(new_notifiers.front()->version());
 
         new_notifier_change_info.emplace(*new_notifier_transaction, new_notifiers);
