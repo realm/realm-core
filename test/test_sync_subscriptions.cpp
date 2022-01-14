@@ -259,8 +259,9 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
         CHECK(inserted);
         named_id = it->id();
 
-        std::tie(it, inserted) = out.insert_or_assign("b sub", query_b);
+        std::tie(it, inserted) = out.insert_or_assign("", query_b);
         CHECK(inserted);
+        CHECK_EQUAL(it->name(), "");
         CHECK_NOT_EQUAL(it->id(), named_id);
         CHECK_EQUAL(out.size(), 4);
     }

@@ -89,6 +89,11 @@ Timestamp Subscription::updated_at() const
     return m_updated_at;
 }
 
+bool Subscription::has_name() const
+{
+    return static_cast<bool>(m_name);
+}
+
 std::string_view Subscription::name() const
 {
     if (!m_name) {
@@ -246,7 +251,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name() == name);
+        return (sub.has_name() && sub.name() == name);
     });
 
     return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
