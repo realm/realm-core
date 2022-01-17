@@ -118,6 +118,18 @@ void SetBase::clear_repl(Replication* repl) const
     repl->set_clear(*this);
 }
 
+std::vector<Mixed> SetBase::convert_to_mixed_set(const CollectionBase& rhs)
+{
+    std::vector<Mixed> mixed;
+    mixed.reserve(rhs.size());
+    for (size_t i = 0; i < rhs.size(); i++) {
+        mixed.push_back(rhs.get_any(i));
+    }
+    std::sort(mixed.begin(), mixed.end(), SetElementLessThan<Mixed>());
+    mixed.erase(std::unique(mixed.begin(), mixed.end()), mixed.end());
+    return mixed;
+}
+
 template <>
 void Set<ObjKey>::do_insert(size_t ndx, ObjKey target_key)
 {

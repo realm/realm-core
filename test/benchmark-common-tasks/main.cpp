@@ -1221,6 +1221,99 @@ struct BenchmarkSortInt : BenchmarkWithInts {
     }
 };
 
+struct BenchmarkSortIntList : Benchmark {
+    const char* name() const
+    {
+        return "BenchmarkSortIntList";
+    }
+
+    void before_all(DBRef group)
+    {
+        WrtTrans tr(group);
+        TableRef t = tr.add_table(name());
+        m_col = t->add_column_list(type_Int, "ints");
+        auto obj = t->create_object();
+        m_obj = obj.get_key();
+
+        auto list = obj.get_list<int64_t>(m_col);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE; ++i) {
+            list.add(r.draw_int<int64_t>());
+        }
+        tr.commit();
+        m_indices.reserve(BASE_SIZE);
+    }
+
+    void after_all(DBRef db)
+    {
+        WrtTrans tr(db);
+        tr.get_group().remove_table(name());
+        tr.commit();
+    }
+
+    void operator()(DBRef db)
+    {
+        RdTrans tr(db);
+        auto table = tr.get_group().get_table(name());
+        auto list = table->get_object(m_obj).get_list<int64_t>(m_col);
+        list.sort(m_indices, true);
+        list.sort(m_indices, false);
+        m_indices.clear();
+    }
+
+    ColKey m_col;
+    ObjKey m_obj;
+    std::vector<size_t> m_indices;
+};
+
+struct BenchmarkSortIntDictionary : Benchmark {
+    // Dictionary sorting is sufficiently slow that we want to use a smaller size
+    static const size_t size = BASE_SIZE / 10;
+
+    const char* name() const
+    {
+        return "BenchmarkSortIntDictionary";
+    }
+
+    void before_all(DBRef group)
+    {
+        WrtTrans tr(group);
+        TableRef t = tr.add_table(name());
+        m_col = t->add_column_dictionary(type_Int, "ints");
+        auto obj = t->create_object();
+        m_obj = obj.get_key();
+
+        Dictionary dict = obj.get_dictionary(m_col);
+        Random r;
+        for (size_t i = 0; i < size; ++i) {
+            dict.insert(util::to_string(i), r.draw_int<int64_t>());
+        }
+        tr.commit();
+        m_indices.reserve(size);
+    }
+
+    void after_all(DBRef db)
+    {
+        WrtTrans tr(db);
+        tr.get_group().remove_table(name());
+        tr.commit();
+    }
+
+    void operator()(DBRef db)
+    {
+        RdTrans tr(db);
+        auto table = tr.get_group().get_table(name());
+        auto dict = table->get_object(m_obj).get_dictionary(m_col);
+        dict.sort(m_indices, true);
+        dict.sort(m_indices, false);
+        m_indices.clear();
+    }
+
+    ColKey m_col;
+    ObjKey m_obj;
+    std::vector<size_t> m_indices;
+};
+
 struct BenchmarkInsert : BenchmarkWithStringsTable {
     const char* name() const
     {
@@ -2000,6 +2093,8 @@ int benchmark_common_tasks_main()
 
     BENCH(BenchmarkSort);
     BENCH(BenchmarkSortInt);
+    BENCH(BenchmarkSortIntList);
+    BENCH(BenchmarkSortIntDictionary);
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkUnorderedTableViewClearIndexed);

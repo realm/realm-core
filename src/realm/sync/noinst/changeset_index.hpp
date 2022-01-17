@@ -5,7 +5,6 @@
 #include <deque>
 #include <list>
 #include <map>
-#include <set>
 
 #include <realm/sync/changeset.hpp>
 #include <realm/util/metered/map.hpp>
