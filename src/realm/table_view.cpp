@@ -53,15 +53,14 @@ void TableView::KeyValues::move_from(KeyValues& rhs)
     rhs.m_size = 0;
 }
 
-TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy mode)
+TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy policy_mode)
     : m_source_column_key(src.m_source_column_key)
-    , m_linked_obj_key(src.m_linked_obj_key)
 {
     bool was_in_sync = src.is_in_sync();
-    m_query = Query(src.m_query, tr, mode);
+    m_query = Query(src.m_query, tr, policy_mode);
     m_table = tr->import_copy_of(src.m_table);
 
-    if (mode == PayloadPolicy::Stay)
+    if (policy_mode == PayloadPolicy::Stay)
         was_in_sync = false;
 
     VersionID src_version =
@@ -69,26 +68,28 @@ TableView::TableView(TableView& src, Transaction* tr, PayloadPolicy mode)
     if (src_version != tr->get_version_of_current_transaction())
         was_in_sync = false;
 
+    m_table = tr->import_copy_of(src.m_table);
+    m_collection_source = tr->import_copy_of(src.m_collection_source);
+    if (src.m_source_column_key) {
+        m_linked_obj = tr->import_copy_of(src.m_linked_obj);
+    }
+
     if (was_in_sync)
         m_last_seen_versions = get_dependency_versions();
     else
         m_last_seen_versions.clear();
-    m_table = tr->import_copy_of(src.m_table);
-    m_collection_source = tr->import_copy_of(src.m_collection_source);
-    if (src.m_source_column_key) {
-        m_linked_table = tr->import_copy_of(src.m_linked_table);
-    }
+
     // don't use methods which throw after this point...or m_table_view_key_values will leak
-    if (mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
+    if (policy_mode == PayloadPolicy::Copy && src.m_key_values.is_attached()) {
         m_key_values.copy_from(src.m_key_values);
     }
-    else if (mode == PayloadPolicy::Move && src.m_key_values.is_attached())
+    else if (policy_mode == PayloadPolicy::Move && src.m_key_values.is_attached())
         // Requires that 'src' is a writable object
         m_key_values.move_from(src.m_key_values);
     else {
         m_key_values.create();
     }
-    if (mode == PayloadPolicy::Move) {
+    if (policy_mode == PayloadPolicy::Move) {
         src.m_last_seen_versions.clear();
     }
     m_descriptor_ordering = src.m_descriptor_ordering;
@@ -429,7 +430,7 @@ bool TableView::depends_on_deleted_object() const
         return !m_collection_source->get_owning_obj().is_valid();
     }
 
-    if (m_source_column_key && !(m_linked_table && m_linked_table->is_valid(m_linked_obj_key))) {
+    if (m_source_column_key && !m_linked_obj.is_valid()) {
         return true;
     }
     else if (m_query.m_source_table_view) {
@@ -440,10 +441,10 @@ bool TableView::depends_on_deleted_object() const
 
 void TableView::get_dependencies(TableVersions& ret) const
 {
-    if (m_source_column_key) {
+    if (m_source_column_key && m_linked_obj) {
         // m_source_column_key is set when this TableView was created by Table::get_backlink_view().
-        if (m_linked_table) {
-            ret.emplace_back(m_linked_table->get_key(), m_linked_table->get_content_version());
+        if (auto linked_table = m_linked_obj.get_table()) {
+            ret.emplace_back(linked_table->get_key(), linked_table->get_content_version());
         }
     }
     else if (m_query.m_table) {
@@ -572,12 +573,10 @@ void TableView::do_sync()
     }
     else if (m_source_column_key) {
         m_key_values.clear();
-        if (m_table && m_linked_table->is_valid(m_linked_obj_key)) {
-            const Obj m_linked_obj = m_linked_table->get_object(m_linked_obj_key);
+        if (m_table && m_linked_obj.is_valid()) {
             if (m_table->valid_column(m_source_column_key)) { // return empty result, if column has been removed
                 ColKey backlink_col = m_table->get_opposite_column(m_source_column_key);
                 REALM_ASSERT(backlink_col);
-                m_linked_table->report_invalid_key(backlink_col);
                 auto backlinks = m_linked_obj.get_all_backlinks(backlink_col);
                 for (auto k : backlinks) {
                     m_key_values.add(k);

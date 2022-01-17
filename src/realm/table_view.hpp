@@ -396,8 +396,7 @@ protected:
     // The source column index that this view contain backlinks for.
     ColKey m_source_column_key;
     // The target object that rows in this view link to.
-    ObjKey m_linked_obj_key;
-    ConstTableRef m_linked_table;
+    Obj m_linked_obj;
 
     // If this TableView was created from an Object Collection, then this reference points to it. Otherwise it's 0
     mutable LinkCollectionPtr m_collection_source;
@@ -472,8 +471,7 @@ inline TableView::TableView(Query& query, size_t lim)
 inline TableView::TableView(ConstTableRef src_table, ColKey src_column_key, const Obj& obj)
     : m_table(src_table) // Throws
     , m_source_column_key(src_column_key)
-    , m_linked_obj_key(obj.get_key())
-    , m_linked_table(obj.get_table())
+    , m_linked_obj(obj)
 {
     m_key_values.create();
     if (m_table) {
@@ -496,8 +494,7 @@ inline TableView::TableView(LinkCollectionPtr&& collection)
 inline TableView::TableView(const TableView& tv)
     : m_table(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
-    , m_linked_obj_key(tv.m_linked_obj_key)
-    , m_linked_table(tv.m_linked_table)
+    , m_linked_obj(tv.m_linked_obj)
     , m_collection_source(tv.m_collection_source ? tv.m_collection_source->clone_obj_list() : LinkCollectionPtr{})
     , m_descriptor_ordering(tv.m_descriptor_ordering)
     , m_query(tv.m_query)
@@ -511,8 +508,7 @@ inline TableView::TableView(const TableView& tv)
 inline TableView::TableView(TableView&& tv) noexcept
     : m_table(tv.m_table)
     , m_source_column_key(tv.m_source_column_key)
-    , m_linked_obj_key(tv.m_linked_obj_key)
-    , m_linked_table(tv.m_linked_table)
+    , m_linked_obj(tv.m_linked_obj)
     , m_collection_source(std::move(tv.m_collection_source))
     , m_descriptor_ordering(std::move(tv.m_descriptor_ordering))
     , m_query(std::move(tv.m_query))
@@ -535,8 +531,7 @@ inline TableView& TableView::operator=(TableView&& tv) noexcept
     m_limit = tv.m_limit;
     m_limit_count = tv.m_limit_count;
     m_source_column_key = tv.m_source_column_key;
-    m_linked_obj_key = tv.m_linked_obj_key;
-    m_linked_table = tv.m_linked_table;
+    m_linked_obj = tv.m_linked_obj;
     m_collection_source = std::move(tv.m_collection_source);
     m_descriptor_ordering = std::move(tv.m_descriptor_ordering);
 
@@ -555,8 +550,7 @@ inline TableView& TableView::operator=(const TableView& tv)
     m_limit = tv.m_limit;
     m_limit_count = tv.m_limit_count;
     m_source_column_key = tv.m_source_column_key;
-    m_linked_obj_key = tv.m_linked_obj_key;
-    m_linked_table = tv.m_linked_table;
+    m_linked_obj = tv.m_linked_obj;
     m_collection_source = tv.m_collection_source ? tv.m_collection_source->clone_obj_list() : LinkCollectionPtr{};
     m_descriptor_ordering = tv.m_descriptor_ordering;
 
