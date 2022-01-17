@@ -19,6 +19,7 @@
 #include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
+#include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 
 #include <realm/object-store/binding_context.hpp>
@@ -1714,3 +1715,153 @@ TEST_CASE("list of embedded objects") {
         REQUIRE_THROWS(list.set_embedded(1));  // At index > size()
     }
 }
+
+#if REALM_ENABLE_SYNC
+namespace realm {
+class TestHelper {
+public:
+    static std::shared_ptr<Transaction> transaction(Realm& shared_realm)
+    {
+        return Realm::Internal::get_transaction_ref(shared_realm);
+    }
+};
+} // namespace realm
+
+TEST_CASE("list with unresolved links") {
+    TestSyncManager init_sync_manager({}, {false});
+    auto& server = init_sync_manager.sync_server();
+
+    SyncTestFile config1(init_sync_manager.app(), "shared");
+    config1.schema = Schema{
+        {"origin",
+         {{"_id", PropertyType::Int, Property::IsPrimary(true)},
+          {"array", PropertyType::Array | PropertyType::Object, "target"}}},
+        {"target", {{"_id", PropertyType::Int, Property::IsPrimary(true)}, {"value", PropertyType::Int}}},
+    };
+
+    SyncTestFile config2(init_sync_manager.app(), "shared");
+
+    auto r1 = Realm::get_shared_realm(config1);
+    auto r2 = Realm::get_shared_realm(config2);
+
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config2.path);
+    coordinator->enable_wait_for_change();
+
+    auto origin = r1->read_group().get_table("class_origin");
+    auto target = r1->read_group().get_table("class_target");
+    ColKey col_link = origin->get_column_key("array");
+    ColKey col_target_value = target->get_column_key("value");
+
+    r1->begin_transaction();
+
+    std::vector<ObjKey> target_keys;
+    for (int64_t i = 0; i < 11; ++i) {
+        target_keys.push_back(target->create_object_with_primary_key(i).set(col_target_value, i).get_key());
+    }
+    auto origin_obj = origin->create_object_with_primary_key(100);
+    auto ll = origin_obj.get_linklist(col_link);
+    for (int i = 0; i < 10; ++i) {
+        ll.add(target_keys[i]);
+    }
+    target->invalidate_object(target_keys[2]); // Entry 2 in list will be unresolved
+    r1->commit_transaction();
+
+    server.start();
+
+    util::EventLoop::main().run_until([&] {
+        if (auto table = r2->read_group().get_table("class_target")) {
+            return table->size() > 0;
+        }
+        return false;
+    });
+
+    auto table = r2->read_group().get_table("class_origin");
+    Obj obj = *table->begin();
+    auto col = table->get_column_key("array");
+    CollectionChangeSet change;
+    List lst(r2, obj, col);
+    bool called = false;
+
+    auto require_change = [&] {
+        auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            if (!c.empty()) {
+                change = c;
+                called = true;
+            }
+        });
+        return token;
+    };
+
+    auto write = [&](auto&& f) {
+        r1->begin_transaction();
+        f();
+        r1->commit_transaction();
+        called = false;
+        util::EventLoop::main().run_until([&] {
+            return called;
+        });
+    };
+
+    SECTION("adjust index of deleted entry") {
+        auto token = require_change();
+        write([&] {
+            ll.remove(5);
+        });
+        REQUIRE_INDICES(change.deletions, 5);
+    }
+
+    SECTION("adjust index of inserted entry") {
+        auto token = require_change();
+        write([&] {
+            ll.insert(5, target_keys[10]);
+        });
+        REQUIRE_INDICES(change.insertions, 5);
+    }
+
+    SECTION("adjust index of modified entry") {
+        auto token = require_change();
+        write([&] {
+            ll.set(5, target_keys[10]);
+        });
+        REQUIRE_INDICES(change.modifications, 5);
+    }
+
+    SECTION("invalidating an object is seen as a deletion") {
+        auto token = require_change();
+        write([&] {
+            target->invalidate_object(target_keys[6]);
+        });
+        REQUIRE_INDICES(change.deletions, 5);
+    }
+
+    SECTION("resurrecting an object is seen as an insertion") {
+        auto token = require_change();
+        write([&] {
+            target->create_object_with_primary_key(2);
+        });
+        REQUIRE_INDICES(change.insertions, 2);
+    }
+
+    SECTION("inserting an unresolved link is not seen") {
+        auto token = require_change();
+        write([&] {
+            origin_obj.get_list<ObjKey>(col_link).insert(7, target->get_objkey_from_primary_key(100));
+            // We will have to make other modifications for the notifier to be called
+            ll.set(6, target_keys[10]);
+        });
+        REQUIRE(change.insertions.empty());
+        REQUIRE_INDICES(change.modifications, 6);
+    }
+
+    SECTION("erasing an unresolved link is not seen") {
+        auto token = require_change();
+        write([&] {
+            origin_obj.get_list<ObjKey>(col_link).remove(2);
+            // We will have to make other modifications for the notifier to be called
+            ll.set(6, target_keys[10]);
+        });
+        REQUIRE(change.deletions.empty());
+        REQUIRE_INDICES(change.modifications, 6);
+    }
+}
+#endif

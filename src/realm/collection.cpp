@@ -14,6 +14,32 @@ size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept
     return ndx;
 }
 
+size_t virtual2real(const BPlusTree<ObjKey>* tree, size_t ndx) noexcept
+{
+    // Only translate if context flag is set.
+    if (tree->get_context_flag()) {
+        size_t adjust = 0;
+        auto func = [&adjust, ndx](BPlusTreeNode* node, size_t offset) {
+            auto leaf = static_cast<BPlusTree<ObjKey>::LeafNode*>(node);
+            size_t sz = leaf->size();
+            for (size_t i = 0; i < sz; i++) {
+                if (i + offset == ndx) {
+                    return true;
+                }
+                auto k = leaf->get(i);
+                if (k.is_unresolved()) {
+                    adjust++;
+                }
+            }
+            return false;
+        };
+
+        tree->traverse(func);
+        ndx -= adjust;
+    }
+    return ndx;
+}
+
 size_t real2virtual(const std::vector<size_t>& vec, size_t ndx) noexcept
 {
     // Subtract the number of tombstones below ndx.

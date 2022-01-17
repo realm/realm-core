@@ -340,20 +340,20 @@ TEST(InstructionReplication_InvalidateObject)
 {
     Fixture fixture{test_context};
     {
-        WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.get_or_add_table("class_foo");
+        auto wt = fixture.sg_1->start_write();
+        TableRef foo = wt->add_table_with_primary_key("class_foo", type_Int, "_id");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        TableRef bar = wt.get_or_add_table("class_bar");
+        TableRef bar = wt->get_or_add_table("class_bar");
         ColKey col_link = bar->add_column(*foo, "link");
         ColKey col_linklist = bar->add_column_list(*foo, "linklist");
 
-        Obj obj = foo->create_object().set(col_ndx, 123);
+        Obj obj = foo->create_object_with_primary_key(1).set(col_ndx, 123);
         // Create link to object soon to be deleted
         bar->create_object().set(col_link, obj.get_key()).get_linklist(col_linklist).add(obj.get_key());
 
-        foo->create_object().set(col_ndx, 456);
+        foo->create_object_with_primary_key(2).set(col_ndx, 456);
         obj.invalidate();
-        wt.commit();
+        wt->commit();
     }
     fixture.replay_transactions();
     fixture.check_equal();

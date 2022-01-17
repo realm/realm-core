@@ -398,15 +398,22 @@ void SyncReplication::rename_column(const Table*, ColKey, StringData)
 
 void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed value)
 {
-    Replication::list_set(list, ndx, value);
+    Mixed prior_value = list.get_any(ndx);
+    bool prior_is_unresolved =
+        prior_value.is_type(type_Link, type_TypedLink) && prior_value.get<ObjKey>().is_unresolved();
 
-    if (!value.is_null()) {
-        // If link is unresolved, it should not be communicated.
-        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
-            return;
+    // If link is unresolved, it should not be communicated.
+    if (value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved()) {
+        // ... but reported internally as a deletion if prior value was not unresolved
+        if (!prior_is_unresolved)
+            Replication::list_erase(list, ndx);
+    }
+    else {
+        if (prior_is_unresolved) {
+            Replication::list_insert(list, ndx, value, 0 /* prior size not used */);
         }
-        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
-            return;
+        else {
+            Replication::list_set(list, ndx, value);
         }
     }
 
@@ -450,16 +457,9 @@ void SyncReplication::list_set(const CollectionBase& list, size_t ndx, Mixed val
 
 void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed value, size_t prior_size)
 {
-    Replication::list_insert(list, ndx, value, prior_size);
-
-    if (!value.is_null()) {
-        // If link is unresolved, it should not be communicated.
-        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
-            return;
-        }
-        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
-            return;
-        }
+    // If link is unresolved, it should not be communicated.
+    if (!(value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved())) {
+        Replication::list_insert(list, ndx, value, prior_size);
     }
 
     if (select_collection(list)) {
@@ -497,14 +497,9 @@ void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed valu
         return;
     }
 
-    if (!value.is_null()) {
-        // If link is unresolved, it should not be communicated.
-        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
-            return;
-        }
-        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
-            return;
-        }
+    // If link is unresolved, it should not be communicated.
+    if (value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved()) {
+        return;
     }
 
     if (select_table(*table)) {
@@ -564,13 +559,18 @@ void SyncReplication::list_move(const CollectionBase& view, size_t from_ndx, siz
     }
 }
 
-void SyncReplication::list_erase(const CollectionBase& view, size_t ndx)
+void SyncReplication::list_erase(const CollectionBase& list, size_t ndx)
 {
-    size_t prior_size = view.size();
-    Replication::list_erase(view, ndx);
-    if (select_collection(view)) {
+    Mixed prior_value = list.get_any(ndx);
+    // If link is unresolved, it should not be communicated.
+    if (!(prior_value.is_type(type_Link, type_TypedLink) && prior_value.get<ObjKey>().is_unresolved())) {
+        Replication::list_erase(list, ndx);
+    }
+
+    size_t prior_size = list.size();
+    if (select_collection(list)) {
         Instruction::ArrayErase instr;
-        populate_path_instr(instr, view, uint32_t(ndx));
+        populate_path_instr(instr, list, uint32_t(ndx));
         instr.prior_size = uint32_t(prior_size);
         emit(instr);
     }
@@ -623,14 +623,9 @@ void SyncReplication::set_clear(const CollectionBase& set)
 
 void SyncReplication::dictionary_update(const CollectionBase& dict, const Mixed& key, const Mixed& value)
 {
-    if (!value.is_null()) {
-        // If link is unresolved, it should not be communicated.
-        if (value.is_type(type_Link) && value.get<ObjKey>().is_unresolved()) {
-            return;
-        }
-        if (value.is_type(type_TypedLink) && value.get<ObjLink>().get_obj_key().is_unresolved()) {
-            return;
-        }
+    // If link is unresolved, it should not be communicated.
+    if (value.is_type(type_Link, type_TypedLink) && value.get<ObjKey>().is_unresolved()) {
+        return;
     }
 
     if (select_collection(dict)) {
@@ -741,35 +736,8 @@ Instruction::PrimaryKey SyncReplication::primary_key_for_object(const Table& tab
     bool should_emit = select_table(table);
     REALM_ASSERT(should_emit);
 
-    ColKey pk_col = table.get_primary_key_column();
-    const Obj obj = table.get_object(key);
-    if (pk_col) {
-        DataType pk_type = table.get_column_type(pk_col);
-        if (obj.is_null(pk_col)) {
-            return mpark::monostate{};
-        }
-
-        if (pk_type == type_Int) {
-            return obj.get<int64_t>(pk_col);
-        }
-
-        if (pk_type == type_String) {
-            StringData str = obj.get<StringData>(pk_col);
-            auto interned = m_encoder.intern_string(str);
-            return interned;
-        }
-
-        if (pk_type == type_ObjectId) {
-            ObjectId id = obj.get<ObjectId>(pk_col);
-            return id;
-        }
-
-        if (pk_type == type_UUID) {
-            UUID id = obj.get<UUID>(pk_col);
-            return id;
-        }
-
-        unsupported_instruction(); // Unsupported PK type
+    if (table.get_primary_key_column()) {
+        return as_primary_key(table.get_primary_key(key));
     }
 
     GlobalKey global_key = table.get_object_id(key);
