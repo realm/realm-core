@@ -708,44 +708,6 @@ public:
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
 
-    /// \brief Announce that a new access token is available.
-    ///
-    /// By calling this function, the application announces to the session
-    /// object that a new access token has been made available, and that it can
-    /// be fetched by calling get_signed_access_token().
-    ///
-    /// This function will not resume a session that has already been suspended
-    /// by an error (e.g., `ProtocolError::token_expired`). If the application
-    /// wishes to resume such a session, it should follow up with a call to
-    /// cancel_resumption_delay().
-    ///
-    /// Even if the session is not suspended when this function is called, it
-    /// may end up becoming suspended before the new access token is delivered
-    /// to the server. For example, the prior access token may expire before the
-    /// new access token is received by the server, but the ERROR message may
-    /// not arrive on the client until after the new token is made available by
-    /// the application. This means that the application must be prepared to
-    /// receive `ProtocolError::token_expired` after making a new access token
-    /// available, even when the new token has not expired. Fortunately, this
-    /// should be a rare event, so the application can choose to handle this by
-    /// "blindly" renewing the token again, even though such a renewal is
-    /// technically redundant.
-    ///
-    /// FIXME: Improve the implementation of new_access_token_available() such
-    /// that there is no risk of getting the session suspended by
-    /// `ProtocolError::token_expired` after a new access token has been made
-    /// available. Doing this right, requires protocol changes: Add sequence
-    /// number to REFRESH messages sent by client, and introduce a REFRESH
-    /// response message telling the client that a particular token has been
-    /// received by the server.
-    ///
-    /// IMPORTANT: get_signed_access_token() may get called before
-    /// new_access_token_available() returns (reentrant callback).
-    ///
-    /// It is an error to call this function before activation of the session,
-    /// or after initiation of deactivation.
-    void new_access_token_available();
-
     /// If this session is currently suspended, resume it immediately.
     ///
     /// It is an error to call this function before activation of the session,
@@ -801,18 +763,6 @@ private:
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
     const std::string& get_virt_path() const noexcept;
-
-    /// Fetch a reference to the signed access token.
-    ///
-    /// This function is always called by the event loop thread of the
-    /// associated client object.
-    ///
-    /// This function is guaranteed to not be called before activation, and also
-    /// not after initiation of deactivation.
-    ///
-    /// FIXME: For the upstream client of a 2nd tier server it is not ideal that
-    /// the admin token needs to be uploaded for every session.
-    const std::string& get_signed_access_token() const noexcept;
 
     const std::string& get_realm_path() const noexcept;
     DB& get_db() const noexcept;
@@ -933,11 +883,6 @@ private:
 
     util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
     std::chrono::milliseconds m_try_again_activation_delay{1000};
-
-    // Set to false when a new access token is available and needs to be
-    // uploaded to the server. Set to true when uploading of the token has been
-    // initiated via a BIND or a REFRESH message.
-    bool m_access_token_sent = false;
 
     DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
 
@@ -1097,7 +1042,6 @@ private:
     void send_upload_message();
     void send_mark_message();
     void send_alloc_message();
-    void send_refresh_message();
     void send_unbind_message();
     void send_query_change_message();
     std::error_code receive_ident_message(SaltedFileIdent);
@@ -1344,19 +1288,6 @@ inline void ClientImpl::Session::request_download_completion_notification()
     // cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
     if (m_ident_message_sent && !m_error_message_received)
-        ensure_enlisted_to_send(); // Throws
-}
-
-inline void ClientImpl::Session::new_access_token_available()
-{
-    REALM_ASSERT(m_state == Active);
-
-    m_access_token_sent = false;
-
-    // Since the deactivation process has not been initiated, the UNBIND message
-    // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_bind_message_sent && !m_error_message_received)
         ensure_enlisted_to_send(); // Throws
 }
 

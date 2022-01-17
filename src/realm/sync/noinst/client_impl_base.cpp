@@ -1595,9 +1595,6 @@ void Session::send_message()
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
-    if (!m_access_token_sent)
-        return send_refresh_message(); // Throws
-
     if (!m_ident_message_sent) {
         if (have_client_file_ident())
             send_ident_message(); // Throws
@@ -1645,7 +1642,6 @@ void Session::send_bind_message()
 
     session_ident_type session_ident = m_ident;
     const std::string& path = get_virt_path();
-    const std::string& signed_access_token = get_signed_access_token();
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
 
@@ -1653,12 +1649,13 @@ void Session::send_bind_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
-    protocol.make_bind_message(protocol_version, out, session_ident, path, signed_access_token,
-                               need_client_file_ident, is_subserver);   // Throws
+    // Discard the token since it's ignored by the server.
+    std::string empty_access_token{};
+    protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
+                               is_subserver);                           // Throws
     m_conn.initiate_write_message(out, this);                           // Throws
 
     m_bind_message_sent = true;
-    m_access_token_sent = true;
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -1890,36 +1887,6 @@ void Session::send_mark_message()
 }
 
 
-void Session::send_refresh_message()
-{
-    REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(m_bind_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(!m_access_token_sent);
-
-    const std::string& signed_access_token = get_signed_access_token();
-    std::size_t signed_access_token_size = signed_access_token.size();
-
-    logger.debug("Sending: REFRESH(signed_user_token_size=%1)",
-                 signed_access_token_size); // Throws
-
-    ClientProtocol& protocol = m_conn.get_client_protocol();
-    OutputBuffer& out = m_conn.get_output_buffer();
-    session_ident_type session_ident = get_ident();
-    protocol.make_refresh_message(out, session_ident, signed_access_token); // Throws
-    m_conn.initiate_write_message(out, this);                               // Throws
-
-    m_access_token_sent = true;
-
-    // If the IDENT message has not yet been sent, is now ready to be sent if the
-    // file identifier pair has become available. If IDENT message has been
-    // sent, various other messages may be waiting to be sent, but in that case,
-    // we also have the file identifier pair.
-    if (have_client_file_ident())
-        enlist_to_send(); // Throws
-}
-
-
 void Session::send_unbind_message()
 {
     REALM_ASSERT(m_state == Deactivating || m_error_message_received);
@@ -1967,7 +1934,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     m_client_file_ident = client_file_ident;
 
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
-        // Ready to send the IDENT (or REFRESH) message
+        // Ready to send the IDENT message
         ensure_enlisted_to_send(); // Throws
         return std::error_code{};  // Success
     }
@@ -2034,7 +2001,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         this->m_progress.upload.client_version = 0;
     }
 
-    // Ready to send the IDENT (or REFRESH) message
+    // Ready to send the IDENT message
     ensure_enlisted_to_send(); // Throws
     return std::error_code{};  // Success
 }

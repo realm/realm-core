@@ -2620,7 +2620,6 @@ public:
     void terminate()
     {
         logger.detail("Session terminated", m_session_ident);         // Throws
-        modify_user_sessions_metric(-1);                              // Throws
         metrics().increment("session.terminated");                    // Throws
         metrics().gauge("session.online", --gauges().session_online); // Throws
     }
@@ -2652,12 +2651,6 @@ public:
             return;
         }
         // Protocol state was SendUnbound, and remains unchanged
-    }
-
-    bool expired()
-    {
-        const ServerImpl& server = m_connection.get_server();
-        return (m_access_token && m_access_token->expired(server.token_expiration_clock_now()));
     }
 
     bool is_enlisted_to_send() const noexcept
@@ -2740,96 +2733,6 @@ public:
         // This session is now destroyed!
     }
 
-    bool authenticate_user(const std::string& signed_user_token, bool is_refresh, ProtocolError& perror)
-    {
-        AccessToken::ParseError error;
-        Optional<AccessToken> access_token =
-            m_connection.get_server().get_access_control().verify_access_token(signed_user_token, &error);
-        switch (error) {
-            case AccessToken::ParseError::invalid_base64: {
-                logger.error("Invalid Base64 (signed_user_token='%1', is_refresh=%2)",
-                             short_token_fmt(signed_user_token), is_refresh); // Throws
-                metrics().increment("authentication.failed");                 // Throws
-                perror = ProtocolError::bad_authentication;
-                return false;
-            }
-            case AccessToken::ParseError::invalid_json: {
-                logger.error("Invalid JSON (signed_user_token='%1', is_refresh=%2)",
-                             short_token_fmt(signed_user_token), is_refresh); // Throws
-                metrics().increment("authentication.failed");                 // Throws
-                perror = ProtocolError::bad_authentication;
-                return false;
-            }
-            case AccessToken::ParseError::invalid_signature: {
-                if (access_token) {
-                    if (is_refresh && access_token->identity != m_access_token->identity)
-                        goto wrong_identity;
-                    // Invalid signature, but still got a token; this indicates
-                    // that we're running without token verification, so
-                    // issue a warning and proceed.
-                    logger.warn("Accepting client without authentication!"); // Throws
-                    metrics().increment("authentication.failed");            // Throws
-                    m_access_token = std::move(access_token);
-                    return true;
-                }
-                else {
-                    logger.error("Signature does not match user token (signed_user_token='%1', "
-                                 "is_refresh=%2)",
-                                 short_token_fmt(signed_user_token),
-                                 is_refresh);                     // Throws
-                    metrics().increment("authentication.failed"); // Throws
-                    perror = ProtocolError::bad_authentication;
-                    return false;
-                }
-            }
-            case AccessToken::ParseError::invalid_jwt: {
-                logger.error("Invalid JWT format (signed_user_token='%1', is_refresh=%2)",
-                             short_token_fmt(signed_user_token), is_refresh); // Throws
-                metrics().increment("authentication.failed");                 // Throws
-                perror = ProtocolError::bad_authentication;
-                return false;
-            }
-            case AccessToken::ParseError::none:
-                REALM_ASSERT(access_token);
-
-                if (is_refresh && access_token->identity != m_access_token->identity) {
-                wrong_identity:
-                    logger.error("Change of user identity during session (signed_user_token='%1')",
-                                 short_token_fmt(signed_user_token)); // Throws
-                    metrics().increment("authentication.failed");     // Throws
-                    perror = ProtocolError::bad_authentication;
-                    return false;
-                }
-
-                const ServerImpl& server = m_connection.get_server();
-                if (access_token->expired(server.token_expiration_clock_now())) {
-                    logger.detail("Token expired (signed_user_token='%1', is_refresh=%2)",
-                                  short_token_fmt(signed_user_token), is_refresh); // Throws
-                    metrics().increment("authentication.failed");                  // Throws
-                    perror = ProtocolError::token_expired;
-                    return false;
-                }
-
-                if (access_token->sync_label) {
-                    if (*access_token->sync_label != "default") {
-                        const ServerImpl& server = m_connection.get_server();
-                        if (!server.is_load_balancing_allowed()) {
-                            logger.error("Load balancing is not allowed by the feature token "
-                                         "(signed_user_token='%1', is_refresh=%2)",
-                                         short_token_fmt(signed_user_token), is_refresh); // Throws
-                            metrics().increment("authentication.failed");                 // Throws
-                            perror = ProtocolError::bad_authentication;
-                            return false;
-                        }
-                    }
-                }
-
-                m_access_token = std::move(access_token);
-                return true;
-        }
-        REALM_UNREACHABLE();
-    }
-
     bool receive_bind_message(std::string path, std::string signed_user_token, bool need_client_file_ident,
                               bool is_subserver, ProtocolError& error)
     {
@@ -2839,12 +2742,6 @@ public:
                           path, short_token_fmt(signed_user_token), int(need_client_file_ident),
                           int(is_subserver)); // Throws
         }
-
-        bool is_refresh = false;
-        if (!authenticate_user(signed_user_token, is_refresh, error)) // Throws
-            return false;
-
-        modify_user_sessions_metric(+1); // Throws
 
         ServerImpl& server = m_connection.get_server();
         _impl::VirtualPathComponents virt_path_components =
@@ -2858,35 +2755,6 @@ public:
             metrics().increment("protocol.violated");         // Throws
             error = ProtocolError::illegal_realm_path;
             return false;
-        }
-
-        const AccessControl& access_control = server.get_access_control();
-        bool is_admin = access_control.is_admin(*m_access_token);
-
-        // For now, clients can only declare themselves as subservers if they
-        // have admin rights.
-        if (REALM_UNLIKELY(is_subserver && !is_admin)) {
-            logger.error("Permission denied: Client without admin rights cannot declare itself as "
-                         "subserver");                // Throws
-            metrics().increment("permission.denied"); // Throws
-            error = ProtocolError::permission_denied;
-            return false;
-        }
-
-        // We need to check that the user has permission to work with the Realm corresponding to path.
-        // Admin users have full access.
-
-        if (!is_admin) {
-            // Full sync for a non-admin user.
-            if (REALM_UNLIKELY(!access_control.can(*m_access_token, Privilege::Download, path))) {
-                logger.error("Permission denied for full sync "
-                             "(message_type='bind', permission='download', path='%1', "
-                             "signed_user_token='%2')",
-                             path, short_token_fmt(signed_user_token)); // Throws
-                metrics().increment("permission.denied");               // Throws
-                error = ProtocolError::permission_denied;
-                return false;
-            }
         }
 
         // The user has proper permissions at this stage.
@@ -2908,8 +2776,8 @@ public:
 
         m_server_file->add_unidentified_session(this); // Throws
 
-        logger.info("Client info: (path='%1', user='%2', from=%3, protocol=%4) %5", path, m_access_token->identity,
-                    m_connection.get_remote_endpoint(), m_connection.get_client_protocol_version(),
+        logger.info("Client info: (path='%1', from=%2, protocol=%3) %4", path, m_connection.get_remote_endpoint(),
+                    m_connection.get_client_protocol_version(),
                     m_connection.get_client_user_agent()); // Throws
 
         m_is_subserver = is_subserver;
@@ -2929,7 +2797,7 @@ public:
         return true;
     }
 
-    bool receive_refresh_message(std::string signed_user_token, ProtocolError& error)
+    bool receive_refresh_message(std::string signed_user_token)
     {
         // Protocol state must be AllocatingIdent, SendIdent, WaitForIdent, or WaitForUnbind.
         REALM_ASSERT(!unbind_message_received());
@@ -2937,22 +2805,6 @@ public:
 
         logger.detail("Received: REFRESH(signed_user_token='%1')",
                       short_token_fmt(signed_user_token)); // Throws
-
-        bool is_refresh = true;
-        if (!authenticate_user(signed_user_token, is_refresh, error)) // Throws
-            return false;
-
-        const std::string& virt_path = m_server_file->get_virt_path();
-        const AccessControl& access_control = m_connection.get_server().get_access_control();
-        if (!access_control.can(*m_access_token, Privilege::Download, virt_path)) {
-            logger.error("Permission denied "
-                         "(message_type='bind', permission='download', path='%1', "
-                         "signed_user_token='%2').",
-                         virt_path, short_token_fmt(signed_user_token)); // Throws
-            metrics().increment("permission.denied");                    // Throws
-            error = ProtocolError::permission_denied;
-            return false;
-        }
 
         return true;
     }
@@ -2976,30 +2828,6 @@ public:
                      "latest_server_version_salt=%6)",
                      client_file_ident, client_file_ident_salt, scan_server_version, scan_client_version,
                      latest_server_version, latest_server_version_salt); // Throws
-
-        if (!m_access_token) {
-            logger.error("Permission denied (message_type='ident', reason='not logged in')"); // Throws
-            metrics().increment("permission.denied");                                         // Throws
-            error = ProtocolError::permission_denied;
-            return false;
-        }
-
-        if (expired()) {
-            logger.detail("Received IDENT message while session token had expired"); // Throws
-            metrics().increment("authentication.failed");                            // Throws
-            error = ProtocolError::token_expired;
-            return false;
-        }
-
-        ServerImpl& server = m_connection.get_server();
-        const std::string& virt_path = m_server_file->get_virt_path();
-        const AccessControl& access_control = server.get_access_control();
-        if (!access_control.can(*m_access_token, Privilege::Download, virt_path)) {
-            logger.error("Permission denied (message_type='ident', permission='download')"); // Throws
-            metrics().increment("permission.denied");                                        // Throws
-            error = ProtocolError::permission_denied;
-            return false;
-        }
 
         {
             const ClientFileBlacklist& list = m_server_file->get_client_file_blacklist();
@@ -3107,6 +2935,7 @@ public:
         m_upload_threshold = upload_threshold;
         m_locked_server_version = locked_server_version;
 
+        ServerImpl& server = m_connection.get_server();
         const Server::Config& config = server.get_config();
         m_disable_download = (config.disable_download_for.count(client_file_ident) != 0);
 
@@ -3135,39 +2964,6 @@ public:
                       "locked_server_version=%3, num_changesets=%4)",
                       progress_client_version, progress_server_version, locked_server_version,
                       upload_changesets.size()); // Throws
-
-        // UPLOAD permission is only checked if there are actually changesets in
-        // the UPLOAD message. If the UPLOAD message is empty, it means only
-        // that the client is reporting its download progress to the server, so
-        // we actually want to react to that when we can, such that history can
-        // be compacted, even for read-only clients.
-        if (!upload_changesets.empty()) {
-            if (REALM_UNLIKELY(!m_access_token)) {
-                logger.error("Permission denied (message_type='upload', "
-                             "reason='not logged in')");  // Throws
-                metrics().increment("permission.denied"); // Throws
-                error = ProtocolError::permission_denied;
-                return false;
-            }
-
-            if (REALM_UNLIKELY(expired())) {
-                logger.detail("Received non-empty UPLOAD message while session token had "
-                              "expired");                     // Throws
-                metrics().increment("authentication.failed"); // Throws
-                error = ProtocolError::token_expired;
-                return false;
-            }
-
-            const AccessControl& access_control = m_connection.get_server().get_access_control();
-            const std::string& virt_path = m_server_file->get_virt_path();
-            if (REALM_UNLIKELY(!access_control.can(*m_access_token, Privilege::Upload, virt_path))) {
-                logger.error("Permission denied (message_type='upload', path='%1')",
-                             virt_path);                  // Throws
-                metrics().increment("permission.denied"); // Throws
-                error = ProtocolError::permission_denied;
-                return false;
-            }
-        }
 
         // We are unable to reproduce the cursor object for the upload progress
         // when the protocol version is less than 29, because the client does
@@ -3424,7 +3220,7 @@ public:
         return true;
     }
 
-    bool receive_mark_message(request_ident_type request_ident, ProtocolError& error)
+    bool receive_mark_message(request_ident_type request_ident, ProtocolError&)
     {
         // Protocol state must be WaitForUnbind
         REALM_ASSERT(!m_send_ident_message);
@@ -3434,13 +3230,6 @@ public:
         REALM_ASSERT(!m_error_message_sent);
 
         logger.debug("Received: MARK(request_ident=%1)", request_ident); // Throws
-
-        if (expired()) {
-            logger.detail("Received MARK message while session token had expired"); // Throws
-            metrics().increment("authentication.failed");                           // Throws
-            error = ProtocolError::token_expired;
-            return false;
-        }
 
         m_download_completion_request = request_ident;
 
@@ -3489,10 +3278,6 @@ private:
     // reset to null when the deactivation process is initiated, either when the
     // UNBIND message is recieved, or when initiate_deactivation() is called.
     util::bind_ptr<ServerFile> m_server_file;
-
-    // The current access token, if any, for this session. This is populated
-    // by authenticate_user() after receiving a BIND message.
-    Optional<AccessToken> m_access_token;
 
     bool m_disable_download = false;
     bool m_is_subserver = false;
@@ -3869,16 +3654,6 @@ private:
         if (m_file_ident_request != 0)
             file.cancel_file_ident_request(m_file_ident_request);
         m_server_file.reset();
-    }
-
-    void modify_user_sessions_metric(double diff)
-    {
-        if (m_access_token) {
-            std::string key =
-                ("user_sessions,identity=" + Metrics::percent_encode(m_access_token->identity)); // Throws
-            double val = (gauges().user_sessions[m_access_token->identity] += diff);             // Throws
-            metrics().gauge(key.c_str(), val);                                                   // Throws
-        }
     }
 
     friend class SessionQueue;
@@ -5834,10 +5609,7 @@ void SyncConnection::receive_refresh_message(session_ident_type session_ident, s
         return;
     }
 
-    ProtocolError error;
-    bool success = sess.receive_refresh_message(std::move(signed_user_token), error); // Throws
-    if (REALM_UNLIKELY(!success))                                                     // Throws
-        protocol_error(error, &sess);                                                 // Throws
+    sess.receive_refresh_message(std::move(signed_user_token)); // Throws
 }
 
 
