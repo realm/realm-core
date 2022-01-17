@@ -3255,9 +3255,6 @@ TEST(Sync_Permissions)
 
     TEST_DIR(server_dir);
 
-    // FIXME: This could use a single client, but the fixture doesn't really
-    // make it easier to deal with session-level errors without disrupting other
-    // sessions.
     ClientServerFixture fixture{server_dir, test_context};
     fixture.set_client_side_error_handler([&](std::error_code, bool, const std::string& message) {
         CHECK_EQUAL("", message);
