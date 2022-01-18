@@ -27,7 +27,6 @@ struct EZConfig {
 struct EZEndpoint {
     std::string address;
     port_type port;
-    std::string http_host; // Contents of `Host:` request header
     std::string path;      // Includes auth token in query.
     std::string protocols; // separated with ", "
     bool is_ssl;

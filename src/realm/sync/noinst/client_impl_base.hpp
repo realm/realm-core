@@ -490,7 +490,6 @@ private:
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
-    const std::string m_http_host; // Contents of `Host:` request header
     const bool m_verify_servers_ssl_certificate;
     const util::Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SSLVerifyCallback> m_ssl_verify_callback;

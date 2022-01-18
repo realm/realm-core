@@ -652,7 +652,6 @@ void Connection::initiate_reconnect()
         m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
                                                     m_address,
                                                     m_port,
-                                                    m_http_host,
                                                     get_http_request_path(),
                                                     std::move(sec_websocket_protocol),
                                                     is_ssl(m_protocol_envelope),

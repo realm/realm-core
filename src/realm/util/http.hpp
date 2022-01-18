@@ -515,9 +515,6 @@ private:
     }
 };
 
-
-std::string make_http_host(bool is_ssl, std::string_view address, std::uint_fast16_t port);
-
 } // namespace util
 } // namespace realm
 
