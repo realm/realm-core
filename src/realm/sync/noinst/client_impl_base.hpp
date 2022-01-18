@@ -129,7 +129,6 @@ public:
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
-    bool get_tcp_no_delay() const noexcept;
     util::network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
@@ -151,7 +150,6 @@ private:
     const milliseconds_type m_fast_reconnect_limit;
     const bool m_disable_upload_activation_delay;
     const bool m_dry_run; // For testing purposes only
-    const bool m_tcp_no_delay;
     const bool m_enable_default_port_hack;
     const bool m_disable_upload_compaction;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
@@ -1080,11 +1078,6 @@ inline auto ClientImpl::get_reconnect_mode() const noexcept -> ReconnectMode
 inline bool ClientImpl::is_dry_run() const noexcept
 {
     return m_dry_run;
-}
-
-inline bool ClientImpl::get_tcp_no_delay() const noexcept
-{
-    return m_tcp_no_delay;
 }
 
 inline util::network::Service& ClientImpl::get_service() noexcept

@@ -3563,7 +3563,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     Client::Config config;
     config.logger = &client_logger;
     config.reconnect_mode = ReconnectMode::testing;
-    config.tcp_no_delay = true;
     Client client(config);
 
     ThreadWrapper client_thread;
@@ -3721,7 +3720,6 @@ TEST(Sync_UploadDownloadProgress_1)
         Client::Config config;
         config.logger = &client_logger;
         config.reconnect_mode = ReconnectMode::testing;
-        config.tcp_no_delay = true;
         Client client(config);
 
         ThreadWrapper client_thread;
@@ -3997,7 +3995,6 @@ TEST(Sync_UploadDownloadProgress_3)
     Client::Config client_config;
     client_config.logger = &client_logger;
     client_config.reconnect_mode = ReconnectMode::testing;
-    client_config.tcp_no_delay = true;
     Client client(client_config);
 
     ThreadWrapper client_thread;
@@ -4303,7 +4300,6 @@ TEST(Sync_UploadDownloadProgress_6)
     client_config.logger = &client_logger;
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
-    client_config.tcp_no_delay = true;
     Client client(client_config);
 
     ThreadWrapper client_thread;
@@ -4363,7 +4359,6 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     Client::Config config;
     config.logger = &test_context.logger;
     config.reconnect_mode = ReconnectMode::testing;
-    config.tcp_no_delay = true;
     Client client{config};
     Session session_1{client, db, nullptr};
     Session session_2{client, db, nullptr};
