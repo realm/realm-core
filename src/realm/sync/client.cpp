@@ -1397,7 +1397,15 @@ void ClientImpl::Connection::on_idle()
 
 std::string ClientImpl::Connection::get_http_request_path() const
 {
-    std::string path = m_http_request_path_prefix; // Throws (copy)
+    using namespace std::string_view_literals;
+    const auto param = m_http_request_path_prefix.find('?') == std::string::npos ? "?baas_at="sv : "&baas_at="sv;
+
+    std::string path;
+    path.reserve(m_http_request_path_prefix.size() + param.size() + m_signed_access_token.size());
+    path += m_http_request_path_prefix;
+    path += param;
+    path += m_signed_access_token;
+
     return path;
 }
 

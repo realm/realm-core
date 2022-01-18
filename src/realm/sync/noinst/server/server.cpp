@@ -1981,7 +1981,7 @@ private:
         // supposed to be mandatory, then that check ought to be delegated to
         // handle_request_for_sync(), as that will yield a sharper separation of
         // concerns.
-        if (path == "/realm-sync" || path.begins_with("/realm-sync/%2F")) {
+        if (path == "/realm-sync" || path.begins_with("/realm-sync?") || path.begins_with("/realm-sync/%2F")) {
             handle_request_for_sync(request); // Throws
         }
         else if (path.begins_with("/api/")) {
