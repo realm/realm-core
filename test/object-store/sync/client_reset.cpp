@@ -387,6 +387,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 })
                 ->run();
         }
+
         SECTION("delete") {
             test_reset
                 ->make_local_changes([&](SharedRealm local) {
@@ -412,29 +413,111 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
 
-        SECTION("added table") {
-            auto verify_changes = [](SharedRealm realm) {
+        SECTION("Simultaneous compatible schema changes are allowed") {
+            const std::string new_table_name = "same new table name";
+            const std::string existing_table_name = "preexisting table name";
+            const std::string locally_added_table_name = "locally added table";
+            const std::string remotely_added_table_name = "remotely added table";
+            const Property pk_id = {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}};
+            const Property shared_added_property = {"added identical property",
+                                                    PropertyType::UUID | PropertyType::Nullable};
+            const Property locally_added_property = {"locally added property", PropertyType::ObjectId};
+            const Property remotely_added_property = {"remotely added property",
+                                                      PropertyType::Float | PropertyType::Nullable};
+            auto verify_changes = [&](SharedRealm realm) {
                 REQUIRE_NOTHROW(advance_and_notify(*realm));
-                auto table = get_table(*realm, "object2");
-                REQUIRE(table);
-                auto sorted = table->get_sorted_view(table->get_column_key("_id"));
-                REQUIRE(sorted.size() == 2);
-                REQUIRE(sorted.get_object(0).get_primary_key().get_int() == 1);
-                REQUIRE(sorted.get_object(1).get_primary_key().get_int() == 2);
+                std::vector<std::string> tables_to_check = {existing_table_name, new_table_name,
+                                                            locally_added_table_name, remotely_added_table_name};
+                for (auto& table_name : tables_to_check) {
+                    CAPTURE(table_name);
+                    auto table = get_table(*realm, table_name);
+                    REQUIRE(table);
+                    REQUIRE(table->get_column_key(shared_added_property.name));
+                    REQUIRE(table->get_column_key(locally_added_property.name));
+                    REQUIRE(table->get_column_key(remotely_added_property.name));
+                    auto sorted_results = table->get_sorted_view(table->get_column_key(pk_id.name));
+                    REQUIRE(sorted_results.size() == 2);
+                    REQUIRE(sorted_results.get_object(0).get_primary_key().get_int() == 1);
+                    REQUIRE(sorted_results.get_object(1).get_primary_key().get_int() == 2);
+                }
             };
             make_reset(local_config, remote_config)
-                ->make_local_changes([&](SharedRealm local) {
-                    local->update_schema(
+                ->setup([&](SharedRealm before) {
+                    before->update_schema(
                         {
-                            {"object2",
+                            {existing_table_name,
                              {
-                                 {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
-                                 {"realm_id", PropertyType::String | PropertyType::Nullable},
+                                 pk_id,
+                                 partition_prop,
                              }},
                         },
                         0, nullptr, nullptr, true);
-                    create_object(*local, "object2", partition, {1});
-                    create_object(*local, "object2", partition, {2});
+                })
+                ->make_local_changes([&](SharedRealm local) {
+                    local->update_schema(
+                        {
+                            {new_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 locally_added_property,
+                                 shared_added_property,
+                             }},
+                            {existing_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 locally_added_property,
+                                 shared_added_property,
+                             }},
+                            {locally_added_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 locally_added_property,
+                                 shared_added_property,
+                                 remotely_added_property,
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+
+                    create_object(*local, new_table_name, partition, {1});
+                    create_object(*local, existing_table_name, partition, {1});
+                    create_object(*local, locally_added_table_name, partition, {1});
+                    create_object(*local, locally_added_table_name, partition, {2});
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    remote->update_schema(
+                        {
+                            {new_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 remotely_added_property,
+                                 shared_added_property,
+                             }},
+                            {existing_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 remotely_added_property,
+                                 shared_added_property,
+                             }},
+                            {remotely_added_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 remotely_added_property,
+                                 locally_added_property,
+                                 shared_added_property,
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+
+                    create_object(*remote, new_table_name, partition, {2});
+                    create_object(*remote, existing_table_name, partition, {2});
+                    create_object(*remote, remotely_added_table_name, partition, {1});
+                    create_object(*remote, remotely_added_table_name, partition, {2});
                 })
                 ->on_post_reset([&](SharedRealm local) {
                     verify_changes(local);
@@ -444,57 +527,54 @@ TEST_CASE("sync: client reset", "[client reset]") {
             wait_for_upload(*remote);
             wait_for_download(*remote);
             verify_changes(remote);
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
         }
 
-        SECTION("added property") {
-            const std::string new_property_value = "new property value";
-            auto verify_changes = [&](SharedRealm realm) {
-                REQUIRE_NOTHROW(advance_and_notify(*realm));
-                auto table = get_table(*realm, "object");
-                REQUIRE(table);
-                ColKey col_int_array = table->get_column_key("array");
-                REQUIRE(col_int_array);
-                REQUIRE(col_int_array.is_list());
-                REQUIRE(col_int_array.get_type() == col_type_Int);
-                REQUIRE(col_int_array.is_nullable() == false);
-                ColKey col_link = table->get_column_key("link");
-                REQUIRE(col_link);
-                REQUIRE(col_link.is_collection() == false);
-                REQUIRE(col_link.get_type() == col_type_Link);
-                REQUIRE(table->get_link_target(col_link) == table);
-                ColKey col_string = table->get_column_key("value2");
-                REQUIRE(col_string);
-                REQUIRE(col_string.get_type() == col_type_String);
-                REQUIRE(col_string.is_nullable() == true);
-                REQUIRE(col_string.is_collection() == false);
-                REQUIRE(table->begin()->get_any(col_string).get_string() == new_property_value);
+        SECTION("incompatible property changes are rejected") {
+            const Property pk_id = {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}};
+            const std::string table_name = "new table";
+            const std::string prop_name = "new_property";
+            ThreadSafeSyncError err;
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                err = error;
             };
             make_reset(local_config, remote_config)
                 ->make_local_changes([&](SharedRealm local) {
                     local->update_schema(
                         {
-                            {"object",
+                            {table_name,
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                                 {"value2", PropertyType::String | PropertyType::Nullable, Property::IsPrimary{false},
-                                  Property::IsIndexed{true}},
-                                 {"array", PropertyType::Int | PropertyType::Array},
-                                 {"link", PropertyType::Object | PropertyType::Nullable, "object"},
-                                 {"realm_id", PropertyType::String | PropertyType::Nullable},
+                                 pk_id,
+                                 partition_prop,
+                                 {prop_name, PropertyType::Float},
                              }},
                         },
                         0, nullptr, nullptr, true);
-                    auto table = ObjectStore::table_for_object_type(local->read_group(), "object");
-                    table->begin()->set(table->get_column_key("value2"), new_property_value);
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    remote->update_schema(
+                        {
+                            {table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 {prop_name, PropertyType::Int},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
-                    verify_changes(realm);
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
+                    REQUIRE_NOTHROW(realm->refresh());
                 })
                 ->run();
-            auto remote = Realm::get_shared_realm(remote_config);
-            wait_for_upload(*remote);
-            wait_for_download(*remote);
-            verify_changes(remote);
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
         }
     }
 

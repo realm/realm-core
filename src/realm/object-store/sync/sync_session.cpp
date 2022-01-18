@@ -391,6 +391,7 @@ void SyncSession::handle_error(SyncError error)
                     case ClientResyncMode::DiscardLocal:
                         [[fallthrough]];
                     case ClientResyncMode::Recover: {
+                        // FIXME: check the error to see if the server says that Recover mode is allowed.
                         REALM_ASSERT(bool(m_config.get_fresh_realm_for_path));
                         std::string fresh_path = _impl::ClientResetOperation::get_fresh_path_for(m_db->get_path());
                         m_config.get_fresh_realm_for_path(fresh_path, [weak_self_ref = weak_from_this()](
