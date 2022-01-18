@@ -30,7 +30,10 @@
 
 namespace realm::sync {
 namespace {
+// Schema version history:
+//   v2: Initial public beta.
 
+constexpr static int c_flx_schema_version = 2;
 constexpr static std::string_view c_flx_metadata_table("flx_metadata");
 constexpr static std::string_view c_flx_subscription_sets_table("flx_subscription_sets");
 constexpr static std::string_view c_flx_subscriptions_table("flx_subscriptions");
@@ -506,7 +509,7 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
 
         auto schema_metadata = tr->add_table(c_flx_metadata_table);
         auto version_col = schema_metadata->add_column(type_Int, c_flx_meta_schema_version_field);
-        schema_metadata->create_object().set(version_col, int64_t(2));
+        schema_metadata->create_object().set(version_col, int64_t(c_flx_schema_version));
 
         auto sub_sets_table =
             tr->add_table_with_primary_key(c_flx_subscription_sets_table, type_Int, c_flx_sub_sets_version_field);
@@ -526,7 +529,7 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         m_sub_set_keys->error_str = sub_sets_table->add_column(type_String, c_flx_sub_sets_error_str_field, true);
         m_sub_set_keys->subscriptions =
             sub_sets_table->add_column_list(*subs_table, c_flx_sub_sets_subscriptions_field);
-        tr->commit();
+        tr->commit_and_continue_as_read();
         return true;
     };
 
@@ -549,7 +552,7 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         auto version_obj = schema_metadata->get_object(0);
         auto version = version_obj.get<int64_t>(
             lookup_and_validate_column(schema_metadata, c_flx_meta_schema_version_field, type_Int));
-        if (version != 2) {
+        if (version != c_flx_schema_version) {
             throw std::runtime_error("Invalid schema version for flexible sync metadata");
         }
 
@@ -576,6 +579,16 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
         m_sub_keys->query_str = lookup_and_validate_column(subs, c_flx_sub_query_str_field, type_String);
         m_sub_keys->object_class_name = lookup_and_validate_column(subs, c_flx_sub_object_class_field, type_String);
         m_sub_keys->name = lookup_and_validate_column(subs, c_flx_sub_name_field, type_String);
+    }
+
+    // There should always be at least one subscription set so that the user can always wait for synchronizationon
+    // on the result of get_latest().
+    if (auto sub_sets = tr->get_table(m_sub_set_keys->table); sub_sets->is_empty()) {
+        tr->promote_to_write();
+        auto zero_sub = sub_sets->create_object_with_primary_key(Mixed{int64_t(0)});
+        zero_sub.set(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Pending));
+        zero_sub.set(m_sub_set_keys->snapshot_version, tr->get_version());
+        tr->commit();
     }
 }
 

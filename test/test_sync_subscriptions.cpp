@@ -34,15 +34,16 @@ TEST(Sync_SubscriptionStoreBasic)
     {
         SubscriptionStoreFixture fixture(sub_store_path);
         SubscriptionStore store(fixture.db, [](int64_t) {});
-        // Because there are no subscription sets yet, get_latest should point to an invalid object
-        // and all the property accessors should return dummy values.
+        // Because there are no subscription sets yet, get_latest should point to an empty object
         auto latest = store.get_latest();
         CHECK(latest.begin() == latest.end());
         CHECK_EQUAL(latest.size(), 0);
         CHECK(latest.find("a sub") == latest.end());
         CHECK_EQUAL(latest.version(), 0);
         CHECK(latest.error_str().is_null());
-        CHECK_EQUAL(latest.state(), SubscriptionSet::State::Uncommitted);
+        // The "0" query is "Pending" from beginning since it gets created in the initial constructor
+        // of SubscriptionStore
+        CHECK_EQUAL(latest.state(), SubscriptionSet::State::Pending);
 
         // By making a mutable copy of `latest` we should create an actual object that we can modify.
         auto out = latest.make_mutable_copy();

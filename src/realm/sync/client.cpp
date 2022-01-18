@@ -828,6 +828,9 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
 
 void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
 {
+    if (!has_flx_subscription_store()) {
+        return;
+    }
     REALM_ASSERT(new_version >= m_flx_last_seen_version);
     REALM_ASSERT(new_version >= m_flx_active_version);
     SubscriptionSet::State new_state;
@@ -847,11 +850,9 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             break;
     }
 
-    if (new_version != 0) {
-        auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
-        mut_subs.update_state(new_state);
-        std::move(mut_subs).commit();
-    }
+    auto mut_subs = get_flx_subscription_store()->get_mutable_by_version(new_version);
+    mut_subs.update_state(new_state);
+    std::move(mut_subs).commit();
 }
 
 SubscriptionStore* SessionWrapper::get_flx_subscription_store()

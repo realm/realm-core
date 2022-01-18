@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* SubscriptionStore's should be initialized with an implict empty SubscriptionSet so users can wait for query version zero to finish synchronizing. ((#5166)[https://github.com/realm/realm-core/pull/5166])
 
 ----------------------------------------------
 
