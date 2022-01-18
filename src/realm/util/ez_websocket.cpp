@@ -218,8 +218,6 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
     }
 
     REALM_ASSERT(m_socket);
-    if (m_config.tcp_no_delay)
-        m_socket->set_option(util::network::SocketBase::no_delay(true)); // Throws
     util::network::Endpoint ep_2 = m_socket->local_endpoint();
     logger().info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
                   ep_2.port()); // Throws

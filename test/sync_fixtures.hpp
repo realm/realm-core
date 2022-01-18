@@ -545,7 +545,6 @@ public:
             config_2.ping_keepalive_period = config.client_ping_period;
             config_2.pong_keepalive_timeout = config.client_pong_timeout;
             config_2.disable_upload_compaction = config.disable_upload_compaction;
-            config_2.tcp_no_delay = true;
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
             m_clients[i] = std::make_unique<Client>(std::move(config_2));

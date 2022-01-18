@@ -21,7 +21,6 @@ struct EZConfig {
     std::mt19937_64& random;
     util::network::Service& service;
     std::string user_agent;
-    bool tcp_no_delay;
 };
 
 struct EZEndpoint {
