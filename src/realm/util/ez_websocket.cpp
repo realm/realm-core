@@ -334,7 +334,7 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
 
 void EZSocketImpl::initiate_websocket_handshake()
 {
-    HTTPHeaders headers = m_endpoint.headers;
+    auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_config.user_agent;
 
     m_websocket.initiate_client_handshake(m_endpoint.path, m_endpoint.http_host, m_endpoint.protocols,

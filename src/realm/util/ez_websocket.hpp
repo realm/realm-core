@@ -28,10 +28,14 @@ struct EZEndpoint {
     std::string address;
     port_type port;
     std::string http_host; // Contents of `Host:` request header
-    std::string path;
+    std::string path;      // Includes auth token in query.
     std::string protocols; // separated with ", "
     bool is_ssl;
-    util::HTTPHeaders headers; // Includes both auth and "custom" headers
+
+    // The remaining fields are just passing through values from the SyncConfig. They can be ignored if SDK chooses
+    // not to support the related config options. This may be necessary when using websocket libraries without
+    // low-level control.
+    std::map<std::string, std::string> headers; // Only includes "custom" headers.
     bool verify_servers_ssl_certificate;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;

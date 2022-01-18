@@ -648,25 +648,20 @@ void Connection::initiate_reconnect()
         sec_websocket_protocol = std::move(out).str();
     }
 
-    util::HTTPHeaders headers;
-    headers[m_authorization_header_name] = _impl::make_authorization_header(m_signed_access_token); // Throws
-
-    for (auto const& header : m_custom_http_headers)
-        headers[header.first] = header.second;
-
-    m_websocket = m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
-                                                              m_address,
-                                                              m_port,
-                                                              m_http_host,
-                                                              get_http_request_path(),
-                                                              std::move(sec_websocket_protocol),
-                                                              is_ssl(m_protocol_envelope),
-                                                              std::move(headers),
-                                                              m_verify_servers_ssl_certificate,
-                                                              m_ssl_trust_certificate_path,
-                                                              m_ssl_verify_callback,
-                                                              m_proxy_config,
-                                                          });
+    m_websocket =
+        m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
+                                                    m_address,
+                                                    m_port,
+                                                    m_http_host,
+                                                    get_http_request_path(),
+                                                    std::move(sec_websocket_protocol),
+                                                    is_ssl(m_protocol_envelope),
+                                                    {m_custom_http_headers.begin(), m_custom_http_headers.end()},
+                                                    m_verify_servers_ssl_certificate,
+                                                    m_ssl_trust_certificate_path,
+                                                    m_ssl_verify_callback,
+                                                    m_proxy_config,
+                                                });
 }
 
 
