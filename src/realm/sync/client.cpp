@@ -1337,7 +1337,6 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
     , m_port{std::get<2>(endpoint)}
-    , m_http_host{util::make_http_host(is_ssl(m_protocol_envelope), m_address, m_port)} // Throws
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
     , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}

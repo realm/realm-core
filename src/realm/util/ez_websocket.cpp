@@ -337,7 +337,12 @@ void EZSocketImpl::initiate_websocket_handshake()
     auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_config.user_agent;
 
-    m_websocket.initiate_client_handshake(m_endpoint.path, m_endpoint.http_host, m_endpoint.protocols,
+    // Compute the value of the "Host" header.
+    const std::uint_fast16_t default_port = (m_endpoint.is_ssl ? 443 : 80);
+    auto host = m_endpoint.port == default_port ? m_endpoint.address
+                                                : util::format("%1:%2", m_endpoint.address, m_endpoint.port);
+
+    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), m_endpoint.protocols,
                                           std::move(headers)); // Throws
 }
 } // namespace
