@@ -125,24 +125,6 @@ public:
     }
 };
 
-/// Thrown when a column can not by found
-class ColumnNotFound : public std::runtime_error {
-public:
-    ColumnNotFound()
-        : std::runtime_error("Column not found")
-    {
-    }
-};
-
-/// Thrown when a column key is already used
-class ColumnAlreadyExists : public std::runtime_error {
-public:
-    ColumnAlreadyExists()
-        : std::runtime_error("Column already exists")
-    {
-    }
-};
-
 /// Thrown when a key is already existing when trying to create a new object
 class KeyAlreadyUsed : public std::runtime_error {
 public:

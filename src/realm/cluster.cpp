@@ -1004,7 +1004,7 @@ void Cluster::init_leaf(ColKey col_key, ArrayPayload* leaf) const
     // Currently, the query subsystem may call with an unvalidated key.
     // once fixed, reintroduce the noexcept declaration :-D
     if (auto t = m_tree_top.get_owning_table())
-        t->report_invalid_key(col_key);
+        t->check_column(col_key);
     ref_type ref = to_ref(Array::get(col_ndx.val + 1));
     if (leaf->need_spec()) {
         m_tree_top.set_spec(*leaf, col_ndx);

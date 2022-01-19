@@ -292,7 +292,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
-            table->report_invalid_key(col_key);
+            table->check_column(col_key);
 
             if (col_key.is_collection()) {
                 auto& schema = schema_for_table(obj->get_realm(), table->get_key());
@@ -325,7 +325,7 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
-        table->report_invalid_key(col_key);
+        table->check_column(col_key);
 
         if (!col_key.is_list()) {
             auto table = obj.get_table();

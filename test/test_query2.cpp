@@ -4628,10 +4628,10 @@ TEST(Query_ColumnDeletionLinks)
     CHECK_EQUAL(tv.size(), 1);
     // remove link column, disaster
     bar->remove_column(col_link0);
-    CHECK_LOGIC_ERROR(bar->report_invalid_key(col_link0), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(bar->check_column(col_link0), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
     foo->remove_column(col_link1);
-    CHECK_LOGIC_ERROR(foo->report_invalid_key(col_link1), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(foo->check_column(col_link1), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
 }

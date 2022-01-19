@@ -160,7 +160,11 @@ public:
     void remove_column(ColKey col_key);
     void rename_column(ColKey col_key, StringData new_name);
     bool valid_column(ColKey col_key) const noexcept;
-    void check_column(ColKey col_key) const;
+    void check_column(ColKey col_key) const
+    {
+        if (REALM_UNLIKELY(!valid_column(col_key)))
+            throw LogicError(LogicError::column_does_not_exist);
+    }
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
     void set_embedded(bool embedded);
@@ -392,7 +396,7 @@ public:
     // Will return pointer to search index accessor. Will return nullptr if no index
     StringIndex* get_search_index(ColKey col) const noexcept
     {
-        report_invalid_key(col);
+        check_column(col);
         if (!has_search_index(col))
             return nullptr;
         return m_index_accessors[col.get_index().val].get();
@@ -521,7 +525,6 @@ public:
     ColKey::Idx spec_ndx2leaf_ndx(size_t idx) const;
     ColKey leaf_ndx2colkey(ColKey::Idx idx) const;
     ColKey spec_ndx2colkey(size_t ndx) const;
-    void report_invalid_key(ColKey col_key) const;
 
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
@@ -981,7 +984,7 @@ public:
     template <class T>
     inline Columns<T> column(ColKey col_key)
     {
-        m_current_table->report_invalid_key(col_key);
+        m_current_table->check_column(col_key);
 
         // Check if user-given template type equals Realm type.
         auto ct = col_key.get_type();
@@ -1302,15 +1305,6 @@ inline ColKey Table::spec_ndx2colkey(size_t spec_ndx) const
     return m_leaf_ndx2colkey[m_spec_ndx2leaf_ndx[spec_ndx].val];
 }
 
-inline void Table::report_invalid_key(ColKey col_key) const
-{
-    if (col_key == ColKey())
-        throw LogicError(LogicError::column_does_not_exist);
-    auto idx = col_key.get_index();
-    if (idx.val >= m_leaf_ndx2colkey.size() || m_leaf_ndx2colkey[idx.val] != col_key)
-        throw LogicError(LogicError::column_does_not_exist);
-}
-
 inline size_t Table::leaf_ndx2spec_ndx(ColKey::Idx leaf_ndx) const
 {
     REALM_ASSERT(leaf_ndx.val < m_leaf_ndx2colkey.size());
@@ -1343,12 +1337,6 @@ bool inline Table::valid_column(ColKey col_key) const noexcept
     if (leaf_idx.val >= m_leaf_ndx2colkey.size())
         return false;
     return col_key == m_leaf_ndx2colkey[leaf_idx.val];
-}
-
-inline void Table::check_column(ColKey col_key) const
-{
-    if (REALM_UNLIKELY(!valid_column(col_key)))
-        throw ColumnNotFound();
 }
 
 // The purpose of this class is to give internal access to some, but
