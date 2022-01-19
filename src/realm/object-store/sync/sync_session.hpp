@@ -131,10 +131,12 @@ public:
     // The callback is run asynchronously, and upon whatever thread the underlying sync client
     // chooses to run it on.
     void wait_for_upload_completion(std::function<void(std::error_code)> callback);
+    util::Future<std::error_code> wait_for_upload_completion();
 
     // Register a callback that will be called when all pending downloads have been completed.
     // Works the same way as `wait_for_upload_completion()`.
     void wait_for_download_completion(std::function<void(std::error_code)> callback);
+    util::Future<std::error_code> wait_for_download_completion();
 
     // Register a notifier that updates the app regarding progress.
     //
@@ -265,7 +267,6 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
-    using CompletionCallbacks = std::map<int64_t, std::pair<ProgressDirection, std::function<void(std::error_code)>>>;
 
     class ConnectionChangeNotifier {
     public:
@@ -285,6 +286,21 @@ private:
         size_t m_callback_index = -1;
         size_t m_callback_count = -1;
         uint64_t m_next_token = 0;
+    };
+
+    struct CompletionFuture : util::AtomicRefCountBase {
+        CompletionFuture(util::Promise<std::error_code>&& promise,
+                         _impl::SyncProgressNotifier::NotifierType direction)
+            : promise(std::forward<util::Promise<std::error_code>>(promise))
+            , direction(direction)
+            , complete(false)
+        {
+        }
+
+        util::Promise<std::error_code> promise;
+        _impl::SyncProgressNotifier::NotifierType direction;
+        bool complete;
+        std::list<util::bind_ptr<CompletionFuture>>::iterator pos;
     };
 
     friend class realm::SyncManager;
@@ -314,6 +330,7 @@ private:
     void handle_error(SyncError);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
                          const std::string& context_message);
+    std::list<util::bind_ptr<CompletionFuture>> get_cancelable_waits(const std::unique_lock<std::mutex>&);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
@@ -336,8 +353,9 @@ private:
     void become_waiting_for_access_token(std::unique_lock<std::mutex>&);
 
 
-    void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
+    void add_completion_callback(const std::unique_lock<std::mutex>&, util::Promise<std::error_code> promise,
                                  ProgressDirection direction);
+    void register_completion_package(const std::unique_lock<std::mutex>&, util::bind_ptr<CompletionFuture> package);
 
     std::function<TransactionCallback> m_sync_transact_callback;
 
@@ -359,8 +377,7 @@ private:
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager = nullptr;
 
-    int64_t m_completion_request_counter = 0;
-    CompletionCallbacks m_completion_callbacks;
+    std::list<util::bind_ptr<CompletionFuture>> m_completion_futures;
 
     // The underlying `Session` object that is owned and managed by this `SyncSession`.
     // The session is first created when the `SyncSession` is moved out of its initial `inactive` state.

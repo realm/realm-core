@@ -2023,23 +2023,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     auto get_dogs = [](SharedRealm r) -> Results {
         auto& config = r->config();
         auto session = config.sync_config->user->sync_manager()->get_existing_session(config.path);
-        std::atomic<bool> called{false};
-        session->wait_for_upload_completion([&](std::error_code err) {
-            REQUIRE(err == std::error_code{});
-            called.store(true);
-        });
-        timed_wait_for([&] {
-            return called.load();
-        });
-        REQUIRE(called);
-        called.store(false);
-        session->wait_for_download_completion([&](std::error_code err) {
-            REQUIRE(err == std::error_code{});
-            called.store(true);
-        });
-        timed_wait_for([&] {
-            return called.load();
-        });
+        REQUIRE(session->wait_for_upload_completion().get() == std::error_code{});
+        REQUIRE(session->wait_for_download_completion().get() == std::error_code{});
         return Results(r, r->read_group().get_table("class_Dog"));
     };
 

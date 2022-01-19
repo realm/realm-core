@@ -842,6 +842,8 @@ private:
     /// The default implementation does nothing.
     void on_download_completion();
 
+    void on_sync_completion(WaitForCompletionType which);
+
     //@{
     /// These are called as the state of the session changes between
     /// "suspended" and "resumed". The initial state is

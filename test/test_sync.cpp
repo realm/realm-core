@@ -175,17 +175,11 @@ TEST(Sync_AsyncWaitForUploadCompletion)
     Session session = fixture.make_bound_session(db, "/test");
 
     auto wait = [&] {
-        BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
-                bowl.add_stone();
-        };
-        session.async_wait_for_upload_completion(handler);
-        bowl.get_stone();
+        session.async_wait_for_sync_completion(WaitForCompletionTypeUpload).get();
     };
 
     // Empty
-    wait();
+    session.async_wait_for_sync_completion(WaitForCompletionTypeUpload).get();
 
     // Nonempty
     write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
@@ -213,13 +207,7 @@ TEST(Sync_AsyncWaitForDownloadCompletion)
     fixture.start();
 
     auto wait = [&](Session& session) {
-        BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
-                bowl.add_stone();
-        };
-        session.async_wait_for_download_completion(handler);
-        bowl.get_stone();
+        session.async_wait_for_sync_completion(WaitForCompletionTypeDownload).get();
     };
 
     // Nothing to download
@@ -275,13 +263,7 @@ TEST(Sync_AsyncWaitForSyncCompletion)
     fixture.start();
 
     auto wait = [&](Session& session) {
-        BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec) {
-            if (CHECK_NOT(ec))
-                bowl.add_stone();
-        };
-        session.async_wait_for_sync_completion(handler);
-        bowl.get_stone();
+        session.async_wait_for_sync_completion(WaitForCompletionTypeDownload | WaitForCompletionTypeUpload).get();
     };
 
     // Nothing to synchronize
@@ -321,31 +303,22 @@ TEST(Sync_AsyncWaitCancellation)
     TEST_CLIENT_DB(db);
     ClientServerFixture fixture(dir, test_context);
 
-    BowlOfStonesSemaphore bowl;
-    auto upload_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
-    auto download_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
-    auto sync_completion_handler = [&](std::error_code ec) {
-        CHECK_EQUAL(util::error::operation_aborted, ec);
-        bowl.add_stone();
-    };
+    std::vector<util::Future<void>> futures;
     {
         Session session = fixture.make_bound_session(db, "/test");
-        session.async_wait_for_upload_completion(upload_completion_handler);
-        session.async_wait_for_download_completion(download_completion_handler);
-        session.async_wait_for_sync_completion(sync_completion_handler);
+        futures.push_back(session.async_wait_for_sync_completion(WaitForCompletionTypeUpload));
+        futures.push_back(session.async_wait_for_sync_completion(WaitForCompletionTypeDownload));
+        futures.push_back(
+            session.async_wait_for_sync_completion(WaitForCompletionTypeDownload | WaitForCompletionTypeUpload));
         // Destruction of session cancels wait operations
     }
 
     fixture.start();
-    bowl.get_stone();
-    bowl.get_stone();
-    bowl.get_stone();
+
+    for (auto& future : futures) {
+        auto res = std::move(future).get_no_throw();
+        CHECK_EQUAL(res.code(), ErrorCodes::OperationAborted);
+    }
 }
 
 
@@ -519,11 +492,7 @@ TEST(Sync_WaitForSessionTerminations)
     session.wait_for_download_complete_or_client_stopped();
     // Note: Atomicity would not be needed if
     // Session::async_wait_for_download_completion() was assumed to work.
-    std::atomic<bool> called{false};
-    auto handler = [&](std::error_code) {
-        called = true;
-    };
-    session.async_wait_for_download_completion(std::move(handler));
+    auto download_complete = session.async_wait_for_sync_completion(WaitForCompletionTypeDownload);
     session.detach();
     // The completion handler of an asynchronous wait operation is guaranteed
     // to be called, and no later than at session termination time. Also, any
@@ -532,7 +501,8 @@ TEST(Sync_WaitForSessionTerminations)
     // operation, must have finished executing when
     // Client::wait_for_session_terminations_or_client_stopped() returns.
     fixture.wait_for_session_terminations_or_client_stopped();
-    CHECK(called);
+    CHECK(download_complete.is_ready());
+    CHECK_NOT(download_complete.get_no_throw().is_ok());
 }
 
 

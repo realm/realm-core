@@ -211,14 +211,12 @@ TEST_CASE("sync: log-in", "[sync]") {
             ++error_count;
         });
 
-        std::atomic<bool> download_did_complete(false);
-        session->wait_for_download_completion([&](auto) {
-            download_did_complete = true;
-        });
+        auto download_complete = session->wait_for_download_completion();
         EventLoop::main().run_until([&] {
-            return download_did_complete.load() || error_count > 0;
+            return download_complete.is_ready() || error_count > 0;
         });
         CHECK(error_count == 0);
+        std::move(download_complete).ignore_value().get();
     }
 
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
@@ -293,13 +291,11 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
     }
 
     SECTION("handles reconnects while it's trying to deactivate session") {
-        bool wait_called = false;
-        session->wait_for_download_completion([&](std::error_code ec) {
+        Future<void> wait_done = session->wait_for_download_completion().then([session](std::error_code ec) {
             REQUIRE(ec == util::error::operation_aborted);
             REQUIRE(session->config().client_validate_ssl);
             REQUIRE(session->state() == SyncSession::State::Inactive);
 
-            wait_called = true;
             session->revive_if_needed();
 
             REQUIRE(session->state() != SyncSession::State::Inactive);
@@ -308,7 +304,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
         auto config = session->config();
         config.client_validate_ssl = false;
         session->update_configuration(std::move(config));
-        REQUIRE(wait_called);
+        wait_done.get();
     }
 }
 

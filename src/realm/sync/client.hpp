@@ -653,9 +653,9 @@ public:
     ///
     /// Note: These functions are fully thread-safe. That is, they may be called
     /// by any thread, and by multiple threads concurrently.
-    void async_wait_for_sync_completion(WaitOperCompletionHandler);
-    void async_wait_for_upload_completion(WaitOperCompletionHandler);
-    void async_wait_for_download_completion(WaitOperCompletionHandler);
+    util::Future<void> async_wait_for_upload_completion();
+    util::Future<void> async_wait_for_download_completion();
+    util::Future<void> async_wait_for_sync_completion(WaitForCompletionType which);
     /// @}
 
     /// @{ \brief Synchronous wait for upload or download completion.
@@ -714,7 +714,6 @@ private:
     SessionWrapper* m_impl = nullptr;
 
     void abandon() noexcept;
-    void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);
 };
 
 std::ostream& operator<<(std::ostream& os, SyncConfig::ProxyConfig::Type);
@@ -773,22 +772,14 @@ inline void Session::set_error_handler(std::function<ErrorHandler> handler)
     set_connection_state_change_listener(std::move(handler_2)); // Throws
 }
 
-inline void Session::async_wait_for_sync_completion(WaitOperCompletionHandler handler)
+inline util::Future<void> Session::async_wait_for_upload_completion()
 {
-    bool upload_completion = true, download_completion = true;
-    async_wait_for(upload_completion, download_completion, std::move(handler)); // Throws
+    return async_wait_for_sync_completion(WaitForCompletionTypeUpload);
 }
 
-inline void Session::async_wait_for_upload_completion(WaitOperCompletionHandler handler)
+inline util::Future<void> Session::async_wait_for_download_completion()
 {
-    bool upload_completion = true, download_completion = false;
-    async_wait_for(upload_completion, download_completion, std::move(handler)); // Throws
-}
-
-inline void Session::async_wait_for_download_completion(WaitOperCompletionHandler handler)
-{
-    bool upload_completion = false, download_completion = true;
-    async_wait_for(upload_completion, download_completion, std::move(handler)); // Throws
+    return async_wait_for_sync_completion(WaitForCompletionTypeDownload);
 }
 
 } // namespace realm::sync

@@ -187,6 +187,8 @@ public:
     void nonsync_transact_notify(version_type new_version);
     void cancel_reconnect_delay();
 
+
+    Future<void> async_wait_for(WaitForCompletionType oper);
     void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);
     bool wait_for_upload_complete_or_client_stopped();
     bool wait_for_download_complete_or_client_stopped();
@@ -291,9 +293,18 @@ private:
     SessionImpl* m_sess = nullptr;
 
     // These must only be accessed from the event loop thread.
-    std::vector<WaitOperCompletionHandler> m_upload_completion_handlers;
-    std::vector<WaitOperCompletionHandler> m_download_completion_handlers;
-    std::vector<WaitOperCompletionHandler> m_sync_completion_handlers;
+    struct WaitOperPromise {
+        WaitOperPromise(util::Promise<void>&& promise, WaitForCompletionType which)
+            : completion_promise(std::forward<util::Promise<void>>(promise))
+            , waiting_for(which)
+        {
+        }
+
+        Promise<void> completion_promise;
+        WaitForCompletionType waiting_for;
+    };
+
+    std::list<WaitOperPromise> m_completion_futures;
 
     // `m_target_*load_mark` and `m_reached_*load_mark` are protected by
     // `m_client.m_mutex`. `m_staged_*load_mark` must only be accessed by the
@@ -944,37 +955,43 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
                                     WaitOperCompletionHandler handler)
 {
     REALM_ASSERT(upload_completion || download_completion);
+    WaitForCompletionType which = (upload_completion ? WaitForCompletionTypeUpload : 0) |
+                                  (download_completion ? WaitForCompletionTypeDownload : 0);
+    async_wait_for(which).get_async([handler = std::move(handler)](Status res) {
+        if (res.is_ok()) {
+            return handler(std::error_code{});
+        }
+        REALM_ASSERT(res.code() == ErrorCodes::OperationAborted);
+        handler(util::error::operation_aborted);
+    });
+}
+
+util::Future<void> SessionWrapper::async_wait_for(WaitForCompletionType waiting_for)
+{
+    REALM_ASSERT(waiting_for != 0 || waiting_for <= (WaitForCompletionTypeDownload | WaitForCompletionTypeUpload));
     REALM_ASSERT(m_initiated);
 
-    util::bind_ptr<SessionWrapper> self{this};
-    auto handler_2 = [self = std::move(self), handler = std::move(handler), upload_completion, download_completion] {
+    util::bind_ptr<SessionWrapper> self(this);
+    auto [promise, future] = util::make_promise_future<void>();
+    m_client.get_service().post([self = std::move(self), promise = std::move(promise), waiting_for]() mutable {
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
-            // Already finalized
-            handler(util::error::operation_aborted); // Throws
+            // Already finalized.
+            promise.set_error(
+                {ErrorCodes::OperationAborted,
+                 "Sync session destroyed before registration of sync completion notification could begin"});
             return;
         }
-        if (upload_completion) {
-            if (download_completion) {
-                // Wait for upload and download completion
-                self->m_sync_completion_handlers.push_back(std::move(handler)); // Throws
-            }
-            else {
-                // Wait for upload completion only
-                self->m_upload_completion_handlers.push_back(std::move(handler)); // Throws
-            }
+
+        self->m_completion_futures.emplace_back(std::move(promise), waiting_for);
+        if (waiting_for & WaitForCompletionTypeDownload) {
+            self->m_sess->request_download_completion_notification();
         }
-        else {
-            // Wait for download completion only
-            self->m_download_completion_handlers.push_back(std::move(handler)); // Throws
+        if (waiting_for & WaitForCompletionTypeUpload) {
+            self->m_sess->request_upload_completion_notification();
         }
-        SessionImpl& sess = *self->m_sess;
-        if (upload_completion)
-            sess.request_upload_completion_notification(); // Throws
-        if (download_completion)
-            sess.request_download_completion_notification(); // Throws
-    };
-    m_client.get_service().post(std::move(handler_2)); // Throws
+    });
+    return std::move(future);
 }
 
 
@@ -1151,23 +1168,10 @@ void SessionWrapper::finalize()
     m_db = nullptr;
 
     // All outstanding wait operations must be canceled
-    while (!m_upload_completion_handlers.empty()) {
-        auto handler = std::move(m_upload_completion_handlers.back());
-        m_upload_completion_handlers.pop_back();
-        std::error_code ec = error::operation_aborted;
-        handler(ec); // Throws
-    }
-    while (!m_download_completion_handlers.empty()) {
-        auto handler = std::move(m_download_completion_handlers.back());
-        m_download_completion_handlers.pop_back();
-        std::error_code ec = error::operation_aborted;
-        handler(ec); // Throws
-    }
-    while (!m_sync_completion_handlers.empty()) {
-        auto handler = std::move(m_sync_completion_handlers.back());
-        m_sync_completion_handlers.pop_back();
-        std::error_code ec = error::operation_aborted;
-        handler(ec); // Throws
+    auto completion_handlers = std::move(m_completion_futures);
+    for (auto& future : completion_handlers) {
+        future.completion_promise.set_error(
+            {ErrorCodes::OperationAborted, "Session wrapper destroyed before sync notification completed"});
     }
 }
 
@@ -1204,16 +1208,16 @@ inline void SessionWrapper::on_sync_progress()
 
 void SessionWrapper::on_upload_completion()
 {
-    while (!m_upload_completion_handlers.empty()) {
-        auto handler = std::move(m_upload_completion_handlers.back());
-        m_upload_completion_handlers.pop_back();
-        std::error_code ec; // Success
-        handler(ec);        // Throws
-    }
-    while (!m_sync_completion_handlers.empty()) {
-        auto handler = std::move(m_sync_completion_handlers.back());
-        m_download_completion_handlers.push_back(std::move(handler)); // Throws
-        m_sync_completion_handlers.pop_back();
+    for (auto it = m_completion_futures.begin(); it != m_completion_futures.end();) {
+        if (it->waiting_for & WaitForCompletionTypeDownload) {
+            if (it->waiting_for & WaitForCompletionTypeUpload) {
+                it->waiting_for = WaitForCompletionTypeDownload;
+            }
+            ++it;
+            continue;
+        }
+        it->completion_promise.emplace_value();
+        it = m_completion_futures.erase(it);
     }
     util::LockGuard lock{m_client.m_mutex};
     if (m_staged_upload_mark > m_reached_upload_mark) {
@@ -1225,16 +1229,16 @@ void SessionWrapper::on_upload_completion()
 
 void SessionWrapper::on_download_completion()
 {
-    while (!m_download_completion_handlers.empty()) {
-        auto handler = std::move(m_download_completion_handlers.back());
-        m_download_completion_handlers.pop_back();
-        std::error_code ec; // Success
-        handler(ec);        // Throws
-    }
-    while (!m_sync_completion_handlers.empty()) {
-        auto handler = std::move(m_sync_completion_handlers.back());
-        m_upload_completion_handlers.push_back(std::move(handler)); // Throws
-        m_sync_completion_handlers.pop_back();
+    for (auto it = m_completion_futures.begin(); it != m_completion_futures.end();) {
+        if (it->waiting_for & WaitForCompletionTypeUpload) {
+            if (it->waiting_for & WaitForCompletionTypeDownload) {
+                it->waiting_for = WaitForCompletionTypeUpload;
+            }
+            ++it;
+            continue;
+        }
+        it->completion_promise.emplace_value();
+        it = m_completion_futures.erase(it);
     }
     util::LockGuard lock{m_client.m_mutex};
     if (m_staged_download_mark > m_reached_download_mark) {
@@ -1538,11 +1542,10 @@ void Session::cancel_reconnect_delay()
 }
 
 
-void Session::async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler handler)
+util::Future<void> Session::async_wait_for_sync_completion(WaitForCompletionType which)
 {
-    m_impl->async_wait_for(upload_completion, download_completion, std::move(handler)); // Throws
+    return m_impl->async_wait_for(which);
 }
-
 
 bool Session::wait_for_upload_complete_or_client_stopped()
 {

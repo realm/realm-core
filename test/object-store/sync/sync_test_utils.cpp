@@ -152,23 +152,8 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
 
 void wait_for_sync_changes(std::shared_ptr<SyncSession> session)
 {
-    std::atomic<bool> called{false};
-    session->wait_for_upload_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-    REQUIRE(called);
-    called.store(false);
-    session->wait_for_download_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
+    REQUIRE(session->wait_for_upload_completion().get() == std::error_code{});
+    REQUIRE(session->wait_for_download_completion().get() == std::error_code{});
 }
 
 #if REALM_ENABLE_AUTH_TESTS

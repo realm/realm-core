@@ -35,6 +35,7 @@ public:
         RuntimeError = 2,
         LogicError = 3,
         BrokenPromise = 4,
+        OperationAborted = 5,
     };
 
     static StringData error_string(Error code);

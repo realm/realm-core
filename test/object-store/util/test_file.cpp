@@ -245,34 +245,16 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
-static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(std::function<void(std::error_code)>))
-{
-    std::condition_variable cv;
-    std::mutex wait_mutex;
-    bool wait_flag(false);
-    std::error_code ec;
-    auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
-    (session.*fn)([&](std::error_code error) {
-        std::unique_lock<std::mutex> lock(wait_mutex);
-        wait_flag = true;
-        ec = error;
-        cv.notify_one();
-    });
-    std::unique_lock<std::mutex> lock(wait_mutex);
-    cv.wait(lock, [&]() {
-        return wait_flag == true;
-    });
-    return ec;
-}
-
 std::error_code wait_for_upload(Realm& realm)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+    auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
+    return session.wait_for_upload_completion().get();
 }
 
 std::error_code wait_for_download(Realm& realm)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_download_completion);
+    auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
+    return session.wait_for_download_completion().get();
 }
 
 // MARK: - TestSyncManager

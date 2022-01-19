@@ -996,10 +996,6 @@ public:
 
     using WaitOperCompletionHandler = Session::WaitOperCompletionHandler;
 
-    void async_wait_for_sync_completion(WaitOperCompletionHandler);
-    void async_wait_for_upload_completion(WaitOperCompletionHandler);
-    void async_wait_for_download_completion(WaitOperCompletionHandler);
-
     version_type get_last_integrated_server_version() const;
 
 private:
@@ -1084,21 +1080,6 @@ inline bool RealmFixture::wait_for_upload_complete_or_client_stopped()
 inline bool RealmFixture::wait_for_download_complete_or_client_stopped()
 {
     return m_session.wait_for_download_complete_or_client_stopped();
-}
-
-inline void RealmFixture::async_wait_for_sync_completion(WaitOperCompletionHandler handler)
-{
-    m_session.async_wait_for_sync_completion(std::move(handler));
-}
-
-inline void RealmFixture::async_wait_for_upload_completion(WaitOperCompletionHandler handler)
-{
-    m_session.async_wait_for_upload_completion(std::move(handler));
-}
-
-inline void RealmFixture::async_wait_for_download_completion(WaitOperCompletionHandler handler)
-{
-    m_session.async_wait_for_download_completion(std::move(handler));
 }
 
 inline version_type RealmFixture::get_last_integrated_server_version() const

@@ -33,8 +33,7 @@
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
-using namespace realm;
-using namespace realm::_impl;
+namespace realm {
 
 using SessionWaiterPointer = void (sync::Session::*)(std::function<void(std::error_code)>);
 
@@ -90,14 +89,8 @@ void SyncSession::become_active(std::unique_lock<std::mutex>& lock)
         m_session->bind();
     }
 
-    // Register all the pending wait-for-completion blocks. This can
-    // potentially add a redundant callback if we're coming from the Dying
-    // state, but that's okay (we won't call the user callbacks twice).
-    SyncSession::CompletionCallbacks callbacks_to_register;
-    std::swap(m_completion_callbacks, callbacks_to_register);
-
-    for (auto& [id, callback_tuple] : callbacks_to_register) {
-        add_completion_callback(lock, std::move(callback_tuple.second), callback_tuple.first);
+    for (auto& package : m_completion_futures) {
+        register_completion_package(lock, package);
     }
 }
 
@@ -114,8 +107,15 @@ void SyncSession::become_dying(std::unique_lock<std::mutex>& lock)
     }
 
     size_t current_death_count = ++m_death_count;
-    m_session->async_wait_for_upload_completion(
-        [weak_session = weak_from_this(), current_death_count](std::error_code) {
+    m_session->async_wait_for_upload_completion()
+        .on_completion([](Status res) -> std::error_code {
+            if (res.is_ok()) {
+                return std::error_code{};
+            }
+            REALM_ASSERT(res == ErrorCodes::OperationAborted);
+            return util::error::operation_aborted;
+        })
+        .get_async([weak_session = weak_from_this(), current_death_count](StatusWith<std::error_code>) {
             if (auto session = weak_session.lock()) {
                 std::unique_lock<std::mutex> lock(session->m_state_mutex);
                 if (session->m_state == State::Dying && session->m_death_count == current_death_count) {
@@ -137,8 +137,7 @@ void SyncSession::become_inactive(std::unique_lock<std::mutex>& lock)
     auto old_state = m_connection_state;
     auto new_state = m_connection_state = SyncSession::ConnectionState::Disconnected;
 
-    SyncSession::CompletionCallbacks waits;
-    std::swap(waits, m_completion_callbacks);
+    auto to_cancel = get_cancelable_waits(lock);
 
     m_session = nullptr;
     lock.unlock();
@@ -149,9 +148,9 @@ void SyncSession::become_inactive(std::unique_lock<std::mutex>& lock)
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
-    // Inform any queued-up completion handlers that they were cancelled.
-    for (auto& [id, callback] : waits)
-        callback.second(make_error_code(util::error::operation_aborted));
+    for (auto& package : to_cancel) {
+        package->promise.emplace_value(util::error::operation_aborted);
+    }
 }
 
 void SyncSession::become_waiting_for_access_token(std::unique_lock<std::mutex>& lock)
@@ -228,7 +227,8 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, SyncManager* sync_manager)
+SyncSession::SyncSession(_impl::SyncClient& client, std::shared_ptr<DB> db, SyncConfig config,
+                         SyncManager* sync_manager)
     : m_config(std::move(config))
     , m_db(std::move(db))
     , m_flx_subscription_store(make_flx_subscription_store())
@@ -323,11 +323,16 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     {
         m_force_client_reset = true;
         m_client_reset_fresh_copy = std::move(db);
-        CompletionCallbacks callbacks;
-        std::swap(m_completion_callbacks, callbacks);
+        auto completion_futures = get_cancelable_waits(lock);
         // always swap back, even if advance_state throws
         auto guard = util::make_scope_exit([&]() noexcept {
-            std::swap(callbacks, m_completion_callbacks);
+            std::unique_lock<std::mutex> splice_lk(std::move(lock));
+            if (!splice_lk.owns_lock()) {
+                splice_lk.lock();
+            }
+            for (auto& old_package : completion_futures) {
+                add_completion_callback(splice_lk, std::move(old_package->promise), old_package->direction);
+            }
         });
         become_inactive(lock); // unlocks the lock
     }
@@ -500,16 +505,26 @@ void SyncSession::handle_error(SyncError error)
     }
 }
 
+std::list<util::bind_ptr<SyncSession::CompletionFuture>>
+SyncSession::get_cancelable_waits(const std::unique_lock<std::mutex>&)
+{
+    std::list<util::bind_ptr<CompletionFuture>> to_cancel;
+    std::swap(m_completion_futures, to_cancel);
+    for (auto& package : to_cancel) {
+        package->complete = true;
+    }
+
+    return to_cancel;
+}
+
 void SyncSession::cancel_pending_waits(std::unique_lock<std::mutex>& lock, std::error_code error)
 {
-
-    CompletionCallbacks callbacks;
-    std::swap(callbacks, m_completion_callbacks);
+    auto to_cancel = get_cancelable_waits(lock);
     lock.unlock();
 
     // Inform any queued-up completion handlers that they were cancelled.
-    for (auto& [id, callback] : callbacks)
-        callback.second(error);
+    for (auto& package : to_cancel)
+        package->promise.emplace_value(error);
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable, uint64_t uploaded,
@@ -562,7 +577,7 @@ void SyncSession::do_create_sync_session()
         config.notify_after_client_reset = [this](std::string local_path, VersionID previous_version) {
             REALM_ASSERT(!local_path.empty());
             SharedRealm frozen_before, active_after;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            if (auto local_coordinator = _impl::RealmCoordinator::get_existing_coordinator(local_path)) {
                 auto local_config = local_coordinator->get_config();
                 active_after = local_coordinator->get_realm(local_config, util::none);
                 local_config.scheduler = nullptr;
@@ -578,7 +593,7 @@ void SyncSession::do_create_sync_session()
             REALM_ASSERT(!local_path.empty());
             SharedRealm frozen_local;
             Realm::Config local_config;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            if (auto local_coordinator = _impl::RealmCoordinator::get_existing_coordinator(local_path)) {
                 local_config = local_coordinator->get_config();
                 local_config.scheduler = nullptr;
                 frozen_local = local_coordinator->get_realm(local_config, VersionID());
@@ -807,46 +822,86 @@ void SyncSession::initiate_access_token_refresh()
     }
 }
 
-void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
-                                          std::function<void(std::error_code)> callback,
+void SyncSession::register_completion_package(const std::unique_lock<std::mutex>&,
+                                              util::bind_ptr<CompletionFuture> package)
+{
+    sync::WaitForCompletionType wait_oper =
+        (package->direction == _impl::SyncProgressNotifier::NotifierType::download)
+            ? sync::WaitForCompletionTypeDownload
+            : sync::WaitForCompletionTypeUpload;
+    m_session->async_wait_for_sync_completion(wait_oper).get_async(
+        [weak_self = weak_from_this(), package](Status res) {
+            auto self = weak_self.lock();
+            if (!self)
+                return;
+
+            std::unique_lock<std::mutex> lock(self->m_state_mutex);
+            bool was_complete = std::exchange(package->complete, true);
+            if (was_complete) {
+                return;
+            }
+
+            self->m_completion_futures.erase(package->pos);
+            lock.unlock();
+
+            if (res.is_ok()) {
+                package->promise.emplace_value();
+            }
+            else if (res.code() == ErrorCodes::OperationAborted) {
+                package->promise.emplace_value(util::error::operation_aborted);
+            }
+            else {
+                REALM_UNREACHABLE();
+            }
+        });
+}
+
+void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>& lk,
+                                          util::Promise<std::error_code> promise,
                                           _impl::SyncProgressNotifier::NotifierType direction)
 {
-    bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
+    util::bind_ptr<CompletionFuture> package(new CompletionFuture(std::move(promise), direction));
+    package->pos = m_completion_futures.emplace(m_completion_futures.end(), package);
 
-    m_completion_request_counter++;
-    m_completion_callbacks.emplace_hint(m_completion_callbacks.end(), m_completion_request_counter,
-                                        std::make_pair(direction, std::move(callback)));
     // If the state is inactive then just store the callback and return. The callback will get
     // re-registered with the underlying session if/when the session ever becomes active again.
     if (!m_session) {
         return;
     }
 
-    auto waiter = is_download ? &sync::Session::async_wait_for_download_completion
-                              : &sync::Session::async_wait_for_upload_completion;
+    register_completion_package(lk, std::move(package));
+}
 
-    (m_session.get()->*waiter)([weak_self = weak_from_this(), id = m_completion_request_counter](std::error_code ec) {
-        auto self = weak_self.lock();
-        if (!self)
-            return;
-        std::unique_lock<std::mutex> lock(self->m_state_mutex);
-        auto callback_node = self->m_completion_callbacks.extract(id);
-        lock.unlock();
-        if (callback_node)
-            callback_node.mapped().second(ec);
-    });
+util::Future<std::error_code> SyncSession::wait_for_download_completion()
+{
+    auto [promise, future] = util::make_promise_future<std::error_code>();
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    add_completion_callback(lock, std::move(promise), ProgressDirection::download);
+    return std::move(future);
+}
+
+util::Future<std::error_code> SyncSession::wait_for_upload_completion()
+{
+    auto [promise, future] = util::make_promise_future<std::error_code>();
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    add_completion_callback(lock, std::move(promise), ProgressDirection::upload);
+    return std::move(future);
 }
 
 void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    add_completion_callback(lock, std::move(callback), ProgressDirection::upload);
+    wait_for_upload_completion().get_async([callback](StatusWith<std::error_code> res) {
+        REALM_ASSERT(res.is_ok());
+        callback(res.get_value());
+    });
 }
 
 void SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    add_completion_callback(lock, std::move(callback), ProgressDirection::download);
+    wait_for_download_completion().get_async([callback](StatusWith<std::error_code> res) {
+        REALM_ASSERT(res.is_ok());
+        callback(res.get_value());
+    });
 }
 
 uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback> notifier,
@@ -976,6 +1031,7 @@ void SyncSession::did_drop_external_reference()
     close(lock1);
 }
 
+namespace _impl {
 uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
@@ -1068,6 +1124,8 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
     };
 }
 
+} // namespace _impl
+
 uint64_t SyncSession::ConnectionChangeNotifier::add_callback(std::function<ConnectionStateChangeCallback> callback)
 {
     std::lock_guard<std::mutex> lock(m_callback_mutex);
@@ -1114,3 +1172,5 @@ void SyncSession::ConnectionChangeNotifier::invoke_callbacks(ConnectionState old
     }
     m_callback_index = npos;
 }
+
+} // namespace realm

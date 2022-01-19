@@ -331,6 +331,10 @@ struct SessionErrorInfo {
 
 enum class ConnectionState { disconnected, connecting, connected };
 
+using WaitForCompletionType = int;
+constexpr static WaitForCompletionType WaitForCompletionTypeUpload = 0b01;
+constexpr static WaitForCompletionType WaitForCompletionTypeDownload = 0b10;
+
 } // namespace realm::sync
 
 #endif // REALM_SYNC_CLIENT_BASE_HPP
