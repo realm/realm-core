@@ -111,6 +111,7 @@ void SyncSession::become_dying(std::unique_lock<std::mutex>& lock)
     }
 
     size_t current_death_count = ++m_death_count;
+    lock.unlock();
     m_session->async_wait_for_upload_completion()
         .on_completion([](Status res) -> std::error_code {
             if (res.is_ok()) {

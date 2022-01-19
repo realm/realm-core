@@ -789,13 +789,6 @@ SessionWrapper::~SessionWrapper() noexcept
 {
     if (m_db && m_actualized)
         m_db->release_sync_agent();
-
-    // All outstanding wait operations must be canceled
-    auto completion_handlers = std::move(m_completion_futures);
-    for (auto& future : completion_handlers) {
-        future.completion_promise.set_error(
-            {ErrorCodes::OperationAborted, "Session wrapper destroyed before sync notification completed"});
-    }
 }
 
 
@@ -982,7 +975,18 @@ util::Future<void> SessionWrapper::async_wait_for(WaitForCompletionType waiting_
             self->m_sess->request_upload_completion_notification();
         }
     });
-    return std::move(future);
+
+    // Our implementation Service::post() does not guarantee that callbacks will get run. so we should transform
+    // any broken promises into OperationAborted so callers up the stack don't have to worry about the implementation
+    // details of our event loop.
+    return std::move(future).on_error([](Status err) {
+        if (err == ErrorCodes::BrokenPromise) {
+            return Status(ErrorCodes::OperationAborted,
+                          "Sync client was destroyed before sync completion notification could run");
+        }
+        REALM_ASSERT(err == ErrorCodes::OperationAborted);
+        return err;
+    });
 }
 
 
