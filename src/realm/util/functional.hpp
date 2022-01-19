@@ -77,7 +77,7 @@ public:
         // std::unique_ptr<Base>(std::make_unique<Derived>()) results in
         // std::unique_ptr<Derived> being instantiated, which can have
         // surprisingly negative effects on debug build performance.
-        : impl(new SpecificImpl<Functor>(std::forward<Functor>(functor)))
+        : impl(new SpecificImpl<std::decay_t<Functor>>(std::forward<Functor>(functor)))
     {
     }
 
@@ -92,6 +92,15 @@ public:
     explicit operator bool() const noexcept
     {
         return static_cast<bool>(this->impl);
+    }
+
+    template <typename T>
+    const T* target() const noexcept
+    {
+        if (impl && typeid(*impl) == typeid(SpecificImpl<T>)) {
+            return &static_cast<SpecificImpl<T>*>(impl.get())->f;
+        }
+        return nullptr;
     }
 
     // Needed to make `std::is_convertible<util::UniqueFunction<...>, std::function<...>>` be
@@ -130,8 +139,9 @@ private:
 
     template <typename Functor>
     struct SpecificImpl : Impl {
-        explicit SpecificImpl(Functor&& func)
-            : f(std::forward<Functor>(func))
+        template <typename F>
+        explicit SpecificImpl(F&& func)
+            : f(std::forward<F>(func))
         {
         }
 
@@ -140,7 +150,7 @@ private:
             return call_regular_void(std::is_void<RetType>(), f, std::forward<Args>(args)...);
         }
 
-        std::decay_t<Functor> f;
+        Functor f;
     };
 
     std::unique_ptr<Impl> impl;
