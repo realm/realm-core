@@ -89,8 +89,12 @@ void SyncSession::become_active(std::unique_lock<std::mutex>& lock)
         m_session->bind();
     }
 
-    for (auto& package : m_completion_futures) {
-        register_completion_package(lock, package);
+    // Register all the pending wait-for-completion blocks. This can
+    // potentially add a redundant callback if we're coming from the Dying
+    // state, but that's okay (we won't call the user callbacks twice).
+    auto to_re_register = get_cancelable_waits(lock);
+    for (auto& package : to_re_register) {
+        add_completion_callback(lock, std::move(package->promise), package->direction);
     }
 }
 
@@ -148,6 +152,7 @@ void SyncSession::become_inactive(std::unique_lock<std::mutex>& lock)
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
+    // Inform any queued-up completion handlers that they were cancelled.
     for (auto& package : to_cancel) {
         package->promise.emplace_value(util::error::operation_aborted);
     }

@@ -189,7 +189,6 @@ public:
 
 
     Future<void> async_wait_for(WaitForCompletionType oper);
-    void async_wait_for(bool upload_completion, bool download_completion, WaitOperCompletionHandler);
     bool wait_for_upload_complete_or_client_stopped();
     bool wait_for_download_complete_or_client_stopped();
 
@@ -950,21 +949,6 @@ void SessionWrapper::cancel_reconnect_delay()
     m_client.get_service().post(std::move(handler)); // Throws
 }
 
-
-void SessionWrapper::async_wait_for(bool upload_completion, bool download_completion,
-                                    WaitOperCompletionHandler handler)
-{
-    REALM_ASSERT(upload_completion || download_completion);
-    WaitForCompletionType which = (upload_completion ? WaitForCompletionTypeUpload : 0) |
-                                  (download_completion ? WaitForCompletionTypeDownload : 0);
-    async_wait_for(which).get_async([handler = std::move(handler)](Status res) {
-        if (res.is_ok()) {
-            return handler(std::error_code{});
-        }
-        REALM_ASSERT(res.code() == ErrorCodes::OperationAborted);
-        handler(util::error::operation_aborted);
-    });
-}
 
 util::Future<void> SessionWrapper::async_wait_for(WaitForCompletionType waiting_for)
 {
