@@ -331,7 +331,7 @@ private:
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
                          const std::string& context_message);
     std::list<util::bind_ptr<CompletionFuture>> get_cancelable_waits(const std::unique_lock<std::mutex>&);
-    void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
+    void cancel_pending_waits(std::unique_lock<std::mutex>, std::error_code);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     std::string get_recovery_file_path();
@@ -345,17 +345,16 @@ private:
     void do_create_sync_session();
     void did_drop_external_reference() REQUIRES(!m_external_reference_mutex);
     void detach_from_sync_manager();
-    void close(std::unique_lock<std::mutex>&);
+    void close(std::unique_lock<std::mutex>);
 
-    void become_active(std::unique_lock<std::mutex>&);
-    void become_dying(std::unique_lock<std::mutex>&);
-    void become_inactive(std::unique_lock<std::mutex>&);
-    void become_waiting_for_access_token(std::unique_lock<std::mutex>&);
+    void become_active(std::unique_lock<std::mutex>);
+    void become_dying(std::unique_lock<std::mutex>);
+    void become_inactive(std::unique_lock<std::mutex>);
+    void become_waiting_for_access_token(std::unique_lock<std::mutex>);
 
 
-    void add_completion_callback(const std::unique_lock<std::mutex>&, util::Promise<std::error_code> promise,
+    void add_completion_callback(std::unique_lock<std::mutex>, util::Promise<std::error_code> promise,
                                  ProgressDirection direction);
-    void register_completion_package(const std::unique_lock<std::mutex>&, util::bind_ptr<CompletionFuture> package);
 
     std::function<TransactionCallback> m_sync_transact_callback;
 
