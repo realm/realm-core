@@ -3092,12 +3092,22 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
+    auto waitpid_checked = [](int pid, int* status, int options) {
+        int ret;
+        do {
+            ret = waitpid(pid, status, options);
+        } while (ret == -1 && errno == EINTR);
+        REALM_ASSERT_EX(ret != -1, errno);
+        REALM_ASSERT(WIFEXITED(*status));
+        REALM_ASSERT(WEXITSTATUS(*status) == 0);
+    };
 
     int readpids[read_process_count];
     int writepids[write_process_count];
     SHARED_GROUP_TEST_PATH(path);
 
     int pid = fork();
+    REALM_ASSERT(pid >= 0);
     if (pid == 0) {
         {
             std::unique_ptr<Replication> hist(make_in_realm_history());
@@ -3119,12 +3129,13 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
     else {
         int status;
-        waitpid(pid, &status, 0);
+        waitpid_checked(pid, &status, 0);
     }
 
     // intialization complete. Start writers:
     for (int i = 0; i < write_process_count; ++i) {
         writepids[i] = fork();
+        REALM_ASSERT(writepids[i] >= 0);
         if (writepids[i] == 0) {
             std::unique_ptr<Replication> hist(make_in_realm_history());
             DBRef sg = DB::create(*hist, path);
@@ -3136,6 +3147,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // then start readers:
     for (int i = 0; i < read_process_count; ++i) {
         readpids[i] = fork();
+        REALM_ASSERT(readpids[i] >= 0);
         if (readpids[i] == 0) {
             std::unique_ptr<Replication> hist(make_in_realm_history());
             DBRef sg = DB::create(*hist, path);
@@ -3147,7 +3159,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all writer threads to complete
     for (int i = 0; i < write_process_count; ++i) {
         int status = 0;
-        waitpid(writepids[i], &status, 0);
+        waitpid_checked(writepids[i], &status, 0);
     }
 
     // Allow readers time to catch up
@@ -3167,7 +3179,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all reader threads to complete
     for (int i = 0; i < read_process_count; ++i) {
         int status;
-        waitpid(readpids[i], &status, 0);
+        waitpid_checked(readpids[i], &status, 0);
     }
 }
 
