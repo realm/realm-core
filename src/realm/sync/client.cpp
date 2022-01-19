@@ -789,6 +789,13 @@ SessionWrapper::~SessionWrapper() noexcept
 {
     if (m_db && m_actualized)
         m_db->release_sync_agent();
+
+    // All outstanding wait operations must be canceled
+    auto completion_handlers = std::move(m_completion_futures);
+    for (auto& future : completion_handlers) {
+        future.completion_promise.set_error(
+            {ErrorCodes::OperationAborted, "Session wrapper destroyed before sync notification completed"});
+    }
 }
 
 
@@ -1155,7 +1162,7 @@ void SessionWrapper::finalize()
     auto completion_handlers = std::move(m_completion_futures);
     for (auto& future : completion_handlers) {
         future.completion_promise.set_error(
-            {ErrorCodes::OperationAborted, "Session wrapper destroyed before sync notification completed"});
+            {ErrorCodes::OperationAborted, "Session wrapper finalized before sync notification completed"});
     }
 }
 
