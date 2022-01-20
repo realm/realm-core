@@ -52,19 +52,22 @@ constexpr static std::string_view c_flx_sub_name_field("name");
 constexpr static std::string_view c_flx_sub_object_class_field("object_class");
 constexpr static std::string_view c_flx_sub_query_str_field("query");
 
+using OptionalString = util::Optional<std::string>;
+
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
     : m_id(obj.get<ObjectId>(parent->m_sub_keys->id))
     , m_created_at(obj.get<Timestamp>(parent->m_sub_keys->created_at))
     , m_updated_at(obj.get<Timestamp>(parent->m_sub_keys->updated_at))
-    , m_name(obj.get<String>(parent->m_sub_keys->name))
+    , m_name(obj.is_null(parent->m_sub_keys->name) ? OptionalString(util::none)
+                                                   : OptionalString{obj.get<String>(parent->m_sub_keys->name)})
     , m_object_class_name(obj.get<String>(parent->m_sub_keys->object_class_name))
     , m_query_string(obj.get<String>(parent->m_sub_keys->query_str))
 {
 }
 
-Subscription::Subscription(std::string name, std::string object_class_name, std::string query_str)
+Subscription::Subscription(util::Optional<std::string> name, std::string object_class_name, std::string query_str)
     : m_id(ObjectId::gen())
     , m_created_at(std::chrono::system_clock::now())
     , m_updated_at(m_created_at)
@@ -89,9 +92,17 @@ Timestamp Subscription::updated_at() const
     return m_updated_at;
 }
 
+bool Subscription::has_name() const
+{
+    return static_cast<bool>(m_name);
+}
+
 std::string_view Subscription::name() const
 {
-    return m_name;
+    if (!m_name) {
+        return std::string_view{};
+    }
+    return m_name.value();
 }
 
 std::string_view Subscription::object_class_name() const
@@ -221,8 +232,8 @@ void MutableSubscriptionSet::insert_sub(const Subscription& sub)
 }
 
 std::pair<SubscriptionSet::iterator, bool>
-MutableSubscriptionSet::insert_or_assign_impl(iterator it, std::string name, std::string object_class_name,
-                                              std::string query_str)
+MutableSubscriptionSet::insert_or_assign_impl(iterator it, util::Optional<std::string> name,
+                                              std::string object_class_name, std::string query_str)
 {
     if (it != end()) {
         it->m_object_class_name = std::move(object_class_name);
@@ -243,7 +254,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name() == name);
+        return (sub.has_name() && sub.name() == name);
     });
 
     return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
@@ -257,7 +268,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
         return (sub.name().empty() && sub.object_class_name() == table_name && sub.query_string() == query_str);
     });
 
-    return insert_or_assign_impl(it, std::string{}, std::move(table_name), std::move(query_str));
+    return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
 }
 
 void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::string_view> error_str)
@@ -424,7 +435,9 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
             new_sub.set(m_mgr->m_sub_keys->id, sub.id());
             new_sub.set(m_mgr->m_sub_keys->created_at, sub.created_at());
             new_sub.set(m_mgr->m_sub_keys->updated_at, sub.updated_at());
-            new_sub.set(m_mgr->m_sub_keys->name, StringData(sub.name()));
+            if (sub.m_name) {
+                new_sub.set(m_mgr->m_sub_keys->name, StringData(sub.name()));
+            }
             new_sub.set(m_mgr->m_sub_keys->object_class_name, StringData(sub.object_class_name()));
             new_sub.set(m_mgr->m_sub_keys->query_str, StringData(sub.query_string()));
         }

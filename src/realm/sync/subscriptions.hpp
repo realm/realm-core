@@ -49,6 +49,9 @@ public:
     // Returns the timestamp of the last time this subscription was updated by calling update_query.
     Timestamp updated_at() const;
 
+    // Returns whether the subscription was created as an anonymous subscription or a named subscription.
+    bool has_name() const;
+
     // Returns the name of the subscription that was set when it was created.
     std::string_view name() const;
 
@@ -63,12 +66,12 @@ private:
     friend class MutableSubscriptionSet;
 
     Subscription(const SubscriptionStore* parent, Obj obj);
-    Subscription(std::string name, std::string object_class_name, std::string query_str);
+    Subscription(util::Optional<std::string> name, std::string object_class_name, std::string query_str);
 
     ObjectId m_id;
     Timestamp m_created_at;
     Timestamp m_updated_at;
-    std::string m_name;
+    util::Optional<std::string> m_name;
     std::string m_object_class_name;
     std::string m_query_string;
 };
@@ -258,8 +261,8 @@ private:
     // To refresh a MutableSubscriptionSet, you should call commit() and call refresh() on its return value.
     void refresh() = delete;
 
-    std::pair<iterator, bool> insert_or_assign_impl(iterator it, std::string name, std::string object_class_name,
-                                                    std::string query_str);
+    std::pair<iterator, bool> insert_or_assign_impl(iterator it, util::Optional<std::string> name,
+                                                    std::string object_class_name, std::string query_str);
 
     void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                          StringData object_class_name, StringData query_str);

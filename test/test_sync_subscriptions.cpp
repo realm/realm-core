@@ -30,6 +30,7 @@ struct SubscriptionStoreFixture {
 
 TEST(Sync_SubscriptionStoreBasic)
 {
+    ObjectId anon_sub_id;
     SHARED_GROUP_TEST_PATH(sub_store_path);
     {
         SubscriptionStoreFixture fixture(sub_store_path);
@@ -59,6 +60,17 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK_EQUAL(it->name(), "a sub");
         CHECK_EQUAL(it->object_class_name(), "a");
         CHECK_EQUAL(it->query_string(), query_a.get_description());
+
+        std::tie(it, inserted) =
+            out.insert_or_assign(Query(read_tr->get_table(fixture.a_table_key)).equal(fixture.foo_col, "bizz"));
+        CHECK_NOT(it == out.end());
+        CHECK(inserted);
+
+        CHECK_EQUAL(it->name(), std::string_view{});
+        StringData name(it->name());
+        CHECK(name.is_null());
+        anon_sub_id = it->id();
+
         std::move(out).commit();
     }
 
@@ -73,7 +85,7 @@ TEST(Sync_SubscriptionStoreBasic)
 
         auto set = store.get_latest();
         CHECK_EQUAL(set.version(), 1);
-        CHECK_EQUAL(set.size(), 1);
+        CHECK_EQUAL(set.size(), 2);
         auto it = set.find(query_a);
         CHECK_NOT(it == set.end());
         CHECK_EQUAL(it->name(), "a sub");
@@ -83,6 +95,12 @@ TEST(Sync_SubscriptionStoreBasic)
         // Make sure we can't get a subscription set that doesn't exist.
         auto it_end = set.find("b subs");
         CHECK(it_end == set.end());
+
+        auto anon_sub_it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
+            return sub.id() == anon_sub_id;
+        });
+        CHECK_NOT(anon_sub_it == set.end());
+        CHECK_EQUAL(anon_sub_it->name(), std::string_view{});
     }
 }
 
@@ -242,8 +260,10 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
         CHECK(inserted);
         named_id = it->id();
 
-        std::tie(it, inserted) = out.insert_or_assign("b sub", query_b);
+        std::tie(it, inserted) = out.insert_or_assign("", query_b);
         CHECK(inserted);
+        CHECK(it->has_name());
+        CHECK_EQUAL(it->name(), "");
         CHECK_NOT_EQUAL(it->id(), named_id);
         CHECK_EQUAL(out.size(), 4);
     }
