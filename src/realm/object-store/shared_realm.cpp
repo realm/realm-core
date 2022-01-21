@@ -721,14 +721,16 @@ void Realm::run_writes()
         // It is safe to use a reference here. Elements are not invalidated by new insertions
         auto& write_desc = m_async_write_q.front();
 
-        CountGuard sending_notifications(m_is_sending_notifications);
-        try {
-            m_coordinator->promote_to_write(*this);
+        {
+            CountGuard sending_notifications(m_is_sending_notifications);
+            try {
+                m_coordinator->promote_to_write(*this);
+            }
+            catch (_impl::UnsupportedSchemaChange const&) {
+                translate_schema_error();
+            }
+            cache_new_schema();
         }
-        catch (_impl::UnsupportedSchemaChange const&) {
-            translate_schema_error();
-        }
-        cache_new_schema();
 
         // prevent any calls to commit/cancel during a simple notification
         m_notify_only = write_desc.notify_only;
