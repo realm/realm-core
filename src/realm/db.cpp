@@ -1713,6 +1713,7 @@ public:
     void sync_to_disk(util::UniqueFunction<void()> fn)
     {
         std::unique_lock lg(m_mutex);
+        REALM_ASSERT(!m_pending_sync);
         m_pending_sync.emplace(std::move(fn));
         m_changed.notify_one();
     }
@@ -2760,7 +2761,7 @@ TransactionRef DB::start_write(bool nonblocking)
     return tr;
 }
 
-void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>& when_acquired)
+void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired)
 {
     std::unique_lock<std::mutex> lck(tr->m_async_mutex);
     REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);

@@ -643,12 +643,16 @@ void Realm::wait_for_change_release()
 
 void Realm::run_writes_on_proper_thread()
 {
-    m_scheduler->schedule_writes();
+    m_scheduler->invoke([self = shared_from_this()] {
+        self->run_writes();
+    });
 }
 
 void Realm::run_async_completions_on_proper_thread()
 {
-    m_scheduler->schedule_completions();
+    m_scheduler->invoke([self = shared_from_this()] {
+        self->run_async_completions();
+    });
 }
 
 void Realm::call_completion_callbacks()
@@ -675,14 +679,8 @@ void Realm::run_async_completions()
 
 void Realm::check_pending_write_requests()
 {
-    if (!m_async_write_q.empty()) {
-        // more writes to run later, so re-request the write mutex:
-        if (!m_transaction->is_async()) {
-            m_coordinator->async_request_write_mutex(m_transaction, [this]() {
-                // callback happens on a different thread so...:
-                run_writes_on_proper_thread();
-            });
-        }
+    if (!m_async_write_q.empty() && !m_transaction->is_async()) {
+        m_coordinator->async_request_write_mutex(*this);
     }
 }
 
@@ -702,7 +700,7 @@ void Realm::run_writes()
         // Realm might have been closed
         return;
     }
-    REALM_ASSERT(!m_transaction->is_synchronizing());
+    REALM_ASSERT(!m_transaction->is_synchronizing() || m_async_write_q.empty());
 
     CountGuard running_writes(m_is_running_async_writes);
     int run_limit = 20; // max number of commits without full sync to disk
@@ -780,6 +778,10 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
         throw InvalidTransactionException(
             "Can't begin a write transaction from inside a commit completion callback.");
     }
+    if (!m_scheduler->can_invoke()) {
+        throw InvalidTransactionException(
+            "Cannot schedule async transaction. Make sure you are running from inside a run loop.");
+    }
     REALM_ASSERT(the_write_block);
 
     // make sure we have a (at least a) read transaction
@@ -787,16 +789,8 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
     auto handle = m_async_commit_handle++;
     m_async_write_q.push_back({std::move(the_write_block), notify_only, handle});
 
-    if (!m_is_running_async_writes) {
-        REALM_ASSERT(m_scheduler);
-        REALM_ASSERT(m_scheduler->can_schedule_writes());
-        REALM_ASSERT(m_scheduler->can_schedule_completions());
-        if (!m_transaction->is_async()) {
-            m_coordinator->async_request_write_mutex(m_transaction, [this] {
-                // callback happens on a different thread so...:
-                run_writes_on_proper_thread();
-            });
-        }
+    if (!m_is_running_async_writes && !m_transaction->is_async()) {
+        m_coordinator->async_request_write_mutex(*this);
     }
     return handle;
 }
@@ -891,7 +885,7 @@ void Realm::begin_transaction()
 
     // Request write lock asynchronously
     if (async_is_idle) {
-        m_coordinator->async_request_write_mutex(m_transaction);
+        m_coordinator->async_request_write_mutex(*this);
         m_transaction->wait_for_async_completion();
     }
 
@@ -1179,7 +1173,7 @@ bool Realm::can_deliver_notifications() const noexcept
         return false;
     }
 
-    if (!m_scheduler || !m_scheduler->can_deliver_notifications()) {
+    if (!m_scheduler || !m_scheduler->can_invoke()) {
         return false;
     }
 

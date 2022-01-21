@@ -37,31 +37,19 @@ WeakRealmNotifier::~WeakRealmNotifier() = default;
 
 void WeakRealmNotifier::notify()
 {
-    if (m_scheduler)
-        m_scheduler->notify();
+    if (m_scheduler) {
+        m_scheduler->invoke([weak_realm = m_realm] {
+            if (auto realm = weak_realm.lock()) {
+                realm->notify();
+            }
+        });
+    }
 }
 
 void WeakRealmNotifier::bind_to_scheduler()
 {
     REALM_ASSERT(!m_scheduler);
     m_scheduler = realm()->scheduler();
-    if (m_scheduler) {
-        m_scheduler->set_notify_callback([weak_realm = m_realm] {
-            if (auto realm = weak_realm.lock()) {
-                realm->notify();
-            }
-        });
-        m_scheduler->set_schedule_writes_callback([weak_realm = m_realm]() {
-            if (auto realm = weak_realm.lock()) {
-                realm->run_writes();
-            }
-        });
-        m_scheduler->set_schedule_completions_callback([weak_realm = m_realm]() {
-            if (auto realm = weak_realm.lock()) {
-                realm->run_async_completions();
-            }
-        });
-    }
 }
 
 bool WeakRealmNotifier::is_cached_for_scheduler(std::shared_ptr<util::Scheduler> scheduler) const

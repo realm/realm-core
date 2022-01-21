@@ -121,13 +121,11 @@ public:
         auto o = dynamic_cast<const DummyScheduler*>(other);
         return (o != nullptr);
     }
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return false;
     }
-
-    void set_notify_callback(std::function<void()>) override {}
-    void notify() override {}
+    void invoke(realm::util::UniqueFunction<void()>&&) override {}
 };
 
 } // anonymous namespace

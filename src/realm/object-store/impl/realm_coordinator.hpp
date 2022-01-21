@@ -201,10 +201,7 @@ public:
     template <typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()> when_acquired = nullptr)
-    {
-        m_db->async_request_write_mutex(tr, when_acquired);
-    }
+    void async_request_write_mutex(Realm& realm);
 
     AuditInterface* audit_context() const noexcept
     {

@@ -338,8 +338,6 @@ typedef void (*realm_scheduler_notify_func_t)(void* userdata);
 typedef bool (*realm_scheduler_is_on_thread_func_t)(void* userdata);
 typedef bool (*realm_scheduler_is_same_as_func_t)(const void* userdata1, const void* userdata2);
 typedef bool (*realm_scheduler_can_deliver_notifications_func_t)(void* userdata);
-typedef void (*realm_scheduler_set_notify_callback_func_t)(void* userdata, void* callback_userdata,
-                                                           realm_free_userdata_func_t, realm_scheduler_notify_func_t);
 typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(void* userdata);
 
 /**
@@ -746,25 +744,31 @@ RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, uin
  * Create a custom scheduler object from callback functions.
  *
  * @param userdata Pointer passed to all callbacks.
- * @param notify Function to trigger a call to the registered callback on the
- *               scheduler's event loop. This function must be thread-safe, or
- *               NULL, in which case the scheduler is considered unable to
- *               deliver notifications.
+ * @param notify Function which will be called whenever the scheduler has work
+ *               to do. Each call to this should trigger a call to
+ *               `realm_scheduler_perform_work()` from within the scheduler's
+ *               event loop. This function must be thread-safe, or NULL, in
+ *               which case the scheduler is considered unable to deliver
+ *               notifications.
  * @param is_on_thread Function to return true if called from the same thread as
  *                     the scheduler. This function must be thread-safe.
  * @param can_deliver_notifications Function to return true if the scheduler can
  *                                  support `notify()`. This function does not
  *                                  need to be thread-safe.
- * @param set_notify_callback Function to accept a callback that will be invoked
- *                            by `notify()` on the scheduler's event loop. This
- *                            function does not need to be thread-safe.
  */
 RLM_API realm_scheduler_t*
 realm_scheduler_new(void* userdata, realm_free_userdata_func_t, realm_scheduler_notify_func_t notify,
                     realm_scheduler_is_on_thread_func_t is_on_thread, realm_scheduler_is_same_as_func_t is_same_as,
-                    realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications,
-                    realm_scheduler_set_notify_callback_func_t set_notify_callback);
+                    realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications);
 
+/**
+ * Performs all of the pending work for the given scheduler.
+ *
+ * This function must be called from within the scheduler's event loop. It must
+ * be called after each time that the notify function passed to the scheduler
+ * is involved.
+ */
+RLM_API void realm_scheduler_perform_work(realm_scheduler_t*);
 /**
  * Create an instance of the default scheduler for the current platform,
  * normally confined to the calling thread.
@@ -805,40 +809,6 @@ RLM_API bool realm_scheduler_has_default_factory(void);
  */
 RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t,
                                                  realm_scheduler_default_factory_func_t);
-
-/**
- * Trigger a call to the registered notifier callback on the scheduler's event loop.
- *
- * This function is thread-safe.
- */
-RLM_API void realm_scheduler_notify(realm_scheduler_t*);
-
-/**
- * Returns true if the caller is currently running on the scheduler's thread.
- *
- * This function is thread-safe.
- */
-RLM_API bool realm_scheduler_is_on_thread(const realm_scheduler_t*);
-
-/**
- * Returns true if the scheduler is able to deliver notifications.
- *
- * A false return value may indicate that notifications are not applicable for
- * the scheduler, not implementable, or a temporary inability to deliver
- * notifications.
- *
- * This function is not thread-safe.
- */
-RLM_API bool realm_scheduler_can_deliver_notifications(const realm_scheduler_t*);
-
-/**
- * Set the callback that will be invoked by `realm_scheduler_notify()`.
- *
- * This function is not thread-safe.
- */
-RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t*, void* userdata, realm_free_userdata_func_t,
-                                                 realm_scheduler_notify_func_t);
-
 
 /**
  * Open a Realm file.

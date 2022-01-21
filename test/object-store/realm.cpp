@@ -477,12 +477,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             const SimpleScheduler* o = dynamic_cast<const SimpleScheduler*>(other);
             return (o && (o->m_id == m_id));
         }
-        bool can_deliver_notifications() const noexcept override
+        bool can_invoke() const noexcept override
         {
             return false;
         }
-        void set_notify_callback(std::function<void()>) override {}
-        void notify() override {}
+        void invoke(util::UniqueFunction<void()>&&) override {}
 
     protected:
         size_t m_id;
@@ -929,7 +928,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 }
 #endif
 
-TEST_CASE("SharedRealm: async_writes") {
+TEST_CASE("SharedRealm: async writes") {
+    _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -978,21 +978,31 @@ TEST_CASE("SharedRealm: async_writes") {
         REQUIRE(done);
     }
     SECTION("realm closed") {
-        bool timeout = false;
-        auto has_timer = realm->scheduler()->set_timeout_callback(100, [&timeout]() {
-            timeout = true;
+        auto scheduler = realm->scheduler();
+        realm->async_begin_transaction([&] {
+            // We should never get here as the realm is closed
+            FAIL();
         });
-        if (has_timer) {
-            realm->async_begin_transaction([&] {
-                // We should never get here as the realm is closed
-                done = true;
-            });
-            realm->close();
-            util::EventLoop::main().run_until([&] {
-                return done || timeout;
-            });
-            REQUIRE(!done);
-        }
+        realm->close();
+        scheduler->invoke([&] {
+            done = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+    }
+    SECTION("realm invalidated") {
+        realm->async_begin_transaction([&] {
+            // We should never get here as the realm is closed
+            FAIL();
+        });
+        realm->invalidate();
+        realm->scheduler()->invoke([&] {
+            done = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
     }
     SECTION("realm closed when sync in progress") {
         bool persisted = false;

@@ -243,7 +243,7 @@ public:
     // ask for write mutex. Callback takes place when mutex has been acquired.
     // callback may occur on ANOTHER THREAD. Must not be called if write mutex
     // has already been acquired.
-    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>& when_acquired);
+    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired);
 
     // report statistics of last commit done on THIS DB.
     // The free space reported is what can be expected to be freed

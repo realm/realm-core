@@ -1299,3 +1299,14 @@ void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_ov
 {
     m_db->write_copy(path, key.data(), allow_overwrite);
 }
+
+void RealmCoordinator::async_request_write_mutex(Realm& realm)
+{
+    auto tr = Realm::Internal::get_transaction_ref(realm);
+    m_db->async_request_write_mutex(tr, [realm = realm.shared_from_this()]() mutable {
+        auto& scheduler = *realm->scheduler();
+        scheduler.invoke([realm = std::move(realm)] {
+            realm->run_writes();
+        });
+    });
+}
