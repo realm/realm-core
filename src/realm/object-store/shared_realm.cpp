@@ -916,13 +916,7 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    DB::VersionID prev_version;
-    if (!m_async_commit_q.empty()) {
-        prev_version = m_transaction->get_oldest_version_not_persisted();
-    }
-    else {
-        prev_version = transaction().get_version_of_current_transaction();
-    }
+    DB::VersionID prev_version = transaction().get_version_of_current_transaction();
 
     constexpr bool commit_to_disk = false;
     m_coordinator->commit_write(*this, commit_to_disk);

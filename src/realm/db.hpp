@@ -602,13 +602,6 @@ public:
     {
         return db->get_version_of_latest_snapshot();
     }
-    DB::VersionID get_oldest_version_not_persisted()
-    {
-        if (m_oldest_version_not_persisted) {
-            return VersionID(m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_reader_idx);
-        }
-        return {};
-    }
     /// Get a version id which may be used to request a different transaction locked to specific version.
     DB::VersionID get_version_of_current_transaction() const noexcept
     {
