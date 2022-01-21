@@ -653,7 +653,7 @@ void Realm::run_async_completions_on_proper_thread()
 
 void Realm::call_completion_callbacks()
 {
-    m_is_running_async_commit_completions = true;
+    CountGuard sending_completions(m_is_running_async_commit_completions);
     if (m_transaction) {
         if (auto error = m_transaction->get_commit_exception())
             std::rethrow_exception(error);
@@ -663,7 +663,6 @@ void Realm::call_completion_callbacks()
         if (cb.when_completed)
             cb.when_completed();
     }
-    m_is_running_async_commit_completions = false;
 
     m_async_commit_q.clear();
 }
