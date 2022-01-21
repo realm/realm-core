@@ -1500,6 +1500,240 @@ TEST(Future_MoveOnly_Fail_onErrorFutureAsync)
     });
 }
 
+TEST(Future_MoveOnly_Success_onCompletionSimple)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<Widget> i) {
+                                return i.get_value() + 2;
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionVoid)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([this](StatusWith<Widget> i) {
+                                CHECK_EQUAL(i.get_value(), 1);
+                            })
+                            .on_completion([this](Status s) {
+                                CHECK(s.is_ok());
+                                return Widget(3);
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionStatus)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([this](StatusWith<Widget> i) {
+                                CHECK_EQUAL(i.get_value(), 1);
+                                return Status::OK();
+                            })
+                            .on_completion([this](Status s) {
+                                CHECK(s.is_ok());
+                                return Widget(3);
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionError_Status)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            auto fut2 = std::move(fut).on_completion([](StatusWith<Widget>) {
+                return fail_status;
+            });
+            static_assert(future_details::is_future<decltype(fut2)>);
+            static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
+            CHECK_EQUAL(fut2.get_no_throw(), fail_status);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionError_StatusWith)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            auto fut2 = std::move(fut).on_completion([](StatusWith<Widget>) {
+                return StatusWith<double>(fail_status);
+            });
+            static_assert(future_details::is_future<decltype(fut2)>);
+            static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
+            CHECK_EQUAL(fut2.get_no_throw(), fail_status);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionFutureImmediate)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<Widget> i) {
+                                return Future<Widget>::make_ready(Widget(i.get_value() + 2));
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionFutureReady)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<Widget> i) {
+                                auto pf = make_promise_future<Widget>();
+                                pf.promise.emplace_value(i.get_value() + 2);
+                                return std::move(pf.future);
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionFutureAsync)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([&](StatusWith<Widget> i) {
+                                return async([i = i.get_value().val] {
+                                    return Widget(i + 2);
+                                });
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_MoveOnly_Success_onCompletionFutureAsyncThrow)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return Widget(1);
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<Widget>) {
+                                throw ExceptionForStatus(fail_status);
+                                return Future<Widget>();
+                            })
+                            .get_no_throw(),
+                        fail_status);
+        });
+}
+
+TEST(Future_MoveOnly_Fail_onCompletionSimple)
+{
+    FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<Widget> i) {
+                            CHECK_NOT(i.is_ok());
+                            return i.get_status();
+                        })
+                        .get_no_throw(),
+                    fail_status);
+    });
+}
+
+TEST(Future_MoveOnly_Fail_onCompletionFutureAsync)
+{
+    FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<Widget> i) {
+                            CHECK_NOT(i.is_ok());
+                            return i.get_status();
+                        })
+                        .get_no_throw(),
+                    fail_status);
+    });
+}
+
+TEST(Future_MoveOnly_Fail_onCompletionError_throw)
+{
+    FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
+        auto fut2 = std::move(fut).on_completion([this](StatusWith<Widget> s) -> Widget {
+            CHECK_EQUAL(s.get_status(), fail_status);
+            throw ExceptionForStatus(fail_status_2);
+        });
+        CHECK_EQUAL(std::move(fut2).get_no_throw(), fail_status_2);
+    });
+}
+
+TEST(Future_MoveOnly_Fail_onCompletionError_StatusWith)
+{
+    FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
+        auto fut2 = std::move(fut).on_completion([this](StatusWith<Widget> s) {
+            CHECK_EQUAL(s.get_status(), fail_status);
+            return StatusWith<Widget>(fail_status_2);
+        });
+        CHECK_EQUAL(std::move(fut2).get_no_throw(), fail_status_2);
+    });
+}
+
+TEST(Future_MoveOnly_Fail_onCompletionFutureImmediate)
+{
+    FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<Widget> s) {
+                            CHECK_EQUAL(s.get_status(), fail_status);
+                            return Future<Widget>::make_ready(Widget(3));
+                        })
+                        .get(),
+                    3);
+    });
+}
+
+TEST(Future_MoveOnly_Fail_onCompletionFutureReady)
+{
+    FUTURE_FAIL_TEST<Widget>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<Widget> s) {
+                            CHECK_EQUAL(s.get_status(), fail_status);
+                            auto pf = make_promise_future<Widget>();
+                            pf.promise.emplace_value(3);
+                            return std::move(pf.future);
+                        })
+                        .get(),
+                    3);
+    });
+}
+
 // This is the motivating case for SharedStateBase::isJustForContinuation. Without that logic, there
 // would be a long chain of SharedStates, growing longer with each recursion. That logic exists to
 // limit it to a fixed-size chain.
@@ -1583,6 +1817,421 @@ TEST(Promise_void_Fail_setFrom)
         auto pf = make_promise_future<void>();
         pf.promise.set_from(std::move(fut));
         CHECK_THROW_EX(std::move(pf.future).get(), ExceptionForStatus, (e.to_status() == fail_status));
+    });
+}
+
+TEST(Future_Success_onCompletionSimple)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<int> i) -> int {
+                                return i.get_value() + 2;
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_Success_onCompletionVoid)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([this](StatusWith<int> i) {
+                                CHECK_EQUAL(i.get_value(), 1);
+                            })
+                            .on_completion([this](Status s) -> int {
+                                CHECK(s.is_ok());
+                                return 3;
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_Success_onCompletionStatus)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([this](StatusWith<int> i) -> Status {
+                                CHECK_EQUAL(i, 1);
+                                return Status::OK();
+                            })
+                            .on_completion([this](Status s) -> int {
+                                CHECK(s.is_ok());
+                                return 3;
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_Success_onCompletionError_Status)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            auto fut2 = std::move(fut).on_completion([](StatusWith<int>) -> Status {
+                return fail_status;
+            });
+#ifndef _MSC_VER
+            static_assert(future_details::is_future<decltype(fut2)>);
+            static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
+#endif
+            CHECK_THROW_EX(fut2.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        });
+}
+
+TEST(Future_Success_onCompletionError_StatusWith)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            auto fut2 = std::move(fut).on_completion([](StatusWith<int>) -> StatusWith<double> {
+                return StatusWith<double>(fail_status);
+            });
+            static_assert(future_details::is_future<decltype(fut2)>);
+            static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
+            CHECK_THROW_EX(fut2.get(), ExceptionForStatus, (e.to_status() == fail_status));
+        });
+}
+
+TEST(Future_Success_onCompletionFutureImmediate)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<int> i) -> Future<int> {
+                                return Future<int>::make_ready(i.get_value() + 2);
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_Success_onCompletionFutureReady)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<int> i) -> Future<int> {
+                                auto pf = make_promise_future<int>();
+                                pf.promise.emplace_value(i.get_value() + 2);
+                                return std::move(pf.future);
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_Success_onCompletionFutureAsync)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<int> i) -> Future<int> {
+                                return async([i = i.get_value()] {
+                                    return i + 2;
+                                });
+                            })
+                            .get(),
+                        3);
+        });
+}
+
+TEST(Future_Success_onCompletionFutureAsyncThrow)
+{
+    FUTURE_SUCCESS_TEST(
+        [] {
+            return 1;
+        },
+        [this](auto&& fut) {
+            CHECK_EQUAL(std::move(fut)
+                            .on_completion([](StatusWith<int>) -> Future<int> {
+                                throw ExceptionForStatus(fail_status);
+                                return Future<int>();
+                            })
+                            .get_no_throw(),
+                        fail_status);
+        });
+}
+
+TEST(Future_Fail_onCompletionSimple)
+{
+    FUTURE_FAIL_TEST<int>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<int> i) -> Status {
+                            CHECK_NOT(i.is_ok());
+
+                            return i.get_status();
+                        })
+                        .get_no_throw(),
+                    fail_status);
+    });
+}
+
+TEST(Future_Fail_onCompletionError_throw)
+{
+    FUTURE_FAIL_TEST<int>([this](auto&& fut) {
+        auto fut2 = std::move(fut).on_completion([this](StatusWith<int> s) -> int {
+            CHECK_EQUAL(s.get_status(), fail_status);
+            throw ExceptionForStatus(fail_status);
+        });
+        CHECK_EQUAL(fut2.get_no_throw(), fail_status);
+    });
+}
+
+TEST(Future_Fail_onCompletionError_StatusWith)
+{
+    FUTURE_FAIL_TEST<int>([this](auto&& fut) {
+        auto fut2 = std::move(fut).on_completion([this](StatusWith<int> s) -> StatusWith<int> {
+            CHECK_EQUAL(s.get_status(), fail_status);
+            return StatusWith<int>(fail_status);
+        });
+        CHECK_EQUAL(fut2.get_no_throw(), fail_status);
+    });
+}
+
+TEST(Future_Fail_onCompletionFutureImmediate)
+{
+    FUTURE_FAIL_TEST<int>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<int> s) -> Future<int> {
+                            CHECK_EQUAL(s.get_status(), fail_status);
+                            return Future<int>::make_ready(3);
+                        })
+                        .get(),
+                    3);
+    });
+}
+
+TEST(Future_Fail_onCompletionFutureReady)
+{
+    FUTURE_FAIL_TEST<int>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](StatusWith<int> s) -> Future<int> {
+                            CHECK_EQUAL(s.get_status(), fail_status);
+                            auto pf = make_promise_future<int>();
+                            pf.promise.emplace_value(3);
+                            return std::move(pf.future);
+                        })
+                        .get(),
+                    3);
+    });
+}
+
+TEST(Future_Void_Success_onCompletionSimple)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            CHECK_EQUAL(std::move(fut)
+                                            .on_completion([this](Status status) {
+                                                CHECK(status.is_ok());
+                                                return 3;
+                                            })
+                                            .get(),
+                                        3);
+                        });
+}
+
+TEST(Future_Void_Success_onCompletionVoid)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            CHECK_EQUAL(std::move(fut)
+                                            .on_completion([this](Status status) {
+                                                CHECK(status.is_ok());
+                                            })
+                                            .then([]() {
+                                                return 3;
+                                            })
+                                            .get(),
+                                        3);
+                        });
+}
+
+TEST(Future_Void_Success_onCompletionError_Status)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            auto fut2 = std::move(fut).on_completion([this](Status status) {
+                                CHECK(status.is_ok());
+                                return fail_status;
+                            });
+                            static_assert(future_details::is_future<decltype(fut2)>);
+                            static_assert(std::is_same_v<typename decltype(fut2)::value_type, void>);
+                            CHECK_EQUAL(fut2.get_no_throw(), fail_status);
+                        });
+}
+
+TEST(Future_Void_Success_onCompletionError_StatusWith)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            auto fut2 = std::move(fut).on_completion([this](Status status) {
+                                CHECK(status.is_ok());
+                                return StatusWith<double>(fail_status);
+                            });
+                            static_assert(future_details::is_future<decltype(fut2)>);
+                            static_assert(std::is_same_v<typename decltype(fut2)::value_type, double>);
+                            CHECK_EQUAL(fut2.get_no_throw(), fail_status);
+                        });
+}
+
+TEST(Future_Void_Success_onCompletionFutureImmediate)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            CHECK_EQUAL(std::move(fut)
+                                            .on_completion([this](Status status) {
+                                                CHECK(status.is_ok());
+                                                return Future<int>::make_ready(3);
+                                            })
+                                            .get(),
+                                        3);
+                        });
+}
+
+TEST(Future_Void_Success_onCompletionFutureReady)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            CHECK_EQUAL(std::move(fut)
+                                            .on_completion([this](Status status) {
+                                                CHECK(status.is_ok());
+                                                auto pf = make_promise_future<int>();
+                                                pf.promise.emplace_value(3);
+                                                return std::move(pf.future);
+                                            })
+                                            .get(),
+                                        3);
+                        });
+}
+
+TEST(Future_Void_Success_onCompletionFutureAsync)
+{
+    FUTURE_SUCCESS_TEST([] {},
+                        [this](auto&& fut) {
+                            CHECK_EQUAL(std::move(fut)
+                                            .on_completion([this](Status status) {
+                                                CHECK(status.is_ok());
+                                                return async([] {
+                                                    return 3;
+                                                });
+                                            })
+                                            .get(),
+                                        3);
+                        });
+}
+
+TEST(Future_Void_Fail_onCompletionSimple)
+{
+    FUTURE_FAIL_TEST<void>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](Status s) {
+                            CHECK_EQUAL(s, fail_status);
+                        })
+                        .then([] {
+                            return 3;
+                        })
+                        .get_no_throw(),
+                    3);
+    });
+}
+
+TEST(Future_Void_Fail_onCompletionError_throw)
+{
+    FUTURE_FAIL_TEST<void>([this](auto&& fut) {
+        auto fut2 = std::move(fut).on_completion([this](Status s) {
+            CHECK_EQUAL(s, fail_status);
+            throw ExceptionForStatus(fail_status_2);
+        });
+        CHECK_EQUAL(fut2.get_no_throw(), fail_status_2);
+    });
+}
+
+TEST(Future_Void_Fail_onCompletionError_Status)
+{
+    FUTURE_FAIL_TEST<void>([this](auto&& fut) {
+        auto fut2 = std::move(fut).on_completion([this](Status s) {
+            CHECK_EQUAL(s, fail_status);
+            return fail_status_2;
+        });
+        CHECK_EQUAL(fut2.get_no_throw(), fail_status_2);
+    });
+}
+
+TEST(Future_Void_Fail_onCompletionFutureImmediate)
+{
+    FUTURE_FAIL_TEST<void>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](Status s) {
+                            CHECK_EQUAL(s, fail_status);
+                            return Future<void>::make_ready();
+                        })
+                        .then([] {
+                            return 3;
+                        })
+                        .get(),
+                    3);
+    });
+}
+
+TEST(Future_Void_Fail_onCompletionFutureReady)
+{
+    FUTURE_FAIL_TEST<void>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](Status s) {
+                            CHECK_EQUAL(s, fail_status);
+                            auto pf = make_promise_future<void>();
+                            pf.promise.emplace_value();
+                            return std::move(pf.future);
+                        })
+                        .then([] {
+                            return 3;
+                        })
+                        .get(),
+                    3);
+    });
+}
+
+TEST(Future_Void_Fail_onCompletionFutureAsync)
+{
+    FUTURE_FAIL_TEST<void>([this](auto&& fut) {
+        CHECK_EQUAL(std::move(fut)
+                        .on_completion([this](Status s) {
+                            CHECK_EQUAL(s, fail_status);
+                            return async([] {});
+                        })
+                        .then([] {
+                            return 3;
+                        })
+                        .get(),
+                    3);
     });
 }
 
