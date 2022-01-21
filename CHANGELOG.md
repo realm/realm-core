@@ -20,6 +20,7 @@
 
 ### Internals
 * SubscriptionStore's should be initialized with an implict empty SubscriptionSet so users can wait for query version zero to finish synchronizing. ((#5166)[https://github.com/realm/realm-core/pull/5166])
+* Fixed `Future::on_completion()` and added missing testing for it ((#5181)[https://github.com/realm/realm-core/pull/5181])
 
 ----------------------------------------------
 
