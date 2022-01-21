@@ -656,7 +656,7 @@ void Realm::call_completion_callbacks()
     m_is_running_async_commit_completions = true;
     if (m_transaction) {
         if (auto error = m_transaction->get_commit_exception())
-            throw error;
+            std::rethrow_exception(error);
     }
 
     for (auto& cb : m_async_commit_q) {
