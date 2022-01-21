@@ -976,7 +976,15 @@ void Realm::invalidate()
         cancel_transaction();
     }
 
+    if (!m_config.immutable() && m_transaction) {
+        // Wait for potential syncing to finish
+        m_transaction->wait_for_async_completion();
+        call_completion_callbacks();
+    }
+
     m_transaction = nullptr;
+    m_async_write_q.clear();
+    m_async_commit_q.clear();
 }
 
 bool Realm::compact()
