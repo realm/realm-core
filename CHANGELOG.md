@@ -5,6 +5,7 @@
 * Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
 * 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
 * Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
+* `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -23,6 +24,7 @@
 * Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state (since v11.8.0).
 * Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
 * Check, when opening a realm, that in-memory realms are not encrypted ([#5195](https://github.com/realm/realm-core/issues/5195))
+* Using asynchronous writes from multiple threads had several race conditions and would often crash (since v11.8.0).
  
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.

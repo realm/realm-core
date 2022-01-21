@@ -529,7 +529,7 @@ struct alignas(8) DB::SharedInfo {
     InterprocessCondVar::SharedPart new_commit_available;
     InterprocessCondVar::SharedPart pick_next_writer;
     std::atomic<uint32_t> next_ticket;
-    uint32_t next_served = 0;
+    std::atomic<uint32_t> next_served = 0;
 
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
@@ -1680,58 +1680,151 @@ public:
                 return;
             }
             m_running = false;
-            m_changed.notify_one();
+            m_cv_worker.notify_one();
         }
-        m_thread->join();
+        m_thread.join();
     }
-    void start_thread()
-    {
-        {
-            std::unique_lock lg(m_mutex);
-            if (m_running) {
-                return;
-            }
-            m_running = true;
-            m_thread = std::make_unique<std::thread>([this]() {
-                main();
-            });
-        }
-    }
+
     void begin_write(util::UniqueFunction<void()> fn)
     {
         std::unique_lock lg(m_mutex);
+        start_thread();
         m_pending_writes.emplace_back(std::move(fn));
-        m_changed.notify_one();
+        m_cv_worker.notify_one();
+    }
+
+    void blocking_begin_write()
+    {
+        std::unique_lock lg(m_mutex);
+
+        // If we support unlocking InterprocessMutex from a different thread
+        // than it was locked on, we can sometimes just begin the write on
+        // the current thread. This requires that no one is currently waiting
+        // for the worker thread to acquire the write lock, as we'll deadlock
+        // if we try to async commit while the worker is waiting for the lock.
+        bool can_lock_on_caller =
+            !InterprocessMutex::is_thread_confined && (!m_owns_write_mutex && m_pending_writes.empty() &&
+                                                       m_write_lock_claim_ticket == m_write_lock_claim_fulfilled);
+
+        // If we support cross-thread unlocking and m_running is false,
+        // can_lock_on_caller should always be true or we forgot to launch the thread
+        REALM_ASSERT(can_lock_on_caller || m_running || InterprocessMutex::is_thread_confined);
+
+        // If possible, just begin the write on the current thread
+        if (can_lock_on_caller) {
+            m_waiting_for_write_mutex = true;
+            lg.unlock();
+            m_db->do_begin_write();
+            lg.lock();
+            m_waiting_for_write_mutex = false;
+            m_has_write_mutex = true;
+            m_owns_write_mutex = false;
+            return;
+        }
+
+        // Otherwise we have to ask the worker thread to acquire it and wait
+        // for that
+        start_thread();
+        size_t ticket = ++m_write_lock_claim_ticket;
+        m_cv_worker.notify_one();
+        m_cv_callers.wait(lg, [this, ticket] {
+            return ticket == m_write_lock_claim_fulfilled;
+        });
     }
 
     void end_write()
     {
         std::unique_lock lg(m_mutex);
-        m_pending_mx_release = true;
-        m_changed.notify_one();
+        REALM_ASSERT(m_has_write_mutex);
+        REALM_ASSERT(m_owns_write_mutex || !InterprocessMutex::is_thread_confined);
+
+        // If we acquired the write lock on the worker thread, also release it
+        // there even if our mutex supports unlocking cross-thread as it simplifies things.
+        if (m_owns_write_mutex) {
+            m_pending_mx_release = true;
+            m_cv_worker.notify_one();
+        }
+        else {
+            m_db->do_end_write();
+            m_has_write_mutex = false;
+        }
     }
+
+    bool blocking_end_write()
+    {
+        std::unique_lock lg(m_mutex);
+        if (!m_has_write_mutex) {
+            return false;
+        }
+        REALM_ASSERT(m_owns_write_mutex || !InterprocessMutex::is_thread_confined);
+
+        // If we acquired the write lock on the worker thread, also release it
+        // there even if our mutex supports unlocking cross-thread as it simplifies things.
+        if (m_owns_write_mutex) {
+            m_pending_mx_release = true;
+            m_cv_worker.notify_one();
+            m_cv_callers.wait(lg, [this] {
+                return !m_pending_mx_release;
+            });
+        }
+        else {
+            m_db->do_end_write();
+            m_has_write_mutex = false;
+
+            // The worker thread may have ignored a request for the write mutex
+            // while we were acquiring it, so we need to wake up the thread
+            if (has_pending_write_requests()) {
+                lg.unlock();
+                m_cv_worker.notify_one();
+            }
+        }
+        return true;
+    }
+
 
     void sync_to_disk(util::UniqueFunction<void()> fn)
     {
+        REALM_ASSERT(fn);
         std::unique_lock lg(m_mutex);
         REALM_ASSERT(!m_pending_sync);
-        m_pending_sync.emplace(std::move(fn));
-        m_changed.notify_one();
+        start_thread();
+        m_pending_sync = std::move(fn);
+        m_cv_worker.notify_one();
     }
-
 
 private:
     DB* m_db;
-    std::unique_ptr<std::thread> m_thread;
+    std::thread m_thread;
     std::mutex m_mutex;
-    std::condition_variable m_changed;
+    std::condition_variable m_cv_worker;
+    std::condition_variable m_cv_callers;
     std::deque<util::UniqueFunction<void()>> m_pending_writes;
-    util::Optional<util::UniqueFunction<void()>> m_pending_sync;
+    util::UniqueFunction<void()> m_pending_sync;
+    size_t m_write_lock_claim_ticket = 0;
+    size_t m_write_lock_claim_fulfilled = 0;
     bool m_pending_mx_release = false;
     bool m_running = false;
     bool m_has_write_mutex = false;
+    bool m_owns_write_mutex = false;
+    bool m_waiting_for_write_mutex = false;
 
     void main();
+
+    void start_thread()
+    {
+        if (m_running) {
+            return;
+        }
+        m_running = true;
+        m_thread = std::thread([this]() {
+            main();
+        });
+    }
+
+    bool has_pending_write_requests()
+    {
+        return m_write_lock_claim_fulfilled < m_write_lock_claim_ticket || !m_pending_writes.empty();
+    }
 };
 
 void DB::AsyncCommitHelper::main()
@@ -1742,40 +1835,67 @@ void DB::AsyncCommitHelper::main()
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
 #endif
         if (m_has_write_mutex) {
-            if (m_pending_sync) {
-                auto cb = std::move(m_pending_sync.value());
-                m_pending_sync.reset();
+            if (auto cb = std::move(m_pending_sync)) {
+                // Only one of sync_to_disk(), end_write(), or blocking_end_write()
+                // should be called, so we should never have both a pending sync
+                // and pending release.
+                REALM_ASSERT(!m_pending_mx_release);
                 lg.unlock();
                 cb();
+                cb = nullptr; // Release things captured by the callback before reacquiring the lock
                 lg.lock();
-                m_has_write_mutex = false;
-                continue;
+                m_pending_mx_release = true;
             }
-            else if (m_pending_mx_release) {
+            if (m_pending_mx_release) {
+                REALM_ASSERT(!InterprocessMutex::is_thread_confined || m_owns_write_mutex);
                 m_db->do_end_write();
                 m_pending_mx_release = false;
                 m_has_write_mutex = false;
+                m_owns_write_mutex = false;
+
+                lg.unlock();
+                m_cv_callers.notify_all();
+                lg.lock();
                 continue;
             }
         }
         else {
-            // Waiting for write req
             REALM_ASSERT(!m_pending_sync && !m_pending_mx_release);
-            if (!m_pending_writes.empty()) {
+
+            // Acquire the write lock if anyone has requested it, but only if
+            // another thread is not already waiting for it. If there's another
+            // thread requesting and they get it while we're waiting, we'll
+            // deadlock if they ask us to perform the sync.
+            if (!m_waiting_for_write_mutex && has_pending_write_requests()) {
+                lg.unlock();
+                m_db->do_begin_write();
+                lg.lock();
+
+                REALM_ASSERT(!m_has_write_mutex);
+                m_has_write_mutex = true;
+                m_owns_write_mutex = true;
+
+                // Synchronous transaction requests get priority over async
+                if (m_write_lock_claim_fulfilled < m_write_lock_claim_ticket) {
+                    ++m_write_lock_claim_fulfilled;
+                    m_cv_callers.notify_all();
+                    continue;
+                }
+
+                REALM_ASSERT(!m_pending_writes.empty());
                 auto callback = std::move(m_pending_writes.front());
                 m_pending_writes.pop_front();
                 lg.unlock();
-                // acquire write mutex
-                m_db->do_begin_write();
                 callback();
+                // Release things captured by the callback before reacquiring the lock
+                callback = nullptr;
                 lg.lock();
-                m_has_write_mutex = true;
                 continue;
             }
         }
-        m_changed.wait(lg);
+        m_cv_worker.wait(lg);
     }
-    if (m_has_write_mutex) {
+    if (m_has_write_mutex && m_owns_write_mutex) {
         m_db->do_end_write();
     }
 }
@@ -1783,17 +1903,19 @@ void DB::AsyncCommitHelper::main()
 
 void DB::async_begin_write(util::UniqueFunction<void()> fn)
 {
-    m_commit_helper->start_thread();
+    REALM_ASSERT(m_commit_helper);
     m_commit_helper->begin_write(std::move(fn));
 }
 
 void DB::async_end_write()
 {
+    REALM_ASSERT(m_commit_helper);
     m_commit_helper->end_write();
 }
 
 void DB::async_sync_to_disk(util::UniqueFunction<void()> fn)
 {
+    REALM_ASSERT(m_commit_helper);
     m_commit_helper->sync_to_disk(std::move(fn));
 }
 
@@ -2090,7 +2212,7 @@ void DB::do_begin_write()
     m_writemutex.lock(); // Throws
 
     // allow for comparison even after wrap around of ticket numbering:
-    int32_t diff = int32_t(my_ticket - info->next_served);
+    int32_t diff = int32_t(my_ticket - info->next_served.load(std::memory_order_relaxed));
     bool should_yield = diff > 0; // ticket is in the future
     // a) the above comparison is only guaranteed to be correct, if the distance
     //    between my_ticket and info->next_served is less than 2^30. This will
@@ -2156,19 +2278,19 @@ void DB::finish_begin_write()
     m_alloc.set_read_only(false);
 }
 
-
 void DB::do_end_write() noexcept
 {
     SharedInfo* info = m_file_map.get_addr();
-    info->next_served++;
+    info->next_served.fetch_add(1, std::memory_order_relaxed);
+
+    {
+        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+        REALM_ASSERT(m_write_transaction_open);
+        m_alloc.set_read_only(true);
+        m_write_transaction_open = false;
+        m_writemutex.unlock();
+    }
     m_pick_next_writer.notify_all();
-
-    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
-
-    REALM_ASSERT(m_write_transaction_open);
-    m_alloc.set_read_only(true);
-    m_write_transaction_open = false;
-    m_writemutex.unlock();
 }
 
 
@@ -2245,11 +2367,21 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     REALM_ASSERT(!m_oldest_version_not_persisted ||
                  m_read_lock.m_version != m_oldest_version_not_persisted->m_version);
 
-    if (m_async_stage == AsyncState::Idle) {
-        db->do_end_write();
-    }
-    else if (m_async_stage == AsyncState::HasLock) {
-        m_async_stage = AsyncState::HasCommits;
+    {
+        util::CheckedLockGuard lock(m_async_mutex);
+        REALM_ASSERT(m_async_stage != AsyncState::Syncing);
+        if (commit_to_disk) {
+            if (m_async_stage == AsyncState::Requesting) {
+                m_async_stage = AsyncState::HasLock;
+            }
+            else {
+                db->end_write_on_correct_thread();
+                m_async_stage = AsyncState::Idle;
+            }
+        }
+        else {
+            m_async_stage = AsyncState::HasCommits;
+        }
     }
 
     // Remap file if it has grown, and update refs in underlying node structure
@@ -2567,9 +2699,7 @@ void Transaction::end_read()
 
 void Transaction::do_end_read() noexcept
 {
-    async_end();
-    wait_for_async_completion();
-
+    prepare_for_close();
     detach();
 
     // We should always be ensuring that async commits finish before we get here,
@@ -2648,7 +2778,7 @@ void Transaction::rollback()
         throw LogicError(LogicError::wrong_transact_state);
     db->reset_free_space_tracking();
     if (!holds_write_mutex())
-        db->do_end_write();
+        db->end_write_on_correct_thread();
 
     do_end_read();
 }
@@ -2684,7 +2814,7 @@ DB::version_type Transaction::commit()
     db->grab_read_lock(lock_after_commit, version_id);
     db->release_read_lock(lock_after_commit);
 
-    db->do_end_write();
+    db->end_write_on_correct_thread();
 
     do_end_read();
     m_read_lock = lock_after_commit;
@@ -2758,7 +2888,7 @@ TransactionRef DB::start_write(bool nonblocking)
     {
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
         if (!is_attached()) {
-            do_end_write();
+            end_write_on_correct_thread();
             throw LogicError(LogicError::wrong_transact_state);
         }
         m_write_transaction_open = true;
@@ -2780,7 +2910,7 @@ TransactionRef DB::start_write(bool nonblocking)
         g.release();
     }
     catch (...) {
-        do_end_write();
+        end_write_on_correct_thread();
         throw;
     }
 
@@ -2789,14 +2919,20 @@ TransactionRef DB::start_write(bool nonblocking)
 
 void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>&& when_acquired)
 {
-    std::unique_lock<std::mutex> lck(tr->m_async_mutex);
-    REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
-    tr->m_async_stage = Transaction::AsyncState::Requesting;
+    {
+        util::CheckedLockGuard lck(tr->m_async_mutex);
+        REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
+        tr->m_async_stage = Transaction::AsyncState::Requesting;
+    }
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, cb = std::move(when_acquired)]() {
         if (auto tr = weak_tr.lock()) {
-            std::unique_lock<std::mutex> lck(tr->m_async_mutex);
-            tr->m_async_stage = Transaction::AsyncState::HasLock;
+            util::CheckedLockGuard lck(tr->m_async_mutex);
+            // If a synchronous transaction happened while we were pending
+            // we may be in HasCommits
+            if (tr->m_async_stage == Transaction::AsyncState::Requesting) {
+                tr->m_async_stage = Transaction::AsyncState::HasLock;
+            }
             if (tr->m_waiting_for_write_lock) {
                 tr->m_waiting_for_write_lock = false;
                 tr->m_async_cv.notify_one();
@@ -2911,8 +3047,10 @@ std::unique_ptr<TableView> Transaction::import_copy_of(TableView& tv, PayloadPol
 inline DB::DB(const DBOptions& options)
     : m_key(options.encryption_key)
     , m_upgrade_callback(std::move(options.upgrade_callback))
-    , m_commit_helper(std::make_unique<AsyncCommitHelper>(this))
 {
+    if (options.enable_async_writes) {
+        m_commit_helper = std::make_unique<AsyncCommitHelper>(this);
+    }
 }
 
 namespace {
@@ -2980,9 +3118,57 @@ void DB::release_sync_agent()
     m_is_sync_agent = false;
 }
 
-void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
+void DB::do_begin_possibly_async_write()
 {
-    std::unique_lock<std::mutex> lck(m_async_mutex);
+    if (m_commit_helper) {
+        m_commit_helper->blocking_begin_write();
+    }
+    else {
+        do_begin_write();
+    }
+}
+
+void DB::end_write_on_correct_thread() noexcept
+{
+    //    m_local_write_mutex.unlock();
+    if (!m_commit_helper || !m_commit_helper->blocking_end_write()) {
+        do_end_write();
+    }
+}
+void Transaction::promote_to_async()
+{
+    util::CheckedLockGuard lck(m_async_mutex);
+    if (m_async_stage == AsyncState::Idle) {
+        m_async_stage = AsyncState::HasLock;
+    }
+}
+
+void Transaction::complete_async_commit()
+{
+    // sync to disk:
+    DB::ReadLockInfo read_lock;
+    try {
+        db->grab_read_lock(read_lock, VersionID());
+        GroupWriter out(*this);
+        out.commit(read_lock.m_top_ref); // Throws
+        // we must release the write mutex before the callback, because the callback
+        // is allowed to re-request it.
+        db->release_read_lock(read_lock);
+        if (m_oldest_version_not_persisted) {
+            db->release_read_lock(*m_oldest_version_not_persisted);
+            m_oldest_version_not_persisted.reset();
+        }
+    }
+    catch (...) {
+        m_commit_exception = std::current_exception();
+        m_async_commit_has_failed = true;
+        db->release_read_lock(read_lock);
+    }
+}
+
+void Transaction::async_complete_writes(util::UniqueFunction<void()> when_synchronized)
+{
+    util::CheckedLockGuard lck(m_async_mutex);
     if (m_async_stage == AsyncState::HasLock) {
         // Nothing to commit to disk - just release write lock
         m_async_stage = AsyncState::Idle;
@@ -2992,37 +3178,99 @@ void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
         m_async_stage = AsyncState::Syncing;
         m_commit_exception = std::exception_ptr();
         // get a callback on the helper thread, in which to sync to disk
-        db->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
-            // sync to disk:
-            DB::ReadLockInfo read_lock;
-            try {
-                db->grab_read_lock(read_lock, VersionID());
-                GroupWriter out(*this);
-                out.commit(read_lock.m_top_ref); // Throws
-                // we must release the write mutex before the callback, because the callback
-                // is allowed to re-request it.
-                db->release_read_lock(read_lock);
-                if (m_oldest_version_not_persisted) {
-                    db->release_read_lock(*m_oldest_version_not_persisted);
-                    m_oldest_version_not_persisted.reset();
-                }
-            }
-            catch (...) {
-                m_commit_exception = std::current_exception();
-                m_async_commit_has_failed = true;
-                db->release_read_lock(read_lock);
-            }
-            db->do_end_write();
-
-            std::unique_lock<std::mutex> lck(m_async_mutex);
+        db->async_sync_to_disk([this, cb = std::move(when_synchronized)]() noexcept {
+            complete_async_commit();
+            util::CheckedLockGuard lck(m_async_mutex);
             m_async_stage = AsyncState::Idle;
             if (m_waiting_for_sync) {
                 m_waiting_for_sync = false;
-                m_async_cv.notify_one();
+                m_async_cv.notify_all();
             }
-            else if (cb) {
+            else {
                 cb();
             }
         });
+    }
+}
+
+void Transaction::prepare_for_close()
+{
+    util::CheckedLockGuard lck(m_async_mutex);
+    switch (m_async_stage) {
+        case AsyncState::Idle:
+            break;
+
+        case AsyncState::Requesting:
+            // We don't have the ability to cancel a wait on the write lock, so
+            // unfortunately we have to wait for it to be acquired.
+            REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+            REALM_ASSERT(!m_oldest_version_not_persisted);
+            m_waiting_for_write_lock = true;
+            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
+                return !m_waiting_for_write_lock;
+            });
+            db->end_write_on_correct_thread();
+            break;
+
+        case AsyncState::HasLock:
+            // We have the lock and are currently in a write transaction, and
+            // also may have some pending previous commits to write
+            if (m_transact_stage == DB::transact_Writing) {
+                db->reset_free_space_tracking();
+                m_transact_stage = DB::transact_Reading;
+            }
+            if (m_oldest_version_not_persisted) {
+                complete_async_commit();
+            }
+            db->end_write_on_correct_thread();
+            break;
+
+        case AsyncState::HasCommits:
+            // We have commits which need to be synced to disk, so do that
+            REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+            complete_async_commit();
+            db->end_write_on_correct_thread();
+            break;
+
+        case AsyncState::Syncing:
+            // The worker thread is currently writing, so wait for it to complete
+            REALM_ASSERT(m_transact_stage == DB::transact_Reading);
+            m_waiting_for_sync = true;
+            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
+                return !m_waiting_for_sync;
+            });
+            break;
+    }
+    m_async_stage = AsyncState::Idle;
+}
+
+void Transaction::acquire_write_lock()
+{
+    util::CheckedUniqueLock lck(m_async_mutex);
+    switch (m_async_stage) {
+        case AsyncState::Idle:
+            lck.unlock();
+            db->do_begin_possibly_async_write();
+            return;
+
+        case AsyncState::Requesting:
+            m_waiting_for_write_lock = true;
+            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
+                return !m_waiting_for_write_lock;
+            });
+            return;
+
+        case AsyncState::HasLock:
+        case AsyncState::HasCommits:
+            return;
+
+        case AsyncState::Syncing:
+            m_waiting_for_sync = true;
+            m_async_cv.wait(lck.native_handle(), [this]() REQUIRES(m_async_mutex) {
+                return !m_waiting_for_sync;
+            });
+            lck.unlock();
+            db->do_begin_possibly_async_write();
+            break;
     }
 }

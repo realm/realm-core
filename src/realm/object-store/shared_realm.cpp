@@ -94,7 +94,7 @@ Realm::~Realm()
 {
     if (m_transaction) {
         // Wait for potential syncing to finish
-        m_transaction->wait_for_async_completion();
+        m_transaction->prepare_for_close();
         call_completion_callbacks();
     }
 
@@ -689,8 +689,13 @@ void Realm::run_async_completions()
 
 void Realm::check_pending_write_requests()
 {
-    if (!m_async_write_q.empty() && !m_transaction->is_async()) {
-        m_coordinator->async_request_write_mutex(*this);
+    if (!m_async_write_q.empty()) {
+        if (m_transaction->is_async()) {
+            run_writes_on_proper_thread();
+        }
+        else {
+            m_coordinator->async_request_write_mutex(*this);
+        }
     }
 }
 
@@ -699,9 +704,10 @@ void Realm::end_current_write(bool check_pending)
     if (!m_transaction) {
         return;
     }
-    m_transaction->async_end([self = shared_from_this()]() {
-        self->m_scheduler->invoke([self] {
-            self->run_async_completions();
+    m_transaction->async_complete_writes([self = shared_from_this(), this]() mutable {
+        m_scheduler->invoke([self = std::move(self), this]() mutable {
+            run_async_completions();
+            self.reset();
         });
     });
     if (check_pending && m_async_commit_q.empty()) {
@@ -715,7 +721,11 @@ void Realm::run_writes()
         // Realm might have been closed
         return;
     }
-    REALM_ASSERT(!m_transaction->is_synchronizing() || m_async_write_q.empty());
+    if (m_transaction->is_synchronizing()) {
+        // Wait for the synchronization complete callback before we run more
+        // writes as we can't add commits while in that state
+        return;
+    }
 
     CountGuard running_writes(m_is_running_async_writes);
     int run_limit = 20; // max number of commits without full sync to disk
@@ -824,6 +834,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_pt
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
+    m_transaction->promote_to_async();
     REALM_ASSERT(m_transaction->holds_write_mutex());
     REALM_ASSERT(!m_notify_only);
     // auditing is not supported
@@ -903,14 +914,6 @@ void Realm::begin_transaction()
     if (is_in_transaction()) {
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
-    bool async_is_idle = true;
-    if (m_transaction) {
-        // Wait for any async operation to complete - that might be
-        // either to obtain the write lock or to wait for syncing to finish
-        async_is_idle = m_transaction->wait_for_async_completion();
-        if (async_is_idle)
-            call_completion_callbacks();
-    }
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -918,12 +921,6 @@ void Realm::begin_transaction()
 
     // make sure we have a read transaction
     read_group();
-
-    // Request write lock asynchronously
-    if (async_is_idle) {
-        m_coordinator->async_request_write_mutex(*this);
-        m_transaction->wait_for_async_completion();
-    }
 
     do_begin_transaction();
 }
@@ -938,6 +935,10 @@ void Realm::do_begin_transaction()
         translate_schema_error();
     }
     cache_new_schema();
+
+    if (m_transaction && !m_transaction->has_unsynced_commits()) {
+        call_completion_callbacks();
+    }
 }
 
 void Realm::commit_transaction()
@@ -951,17 +952,16 @@ void Realm::commit_transaction()
 
     DB::VersionID prev_version = transaction().get_version_of_current_transaction();
 
-    constexpr bool commit_to_disk = false;
-    m_coordinator->commit_write(*this, commit_to_disk);
+    m_coordinator->commit_write(*this, /* commit_to_disk */ true);
     cache_new_schema();
 
     // Realm might have been closed
     if (m_transaction) {
-        m_transaction->async_end();
-        m_transaction->wait_for_async_completion();
+        // Any previous async commits got flushed along with the sync commit
         call_completion_callbacks();
-        if (!m_is_running_async_writes)
-            check_pending_write_requests();
+        // If we have pending async writes we need to rerequest the write mutex
+        if (!m_async_write_q.empty())
+            m_coordinator->async_request_write_mutex(*this);
     }
     if (auto audit = audit_context()) {
         audit->record_write(prev_version, transaction().get_version_of_current_transaction());
@@ -981,9 +981,15 @@ void Realm::cancel_transaction()
         throw InvalidTransactionException("Can't cancel a non-existing write transaction");
     }
 
-    if (!m_is_running_async_writes) {
-        transaction::cancel(transaction(), m_binding_context.get());
-        end_current_write();
+    transaction::cancel(transaction(), m_binding_context.get());
+
+    if (m_transaction && !m_is_running_async_writes) {
+        if (m_async_write_q.empty()) {
+            end_current_write();
+        }
+        else {
+            check_pending_write_requests();
+        }
     }
 }
 
@@ -1009,11 +1015,7 @@ void Realm::invalidate()
 void Realm::do_invalidate()
 {
     if (!m_config.immutable() && m_transaction) {
-        // Wait for potential syncing to finish
-        if (m_is_running_async_writes) {
-            m_transaction->async_end();
-        }
-        m_transaction->wait_for_async_completion();
+        m_transaction->prepare_for_close();
         call_completion_callbacks();
         transaction().close();
     }

@@ -282,7 +282,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     // Idea for solution: Install a custom signal handler for SIGABRT and
     // friends, and kill all spawned child processes from it. See `man abort`.
 
-    CHECK(RobustMutex::is_robust_on_this_platform());
+    CHECK(RobustMutex::is_robust_on_this_platform);
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
@@ -1562,7 +1562,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!RobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform)
         return;
 
     // This test can only be conducted by spawning independent

@@ -178,7 +178,7 @@ void DispatchQueueScheduler::invoke(util::UniqueFunction<void()>&& fn)
 {
     auto ptr = fn.release();
     dispatch_async(m_queue, ^{
-      util::UniqueFunction<void()>{ptr}();
+        util::UniqueFunction<void()>{ptr}();
     });
 }
 

@@ -379,6 +379,13 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         realm_lock.lock_unchecked();
         if (!m_notifier)
             m_notifier = std::move(notifier);
+        else {
+            // The notifier may be waiting on m_realm_mutex, in which case
+            // destroying it with m_realm_mutex held will deadlock
+            realm_lock.unlock_unchecked();
+            notifier.reset();
+            realm_lock.lock_unchecked();
+        }
     }
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
@@ -516,7 +523,6 @@ void RealmCoordinator::open_db()
 #endif
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
-    DBOptions options;
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
@@ -534,6 +540,8 @@ void RealmCoordinator::open_db()
             history = make_in_realm_history();
         }
 
+        DBOptions options;
+        options.enable_async_writes = true;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
 

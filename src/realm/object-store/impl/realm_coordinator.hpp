@@ -91,8 +91,9 @@ public:
     // be managed by this coordinator.
     void bind_to_context(Realm& realm) REQUIRES(!m_realm_mutex);
 
-    Realm::Config get_config() const
+    Realm::Config get_config() const REQUIRES(!m_realm_mutex)
     {
+        util::CheckedLockGuard lock(m_realm_mutex);
         return m_config;
     }
 

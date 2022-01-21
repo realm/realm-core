@@ -345,7 +345,7 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!RobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform)
         return;
 
     Robust robust;
@@ -409,7 +409,7 @@ TEST_IF(Thread_DeathDuringRecovery, TEST_THREAD_ROBUSTNESS)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!RobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform)
         return;
 
     // This test checks that death during recovery causes a robust
@@ -551,7 +551,7 @@ TEST(Thread_RobustMutexTryLock)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!RobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform)
         return;
 
     Thread thread;
