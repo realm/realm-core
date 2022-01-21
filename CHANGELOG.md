@@ -14,6 +14,7 @@
 * Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
 * Fix some warnings when building with Xcode 13.3.
 * Using accented characters in class and field names may end the session ([#5196](https://github.com/realm/realm-core/pull/5196), since v10.2.0)
+* Calling `Realm::close()` or `Realm::invalidate()` from the async write callbacks could result in crashes (since v11.8.0).
  
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.

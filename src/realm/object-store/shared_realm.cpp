@@ -700,7 +700,6 @@ void Realm::run_writes()
 {
     if (!m_transaction) {
         // Realm might have been closed
-        m_async_write_q.clear();
         return;
     }
     REALM_ASSERT(!m_transaction->is_synchronizing());
@@ -1232,6 +1231,8 @@ void Realm::close()
     m_coordinator = nullptr;
     m_scheduler = nullptr;
     m_config = {};
+    m_async_write_q.clear();
+    m_async_commit_q.clear();
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
