@@ -1612,8 +1612,6 @@ public:
 
     void receive_mark_message(session_ident_type, request_ident_type);
 
-    void receive_refresh_message(session_ident_type, std::string signed_user_token);
-
     void receive_unbind_message(session_ident_type);
 
     void receive_ping(milliseconds_type timestamp, milliseconds_type rtt);
@@ -2516,11 +2514,11 @@ private:
 //   Protocol
 //   state                Will send              Can receive
 // -----------------------------------------------------------------------
-//   AllocatingIdent      none                   REFRESH, UNBIND
-//   SendIdent            IDENT                  REFRESH, UNBIND
-//   WaitForIdent         none                   IDENT, REFRESH, UNBIND
+//   AllocatingIdent      none                   UNBIND
+//   SendIdent            IDENT                  UNBIND
+//   WaitForIdent         none                   IDENT, UNBIND
 //   WaitForUnbind        DOWNLOAD, TRANSACT,    UPLOAD, TRANSACT, MARK,
-//                        MARK, ALLOC            REFRESH, ALLOC, UNBIND
+//                        MARK, ALLOC            ALLOC, UNBIND
 //   SendError            ERROR                  any
 //   WaitForUnbindErr     none                   any
 //   SendUnbound          UNBOUND                none
@@ -2793,18 +2791,6 @@ public:
         m_file_ident_request = m_server_file->request_file_ident(*this, proxy_file, client_type); // Throws
         m_send_ident_message = true;
         // Protocol state is now AllocatingIdent
-
-        return true;
-    }
-
-    bool receive_refresh_message(std::string signed_user_token)
-    {
-        // Protocol state must be AllocatingIdent, SendIdent, WaitForIdent, or WaitForUnbind.
-        REALM_ASSERT(!unbind_message_received());
-        REALM_ASSERT(!error_occurred());
-
-        logger.detail("Received: REFRESH(signed_user_token='%1')",
-                      short_token_fmt(signed_user_token)); // Throws
 
         return true;
     }
@@ -5588,28 +5574,6 @@ void SyncConnection::receive_mark_message(session_ident_type session_ident, requ
     bool success = sess.receive_mark_message(request_ident, error); // Throws
     if (REALM_UNLIKELY(!success))                                   // Throws
         protocol_error(error, &sess);                               // Throws
-}
-
-
-void SyncConnection::receive_refresh_message(session_ident_type session_ident, std::string signed_user_token)
-{
-    auto i = m_sessions.find(session_ident);
-    if (REALM_UNLIKELY(i == m_sessions.end())) {
-        bad_session_ident("REFRESH", session_ident); // Throws
-        return;
-    }
-    Session& sess = *i->second;
-    if (REALM_UNLIKELY(sess.unbind_message_received())) {
-        message_after_unbind("REFRESH", session_ident); // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.error_occurred())) {
-        // Protocol state is SendError or WaitForUnbindErr. In these states, all
-        // messages, other than UNBIND, must be ignored.
-        return;
-    }
-
-    sess.receive_refresh_message(std::move(signed_user_token)); // Throws
 }
 
 
