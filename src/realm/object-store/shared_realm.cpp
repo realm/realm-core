@@ -778,7 +778,10 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
 {
     verify_thread();
     check_can_create_write_transaction(this);
-    REALM_ASSERT(!m_is_running_async_commit_completions);
+    if (m_is_running_async_commit_completions) {
+        throw InvalidTransactionException(
+            "Can't begin a write transaction from inside a commit completion callback.");
+    }
     REALM_ASSERT(the_write_block);
 
     // make sure we have a (at least a) read transaction
@@ -803,8 +806,16 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
 auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_block, bool allow_grouping)
     -> AsyncHandle
 {
+    verify_thread();
+    if (m_is_running_async_commit_completions) {
+        throw InvalidTransactionException(
+            "Can't commit a write transaction from inside a commit completion callback.");
+    }
+    if (!is_in_transaction()) {
+        throw InvalidTransactionException("Can't commit a non-existing write transaction");
+    }
+
     REALM_ASSERT(m_transaction->holds_write_mutex());
-    REALM_ASSERT(!m_is_running_async_commit_completions);
     REALM_ASSERT(!m_notify_only);
     // auditing is not supported
     REALM_ASSERT(!audit_context());
@@ -838,16 +849,17 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_blo
 
 void Realm::async_cancel_transaction(AsyncHandle handle)
 {
-    auto it1 = std::find_if(m_async_write_q.begin(), m_async_write_q.end(), [handle](auto& elem) {
+    verify_thread();
+    auto compare = [handle](auto& elem) {
         return elem.handle == handle;
-    });
+    };
+
+    auto it1 = std::find_if(m_async_write_q.begin(), m_async_write_q.end(), compare);
     if (it1 != m_async_write_q.end()) {
         m_async_write_q.erase(it1);
         return;
     }
-    auto it2 = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), [handle](auto& elem) {
-        return elem.handle == handle;
-    });
+    auto it2 = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), compare);
     if (it2 != m_async_commit_q.end()) {
         // Just delete the callback. It is important that we know
         // that there are still commits pending.
@@ -934,7 +946,10 @@ void Realm::cancel_transaction()
     check_can_create_write_transaction(this);
     verify_thread();
 
-    REALM_ASSERT(!m_is_running_async_commit_completions);
+    if (m_is_running_async_commit_completions) {
+        throw InvalidTransactionException(
+            "Can't cancel a write transaction from inside a commit completion callback.");
+    }
     if (!is_in_transaction()) {
         throw InvalidTransactionException("Can't cancel a non-existing write transaction");
     }
