@@ -101,6 +101,8 @@ enum class ClientResyncMode : unsigned char {
     Recover,
 };
 
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
+
 enum class ReconnectMode {
     /// This is the mode that should always be used in production. In this
     /// mode the client uses a scheme for determining a reconnect delay that

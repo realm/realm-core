@@ -26,6 +26,8 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 
+#include <realm/util/flat_map.hpp>
+
 #include <vector>
 
 using namespace realm;
@@ -133,17 +135,23 @@ struct InterRealmValueConverter {
             }
             else {
                 ObjLink src_link = src.get<ObjLink>();
-                TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
-                REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
-                TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
-                REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
-                // embedded tables should always be covered by the m_opposite_of_src case above.
-                REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
-                // regular table, convert by pk
-                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
-                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
-                cmp = converted_src.compare(dst);
+                if (src_link.is_unresolved()) {
+                    converted_src = Mixed{}; // no need to transfer over unresolved links
+                    cmp = converted_src.compare(dst);
+                }
+                else {
+                    TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
+                    REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
+                    TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
+                    REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
+                    // embedded tables should always be covered by the m_opposite_of_src case above.
+                    REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
+                    // regular table, convert by pk
+                    Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+                    Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
+                    converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+                    cmp = converted_src.compare(dst);
+                }
             }
         }
         if (converted_src_out) {
@@ -476,7 +484,7 @@ void EmbeddedObjectConverter::process_pending()
     // hashing. N is the depth to which embedded objects are connected and the upper
     // bound is the total number of tables which is finite, and is usually small.
 
-    std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters;
+    std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters; // FIXME: FlatMap
     auto get_converter = [this, &converters](ConstTableRef src_table,
                                              TableRef dst_table) -> InterRealmObjectConverter& {
         TableKey dst_table_key = dst_table->get_key();
@@ -499,13 +507,185 @@ void EmbeddedObjectConverter::process_pending()
     }
 }
 
+struct ListTracker {
+    bool insert(uint32_t local_index, size_t remote_list_size, uint32_t& remote_index_out)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        remote_index_out = local_index;
+        if (m_did_clear) {
+            return true;
+        }
+        if (remote_index_out > remote_list_size) {
+            remote_index_out = static_cast<uint32_t>(remote_list_size);
+        }
+        for (auto& ndx : m_indices_allowed) {
+            if (ndx.local >= local_index) {
+                ++ndx.local;
+                ++ndx.remote;
+            }
+        }
+        m_indices_allowed.push_back(IndexPair{local_index, remote_index_out});
+        return true;
+    }
+
+    bool update(uint32_t index, uint32_t& remote_index_out)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        remote_index_out = index;
+        if (m_did_clear) {
+            return true;
+        }
+        for (auto& ndx : m_indices_allowed) {
+            if (ndx.local == index) {
+                remote_index_out = ndx.remote;
+                return true;
+            }
+        }
+        m_requires_manual_copy = true;
+        m_indices_allowed.clear();
+        return false;
+    }
+
+    void clear()
+    {
+        // any local operations to a list after a clear are
+        // strictly on locally added elements so no need to continue tracking
+        m_requires_manual_copy = false;
+        m_did_clear = true;
+        m_indices_allowed.clear();
+    }
+
+    bool move(uint32_t from, uint32_t to, size_t lst_size, uint32_t& remote_from_out, uint32_t& remote_to_out)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        remote_from_out = from;
+        remote_to_out = to;
+        if (m_did_clear) {
+            return true;
+        }
+        //        if (from >= lst_size || to >= lst_size) {
+        //            m_requires_manual_copy = true;
+        //            m_indices_allowed.clear();
+        //            return false;
+        //        }
+        if (from == to) {
+            // not sure if this is possible, but it is a no-op
+            return true;
+        }
+        else if (from < to) {
+            auto target = m_indices_allowed.end();
+            for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
+                if (it->local == from) {
+                    REALM_ASSERT(target == m_indices_allowed.end());
+                    target = it;
+                }
+                else if (it->local > from && it->local <= to) {
+                    REALM_ASSERT(it->local != 0);
+                    REALM_ASSERT(it->remote != 0);
+                    --it->local;
+                    --it->remote;
+                }
+            }
+            if (target == m_indices_allowed.end() || target->remote + (to - from) >= lst_size) {
+                m_requires_manual_copy = true;
+                m_indices_allowed.clear();
+                return false;
+            }
+            remote_from_out = target->remote;
+            remote_to_out = target->remote + (to - from);
+            target->local = to;
+            target->remote = target->remote + (to - from);
+            return true;
+        }
+        else { // from > to
+            auto target = m_indices_allowed.end();
+            for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
+                if (it->local == from) {
+                    REALM_ASSERT(target == m_indices_allowed.end());
+                    target = it;
+                }
+                else if (it->local < from && it->local >= to) {
+                    ++it->local;
+                    ++it->remote;
+                }
+            }
+            if (target == m_indices_allowed.end() || target->remote < (from - to)) {
+                m_requires_manual_copy = true;
+                m_indices_allowed.clear();
+                return false;
+            }
+            remote_from_out = target->remote;
+            remote_to_out = target->remote - (from - to);
+            target->local = to;
+            target->remote = target->remote - (from - to);
+            return true;
+        }
+        REALM_UNREACHABLE();
+        return false;
+    }
+
+    bool remove(uint32_t index, uint32_t& remote_index_out)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        remote_index_out = index;
+        if (m_did_clear) {
+            return true;
+        }
+        bool found = false;
+        for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end();) {
+            if (it->local == index) {
+                found = true;
+                remote_index_out = it->remote;
+                it = m_indices_allowed.erase(it);
+                continue;
+            }
+            else if (it->local > index) {
+                --it->local;
+                --it->remote;
+            }
+            ++it;
+        }
+        if (!found) {
+            m_requires_manual_copy = true;
+            m_indices_allowed.clear();
+            return false;
+        }
+        return true;
+    }
+
+    bool requires_manual_copy() const
+    {
+        return m_requires_manual_copy;
+    }
+
+private:
+    struct IndexPair {
+        uint32_t local;
+        uint32_t remote;
+    };
+    std::vector<IndexPair> m_indices_allowed;
+    bool m_requires_manual_copy = false;
+    bool m_did_clear = false;
+};
+
 struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     using Instruction = sync::Instruction;
 
     Transaction& remote;
+    Group& local;
     util::Logger& logger;
     const sync::Changeset* log;
+
+    util::FlatMap<TableKey, util::FlatMap<ObjKey, util::FlatMap<ColKey, ListTracker>>> m_tables;
 
     // The recovery fails if there seems to be conflict between the
     // instructions and state.
@@ -515,9 +695,10 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     // 2. Creation of an already existing table with another type.
     // 3. Creation of an already existing column with another type.
 
-    RecoverLocalChangesetsHandler(Transaction& remote_wt, util::Logger& logger)
+    RecoverLocalChangesetsHandler(Transaction& remote_wt, Group& local_read_group, util::Logger& logger)
         : InstructionApplier(remote_wt)
         , remote{remote_wt}
+        , local{local_read_group}
         , logger{logger}
     {
     }
@@ -547,6 +728,67 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             instr->visit(*this); // Throws
         }
         InstructionApplier::end_apply();
+        copy_lists_with_unrecoverable_changes();
+    }
+
+    void copy_lists_with_unrecoverable_changes()
+    {
+        // Any modifications, moves or deletes to list elements which were not also created in the recovery
+        // cannot be reliably applied because there is no way to know if the indices on the server have
+        // shifted without a reliable server side history. For these lists, create a consistant state by
+        // copying over the entire list from the recovering client's state. This does create a "last recovery wins"
+        // scenario for modifications to lists, but this is only a best effort.
+        // For example, consider a list [A,B].
+        // Now the server has been reset, and applied an ArrayMove from a different client producing [B,A]
+        // A client being reset tries to recover the instruction ArrayErase(index=0) intending to erase A.
+        // But if this instruction were to be applied to the server's array, element B would be erased which is wrong.
+        // So to prevent this, upon discovery of this type of instruction, replace the entire array to the client's
+        // final state which would be [B].
+        // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
+        // we would know where list elements ended up or if they were deleted by the server.
+        EmbeddedObjectConverter embedded_object_tracker;
+        for (auto table_key_it : m_tables) {
+            TableRef local_table = local.get_table(table_key_it.first);
+            StringData table_name = local_table->get_name();
+            TableRef remote_table = remote.get_table(table_name);
+            REALM_ASSERT(local_table);
+            REALM_ASSERT(remote_table);
+            for (auto obj_key_it : table_key_it.second) {
+                ObjKey key = obj_key_it.first;
+                if (auto local_obj = local_table->try_get_object(key)) {
+                    try {
+                        Mixed pk = local_obj.get_primary_key();
+                        Obj remote_obj = remote_table->get_object_with_primary_key(pk); // throws
+                        for (auto& list_trackers : obj_key_it.second) {
+                            if (list_trackers.second.requires_manual_copy()) {
+                                ColKey local_col_key = list_trackers.first;
+                                REALM_ASSERT(local_col_key);
+                                ColKey remote_col_key =
+                                    remote_table->get_column_key(local_table->get_column_name(local_col_key));
+                                REALM_ASSERT(remote_col_key);
+                                auto remote_list = remote_obj.get_listbase_ptr(remote_col_key);
+                                REALM_ASSERT(remote_list);
+                                auto local_list = local_obj.get_listbase_ptr(list_trackers.first);
+                                REALM_ASSERT(local_list);
+                                InterRealmValueConverter value_converter(local_table, local_col_key, remote_table,
+                                                                         remote_col_key, embedded_object_tracker);
+                                logger.debug("Recovery overwrites list for %1.%2 size: %3 -> %4", table_name, pk,
+                                             remote_list->size(), local_list->size());
+                                copy_list(local_obj, remote_obj, value_converter, nullptr);
+                            }
+                        }
+                        embedded_object_tracker.process_pending();
+                    }
+                    catch (const KeyNotFound& e) {
+                        // object no longer exists in the remote, ignore and continue
+                        logger.warn("Discarding a list recovery made to an object which no longer exists for table "
+                                    "'%1', pk '%2'",
+                                    local_table->get_name(), local_obj.get_primary_key());
+                    }
+                }
+            }
+        }
+        embedded_object_tracker.process_pending();
     }
 
     StringData get_string(sync::InternString intern_string) const
@@ -593,16 +835,46 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::EraseObject& instr)
     {
-        if (get_top_object(instr, "EraseObject")) {
-            InstructionApplier::operator()(instr);
+        if (auto obj = get_top_object(instr, "EraseObject")) {
+            // FIXME: The InstructionApplier uses obj->invalidate() rather than remove(). It should have the same net
+            // effect, but that is not the case. Notably when erasing an object which has links from a Lst<Mixed> the
+            // list size does not decrease because there is no hiding the unresolved (null) element.
+            // InstructionApplier::operator()(instr);
+            obj->remove();
         }
         // if the object doesn't exist, a local delete is a no-op.
     }
 
     void operator()(const Instruction::Update& instr)
     {
-        if (get_top_object(instr, "Update")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "Update";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            Instruction::Update instr_copy = instr;
+            if (!check_links_exist(instr.value)) {
+                if (!allows_null_links(instr, instr_name)) {
+                    logger.warn("Discarding an update which links to a deleted object");
+                    return;
+                }
+                instr_copy.value = {};
+            }
+
+            bool allowed_to_update = true;
+            resolve_if_list(instr, instr_name, [&](LstBase& list) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                uint32_t translated_ndx;
+                allowed_to_update = list_tracker.update(instr.index(), translated_ndx);
+                instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                instr_copy.path.back() = translated_ndx;
+            });
+            if (allowed_to_update) {
+                try {
+                    InstructionApplier::operator()(instr_copy);
+                }
+                catch (const KeyNotFound& e) {
+                    logger.warn("Discarding an update to a non existing object/key for object '%1' in '%2': '%3'",
+                                obj->get_primary_key(), obj->get_table()->get_name(), e.what());
+                }
+            }
         }
         else {
             logger.warn("Discarding a local Update made to an object which no longer exists");
@@ -621,11 +893,16 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::Clear& instr)
     {
-        if (get_top_object(instr, "Clear")) {
+        const char* instr_name = "Clear";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            resolve_if_list(instr, instr_name, [&](LstBase& list) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                list_tracker.clear();
+            });
             InstructionApplier::operator()(instr);
         }
         else {
-            logger.warn("Discarding a local Clear instruction made to an object which no longer exists");
+            logger.warn("Discarding a local %1 instruction made to an object which no longer exists", instr_name);
         }
     }
 
@@ -648,54 +925,113 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         // Destructive schema changes are not allowed by the resetting client.
         static_cast<void>(instr);
-        handle_error(util::format("Properties cannot be erased during client reset"));
+        handle_error(util::format("Properties cannot be erased during client reset recovery"));
     }
 
     void operator()(const Instruction::ArrayInsert& instr)
     {
-        if (get_top_object(instr, "ArrayInsert")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "ArrayInsert";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            Instruction::ArrayInsert instr_copy = instr;
+            if (!check_links_exist(instr.value)) {
+                logger.warn("Discarding %1 which links to a deleted object", instr_name);
+                return;
+            }
+            bool allowed_to_insert = false;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                size_t list_size = list.size();
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                uint32_t translated_index;
+                allowed_to_insert = list_tracker.insert(static_cast<uint32_t>(index), list_size, translated_index);
+                if (allowed_to_insert) {
+                    instr_copy.prior_size = static_cast<uint32_t>(list_size);
+                    instr_copy.path.back() = translated_index;
+                }
+            });
+            if (allowed_to_insert) {
+                InstructionApplier::operator()(instr_copy);
+            }
         }
         else {
-            logger.warn("Discarding a local ArrayInsert made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
 
     void operator()(const Instruction::ArrayMove& instr)
     {
-        if (get_top_object(instr, "ArrayMove")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "ArrayMove";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            bool allowed_to_move = false;
+            Instruction::ArrayMove instr_copy = instr;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                size_t lst_size = list.size();
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                uint32_t translated_from, translated_to;
+                allowed_to_move = list_tracker.move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
+                                                    translated_from, translated_to);
+                if (allowed_to_move) {
+                    instr_copy.prior_size = static_cast<uint32_t>(lst_size);
+                    instr_copy.path.back() = translated_from;
+                    instr_copy.ndx_2 = translated_to;
+                }
+            });
+            if (allowed_to_move) {
+                InstructionApplier::operator()(instr_copy);
+            }
         }
         else {
-            logger.warn("Discarding a local ArrayMove made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
 
     void operator()(const Instruction::ArrayErase& instr)
     {
-        if (get_top_object(instr, "ArrayErase")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "ArrayErase";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            Instruction::ArrayErase instr_copy = instr;
+            bool allowed_to_delete = false;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                uint32_t translated_index;
+                allowed_to_delete = list_tracker.remove(static_cast<uint32_t>(index), translated_index);
+                if (allowed_to_delete) {
+                    instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                    instr_copy.path.back() = translated_index;
+                }
+            });
+            if (allowed_to_delete) {
+                InstructionApplier::operator()(instr_copy);
+            }
         }
         else {
-            logger.warn("Discarding a local ArrayErase made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
+
     void operator()(const Instruction::SetInsert& instr)
     {
-        if (get_top_object(instr, "SetInsert")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "SetInsert";
+        if (get_top_object(instr, instr_name)) {
+            Instruction::SetInsert instr_copy = instr;
+            if (!check_links_exist(instr.value)) {
+                logger.warn("Discarding a %1 which links to a deleted object", instr_name);
+                return;
+            }
+            InstructionApplier::operator()(instr_copy);
         }
         else {
-            logger.warn("Discarding a local SetInsert made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
+
     void operator()(const Instruction::SetErase& instr)
     {
-        if (get_top_object(instr, "SetErase")) {
+        const char* instr_name = "SetErase";
+        if (get_top_object(instr, instr_name)) {
             InstructionApplier::operator()(instr);
         }
         else {
-            logger.warn("Discarding a local SetErase made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
 };
@@ -1016,6 +1352,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
 
     auto wt_local = db_local.start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
+    REALM_ASSERT(history_local);
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     wt_local->get_history()->ensure_updated(current_version_local);
@@ -1030,13 +1367,13 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         logger.debug("Local changesets to recover: %1", local_changes.size());
 
         // FIXME: this is for debugging only
-        //        for (const auto& change : local_changes) {
-        //            // Debug.
-        //            ChunkedBinaryInputStream in{change};
-        //            sync::Changeset log;
-        //            sync::parse_changeset(in, log); // Throws
-        //            log.print();
-        //        }
+        // for (const auto& change : local_changes) {
+        //     // Debug.
+        //     ChunkedBinaryInputStream in{change};
+        //     sync::Changeset log;
+        //     sync::parse_changeset(in, log); // Throws
+        //     log.print();
+        // }
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
@@ -1044,6 +1381,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     if (db_remote) {
         auto wt_remote = db_remote->start_write();
         auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
+        REALM_ASSERT(history_remote);
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
         history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
@@ -1057,10 +1395,9 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         if (recover_local_changes) {
             // FIXME: keep track of current version, and apply the recovered changes, then erase the history before
             // the recovered changes
-            RecoverLocalChangesetsHandler handler{*wt_remote, logger};
+            RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
             // FIXME: it may be desirable to make these separate transactions
             for (const auto& change : local_changes) {
-                // FIXME: should failure be fatal? Or should we rollback and attempt DiscardLocal mode only?
                 handler.process_changeset(change); // throws on error
             }
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());

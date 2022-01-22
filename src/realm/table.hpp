@@ -285,7 +285,7 @@ public:
         return m_clusters.get(ndx);
     }
     // Get object based on primary key
-    Obj get_object_with_primary_key(Mixed pk) const;
+    Obj get_object_with_primary_key(Mixed pk) const; // FIXME: verify this for non-existant pk
     // Get primary key based on ObjKey
     Mixed get_primary_key(ObjKey key) const;
     // Get logical index for object. This function is not very efficient

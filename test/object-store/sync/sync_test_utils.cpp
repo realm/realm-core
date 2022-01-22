@@ -24,6 +24,7 @@
 #include <realm/object-store/sync/mongo_client.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/hex_dump.hpp>
@@ -220,6 +221,14 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
 #endif // REALM_ENABLE_AUTH_TESTS
 #endif // REALM_ENABLE_SYNC
 
+class TestHelper {
+public:
+    static DBRef& get_db(SharedRealm const& shared_realm)
+    {
+        return Realm::Internal::get_db(*shared_realm);
+    }
+};
+
 namespace reset_utils {
 
 struct Partition {
@@ -253,75 +262,99 @@ struct FakeLocalClientReset : public TestClientReset {
         : TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
-        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::DiscardLocal);
-        // turn off sync, we only fake it
+        m_mode = m_local_config.sync_config->client_resync_mode;
+        REALM_ASSERT(m_mode == ClientResyncMode::DiscardLocal || m_mode == ClientResyncMode::Recover);
+        // Turn off real sync. But we still need a SyncClientHistory for recovery mode so fake it.
         m_local_config.sync_config = {};
         m_remote_config.sync_config = {};
+        m_local_config.force_sync_history = true;
+        m_remote_config.force_sync_history = true;
+        m_local_config.in_memory = true;
+        m_remote_config.in_memory = true;
     }
 
     void run() override
     {
         m_did_run = true;
-        auto realm = Realm::get_shared_realm(m_local_config);
-        realm->begin_transaction();
+        auto local_realm = Realm::get_shared_realm(m_local_config);
         if (m_on_setup) {
-            m_on_setup(realm);
+            local_realm->begin_transaction();
+            m_on_setup(local_realm);
+            local_realm->commit_transaction();
+
+            // Update the sync history to mark this initial setup state as if it
+            // has been uploaded so that it doesn't replay during recovery.
+            auto history_local =
+                dynamic_cast<sync::ClientHistory*>(local_realm->read_group().get_replication()->_get_history_write());
+            REALM_ASSERT(history_local);
+            sync::version_type current_version;
+            sync::SaltedFileIdent file_ident;
+            sync::SyncProgress progress;
+            history_local->get_status(current_version, file_ident, progress);
+            progress.upload.client_version = current_version;
+            progress.upload.last_integrated_server_version = current_version;
+            sync::VersionInfo info_out;
+            history_local->set_sync_progress(progress, nullptr, info_out);
         }
-        realm->commit_transaction();
         constexpr int64_t shared_pk = -42;
         {
-            realm->begin_transaction();
-            auto obj = create_object(*realm, "object", shared_pk);
+            local_realm->begin_transaction();
+            auto obj = create_object(*local_realm, "object", shared_pk);
             auto col = obj.get_table()->get_column_key("value");
             obj.set(col, 1);
             obj.set(col, 2);
             obj.set(col, 3);
-            realm->commit_transaction();
+            local_realm->commit_transaction();
 
-            realm->begin_transaction();
+            local_realm->begin_transaction();
             obj.set(col, 4);
             if (m_make_local_changes) {
-                m_make_local_changes(realm);
+                m_make_local_changes(local_realm);
             }
-            realm->commit_transaction();
+            local_realm->commit_transaction();
             if (m_on_post_local) {
-                m_on_post_local(realm);
+                m_on_post_local(local_realm);
             }
         }
 
         {
-            auto realm2 = Realm::get_shared_realm(m_remote_config);
-            realm2->begin_transaction();
+            auto remote_realm = Realm::get_shared_realm(m_remote_config);
+            remote_realm->begin_transaction();
             if (m_on_setup) {
-                m_on_setup(realm2);
+                m_on_setup(remote_realm);
             }
 
             // fake a sync by creating an object with the same pk
-            create_object(*realm2, "object", shared_pk);
+            create_object(*remote_realm, "object", shared_pk);
 
             for (int i = 0; i < 2; ++i) {
-                auto table = get_table(*realm2, "object");
+                auto table = get_table(*remote_realm, "object");
                 auto col = table->get_column_key("value");
                 table->begin()->set(col, i + 5);
             }
 
             if (m_make_remote_changes) {
-                m_make_remote_changes(realm2);
+                m_make_remote_changes(remote_realm);
             }
-
-            realm->begin_transaction();
+            remote_realm->commit_transaction();
 
             TestLogger logger;
-            _impl::client_reset::transfer_group((Transaction&)realm2->read_group(), (Transaction&)realm->read_group(),
-                                                logger);
-            realm->commit_transaction();
-            realm2->cancel_transaction();
-            realm2->close();
+            sync::SaltedFileIdent fake_ident{1, 123456789};
+            const bool recover = m_mode == ClientResyncMode::Recover;
+            auto local_db = TestHelper::get_db(local_realm);
+            auto remote_db = TestHelper::get_db(remote_realm);
+            using _impl::client_reset::perform_client_reset_diff;
+            perform_client_reset_diff(*local_db, remote_db, fake_ident, logger, recover);
+
+            remote_realm->close();
             if (m_on_post_reset) {
-                m_on_post_reset(realm);
+                m_on_post_reset(local_realm);
             }
         }
     }
+
+private:
+    ClientResyncMode m_mode;
 };
 
 #if REALM_ENABLE_SYNC

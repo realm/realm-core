@@ -38,6 +38,7 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include <algorithm>
 #include <iostream>
 
 struct ThreadSafeSyncError {
@@ -97,9 +98,8 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
     FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
-
+/*
 #if REALM_ENABLE_AUTH_TESTS
-
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
         return;
@@ -1342,7 +1342,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
 /*
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -1359,7 +1359,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    config.sync_config->client_resync_mode = test_mode;
     config.schema = Schema{
         {"object",
          {
@@ -1398,29 +1399,30 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
         });
     };
 
-    auto check_list = [&](Obj obj, std::vector<T> expected) {
+    auto check_list = [&](Obj obj, std::vector<T>& expected) {
         ColKey col = obj.get_table()->get_column_key("list");
         auto actual = obj.get_list_values<T>(col);
         REQUIRE(actual == expected);
     };
 
-    auto check_dictionary = [&](Obj obj, std::vector<std::pair<std::string, Mixed>> expected) {
+    auto check_dictionary = [&](Obj obj, std::map<std::string, Mixed>& expected) {
         ColKey col = obj.get_table()->get_column_key("dictionary");
         Dictionary dict = obj.get_dictionary(col);
         REQUIRE(dict.size() == expected.size());
-        for (auto pair : expected) {
+        for (auto& pair : expected) {
             auto it = dict.find(pair.first);
             REQUIRE(it != dict.end());
             REQUIRE((*it).second == pair.second);
         }
     };
 
-    auto check_set = [&](Obj obj, std::vector<Mixed> expected) {
+    auto check_set = [&](Obj obj, std::set<Mixed>& expected) {
         ColKey col = obj.get_table()->get_column_key("set");
         SetBasePtr set = obj.get_setbase_ptr(col);
         REQUIRE(set->size() == expected.size());
-        for (auto value : expected) {
+        for (auto& value : expected) {
             auto ndx = set->find_any(value);
+            CAPTURE(value);
             REQUIRE(ndx != realm::not_found);
         }
     };
@@ -1476,9 +1478,10 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_value(results.get<Obj>(0), remote_state);
-                    check_value(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    T expected_state = (test_mode == ClientResyncMode::DiscardLocal) ? remote_state : local_state;
+                    check_value(results.get<Obj>(0), expected_state);
+                    check_value(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1523,7 +1526,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             obj.template set_list_values<T>(col, {initial_list_value});
         });
 
-        auto reset_list = [&](std::vector<T> local_state, std::vector<T> remote_state) {
+        auto reset_list = [&](std::vector<T>&& local_state, std::vector<T>&& remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1553,9 +1556,13 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_list(results.get<Obj>(0), remote_state);
-                    check_list(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    std::vector<T>& expected_state = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        expected_state.insert(expected_state.begin(), local_state.begin(), local_state.end());
+                    }
+                    check_list(results.get<Obj>(0), expected_state);
+                    check_list(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1614,8 +1621,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             dict.insert(dict_key, Mixed{values[0]});
         });
 
-        auto reset_dictionary = [&](std::vector<std::pair<std::string, Mixed>> local_state,
-                                    std::vector<std::pair<std::string, Mixed>> remote_state) {
+        auto reset_dictionary = [&](std::map<std::string, Mixed>&& local_state,
+                                    std::map<std::string, Mixed>&& remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1623,7 +1630,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("dictionary");
                     Dictionary dict = table->begin()->get_dictionary(col);
-                    for (auto pair : local_state) {
+                    for (auto& pair : local_state) {
                         dict.insert(pair.first, pair.second);
                     }
                     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -1641,7 +1648,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("dictionary");
                     Dictionary dict = table->begin()->get_dictionary(col);
-                    for (auto pair : remote_state) {
+                    for (auto& pair : remote_state) {
                         dict.insert(pair.first, pair.second);
                     }
                     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -1666,9 +1673,19 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_dictionary(results.get<Obj>(0), remote_state);
-                    check_dictionary(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+
+                    auto& expected_state = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        for (auto it : local_state) {
+                            expected_state[it.first] = it.second;
+                        }
+                        if (local_state.find(dict_key) == local_state.end()) {
+                            expected_state.erase(dict_key); // explict erasure of initial state occured
+                        }
+                    }
+                    check_dictionary(results.get<Obj>(0), expected_state);
+                    check_dictionary(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1691,19 +1708,19 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {{dict_key, Mixed{values[0]}}});
         }
         SECTION("modify complex") {
-            std::vector<std::pair<std::string, Mixed>> local;
-            local.emplace_back("adam", Mixed(values[0]));
-            local.emplace_back("bernie", Mixed(values[0]));
-            local.emplace_back("david", Mixed(values[0]));
-            local.emplace_back("eric", Mixed(values[0]));
-            local.emplace_back("frank", Mixed(values[1]));
-            std::vector<std::pair<std::string, Mixed>> remote;
-            remote.emplace_back("adam", Mixed(values[0]));
-            remote.emplace_back("bernie", Mixed(values[1]));
-            remote.emplace_back("carl", Mixed(values[0]));
-            remote.emplace_back("david", Mixed(values[1]));
-            remote.emplace_back("frank", Mixed(values[0]));
-            reset_dictionary(local, remote);
+            std::map<std::string, Mixed> local;
+            local.emplace(std::make_pair("adam", Mixed(values[0])));
+            local.emplace(std::make_pair("bernie", Mixed(values[0])));
+            local.emplace(std::make_pair("david", Mixed(values[0])));
+            local.emplace(std::make_pair("eric", Mixed(values[0])));
+            local.emplace(std::make_pair("frank", Mixed(values[1])));
+            std::map<std::string, Mixed> remote;
+            remote.emplace(std::make_pair("adam", Mixed(values[0])));
+            remote.emplace(std::make_pair("bernie", Mixed(values[1])));
+            remote.emplace(std::make_pair("carl", Mixed(values[0])));
+            remote.emplace(std::make_pair("david", Mixed(values[1])));
+            remote.emplace(std::make_pair("frank", Mixed(values[0])));
+            reset_dictionary(std::move(local), std::move(remote));
         }
         SECTION("empty remote") {
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {});
@@ -1722,7 +1739,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     SECTION("set") {
         int64_t pk_val = 0;
 
-        auto reset_set = [&](std::vector<Mixed> local_state, std::vector<Mixed> remote_state) {
+        auto reset_set = [&](std::set<Mixed> local_state, std::set<Mixed> remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1731,7 +1748,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     SetBasePtr set = table->begin()->get_setbase_ptr(col);
                     for (size_t i = set->size(); i > 0; --i) {
                         Mixed si = set->get_any(i - 1);
-                        if (std::find(local_state.begin(), local_state.end(), si) == local_state.end()) {
+                        if (local_state.find(si) == local_state.end()) {
                             set->erase_any(si);
                         }
                     }
@@ -1746,7 +1763,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     SetBasePtr set = table->begin()->get_setbase_ptr(col);
                     for (size_t i = set->size(); i > 0; --i) {
                         Mixed si = set->get_any(i - 1);
-                        if (std::find(remote_state.begin(), remote_state.end(), si) == remote_state.end()) {
+                        if (remote_state.find(si) == remote_state.end()) {
                             set->erase_any(si);
                         }
                     }
@@ -1767,9 +1784,18 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_set(results.get<Obj>(0), remote_state);
-                    check_set(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    std::set<Mixed>& expected = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        for (auto& e : local_state) {
+                            expected.insert(e);
+                        }
+                        if (local_state.find(Mixed{values[0]}) == local_state.end()) {
+                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occured
+                        }
+                    }
+                    check_set(results.get<Obj>(0), expected);
+                    check_set(object.obj(), expected);
+                    if (local_state == expected) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1822,18 +1848,159 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
         }
     }
 }
+*/
+namespace test_instructions {
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard local][collections]",
-                   cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
-                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
+struct Add {
+    Add(int64_t key)
+        : pk(key)
+    {
+    }
+    int64_t pk;
+};
+
+struct Remove {
+    Remove(int64_t key)
+        : pk(key)
+    {
+    }
+    int64_t pk;
+};
+
+struct Clear {
+};
+
+struct RemoveObject {
+    RemoveObject(std::string_view name, int64_t key)
+        : pk(key)
+        , class_name(name)
+    {
+    }
+    int64_t pk;
+    std::string_view class_name;
+};
+
+struct CreateObject {
+    CreateObject(std::string_view name, int64_t key)
+        : pk(key)
+        , class_name(name)
+    {
+    }
+    int64_t pk;
+    std::string_view class_name;
+};
+
+struct Move {
+    Move(size_t from_ndx, size_t to_ndx)
+        : from(from_ndx)
+        , to(to_ndx)
+    {
+    }
+    size_t from;
+    size_t to;
+};
+
+struct CollectionOperation {
+    CollectionOperation(Add op)
+        : m_type(Type::Add)
+        , add_link(op)
+    {
+    }
+    CollectionOperation(Remove op)
+        : m_type(Type::Remove)
+        , remove_link(op)
+    {
+    }
+    CollectionOperation(RemoveObject op)
+        : m_type(Type::RemoveObject)
+        , remove_object(op)
+    {
+    }
+    CollectionOperation(CreateObject op)
+        : m_type(Type::CreateObject)
+        , create_object(op)
+    {
+    }
+    CollectionOperation(Clear op)
+        : m_type(Type::Clear)
+        , clear_collection(op)
+    {
+    }
+    CollectionOperation(Move op)
+        : m_type(Type::Move)
+        , move(op)
+    {
+    }
+    void apply(collection_fixtures::LinkedCollectionBase* collection, Obj src_obj, TableRef dst_table)
+    {
+        switch (m_type) {
+            case Type::Add: {
+                ObjKey dst_key = dst_table->find_primary_key(Mixed{add_link.pk});
+                REALM_ASSERT(dst_key);
+                collection->add_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                break;
+            }
+            case Type::Remove: {
+                ObjKey dst_key = dst_table->find_primary_key(Mixed{remove_link.pk});
+                REALM_ASSERT(dst_key);
+                bool did_remove = collection->remove_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                REALM_ASSERT(did_remove);
+                break;
+            }
+            case Type::RemoveObject: {
+                Group* group = dst_table->get_parent_group();
+                Group::TableNameBuffer buffer;
+                TableRef table = group->get_table(Group::class_name_to_table_name(remove_object.class_name, buffer));
+                REALM_ASSERT(table);
+                ObjKey dst_key = table->find_primary_key(Mixed{remove_object.pk});
+                REALM_ASSERT(dst_key);
+                table->remove_object(dst_key);
+                break;
+            }
+            case Type::CreateObject: {
+                Group* group = dst_table->get_parent_group();
+                Group::TableNameBuffer buffer;
+                TableRef table = group->get_table(Group::class_name_to_table_name(create_object.class_name, buffer));
+                REALM_ASSERT(table);
+                table->create_object_with_primary_key(Mixed{create_object.pk});
+                break;
+            }
+            case Type::Clear:
+                collection->clear_collection(src_obj);
+                break;
+            case Type::Move:
+                collection->move(src_obj, move.from, move.to);
+                break;
+        }
+    }
+
+private:
+    enum class Type { Add, Remove, Clear, RemoveObject, CreateObject, Move } m_type;
+    union {
+        Add add_link;
+        Remove remove_link;
+        Clear clear_collection;
+        RemoveObject remove_object;
+        CreateObject create_object;
+        Move move;
+    };
+};
+
+} // namespace test_instructions
+
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][collections]", cf::ListOfObjects,
+                   cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
+                   cf::DictionaryOfMixedLinks)
 {
     if (!util::EventLoop::has_implementation())
         return;
 
+    using namespace test_instructions;
     const std::string valid_pk_name = "_id";
     const auto partition = random_string(100);
     const std::string collection_prop_name = "collection";
     TestType test_type(collection_prop_name, "dest");
+    constexpr bool test_type_is_array = realm::is_any_v<TestType, cf::ListOfObjects, cf::ListOfMixedLinks>;
     Schema schema = {
         {"source",
          {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
@@ -1857,7 +2024,9 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
+    config.sync_config->client_resync_mode = test_mode;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = schema;
@@ -1885,26 +2054,34 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
     };
 
-    auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
+    auto require_links_to_match_ids = [&](std::vector<Obj>& links, std::vector<int64_t>& expected, bool sorted) {
         std::vector<int64_t> actual;
         for (auto obj : links) {
             actual.push_back(obj.get<Int>(valid_pk_name));
         }
-        std::sort(actual.begin(), actual.end());
-        std::sort(expected.begin(), expected.end());
+        if (sorted) {
+            std::sort(actual.begin(), actual.end());
+        }
         REQUIRE(actual == expected);
     };
+
+    constexpr int64_t source_pk = 0;
+    constexpr int64_t dest_pk_1 = 1;
+    constexpr int64_t dest_pk_2 = 2;
+    constexpr int64_t dest_pk_3 = 3;
+    constexpr int64_t dest_pk_4 = 4;
+    constexpr int64_t dest_pk_5 = 5;
 
     Results results;
     Object object;
     CollectionChangeSet object_changes, results_changes;
     NotificationToken object_token, results_token;
     auto setup_listeners = [&](SharedRealm realm) {
-        results =
-            Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "source")).sort({{{"_id", true}}});
-        if (results.size() >= 1) {
-            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "source")->begin();
-            object = Object(realm, obj);
+        TableRef source_table = get_table(*realm, "source");
+        ColKey id_col = source_table->get_column_key("_id");
+        results = Results(realm, source_table->where().equal(id_col, source_pk));
+        if (auto obj = results.first()) {
+            object = Object(realm, *obj);
             object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
                 REQUIRE_FALSE(err);
                 object_changes = std::move(changes);
@@ -1915,146 +2092,277 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
             results_changes = std::move(changes);
         });
     };
-    auto set_links = [&](SharedRealm realm, std::vector<int64_t>& link_pks) {
+
+    auto get_source_object = [&](SharedRealm realm) -> Obj {
         TableRef src_table = get_table(*realm, "source");
-        REQUIRE(src_table->size() == 1);
+        return src_table->try_get_object(src_table->find_primary_key(Mixed{source_pk}));
+    };
+    auto apply_instructions = [&](SharedRealm realm, std::vector<CollectionOperation>& instructions) {
         TableRef dst_table = get_table(*realm, "dest");
-        std::vector<Obj> linked_objects = test_type.get_links(*src_table->begin());
-        if (is_array(test_type.property().type)) {
-            // order matters for lists, leave it be if they are identical,
-            // otherwise clear and add everything in the correct order
-            bool equal = std::equal(linked_objects.begin(), linked_objects.end(), link_pks.begin(), link_pks.end(),
-                                    [&](const Obj& obj, const int64_t& pk) {
-                                        return obj.get_primary_key().template get<int64_t>() == pk;
-                                    });
-            if (!equal) {
-                test_type.clear_collection(*src_table->begin());
-                for (size_t i = 0; i < link_pks.size(); ++i) {
-                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{link_pks[i]});
-                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
-                }
-            }
-        }
-        else {
-            for (auto lnk : linked_objects) {
-                int64_t lnk_pk = lnk.get_primary_key().get<int64_t>();
-                if (std::find(link_pks.begin(), link_pks.end(), lnk_pk) == link_pks.end()) {
-                    test_type.remove_link(*src_table->begin(), ObjLink{lnk.get_table()->get_key(), lnk.get_key()});
-                }
-            }
-            REQUIRE(dst_table);
-            for (int64_t lnk_pk : link_pks) {
-                if (std::find_if(linked_objects.begin(), linked_objects.end(), [lnk_pk](auto& lnk) {
-                        return lnk.get_primary_key().template get<int64_t>() == lnk_pk;
-                    }) == linked_objects.end()) {
-                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{lnk_pk});
-                    REQUIRE(dst_key);
-                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
-                }
-            }
+        for (auto& instruction : instructions) {
+            Obj src_obj = get_source_object(realm);
+            instruction.apply(&test_type, src_obj, dst_table);
         }
     };
 
-    SECTION("integration testing") {
-        auto reset_collection = [&](std::vector<int64_t> local_pk_links, std::vector<int64_t> remote_pk_links) {
-            test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    set_links(local_realm, local_pk_links);
-                })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    set_links(remote_realm, remote_pk_links);
-                })
-                ->on_post_local_changes([&](SharedRealm realm) {
-                    setup_listeners(realm);
-                    REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(results.size() == 1);
-                    auto linked_objects = test_type.get_links(results.get(0));
-                    require_links_to_match_ids(linked_objects, local_pk_links);
-                })
-                ->on_post_reset([&](SharedRealm realm) {
-                    object_changes = {};
-                    results_changes = {};
-                    REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(results.size() == 1);
-                    CHECK(object.is_valid());
-                    auto linked_objects = test_type.get_links(results.get(0));
-                    require_links_to_match_ids(linked_objects, remote_pk_links);
-                    if (!is_array(test_type.property().type)) {
-                        // order should not matter except for lists
-                        std::sort(local_pk_links.begin(), local_pk_links.end());
-                        std::sort(remote_pk_links.begin(), remote_pk_links.end());
+    auto reset_collection = [&](std::vector<CollectionOperation>&& local_ops,
+                                std::vector<CollectionOperation>&& remote_ops,
+                                std::vector<int64_t>&& expected_recovered_state, size_t num_expected_nulls = 0) {
+        std::vector<int64_t> remote_pks;
+        std::vector<int64_t> local_pks;
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                apply_instructions(local_realm, local_ops);
+                Obj source_obj = get_source_object(local_realm);
+                if (source_obj) {
+                    auto local_links = test_type.get_links(source_obj);
+                    std::transform(local_links.begin(), local_links.end(), std::back_inserter(local_pks),
+                                   [](auto obj) -> int64_t {
+                                       return obj.get_primary_key().get_int();
+                                   });
+                }
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                apply_instructions(remote_realm, remote_ops);
+                Obj source_obj = get_source_object(remote_realm);
+                if (source_obj) {
+                    auto remote_links = test_type.get_links(source_obj);
+                    std::transform(remote_links.begin(), remote_links.end(), std::back_inserter(remote_pks),
+                                   [](auto obj) -> int64_t {
+                                       return obj.get_primary_key().get_int();
+                                   });
+                }
+            })
+            ->on_post_local_changes([&](SharedRealm realm) {
+                setup_listeners(realm);
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                CHECK(results.size() == 1);
+            })
+            ->on_post_reset([&](SharedRealm realm) {
+                object_changes = {};
+                results_changes = {};
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                CHECK(results.size() == 1);
+                CHECK(object.is_valid());
+                auto linked_objects = test_type.get_links(results.get(0));
+                std::vector<int64_t>& expected_links = remote_pks;
+                if (test_mode == ClientResyncMode::Recover) {
+                    expected_links = expected_recovered_state;
+                    size_t expected_size = expected_links.size();
+                    if (!test_type.will_erase_removed_object_links()) {
+                        // dictionary size will remain the same because the key is preserved with a null value
+                        expected_size += num_expected_nulls;
                     }
-                    if (local_pk_links == remote_pk_links) {
-                        REQUIRE_INDICES(results_changes.modifications);
-                        REQUIRE_INDICES(object_changes.modifications);
-                    }
-                    else {
-                        REQUIRE_INDICES(results_changes.modifications, 0);
-                        REQUIRE_INDICES(object_changes.modifications, 0);
-                    }
-                    REQUIRE_INDICES(results_changes.insertions);
-                    REQUIRE_INDICES(results_changes.deletions);
-                    REQUIRE_INDICES(object_changes.insertions);
-                    REQUIRE_INDICES(object_changes.deletions);
-                })
-                ->run();
-        };
+                    CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
+                }
+                const bool sorted_comparison = !test_type_is_array;
+                if constexpr (sorted_comparison) {
+                    // order should not matter except for lists
+                    std::sort(local_pks.begin(), local_pks.end());
+                    std::sort(expected_links.begin(), expected_links.end());
+                }
+                require_links_to_match_ids(linked_objects, expected_links, sorted_comparison);
+                if (local_pks == expected_links) {
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(object_changes.modifications);
+                }
+                else {
+                    REQUIRE_INDICES(results_changes.modifications, 0);
+                    REQUIRE_INDICES(object_changes.modifications, 0);
+                }
+                REQUIRE_INDICES(results_changes.insertions);
+                REQUIRE_INDICES(results_changes.deletions);
+                REQUIRE_INDICES(object_changes.insertions);
+                REQUIRE_INDICES(object_changes.deletions);
+            })
+            ->run();
+    };
 
-        constexpr int64_t source_pk = 0;
-        constexpr int64_t dest_pk_1 = 1;
-        constexpr int64_t dest_pk_2 = 2;
-        constexpr int64_t dest_pk_3 = 3;
-        test_reset->setup([&](SharedRealm realm) {
-            test_type.reset_test_state();
-            // add a container collection with three valid links
-            ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
-            ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
-            ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
-            create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
-        });
+    auto reset_collection_removing_source_object = [&](std::vector<CollectionOperation>&& local_ops,
+                                                       std::vector<CollectionOperation>&& remote_ops) {
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                apply_instructions(local_realm, local_ops);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                apply_instructions(remote_realm, remote_ops);
+            })
+            ->on_post_reset([&](SharedRealm realm) {
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                TableRef table = realm->read_group().get_table("class_source");
+                REQUIRE(!table->find_primary_key(Mixed{source_pk}));
+            })
+            ->run();
+    };
 
-        SECTION("both empty") {
-            reset_collection({}, {});
+    test_reset->setup([&](SharedRealm realm) {
+        test_type.reset_test_state();
+        // add a container collection with three valid links
+        ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
+        ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
+        ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
+        ObjLink dest4 = create_one_dest_object(realm, dest_pk_4);
+        ObjLink dest5 = create_one_dest_object(realm, dest_pk_5);
+        create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+    });
+
+    SECTION("no changes") {
+        reset_collection({}, {}, {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    SECTION("remote removes all") {
+        reset_collection({}, {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
+    }
+    SECTION("local removes all") { // local client state wins
+        reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {}, {});
+    }
+    SECTION("both remove all links") { // local client state wins
+        reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}},
+                         {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
+    }
+    SECTION("local removes first link") { // local client state wins
+        reset_collection({{Remove{dest_pk_1}}}, {}, {dest_pk_2, dest_pk_3});
+    }
+    SECTION("local removes middle link") { // local client state wins
+        reset_collection({{Remove{dest_pk_2}}}, {}, {dest_pk_1, dest_pk_3});
+    }
+    SECTION("local removes last link") { // local client state wins
+        reset_collection({{Remove{dest_pk_3}}}, {}, {dest_pk_1, dest_pk_2});
+    }
+    SECTION("remote removes first link") {
+        reset_collection({}, {{Remove{dest_pk_1}}}, {dest_pk_2, dest_pk_3});
+    }
+    SECTION("remote removes middle link") {
+        reset_collection({}, {{Remove{dest_pk_2}}}, {dest_pk_1, dest_pk_3});
+    }
+    SECTION("remote removes last link") {
+        reset_collection({}, {{Remove{dest_pk_3}}}, {dest_pk_1, dest_pk_2});
+    }
+    SECTION("removal of different links") {
+        std::vector<int64_t> expected = {dest_pk_2};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_2, dest_pk_3}; // local client state wins
         }
-        SECTION("remove all") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {});
+        reset_collection({Remove{dest_pk_1}}, {Remove{dest_pk_3}}, std::move(expected));
+    }
+    SECTION("local addition") {
+        reset_collection({Add{dest_pk_4}}, {}, {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("remote addition") {
+        reset_collection({}, {Add{dest_pk_4}}, {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("both addition of different items") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_5});
+    }
+    SECTION("both addition of same items") {
+        std::vector<int64_t> expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_4};
         }
-        SECTION("no change") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        // dictionary has added the new link to the same key on both sides
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}}, std::move(expected));
+    }
+    SECTION("local add/delete, remote add/delete/add different") {
+        reset_collection({Add{dest_pk_4}, Remove{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5});
+    }
+    SECTION("remote add/delete, local add") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("local remove, remote add") {
+        std::vector<int64_t> expected = {dest_pk_1, dest_pk_3, dest_pk_4, dest_pk_5};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_1, dest_pk_3}; // local client state wins
         }
-        SECTION("remove middle link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
+        reset_collection({Remove{dest_pk_2}}, {Add{dest_pk_4}, Add{dest_pk_5}}, std::move(expected));
+    }
+    SECTION("local adds link to remotely deleted object") {
+        reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
+    }
+    SECTION("local clear") {
+        reset_collection({Clear{}}, {}, {});
+    }
+    SECTION("remote clear") {
+        reset_collection({}, {Clear{}}, {});
+    }
+    SECTION("both clear") {
+        reset_collection({Clear{}}, {Clear{}}, {});
+    }
+    SECTION("both clear and add") {
+        reset_collection({Clear{}, Add{dest_pk_1}}, {Clear{}, Add{dest_pk_2}}, {dest_pk_1});
+    }
+    SECTION("both clear and add/remove/add/add") {
+        reset_collection({Clear{}, Add{dest_pk_1}, Remove{dest_pk_1}, Add{dest_pk_2}, Add{dest_pk_3}},
+                         {Clear{}, Add{dest_pk_1}, Remove{dest_pk_1}, Add{dest_pk_2}, Add{dest_pk_3}},
+                         {dest_pk_2, dest_pk_3});
+    }
+    SECTION("local add to remotely deleted object") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
+    }
+    SECTION("remote adds link to locally deleted object with link") {
+        reset_collection({Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
+    }
+    SECTION("remote adds link to locally deleted object without link") {
+        reset_collection({RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
+    }
+    if (test_mode == ClientResyncMode::Recover) {
+        SECTION("local removes source object, remote modifies list") {
+            reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
+                                                    {Add{dest_pk_5}});
         }
-        SECTION("remove first link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2, dest_pk_3});
+        SECTION("remote removes source object, recover local modifications") {
+            reset_collection_removing_source_object({Add{dest_pk_4}, Clear{}}, {RemoveObject{"source", source_pk}});
         }
-        SECTION("remove last link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2});
+        SECTION("remote removes source object, local attempts to ccpy over list state") {
+            reset_collection_removing_source_object({Remove{dest_pk_1}}, {RemoveObject{"source", source_pk}});
         }
-        SECTION("remove outside links") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
+        SECTION("remote removes source object, local adds it back and modifies it") {
+            reset_collection({Add{dest_pk_4}, RemoveObject{"source", source_pk}, CreateObject{"source", source_pk},
+                              Add{dest_pk_1}},
+                             {RemoveObject{"source", source_pk}}, {dest_pk_1});
         }
-        SECTION("additive") {
-            reset_collection({}, {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    else if (test_mode == ClientResyncMode::DiscardLocal) {
+        SECTION("remote removes source object") {
+            reset_collection_removing_source_object({Add{dest_pk_4}}, {RemoveObject{"source", source_pk}});
         }
-        SECTION("add middle") {
-            reset_collection({dest_pk_1, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    if constexpr (test_type_is_array) {
+        SECTION("local moves on non-added elements causes a diff which overrides server changes") {
+            reset_collection({Move{0, 1}, Add{dest_pk_5}}, {Add{dest_pk_4}},
+                             {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5});
         }
-        SECTION("add first") {
-            reset_collection({dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        SECTION("local moves on added elements can be merged with remote moves") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Move{0, 1}},
+                             {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5, dest_pk_4});
         }
-        SECTION("add last") {
-            reset_collection({dest_pk_1, dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        SECTION("local moves on added elements can be merged with remote additions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Add{dest_pk_1}, Add{dest_pk_2}},
+                             {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5, dest_pk_4, dest_pk_1, dest_pk_2});
         }
-        SECTION("add outside") {
-            reset_collection({dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        SECTION("local moves on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Remove{dest_pk_1}, Remove{dest_pk_2}},
+                             {dest_pk_3, dest_pk_5, dest_pk_4});
         }
-        SECTION("reversed order") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
+        SECTION("local move (down) on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}}, {Remove{dest_pk_1}, Remove{dest_pk_2}},
+                             {dest_pk_3, dest_pk_5, dest_pk_4});
+        }
+        SECTION("local move with delete on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}, Remove{dest_pk_5}},
+                             {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
+        }
+        SECTION("local move (down) with delete on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}, Remove{dest_pk_5}},
+                             {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
         }
     }
 }
-
+/*
 TEST_CASE("client reset with embedded object", "[client reset][discard local][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
