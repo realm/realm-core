@@ -1306,7 +1306,7 @@ void RealmCoordinator::async_request_write_mutex(Realm& realm)
     m_db->async_request_write_mutex(tr, [realm = realm.shared_from_this()]() mutable {
         auto& scheduler = *realm->scheduler();
         scheduler.invoke([realm = std::move(realm)] {
-            realm->run_writes();
+            Realm::Internal::run_writes(*realm);
         });
     });
 }

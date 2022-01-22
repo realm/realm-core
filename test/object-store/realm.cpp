@@ -1030,6 +1030,7 @@ TEST_CASE("SharedRealm: async writes") {
         util::EventLoop::main().run_until([&] {
             return done;
         });
+        realm->cancel_transaction();
     }
     SECTION("exception thrown during transaction") {
         auto table = realm->read_group().get_table("class_object");
@@ -1295,6 +1296,10 @@ TEST_CASE("SharedRealm: async writes") {
         auto obj = table->create_object();
         r2->commit_transaction();
     }
+
+    util::EventLoop::main().run_until([&] {
+        return !realm->has_pending_async_work();
+    });
 }
 
 class LooperDelegate {
@@ -1455,15 +1460,20 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 1);
     }
 
-    SECTION("notifications created in async transaction are sent asynchronously") {
+    SECTION("notifications created in async transaction are sent synchronously") {
         realm->async_begin_transaction([&] {
+            REQUIRE(change_count == 0);
             realm->async_commit_transaction();
+            REQUIRE(change_count == 1);
         });
         REQUIRE(change_count == 0);
         util::EventLoop::main().run_until([&] {
             return change_count > 0;
         });
         REQUIRE(change_count == 1);
+        util::EventLoop::main().run_until([&] {
+            return !realm->has_pending_async_work();
+        });
     }
 
     SECTION("refresh() from within changes_available() refreshes") {

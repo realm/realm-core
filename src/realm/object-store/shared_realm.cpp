@@ -641,17 +641,16 @@ void Realm::wait_for_change_release()
     m_coordinator->wait_for_change_release();
 }
 
+bool Realm::has_pending_async_work() const
+{
+    verify_thread();
+    return !m_async_commit_q.empty() || !m_async_write_q.empty() || (m_transaction && m_transaction->is_async());
+}
+
 void Realm::run_writes_on_proper_thread()
 {
     m_scheduler->invoke([self = shared_from_this()] {
         self->run_writes();
-    });
-}
-
-void Realm::run_async_completions_on_proper_thread()
-{
-    m_scheduler->invoke([self = shared_from_this()] {
-        self->run_async_completions();
     });
 }
 
@@ -684,12 +683,14 @@ void Realm::check_pending_write_requests()
     }
 }
 
-void Realm::end_current_write()
+void Realm::end_current_write(bool check_pending)
 {
-    m_transaction->async_end([this]() {
-        run_async_completions_on_proper_thread();
+    m_transaction->async_end([self = shared_from_this()]() {
+        self->m_scheduler->invoke([self] {
+            self->run_async_completions();
+        });
     });
-    if (m_async_commit_q.empty()) {
+    if (check_pending && m_async_commit_q.empty()) {
         check_pending_write_requests();
     }
 }
@@ -831,9 +832,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_blo
             run_writes();
         }
         else {
-            m_transaction->async_end([this]() {
-                run_async_completions_on_proper_thread();
-            });
+            end_current_write(false);
         }
     }
     return handle;

@@ -326,15 +326,13 @@ public:
         return m_in_migration;
     }
 
+    void notify();
     bool refresh();
     void set_auto_refresh(bool auto_refresh);
     bool auto_refresh() const
     {
         return m_auto_refresh;
     }
-    void notify();
-    void run_writes();
-    void run_async_completions();
 
     void invalidate();
 
@@ -394,6 +392,8 @@ public:
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
 
+    bool has_pending_async_work() const;
+
     Realm(const Realm&) = delete;
     Realm& operator=(const Realm&) = delete;
     Realm(Realm&&) = delete;
@@ -415,8 +415,8 @@ public:
                                        MakeSharedTag{});
     }
 
-    // Expose some internal functionality to other parts of the ObjectStore
-    // without making it public to everyone
+    // Expose some internal functionality which isn't intended to be used directly
+    // by SDKS to other parts of the ObjectStore
     class Internal {
         friend class _impl::CollectionNotifier;
         friend class _impl::RealmCoordinator;
@@ -430,6 +430,11 @@ public:
         static std::shared_ptr<Transaction> get_transaction_ref(Realm& realm)
         {
             return realm.transaction_ref();
+        }
+
+        static void run_writes(Realm& realm)
+        {
+            realm.run_writes();
         }
 
         // CollectionNotifier needs to be able to access the owning
@@ -475,6 +480,24 @@ private:
     // primary key values)
     bool m_in_migration = false;
 
+    struct AsyncWriteDesc {
+        util::UniqueFunction<void()> writer;
+        bool notify_only;
+        unsigned handle;
+    };
+    std::deque<AsyncWriteDesc> m_async_write_q;
+    struct AsyncCommitDesc {
+        util::UniqueFunction<void()> when_completed;
+        unsigned handle;
+    };
+    std::vector<AsyncCommitDesc> m_async_commit_q;
+    unsigned m_async_commit_handle = 0;
+    size_t m_is_running_async_writes = 0;
+    bool m_notify_only = false;
+    size_t m_is_running_async_commit_completions = 0;
+    bool m_async_commit_barrier_requested = false;
+    util::UniqueFunction<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
+
     void begin_read(VersionID);
     bool do_refresh();
 
@@ -495,28 +518,13 @@ private:
     Transaction& transaction();
     Transaction& transaction() const;
     std::shared_ptr<Transaction> transaction_ref();
-    struct AsyncWriteDesc {
-        util::UniqueFunction<void()> writer;
-        bool notify_only;
-        unsigned handle;
-    };
-    std::deque<AsyncWriteDesc> m_async_write_q;
-    struct AsyncCommitDesc {
-        util::UniqueFunction<void()> when_completed;
-        unsigned handle;
-    };
-    std::vector<AsyncCommitDesc> m_async_commit_q;
-    unsigned m_async_commit_handle = 0;
-    size_t m_is_running_async_writes = 0;
-    bool m_notify_only = false;
-    size_t m_is_running_async_commit_completions = 0;
-    bool m_async_commit_barrier_requested = false;
-    util::UniqueFunction<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
+
     void run_writes_on_proper_thread();
-    void run_async_completions_on_proper_thread();
     void check_pending_write_requests();
-    void end_current_write();
+    void end_current_write(bool check_pending = true);
     void call_completion_callbacks();
+    void run_writes();
+    void run_async_completions();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;
