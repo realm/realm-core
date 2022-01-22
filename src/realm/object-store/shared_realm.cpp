@@ -704,7 +704,7 @@ void Realm::run_writes()
     }
     REALM_ASSERT(!m_transaction->is_synchronizing());
 
-    m_is_running_async_writes = true;
+    CountGuard running_writes(m_is_running_async_writes);
     int run_limit = 20; // max number of commits without full sync to disk
     // this is tricky
     //  - each pending call may itself add other async writes
@@ -749,7 +749,6 @@ void Realm::run_writes()
         // and terminate with a call to async commit or async cancel
         if (m_notify_only) {
             m_notify_only = false;
-            m_is_running_async_writes = false;
             return;
         }
 
@@ -769,7 +768,6 @@ void Realm::run_writes()
         if (m_async_commit_barrier_requested)
             break;
     }
-    m_is_running_async_writes = false;
 
     end_current_write();
 }

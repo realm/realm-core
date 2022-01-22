@@ -1015,24 +1015,42 @@ TEST_CASE("SharedRealm: async_writes") {
         });
     }
     SECTION("exception thrown during transaction") {
+        auto table = realm->read_group().get_table("class_object");
         Realm::AsyncHandle h = 7;
         bool called = false;
         realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
-            CHECK(error);
+            REQUIRE(error);
+            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "an error");
             CHECK(handle == h);
             called = true;
         });
         h = realm->async_begin_transaction([&] {
+            table->create_object();
             done = true;
-            auto table = realm->read_group().get_table("class_object");
-            table->create_object_with_primary_key(45); // Will throw
-            realm->async_commit_transaction();
+            throw std::runtime_error("an error");
         });
         util::EventLoop::main().run_until([&] {
             return done;
         });
-        realm->close();
+
+        // Transaction should have been rolled back
+        REQUIRE_FALSE(realm->is_in_transaction());
+        REQUIRE(table->size() == 0);
         REQUIRE(called);
+
+        // Should be able to perform another write afterwards
+        done = false;
+        called = false;
+        h = realm->async_begin_transaction([&] {
+            table->create_object();
+            realm->commit_transaction();
+            done = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        REQUIRE(table->size() == 1);
+        REQUIRE_FALSE(called);
     }
     SECTION("Canceling async transaction") {
         auto handle = realm->async_begin_transaction([&]() {
@@ -1160,7 +1178,7 @@ TEST_CASE("SharedRealm: async_writes") {
             auto col = table->get_column_key("value");
             table->create_object().set(col, 45);
             auto handle = realm->async_commit_transaction([&]() {
-                throw std::runtime_error("Should not go here");
+                FAIL();
             });
             realm->async_cancel_transaction(handle);
         });
