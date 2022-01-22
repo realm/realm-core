@@ -653,11 +653,21 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::ArrayInsert& instr)
     {
-        if (get_top_object(instr, "ArrayInsert")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "ArrayInsert";
+        // FIXME: any links being set or inserted need to be validated and if the dest object is not found then
+        // ignored.
+        if (get_top_object(instr, instr_name)) {
+            Instruction::ArrayInsert instr_copy = instr;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                if (index > instr_copy.prior_size) {
+                    instr_copy.path.back() = instr_copy.prior_size; // FIXME: is clamping reasonable?
+                }
+            });
+            InstructionApplier::operator()(instr_copy);
         }
         else {
-            logger.warn("Discarding a local ArrayInsert made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
 
@@ -665,6 +675,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         if (get_top_object(instr, "ArrayMove")) {
             InstructionApplier::operator()(instr);
+            // FIXME: adjust prior_size and check for indices which were not recovered inserts.
         }
         else {
             logger.warn("Discarding a local ArrayMove made to an object which no longer exists");
@@ -673,13 +684,20 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::ArrayErase& instr)
     {
-        if (get_top_object(instr, "ArrayErase")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "ArrayErase";
+        if (get_top_object(instr, instr_name)) {
+            Instruction::ArrayErase instr_copy = instr;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t /*index*/) {
+                instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                // FIXME: if index was not previously inserted in this recovery, fallback to diff mode.
+            });
+            InstructionApplier::operator()(instr_copy);
         }
         else {
-            logger.warn("Discarding a local ArrayErase made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
+
     void operator()(const Instruction::SetInsert& instr)
     {
         if (get_top_object(instr, "SetInsert")) {
@@ -1016,6 +1034,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
 
     auto wt_local = db_local.start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
+    REALM_ASSERT(history_local);
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     wt_local->get_history()->ensure_updated(current_version_local);
@@ -1044,6 +1063,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     if (db_remote) {
         auto wt_remote = db_remote->start_write();
         auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
+        REALM_ASSERT(history_remote);
         sync::version_type current_version_remote = wt_remote->get_version();
         history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
         history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
@@ -1060,7 +1080,6 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
             RecoverLocalChangesetsHandler handler{*wt_remote, logger};
             // FIXME: it may be desirable to make these separate transactions
             for (const auto& change : local_changes) {
-                // FIXME: should failure be fatal? Or should we rollback and attempt DiscardLocal mode only?
                 handler.process_changeset(change); // throws on error
             }
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());

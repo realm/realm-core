@@ -1274,7 +1274,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
 /*
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -1291,7 +1291,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    config.sync_config->client_resync_mode = test_mode;
     config.schema = Schema{
         {"object",
          {
@@ -1330,29 +1331,30 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
         });
     };
 
-    auto check_list = [&](Obj obj, std::vector<T> expected) {
+    auto check_list = [&](Obj obj, std::vector<T>& expected) {
         ColKey col = obj.get_table()->get_column_key("list");
         auto actual = obj.get_list_values<T>(col);
         REQUIRE(actual == expected);
     };
 
-    auto check_dictionary = [&](Obj obj, std::vector<std::pair<std::string, Mixed>> expected) {
+    auto check_dictionary = [&](Obj obj, std::map<std::string, Mixed>& expected) {
         ColKey col = obj.get_table()->get_column_key("dictionary");
         Dictionary dict = obj.get_dictionary(col);
         REQUIRE(dict.size() == expected.size());
-        for (auto pair : expected) {
+        for (auto& pair : expected) {
             auto it = dict.find(pair.first);
             REQUIRE(it != dict.end());
             REQUIRE((*it).second == pair.second);
         }
     };
 
-    auto check_set = [&](Obj obj, std::vector<Mixed> expected) {
+    auto check_set = [&](Obj obj, std::set<Mixed>& expected) {
         ColKey col = obj.get_table()->get_column_key("set");
         SetBasePtr set = obj.get_setbase_ptr(col);
         REQUIRE(set->size() == expected.size());
-        for (auto value : expected) {
+        for (auto& value : expected) {
             auto ndx = set->find_any(value);
+            CAPTURE(value);
             REQUIRE(ndx != realm::not_found);
         }
     };
@@ -1408,9 +1410,10 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_value(results.get<Obj>(0), remote_state);
-                    check_value(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    T expected_state = (test_mode == ClientResyncMode::DiscardLocal) ? remote_state : local_state;
+                    check_value(results.get<Obj>(0), expected_state);
+                    check_value(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1455,7 +1458,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             obj.template set_list_values<T>(col, {initial_list_value});
         });
 
-        auto reset_list = [&](std::vector<T> local_state, std::vector<T> remote_state) {
+        auto reset_list = [&](std::vector<T>&& local_state, std::vector<T>&& remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1485,9 +1488,13 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_list(results.get<Obj>(0), remote_state);
-                    check_list(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    std::vector<T>& expected_state = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        expected_state.insert(expected_state.begin(), local_state.begin(), local_state.end());
+                    }
+                    check_list(results.get<Obj>(0), expected_state);
+                    check_list(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1546,8 +1553,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             dict.insert(dict_key, Mixed{values[0]});
         });
 
-        auto reset_dictionary = [&](std::vector<std::pair<std::string, Mixed>> local_state,
-                                    std::vector<std::pair<std::string, Mixed>> remote_state) {
+        auto reset_dictionary = [&](std::map<std::string, Mixed>&& local_state,
+                                    std::map<std::string, Mixed>&& remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1555,7 +1562,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("dictionary");
                     Dictionary dict = table->begin()->get_dictionary(col);
-                    for (auto pair : local_state) {
+                    for (auto& pair : local_state) {
                         dict.insert(pair.first, pair.second);
                     }
                     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -1573,7 +1580,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("dictionary");
                     Dictionary dict = table->begin()->get_dictionary(col);
-                    for (auto pair : remote_state) {
+                    for (auto& pair : remote_state) {
                         dict.insert(pair.first, pair.second);
                     }
                     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -1598,9 +1605,19 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_dictionary(results.get<Obj>(0), remote_state);
-                    check_dictionary(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+
+                    auto& expected_state = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        for (auto it : local_state) {
+                            expected_state[it.first] = it.second;
+                        }
+                        if (local_state.find(dict_key) == local_state.end()) {
+                            expected_state.erase(dict_key); // explict erasure of initial state occured
+                        }
+                    }
+                    check_dictionary(results.get<Obj>(0), expected_state);
+                    check_dictionary(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1623,19 +1640,19 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {{dict_key, Mixed{values[0]}}});
         }
         SECTION("modify complex") {
-            std::vector<std::pair<std::string, Mixed>> local;
-            local.emplace_back("adam", Mixed(values[0]));
-            local.emplace_back("bernie", Mixed(values[0]));
-            local.emplace_back("david", Mixed(values[0]));
-            local.emplace_back("eric", Mixed(values[0]));
-            local.emplace_back("frank", Mixed(values[1]));
-            std::vector<std::pair<std::string, Mixed>> remote;
-            remote.emplace_back("adam", Mixed(values[0]));
-            remote.emplace_back("bernie", Mixed(values[1]));
-            remote.emplace_back("carl", Mixed(values[0]));
-            remote.emplace_back("david", Mixed(values[1]));
-            remote.emplace_back("frank", Mixed(values[0]));
-            reset_dictionary(local, remote);
+            std::map<std::string, Mixed> local;
+            local.emplace(std::make_pair("adam", Mixed(values[0])));
+            local.emplace(std::make_pair("bernie", Mixed(values[0])));
+            local.emplace(std::make_pair("david", Mixed(values[0])));
+            local.emplace(std::make_pair("eric", Mixed(values[0])));
+            local.emplace(std::make_pair("frank", Mixed(values[1])));
+            std::map<std::string, Mixed> remote;
+            remote.emplace(std::make_pair("adam", Mixed(values[0])));
+            remote.emplace(std::make_pair("bernie", Mixed(values[1])));
+            remote.emplace(std::make_pair("carl", Mixed(values[0])));
+            remote.emplace(std::make_pair("david", Mixed(values[1])));
+            remote.emplace(std::make_pair("frank", Mixed(values[0])));
+            reset_dictionary(std::move(local), std::move(remote));
         }
         SECTION("empty remote") {
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {});
@@ -1654,7 +1671,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     SECTION("set") {
         int64_t pk_val = 0;
 
-        auto reset_set = [&](std::vector<Mixed> local_state, std::vector<Mixed> remote_state) {
+        auto reset_set = [&](std::set<Mixed> local_state, std::set<Mixed> remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1663,7 +1680,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     SetBasePtr set = table->begin()->get_setbase_ptr(col);
                     for (size_t i = set->size(); i > 0; --i) {
                         Mixed si = set->get_any(i - 1);
-                        if (std::find(local_state.begin(), local_state.end(), si) == local_state.end()) {
+                        if (local_state.find(si) == local_state.end()) {
                             set->erase_any(si);
                         }
                     }
@@ -1678,7 +1695,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     SetBasePtr set = table->begin()->get_setbase_ptr(col);
                     for (size_t i = set->size(); i > 0; --i) {
                         Mixed si = set->get_any(i - 1);
-                        if (std::find(remote_state.begin(), remote_state.end(), si) == remote_state.end()) {
+                        if (remote_state.find(si) == remote_state.end()) {
                             set->erase_any(si);
                         }
                     }
@@ -1699,9 +1716,18 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_set(results.get<Obj>(0), remote_state);
-                    check_set(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    std::set<Mixed>& expected = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        for (auto& e : local_state) {
+                            expected.insert(e);
+                        }
+                        if (local_state.find(Mixed{values[0]}) == local_state.end()) {
+                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occured
+                        }
+                    }
+                    check_set(results.get<Obj>(0), expected);
+                    check_set(object.obj(), expected);
+                    if (local_state == expected) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1754,7 +1780,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
         }
     }
 }
-
+/*
 TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard local][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
