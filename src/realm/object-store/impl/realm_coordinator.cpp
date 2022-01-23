@@ -813,13 +813,15 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
         SyncSession::Internal::nonsync_transact_notify(*m_sync_session, new_version.version);
     }
 #endif
-    if (realm.m_binding_context) {
-        realm.m_binding_context->did_change({}, {});
-    }
-
     if (m_notifier) {
         m_notifier->notify_others();
     }
+
+    if (realm.m_binding_context) {
+        realm.m_binding_context->did_change({}, {});
+    }
+    // note: no longer safe to access `realm` or `this` after this point as
+    // did_change() may have closed the Realm.
 }
 
 void RealmCoordinator::enable_wait_for_change()

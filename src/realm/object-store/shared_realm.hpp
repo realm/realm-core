@@ -363,6 +363,8 @@ public:
     }
 
     // Close this Realm. Continuing to use a Realm after closing it will throw ClosedRealmException
+    // Closing a Realm will wait for any asynchronous writes which have been commited but not synced
+    // to sync. Asynchronous writes which have not yet started are canceled.
     void close();
     bool is_closed() const
     {
@@ -500,6 +502,8 @@ private:
 
     void begin_read(VersionID);
     bool do_refresh();
+    void do_begin_transaction();
+    void do_invalidate();
 
     void set_schema(Schema const& reference, Schema schema);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);

@@ -656,6 +656,10 @@ void Realm::run_writes_on_proper_thread()
 
 void Realm::call_completion_callbacks()
 {
+    if (m_is_running_async_commit_completions) {
+        return;
+    }
+
     CountGuard sending_completions(m_is_running_async_commit_completions);
     if (m_transaction) {
         if (auto error = m_transaction->get_commit_exception())
@@ -709,25 +713,15 @@ void Realm::run_writes()
     //  - each pending call may itself add other async writes
     //  - the 'run' will terminate as soon as a commit without grouping is requested
     while (!m_async_write_q.empty()) {
-
         // We might have made a sync commit and thereby given up the write lock
         if (!m_transaction->holds_write_mutex()) {
             return;
         }
 
-        // It is safe to use a reference here. Elements are not invalidated by new insertions
-        auto& write_desc = m_async_write_q.front();
+        do_begin_transaction();
 
-        {
-            CountGuard sending_notifications(m_is_sending_notifications);
-            try {
-                m_coordinator->promote_to_write(*this);
-            }
-            catch (_impl::UnsupportedSchemaChange const&) {
-                translate_schema_error();
-            }
-            cache_new_schema();
-        }
+        auto write_desc = std::move(m_async_write_q.front());
+        m_async_write_q.pop_front();
 
         // prevent any calls to commit/cancel during a simple notification
         m_notify_only = write_desc.notify_only;
@@ -742,8 +736,7 @@ void Realm::run_writes()
             if (m_async_exception_handler)
                 m_async_exception_handler(write_desc.handle, std::current_exception());
         }
-        auto new_version = m_transaction->get_version();
-        m_async_write_q.pop_front();
+
         // if we've merely delivered a notification, the full transaction will follow later
         // and terminate with a call to async commit or async cancel
         if (m_notify_only) {
@@ -751,6 +744,12 @@ void Realm::run_writes()
             return;
         }
 
+        // Realm may have been closed in the write function
+        if (!m_transaction) {
+            return;
+        }
+
+        auto new_version = m_transaction->get_version();
         // if we've run the full transaction, there is follow up work to do:
         if (new_version > prev_version) {
             // A commit was done during callback
@@ -888,6 +887,11 @@ void Realm::begin_transaction()
         m_transaction->wait_for_async_completion();
     }
 
+    do_begin_transaction();
+}
+
+void Realm::do_begin_transaction()
+{
     CountGuard sending_notifications(m_is_sending_notifications);
     try {
         m_coordinator->promote_to_write(*this);
@@ -961,10 +965,19 @@ void Realm::invalidate()
         cancel_transaction();
     }
 
+    do_invalidate();
+}
+
+void Realm::do_invalidate()
+{
     if (!m_config.immutable() && m_transaction) {
         // Wait for potential syncing to finish
+        if (m_is_running_async_writes) {
+            m_transaction->async_end();
+        }
         m_transaction->wait_for_async_completion();
         call_completion_callbacks();
+        transaction().close();
     }
 
     m_transaction = nullptr;
@@ -1208,24 +1221,19 @@ SharedRealm Realm::freeze()
 
 void Realm::close()
 {
+    if (is_closed()) {
+        return;
+    }
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
 
-    if (!m_config.immutable() && m_transaction) {
-        // Wait for potential syncing to finish
-        m_transaction->wait_for_async_completion();
-        call_completion_callbacks();
-        transaction().close();
-    }
+    do_invalidate();
 
-    m_transaction = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
     m_scheduler = nullptr;
     m_config = {};
-    m_async_write_q.clear();
-    m_async_commit_q.clear();
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
