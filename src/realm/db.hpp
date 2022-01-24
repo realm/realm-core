@@ -536,6 +536,9 @@ private:
     // call to grab_read_lock().
     void release_read_lock(ReadLockInfo&) noexcept;
 
+    // Stop tracking a read lock without actually releasing it.
+    void leak_read_lock(ReadLockInfo&) noexcept;
+
     // Release all read locks held by this DB object. After release, further calls to
     // release_read_lock for locks already released must be avoided.
     void release_all_read_locks() noexcept;
@@ -726,9 +729,12 @@ public:
         return m_async_stage == Transaction::AsyncState::Idle;
     }
 
-    std::exception_ptr get_commit_exception()
+    std::exception_ptr get_commit_exception() noexcept REQUIRES(!m_async_mutex)
     {
-        return m_commit_exception;
+        util::CheckedLockGuard lck(m_async_mutex);
+        auto err = std::move(m_commit_exception);
+        m_commit_exception = nullptr;
+        return err;
     }
 
 private:
@@ -759,7 +765,8 @@ private:
 
     DB::ReadLockInfo m_read_lock;
     util::Optional<DB::ReadLockInfo> m_oldest_version_not_persisted;
-    std::exception_ptr m_commit_exception;
+    std::exception_ptr m_commit_exception GUARDED_BY(m_async_mutex);
+    bool m_async_commit_has_failed = false;
 
     // Mutex is protecting access to members just below
     std::mutex m_async_mutex;

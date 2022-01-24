@@ -35,6 +35,7 @@ class SimulatedFailure : public std::system_error {
 public:
     enum FailureType {
         generic,
+        group_writer__commit,
         slab_alloc__reset_free_space_tracking,
         slab_alloc__remap,
         shared_group__grow_reader_mapping,
@@ -84,6 +85,11 @@ public:
     /// Throws std::bad_alloc if a mmap predicate has been set and it returns true.
     static void trigger_mmap(size_t);
 
+    /// Set whether simulator failures are thread-local. SimulatorFailure does
+    /// not perform any synchronization, so care must be used to avoid races
+    /// when turning this off.
+    static void set_thread_local(bool);
+
     SimulatedFailure(std::error_code);
 
 private:
@@ -94,11 +100,12 @@ private:
     static bool do_check_trigger(FailureType) noexcept;
     static void do_prime_mmap(bool (*)(size_t));
     static void do_trigger_mmap(size_t);
+    static void do_set_thread_local(bool);
 #endif
 };
 
 std::error_code make_error_code(SimulatedFailure::FailureType) noexcept;
-    
+
 class SimulatedFailure::OneShotPrimeGuard {
 public:
     OneShotPrimeGuard(FailureType);
@@ -200,6 +207,15 @@ inline constexpr bool SimulatedFailure::is_enabled()
     return true;
 #else
     return false;
+#endif
+}
+
+inline void SimulatedFailure::set_thread_local(bool tl)
+{
+#ifdef REALM_ENABLE_SIMULATED_FAILURE
+    do_set_thread_local(tl);
+#else
+    static_cast<void>(tl);
 #endif
 }
 

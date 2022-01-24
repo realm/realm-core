@@ -267,7 +267,7 @@ public:
     //   intervening synchronization of stable storage.
     // * Such a sequence of commits form a group. In case of a platform crash,
     //   either none or all of the commits in a group will reach stable storage.
-    AsyncHandle async_commit_transaction(util::UniqueFunction<void()>&& the_done_block = nullptr,
+    AsyncHandle async_commit_transaction(util::UniqueFunction<void(std::exception_ptr)>&& the_done_block = nullptr,
                                          bool allow_grouping = false);
 
     // Cancel a queued code block (either for an async_transaction or for an async_commit)
@@ -489,7 +489,7 @@ private:
     };
     std::deque<AsyncWriteDesc> m_async_write_q;
     struct AsyncCommitDesc {
-        util::UniqueFunction<void()> when_completed;
+        util::UniqueFunction<void(std::exception_ptr)> when_completed;
         unsigned handle;
     };
     std::vector<AsyncCommitDesc> m_async_commit_q;

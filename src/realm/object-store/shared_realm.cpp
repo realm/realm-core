@@ -661,11 +661,7 @@ void Realm::call_completion_callbacks()
     }
 
     CountGuard sending_completions(m_is_running_async_commit_completions);
-    if (m_transaction) {
-        if (auto error = m_transaction->get_commit_exception())
-            std::rethrow_exception(error);
-    }
-
+    auto error = m_transaction->get_commit_exception();
     auto completions = std::move(m_async_commit_q);
     m_async_commit_q.clear();
     for (auto& cb : completions) {
@@ -673,14 +669,14 @@ void Realm::call_completion_callbacks()
             continue;
         if (m_async_exception_handler) {
             try {
-                cb.when_completed();
+                cb.when_completed(error);
             }
             catch (...) {
                 m_async_exception_handler(cb.handle, std::current_exception());
             }
         }
         else {
-            cb.when_completed();
+            cb.when_completed(error);
         }
     }
 }
@@ -816,7 +812,7 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
     return handle;
 }
 
-auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_block, bool allow_grouping)
+auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_ptr)>&& completion, bool allow_grouping)
     -> AsyncHandle
 {
     verify_thread();
@@ -835,8 +831,29 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void()>&& the_done_blo
     // grab a version lock on current version, push it along with the done block
     // do in-buffer-cache commit_transaction();
     auto handle = m_async_commit_handle++;
-    m_async_commit_q.push_back({std::move(the_done_block), handle});
-    m_coordinator->commit_write(*this, /* commit_to_disk: */ false);
+    m_async_commit_q.push_back({std::move(completion), handle});
+    try {
+        m_coordinator->commit_write(*this, /* commit_to_disk: */ false);
+    }
+    catch (...) {
+        // If the exception happened before the commit, we need to roll back the
+        // transaction and remove the completion handler from the queue
+        if (is_in_transaction()) {
+            // Exception happened before the commit, so roll back the transaction
+            // and remove the completion handler from the queue
+            cancel_transaction();
+            auto it = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), [=](auto& e) {
+                return e.handle == handle;
+            });
+            if (it != m_async_commit_q.end()) {
+                m_async_commit_q.erase(it);
+            }
+        }
+        else if (m_transaction) {
+            end_current_write(false);
+        }
+        throw;
+    }
 
     if (m_is_running_async_writes) {
         // we're called from with the callback loop and it will take care of releasing lock

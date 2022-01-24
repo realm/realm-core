@@ -1578,6 +1578,7 @@ void DB::release_all_read_locks() noexcept
         atomic_double_dec(r.count);
     }
     m_local_locks_held.clear();
+    REALM_ASSERT(m_transaction_count == 0);
 }
 
 // Note: close() and close_internal() may be called from the DB::~DB().
@@ -2047,6 +2048,21 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
         // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
         REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
         return;
+    }
+}
+
+void DB::leak_read_lock(ReadLockInfo& read_lock) noexcept
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+    // simple linear search and move-last-over if a match is found.
+    // common case should have only a modest number of transactions in play..
+    for (size_t j = 0; j < m_local_locks_held.size(); ++j) {
+        if (m_local_locks_held[j].m_version == read_lock.m_version) {
+            m_local_locks_held[j] = m_local_locks_held.back();
+            m_local_locks_held.pop_back();
+            --m_transaction_count;
+            return;
+        }
     }
 }
 
@@ -2556,7 +2572,17 @@ void Transaction::do_end_read() noexcept
 
     detach();
 
-    REALM_ASSERT(!m_oldest_version_not_persisted);
+    // We should always be ensuring that async commits finish before we get here,
+    // but if the fsync() failed or we failed to update the top pointer then
+    // there's not much we can do and we have to just accept that we're losing
+    // those commits.
+    if (m_oldest_version_not_persisted) {
+        REALM_ASSERT(m_async_commit_has_failed);
+        // We need to not release our read lock on m_oldest_version_not_persisted
+        // as that's the version the top pointer is referencing and overwriting
+        // that version will corrupt the Realm file.
+        db->leak_read_lock(*m_oldest_version_not_persisted);
+    }
     db->release_read_lock(m_read_lock);
 
     m_alloc.note_reader_end(this);
@@ -2968,8 +2994,8 @@ void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
         // get a callback on the helper thread, in which to sync to disk
         db->async_sync_to_disk([&, cb = std::move(when_synchronized)]() noexcept {
             // sync to disk:
+            DB::ReadLockInfo read_lock;
             try {
-                DB::ReadLockInfo read_lock;
                 db->grab_read_lock(read_lock, VersionID());
                 GroupWriter out(*this);
                 out.commit(read_lock.m_top_ref); // Throws
@@ -2980,11 +3006,13 @@ void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
                     db->release_read_lock(*m_oldest_version_not_persisted);
                     m_oldest_version_not_persisted.reset();
                 }
-                db->do_end_write();
             }
             catch (...) {
                 m_commit_exception = std::current_exception();
+                m_async_commit_has_failed = true;
+                db->release_read_lock(read_lock);
             }
+            db->do_end_write();
 
             std::unique_lock<std::mutex> lck(m_async_mutex);
             m_async_stage = AsyncState::Idle;
