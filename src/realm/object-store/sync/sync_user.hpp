@@ -21,9 +21,9 @@
 
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
 

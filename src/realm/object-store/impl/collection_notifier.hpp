@@ -20,9 +20,9 @@
 #define REALM_BACKGROUND_COLLECTION_HPP
 
 #include <realm/object-store/impl/deep_change_checker.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 
 #include <realm/util/assert.hpp>
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/version_id.hpp>
 #include <realm/table_ref.hpp>
