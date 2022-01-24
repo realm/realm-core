@@ -977,7 +977,8 @@ TEST_CASE("SharedRealm: async writes") {
     }
 
     auto verify_persisted = [&] {
-        realm->close();
+        if (realm)
+            realm->close();
         _impl::RealmCoordinator::assert_no_open_realms();
 
         auto new_realm = Realm::get_shared_realm(config);
@@ -1310,6 +1311,20 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 2);
         REQUIRE(!table->find_first_int(col, 90));
     }
+    SECTION("release reference to Realm after async begin") {
+        std::weak_ptr<Realm> weak_realm = realm;
+        realm->async_begin_transaction([&]() {
+            table->create_object().set(col, 45);
+            weak_realm.lock()->async_commit_transaction([&] {
+                done = true;
+            });
+        });
+        realm = nullptr;
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        verify_persisted();
+    }
     SECTION("object change information") {
         realm->begin_transaction();
         auto col = table->get_column_key("ints");
@@ -1367,7 +1382,7 @@ TEST_CASE("SharedRealm: async writes") {
     }
 
     util::EventLoop::main().run_until([&] {
-        return !realm->has_pending_async_work();
+        return !realm || !realm->has_pending_async_work();
     });
 }
 
