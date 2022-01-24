@@ -1110,7 +1110,7 @@ TEST_CASE("SharedRealm: async writes") {
         });
         realm->cancel_transaction();
     }
-    SECTION("exception thrown during transaction") {
+    SECTION("exception thrown during transaction with error handler") {
         Realm::AsyncHandle h = 7;
         bool called = false;
         realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
@@ -1146,6 +1146,44 @@ TEST_CASE("SharedRealm: async writes") {
         });
         REQUIRE(table->size() == 1);
         REQUIRE_FALSE(called);
+    }
+    SECTION("exception thrown during transaction without error handler") {
+        realm->set_async_error_handler(nullptr);
+        realm->async_begin_transaction([&] {
+            table->create_object();
+            throw std::runtime_error("an error");
+        });
+        REQUIRE_THROWS_CONTAINING(util::EventLoop::main().run_until([&] {
+            return false;
+        }),
+                                  "an error");
+
+        // Transaction should have been rolled back
+        REQUIRE_FALSE(realm->is_in_transaction());
+        REQUIRE(table->size() == 0);
+
+        // Should be able to perform another write afterwards
+        realm->async_begin_transaction([&] {
+            table->create_object();
+            realm->commit_transaction();
+            done = true;
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        REQUIRE(table->size() == 1);
+    }
+    SECTION("exception thrown during transaction without error handler after closing Realm") {
+        realm->set_async_error_handler(nullptr);
+        realm->async_begin_transaction([&] {
+            realm->close();
+            throw std::runtime_error("an error");
+        });
+        REQUIRE_THROWS_CONTAINING(util::EventLoop::main().run_until([&] {
+            return false;
+        }),
+                                  "an error");
+        REQUIRE(realm->is_closed());
     }
     SECTION("Canceling async transaction") {
         auto handle = realm->async_begin_transaction([&]() {

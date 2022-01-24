@@ -689,6 +689,9 @@ void Realm::check_pending_write_requests()
 
 void Realm::end_current_write(bool check_pending)
 {
+    if (!m_transaction) {
+        return;
+    }
     m_transaction->async_end([self = shared_from_this()]() {
         self->m_scheduler->invoke([self] {
             self->run_async_completions();
@@ -712,7 +715,7 @@ void Realm::run_writes()
     // this is tricky
     //  - each pending call may itself add other async writes
     //  - the 'run' will terminate as soon as a commit without grouping is requested
-    while (!m_async_write_q.empty()) {
+    while (!m_async_write_q.empty() && m_transaction) {
         // We might have made a sync commit and thereby given up the write lock
         if (!m_transaction->holds_write_mutex()) {
             return;
@@ -731,10 +734,17 @@ void Realm::run_writes()
             write_desc.writer();
         }
         catch (const std::exception&) {
-            // The version check below will cause a rollback to be performed if a commit
-            // was not done
-            if (m_async_exception_handler)
+            if (m_transaction) {
+                transaction::cancel(*m_transaction, m_binding_context.get());
+            }
+            m_notify_only = false;
+
+            if (m_async_exception_handler) {
                 m_async_exception_handler(write_desc.handle, std::current_exception());
+                continue;
+            }
+            end_current_write();
+            throw;
         }
 
         // if we've merely delivered a notification, the full transaction will follow later
