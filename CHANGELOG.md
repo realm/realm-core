@@ -9,6 +9,7 @@
 * If a list of objects contains links to objects not included in the synchronized partition, the indices contained in CollectionChangeSet for that list may be wrong ([#5164](https://github.com/realm/realm-core/issues/5164), since v10.0.0)
 * Sending a QUERY message may fail with `Assertion failed: !m_unbind_message_sent` ([#5149](https://github.com/realm/realm-core/pull/5149), since v11.8.0)
 * Subscription names correctly distinguish an empty string from a nullptr ([#5160](https://github.com/realm/realm-core/pull/5160), since v11.8.0)
+* Fix an error when compiling a watchOS target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623))
  
 ### Breaking changes
 * None.
