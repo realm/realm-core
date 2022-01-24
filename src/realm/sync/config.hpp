@@ -160,7 +160,7 @@ struct SyncConfig {
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
     std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
-    std::function<void(const std::string&, std::function<void(DBRef, util::Optional<std::string>)>)>
+    std::function<void(const std::string&, util::UniqueFunction<void(DBRef, util::Optional<std::string>)>)>
         get_fresh_realm_for_path;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);

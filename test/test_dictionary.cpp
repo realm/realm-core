@@ -649,7 +649,7 @@ public:
     }
 
     std::map<std::string, Mixed> the_map;
-    std::function<int64_t(void)> rnd = std::mt19937(unit_test_random_seed);
+    util::UniqueFunction<int64_t(void)> rnd = std::mt19937(unit_test_random_seed);
 };
 
 NONCONCURRENT_TEST(Dictionary_HashRandomOpsTransaction)

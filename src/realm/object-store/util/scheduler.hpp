@@ -20,9 +20,9 @@
 #define REALM_OS_UTIL_SCHEDULER
 
 #include <realm/util/features.h>
+#include <realm/util/functional.hpp>
 #include <realm/version_id.hpp>
 
-#include <functional>
 #include <memory>
 
 #if REALM_PLATFORM_APPLE
@@ -87,15 +87,15 @@ public:
     //
     // This function is not thread-safe.
     virtual void set_notify_callback(std::function<void()>) = 0;
-    virtual void set_schedule_writes_callback(std::function<void()>) {}
-    virtual void set_schedule_completions_callback(std::function<void()>) {}
+    virtual void set_schedule_writes_callback(util::UniqueFunction<void()>) {}
+    virtual void set_schedule_completions_callback(util::UniqueFunction<void()>) {}
 
-    virtual bool set_timeout_callback(uint64_t, std::function<void()>)
+    virtual bool set_timeout_callback(uint64_t, util::UniqueFunction<void()>)
     {
         return false;
     }
 
-    // virtual int enqueue_write(std::function<void()>& block) = 0;
+    // virtual int enqueue_write(util::UniqueFunction<void()>& block) = 0;
 
     [[deprecated("Use Scheduler::make_frozen() instead")]] static std::shared_ptr<Scheduler>
     get_frozen(VersionID version);
@@ -145,7 +145,7 @@ public:
 
     /// Register a factory function which can produce custom schedulers when
     /// `Scheduler::make_default()` is called.
-    static void set_default_factory(std::function<std::shared_ptr<Scheduler>()>);
+    static void set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()>);
 };
 
 

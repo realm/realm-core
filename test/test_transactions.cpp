@@ -670,7 +670,7 @@ void preparations(SharedGroup& sg_w)
 // illustration of possible governor function which takes total system load into account
 class ExampleGovernor : public util::PageReclaimGovernor {
 public:
-    std::function<int64_t()> current_target_getter(size_t load) override
+    util::UniqueFunction<int64_t()> current_target_getter(size_t load) override
     {
         return std::bind(file_control_governor, load);
     }

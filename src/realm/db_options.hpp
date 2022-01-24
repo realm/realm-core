@@ -59,7 +59,6 @@ struct DBOptions {
         : durability(Durability::Full)
         , encryption_key(key)
         , allow_file_format_upgrade(true)
-        , upgrade_callback(std::function<void(int, int)>())
         , temp_dir(sys_tmp_dir)
         , enable_metrics(false)
         , metrics_buffer_size(10000)

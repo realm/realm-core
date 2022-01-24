@@ -68,7 +68,7 @@ std::string property_type_to_bson_type_str(PropertyType type)
 
 class BaasRuleBuilder {
 public:
-    using IncludePropCond = std::function<bool(const Property&)>;
+    using IncludePropCond = util::UniqueFunction<bool(const Property&)>;
     BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
                     const std::string& db_name, IncludePropCond include_prop)
         : m_schema(schema)
@@ -88,7 +88,7 @@ private:
     const Property& m_partition_key;
     const std::string& m_mongo_service_name;
     const std::string& m_mongo_db_name;
-    std::function<bool(const Property&)> m_include_prop;
+    util::UniqueFunction<bool(const Property&)> m_include_prop;
     nlohmann::json m_relationships;
     std::vector<std::string> m_current_path;
 };
@@ -264,7 +264,7 @@ size_t curl_header_cb(char* buffer, size_t size, size_t nitems, std::map<std::st
 
 } // namespace
 
-app::Response do_http_request(const app::Request& request)
+app::Response do_http_request(app::Request&& request)
 {
     CurlGlobalGuard curl_global_guard;
     auto curl = curl_easy_init();
@@ -346,8 +346,7 @@ app::Response AdminAPIEndpoint::do_request(app::Request request) const
     request.headers["Content-Type"] = "application/json;charset=utf-8";
     request.headers["Accept"] = "application/json";
     request.headers["Authorization"] = util::format("Bearer %1", m_access_token);
-    auto resp = do_http_request(request);
-    return resp;
+    return do_http_request(std::move(request));
 }
 
 app::Response AdminAPIEndpoint::get() const
@@ -439,7 +438,7 @@ AdminAPISession AdminAPISession::login(const std::string& base_url, const std::s
         },
         login_req_body.dump(),
     };
-    auto login_resp = do_http_request(auth_req);
+    auto login_resp = do_http_request(std::move(auth_req));
     REALM_ASSERT(login_resp.http_status_code == 200);
     auto login_resp_body = nlohmann::json::parse(login_resp.body);
 

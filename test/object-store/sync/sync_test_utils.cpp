@@ -66,7 +66,7 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
     return false;
 }
 
-void timed_wait_for(std::function<bool()> condition, std::chrono::milliseconds max_ms)
+void timed_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
     util::EventLoop::main().run_until([&] {
@@ -77,7 +77,7 @@ void timed_wait_for(std::function<bool()> condition, std::chrono::milliseconds m
     });
 }
 
-void timed_sleeping_wait_for(std::function<bool()> condition, std::chrono::milliseconds max_ms)
+void timed_sleeping_wait_for(util::FunctionRef<bool()> condition, std::chrono::milliseconds max_ms)
 {
     const auto wait_start = std::chrono::steady_clock::now();
     while (!condition()) {
@@ -244,7 +244,7 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> 
 
 // fake discard local mode by turning off sync and calling transfer group directly
 struct FakeLocalClientReset : public TestClientReset {
-    FakeLocalClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
+    FakeLocalClientReset(const Realm::Config& local_config, const Realm::Config& remote_config)
         : TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
@@ -322,7 +322,7 @@ struct FakeLocalClientReset : public TestClientReset {
 #if REALM_ENABLE_SYNC
 
 struct TestServerClientReset : public TestClientReset {
-    TestServerClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config,
+    TestServerClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
                           TestSyncManager& test_sync_manager)
         : TestClientReset(local_config, remote_config)
         , m_test_sync_manager(test_sync_manager)
@@ -404,8 +404,8 @@ private:
     TestSyncManager& m_test_sync_manager;
 };
 
-std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config local_config,
-                                                               Realm::Config remote_config,
+std::unique_ptr<TestClientReset> make_test_server_client_reset(const Realm::Config& local_config,
+                                                               const Realm::Config& remote_config,
                                                                TestSyncManager& test_sync_manager)
 {
     return std::make_unique<TestServerClientReset>(local_config, remote_config, test_sync_manager);
@@ -414,7 +414,7 @@ std::unique_ptr<TestClientReset> make_test_server_client_reset(Realm::Config loc
 #if REALM_ENABLE_AUTH_TESTS
 
 struct BaasClientReset : public TestClientReset {
-    BaasClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config,
+    BaasClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
                     TestSyncManager& test_sync_manager)
         : TestClientReset(local_config, remote_config)
         , m_test_sync_manager(test_sync_manager)
@@ -559,7 +559,8 @@ private:
     TestSyncManager& m_test_sync_manager;
 };
 
-std::unique_ptr<TestClientReset> make_baas_client_reset(Realm::Config local_config, Realm::Config remote_config,
+std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
+                                                        const Realm::Config& remote_config,
                                                         TestSyncManager& test_sync_manager)
 {
     return std::make_unique<BaasClientReset>(local_config, remote_config, test_sync_manager);
@@ -570,7 +571,7 @@ std::unique_ptr<TestClientReset> make_baas_client_reset(Realm::Config local_conf
 #endif // REALM_ENABLE_SYNC
 
 
-TestClientReset::TestClientReset(realm::Realm::Config local_config, realm::Realm::Config remote_config)
+TestClientReset::TestClientReset(const Realm::Config& local_config, const Realm::Config& remote_config)
     : m_local_config(local_config)
     , m_remote_config(remote_config)
 {
@@ -581,33 +582,34 @@ TestClientReset::~TestClientReset()
     REALM_ASSERT(m_did_run || !(m_make_local_changes || m_make_remote_changes || m_on_post_local || m_on_post_reset));
 }
 
-TestClientReset* TestClientReset::setup(callback_t&& on_setup)
+TestClientReset* TestClientReset::setup(Callback&& on_setup)
 {
     m_on_setup = std::move(on_setup);
     return this;
 }
-TestClientReset* TestClientReset::make_local_changes(callback_t&& changes_local)
+TestClientReset* TestClientReset::make_local_changes(Callback&& changes_local)
 {
     m_make_local_changes = std::move(changes_local);
     return this;
 }
-TestClientReset* TestClientReset::make_remote_changes(callback_t&& changes_remote)
+TestClientReset* TestClientReset::make_remote_changes(Callback&& changes_remote)
 {
     m_make_remote_changes = std::move(changes_remote);
     return this;
 }
-TestClientReset* TestClientReset::on_post_local_changes(callback_t&& post_local)
+TestClientReset* TestClientReset::on_post_local_changes(Callback&& post_local)
 {
     m_on_post_local = std::move(post_local);
     return this;
 }
-TestClientReset* TestClientReset::on_post_reset(callback_t&& post_reset)
+TestClientReset* TestClientReset::on_post_reset(Callback&& post_reset)
 {
     m_on_post_reset = std::move(post_reset);
     return this;
 }
 
-std::unique_ptr<TestClientReset> make_fake_local_client_reset(Realm::Config local_config, Realm::Config remote_config)
+std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
+                                                              const Realm::Config& remote_config)
 {
     return std::make_unique<FakeLocalClientReset>(local_config, remote_config);
 }

@@ -29,7 +29,7 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 namespace realm {
-app::Response do_http_request(const app::Request& request);
+app::Response do_http_request(app::Request&& request);
 
 class AdminAPIEndpoint {
 public:
@@ -171,10 +171,10 @@ AppSession create_app(const AppCreateConfig& config);
 
 class SynchronousTestTransport : public app::GenericNetworkTransport {
 public:
-    void send_request_to_server(const app::Request request,
-                                std::function<void(const app::Response)> completion_block) override
+    void send_request_to_server(app::Request&& request,
+                                util::UniqueFunction<void(const app::Response&)>&& completion) override
     {
-        completion_block(do_http_request(request));
+        completion(do_http_request(std::move(request)));
     }
 };
 

@@ -18,10 +18,7 @@
 
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
-#include <string>
-
-namespace realm {
-namespace app {
+namespace realm::app {
 
 namespace {
 
@@ -255,5 +252,4 @@ std::error_code make_client_error_code(ClientErrorCode error) noexcept
     return std::error_code{int(error), g_client_error_category};
 }
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app

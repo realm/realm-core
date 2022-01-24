@@ -136,10 +136,22 @@ public:
         return double_val;
     }
 
+    explicit operator std::string&()
+    {
+        REALM_ASSERT(m_type == Bson::Type::String);
+        return string_val;
+    }
+
     explicit operator const std::string&() const
     {
         REALM_ASSERT(m_type == Bson::Type::String);
         return string_val;
+    }
+
+    explicit operator std::vector<char>&()
+    {
+        REALM_ASSERT(m_type == Bson::Type::Binary);
+        return binary_val;
     }
 
     explicit operator const std::vector<char>&() const
@@ -190,10 +202,22 @@ public:
         return max_key_val;
     }
 
+    explicit operator IndexedMap<Bson>&() noexcept
+    {
+        REALM_ASSERT(m_type == Bson::Type::Document);
+        return *document_val;
+    }
+
     explicit operator const IndexedMap<Bson>&() const noexcept
     {
         REALM_ASSERT(m_type == Bson::Type::Document);
         return *document_val;
+    }
+
+    explicit operator std::vector<Bson>&() noexcept
+    {
+        REALM_ASSERT(m_type == Bson::Type::Array);
+        return *array_val;
     }
 
     explicit operator const std::vector<Bson>&() const noexcept

@@ -115,7 +115,7 @@ public:
     Results get_keys() const;
     Results get_values() const;
 
-    using CBFunc = std::function<void(DictionaryChangeSet, std::exception_ptr)>;
+    using CBFunc = util::UniqueFunction<void(DictionaryChangeSet, std::exception_ptr)>;
     NotificationToken add_key_based_notification_callback(CBFunc cb, KeyPathArray key_path_array = {}) &;
 
     Iterator begin() const;

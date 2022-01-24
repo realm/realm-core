@@ -85,8 +85,8 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
 
     SECTION("reports inserts/deletes for simple reorderings") {
         auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows,
-                        std::function<bool(size_t)> modifications) {
-            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, modifications, false);
+                        util::UniqueFunction<bool(size_t)> modifications) {
+            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, std::move(modifications), false);
         };
         std::vector<int64_t> indices = {};
         constexpr size_t indices_size = 10000;

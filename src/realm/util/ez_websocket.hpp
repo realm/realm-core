@@ -87,7 +87,7 @@ class EZSocket {
 public:
     virtual ~EZSocket();
 
-    virtual void async_write_binary(const char* data, size_t size, std::function<void()>&& handler) = 0;
+    virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
 };
 
 class EZSocketFactory {

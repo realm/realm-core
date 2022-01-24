@@ -69,7 +69,7 @@ void ClientHistory::set_client_reset_adjustments(version_type current_version, S
 }
 
 
-void ClientHistory::set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn)
+void ClientHistory::set_local_origin_timestamp_source(util::UniqueFunction<timestamp_type()> source_fn)
 {
     m_local_origin_timestamp_source = std::move(source_fn);
 }

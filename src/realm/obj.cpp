@@ -729,8 +729,7 @@ void Obj::traverse_path(Visitor v, PathSizer ps, size_t path_length) const
         });
     }
     else {
-        if (ps)
-            ps(path_length);
+        ps(path_length);
     }
 }
 

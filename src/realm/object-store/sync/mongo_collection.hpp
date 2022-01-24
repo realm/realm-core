@@ -20,8 +20,9 @@
 #define MONGO_COLLECTION_HPP
 
 #include <realm/object-store/util/bson/bson.hpp>
-
+#include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
+
 #include <string>
 #include <vector>
 
@@ -70,7 +71,7 @@ public:
         /// (only available for find_one_and_replace and find_one_and_update)
         bool return_new_document = false;
 
-        void set_bson(bson::BsonDocument& bson)
+        void set_bson(bson::BsonDocument& bson) const
         {
             if (upsert) {
                 bson["upsert"] = true;
@@ -106,18 +107,20 @@ public:
         return m_database_name;
     }
 
-    /// Finds the documents in this collection which match the provided filter.
-    /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param options `FindOptions` to use when executing the command.
-    /// @param completion_block The resulting bson array of documents or error if one occurs
-    void find(const bson::BsonDocument& filter_bson, FindOptions options,
-              std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
+    template <typename T>
+    using ResponseHandler = util::UniqueFunction<void(T&&, util::Optional<AppError>)>;
 
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param completion_block The resulting bson array as a string or error if one occurs
-    void find(const bson::BsonDocument& filter_bson,
-              std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
+    /// @param options `FindOptions` to use when executing the command.
+    /// @param completion The resulting bson array of documents or error if one occurs
+    void find(const bson::BsonDocument& filter_bson, const FindOptions& options,
+              ResponseHandler<util::Optional<bson::BsonArray>>&& completion);
+
+    /// Finds the documents in this collection which match the provided filter.
+    /// @param filter_bson A `Document` as bson that should match the query.
+    /// @param completion The resulting bson array as a string or error if one occurs
+    void find(const bson::BsonDocument& filter_bson, ResponseHandler<util::Optional<bson::BsonArray>>&& completion);
 
     /// Returns one document from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
@@ -125,95 +128,88 @@ public:
     /// order.
     /// @param filter_bson A `Document` as bson that should match the query.
     /// @param options `FindOptions` to use when executing the command.
-    /// @param completion_block The resulting bson or error if one occurs
-    void find_one(const bson::BsonDocument& filter_bson, FindOptions options,
-                  std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The resulting bson or error if one occurs
+    void find_one(const bson::BsonDocument& filter_bson, const FindOptions& options,
+                  ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Returns one document from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
     /// returns the first document according to the query's sort order or natural
     /// order.
     /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param completion_block The resulting bson or error if one occurs
+    /// @param completion The resulting bson or error if one occurs
     void find_one(const bson::BsonDocument& filter_bson,
-                  std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                  ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Runs an aggregation framework pipeline against this collection.
     /// @param pipeline A bson array made up of `Documents` containing the pipeline of aggregation operations to
     /// perform.
-    /// @param completion_block The resulting bson array of documents or error if one occurs
-    void aggregate(const bson::BsonArray& pipeline,
-                   std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
+    /// @param completion The resulting bson array of documents or error if one occurs
+    void aggregate(const bson::BsonArray& pipeline, ResponseHandler<util::Optional<bson::BsonArray>>&& completion);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
     /// @param limit The max amount of documents to count
-    /// @param completion_block Returns the count of the documents that matched the filter.
-    void count(const bson::BsonDocument& filter_bson, int64_t limit,
-               std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
+    /// @param completion Returns the count of the documents that matched the filter.
+    void count(const bson::BsonDocument& filter_bson, int64_t limit, ResponseHandler<uint64_t>&& completion);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param completion_block Returns the count of the documents that matched the filter.
-    void count(const bson::BsonDocument& filter_bson,
-               std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
+    /// @param completion Returns the count of the documents that matched the filter.
+    void count(const bson::BsonDocument& filter_bson, ResponseHandler<uint64_t>&& completion);
 
     /// Encodes the provided value to BSON and inserts it. If the value is missing an identifier, one will be
     /// generated for it.
     /// @param value_bson  A `Document` value to insert.
-    /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the
+    /// @param completion The result of attempting to perform the insert. An Id will be returned for the
     /// inserted object on sucess
-    void insert_one(const bson::BsonDocument& value_bson,
-                    std::function<void(util::Optional<bson::Bson>, util::Optional<AppError>)> completion_block);
+    void insert_one(const bson::BsonDocument& value_bson, ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
     /// @param documents  The `Document` values in a bson array to insert.
-    /// @param completion_block The result of the insert, returns an array inserted document ids in order
-    void insert_many(bson::BsonArray documents,
-                     std::function<void(std::vector<bson::Bson>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the insert, returns an array inserted document ids in order
+    void insert_many(const bson::BsonArray& documents, ResponseHandler<std::vector<bson::Bson>>&& completion);
 
     /// Deletes a single matching document from the collection.
     /// @param filter_bson A `Document` as bson that should match the query.
-    /// @param completion_block The result of performing the deletion. Returns the count of deleted objects
-    void delete_one(const bson::BsonDocument& filter_bson,
-                    std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of performing the deletion. Returns the count of deleted objects
+    void delete_one(const bson::BsonDocument& filter_bson, ResponseHandler<uint64_t>&& completion);
 
     /// Deletes multiple documents
     /// @param filter_bson Document representing the match criteria
-    /// @param completion_block The result of performing the deletion. Returns the count of the deletion
-    void delete_many(const bson::BsonDocument& filter_bson,
-                     std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of performing the deletion. Returns the count of the deletion
+    void delete_many(const bson::BsonDocument& filter_bson, ResponseHandler<uint64_t>&& completion);
 
     /// Updates a single document matching the provided filter in this collection.
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param upsert When true, creates a new document if no document matches the query.
-    /// @param completion_block The result of the attempt to update a document.
+    /// @param completion The result of the attempt to update a document.
     void update_one(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson, bool upsert,
-                    std::function<void(UpdateResult, util::Optional<AppError>)> completion_block);
+                    ResponseHandler<UpdateResult>&& completion);
 
     /// Updates a single document matching the provided filter in this collection.
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
-    /// @param completion_block The result of the attempt to update a document.
+    /// @param completion The result of the attempt to update a document.
     void update_one(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson,
-                    std::function<void(UpdateResult, util::Optional<AppError>)> completion_block);
+                    ResponseHandler<UpdateResult>&& completion);
 
     /// Updates multiple documents matching the provided filter in this collection.
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param upsert When true, creates a new document if no document matches the query.
-    /// @param completion_block The result of the attempt to update a document.
+    /// @param completion The result of the attempt to update a document.
     void update_many(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson, bool upsert,
-                     std::function<void(UpdateResult, util::Optional<AppError>)> completion_block);
+                     ResponseHandler<UpdateResult>&& completion);
 
     /// Updates multiple documents matching the provided filter in this collection.
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
-    /// @param completion_block The result of the attempt to update a document.
+    /// @param completion The result of the attempt to update a document.
     void update_many(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson,
-                     std::function<void(UpdateResult, util::Optional<AppError>)> completion_block);
+                     ResponseHandler<UpdateResult>&& completion);
 
     /// Updates a single document in a collection based on a query filter and
     /// returns the document in either its pre-update or post-update form. Unlike
@@ -224,10 +220,10 @@ public:
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param options Optional `FindOneAndModifyOptions` to use when executing the command.
-    /// @param completion_block The result of the attempt to update a document.
-    void find_one_and_update(
-        const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson, FindOneAndModifyOptions options,
-        std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the attempt to update a document.
+    void find_one_and_update(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson,
+                             const FindOneAndModifyOptions& options,
+                             ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Updates a single document in a collection based on a query filter and
     /// returns the document in either its pre-update or post-update form. Unlike
@@ -237,10 +233,9 @@ public:
     /// operations.
     /// @param filter_bson  A bson `Document` representing the match criteria.
     /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
-    /// @param completion_block The result of the attempt to update a document.
-    void find_one_and_update(
-        const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson,
-        std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the attempt to update a document.
+    void find_one_and_update(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson,
+                             ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -251,11 +246,10 @@ public:
     /// @param filter_bson  A `Document` that should match the query.
     /// @param replacement_bson  A `Document` describing the update.
     /// @param options Optional `FindOneAndModifyOptions` to use when executing the command.
-    /// @param completion_block The result of the attempt to replace a document.
-    void find_one_and_replace(
-        const bson::BsonDocument& filter_bson, const bson::BsonDocument& replacement_bson,
-        FindOneAndModifyOptions options,
-        std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the attempt to replace a document.
+    void find_one_and_replace(const bson::BsonDocument& filter_bson, const bson::BsonDocument& replacement_bson,
+                              const FindOneAndModifyOptions& options,
+                              ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -265,10 +259,9 @@ public:
     /// find and update operations.
     /// @param filter_bson  A `Document` that should match the query.
     /// @param replacement_bson  A `Document` describing the update.
-    /// @param completion_block The result of the attempt to replace a document.
-    void find_one_and_replace(
-        const bson::BsonDocument& filter_bson, const bson::BsonDocument& replacement_bson,
-        std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the attempt to replace a document.
+    void find_one_and_replace(const bson::BsonDocument& filter_bson, const bson::BsonDocument& replacement_bson,
+                              ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before
@@ -278,10 +271,9 @@ public:
     /// delete operations.
     /// @param filter_bson  A `Document` that should match the query.
     /// @param options Optional `FindOneAndModifyOptions` to use when executing the command.
-    /// @param completion_block The result of the attempt to delete a document.
-    void find_one_and_delete(
-        const bson::BsonDocument& filter_bson, FindOneAndModifyOptions options,
-        std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the attempt to delete a document.
+    void find_one_and_delete(const bson::BsonDocument& filter_bson, const FindOneAndModifyOptions& options,
+                             ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before
@@ -290,56 +282,51 @@ public:
     /// other update operations changing the document between separate find and
     /// delete operations.
     /// @param filter_bson  A `Document` that should match the query.
-    /// @param completion_block The result of the attempt to delete a document.
-    void find_one_and_delete(
-        const bson::BsonDocument& filter_bson,
-        std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+    /// @param completion The result of the attempt to delete a document.
+    void find_one_and_delete(const bson::BsonDocument& filter_bson,
+                             ResponseHandler<util::Optional<bson::BsonDocument>>&& completion);
 
     // The following methods are equivalent to the ones without _bson suffix with the exception
     // that they return the raw bson response from the function instead of attempting to parse it.
 
-    void find_bson(const bson::BsonDocument& filter_bson, FindOptions options,
-                   std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void find_bson(const bson::BsonDocument& filter_bson, const FindOptions& options,
+                   ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
-    void find_one_bson(const bson::BsonDocument& filter_bson, FindOptions options,
-                       std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void find_one_bson(const bson::BsonDocument& filter_bson, const FindOptions& options,
+                       ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
-    void aggregate_bson(const bson::BsonArray& pipeline,
-                        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void aggregate_bson(const bson::BsonArray& pipeline, ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     void count_bson(const bson::BsonDocument& filter_bson, int64_t limit,
-                    std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+                    ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     void insert_one_bson(const bson::BsonDocument& value_bson,
-                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+                         ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
-    void insert_many_bson(bson::BsonArray documents,
-                          std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void insert_many_bson(const bson::BsonArray& documents, ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     void delete_one_bson(const bson::BsonDocument& filter_bson,
-                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+                         ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     void delete_many_bson(const bson::BsonDocument& filter_bson,
-                          std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+                          ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     void update_one_bson(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson, bool upsert,
-                         std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+                         ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     void update_many_bson(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson, bool upsert,
-                          std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+                          ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
-    void find_one_and_update_bson(
-        const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson, FindOneAndModifyOptions options,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void find_one_and_update_bson(const bson::BsonDocument& filter_bson, const bson::BsonDocument& update_bson,
+                                  const FindOneAndModifyOptions& options,
+                                  ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
-    void find_one_and_replace_bson(
-        const bson::BsonDocument& filter_bson, const bson::BsonDocument& replacement_bson,
-        FindOneAndModifyOptions options,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void find_one_and_replace_bson(const bson::BsonDocument& filter_bson, const bson::BsonDocument& replacement_bson,
+                                   const FindOneAndModifyOptions& options,
+                                   ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
-    void find_one_and_delete_bson(
-        const bson::BsonDocument& filter_bson, FindOneAndModifyOptions options,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+    void find_one_and_delete_bson(const bson::BsonDocument& filter_bson, const FindOneAndModifyOptions& options,
+                                  ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     /*
      * SDKs should also support a watch method with the following 3 overloads:
@@ -359,16 +346,11 @@ public:
 private:
     friend class MongoDatabase;
 
-    MongoCollection(std::string name, std::string database_name, std::shared_ptr<SyncUser> user,
-                    std::shared_ptr<AppServiceClient> service, std::string service_name)
-        : m_name(std::move(name))
-        , m_database_name(std::move(database_name))
-        , m_base_operation_args({{"database", m_database_name}, {"collection", m_name}})
-        , m_user(std::move(user))
-        , m_service(std::move(service))
-        , m_service_name(std::move(service_name))
-    {
-    }
+    MongoCollection(const std::string& name, const std::string& database_name, const std::shared_ptr<SyncUser>& user,
+                    const std::shared_ptr<AppServiceClient>& service, const std::string& service_name);
+
+    void call_function(const char* name, const bson::BsonDocument& arg,
+                       ResponseHandler<util::Optional<bson::Bson>>&& completion);
 
     /// The name of this collection.
     std::string m_name;

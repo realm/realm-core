@@ -1275,12 +1275,10 @@ public:
             }
         }
     }
-    std::shared_ptr<bool> add_task(const std::function<void()>& the_job)
+    std::shared_ptr<bool> add_task(util::UniqueFunction<void()>&& the_job)
     {
-        Task t{std::make_shared<bool>(false), the_job};
-
-        m_tasks.push_back(t);
-        return t.may_run;
+        m_tasks.push_back(Task{std::make_shared<bool>(false), std::move(the_job)});
+        return m_tasks.back().may_run;
     }
     bool has_tasks()
     {
@@ -1290,7 +1288,7 @@ public:
 private:
     struct Task {
         std::shared_ptr<bool> may_run;
-        std::function<void()> the_job;
+        util::UniqueFunction<void()> the_job;
     };
     std::vector<Task> m_tasks;
 };
@@ -1311,20 +1309,18 @@ TEST_CASE("SharedRealm: async_writes_2") {
     auto realm = Realm::get_shared_realm(config);
     int write_nr = 0;
     int commit_nr = 0;
+    auto table = realm->read_group().get_table("class_object");
+    auto col = table->get_column_key("value");
     LooperDelegate ld;
     std::shared_ptr<bool> t1_rdy = ld.add_task([&]() {
         REQUIRE(write_nr == 0);
         ++write_nr;
-        auto table = realm->read_group().get_table("class_object");
-        auto col = table->get_column_key("value");
         table->create_object().set(col, 45);
         realm->cancel_transaction();
     });
     std::shared_ptr<bool> t2_rdy = ld.add_task([&]() {
         REQUIRE(write_nr == 1);
         ++write_nr;
-        auto table = realm->read_group().get_table("class_object");
-        auto col = table->get_column_key("value");
         table->create_object().set(col, 45);
         realm->async_commit_transaction([&]() {
             REQUIRE(commit_nr == 0);
@@ -1333,8 +1329,6 @@ TEST_CASE("SharedRealm: async_writes_2") {
     });
     std::shared_ptr<bool> t3_rdy = ld.add_task([&]() {
         ++write_nr;
-        auto table = realm->read_group().get_table("class_object");
-        auto col = table->get_column_key("value");
         auto o = table->get_object(0);
         o.set(col, o.get<int64_t>(col) + 37);
         realm->async_commit_transaction([&]() {
@@ -1379,8 +1373,8 @@ TEST_CASE("SharedRealm: notifications") {
 
     struct Context : BindingContext {
         size_t* change_count;
-        std::function<void()> did_change_fn;
-        std::function<void()> changes_available_fn;
+        util::UniqueFunction<void()> did_change_fn;
+        util::UniqueFunction<void()> changes_available_fn;
 
         Context(size_t* out)
             : change_count(out)

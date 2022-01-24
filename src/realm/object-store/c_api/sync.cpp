@@ -545,7 +545,7 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
                                                              void* userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
-    std::function<void(std::error_code)> cb =
+    util::UniqueFunction<void(std::error_code)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](std::error_code e) {
             if (e) {
                 std::string error_code_message;
@@ -563,7 +563,7 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
                                                            realm_sync_upload_completion_func_t done, void* userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
-    std::function<void(std::error_code)> cb =
+    util::UniqueFunction<void(std::error_code)> cb =
         [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](std::error_code e) {
             if (e) {
                 std::string error_code_message;

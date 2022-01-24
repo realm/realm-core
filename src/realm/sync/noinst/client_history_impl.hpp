@@ -241,7 +241,7 @@ public: // Stuff in this section is only used by CLI tools.
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
     /// of local origin. This should only be used for testing and defaults to calling
     /// generate_changeset_timestamp().
-    void set_local_origin_timestamp_source(std::function<timestamp_type()> source_fn);
+    void set_local_origin_timestamp_source(util::UniqueFunction<timestamp_type()> source_fn);
 
 public: // Stuff in this section is only used by tests.
     // virtual void set_client_file_ident_in_wt() sets the client file ident.
@@ -365,7 +365,7 @@ private:
 
     version_type m_version_of_oldest_bound_snapshot = 0;
 
-    std::function<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
+    util::UniqueFunction<timestamp_type()> m_local_origin_timestamp_source = generate_changeset_timestamp;
 
     void initialize(DB& db) noexcept
     {

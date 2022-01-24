@@ -19,10 +19,9 @@
 #ifndef REALM_GENERIC_NETWORK_TRANSPORT_HPP
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
-#include <realm/util/to_string.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/util/optional.hpp>
 
-#include <functional>
 #include <iosfwd>
 #include <map>
 #include <memory>
@@ -30,8 +29,7 @@
 #include <system_error>
 #include <vector>
 
-namespace realm {
-namespace app {
+namespace realm::app {
 
 enum class ClientErrorCode { user_not_found = 1, user_not_logged_in = 2, app_deallocated = 3 };
 
@@ -220,12 +218,11 @@ struct Response {
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
-    virtual void send_request_to_server(const Request request,
-                                        std::function<void(const Response)> completionBlock) = 0;
+    virtual void send_request_to_server(Request&& request,
+                                        util::UniqueFunction<void(const Response&)>&& completionBlock) = 0;
     virtual ~GenericNetworkTransport() = default;
 };
 
-} // namespace app
-} // namespace realm
+} // namespace realm::app
 
 #endif /* REALM_GENERIC_NETWORK_TRANSPORT_HPP */

@@ -88,7 +88,7 @@ bool set_string_compare_method(string_compare_method_t method, StringCompareCall
 #endif
     }
     else if (method == STRING_COMPARE_CALLBACK) {
-        string_compare_callback = callback;
+        string_compare_callback = std::move(callback);
     }
 
     // other success actions

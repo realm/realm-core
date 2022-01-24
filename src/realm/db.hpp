@@ -369,8 +369,8 @@ public:
     // files through a DB.
     // It is safe to delete/replace realm files inside the callback.
     // WARNING: It is not safe to delete the lock file in the callback.
-    using CallbackWithLock = std::function<void(const std::string& realm_path)>;
-    static bool call_with_lock(const std::string& realm_path, CallbackWithLock callback);
+    using CallbackWithLock = util::FunctionRef<void(const std::string& realm_path)>;
+    static bool call_with_lock(const std::string& realm_path, CallbackWithLock&& callback);
 
     enum CoreFileType : uint8_t {
         Lock,
