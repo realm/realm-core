@@ -1186,6 +1186,37 @@ TEST_CASE("SharedRealm: async writes") {
                                   "an error");
         REQUIRE(realm->is_closed());
     }
+    SECTION("exception thrown from async commit completion callback with error handler") {
+        Realm::AsyncHandle h;
+        realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
+            REQUIRE(error);
+            REQUIRE_THROWS_CONTAINING(std::rethrow_exception(error), "an error");
+            CHECK(handle == h);
+            done = true;
+        });
+
+        realm->begin_transaction();
+        table->create_object();
+        h = realm->async_commit_transaction([&] {
+            throw std::runtime_error("an error");
+        });
+        util::EventLoop::main().run_until([&] {
+            return done;
+        });
+        verify_persisted();
+    }
+    SECTION("exception thrown from async commit completion callback without error handler") {
+        realm->begin_transaction();
+        table->create_object();
+        realm->async_commit_transaction([&] {
+            throw std::runtime_error("an error");
+        });
+        REQUIRE_THROWS_CONTAINING(util::EventLoop::main().run_until([&] {
+            return false;
+        }),
+                                  "an error");
+        REQUIRE(table->size() == 1);
+    }
     SECTION("Canceling async transaction") {
         auto handle = realm->async_begin_transaction([&]() {
             table->create_object().set(col, 45);

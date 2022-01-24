@@ -666,12 +666,23 @@ void Realm::call_completion_callbacks()
             std::rethrow_exception(error);
     }
 
-    for (auto& cb : m_async_commit_q) {
-        if (cb.when_completed)
-            cb.when_completed();
-    }
-
+    auto completions = std::move(m_async_commit_q);
     m_async_commit_q.clear();
+    for (auto& cb : completions) {
+        if (!cb.when_completed)
+            continue;
+        if (m_async_exception_handler) {
+            try {
+                cb.when_completed();
+            }
+            catch (...) {
+                m_async_exception_handler(cb.handle, std::current_exception());
+            }
+        }
+        else {
+            cb.when_completed();
+        }
+    }
 }
 
 void Realm::run_async_completions()
