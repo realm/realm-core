@@ -275,12 +275,25 @@ struct FakeLocalClientReset : public TestClientReset {
     {
         m_did_run = true;
         auto local_realm = Realm::get_shared_realm(m_local_config);
-        local_realm->begin_transaction();
         if (m_on_setup) {
-            m_on_setup(local_realm); // FIXME: update sync history to mark this as uploaded such that it doesn't
-                                     // replay during recovery.
+            local_realm->begin_transaction();
+            m_on_setup(local_realm);
+            local_realm->commit_transaction();
+
+            // Update the sync history to mark this initial setup state as if it
+            // has been uploaded so that it doesn't replay during recovery.
+            auto history_local =
+                dynamic_cast<sync::ClientHistory*>(local_realm->read_group().get_replication()->_get_history_write());
+            REALM_ASSERT(history_local);
+            sync::version_type current_version;
+            sync::SaltedFileIdent file_ident;
+            sync::SyncProgress progress;
+            history_local->get_status(current_version, file_ident, progress);
+            progress.upload.client_version = current_version;
+            progress.upload.last_integrated_server_version = current_version;
+            sync::VersionInfo info_out;
+            history_local->set_sync_progress(progress, nullptr, info_out);
         }
-        local_realm->commit_transaction();
         constexpr int64_t shared_pk = -42;
         {
             local_realm->begin_transaction();

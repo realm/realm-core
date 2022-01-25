@@ -38,6 +38,7 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include <algorithm>
 #include <iostream>
 
 struct ThreadSafeSyncError {
@@ -97,9 +98,8 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
     FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
-
+/*
 #if REALM_ENABLE_AUTH_TESTS
-
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
         return;
@@ -1780,14 +1780,77 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
         }
     }
 }
-/*
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard local][collections]",
-                   cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
-                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
+*/
+namespace test_instructions {
+
+struct Add {
+    Add(int64_t key)
+        : pk(key)
+    {
+    }
+    int64_t pk;
+};
+struct Remove {
+    Remove(int64_t key)
+        : pk(key)
+    {
+    }
+    int64_t pk;
+};
+struct Clear {
+};
+
+struct CollectionOperation {
+    CollectionOperation(Add op)
+        : m_type(Type::Add)
+        , m_link_pk(op.pk)
+    {
+    }
+    CollectionOperation(Remove op)
+        : m_type(Type::Remove)
+        , m_link_pk(op.pk)
+    {
+    }
+    CollectionOperation(Clear)
+        : m_type(Type::Clear)
+        , m_link_pk(-1)
+    {
+    }
+    void apply(collection_fixtures::LinkedCollectionBase* collection, Obj src_obj, TableRef dst_table)
+    {
+        switch (m_type) {
+            case Type::Add: {
+                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{m_link_pk});
+                collection->add_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                break;
+            }
+            case Type::Remove: {
+                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{m_link_pk});
+                bool did_remove = collection->remove_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                REALM_ASSERT(did_remove);
+                break;
+            }
+            case Type::Clear:
+                collection->clear_collection(src_obj);
+                break;
+        }
+    }
+
+private:
+    enum class Type { Add, Remove, Clear } m_type;
+    int64_t m_link_pk;
+};
+
+} // namespace test_instructions
+
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][collections]", cf::ListOfObjects,
+                   cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
+                   cf::DictionaryOfMixedLinks)
 {
     if (!util::EventLoop::has_implementation())
         return;
 
+    using namespace test_instructions;
     const std::string valid_pk_name = "_id";
     const auto partition = random_string(100);
     const std::string collection_prop_name = "collection";
@@ -1815,7 +1878,8 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    config.sync_config->client_resync_mode = test_mode;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = schema;
@@ -1873,146 +1937,158 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
             results_changes = std::move(changes);
         });
     };
-    auto set_links = [&](SharedRealm realm, std::vector<int64_t>& link_pks) {
+    auto apply_instructions = [&](SharedRealm realm, std::vector<CollectionOperation>& instructions) {
         TableRef src_table = get_table(*realm, "source");
         REQUIRE(src_table->size() == 1);
         TableRef dst_table = get_table(*realm, "dest");
         std::vector<Obj> linked_objects = test_type.get_links(*src_table->begin());
-        if (is_array(test_type.property().type)) {
-            // order matters for lists, leave it be if they are identical,
-            // otherwise clear and add everything in the correct order
-            bool equal = std::equal(linked_objects.begin(), linked_objects.end(), link_pks.begin(), link_pks.end(),
-                                    [&](const Obj& obj, const int64_t& pk) {
-                                        return obj.get_primary_key().template get<int64_t>() == pk;
-                                    });
-            if (!equal) {
-                test_type.clear_collection(*src_table->begin());
-                for (size_t i = 0; i < link_pks.size(); ++i) {
-                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{link_pks[i]});
-                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
-                }
-            }
-        }
-        else {
-            for (auto lnk : linked_objects) {
-                int64_t lnk_pk = lnk.get_primary_key().get<int64_t>();
-                if (std::find(link_pks.begin(), link_pks.end(), lnk_pk) == link_pks.end()) {
-                    test_type.remove_link(*src_table->begin(), ObjLink{lnk.get_table()->get_key(), lnk.get_key()});
-                }
-            }
-            REQUIRE(dst_table);
-            for (int64_t lnk_pk : link_pks) {
-                if (std::find_if(linked_objects.begin(), linked_objects.end(), [lnk_pk](auto& lnk) {
-                        return lnk.get_primary_key().template get<int64_t>() == lnk_pk;
-                    }) == linked_objects.end()) {
-                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{lnk_pk});
-                    REQUIRE(dst_key);
-                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
-                }
-            }
+
+        for (auto& instruction : instructions) {
+            instruction.apply(&test_type, *src_table->begin(), dst_table);
         }
     };
 
-    SECTION("integration testing") {
-        auto reset_collection = [&](std::vector<int64_t> local_pk_links, std::vector<int64_t> remote_pk_links) {
-            test_reset
-                ->make_local_changes([&](SharedRealm local_realm) {
-                    set_links(local_realm, local_pk_links);
-                })
-                ->make_remote_changes([&](SharedRealm remote_realm) {
-                    set_links(remote_realm, remote_pk_links);
-                })
-                ->on_post_local_changes([&](SharedRealm realm) {
-                    setup_listeners(realm);
-                    REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(results.size() == 1);
-                    auto linked_objects = test_type.get_links(results.get(0));
-                    require_links_to_match_ids(linked_objects, local_pk_links);
-                })
-                ->on_post_reset([&](SharedRealm realm) {
-                    object_changes = {};
-                    results_changes = {};
-                    REQUIRE_NOTHROW(advance_and_notify(*realm));
-                    CHECK(results.size() == 1);
-                    CHECK(object.is_valid());
-                    auto linked_objects = test_type.get_links(results.get(0));
-                    require_links_to_match_ids(linked_objects, remote_pk_links);
-                    if (!is_array(test_type.property().type)) {
-                        // order should not matter except for lists
-                        std::sort(local_pk_links.begin(), local_pk_links.end());
-                        std::sort(remote_pk_links.begin(), remote_pk_links.end());
-                    }
-                    if (local_pk_links == remote_pk_links) {
-                        REQUIRE_INDICES(results_changes.modifications);
-                        REQUIRE_INDICES(object_changes.modifications);
-                    }
-                    else {
-                        REQUIRE_INDICES(results_changes.modifications, 0);
-                        REQUIRE_INDICES(object_changes.modifications, 0);
-                    }
-                    REQUIRE_INDICES(results_changes.insertions);
-                    REQUIRE_INDICES(results_changes.deletions);
-                    REQUIRE_INDICES(object_changes.insertions);
-                    REQUIRE_INDICES(object_changes.deletions);
-                })
-                ->run();
-        };
+    auto reset_collection = [&](std::vector<CollectionOperation>&& local_ops,
+                                std::vector<CollectionOperation>&& remote_ops,
+                                std::vector<int64_t>&& expected_recovered_state) {
+        std::vector<int64_t> remote_pks;
+        std::vector<int64_t> local_pks;
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                apply_instructions(local_realm, local_ops);
+                TableRef source = ObjectStore::table_for_object_type(local_realm->read_group(), "source");
+                REALM_ASSERT(source && source->size() == 1);
+                auto local_links = test_type.get_links(*source->begin());
+                std::transform(local_links.begin(), local_links.end(), std::back_inserter(local_pks),
+                               [](auto obj) -> int64_t {
+                                   return obj.get_primary_key().get_int();
+                               });
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                apply_instructions(remote_realm, remote_ops);
+                TableRef source = ObjectStore::table_for_object_type(remote_realm->read_group(), "source");
+                REALM_ASSERT(source && source->size() == 1);
+                auto remote_links = test_type.get_links(*source->begin());
+                std::transform(remote_links.begin(), remote_links.end(), std::back_inserter(remote_pks),
+                               [](auto obj) -> int64_t {
+                                   return obj.get_primary_key().get_int();
+                               });
+            })
+            ->on_post_local_changes([&](SharedRealm realm) {
+                setup_listeners(realm);
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                CHECK(results.size() == 1);
+            })
+            ->on_post_reset([&](SharedRealm realm) {
+                object_changes = {};
+                results_changes = {};
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                CHECK(results.size() == 1);
+                CHECK(object.is_valid());
+                auto linked_objects = test_type.get_links(results.get(0));
+                std::vector<int64_t>& expected_links = remote_pks;
+                if (test_mode == ClientResyncMode::Recover) {
+                    expected_links = expected_recovered_state;
+                }
+                require_links_to_match_ids(linked_objects, expected_links);
+                if (!is_array(test_type.property().type)) {
+                    // order should not matter except for lists
+                    std::sort(local_pks.begin(), local_pks.end());
+                    std::sort(expected_links.begin(), expected_links.end());
+                }
+                if (local_pks == expected_links) {
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(object_changes.modifications);
+                }
+                else {
+                    REQUIRE_INDICES(results_changes.modifications, 0);
+                    REQUIRE_INDICES(object_changes.modifications, 0);
+                }
+                REQUIRE_INDICES(results_changes.insertions);
+                REQUIRE_INDICES(results_changes.deletions);
+                REQUIRE_INDICES(object_changes.insertions);
+                REQUIRE_INDICES(object_changes.deletions);
+            })
+            ->run();
+    };
 
-        constexpr int64_t source_pk = 0;
-        constexpr int64_t dest_pk_1 = 1;
-        constexpr int64_t dest_pk_2 = 2;
-        constexpr int64_t dest_pk_3 = 3;
-        test_reset->setup([&](SharedRealm realm) {
-            test_type.reset_test_state();
-            // add a container collection with three valid links
-            ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
-            ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
-            ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
-            create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
-        });
+    constexpr int64_t source_pk = 0;
+    constexpr int64_t dest_pk_1 = 1;
+    constexpr int64_t dest_pk_2 = 2;
+    constexpr int64_t dest_pk_3 = 3;
+    test_reset->setup([&](SharedRealm realm) {
+        test_type.reset_test_state();
+        // add a container collection with three valid links
+        ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
+        ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
+        ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
+        create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+    });
 
-        SECTION("both empty") {
-            reset_collection({}, {});
-        }
-        SECTION("remove all") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {});
-        }
-        SECTION("no change") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        }
-        SECTION("remove middle link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
-        }
-        SECTION("remove first link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2, dest_pk_3});
-        }
-        SECTION("remove last link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2});
-        }
-        SECTION("remove outside links") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
-        }
-        SECTION("additive") {
-            reset_collection({}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        }
-        SECTION("add middle") {
-            reset_collection({dest_pk_1, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        }
-        SECTION("add first") {
-            reset_collection({dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        }
-        SECTION("add last") {
-            reset_collection({dest_pk_1, dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        }
-        SECTION("add outside") {
-            reset_collection({dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
-        }
-        SECTION("reversed order") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
-        }
+    SECTION("no changes") {
+        reset_collection({}, {}, {dest_pk_1, dest_pk_2, dest_pk_3});
     }
-}
+    SECTION("remote removes all") {
+        reset_collection({}, {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
+    }
+    SECTION("local removes all") {
+        reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {}, {});
+    }
+    SECTION("both remove all links") {
+        reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}},
+                         {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
+    }
+    SECTION("local removes first link") {
+        reset_collection({{Remove{dest_pk_1}}}, {}, {dest_pk_2, dest_pk_3});
+    }
+    SECTION("local removes middle link") {
+        reset_collection({{Remove{dest_pk_2}}}, {}, {dest_pk_1, dest_pk_3});
+    }
+    SECTION("local removes last link") {
+        reset_collection({{Remove{dest_pk_3}}}, {}, {dest_pk_1, dest_pk_2});
+    }
+    SECTION("remote removes first link") {
+        reset_collection({}, {{Remove{dest_pk_1}}}, {dest_pk_2, dest_pk_3});
+    }
+    SECTION("remote removes middle link") {
+        reset_collection({}, {{Remove{dest_pk_2}}}, {dest_pk_1, dest_pk_3});
+    }
+    SECTION("remote removes last link") {
+        reset_collection({}, {{Remove{dest_pk_3}}}, {dest_pk_1, dest_pk_2});
+    }
+    SECTION("removal of different links") {
+        reset_collection({Remove{dest_pk_1}}, {Remove{dest_pk_3}}, {dest_pk_2});
+    }
+    SECTION("local clear") {
+        reset_collection({Clear{}}, {}, {});
+    }
+    SECTION("remote clear") {
+        reset_collection({}, {Clear{}}, {});
+    }
+    SECTION("both clear") {
+        reset_collection({Clear{}}, {Clear{}}, {});
+    }
 
+    //    SECTION("additive") {
+    //        reset_collection({}, {dest_pk_1, dest_pk_2, dest_pk_3}, {});
+    //    }
+    //    SECTION("add middle") {
+    //        reset_collection({dest_pk_1, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
+    //    }
+    //    SECTION("add first") {
+    //        reset_collection({dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2, dest_pk_3});
+    //    }
+    //    SECTION("add last") {
+    //        reset_collection({dest_pk_1, dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2});
+    //    }
+    //    SECTION("add outside") {
+    //        reset_collection({dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
+    //    }
+    //    SECTION("reversed order") {
+    //        reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
+    //    }
+}
+/*
 TEST_CASE("client reset with embedded object", "[client reset][discard local][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
