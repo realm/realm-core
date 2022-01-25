@@ -24,14 +24,6 @@ void ClientProtocol::make_bind_message(int protocol_version, OutputBuffer& out, 
     out.write(signed_user_token.data(), signed_user_token.size()); // Throws
 }
 
-void ClientProtocol::make_refresh_message(OutputBuffer& out, session_ident_type session_ident,
-                                          const std::string& signed_user_token)
-{
-    out << "refresh " << session_ident << " " << signed_user_token.size() << "\n"; // Throws
-    out.write(signed_user_token.data(), signed_user_token.size());                 // Throws
-    REALM_ASSERT(!out.fail());
-}
-
 void ClientProtocol::make_pbs_ident_message(OutputBuffer& out, session_ident_type session_ident,
                                             SaltedFileIdent client_file_ident, const SyncProgress& progress)
 {
