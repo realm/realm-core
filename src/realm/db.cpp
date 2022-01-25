@@ -2131,6 +2131,11 @@ void DB::finish_begin_write()
         throw std::runtime_error("Crash of other process detected, session restart required");
     }
 
+
+    {
+        std::lock_guard local_lock(m_mutex);
+        m_write_transaction_open = true;
+    }
     m_alloc.set_read_only(false);
 }
 
@@ -2143,6 +2148,7 @@ void DB::do_end_write() noexcept
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
 
+    REALM_ASSERT(m_write_transaction_open);
     m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
