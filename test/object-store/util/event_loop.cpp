@@ -17,8 +17,9 @@
  **************************************************************************/
 
 #include "util/event_loop.hpp"
-#include <realm/object-store/util/event_loop_dispatcher.hpp>
 
+#include <realm/object-store/util/event_loop_dispatcher.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/util/features.h>
 
 #include <mutex>
@@ -186,8 +187,10 @@ void EventLoop::Impl::run_until(util::FunctionRef<bool()> predicate)
         }
     });
 
+    auto cleanup = make_scope_exit([&]() noexcept {
+        uv_idle_stop(observer.idle);
+    });
     uv_run(m_loop, UV_RUN_DEFAULT);
-    uv_idle_stop(observer.idle);
 }
 
 void EventLoop::Impl::perform(util::UniqueFunction<void()> f)
@@ -233,9 +236,11 @@ void EventLoop::Impl::run_until(util::FunctionRef<bool()> predicate)
         }));
     CFRunLoopAddObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
     CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer.get(), kCFRunLoopCommonModes);
+    auto cleanup = make_scope_exit([&]() noexcept {
+        CFRunLoopRemoveTimer(CFRunLoopGetCurrent(), timer.get(), kCFRunLoopCommonModes);
+        CFRunLoopRemoveObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
+    });
     CFRunLoopRun();
-    CFRunLoopRemoveTimer(CFRunLoopGetCurrent(), timer.get(), kCFRunLoopCommonModes);
-    CFRunLoopRemoveObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
 }
 
 void EventLoop::Impl::perform(util::UniqueFunction<void()> func)
