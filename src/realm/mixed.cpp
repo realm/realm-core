@@ -131,7 +131,7 @@ inline int compare_decimals(Decimal128 lhs, Decimal128 rhs)
 
 inline int compare_decimal_to_double(Decimal128 lhs, double rhs)
 {
-    return lhs.compare(Decimal128(rhs)); // FIXME: slow and not accurate in all cases
+    return lhs.compare(Decimal128(rhs));
 }
 
 // This is the tricky one. Needs to support the following cases:
