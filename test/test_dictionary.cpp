@@ -406,7 +406,7 @@ TEST(Dictionary_Aggregate)
     CHECK_EQUAL(ndx, realm::npos);
 }
 
-TEST(Dictionary_Performance)
+NONCONCURRENT_TEST(Dictionary_Performance)
 {
     size_t nb_reps = 1000;
 

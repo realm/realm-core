@@ -5535,7 +5535,7 @@ TEST_IF(Query_OptimalNode, false)
     // std::cout << "cnt: " << cnt << " dur3: " << dur3 << " us" << std::endl;
 }
 
-TEST(Query_IntPerformance)
+NONCONCURRENT_TEST(Query_IntPerformance)
 {
     Table table;
     auto col_1 = table.add_column(type_Int, "1");
