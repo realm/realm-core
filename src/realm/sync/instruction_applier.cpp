@@ -849,6 +849,66 @@ void InstructionApplier::resolve_list(const Instruction::PathInstruction& instr,
     resolve_path(instr, instr_name, std::move(callback));
 }
 
+void InstructionApplier::resolve_if_list(const Instruction::PathInstruction& instr, const char* instr_name,
+                                         util::UniqueFunction<void(LstBase&)> list_callback)
+{
+    auto callback = util::overload{[&](LstBase& list, size_t) {
+                                       list_callback(list);
+                                   },
+                                   [&](LstBase& list) {
+                                       list_callback(list);
+                                   },
+                                   [&](SetBase&) {},
+                                   [&](Dictionary&) {},
+                                   [&](Dictionary&, Mixed) {},
+                                   [&](Obj&, ColKey) {}};
+    resolve_path(instr, instr_name, std::move(callback));
+}
+
+bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
+{
+    bool valid_payload = true;
+    using Type = Instruction::Payload::Type;
+    if (payload.type == Type::Link) {
+        StringData class_name = get_string(payload.data.link.target_table);
+        Group::TableNameBuffer buffer;
+        StringData target_table_name = Group::class_name_to_table_name(class_name, buffer);
+        TableRef target_table = m_transaction.get_table(target_table_name);
+        if (!target_table) {
+            bad_transaction_log("Link with invalid target table '%1'", target_table_name);
+        }
+        if (target_table->is_embedded()) {
+            bad_transaction_log("Link to embedded table '%1'", target_table_name);
+        }
+        Mixed linked_pk = mpark::visit(
+            util::overload{
+                [&](mpark::monostate) {
+                    return Mixed{};
+                },
+                [&](int64_t pk) {
+                    return Mixed{pk};
+                },
+                [&](InternString interned_pk) {
+                    return Mixed{get_string(interned_pk)};
+                },
+                [&](GlobalKey) {
+                    REALM_UNREACHABLE(); // unexpected link to embedded object when validating a primary key
+                    return Mixed{};
+                },
+                [&](ObjectId pk) {
+                    return Mixed{pk};
+                },
+                [&](UUID pk) {
+                    return Mixed{pk};
+                }},
+            payload.data.link.target);
+
+        if (!target_table->find_primary_key(linked_pk)) {
+            valid_payload = false;
+        }
+    }
+    return valid_payload;
+}
 
 void InstructionApplier::operator()(const Instruction::SetInsert& instr)
 {

@@ -1790,6 +1790,7 @@ struct Add {
     }
     int64_t pk;
 };
+
 struct Remove {
     Remove(int64_t key)
         : pk(key)
@@ -1797,7 +1798,16 @@ struct Remove {
     }
     int64_t pk;
 };
+
 struct Clear {
+};
+
+struct RemoveObject {
+    RemoveObject(int64_t key)
+        : pk(key)
+    {
+    }
+    int64_t pk;
 };
 
 struct CollectionOperation {
@@ -1808,6 +1818,11 @@ struct CollectionOperation {
     }
     CollectionOperation(Remove op)
         : m_type(Type::Remove)
+        , m_link_pk(op.pk)
+    {
+    }
+    CollectionOperation(RemoveObject op)
+        : m_type(Type::RemoveDestObject)
         , m_link_pk(op.pk)
     {
     }
@@ -1830,6 +1845,11 @@ struct CollectionOperation {
                 REALM_ASSERT(did_remove);
                 break;
             }
+            case Type::RemoveDestObject: {
+                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{m_link_pk});
+                collection->remove_linked_object(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                break;
+            }
             case Type::Clear:
                 collection->clear_collection(src_obj);
                 break;
@@ -1837,7 +1857,7 @@ struct CollectionOperation {
     }
 
 private:
-    enum class Type { Add, Remove, Clear } m_type;
+    enum class Type { Add, Remove, Clear, RemoveDestObject } m_type;
     int64_t m_link_pk;
 };
 
@@ -1855,6 +1875,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
     const auto partition = random_string(100);
     const std::string collection_prop_name = "collection";
     TestType test_type(collection_prop_name, "dest");
+    constexpr bool test_type_is_array = realm::is_any_v<TestType, cf::ListOfObjects, cf::ListOfMixedLinks>;
     Schema schema = {
         {"source",
          {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
@@ -1991,7 +2012,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
                     expected_links = expected_recovered_state;
                 }
                 require_links_to_match_ids(linked_objects, expected_links);
-                if (!is_array(test_type.property().type)) {
+                if constexpr (!test_type_is_array) {
                     // order should not matter except for lists
                     std::sort(local_pks.begin(), local_pks.end());
                     std::sort(expected_links.begin(), expected_links.end());
@@ -2016,12 +2037,16 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
     constexpr int64_t dest_pk_1 = 1;
     constexpr int64_t dest_pk_2 = 2;
     constexpr int64_t dest_pk_3 = 3;
+    constexpr int64_t dest_pk_4 = 4;
+    constexpr int64_t dest_pk_5 = 5;
     test_reset->setup([&](SharedRealm realm) {
         test_type.reset_test_state();
         // add a container collection with three valid links
         ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
         ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
         ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
+        ObjLink dest4 = create_one_dest_object(realm, dest_pk_4);
+        ObjLink dest5 = create_one_dest_object(realm, dest_pk_5);
         create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
     });
 
@@ -2031,20 +2056,20 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
     SECTION("remote removes all") {
         reset_collection({}, {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
     }
-    SECTION("local removes all") {
+    SECTION("local removes all") { // local client state wins
         reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {}, {});
     }
-    SECTION("both remove all links") {
+    SECTION("both remove all links") { // local client state wins
         reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}},
                          {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
     }
-    SECTION("local removes first link") {
+    SECTION("local removes first link") { // local client state wins
         reset_collection({{Remove{dest_pk_1}}}, {}, {dest_pk_2, dest_pk_3});
     }
-    SECTION("local removes middle link") {
+    SECTION("local removes middle link") { // local client state wins
         reset_collection({{Remove{dest_pk_2}}}, {}, {dest_pk_1, dest_pk_3});
     }
-    SECTION("local removes last link") {
+    SECTION("local removes last link") { // local client state wins
         reset_collection({{Remove{dest_pk_3}}}, {}, {dest_pk_1, dest_pk_2});
     }
     SECTION("remote removes first link") {
@@ -2057,7 +2082,44 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         reset_collection({}, {{Remove{dest_pk_3}}}, {dest_pk_1, dest_pk_2});
     }
     SECTION("removal of different links") {
-        reset_collection({Remove{dest_pk_1}}, {Remove{dest_pk_3}}, {dest_pk_2});
+        std::vector<int64_t> expected = {dest_pk_2};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_2, dest_pk_3}; // local client state wins
+        }
+        reset_collection({Remove{dest_pk_1}}, {Remove{dest_pk_3}}, std::move(expected));
+    }
+    SECTION("local addition") {
+        reset_collection({Add{dest_pk_4}}, {}, {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("remote addition") {
+        reset_collection({}, {Add{dest_pk_4}}, {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("both addition of different items") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_5});
+    }
+    SECTION("both addition of same items") {
+        std::vector<int64_t> expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_4};
+        }
+        // dictionary has added the new link to the same key on both sides
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}}, std::move(expected));
+    }
+    SECTION("local add/delete, remote add/delete/add different") {
+        reset_collection({Add{dest_pk_4}, Remove{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5});
+    }
+    SECTION("remote add/delete, local add") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("local remove, remote add") {
+        std::vector<int64_t> expected = {dest_pk_1, dest_pk_3, dest_pk_4, dest_pk_5};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_1, dest_pk_3}; // local client state wins
+        }
+        reset_collection({Remove{dest_pk_2}}, {Add{dest_pk_4}, Add{dest_pk_5}}, std::move(expected));
     }
     SECTION("local clear") {
         reset_collection({Clear{}}, {}, {});
@@ -2068,22 +2130,23 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
     SECTION("both clear") {
         reset_collection({Clear{}}, {Clear{}}, {});
     }
-
-    //    SECTION("additive") {
-    //        reset_collection({}, {dest_pk_1, dest_pk_2, dest_pk_3}, {});
-    //    }
-    //    SECTION("add middle") {
-    //        reset_collection({dest_pk_1, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
-    //    }
-    //    SECTION("add first") {
-    //        reset_collection({dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2, dest_pk_3});
-    //    }
-    //    SECTION("add last") {
-    //        reset_collection({dest_pk_1, dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2});
-    //    }
-    //    SECTION("add outside") {
-    //        reset_collection({dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
-    //    }
+    SECTION("both clear and add") {
+        reset_collection({Clear{}, Add{dest_pk_1}}, {Clear{}, Add{dest_pk_2}}, {dest_pk_1});
+    }
+    SECTION("both clear and add/remove/add/add") {
+        reset_collection({Clear{}, Add{dest_pk_1}, Remove{dest_pk_1}, Add{dest_pk_2}, Add{dest_pk_3}},
+                         {Clear{}, Add{dest_pk_1}, Remove{dest_pk_1}, Add{dest_pk_2}, Add{dest_pk_3}},
+                         {dest_pk_2, dest_pk_3});
+    }
+    SECTION("local add to remotely deleted object") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}, RemoveObject{dest_pk_4}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    SECTION("remote adds link to locally deleted object") {
+        reset_collection({Add{dest_pk_4}, RemoveObject{dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5});
+    }
+    // FIXME: move
     //    SECTION("reversed order") {
     //        reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
     //    }

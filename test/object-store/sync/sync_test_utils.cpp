@@ -269,6 +269,8 @@ struct FakeLocalClientReset : public TestClientReset {
         m_remote_config.sync_config = {};
         m_local_config.force_sync_history = true;
         m_remote_config.force_sync_history = true;
+        m_local_config.in_memory = true;
+        m_remote_config.in_memory = true;
     }
 
     void run() override

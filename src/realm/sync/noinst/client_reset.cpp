@@ -26,6 +26,8 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 
+#include <realm/util/flat_map.hpp>
+
 #include <vector>
 
 using namespace realm;
@@ -476,7 +478,7 @@ void EmbeddedObjectConverter::process_pending()
     // hashing. N is the depth to which embedded objects are connected and the upper
     // bound is the total number of tables which is finite, and is usually small.
 
-    std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters;
+    std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters; // FIXME: FlatMap
     auto get_converter = [this, &converters](ConstTableRef src_table,
                                              TableRef dst_table) -> InterRealmObjectConverter& {
         TableKey dst_table_key = dst_table->get_key();
@@ -499,13 +501,101 @@ void EmbeddedObjectConverter::process_pending()
     }
 }
 
+struct ListTracker {
+    void insert(size_t index)
+    {
+        if (m_requires_manual_copy) {
+            return;
+        }
+        else if (m_did_clear) {
+            return;
+        }
+        for (auto& ndx : m_indices_allowed) {
+            if (ndx >= index) {
+                ++ndx;
+            }
+        }
+        m_indices_allowed.push_back(index);
+    }
+
+    bool update(size_t index)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        else if (m_did_clear) {
+            return true;
+        }
+        for (auto& ndx : m_indices_allowed) {
+            if (ndx == index) {
+                return true;
+            }
+        }
+        m_requires_manual_copy = true;
+        m_indices_allowed.clear();
+        return false;
+    }
+
+    void clear()
+    {
+        // by definition, any local operations to a list after a clear are
+        // strictly on locally added elements so no need to continue tracking
+        m_requires_manual_copy = false;
+        m_did_clear = true;
+        m_indices_allowed.clear();
+    }
+
+    // FIXME: move(size_t from, size_t to)
+
+    bool remove(size_t index)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        else if (m_did_clear) {
+            return true;
+        }
+        bool found = false;
+        for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end();) {
+            if (*it == index) {
+                found = true;
+                it = m_indices_allowed.erase(it);
+                continue;
+            }
+            else if (*it > index) {
+                --*it;
+            }
+            ++it;
+        }
+        if (!found) {
+            m_requires_manual_copy = true;
+            m_indices_allowed.clear();
+            return false;
+        }
+        return true;
+    }
+
+    bool requires_manual_copy() const
+    {
+        return m_requires_manual_copy;
+    }
+
+private:
+    std::vector<size_t> m_indices_allowed;
+    bool m_requires_manual_copy = false;
+    bool m_did_clear = false;
+};
+
 struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     using Instruction = sync::Instruction;
 
     Transaction& remote;
+    Group& local;
     util::Logger& logger;
     const sync::Changeset* log;
+
+    util::FlatMap<TableKey, util::FlatMap<ObjKey, util::FlatMap<ColKey, ListTracker>>> m_tables;
 
     // The recovery fails if there seems to be conflict between the
     // instructions and state.
@@ -515,9 +605,10 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     // 2. Creation of an already existing table with another type.
     // 3. Creation of an already existing column with another type.
 
-    RecoverLocalChangesetsHandler(Transaction& remote_wt, util::Logger& logger)
+    RecoverLocalChangesetsHandler(Transaction& remote_wt, Group& local_read_group, util::Logger& logger)
         : InstructionApplier(remote_wt)
         , remote{remote_wt}
+        , local{local_read_group}
         , logger{logger}
     {
     }
@@ -547,6 +638,54 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             instr->visit(*this); // Throws
         }
         InstructionApplier::end_apply();
+
+        // Any modifications, moves or deletes to list elements which were not also created in the recovery
+        // cannot be reliably applied because there is no way to know if the indices on the server have
+        // shifted without a reliable server side history. For these lists, create a consistant state by
+        // copying over the entire list from the recovering client's state. This does create a "last recovery wins"
+        // scenario for modifications to lists, but this is only a best effort.
+        // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
+        // we would know where list elements ended up or if they were deleted by the server.
+        EmbeddedObjectConverter embedded_object_tracker;
+        for (auto table_key_it : m_tables) {
+            TableRef local_table = local.get_table(table_key_it.first);
+            TableRef remote_table = remote.get_table(local_table->get_name());
+            REALM_ASSERT(local_table);
+            REALM_ASSERT(remote_table);
+            for (auto obj_key_it : table_key_it.second) {
+                ObjKey key = obj_key_it.first;
+                if (auto local_obj = local_table->try_get_object(key)) {
+                    try {
+                        Obj remote_obj =
+                            remote_table->get_object_with_primary_key(local_obj.get_primary_key()); // throws
+                        for (auto& list_trackers : obj_key_it.second) {
+                            if (list_trackers.second.requires_manual_copy()) {
+                                ColKey local_col_key = list_trackers.first;
+                                REALM_ASSERT(local_col_key);
+                                ColKey remote_col_key =
+                                    remote_table->get_column_key(local_table->get_column_name(local_col_key));
+                                REALM_ASSERT(remote_col_key);
+                                auto remote_list = remote_obj.get_listbase_ptr(remote_col_key);
+                                REALM_ASSERT(remote_list);
+                                auto local_list = local_obj.get_listbase_ptr(list_trackers.first);
+                                REALM_ASSERT(local_list);
+                                InterRealmValueConverter value_converter(local_table, local_col_key, remote_table,
+                                                                         remote_col_key, embedded_object_tracker);
+                                copy_list(local_obj, remote_obj, value_converter, nullptr);
+                            }
+                        }
+                        embedded_object_tracker.process_pending();
+                    }
+                    catch (const KeyNotFound& e) {
+                        // object no longer exists in the remote, ignore and continue
+                        logger.warn("Discarding a list recovery made to an object which no longer exists for table "
+                                    "'%1', pk '%2'",
+                                    local_table->get_name(), local_obj.get_primary_key());
+                    }
+                }
+            }
+        }
+        embedded_object_tracker.process_pending();
     }
 
     StringData get_string(sync::InternString intern_string) const
@@ -601,8 +740,27 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::Update& instr)
     {
-        if (get_top_object(instr, "Update")) {
-            InstructionApplier::operator()(instr);
+        const char* instr_name = "Update";
+        if (!check_links_exist(instr.value)) { // FIXME: should this set to null instead of ignoring it?
+            logger.warn("Discarding an update which links to a deleted object");
+        }
+        else if (auto obj = get_top_object(instr, instr_name)) {
+            Instruction::Update instr_copy = instr;
+            bool allowed_to_update = true;
+            resolve_if_list(instr, instr_name, [&](LstBase& list) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                allowed_to_update = list_tracker.update(instr.index());
+                instr_copy.prior_size = static_cast<uint32_t>(list.size());
+            });
+            if (allowed_to_update) {
+                try {
+                    InstructionApplier::operator()(instr_copy);
+                }
+                catch (const KeyNotFound& e) {
+                    logger.warn("Discarding an update to a non existing object/key for object '%1' in '%2': '%3'",
+                                obj->get_primary_key(), obj->get_table()->get_name(), e.what());
+                }
+            }
         }
         else {
             logger.warn("Discarding a local Update made to an object which no longer exists");
@@ -621,7 +779,12 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::Clear& instr)
     {
-        if (get_top_object(instr, "Clear")) {
+        const char* instr_name = "Clear";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            resolve_if_list(instr, instr_name, [&](LstBase& list) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                list_tracker.clear();
+            });
             InstructionApplier::operator()(instr);
         }
         else {
@@ -656,9 +819,14 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         const char* instr_name = "ArrayInsert";
         // FIXME: any links being set or inserted need to be validated and if the dest object is not found then
         // ignored.
-        if (get_top_object(instr, instr_name)) {
+        if (!check_links_exist(instr.value)) {
+            logger.warn("Discarding %1 which links to a deleted object", instr_name);
+        }
+        else if (auto obj = get_top_object(instr, instr_name)) {
             Instruction::ArrayInsert instr_copy = instr;
             resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                list_tracker.insert(index);
                 instr_copy.prior_size = static_cast<uint32_t>(list.size());
                 if (index > instr_copy.prior_size) {
                     instr_copy.path.back() = instr_copy.prior_size; // FIXME: is clamping reasonable?
@@ -685,13 +853,17 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::ArrayErase& instr)
     {
         const char* instr_name = "ArrayErase";
-        if (get_top_object(instr, instr_name)) {
+        if (auto obj = get_top_object(instr, instr_name)) {
             Instruction::ArrayErase instr_copy = instr;
-            resolve_list(instr, instr_name, [&](LstBase& list, size_t /*index*/) {
+            bool allowed_to_delete = false;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                allowed_to_delete = list_tracker.remove(index);
                 instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                // FIXME: if index was not previously inserted in this recovery, fallback to diff mode.
             });
-            InstructionApplier::operator()(instr_copy);
+            if (allowed_to_delete) {
+                InstructionApplier::operator()(instr_copy);
+            }
         }
         else {
             logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
@@ -700,13 +872,18 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::SetInsert& instr)
     {
-        if (get_top_object(instr, "SetInsert")) {
+        const char* instr_name = "SetInsert";
+        if (!check_links_exist(instr.value)) {
+            logger.warn("Discarding a %1 which links to a deleted object", instr_name);
+        }
+        else if (get_top_object(instr, instr_name)) {
             InstructionApplier::operator()(instr);
         }
         else {
-            logger.warn("Discarding a local SetInsert made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
+
     void operator()(const Instruction::SetErase& instr)
     {
         if (get_top_object(instr, "SetErase")) {
@@ -1077,7 +1254,7 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         if (recover_local_changes) {
             // FIXME: keep track of current version, and apply the recovered changes, then erase the history before
             // the recovered changes
-            RecoverLocalChangesetsHandler handler{*wt_remote, logger};
+            RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
             // FIXME: it may be desirable to make these separate transactions
             for (const auto& change : local_changes) {
                 handler.process_changeset(change); // throws on error

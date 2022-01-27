@@ -487,6 +487,18 @@ struct LinkedCollectionBase {
     virtual void add_link(Obj from, ObjLink to) = 0;
     virtual bool remove_link(Obj from, ObjLink to) = 0;
     virtual void clear_collection(Obj obj) = 0;
+    virtual std::vector<Obj> get_links(Obj obj) = 0;
+    bool remove_linked_object(Obj obj, ObjLink to)
+    {
+        auto links = get_links(obj);
+        for (auto& o : links) {
+            if (o.get_key() == to.get_obj_key()) {
+                o.remove();
+                return true;
+            }
+        }
+        return false;
+    }
     virtual bool will_erase_removed_object_links()
     {
         return true; // only dictionaries are false
@@ -508,12 +520,12 @@ struct ListOfObjects : public LinkedCollectionBase {
     {
         return {m_prop_name, PropertyType::Array | PropertyType::Object, m_dest_name};
     }
-    void add_link(Obj from, ObjLink to)
+    void add_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         from.get_linklist(col).add(to.get_obj_key());
     }
-    std::vector<Obj> get_links(Obj obj)
+    std::vector<Obj> get_links(Obj obj) override
     {
         std::vector<Obj> links;
         ColKey col = get_link_col_key(obj.get_table());
@@ -523,7 +535,7 @@ struct ListOfObjects : public LinkedCollectionBase {
         }
         return links;
     }
-    bool remove_link(Obj from, ObjLink to)
+    bool remove_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         auto coll = from.get_linklist(col);
@@ -539,7 +551,7 @@ struct ListOfObjects : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         return obj.get_linklist(col).size();
     }
-    void clear_collection(Obj obj)
+    void clear_collection(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_linklist(col).clear();
@@ -561,7 +573,7 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
     {
         return {m_prop_name, PropertyType::Array | PropertyType::Mixed | PropertyType::Nullable};
     }
-    void add_link(Obj from, ObjLink to)
+    void add_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         from.get_list<Mixed>(col).add(to);
@@ -576,13 +588,13 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         return obj.get_list<Mixed>(col).size();
     }
-    std::vector<Obj> get_links(Obj obj)
+    std::vector<Obj> get_links(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         auto coll = obj.get_list<Mixed>(col);
         return get_linked_objects(coll);
     }
-    bool remove_link(Obj from, ObjLink to)
+    bool remove_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         auto coll = from.get_list<Mixed>(col);
@@ -593,7 +605,7 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
         }
         return false;
     }
-    void clear_collection(Obj obj)
+    void clear_collection(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_list<Mixed>(col).clear();
@@ -623,12 +635,12 @@ struct SetOfObjects : public LinkedCollectionBase {
     {
         return {m_prop_name, PropertyType::Set | PropertyType::Object, m_dest_name};
     }
-    void add_link(Obj from, ObjLink to)
+    void add_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         from.get_linkset(col).insert(to.get_obj_key());
     }
-    std::vector<Obj> get_links(Obj obj)
+    std::vector<Obj> get_links(Obj obj) override
     {
         std::vector<Obj> links;
         ColKey col = get_link_col_key(obj.get_table());
@@ -638,7 +650,7 @@ struct SetOfObjects : public LinkedCollectionBase {
         }
         return links;
     }
-    bool remove_link(Obj from, ObjLink to)
+    bool remove_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         auto coll = from.get_linkset(col);
@@ -650,7 +662,7 @@ struct SetOfObjects : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         return obj.get_linkset(col).size();
     }
-    void clear_collection(Obj obj)
+    void clear_collection(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_linkset(col).clear();
@@ -672,7 +684,7 @@ struct SetOfMixedLinks : public LinkedCollectionBase {
     {
         return {m_prop_name, PropertyType::Set | PropertyType::Mixed | PropertyType::Nullable};
     }
-    void add_link(Obj from, ObjLink to)
+    void add_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         from.get_set<Mixed>(col).insert(to);
@@ -682,20 +694,20 @@ struct SetOfMixedLinks : public LinkedCollectionBase {
             m_relation_updater();
         }
     }
-    std::vector<Obj> get_links(Obj obj)
+    std::vector<Obj> get_links(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         auto coll = obj.get_set<Mixed>(col);
         return get_linked_objects(coll);
     }
-    bool remove_link(Obj from, ObjLink to)
+    bool remove_link(Obj from, ObjLink to) override
     {
         ColKey col = get_link_col_key(from.get_table());
         auto coll = from.get_set<Mixed>(col);
         auto pair = coll.erase(Mixed{to});
         return pair.second;
     }
-    void clear_collection(Obj obj)
+    void clear_collection(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_set<Mixed>(col).clear();
@@ -734,7 +746,7 @@ struct DictionaryOfObjects : public LinkedCollectionBase {
         ColKey link_col = get_link_col_key(from.get_table());
         from.get_dictionary(link_col).insert(util::format("key_%1", key_counter++), to.get_obj_key());
     }
-    std::vector<Obj> get_links(Obj obj)
+    std::vector<Obj> get_links(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         auto coll = obj.get_dictionary(col);
@@ -806,7 +818,7 @@ struct DictionaryOfMixedLinks : public LinkedCollectionBase {
             m_relation_updater();
         }
     }
-    std::vector<Obj> get_links(Obj obj)
+    std::vector<Obj> get_links(Obj obj) override
     {
         ColKey col = get_link_col_key(obj.get_table());
         auto coll = obj.get_dictionary(col);
