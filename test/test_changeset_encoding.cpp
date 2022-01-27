@@ -22,6 +22,17 @@ Changeset encode_then_parse(const Changeset& changeset)
 }
 } // namespace
 
+TEST(ChangesetEncoding_InternStringsNotDuplicated)
+{
+    sync::ChangesetEncoder encoder;
+
+    encoder.intern_string("Prógram");
+    encoder.intern_string("Program");
+    // Bug #5193 caused "Program" not to be found through the interned strings
+    // although it was just created before.
+    encoder.intern_string("Program");
+}
+
 TEST(ChangesetEncoding_AddTable)
 {
     Changeset changeset;
