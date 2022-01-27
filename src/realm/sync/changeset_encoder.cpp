@@ -224,13 +224,13 @@ void ChangesetEncoder::operator()(const Instruction::SetErase& instr)
 
 InternString ChangesetEncoder::intern_string(StringData str)
 {
-    auto it = m_intern_strings_rev.find(str);
+    auto it = m_intern_strings_rev.find(static_cast<std::string_view>(str));
     if (it == m_intern_strings_rev.end()) {
         size_t index = m_intern_strings_rev.size();
         // FIXME: Assert might be able to be removed after refactoring of changeset_parser types?
         REALM_ASSERT_RELEASE_EX(index <= std::numeric_limits<uint32_t>::max(), index);
         bool inserted;
-        std::tie(it, inserted) = m_intern_strings_rev.insert({str, uint32_t(index)});
+        std::tie(it, inserted) = m_intern_strings_rev.insert({std::string{str}, uint32_t(index)});
         REALM_ASSERT_RELEASE_EX(inserted, str);
 
         StringBufferRange range = add_string_range(str);
@@ -250,7 +250,7 @@ void ChangesetEncoder::set_intern_string(uint32_t index, StringBufferRange range
 
 StringBufferRange ChangesetEncoder::add_string_range(StringData data)
 {
-    m_string_range = data;
+    m_string_range = static_cast<std::string_view>(data);
     REALM_ASSERT(data.size() <= std::numeric_limits<uint32_t>::max());
     return StringBufferRange{0, uint32_t(data.size())};
 }
