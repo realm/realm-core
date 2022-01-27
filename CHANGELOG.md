@@ -26,6 +26,7 @@
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
 * Renamed SubscriptionSet::SupercededTag -> SupersededTag to correct typo.
+* `ClientError::ssl_server_cert_rejected` and `RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED` error codes were removed along with the code path that generates them.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

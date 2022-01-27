@@ -277,7 +277,6 @@ enum class ClientImpl::ConnectionTerminationReason {
     connect_operation_failed,          ///< Failure during connect operation
     closed_voluntarily,                ///< Voluntarily closed or connection operation canceled
     read_or_write_error,               ///< Read/write error after successful TCP connect operation
-    ssl_certificate_rejected,          ///< Client rejected the SSL certificate of the server
     ssl_protocol_violation,            ///< A violation of the SSL protocol
     websocket_protocol_violation,      ///< A violation of the WebSocket protocol
     http_response_says_fatal_error,    ///< Status code in HTTP response says "fatal error"
@@ -372,7 +371,6 @@ public:
     // Overriding methods in util::websocket::EZObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
     void websocket_connect_error_handler(std::error_code) override;
-    void websocket_ssl_handshake_error_handler(std::error_code) override;
     void websocket_read_or_write_error_handler(std::error_code) override;
     void websocket_handshake_error_handler(std::error_code) override;
     void websocket_protocol_error_handler(std::error_code) override;
@@ -1216,7 +1214,6 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
             return true;
         case ConnectionTerminationReason::connect_operation_failed:
         case ConnectionTerminationReason::read_or_write_error:
-        case ConnectionTerminationReason::ssl_certificate_rejected:
         case ConnectionTerminationReason::ssl_protocol_violation:
         case ConnectionTerminationReason::websocket_protocol_violation:
         case ConnectionTerminationReason::http_response_says_fatal_error:

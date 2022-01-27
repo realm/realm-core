@@ -322,7 +322,8 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
-        m_observer.websocket_ssl_handshake_error_handler(ec); // Throws
+        m_config.logger.error("SSL handshake failed: %1", ec.message()); // Throws
+        m_observer.websocket_connect_error_handler(ec);                  // Throws
         return;
     }
 

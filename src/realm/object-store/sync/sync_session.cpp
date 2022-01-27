@@ -437,7 +437,6 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::connect_timeout:
             case ClientError::limits_exceeded:
             case ClientError::protocol_mismatch:
-            case ClientError::ssl_server_cert_rejected:
             case ClientError::missing_protocol_feature:
             case ClientError::unknown_message:
             case ClientError::http_tunnel_failed:

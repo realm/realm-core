@@ -63,7 +63,6 @@ public:
     /// It is safe to destroy the WebSocket object in these handlers.
     /// TODO there are too many error handlers. Try to get down to just one.
     virtual void websocket_connect_error_handler(std::error_code) = 0;
-    virtual void websocket_ssl_handshake_error_handler(std::error_code) = 0;
     virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
     virtual void websocket_handshake_error_handler(std::error_code) = 0;
     virtual void websocket_protocol_error_handler(std::error_code) = 0;

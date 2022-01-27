@@ -89,7 +89,7 @@ enum class ClientError {
     bad_error_code              = 114, ///< Bad error code (ERROR),
     bad_compression             = 115, ///< Bad compression (DOWNLOAD)
     bad_client_version          = 116, ///< Bad last integrated client version in changeset header (DOWNLOAD)
-    ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
+    // (REMOVED) ssl_server_cert_rejected    = 117, ///< SSL server certificate rejected
     pong_timeout                = 118, ///< Timeout on reception of PONG respone message
     bad_client_file_ident_salt  = 119, ///< Bad client file identifier salt (IDENT)
     bad_file_ident              = 120, ///< Bad file identifier (ALLOC)

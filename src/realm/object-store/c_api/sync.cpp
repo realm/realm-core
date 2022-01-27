@@ -90,8 +90,6 @@ static_assert(realm_sync_errno_client_e(Client::Error::bad_request_ident) == RLM
 static_assert(realm_sync_errno_client_e(Client::Error::bad_error_code) == RLM_SYNC_ERR_CLIENT_BAD_ERROR_CODE);
 static_assert(realm_sync_errno_client_e(Client::Error::bad_compression) == RLM_SYNC_ERR_CLIENT_BAD_COMPRESSION);
 static_assert(realm_sync_errno_client_e(Client::Error::bad_client_version) == RLM_SYNC_ERR_CLIENT_BAD_CLIENT_VERSION);
-static_assert(realm_sync_errno_client_e(Client::Error::ssl_server_cert_rejected) ==
-              RLM_SYNC_ERR_CLIENT_SSL_SERVER_CERT_REJECTED);
 static_assert(realm_sync_errno_client_e(Client::Error::pong_timeout) == RLM_SYNC_ERR_CLIENT_PONG_TIMEOUT);
 static_assert(realm_sync_errno_client_e(Client::Error::bad_client_file_ident_salt) ==
               RLM_SYNC_ERR_CLIENT_BAD_CLIENT_FILE_IDENT_SALT);

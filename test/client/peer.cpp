@@ -157,7 +157,6 @@ Peer::Error map_error(std::error_code ec) noexcept
             case sync::Client::Error::bad_error_code:
             case sync::Client::Error::bad_compression:
             case sync::Client::Error::bad_client_version:
-            case sync::Client::Error::ssl_server_cert_rejected:
             case sync::Client::Error::bad_timestamp:
             case sync::Client::Error::bad_state_message:
             case sync::Client::Error::bad_client_file_ident_salt:

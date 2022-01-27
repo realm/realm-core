@@ -479,7 +479,6 @@ void Connection::initiate_reconnect_wait()
                     delay = max_delay;
                     record_delay_as_zero = true;
                     break;
-                case ConnectionTerminationReason::ssl_certificate_rejected:
                 case ConnectionTerminationReason::ssl_protocol_violation:
                 case ConnectionTerminationReason::websocket_protocol_violation:
                 case ConnectionTerminationReason::http_response_says_fatal_error:
@@ -961,28 +960,6 @@ void Connection::websocket_connect_error_handler(std::error_code ec)
     bool is_fatal = false;
     StringData* custom_message = nullptr;
     involuntary_disconnect(ec, is_fatal, custom_message); // Throws
-}
-
-void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
-{
-    logger.error("SSL handshake failed: %1", ec.message()); // Throws
-    // FIXME: Some error codes (those from OpenSSL) most likely indicate a
-    // fatal error (SSL protocol violation), but other errors codes
-    // (read/write error from underlying socket) most likely indicate a
-    // nonfatal error.
-    bool is_fatal = false;
-    std::error_code ec2;
-    if (ec == network::ssl::Errors::certificate_rejected) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        ec2 = ClientError::ssl_server_cert_rejected;
-        is_fatal = true;
-    }
-    else {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
-        ec2 = ec;
-        is_fatal = false;
-    }
-    close_due_to_client_side_error(ec2, is_fatal); // Throws
 }
 
 

@@ -71,8 +71,6 @@ const char* get_error_message(ClientError error_code)
             return "Bad compression (DOWNLOAD)";
         case ClientError::bad_client_version:
             return "Bad last integrated client version in changeset header (DOWNLOAD)";
-        case ClientError::ssl_server_cert_rejected:
-            return "SSL server certificate rejected";
         case ClientError::pong_timeout:
             return "Timeout on reception of PONG respone message";
         case ClientError::bad_client_file_ident_salt:
