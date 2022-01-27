@@ -279,8 +279,6 @@ enum class ClientImpl::ConnectionTerminationReason {
     read_or_write_error,               ///< Read/write error after successful TCP connect operation
     ssl_protocol_violation,            ///< A violation of the SSL protocol
     websocket_protocol_violation,      ///< A violation of the WebSocket protocol
-    http_response_says_fatal_error,    ///< Status code in HTTP response says "fatal error"
-    http_response_says_nonfatal_error, ///< Status code in HTTP response says "nonfatal error"
     bad_headers_in_http_response,      ///< Missing or bad headers in HTTP response
     sync_protocol_violation,           ///< Client received a bad message from the server
     sync_connect_timeout,              ///< Sync connection was not fully established in time
@@ -371,8 +369,8 @@ public:
     // Overriding methods in util::websocket::EZObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
     void websocket_connect_error_handler(std::error_code) override;
+    void websocket_401_unauthorized_error_handler() override;
     void websocket_read_or_write_error_handler(std::error_code) override;
-    void websocket_handshake_error_handler(std::error_code) override;
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
@@ -1216,8 +1214,6 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::read_or_write_error:
         case ConnectionTerminationReason::ssl_protocol_violation:
         case ConnectionTerminationReason::websocket_protocol_violation:
-        case ConnectionTerminationReason::http_response_says_fatal_error:
-        case ConnectionTerminationReason::http_response_says_nonfatal_error:
         case ConnectionTerminationReason::bad_headers_in_http_response:
         case ConnectionTerminationReason::sync_protocol_violation:
         case ConnectionTerminationReason::sync_connect_timeout:

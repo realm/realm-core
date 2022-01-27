@@ -341,26 +341,12 @@ void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 }
 
 
-void Connection::websocket_handshake_error_handler(std::error_code ec)
+void Connection::websocket_401_unauthorized_error_handler()
 {
-    bool is_fatal;
-    if (ec == util::websocket::Error::bad_response_3xx_redirection ||
-        ec == util::websocket::Error::bad_response_301_moved_permanently ||
-        ec == util::websocket::Error::bad_response_401_unauthorized ||
-        ec == util::websocket::Error::bad_response_5xx_server_error ||
-        ec == util::websocket::Error::bad_response_500_internal_server_error ||
-        ec == util::websocket::Error::bad_response_502_bad_gateway ||
-        ec == util::websocket::Error::bad_response_503_service_unavailable ||
-        ec == util::websocket::Error::bad_response_504_gateway_timeout) {
-        is_fatal = false;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-    }
-    else {
-        is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-    }
-
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    // This is handled the same as any other connect failure. However, we need to use this exact error code because
+    // that is what the Object Store layer is looking for in order to refresh the access token.
+    // TODO delete this function once REALMC-10531 is resolved.
+    websocket_connect_error_handler(util::websocket::Error::bad_response_401_unauthorized);
 }
 
 
@@ -459,7 +445,6 @@ void Connection::initiate_reconnect_wait()
                     delay = min_delay;
                     break;
                 case ConnectionTerminationReason::connect_operation_failed:
-                case ConnectionTerminationReason::http_response_says_nonfatal_error:
                 case ConnectionTerminationReason::sync_connect_timeout:
                     // The last attempt at establishing a connection failed. In
                     // this case, the reconnect delay will increase with the
@@ -481,7 +466,6 @@ void Connection::initiate_reconnect_wait()
                     break;
                 case ConnectionTerminationReason::ssl_protocol_violation:
                 case ConnectionTerminationReason::websocket_protocol_violation:
-                case ConnectionTerminationReason::http_response_says_fatal_error:
                 case ConnectionTerminationReason::bad_headers_in_http_response:
                 case ConnectionTerminationReason::sync_protocol_violation:
                 case ConnectionTerminationReason::server_said_do_not_reconnect:

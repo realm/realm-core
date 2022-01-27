@@ -52,9 +52,6 @@ public:
     /// error occurs on the underlying stream given by the async_read and async_write functions above.
     /// The error_code is passed through.
     ///
-    /// websocket_handshake_error_handler() will be called when there is an error in the handshake
-    /// such as "404 Not found".
-    ///
     /// websocket_protocol_error_handler() is called when there is an protocol error in the incoming
     /// websocket messages.
     ///
@@ -64,9 +61,13 @@ public:
     /// TODO there are too many error handlers. Try to get down to just one.
     virtual void websocket_connect_error_handler(std::error_code) = 0;
     virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
-    virtual void websocket_handshake_error_handler(std::error_code) = 0;
     virtual void websocket_protocol_error_handler(std::error_code) = 0;
     //@}
+
+    /// This is called when the server replies to the websocket HTTP handshake with a 401 unauthorized error.
+    ///
+    /// TODO remove this once REALMC-10531 is resolved.
+    virtual void websocket_401_unauthorized_error_handler() = 0;
 
     //@{
     /// The five callback functions below are called whenever a full message has arrived.

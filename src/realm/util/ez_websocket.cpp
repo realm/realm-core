@@ -59,7 +59,12 @@ private:
     void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
                                            const std::string_view*) override
     {
-        m_observer.websocket_handshake_error_handler(ec);
+        if (ec == websocket::Error::bad_response_401_unauthorized) {
+            m_observer.websocket_401_unauthorized_error_handler();
+        }
+        else {
+            m_observer.websocket_connect_error_handler(ec);
+        }
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
