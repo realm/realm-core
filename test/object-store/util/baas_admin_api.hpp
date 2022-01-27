@@ -174,8 +174,23 @@ public:
     void send_request_to_server(app::Request&& request,
                                 util::UniqueFunction<void(const app::Response&)>&& completion) override
     {
+        {
+            std::lock_guard barrier(m_mutex);
+        }
         completion(do_http_request(std::move(request)));
     }
+
+    void block()
+    {
+        m_mutex.lock();
+    }
+    void unblock()
+    {
+        m_mutex.unlock();
+    }
+
+private:
+    std::mutex m_mutex;
 };
 
 // This will create a new test app in the baas server at base_url
