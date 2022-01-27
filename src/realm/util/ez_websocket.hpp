@@ -65,7 +65,7 @@ public:
     virtual void websocket_connect_error_handler(std::error_code) = 0;
     virtual void websocket_ssl_handshake_error_handler(std::error_code) = 0;
     virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
-    virtual void websocket_handshake_error_handler(std::error_code, const std::string_view* body) = 0;
+    virtual void websocket_handshake_error_handler(std::error_code) = 0;
     virtual void websocket_protocol_error_handler(std::error_code) = 0;
     //@}
 

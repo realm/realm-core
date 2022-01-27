@@ -341,7 +341,7 @@ void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 }
 
 
-void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
+void Connection::websocket_handshake_error_handler(std::error_code ec)
 {
     bool is_fatal;
     if (ec == util::websocket::Error::bad_response_3xx_redirection ||
@@ -358,28 +358,6 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
     else {
         is_fatal = true;
         m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        if (body) {
-            std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-            auto i = body->find(identifier);
-            if (i != std::string_view::npos) {
-                std::string_view rest = body->substr(i + identifier.size());
-                // FIXME: Use std::string_view::begins_with() in C++20.
-                auto begins_with = [](std::string_view string, std::string_view prefix) {
-                    return (string.size() >= prefix.size() &&
-                            std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                };
-                if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                    ec = ClientError::client_too_old_for_server;
-                }
-                else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                    ec = ClientError::client_too_new_for_server;
-                }
-                else {
-                    // Other more complicated forms of mismatch
-                    ec = ClientError::protocol_mismatch;
-                }
-            }
-        }
     }
 
     close_due_to_client_side_error(ec, is_fatal); // Throws

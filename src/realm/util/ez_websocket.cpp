@@ -57,9 +57,9 @@ private:
         m_observer.websocket_read_or_write_error_handler(ec);
     }
     void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
-                                           const std::string_view* body) override
+                                           const std::string_view*) override
     {
-        m_observer.websocket_handshake_error_handler(ec, body);
+        m_observer.websocket_handshake_error_handler(ec);
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
