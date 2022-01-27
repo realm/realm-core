@@ -1852,6 +1852,42 @@ RLM_API bool realm_query_delete_all(const realm_query_t*);
 RLM_API bool realm_results_count(realm_results_t*, size_t* out_count);
 
 /**
+ * Create a new results object by further filtering existing result.
+ *
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_results_filter(realm_results_t*, realm_query_t*);
+
+/**
+ * Create a new results object by further sorting existing result.
+ *
+ * @param sort_string Specifies a sort condition. It has the format
+          <param> ["," <param>]*
+          <param> ::= <prop> ["." <prop>]* <direction>,
+          <direction> ::= "ASCENDING" | "DESCENDING"
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_results_sort(realm_results_t* results, const char* sort_string);
+
+/**
+ * Create a new results object by removing duplicates
+ *
+ * @param distinct_string Specifies a distinct condition. It has the format
+          <param> ["," <param>]*
+          <param> ::= <prop> ["." <prop>]*
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_results_distinct(realm_results_t* results, const char* distinct_string);
+
+/**
+ * Create a new results object by limiting the number of items
+ *
+ * @param max_count Specifies the number of elements the new result can have at most
+ * @return A non-null pointer if no exception occurred.
+ */
+RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t max_count);
+
+/**
  * Get the matching element at @a index in the results.
  *
  * If the result is "live" (not a snapshot), this may rerun the query if things

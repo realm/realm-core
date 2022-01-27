@@ -1173,12 +1173,15 @@ TEST_CASE("C API") {
             CPtr<realm_object_t> obj3 = cptr_checked(realm_object_create(realm, class_foo.key));
             CHECK(obj3);
             CHECK(checked(realm_set_value(obj3.get(), foo_int_key, int_val2, false)));
+            CPtr<realm_object_t> obj4 = cptr_checked(realm_object_create(realm, class_foo.key));
+            CHECK(obj3);
+            CHECK(checked(realm_set_value(obj4.get(), foo_int_key, int_val1, false)));
         });
 
         size_t foo_count, bar_count;
         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &foo_count)));
         CHECK(checked(realm_get_num_objects(realm, class_bar.key, &bar_count)));
-        REQUIRE(foo_count == 2);
+        REQUIRE(foo_count == 3);
         REQUIRE(bar_count == 1);
 
         SECTION("realm_clone()") {
@@ -1201,7 +1204,7 @@ TEST_CASE("C API") {
             size_t num_foos, num_bars;
             CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_foos)));
             CHECK(checked(realm_get_num_objects(realm, class_bar.key, &num_bars)));
-            CHECK(num_foos == 2);
+            CHECK(num_foos == 3);
             CHECK(num_bars == 1);
 
             CHECK(checked(realm_get_num_objects(realm, class_bar.key, nullptr)));
@@ -1669,6 +1672,45 @@ TEST_CASE("C API") {
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
                 }
 
+                SECTION("realm_results_filter()") {
+                    auto q2 = cptr_checked(realm_query_parse(realm, class_foo.key, "int == 789", 0, nullptr));
+                    auto r2 = cptr_checked(realm_results_filter(r.get(), q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 0);
+                }
+
+                SECTION("realm_results_sort()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    auto p = cptr_checked(realm_results_get_object(r_all.get(), 0));
+                    CHECK(p.get());
+                    CHECK(realm_equals(p.get(), obj1.get()));
+                    auto r2 = cptr_checked(realm_results_sort(r_all.get(), "int DESCENDING, float ASCENDING"));
+                    p = cptr_checked(realm_results_get_object(r2.get(), 1));
+                    CHECK(p.get());
+                    CHECK(realm_equals(p.get(), obj1.get()));
+                }
+
+                SECTION("realm_results_distinct()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    size_t count;
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 3);
+                    auto r2 = cptr_checked(realm_results_distinct(r_all.get(), "int"));
+                    realm_results_count(r2.get(), &count);
+                    CHECK(count == 2);
+                }
+
+                SECTION("realm_results_limit()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    size_t count;
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 3);
+                    auto r2 = cptr_checked(realm_results_limit(r_all.get(), 1));
+                    realm_results_count(r2.get(), &count);
+                    CHECK(count == 1);
+                }
+
                 SECTION("realm_results_min()") {
                     realm_value_t value = rlm_null();
                     CHECK(checked(realm_results_min(r.get(), foo_int_key, &value, &found)));
@@ -1724,10 +1766,10 @@ TEST_CASE("C API") {
                     write([&]() {
                         size_t num_objects;
                         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_objects)));
-                        CHECK(num_objects == 2);
+                        CHECK(num_objects == 3);
                         CHECK(checked(realm_results_delete_all(r.get())));
                         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_objects)));
-                        CHECK(num_objects == 1);
+                        CHECK(num_objects == 2);
                     });
                 }
 
