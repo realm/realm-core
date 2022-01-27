@@ -69,7 +69,7 @@ private:
     void append_value(UUID);
 
     Buffer m_buffer;
-    util::metered::map<std::string, uint32_t> m_intern_strings_rev;
+    util::metered::map<StringData, uint32_t> m_intern_strings_rev;
     StringData m_string_range;
 };
 

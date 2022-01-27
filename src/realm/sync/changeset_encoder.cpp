@@ -229,7 +229,9 @@ InternString ChangesetEncoder::intern_string(StringData str)
         size_t index = m_intern_strings_rev.size();
         // FIXME: Assert might be able to be removed after refactoring of changeset_parser types?
         REALM_ASSERT_RELEASE_EX(index <= std::numeric_limits<uint32_t>::max(), index);
-        it = m_intern_strings_rev.insert({std::string{str}, uint32_t(index)}).first;
+        bool inserted;
+        std::tie(it, inserted) = m_intern_strings_rev.insert({str, uint32_t(index)});
+        REALM_ASSERT_RELEASE_EX(inserted, str);
 
         StringBufferRange range = add_string_range(str);
         set_intern_string(uint32_t(index), range);
