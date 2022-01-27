@@ -283,6 +283,44 @@ RLM_API bool realm_results_count(realm_results_t* results, size_t* out_count)
     });
 }
 
+RLM_API realm_results_t* realm_results_filter(realm_results_t* results, realm_query_t* query)
+{
+    return wrap_err([&]() {
+        return new realm_results{results->filter(std::move(query->query))};
+    });
+}
+
+namespace {
+realm_results_t* realm_results_ordering(realm_results_t* results, const char* op, const char* ordering)
+{
+    return wrap_err([&]() -> realm_results_t* {
+        std::string str = "TRUEPREDICATE " + std::string(op) + "(" + std::string(ordering) + ")";
+        auto q = results->get_table()->query(str);
+        auto ordering{q.get_ordering()};
+        return new realm_results{results->apply_ordering(std::move(*ordering))};
+        return nullptr;
+    });
+}
+} // namespace
+
+RLM_API realm_results_t* realm_results_sort(realm_results_t* results, const char* sort_string)
+{
+    return realm_results_ordering(results, "SORT", sort_string);
+}
+
+RLM_API realm_results_t* realm_results_distinct(realm_results_t* results, const char* distinct_string)
+{
+    return realm_results_ordering(results, "DISTINCT", distinct_string);
+}
+
+RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t max_count)
+{
+    return wrap_err([&]() {
+        return new realm_results{results->limit(max_count)};
+    });
+}
+
+
 RLM_API bool realm_results_get(realm_results_t* results, size_t index, realm_value_t* out_value)
 {
     return wrap_err([&]() {
