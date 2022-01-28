@@ -12,7 +12,8 @@
 * Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
  
 ### Breaking changes
-* None.
+* Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
+* Renamed SubscriptionSet::SupercededTag -> SupersededTag to correct typo.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
