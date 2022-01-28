@@ -23,6 +23,8 @@
 #include <unordered_set>
 #include <realm/cluster.hpp>
 #include <realm/mixed.hpp>
+#include <realm/util/bind_ptr.hpp>
+
 
 namespace realm {
 
@@ -268,7 +270,7 @@ private:
     size_t m_limit = size_t(-1);
 };
 
-class DescriptorOrdering {
+class DescriptorOrdering : public util::AtomicRefCountBase {
 public:
     DescriptorOrdering() = default;
     DescriptorOrdering(const DescriptorOrdering&);
@@ -303,7 +305,6 @@ public:
     std::string get_description(ConstTableRef target_table) const;
     void collect_dependencies(const Table* table);
     void get_versions(const Group* group, TableVersions& versions) const;
-
 private:
     std::vector<std::unique_ptr<BaseDescriptor>> m_descriptors;
     std::vector<TableKey> m_dependencies;

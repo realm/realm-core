@@ -114,6 +114,12 @@ public:
     {
     }
 
+    // Move from std::unique_ptr
+    bind_ptr(std::unique_ptr<T>&& p) noexcept
+    {
+        bind(p.release());
+    }
+
     // Move assign
     bind_ptr& operator=(bind_ptr&& p) noexcept
     {
@@ -253,6 +259,12 @@ private:
     template <class>
     friend class bind_ptr;
 };
+
+template <class T, typename... Args>
+bind_ptr<T> make_bind(Args&&... __args)
+{
+    return bind_ptr<T>(new T(std::forward<Args>(__args)...));
+}
 
 
 template <class C, class T, class U>
