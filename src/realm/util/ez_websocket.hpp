@@ -52,16 +52,12 @@ public:
     /// error occurs on the underlying stream given by the async_read and async_write functions above.
     /// The error_code is passed through.
     ///
-    /// websocket_protocol_error_handler() is called when there is an protocol error in the incoming
-    /// websocket messages.
-    ///
     /// After calling any of these error callbacks, the Socket will move into the stopped state, and
     /// no more messages should be sent, or will be received.
     /// It is safe to destroy the WebSocket object in these handlers.
     /// TODO there are too many error handlers. Try to get down to just one.
     virtual void websocket_connect_error_handler(std::error_code) = 0;
     virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
-    virtual void websocket_protocol_error_handler(std::error_code) = 0;
     //@}
 
     /// This is called when the server replies to the websocket HTTP handshake with a 401 unauthorized error.

@@ -350,14 +350,6 @@ void Connection::websocket_401_unauthorized_error_handler()
 }
 
 
-void Connection::websocket_protocol_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
-}
-
-
 bool Connection::websocket_binary_message_received(const char* data, std::size_t size)
 {
     std::error_code ec;

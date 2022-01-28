@@ -68,7 +68,7 @@ private:
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
-        m_observer.websocket_protocol_error_handler(ec);
+        m_observer.websocket_read_or_write_error_handler(ec);
     }
     bool websocket_close_message_received(std::error_code ec, StringData message) override
     {
