@@ -123,10 +123,10 @@ SubscriptionSet::SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr
     }
 }
 
-SubscriptionSet::SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupercededTag)
+SubscriptionSet::SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupersededTag)
     : m_mgr(mgr)
     , m_version(version)
-    , m_state(State::Superceded)
+    , m_state(State::Superseded)
 {
 }
 
@@ -305,8 +305,8 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             m_state = new_state;
             m_mgr->supercede_prior_to(m_tr, version());
             break;
-        case State::Superceded:
-            throw std::logic_error("Cannot set a subscription to the superceded state");
+        case State::Superseded:
+            throw std::logic_error("Cannot set a subscription to the superseded state");
             break;
         case State::Pending:
             throw std::logic_error("Cannot set subscription set to the pending state");
@@ -334,7 +334,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If we've already been superceded by another version getting completed, then we should skip registering
     // a notification because it may never fire.
     if (m_mgr->m_min_outstanding_version > version()) {
-        return util::Future<State>::make_ready(State::Superceded);
+        return util::Future<State>::make_ready(State::Superseded);
     }
 
     // Begin by blocking process_notifications from starting to fill futures. No matter the outcome, we'll
@@ -408,7 +408,7 @@ void MutableSubscriptionSet::process_notifications()
             req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
         }
         else if (req.version < my_version) {
-            req.promise.emplace_value(State::Superceded);
+            req.promise.emplace_value(State::Superseded);
         }
         else {
             req.promise.emplace_value(new_state);
@@ -713,7 +713,7 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     catch (const KeyNotFound&) {
         std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
         if (version_id < m_min_outstanding_version) {
-            return SubscriptionSet(this, version_id, SubscriptionSet::SupercededTag{});
+            return SubscriptionSet(this, version_id, SubscriptionSet::SupersededTag{});
         }
         throw;
     }
