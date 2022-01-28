@@ -1711,6 +1711,24 @@ TEST_CASE("C API") {
                     CHECK(count == 1);
                 }
 
+                SECTION("realm_results_snapshot()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    auto r_snapshot = cptr_checked(realm_results_snapshot(r_all.get()));
+                    size_t count;
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 3);
+                    realm_results_count(r_snapshot.get(), &count);
+                    CHECK(count == 3);
+                    write([&]() {
+                        auto p = cptr_checked(realm_results_get_object(r_all.get(), 0));
+                        realm_object_delete(p.get());
+                    });
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 2);
+                    realm_results_count(r_snapshot.get(), &count);
+                    CHECK(count == 3);
+                }
+
                 SECTION("realm_results_min()") {
                     realm_value_t value = rlm_null();
                     CHECK(checked(realm_results_min(r.get(), foo_int_key, &value, &found)));

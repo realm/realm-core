@@ -26,6 +26,7 @@
 * GenericNetworkTransport::send_request_to_server()'s signature has been changed to `void(Request&& request, util::UniqueFunction<void(const Response&)>&& completion)`. Subclasses implementing it will need to be updated.
 * `MongoClient` had a mixture of functions which took `void(Optional<T>, Optional<AppError>)` callbacks and functions which took `void(Optional<AppError>, Optional<T>)` callbacks. They now all have the error parameter last. Most of the error-first functions other than `call_function()` appear to have been unused.
 * Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
+* realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
 
 ----------------------------------------------
 
