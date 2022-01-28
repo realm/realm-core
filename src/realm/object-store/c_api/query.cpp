@@ -356,6 +356,13 @@ RLM_API bool realm_results_delete_all(realm_results_t* results)
     });
 }
 
+RLM_API realm_results_t* realm_results_snapshot(const realm_results_t* results)
+{
+    return wrap_err([&]() {
+        return new realm_results{results->snapshot()};
+    });
+}
+
 RLM_API bool realm_results_min(realm_results_t* results, realm_property_key_t col, realm_value_t* out_value,
                                bool* out_found)
 {
