@@ -56,7 +56,7 @@ public:
     {
     }
 
-    bind_ptr(nullptr_t) noexcept
+    constexpr bind_ptr(std::nullptr_t) noexcept
         : m_ptr(nullptr)
     {
     }
