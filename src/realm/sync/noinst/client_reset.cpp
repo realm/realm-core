@@ -135,17 +135,23 @@ struct InterRealmValueConverter {
             }
             else {
                 ObjLink src_link = src.get<ObjLink>();
-                TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
-                REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
-                TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
-                REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
-                // embedded tables should always be covered by the m_opposite_of_src case above.
-                REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
-                // regular table, convert by pk
-                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
-                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
-                cmp = converted_src.compare(dst);
+                if (src_link.is_unresolved()) {
+                    converted_src = Mixed{}; // no need to transfer over unresolved links
+                    cmp = converted_src.compare(dst);
+                }
+                else {
+                    TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
+                    REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
+                    TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
+                    REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
+                    // embedded tables should always be covered by the m_opposite_of_src case above.
+                    REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
+                    // regular table, convert by pk
+                    Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+                    Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
+                    converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+                    cmp = converted_src.compare(dst);
+                }
             }
         }
         if (converted_src_out) {
@@ -638,26 +644,37 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             instr->visit(*this); // Throws
         }
         InstructionApplier::end_apply();
+        copy_lists_with_unrecoverable_changes();
+    }
 
+    void copy_lists_with_unrecoverable_changes()
+    {
         // Any modifications, moves or deletes to list elements which were not also created in the recovery
         // cannot be reliably applied because there is no way to know if the indices on the server have
         // shifted without a reliable server side history. For these lists, create a consistant state by
         // copying over the entire list from the recovering client's state. This does create a "last recovery wins"
         // scenario for modifications to lists, but this is only a best effort.
+        // For example, consider a list [A,B].
+        // Now the server has been reset, and applied an ArrayMove from a different client producing [B,A]
+        // A client being reset tries to recover the instruction ArrayErase(index=0) intending to erase A.
+        // But if this instruction were to be applied to the server's array, element B would be erased which is wrong.
+        // So to prevent this, upon discovery of this type of instruction, replace the entire array to the client's
+        // final state which would be [B].
         // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
         // we would know where list elements ended up or if they were deleted by the server.
         EmbeddedObjectConverter embedded_object_tracker;
         for (auto table_key_it : m_tables) {
             TableRef local_table = local.get_table(table_key_it.first);
-            TableRef remote_table = remote.get_table(local_table->get_name());
+            StringData table_name = local_table->get_name();
+            TableRef remote_table = remote.get_table(table_name);
             REALM_ASSERT(local_table);
             REALM_ASSERT(remote_table);
             for (auto obj_key_it : table_key_it.second) {
                 ObjKey key = obj_key_it.first;
                 if (auto local_obj = local_table->try_get_object(key)) {
                     try {
-                        Obj remote_obj =
-                            remote_table->get_object_with_primary_key(local_obj.get_primary_key()); // throws
+                        Mixed pk = local_obj.get_primary_key();
+                        Obj remote_obj = remote_table->get_object_with_primary_key(pk); // throws
                         for (auto& list_trackers : obj_key_it.second) {
                             if (list_trackers.second.requires_manual_copy()) {
                                 ColKey local_col_key = list_trackers.first;
@@ -671,6 +688,8 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                                 REALM_ASSERT(local_list);
                                 InterRealmValueConverter value_converter(local_table, local_col_key, remote_table,
                                                                          remote_col_key, embedded_object_tracker);
+                                logger.debug("Recovery overwrites list for %1.%2 size: %3 -> %4", table_name, pk,
+                                             remote_list->size(), local_list->size());
                                 copy_list(local_obj, remote_obj, value_converter, nullptr);
                             }
                         }
@@ -733,6 +752,8 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::EraseObject& instr)
     {
         if (get_top_object(instr, "EraseObject")) {
+            // Note: this calls invalidate() rather than remove(). It should have the same net
+            // effect, but perhaps is not worth exposing this code to more edge cases.
             InstructionApplier::operator()(instr);
         }
         // if the object doesn't exist, a local delete is a no-op.
@@ -788,7 +809,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             InstructionApplier::operator()(instr);
         }
         else {
-            logger.warn("Discarding a local Clear instruction made to an object which no longer exists");
+            logger.warn("Discarding a local %1 instruction made to an object which no longer exists", instr_name);
         }
     }
 
@@ -817,8 +838,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::ArrayInsert& instr)
     {
         const char* instr_name = "ArrayInsert";
-        // FIXME: any links being set or inserted need to be validated and if the dest object is not found then
-        // ignored.
+        // FIXME: if this is a Lst<Mixed> linking to a nonexistant object, should this insert a null instead?
         if (!check_links_exist(instr.value)) {
             logger.warn("Discarding %1 which links to a deleted object", instr_name);
         }
@@ -886,11 +906,12 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::SetErase& instr)
     {
-        if (get_top_object(instr, "SetErase")) {
+        const char* instr_name = "SetErase";
+        if (get_top_object(instr, instr_name)) {
             InstructionApplier::operator()(instr);
         }
         else {
-            logger.warn("Discarding a local SetErase made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
 };
@@ -1226,13 +1247,13 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         logger.debug("Local changesets to recover: %1", local_changes.size());
 
         // FIXME: this is for debugging only
-        //        for (const auto& change : local_changes) {
-        //            // Debug.
-        //            ChunkedBinaryInputStream in{change};
-        //            sync::Changeset log;
-        //            sync::parse_changeset(in, log); // Throws
-        //            log.print();
-        //        }
+        // for (const auto& change : local_changes) {
+        //     // Debug.
+        //     ChunkedBinaryInputStream in{change};
+        //     sync::Changeset log;
+        //     sync::parse_changeset(in, log); // Throws
+        //     log.print();
+        // }
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};

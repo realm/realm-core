@@ -1835,18 +1835,21 @@ struct CollectionOperation {
     {
         switch (m_type) {
             case Type::Add: {
-                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{m_link_pk});
+                ObjKey dst_key = dst_table->find_primary_key(Mixed{m_link_pk});
+                REALM_ASSERT(dst_key);
                 collection->add_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
                 break;
             }
             case Type::Remove: {
-                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{m_link_pk});
+                ObjKey dst_key = dst_table->find_primary_key(Mixed{m_link_pk});
+                REALM_ASSERT(dst_key);
                 bool did_remove = collection->remove_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
                 REALM_ASSERT(did_remove);
                 break;
             }
             case Type::RemoveDestObject: {
-                ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{m_link_pk});
+                ObjKey dst_key = dst_table->find_primary_key(Mixed{m_link_pk});
+                REALM_ASSERT(dst_key);
                 collection->remove_linked_object(src_obj, ObjLink{dst_table->get_key(), dst_key});
                 break;
             }
@@ -1962,7 +1965,6 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         TableRef src_table = get_table(*realm, "source");
         REQUIRE(src_table->size() == 1);
         TableRef dst_table = get_table(*realm, "dest");
-        std::vector<Obj> linked_objects = test_type.get_links(*src_table->begin());
 
         for (auto& instruction : instructions) {
             instruction.apply(&test_type, *src_table->begin(), dst_table);
