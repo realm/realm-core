@@ -176,6 +176,8 @@ functions:
           TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          export UNITTEST_EVERGREEN_TEST_LOGFILE="$(./evergreen/abspath.sh ${task_name}_logs.txt)"
+          touch $UNITTEST_EVERGREEN_TEST_LOGFILE
           if [[ -n "${report_test_progress|}" ]]; then
               export UNITTEST_PROGRESS=${report_test_progress|}
           fi
@@ -186,6 +188,15 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/${task_name}_trace_logs.txt'
+      bucket: mciuploads
+      permissions: public-read
+      local_file: 'realm-core/${task_name}_logs.txt'
+      content_type: '${content_type|text/plain}'
 
   "run hang analyzer":
   - command: shell.exec

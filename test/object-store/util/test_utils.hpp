@@ -21,11 +21,14 @@
 
 #include <catch2/catch.hpp>
 #include <realm/util/file.hpp>
+#include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 
 #include <functional>
 
 namespace realm {
+
+util::Optional<std::function<std::unique_ptr<util::Logger>(util::Logger::Level)>> get_test_reporter_logger();
 
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path);

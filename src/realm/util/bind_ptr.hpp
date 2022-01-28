@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <ostream>
 #include <utility>
 
@@ -54,6 +55,12 @@ public:
         : m_ptr(nullptr)
     {
     }
+
+    bind_ptr(nullptr_t) noexcept
+        : m_ptr(nullptr)
+    {
+    }
+
     ~bind_ptr() noexcept
     {
         unbind();
