@@ -86,7 +86,7 @@ public:
      *                    ┌───────────┬─────────►Error─────────┐
      *                    │           │                        │
      *                    │           │                        ▼
-     *   Uncommitted──►Pending──►Bootstrapping──►Complete───►Superceded
+     *   Uncommitted──►Pending──►Bootstrapping──►Complete───►Superseded
      *                    │                                    ▲
      *                    │                                    │
      *                    └────────────────────────────────────┘
@@ -106,7 +106,7 @@ public:
         Error,
         // The server responded to a later subscription set to this one and this one has been trimmed from the
         // local storage of subscription sets.
-        Superceded,
+        Superseded,
     };
 
     // Used in tests.
@@ -128,8 +128,8 @@ public:
             case State::Error:
                 o << "Error";
                 break;
-            case State::Superceded:
-                o << "Superceded";
+            case State::Superseded:
+                o << "Superseded";
                 break;
         }
         return o;
@@ -145,7 +145,7 @@ public:
 
     // Returns a future that will resolve either with an error status if this subscription set encounters an
     // error, or resolves when the subscription set reaches at least that state. It's possible for a subscription
-    // set to skip a state (i.e. go from Pending to Complete or Pending to Superceded), and the future value
+    // set to skip a state (i.e. go from Pending to Complete or Pending to Superseded), and the future value
     // will the the state it actually reached.
     util::Future<State> get_state_change_notification(State notify_when) const;
 
@@ -181,10 +181,10 @@ public:
 
 protected:
     friend class SubscriptionStore;
-    struct SupercededTag {
+    struct SupersededTag {
     };
 
-    explicit SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupercededTag);
+    explicit SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupersededTag);
     explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
 
     void load_from_database(TransactionRef tr, Obj obj);
