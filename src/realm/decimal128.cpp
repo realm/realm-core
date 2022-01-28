@@ -50,10 +50,10 @@ Decimal128::Decimal128()
     from_int64_t(0);
 }
 
-Decimal128::Decimal128(double val, RoundingPrecision rounding_precision)
+Decimal128::Decimal128(double val, RoundTo rounding_precision)
 {
     // The logic below is ported from MongoDB Decimal128 implementation
-    uint64_t largest_coeff = (rounding_precision == RoundTo7Digits) ? 1E7 - 1 : 1E15 - 1;
+    uint64_t largest_coeff = (rounding_precision == RoundTo::Digits7) ? 9999999 : 999999999999999;
     unsigned flags = 0;
     BID_UINT128 converted_value;
     binary64_to_bid128(&converted_value, &val, &flags);
@@ -88,7 +88,7 @@ Decimal128::Decimal128(double val, RoundingPrecision rounding_precision)
     if (base2Exp < 0)
         base10Exp--;
 
-    int adjust = (rounding_precision == RoundTo7Digits) ? 6 : 14;
+    int adjust = (rounding_precision == RoundTo::Digits7) ? 6 : 14;
     BID_UINT128 q{1, BID_UINT64(base10Exp - adjust + DECIMAL_EXPONENT_BIAS_128) << 49};
     BID_UINT128 quantizedResult;
     bid128_quantize(&quantizedResult, &converted_value, &q, &flags);
