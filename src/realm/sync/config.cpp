@@ -22,12 +22,30 @@
 #include <realm/object-store/util/bson/bson.hpp>
 #include <realm/util/network.hpp>
 
+#include <ostream>
+
 namespace realm {
 
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
 static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type>);
 
 using ProtocolError = realm::sync::ProtocolError;
+
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
+{
+    switch (mode) {
+        case ClientResyncMode::Manual:
+            os << "Manual";
+            break;
+        case ClientResyncMode::DiscardLocal:
+            os << "DiscardLocal";
+            break;
+        case ClientResyncMode::Recover:
+            os << "Recover";
+            break;
+    }
+    return os;
+}
 
 bool SyncError::is_client_error() const
 {

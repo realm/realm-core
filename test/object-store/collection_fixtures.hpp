@@ -488,6 +488,7 @@ struct LinkedCollectionBase {
     virtual bool remove_link(Obj from, ObjLink to) = 0;
     virtual void clear_collection(Obj obj) = 0;
     virtual std::vector<Obj> get_links(Obj obj) = 0;
+    virtual void move(Obj, size_t, size_t) {}
     bool remove_linked_object(Obj obj, ObjLink to)
     {
         auto links = get_links(obj);
@@ -545,6 +546,12 @@ struct ListOfObjects : public LinkedCollectionBase {
             return true;
         }
         return false;
+    }
+    void move(Obj source, size_t from, size_t to) override
+    {
+        ColKey col = get_link_col_key(source.get_table());
+        auto coll = source.get_linklist(col);
+        coll.move(from, to);
     }
     size_t size_of_collection(Obj obj)
     {
@@ -610,6 +617,12 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
         ColKey col = get_link_col_key(obj.get_table());
         obj.get_list<Mixed>(col).clear();
     }
+    void move(Obj obj, size_t from, size_t to) override
+    {
+        ColKey col = get_link_col_key(obj.get_table());
+        obj.get_list<Mixed>(col).move(from, to);
+    }
+
     size_t count_unresolved_links(Obj obj)
     {
         ColKey col = get_link_col_key(obj.get_table());

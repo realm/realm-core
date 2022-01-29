@@ -508,32 +508,40 @@ void EmbeddedObjectConverter::process_pending()
 }
 
 struct ListTracker {
-    void insert(size_t index)
-    {
-        if (m_requires_manual_copy) {
-            return;
-        }
-        else if (m_did_clear) {
-            return;
-        }
-        for (auto& ndx : m_indices_allowed) {
-            if (ndx >= index) {
-                ++ndx;
-            }
-        }
-        m_indices_allowed.push_back(index);
-    }
-
-    bool update(size_t index)
+    bool insert(uint32_t local_index, size_t remote_list_size, uint32_t& remote_index_out)
     {
         if (m_requires_manual_copy) {
             return false;
         }
-        else if (m_did_clear) {
+        remote_index_out = local_index;
+        if (m_did_clear) {
+            return true;
+        }
+        if (remote_index_out > remote_list_size) {
+            remote_index_out = static_cast<uint32_t>(remote_list_size);
+        }
+        for (auto& ndx : m_indices_allowed) {
+            if (ndx.local >= local_index) {
+                ++ndx.local;
+                ++ndx.remote;
+            }
+        }
+        m_indices_allowed.push_back(IndexPair{local_index, remote_index_out});
+        return true;
+    }
+
+    bool update(uint32_t index, uint32_t& remote_index_out)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        remote_index_out = index;
+        if (m_did_clear) {
             return true;
         }
         for (auto& ndx : m_indices_allowed) {
-            if (ndx == index) {
+            if (ndx.local == index) {
+                remote_index_out = ndx.remote;
                 return true;
             }
         }
@@ -544,32 +552,104 @@ struct ListTracker {
 
     void clear()
     {
-        // by definition, any local operations to a list after a clear are
+        // any local operations to a list after a clear are
         // strictly on locally added elements so no need to continue tracking
         m_requires_manual_copy = false;
         m_did_clear = true;
         m_indices_allowed.clear();
     }
 
-    // FIXME: move(size_t from, size_t to)
-
-    bool remove(size_t index)
+    bool move(uint32_t from, uint32_t to, size_t lst_size, uint32_t& remote_from_out, uint32_t& remote_to_out)
     {
         if (m_requires_manual_copy) {
             return false;
         }
-        else if (m_did_clear) {
+        remote_from_out = from;
+        remote_to_out = to;
+        if (m_did_clear) {
+            return true;
+        }
+        //        if (from >= lst_size || to >= lst_size) {
+        //            m_requires_manual_copy = true;
+        //            m_indices_allowed.clear();
+        //            return false;
+        //        }
+        if (from == to) {
+            // not sure if this is possible, but it is a no-op
+            return true;
+        }
+        else if (from < to) {
+            auto target = m_indices_allowed.end();
+            for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
+                if (it->local == from) {
+                    REALM_ASSERT(target == m_indices_allowed.end());
+                    target = it;
+                }
+                else if (it->local > from && it->local <= to) {
+                    REALM_ASSERT(it->local != 0);
+                    REALM_ASSERT(it->remote != 0);
+                    --it->local;
+                    --it->remote;
+                }
+            }
+            if (target == m_indices_allowed.end() || target->remote + (to - from) >= lst_size) {
+                m_requires_manual_copy = true;
+                m_indices_allowed.clear();
+                return false;
+            }
+            remote_from_out = target->remote;
+            remote_to_out = target->remote + (to - from);
+            target->local = to;
+            target->remote = target->remote + (to - from);
+            return true;
+        }
+        else { // from > to
+            auto target = m_indices_allowed.end();
+            for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
+                if (it->local == from) {
+                    REALM_ASSERT(target == m_indices_allowed.end());
+                    target = it;
+                }
+                else if (it->local < from && it->local >= to) {
+                    ++it->local;
+                    ++it->remote;
+                }
+            }
+            if (target == m_indices_allowed.end() || target->remote < (from - to)) {
+                m_requires_manual_copy = true;
+                m_indices_allowed.clear();
+                return false;
+            }
+            remote_from_out = target->remote;
+            remote_to_out = target->remote - (from - to);
+            target->local = to;
+            target->remote = target->remote - (from - to);
+            return true;
+        }
+        REALM_UNREACHABLE();
+        return false;
+    }
+
+    bool remove(uint32_t index, uint32_t& remote_index_out)
+    {
+        if (m_requires_manual_copy) {
+            return false;
+        }
+        remote_index_out = index;
+        if (m_did_clear) {
             return true;
         }
         bool found = false;
         for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end();) {
-            if (*it == index) {
+            if (it->local == index) {
                 found = true;
+                remote_index_out = it->remote;
                 it = m_indices_allowed.erase(it);
                 continue;
             }
-            else if (*it > index) {
-                --*it;
+            else if (it->local > index) {
+                --it->local;
+                --it->remote;
             }
             ++it;
         }
@@ -587,7 +667,11 @@ struct ListTracker {
     }
 
 private:
-    std::vector<size_t> m_indices_allowed;
+    struct IndexPair {
+        uint32_t local;
+        uint32_t remote;
+    };
+    std::vector<IndexPair> m_indices_allowed;
     bool m_requires_manual_copy = false;
     bool m_did_clear = false;
 };
@@ -770,8 +854,10 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             bool allowed_to_update = true;
             resolve_if_list(instr, instr_name, [&](LstBase& list) {
                 auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
-                allowed_to_update = list_tracker.update(instr.index());
+                uint32_t translated_ndx;
+                allowed_to_update = list_tracker.update(instr.index(), translated_ndx);
                 instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                instr_copy.path.back() = translated_ndx;
             });
             if (allowed_to_update) {
                 try {
@@ -843,16 +929,21 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             logger.warn("Discarding %1 which links to a deleted object", instr_name);
         }
         else if (auto obj = get_top_object(instr, instr_name)) {
+            bool allowed_to_insert = false;
             Instruction::ArrayInsert instr_copy = instr;
             resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                size_t list_size = list.size();
                 auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
-                list_tracker.insert(index);
-                instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                if (index > instr_copy.prior_size) {
-                    instr_copy.path.back() = instr_copy.prior_size; // FIXME: is clamping reasonable?
+                uint32_t translated_index;
+                allowed_to_insert = list_tracker.insert(static_cast<uint32_t>(index), list_size, translated_index);
+                if (allowed_to_insert) {
+                    instr_copy.prior_size = static_cast<uint32_t>(list_size);
+                    instr_copy.path.back() = translated_index;
                 }
             });
-            InstructionApplier::operator()(instr_copy);
+            if (allowed_to_insert) {
+                InstructionApplier::operator()(instr_copy);
+            }
         }
         else {
             logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
@@ -861,12 +952,28 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::ArrayMove& instr)
     {
-        if (get_top_object(instr, "ArrayMove")) {
-            InstructionApplier::operator()(instr);
-            // FIXME: adjust prior_size and check for indices which were not recovered inserts.
+        const char* instr_name = "ArrayMove";
+        if (auto obj = get_top_object(instr, instr_name)) {
+            bool allowed_to_move = false;
+            Instruction::ArrayMove instr_copy = instr;
+            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+                size_t lst_size = list.size();
+                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                uint32_t translated_from, translated_to;
+                allowed_to_move = list_tracker.move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
+                                                    translated_from, translated_to);
+                if (allowed_to_move) {
+                    instr_copy.prior_size = static_cast<uint32_t>(lst_size);
+                    instr_copy.path.back() = translated_from;
+                    instr_copy.ndx_2 = translated_to;
+                }
+            });
+            if (allowed_to_move) {
+                InstructionApplier::operator()(instr_copy);
+            }
         }
         else {
-            logger.warn("Discarding a local ArrayMove made to an object which no longer exists");
+            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
         }
     }
 
@@ -878,8 +985,12 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             bool allowed_to_delete = false;
             resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
                 auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
-                allowed_to_delete = list_tracker.remove(index);
-                instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                uint32_t translated_index;
+                allowed_to_delete = list_tracker.remove(static_cast<uint32_t>(index), translated_index);
+                if (allowed_to_delete) {
+                    instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                    instr_copy.path.back() = translated_index;
+                }
             });
             if (allowed_to_delete) {
                 InstructionApplier::operator()(instr_copy);
