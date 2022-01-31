@@ -368,9 +368,8 @@ public:
 
     // Overriding methods in util::websocket::EZObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
-    void websocket_connect_error_handler(std::error_code) override;
+    void websocket_network_error_handler(std::error_code) override;
     void websocket_401_unauthorized_error_handler() override;
-    void websocket_read_or_write_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
 

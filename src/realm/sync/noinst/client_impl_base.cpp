@@ -335,18 +335,12 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
 }
 
 
-void Connection::websocket_read_or_write_error_handler(std::error_code ec)
-{
-    read_or_write_error(ec); // Throws
-}
-
-
 void Connection::websocket_401_unauthorized_error_handler()
 {
     // This is handled the same as any other connect failure. However, we need to use this exact error code because
     // that is what the Object Store layer is looking for in order to refresh the access token.
     // TODO delete this function once REALMC-10531 is resolved.
-    websocket_connect_error_handler(util::websocket::Error::bad_response_401_unauthorized);
+    websocket_network_error_handler(util::websocket::Error::bad_response_401_unauthorized);
 }
 
 
@@ -930,8 +924,14 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 }
 
 
-void Connection::websocket_connect_error_handler(std::error_code ec)
+void Connection::websocket_network_error_handler(std::error_code ec)
 {
+    if (m_state == ConnectionState::connected) {
+        read_or_write_error(ec);
+        return;
+    }
+
+    REALM_ASSERT_RELEASE(m_state == ConnectionState::connecting);
     m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
     bool is_fatal = false;
     StringData* custom_message = nullptr;
