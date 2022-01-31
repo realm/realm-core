@@ -81,11 +81,11 @@ case $(uname -s) in
 esac
 
 # Allow path to $CURL to be overloaded by an environment variable
-CURL=${CURL:=$LAUNCHER curl}
+CURL="${CURL:=$LAUNCHER curl}"
 
-BASE_PATH=$(cd $(dirname "$0"); pwd)
+BASE_PATH="$(cd $(dirname "$0"); pwd)"
 
-REALPATH=$BASE_PATH/abspath.sh
+REALPATH="$BASE_PATH/abspath.sh"
 
 usage()
 {
@@ -116,11 +116,11 @@ if [[ -z "$WORK_PATH" ]]; then
     exit 1
 fi
 
-[[ -d $WORK_PATH ]] || mkdir -p $WORK_PATH
-cd $WORK_PATH
+[[ -d $WORK_PATH ]] || mkdir -p "$WORK_PATH"
+cd "$WORK_PATH"
 
-if [[ -f $WORK_PATH/baas_ready ]]; then
-    rm $WORK_PATH/baas_ready
+if [[ -f "$WORK_PATH/baas_ready" ]]; then
+    rm "$WORK_PATH/baas_ready"
 fi
 
 echo "Installing node and go to build baas and its dependencies"
@@ -159,7 +159,7 @@ fi
 
 cd baas
 echo "Checking out baas version $BAAS_VERSION"
-git checkout $BAAS_VERSION
+git checkout "$BAAS_VERSION"
 cd -
 
 if [[ ! -d $WORK_PATH/baas/etc/dylib/lib ]]; then
@@ -169,11 +169,12 @@ if [[ ! -d $WORK_PATH/baas/etc/dylib/lib ]]; then
     $CURL -LsS $STITCH_SUPPORT_LIB_URL | tar -xz --strip-components=1
     cd -
 fi
-export LD_LIBRARY_PATH=$WORK_PATH/baas/etc/dylib/lib
+export LD_LIBRARY_PATH="$WORK_PATH/baas/etc/dylib/lib"
+export DYLD_LIBRARY_PATH="$WORK_PATH/baas/etc/dylib/lib"
 
 if [[ ! -x $WORK_PATH/baas_dep_binaries/libmongo.so && -n "$STITCH_ASSISTED_AGG_LIB_URL" ]]; then
     echo "Downloading assisted agg library"
-    cd $WORK_PATH/baas_dep_binaries
+    cd "$WORK_PATH/baas_dep_binaries"
     $CURL -LsS $STITCH_ASSISTED_AGG_LIB_URL > libmongo.so
     chmod 755 libmongo.so 
     cd -
@@ -181,7 +182,7 @@ fi
 
 if [[ ! -x $WORK_PATH/baas_dep_binaries/assisted_agg && -n "$STITCH_ASSISTED_AGG_URL" ]]; then
     echo "Downloading assisted agg binary"
-    cd $WORK_PATH/baas_dep_binaries
+    cd "$WORK_PATH/baas_dep_binaries"
     $CURL -LsS $STITCH_ASSISTED_AGG_URL > assisted_agg
     chmod 755 assisted_agg
     cd -
@@ -193,19 +194,19 @@ if [[ ! -x $YARN ]]; then
     mkdir yarn && cd yarn
     $CURL -LsS https://s3.amazonaws.com/stitch-artifacts/yarn/latest.tar.gz | tar -xz --strip-components=1
     cd -
-    mkdir $WORK_PATH/yarn_cache
+    mkdir "$WORK_PATH/yarn_cache"
 fi
 
 if [[ ! -x baas_dep_binaries/transpiler ]]; then
     echo "Building transpiler"
     cd baas/etc/transpiler
-    $YARN --non-interactive --silent --cache-folder $WORK_PATH/yarn_cache
-    $YARN build --cache-folder $WORK_PATH/yarn_cache --non-interactive --silent
+    $YARN --non-interactive --silent --cache-folder "$WORK_PATH/yarn_cache"
+    $YARN build --cache-folder "$WORK_PATH/yarn_cache" --non-interactive --silent
     cd -
-    ln -s $(pwd)/baas/etc/transpiler/bin/transpiler baas_dep_binaries/transpiler
+    ln -s "$(pwd)/baas/etc/transpiler/bin/transpiler" baas_dep_binaries/transpiler
 fi
 
-if [ ! -x $WORK_PATH/mongodb-binaries/bin/mongod ]; then
+if [ ! -x "$WORK_PATH/mongodb-binaries/bin/mongod" ]; then
     echo "Downloading mongodb"
     $CURL -sLS $MONGODB_DOWNLOAD_URL --output mongodb-binaries.tgz
 
@@ -226,24 +227,24 @@ function cleanup() {
     BAAS_PID=""
     MONGOD_PID=""
     if [[ -f $WORK_PATH/baas_server.pid ]]; then
-        BAAS_PID="$(< $WORK_PATH/baas_server.pid)"
+        BAAS_PID="$(< "$WORK_PATH/baas_server.pid")"
     fi
 
     if [[ -f $WORK_PATH/mongod.pid ]]; then
-        MONGOD_PID="$(< $WORK_PATH/mongod.pid)"
+        MONGOD_PID="$(< "$WORK_PATH/mongod.pid")"
     fi
 
     if [[ -n "$BAAS_PID" ]]; then
         echo "Stopping baas $BAAS_PID"
-        kill $BAAS_PID
+        kill "$BAAS_PID"
         echo "Waiting for baas to stop"
-        wait $BAAS_PID
+        wait "$BAAS_PID"
     fi
 
 
     if [[ -n "$MONGOD_PID" ]]; then
         echo "Killing mongod $MONGOD_PID"
-        kill $MONGOD_PID
+        kill "$MONGOD_PID"
         echo "Waiting for processes to exit"
         wait
     fi
@@ -253,14 +254,14 @@ trap "exit" INT TERM ERR
 trap cleanup EXIT
 
 echo "Starting mongodb"
-[[ -f $WORK_PATH/mongodb-dbpath/mongod.pid ]] && rm $WORK_PATH/mongodb-path/mongod.pid
+[[ -f $WORK_PATH/mongodb-dbpath/mongod.pid ]] && rm "$WORK_PATH/mongodb-path/mongod.pid"
 ./mongodb-binaries/bin/mongod \
     --replSet rs \
     --bind_ip_all \
     --port 26000 \
-    --logpath $WORK_PATH/mongodb-dbpath/mongod.log \
-    --dbpath $WORK_PATH/mongodb-dbpath/ \
-    --pidfilepath $WORK_PATH/mongod.pid &
+    --logpath "$WORK_PATH/mongodb-dbpath/mongod.log" \
+    --dbpath "$WORK_PATH/mongodb-dbpath/" \
+    --pidfilepath "$WORK_PATH/mongod.pid" &
 
 ./mongodb-binaries/bin/mongo \
     --nodb \
@@ -270,9 +271,9 @@ echo "Starting mongodb"
 echo "Initializing replica set"
 ./mongodb-binaries/bin/mongo --port 26000 --eval 'rs.initiate()' > /dev/null
 
-cd $WORK_PATH/baas
+cd "$WORK_PATH/baas"
 echo "Adding stitch user"
-go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH" cmd/auth/user.go \
+go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH" cmd/auth/user.go \
     addUser \
     -domainID 000000000000000000000000 \
     -mongoURI mongodb://localhost:26000 \
@@ -282,14 +283,14 @@ go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH" cmd/auth/user.go \
 
 [[ -d tmp ]] || mkdir tmp
 echo "Starting stitch app server"
-[[ -f $WORK_PATH/baas_server.pid ]] && rm $WORK_PATH/baas_server.pid
-go build -o $WORK_PATH/baas_server cmd/server/main.go
-$WORK_PATH/baas_server \
-    --configFile=etc/configs/test_config.json --configFile=$BASE_PATH/config_overrides.json 2>&1 > $WORK_PATH/baas_server.log &
-echo $! > $WORK_PATH/baas_server.pid
-$BASE_PATH/wait_for_baas.sh $WORK_PATH/baas_server.pid
+[[ -f $WORK_PATH/baas_server.pid ]] && rm "$WORK_PATH/baas_server.pid"
+go build -o "$WORK_PATH/baas_server" cmd/server/main.go
+"$WORK_PATH/baas_server" \
+    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json 2>&1 > "$WORK_PATH/baas_server.log" &
+echo $! > "$WORK_PATH/baas_server.pid"
+"$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid"
 
-touch $WORK_PATH/baas_ready
+touch "$WORK_PATH/baas_ready"
 
 echo "Baas server ready"
 wait
