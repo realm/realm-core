@@ -448,7 +448,17 @@ TEST(Util_Network_SSL_BrokenPipeOnHandshakeWrite)
     do {
         socket_2.write_some(buffer.get(), size, ec);
     } while (!ec);
+#if REALM_PLATFORM_APPLE
+    // Which error we get from writing to a closed socket seems to depend on
+    // some asynchronous kernel state. If it notices that the socket is closed
+    // before sending any data we get EPIPE, and if it's after trying to send
+    // data it's ECONNRESET. EHOSTDOWN is not documented as an error code from
+    // send() and may be worth investigating once the macOS 12 XNU source is
+    // released.
+    REALM_ASSERT(ec == error::broken_pipe || ec == error::connection_reset || ec.value() == EHOSTDOWN);
+#else
     REALM_ASSERT(ec == error::broken_pipe);
+#endif
 
     CHECK_SYSTEM_ERROR(ssl_stream_2.handshake(), error::broken_pipe);
 }
@@ -517,7 +527,11 @@ TEST(Util_Network_SSL_BrokenPipeOnWrite)
     do {
         socket_2.write_some(buffer.get(), size, ec);
     } while (!ec);
+#if REALM_PLATFORM_APPLE
+    REALM_ASSERT(ec == error::broken_pipe || ec == error::connection_reset || ec.value() == EHOSTDOWN);
+#else
     REALM_ASSERT(ec == error::broken_pipe);
+#endif
 
     char ch = 0;
     CHECK_SYSTEM_ERROR(ssl_stream_2.write(&ch, 1), error::broken_pipe);
@@ -547,7 +561,11 @@ TEST(Util_Network_SSL_BrokenPipeOnShutdown)
     do {
         socket_2.write_some(buffer.get(), size, ec);
     } while (!ec);
+#if REALM_PLATFORM_APPLE
+    REALM_ASSERT(ec == error::broken_pipe || ec == error::connection_reset || ec.value() == EHOSTDOWN);
+#else
     REALM_ASSERT(ec == error::broken_pipe);
+#endif
 
     CHECK_SYSTEM_ERROR(ssl_stream_2.shutdown(), error::broken_pipe);
 }
