@@ -252,6 +252,14 @@ public:
     bool assertionEnded(AssertionStats const& assertionStats) override
     {
         if (!assertionStats.assertionResult.isOk()) {
+            if (m_logger) {
+                m_logger->error("Assertion failure: %1", assertionStats.assertionResult.getSourceInfo());
+                m_logger->error("from expression: %1", assertionStats.assertionResult.getExpression());
+                m_logger->error(" with expansion: %1", assertionStats.assertionResult.getExpandedExpression());
+                for (const auto& message: assertionStats.infoMessages) {
+                    m_logger->error("assertion message: %1", message.message);
+                }
+            }
             std::cerr << "Assertion failure: " << assertionStats.assertionResult.getSourceInfo() << std::endl;
             std::cerr << "\t from expresion: '" << assertionStats.assertionResult.getExpression() << "'" << std::endl;
             std::cerr << "\t with expansion: '" << assertionStats.assertionResult.getExpandedExpression() << "'"
