@@ -87,6 +87,14 @@ TEST(StringData_Null)
 }
 
 
+TEST(StringData_Empty)
+{
+    CHECK(StringData().empty());         // Null
+    CHECK(StringData("").empty());       // Empty string
+    CHECK(!StringData("hello").empty()); // Nonempty string
+}
+
+
 TEST(StringData_Equal)
 {
     // Test operator==() and operator!=()

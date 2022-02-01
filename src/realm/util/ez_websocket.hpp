@@ -47,17 +47,19 @@ public:
     /// handshake is done. No message_received callbacks will be called before the handshake is done.
     virtual void websocket_handshake_completion_handler(const std::string& protocol) = 0;
 
-    //@{
-    /// websocket_read_error_handler() and websocket_write_error_handler() are called when an
-    /// error occurs on the underlying stream given by the async_read and async_write functions above.
-    /// The error_code is passed through.
+    /// Called for any error that is not an in-band WebSocket close message.
     ///
-    /// After calling any of these error callbacks, the Socket will move into the stopped state, and
-    /// no more messages should be sent, or will be received.
-    /// It is safe to destroy the WebSocket object in these handlers.
-    /// TODO there are too many error handlers. Try to get down to just one.
-    virtual void websocket_network_error_handler(std::error_code) = 0;
-    //@}
+    /// Implementations such as browsers that cannot distinguish network errors from close messages should use
+    /// websocket_close_message_received() with code 1005.
+    ///
+    /// The error_code is primarily for logging, callers do not need to put any specific codes for specific cases. All
+    /// cases that need to be handled specially have their own methods. The provided code will be passed to any
+    /// completion handlers attached to the realm::SyncSession if this causes them to fail.
+    ///
+    /// Pass an empty message if there is nothing to add to what is in the error_code.
+    ///
+    /// Until REALMC-10531 is resolved, HTTP 401 errors must be reported via websocket_401_unauthorized_error_handler.
+    virtual void websocket_network_error_handler(std::error_code, StringData message) = 0;
 
     /// This is called when the server replies to the websocket HTTP handshake with a 401 unauthorized error.
     ///
@@ -65,15 +67,17 @@ public:
     virtual void websocket_401_unauthorized_error_handler() = 0;
 
     //@{
-    /// The five callback functions below are called whenever a full message has arrived.
-    /// The Socket defragments fragmented messages internally and delivers a full message.
+    /// The callback functions below are called whenever a full binary or close message has arrived.
+    ///
+    /// Other message kinds should not be reported to this observer.
+    ///
     /// \param data size The message is delivered in this buffer
     /// The buffer is only valid until the function returns.
     /// \return value designates whether the WebSocket object should continue
     /// processing messages. The normal return value is true. False must be returned if the
     /// websocket object is destroyed during execution of the function.
     virtual bool websocket_binary_message_received(const char* data, size_t size) = 0;
-    virtual bool websocket_close_message_received(std::error_code error_code, StringData message) = 0;
+    virtual bool websocket_close_message_received(int error_code, StringData message) = 0;
     //@}
 
 protected:

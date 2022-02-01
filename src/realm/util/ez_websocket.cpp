@@ -49,12 +49,12 @@ private:
     void websocket_read_error_handler(std::error_code ec) override
     {
         logger().error("Reading failed: %1", ec.message()); // Throws
-        m_observer.websocket_network_error_handler(ec);
+        m_observer.websocket_network_error_handler(ec, {});
     }
     void websocket_write_error_handler(std::error_code ec) override
     {
         logger().error("Writing failed: %1", ec.message()); // Throws
-        m_observer.websocket_network_error_handler(ec);
+        m_observer.websocket_network_error_handler(ec, {});
     }
     void websocket_handshake_error_handler(std::error_code ec, const util::HTTPHeaders*,
                                            const std::string_view*) override
@@ -63,16 +63,17 @@ private:
             m_observer.websocket_401_unauthorized_error_handler();
         }
         else {
-            m_observer.websocket_network_error_handler(ec);
+            m_observer.websocket_network_error_handler(ec, {});
         }
     }
     void websocket_protocol_error_handler(std::error_code ec) override
     {
-        m_observer.websocket_network_error_handler(ec);
+        m_observer.websocket_network_error_handler(ec, {});
     }
     bool websocket_close_message_received(std::error_code ec, StringData message) override
     {
-        return m_observer.websocket_close_message_received(ec, message);
+        REALM_ASSERT_RELEASE(ec.category() == websocket::websocket_close_status_category());
+        return m_observer.websocket_close_message_received(ec.value(), message);
     }
     bool websocket_binary_message_received(const char* ptr, std::size_t size) override
     {
@@ -179,7 +180,7 @@ void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::L
 {
     if (ec) {
         logger().error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
-        m_observer.websocket_network_error_handler(ec);                                                     // Throws
+        m_observer.websocket_network_error_handler(ec, {});                                                 // Throws
         return;
     }
 
@@ -218,7 +219,7 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
         }
         // All endpoints failed
         logger().error("Failed to connect to '%1:%2': All endpoints failed", m_endpoint.address, m_endpoint.port);
-        m_observer.websocket_network_error_handler(ec); // Throws
+        m_observer.websocket_network_error_handler(ec, {}); // Throws
         return;
     }
 
@@ -257,7 +258,7 @@ void EZSocketImpl::initiate_http_tunnel()
     auto handler = [this](HTTPResponse response, std::error_code ec) {
         if (ec && ec != util::error::operation_aborted) {
             logger().error("Failed to establish HTTP tunnel: %1", ec.message());
-            m_observer.websocket_network_error_handler(ec); // Throws
+            m_observer.websocket_network_error_handler(ec, {}); // Throws
             return;
         }
 
@@ -265,7 +266,7 @@ void EZSocketImpl::initiate_http_tunnel()
             logger().error("Proxy server returned response '%1 %2'", response.status, response.reason); // Throws
             std::error_code ec2 =
                 util::websocket::Error::bad_response_unexpected_status_code; // FIXME: is this the right error?
-            m_observer.websocket_network_error_handler(ec2);                 // Throws
+            m_observer.websocket_network_error_handler(ec2, {});             // Throws
             return;
         }
 
@@ -328,7 +329,7 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
         m_config.logger.error("SSL handshake failed: %1", ec.message()); // Throws
-        m_observer.websocket_network_error_handler(ec);                  // Throws
+        m_observer.websocket_network_error_handler(ec, {});              // Throws
         return;
     }
 

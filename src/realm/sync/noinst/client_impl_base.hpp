@@ -368,9 +368,9 @@ public:
 
     // Overriding methods in util::websocket::EZObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
-    void websocket_network_error_handler(std::error_code) override;
+    void websocket_network_error_handler(std::error_code, StringData message) override;
     void websocket_401_unauthorized_error_handler() override;
-    bool websocket_close_message_received(std::error_code error_code, StringData message) override;
+    bool websocket_close_message_received(int error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
 
     connection_ident_type get_ident() const noexcept;
@@ -439,10 +439,10 @@ private:
     void handle_message_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
-    void read_or_write_error(std::error_code);
+    void read_or_write_error(std::error_code, StringData message = {});
     void close_due_to_protocol_error(std::error_code);
     void close_due_to_missing_protocol_feature();
-    void close_due_to_client_side_error(std::error_code, bool is_fatal);
+    void close_due_to_client_side_error(std::error_code, bool is_fatal, StringData message = {});
     void close_due_to_server_side_error(ProtocolError, StringData message, bool try_again);
     void voluntary_disconnect();
     void involuntary_disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
