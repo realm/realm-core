@@ -177,7 +177,7 @@ functions:
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
           export UNITTEST_LOG_TO_FILES="yes"
-          export UNITTEST_LOG_FILE_PREFIX="${task_name}"
+          export UNITTEST_LOG_FILE_PREFIX="${task_name}_thread"
           export UNITTEST_LOG_LEVEL="all"
           export UNITTEST_PROGRESS=yes
           if [[ -n "${report_test_progress|}" ]]; then

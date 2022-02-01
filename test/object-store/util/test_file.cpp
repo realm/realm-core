@@ -195,7 +195,6 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    using namespace std::literals::chrono_literals;
 
 #if TEST_ENABLE_SYNC_LOGGING
-
                    auto logger = new util::StderrLogger();
                    logger->set_level_threshold(util::Logger::Level::all);
                    m_logger.reset(logger);
@@ -314,7 +313,6 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     auto reporter_logger = get_test_reporter_logger();
     if (reporter_logger) {
         sc_config.logger_factory = std::move(*reporter_logger);
-        sc_config.log_level = util::Logger::Level::all;
     }
 
     m_app = app::App::get_shared_app(app_config, sc_config);

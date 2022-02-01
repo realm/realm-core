@@ -200,8 +200,15 @@ public:
     explicit EvergreenReporter(ReporterConfig const& config)
         : Base(config)
     {
-        if (auto should_log = std::string_view(::getenv("UNITTEST_LOG_TO_FILES")); !should_log.empty()) {
-            std::string log_file_name(std::string_view(::getenv("UNITTEST_LOG_FILE_PREFIX")));
+        auto getenv_sv = [](auto name) {
+            auto ptr = ::getenv(name);
+            if (!ptr) {
+                return std::string_view{};
+            }
+            return std::string_view(ptr);
+        };
+        if (auto should_log = getenv_sv("UNITTEST_LOG_TO_FILES"); !should_log.empty()) {
+            std::string log_file_name(getenv_sv("UNITTEST_LOG_FILE_PREFIX"));
             if (log_file_name.empty()) {
                 log_file_name = "realm-object-store-tests.log";
             }
