@@ -618,8 +618,7 @@ bool TestList::run(Config config)
                                      config.abort_on_failure, config.intra_test_log_level);
     shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
-    std::unique_ptr<std::unique_ptr<util::Logger>[]> loggers;
-    loggers.reset(new std::unique_ptr<util::Logger>[ num_threads ]);
+    std::vector<std::unique_ptr<util::Logger>> loggers(static_cast<size_t>(num_threads));
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
         std::unique_ptr<util::Logger> logger;
         std::ostringstream formatter;
@@ -631,7 +630,7 @@ bool TestList::run(Config config)
             for (int i = 0; i != num_threads; ++i) {
                 formatter.str(std::string());
                 formatter << "Thread[" << std::setw(thread_digits) << (i + 1) << "]: ";
-                loggers[i].reset(new util::PrefixLogger(formatter.str(), shared_logger));
+                loggers[i] = std::make_unique<util::PrefixLogger>(formatter.str(), shared_logger);
             }
         }
         else {
@@ -645,7 +644,8 @@ bool TestList::run(Config config)
                 formatter << a << std::setw(thread_digits) << (i + 1) << b;
                 std::string path = formatter.str();
                 shared_logger.info("Logging to %1", path);
-                loggers[i].reset(new util::FileLogger(path));
+                loggers.push_back(std::make_unique<util::FileLogger>(path));
+                loggers[i] = std::make_unique<util::ThreadSafeLogger>(*loggers.back());
             }
         }
     }
@@ -656,10 +656,9 @@ bool TestList::run(Config config)
         thread_context.nonconcur_run();
     }
     else {
-        std::unique_ptr<std::unique_ptr<ThreadContextImpl>[]> thread_contexts;
-        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[ num_threads ]);
+        std::vector<std::unique_ptr<ThreadContextImpl>> thread_contexts(static_cast<size_t>(num_threads));
         for (int i = 0; i < num_threads; ++i)
-            thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
+            thread_contexts[i] = std::make_unique<ThreadContextImpl>(shared_context, i, loggers[i].get());
 
         // First execute regular (concurrent) tests
         {

@@ -26,6 +26,7 @@
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/time.hpp>
 #include <realm/string_data.hpp>
 
 #include <external/json/json.hpp>
@@ -218,8 +219,7 @@ public:
 
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            time_t now = time(nullptr);
-            tm tm = *localtime(&now);
+            auto tm = realm::util::localtime(::time(nullptr));
             out << "./test_logs_" << std::put_time(&tm, "%Y%m%d_%H%M%S");
 
             auto dir_name = out.str();

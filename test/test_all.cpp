@@ -40,6 +40,7 @@
 #include <realm/util/features.h>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/parent_dir.hpp>
+#include <realm/util/time.hpp>
 #include <realm.hpp>
 #include <realm/utilities.hpp>
 #include <realm/disable_sync_to_disk.hpp>
@@ -378,13 +379,6 @@ private:
 };
 
 
-void put_time(std::ostream& out, const std::tm& tm, const char* format)
-{
-    const std::time_put<char>& facet = std::use_facet<std::time_put<char>>(out.getloc());
-    facet.put(std::ostreambuf_iterator<char>(out), out, ' ', &tm, format, format + strlen(format));
-}
-
-
 bool run_tests(util::Logger* logger)
 {
     auto getenv_sv = [](std::string_view name) -> std::string_view {
@@ -513,10 +507,8 @@ bool run_tests(util::Logger* logger)
         if (auto log_to_files = std::string_view(::getenv("UNITTEST_LOG_TO_FILES")); !log_to_files.empty()) {
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            time_t now = time(nullptr);
-            tm tm = *localtime(&now);
-            out << "test_logs_";
-            put_time(out, tm, "%Y%m%d_%H%M%S");
+            auto tm = util::localtime(::time(nullptr));
+            out << "test_logs_" << std::put_time(&tm, "%Y%m%d_%H%M%S");
             std::string dir_path = get_test_path_prefix() + out.str();
             util::make_dir(dir_path);
             config.per_thread_log_path = util::File::resolve(util::format("%1_%%.log", log_file_prefix), dir_path);
