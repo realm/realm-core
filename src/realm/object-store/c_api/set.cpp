@@ -26,8 +26,7 @@ RLM_API bool realm_set_get(const realm_set_t* set, size_t index, realm_value_t* 
 
         auto val = set->get_any(index);
         if (out_value) {
-            auto converted = objkey_to_typed_link(val, *set);
-            *out_value = to_capi(converted);
+            *out_value = to_capi(val);
         }
 
         return true;
@@ -60,8 +59,7 @@ RLM_API bool realm_set_find(const realm_set_t* set, realm_value_t value, size_t*
             return true;
         }
 
-        auto converted = typed_link_to_objkey(val, set->get_parent_column_key());
-        auto index = set->find_any(converted);
+        auto index = set->find_any(val);
         if (out_index)
             *out_index = index;
         if (out_found)
@@ -75,8 +73,6 @@ RLM_API bool realm_set_insert(realm_set_t* set, realm_value_t value, size_t* out
     return wrap_err([&]() {
         auto val = from_capi(value);
         check_value_assignable(*set, val);
-        auto col_key = set->get_parent_column_key();
-        val = typed_link_to_objkey(val, col_key);
 
         auto [index, inserted] = set->insert_any(val);
         if (out_index)
@@ -106,8 +102,7 @@ RLM_API bool realm_set_erase(realm_set_t* set, realm_value_t value, bool* out_er
                 *out_erased = false;
             return true;
         }
-        auto converted = typed_link_to_objkey(val, set->get_parent_column_key());
-        auto [index, erased] = set->remove_any(converted);
+        auto [index, erased] = set->remove_any(val);
         if (out_erased)
             *out_erased = erased;
 

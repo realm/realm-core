@@ -308,7 +308,6 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
             auto val = from_capi(values[i]);
-            val = typed_link_to_objkey(val, col_key);
             o.set_any(col_key, val, is_default);
         }
 
