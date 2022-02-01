@@ -49,7 +49,7 @@ This library supports:
 
 Problems:
 ---------------------------------------------------------------------------------------------------------------------
-    A csv file does not tell its sheme. So we auto-detect it, based on the first N rows. However if a given column
+    A csv file does not tell its scheme. So we auto-detect it, based on the first N rows. However if a given column
     contains 'false, false, false, hello' and we detect and create Realm table scheme using the first 3 rows, we fail
     when we meet 'hello' (this error is handled with a thorough error message)
 
