@@ -30,6 +30,7 @@
 
 #include <external/json/json.hpp>
 
+#include <iomanip>
 #include <iostream>
 #include <fstream>
 
@@ -199,8 +200,25 @@ public:
     explicit EvergreenReporter(ReporterConfig const& config)
         : Base(config)
     {
-        if (auto log_file_raw = ::getenv("UNITTEST_EVERGREEN_TEST_LOGFILE"); log_file_raw != nullptr) {
-            std::string log_file_path(log_file_raw);
+        if (auto should_log = std::string_view(::getenv("UNITTEST_LOG_TO_FILES")); !should_log.empty()) {
+            std::string log_file_name(std::string_view(::getenv("UNITTEST_LOG_FILE_PREFIX")));
+            if (log_file_name.empty()) {
+                log_file_name = "realm-object-store-tests.log";
+            }
+            else {
+                log_file_name += ".log";
+            }
+
+            std::ostringstream out;
+            out.imbue(std::locale::classic());
+            time_t now = time(nullptr);
+            tm tm = *localtime(&now);
+            out << "./test_logs_" << std::put_time(&tm, "%Y%m%d_%H%M%S");
+
+            auto dir_name = out.str();
+            realm::util::make_dir(dir_name);
+
+            auto log_file_path = realm::util::File::resolve(log_file_name, dir_name);
             std::ofstream log_file(log_file_path);
             if (log_file.fail()) {
                 throw std::runtime_error("Cannot open log file at " + log_file_path);

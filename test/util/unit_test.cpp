@@ -1054,9 +1054,11 @@ void SimpleReporter::fail(const TestContext& context, const char* file, long lin
 {
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
-    auto format = context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: ERROR in %3: %5"
-                                                                             : "%1:%2: ERROR in %3#%4: %5";
-    auto msg = util::format(format, file, line, details.test_name, context.recurrence_index + 1, message);
+    auto format = context.thread_context.shared_context.num_recurrences == 1
+                      ? "%1:%2: ERROR in %3: %5 (test thread %6)"
+                      : "%1:%2: ERROR in %3#%4: %5 (test thread %6)";
+    auto msg = util::format(format, file, line, details.test_name, context.recurrence_index + 1, message,
+                            context.thread_context.thread_index);
     if (m_report_progress) {
         m_error_messages.push_back(msg);
     }

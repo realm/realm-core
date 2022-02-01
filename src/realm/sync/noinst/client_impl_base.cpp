@@ -1797,7 +1797,12 @@ void Session::send_upload_message()
 #if REALM_DEBUG
             ChunkedBinaryInputStream in{changeset_data};
             Changeset log;
-            parse_changeset(in, log);
+            try {
+                parse_changeset(in, log);
+            }
+            catch (const BadChangesetError& e) {
+                logger.error("Bad changeset error while parsing changeset to upload: %1", e.what());
+            }
             std::stringstream ss;
             log.print(ss);
             logger.trace("Changeset (parsed):\n%1", ss.str());

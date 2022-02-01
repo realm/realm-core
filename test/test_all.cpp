@@ -387,9 +387,16 @@ void put_time(std::ostream& out, const std::tm& tm, const char* format)
 
 bool run_tests(util::Logger* logger)
 {
+    auto getenv_sv = [](std::string_view name) -> std::string_view {
+        const char* str = ::getenv(name.data());
+        if (!str) {
+            return std::string_view{};
+        }
+        return std::string_view(str);
+    };
+
     {
-        const char* str = getenv("UNITTEST_KEEP_FILES");
-        if (str && strlen(str) != 0)
+        if (!getenv_sv("UNITTEST_KEEP_FILES").empty())
             keep_test_files();
     }
 
@@ -398,15 +405,13 @@ bool run_tests(util::Logger* logger)
 
     // Log timestamps
     {
-        const char* str = getenv("UNITTEST_LOG_TIMESTAMPS");
-        if (str && std::strlen(str) != 0)
+        if (!getenv_sv("UNITTEST_LOG_TIMESTAMPS").empty())
             config.log_timestamps = true;
     }
 
     // Set number of threads
     {
-        const char* str = getenv("UNITTEST_THREADS");
-        if (str && strlen(str) != 0) {
+        if (std::string str(getenv_sv("UNITTEST_THREADS")); !str.empty()) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
             in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
@@ -426,8 +431,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of repetitions
     {
-        const char* str = getenv("UNITTEST_REPEAT");
-        if (str && strlen(str) != 0) {
+        if (std::string str(getenv_sv("UNITTEST_THREADS")); !str.empty()) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
             in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
@@ -440,8 +444,7 @@ bool run_tests(util::Logger* logger)
 
     // Shuffle
     {
-        const char* str = getenv("UNITTEST_SHUFFLE");
-        if (config.num_threads > 1 || (str && strlen(str) != 0))
+        if (config.num_threads > 1 || !getenv_sv("UNITTEST_SHUFFLE").empty())
             config.shuffle = true;
     }
 
@@ -451,13 +454,11 @@ bool run_tests(util::Logger* logger)
 #if REALM_MOBILE
     xml = true;
 #else
-    const char* xml_str = getenv("UNITTEST_XML");
-    xml = (xml_str && strlen(xml_str) != 0);
+    xml = (!getenv_sv("UNITTEST_XML").empty());
 #endif
     std::vector<std::unique_ptr<Reporter>> reporters;
     {
-        const char* str = getenv("UNITTEST_PROGRESS");
-        bool report_progress = str && strlen(str) != 0;
+        bool report_progress = !getenv_sv("UNITTEST_PROGRESS").empty();
         std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
         reporters.push_back(std::move(reporter));
     }
@@ -470,7 +471,7 @@ bool run_tests(util::Logger* logger)
         reporters.push_back(std::move(reporter_1));
         reporters.push_back(std::move(reporter_2));
     }
-    else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
+    else if (std::string str(getenv_sv("UNITTEST_EVERGREEN_TEST_RESULTS")); !str.empty()) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
         auto evergreen_reporter = create_evergreen_reporter(str);
         auto combined_reporter = create_twofold_reporter(*reporters.back(), *evergreen_reporter);
@@ -480,19 +481,18 @@ bool run_tests(util::Logger* logger)
     config.reporter = reporters.back().get();
 
     // Set up filter
-    const char* filter_str = getenv("UNITTEST_FILTER");
+    auto filter_str = std::string(getenv_sv("UNITTEST_FILTER"));
     const char* test_only = get_test_only();
     if (test_only)
         filter_str = test_only;
     std::unique_ptr<Filter> filter;
-    if (filter_str && strlen(filter_str) != 0)
+    if (!filter_str.empty())
         filter = create_wildcard_filter(filter_str);
     config.filter = filter.get();
 
     // Set intra test log level threshold
     {
-        const char* str = getenv("UNITTEST_LOG_LEVEL");
-        if (str && strlen(str) != 0) {
+        if (std::string str(getenv_sv("UNITTEST_LOG_LEVEL")); !str.empty()) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
             in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
@@ -505,8 +505,12 @@ bool run_tests(util::Logger* logger)
 
     // Set up per-thread file logging
     {
-        const char* str = getenv("UNITTEST_LOG_TO_FILES");
-        if (str && strlen(str) != 0) {
+        auto log_file_prefix = getenv_sv("UNITTEST_LOG_FILE_PREFIX");
+        if (log_file_prefix.empty()) {
+            log_file_prefix = "thread";
+        }
+
+        if (auto log_to_files = std::string_view(::getenv("UNITTEST_LOG_TO_FILES")); !log_to_files.empty()) {
             std::ostringstream out;
             out.imbue(std::locale::classic());
             time_t now = time(nullptr);
@@ -515,14 +519,13 @@ bool run_tests(util::Logger* logger)
             put_time(out, tm, "%Y%m%d_%H%M%S");
             std::string dir_path = get_test_path_prefix() + out.str();
             util::make_dir(dir_path);
-            config.per_thread_log_path = util::File::resolve("thread_%.log", dir_path);
+            config.per_thread_log_path = util::File::resolve(util::format("%1_%%.log", log_file_prefix), dir_path);
         }
     }
 
     // Enable abort on failure
     {
-        const char* str = getenv("UNITTEST_ABORT_ON_FAILURE");
-        if (str && strlen(str) != 0) {
+        if (!getenv_sv("UNITTEST_ABORT_ON_FAILURE").empty()) {
             config.abort_on_failure = true;
         }
     }
