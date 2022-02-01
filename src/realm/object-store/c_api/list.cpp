@@ -19,8 +19,6 @@
 #include <realm/object-store/c_api/types.hpp>
 #include <realm/object-store/c_api/util.hpp>
 
-#include <realm/util/overload.hpp>
-
 namespace realm::c_api {
 
 RLM_API bool realm_list_size(const realm_list_t* list, size_t* out_size)
@@ -44,29 +42,11 @@ RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_
 {
     return wrap_err([&]() {
         list->verify_attached();
-        realm_value_t result{};
+        auto mixed = list->get_any(index);
 
-        auto getter = util::overload{
-            [&](Obj*) {
-                Obj o = list->get<Obj>(index);
-                result.type = RLM_TYPE_LINK;
-                result.link.target_table = o.get_table()->get_key().value;
-                result.link.target = o.get_key().value;
-            },
-            [&](util::Optional<Obj>*) {
-                REALM_TERMINATE("Nullable link lists not supported");
-            },
-            [&](auto p) {
-                using T = std::remove_cv_t<std::remove_pointer_t<decltype(p)>>;
-                Mixed mixed{list->get<T>(index)};
-                result = to_capi(mixed);
-            },
-        };
-
-        switch_on_type(list->get_type(), getter);
-
-        if (out_value)
-            *out_value = result;
+        if (out_value) {
+            *out_value = to_capi(mixed);
+        }
         return true;
     });
 }
@@ -76,9 +56,6 @@ RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t v
     return wrap_err([&]() {
         auto val = from_capi(value);
         check_value_assignable(*list, val);
-
-        auto col_key = list->get_parent_column_key();
-        val = typed_link_to_objkey(val, col_key);
 
         list->insert_any(index, val);
         return true;
@@ -90,9 +67,6 @@ RLM_API bool realm_list_set(realm_list_t* list, size_t index, realm_value_t valu
     return wrap_err([&]() {
         auto val = from_capi(value);
         check_value_assignable(*list, val);
-
-        auto col_key = list->get_parent_column_key();
-        val = typed_link_to_objkey(val, col_key);
 
         list->set_any(index, val);
         return true;
