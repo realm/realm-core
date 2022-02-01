@@ -5733,6 +5733,56 @@ TEST(Sync_BadChangeset)
 }
 
 
+TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
+{
+    TEST_DIR(dir);
+    TEST_CLIENT_DB(db);
+
+    bool did_fail = false;
+    {
+        ClientServerFixture::Config config;
+        config.disable_upload_compaction = true;
+        ClientServerFixture fixture(dir, test_context, std::move(config));
+        fixture.start();
+
+        {
+            Session session = fixture.make_bound_session(db);
+            session.wait_for_download_complete_or_client_stopped();
+        }
+
+        {
+            WriteTransaction wt(db);
+            TableRef table = wt.add_table("class_table");
+            table->add_column(type_Int, "prógram");
+            table->add_column(type_Int, "program");
+            auto obj = table->create_object();
+            obj.add_int("program", 42);
+            wt.commit();
+        }
+
+        auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
+            if (state != ConnectionState::disconnected)
+                return;
+            REALM_ASSERT(error_info);
+            std::error_code ec = error_info->error_code;
+            bool is_fatal = error_info->is_fatal;
+            CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
+            CHECK(is_fatal);
+            fixture.stop();
+            did_fail = true;
+        };
+
+        Session session = fixture.make_session(db);
+        session.set_connection_state_change_listener(listener);
+        fixture.bind_session(session, "/test");
+
+        session.wait_for_upload_complete_or_client_stopped();
+        session.wait_for_download_complete_or_client_stopped();
+    }
+    CHECK_NOT(did_fail);
+}
+
+
 namespace issue2104 {
 
 class IntegrationReporter : public _impl::ServerHistory::IntegrationReporter {
