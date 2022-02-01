@@ -256,7 +256,7 @@ public:
                 m_logger->error("Assertion failure: %1", assertionStats.assertionResult.getSourceInfo());
                 m_logger->error("from expression: %1", assertionStats.assertionResult.getExpression());
                 m_logger->error(" with expansion: %1", assertionStats.assertionResult.getExpandedExpression());
-                for (const auto& message: assertionStats.infoMessages) {
+                for (const auto& message : assertionStats.infoMessages) {
                     m_logger->error("assertion message: %1", message.message);
                 }
             }
