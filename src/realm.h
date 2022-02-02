@@ -1731,6 +1731,25 @@ RLM_API realm_set_t* _realm_set_from_native_copy(const void* pset, size_t n);
 RLM_API realm_set_t* _realm_set_from_native_move(void* pset, size_t n);
 
 /**
+ * Resolve the set in the context of a given Realm instance.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ *
+ * If resolution is possible, a valid resolved object is produced at '*resolved*'.
+ * If resolution is not possible, but no error occurs, '*resolved' is set to NULL
+ *
+ * @return true if no error occurred.
+ */
+RLM_API bool realm_set_resolve_in(const realm_set_t* list, const realm_t* target_realm, realm_set_t** resolved);
+
+/**
+ * Check if a set is valid.
+ *
+ * @return True if the set is valid.
+ */
+RLM_API bool realm_set_is_valid(const realm_set_t*);
+
+/**
  * Get the size of a set, in number of unique elements.
  *
  * This function may fail if the object owning the set has been deleted.

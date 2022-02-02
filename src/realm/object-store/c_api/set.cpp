@@ -133,4 +133,50 @@ RLM_API bool realm_set_remove_all(realm_set_t* set)
     });
 }
 
+RLM_API realm_set_t* realm_set_from_thread_safe_reference(const realm_t* realm, realm_thread_safe_reference_t* tsr)
+{
+    return wrap_err([&]() {
+        auto stsr = dynamic_cast<realm_set::thread_safe_reference*>(tsr);
+        if (!stsr) {
+            throw std::logic_error{"Thread safe reference type mismatch"};
+        }
+
+        auto set = stsr->resolve<object_store::Set>(*realm);
+        return new realm_set_t{std::move(set)};
+    });
+}
+
+RLM_API bool realm_set_resolve_in(const realm_set_t* from_set, const realm_t* target_realm, realm_set_t** resolved)
+{
+    return wrap_err([&]() {
+        try {
+            const auto& realm = *target_realm;
+            auto frozen_set = from_set->freeze(realm);
+            if (frozen_set.is_valid()) {
+                *resolved = new realm_set_t{std::move(frozen_set)};
+            }
+            else {
+                *resolved = nullptr;
+            }
+            return true;
+        }
+        catch (NoSuchTable&) {
+            *resolved = nullptr;
+            return true;
+        }
+        catch (KeyNotFound&) {
+            *resolved = nullptr;
+            return true;
+        }
+    });
+}
+
+RLM_API bool realm_set_is_valid(const realm_set_t* set)
+{
+    if (!set)
+        return false;
+    return set->is_valid();
+}
+
+
 } // namespace realm::c_api

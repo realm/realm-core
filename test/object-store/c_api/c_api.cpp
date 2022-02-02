@@ -2280,7 +2280,7 @@ TEST_CASE("C API") {
                     CHECK(strings.get() != set2.get());
                 }
 
-                SECTION("insert, then get") {
+                SECTION("insert, then get, then erase") {
                     write([&]() {
                         bool inserted = false;
                         CHECK(checked(realm_set_insert(strings.get(), a, nullptr, &inserted)));
@@ -2307,6 +2307,12 @@ TEST_CASE("C API") {
                         CHECK(rlm_stdstr(a2) == "a");
                         CHECK(rlm_stdstr(b2) == "b");
                         CHECK(c2.type == RLM_TYPE_NULL);
+
+                        bool erased = false;
+                        CHECK(checked(realm_set_erase(strings.get(), a2, &erased)));
+                        CHECK(erased);
+                        CHECK(checked(realm_set_erase(strings.get(), rlm_int_val(987), &erased)));
+                        CHECK(!erased);
                     });
                 }
 
@@ -2619,10 +2625,14 @@ TEST_CASE("C API") {
                     CHECK(state.destroyed);
                 }
 
-                SECTION("insertion sends a change callback") {
-                    auto token = require_change();
+                SECTION("insertion,deletion sends a change callback") {
                     write([&]() {
                         checked(realm_set_insert(strings.get(), str1, nullptr, nullptr));
+                    });
+
+                    auto token = require_change();
+                    write([&]() {
+                        checked(realm_set_erase(strings.get(), str1, nullptr));
                         checked(realm_set_insert(strings.get(), str2, nullptr, nullptr));
                         checked(realm_set_insert(strings.get(), null, nullptr, nullptr));
                     });
@@ -2633,16 +2643,18 @@ TEST_CASE("C API") {
                     realm_collection_changes_get_num_ranges(state.changes.get(), &num_deletion_ranges,
                                                             &num_insertion_ranges, &num_modification_ranges,
                                                             &num_moves);
-                    CHECK(num_deletion_ranges == 0);
+                    CHECK(num_deletion_ranges == 1);
                     CHECK(num_insertion_ranges == 1);
                     CHECK(num_modification_ranges == 0);
                     CHECK(num_moves == 0);
 
-                    realm_index_range_t insertion_range;
-                    realm_collection_changes_get_ranges(state.changes.get(), nullptr, 0, &insertion_range, 1, nullptr,
-                                                        0, nullptr, 0, nullptr, 0);
+                    realm_index_range_t insertion_range, deletion_range;
+                    realm_collection_changes_get_ranges(state.changes.get(), &deletion_range, 1, &insertion_range, 1,
+                                                        nullptr, 0, nullptr, 0, nullptr, 0);
+                    CHECK(deletion_range.from == 0);
+                    CHECK(deletion_range.to == 1);
                     CHECK(insertion_range.from == 0);
-                    CHECK(insertion_range.to == 3);
+                    CHECK(insertion_range.to == 2);
                 }
             }
         }
@@ -2719,6 +2731,7 @@ TEST_CASE("C API") {
         });
 
         auto list = cptr_checked(realm_get_list(foo_obj.get(), foo_properties["int_list"]));
+        auto set = cptr_checked(realm_get_set(foo_obj.get(), foo_properties["int_set"]));
         auto results = cptr_checked(realm_object_find_all(realm, class_foo.key));
 
         SECTION("wrong thread") {
@@ -2735,6 +2748,7 @@ TEST_CASE("C API") {
             auto foo_obj_tsr = cptr_checked(realm_create_thread_safe_reference(foo_obj.get()));
             auto bar_obj_tsr = cptr_checked(realm_create_thread_safe_reference(bar_obj.get()));
             auto list_tsr = cptr_checked(realm_create_thread_safe_reference(list.get()));
+            auto set_tsr = cptr_checked(realm_create_thread_safe_reference(set.get()));
             auto results_tsr = cptr_checked(realm_create_thread_safe_reference(results.get()));
 
             SECTION("resolve") {
@@ -2747,6 +2761,8 @@ TEST_CASE("C API") {
                         cptr_checked(realm_object_from_thread_safe_reference(realm2.get(), bar_obj_tsr.get()));
                     auto results2 =
                         cptr_checked(realm_results_from_thread_safe_reference(realm2.get(), results_tsr.get()));
+                    auto list2 = cptr_checked(realm_list_from_thread_safe_reference(realm2.get(), list_tsr.get()));
+                    auto set2 = cptr_checked(realm_set_from_thread_safe_reference(realm2.get(), set_tsr.get()));
 
                     realm_value_t foo_obj_int;
                     CHECK(realm_get_value(foo_obj2.get(), foo_int_key, &foo_obj_int));
@@ -2774,6 +2790,8 @@ TEST_CASE("C API") {
                 CHECK(!realm_object_from_thread_safe_reference(realm, list_tsr.get()));
                 CHECK_ERR(RLM_ERR_LOGIC);
                 CHECK(!realm_list_from_thread_safe_reference(realm, foo_obj_tsr.get()));
+                CHECK_ERR(RLM_ERR_LOGIC);
+                CHECK(!realm_set_from_thread_safe_reference(realm, list_tsr.get()));
                 CHECK_ERR(RLM_ERR_LOGIC);
                 CHECK(!realm_results_from_thread_safe_reference(realm, list_tsr.get()));
                 CHECK_ERR(RLM_ERR_LOGIC);
@@ -2906,13 +2924,59 @@ TEST_CASE("C API") {
             realm_list_size(thawed_list, &count);
             CHECK(count == 1);
 
+            CHECK(realm_list_is_valid(thawed_list));
             write([&]() {
                 CHECK(checked(realm_object_delete(obj1.get())));
             });
+            CHECK(!realm_list_is_valid(thawed_list));
             realm_release(thawed_list);
             CHECK(realm_list_resolve_in(frozen_list, realm, &thawed_list));
             CHECK(thawed_list == nullptr);
             realm_release(frozen_list);
+        }
+
+        SECTION("sets") {
+            CPtr<realm_object_t> obj1;
+            size_t count;
+
+            write([&]() {
+                obj1 = cptr_checked(realm_object_create(realm, class_foo.key));
+                CHECK(obj1);
+            });
+
+            auto set = cptr_checked(realm_get_set(obj1.get(), foo_properties["string_set"]));
+            realm_set_size(set.get(), &count);
+            CHECK(count == 0);
+
+            auto frozen_realm = cptr_checked(realm_freeze(realm));
+            realm_set_t* frozen_set;
+            CHECK(realm_set_resolve_in(set.get(), frozen_realm.get(), &frozen_set));
+            realm_set_size(frozen_set, &count);
+            CHECK(count == 0);
+
+            write([&]() {
+                checked(realm_set_insert(set.get(), rlm_str_val("Hello"), nullptr, nullptr));
+            });
+
+            realm_set_size(frozen_set, &count);
+            CHECK(count == 0);
+            realm_set_size(set.get(), &count);
+            CHECK(count == 1);
+
+            realm_set_t* thawed_set;
+            CHECK(realm_set_resolve_in(frozen_set, realm, &thawed_set));
+            realm_set_size(thawed_set, &count);
+            CHECK(count == 1);
+
+            CHECK(realm_set_is_valid(thawed_set));
+            write([&]() {
+                CHECK(checked(realm_object_delete(obj1.get())));
+            });
+            CHECK(!realm_set_is_valid(thawed_set));
+            realm_release(thawed_set);
+            CHECK(realm_set_resolve_in(frozen_set, realm, &thawed_set));
+            CHECK(thawed_set == nullptr);
+            realm_release(frozen_set);
         }
     }
 
