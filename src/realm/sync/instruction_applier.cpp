@@ -865,6 +865,25 @@ void InstructionApplier::resolve_if_list(const Instruction::PathInstruction& ins
     resolve_path(instr, instr_name, std::move(callback));
 }
 
+bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name)
+{
+    bool allows_nulls = false;
+    auto callback = util::overload{[&](LstBase&, size_t) {},
+                                   [&](LstBase&) {},
+                                   [&](SetBase&) {},
+                                   [&](Dictionary&) {
+                                       allows_nulls = true;
+                                   },
+                                   [&](Dictionary&, Mixed) {
+                                       allows_nulls = true;
+                                   },
+                                   [&](Obj&, ColKey) {
+                                       allows_nulls = true;
+                                   }};
+    resolve_path(instr, instr_name, std::move(callback));
+    return allows_nulls;
+}
+
 bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
 {
     bool valid_payload = true;

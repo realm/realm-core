@@ -2039,7 +2039,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
 
     auto reset_collection = [&](std::vector<CollectionOperation>&& local_ops,
                                 std::vector<CollectionOperation>&& remote_ops,
-                                std::vector<int64_t>&& expected_recovered_state) {
+                                std::vector<int64_t>&& expected_recovered_state, size_t num_expected_nulls = 0) {
         std::vector<int64_t> remote_pks;
         std::vector<int64_t> local_pks;
         test_reset
@@ -2080,6 +2080,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
                 std::vector<int64_t>& expected_links = remote_pks;
                 if (test_mode == ClientResyncMode::Recover) {
                     expected_links = expected_recovered_state;
+                    size_t expected_size = expected_links.size();
+                    if (!test_type.will_erase_removed_object_links()) {
+                        // dictionary size will remain the same because the key is preserved with a null value
+                        expected_size += num_expected_nulls;
+                    }
+                    CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
                 }
                 const bool sorted_comparison = !test_type_is_array;
                 if constexpr (sorted_comparison) {
@@ -2203,6 +2209,9 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         }
         reset_collection({Remove{dest_pk_2}}, {Add{dest_pk_4}, Add{dest_pk_5}}, std::move(expected));
     }
+    SECTION("local adds link to remotely deleted object") {
+        reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
+    }
     SECTION("local clear") {
         reset_collection({Clear{}}, {}, {});
     }
@@ -2222,11 +2231,11 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
     }
     SECTION("local add to remotely deleted object") {
         reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}},
-                         {dest_pk_1, dest_pk_2, dest_pk_3});
+                         {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
     }
     SECTION("remote adds link to locally deleted object") {
         reset_collection({Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
-                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5});
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
     if (test_mode == ClientResyncMode::Recover) {
         SECTION("local removes source object, remote modifies list") {
@@ -2266,6 +2275,18 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         SECTION("local moves on added elements can be merged with remote deletions") {
             reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Remove{dest_pk_1}, Remove{dest_pk_2}},
                              {dest_pk_3, dest_pk_5, dest_pk_4});
+        }
+        SECTION("local move (down) on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}}, {Remove{dest_pk_1}, Remove{dest_pk_2}},
+                             {dest_pk_3, dest_pk_5, dest_pk_4});
+        }
+        SECTION("local move with delete on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}, Remove{dest_pk_5}},
+                             {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
+        }
+        SECTION("local move (down) with delete on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}, Remove{dest_pk_5}},
+                             {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
         }
     }
 }

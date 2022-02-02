@@ -835,10 +835,12 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::EraseObject& instr)
     {
-        if (get_top_object(instr, "EraseObject")) {
-            // Note: this calls invalidate() rather than remove(). It should have the same net
-            // effect, but perhaps is not worth exposing this code to more edge cases.
+        if (auto obj = get_top_object(instr, "EraseObject")) {
+            // FIXME: The InstructionApplier uses obj->invalidate() rather than remove(). It should have the same net
+            // effect, but that is not the case. Notably when erasing an object which has links from a Lst<Mixed> the
+            // list size does not decrease because there is no hiding the unresolved (null) element.
             InstructionApplier::operator()(instr);
+            // obj->remove();
         }
         // if the object doesn't exist, a local delete is a no-op.
     }
@@ -846,11 +848,16 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::Update& instr)
     {
         const char* instr_name = "Update";
-        if (!check_links_exist(instr.value)) { // FIXME: should this set to null instead of ignoring it?
-            logger.warn("Discarding an update which links to a deleted object");
-        }
-        else if (auto obj = get_top_object(instr, instr_name)) {
+        if (auto obj = get_top_object(instr, instr_name)) {
             Instruction::Update instr_copy = instr;
+            if (!check_links_exist(instr.value)) {
+                if (!allows_null_links(instr, instr_name)) {
+                    logger.warn("Discarding an update which links to a deleted object");
+                    return;
+                }
+                instr_copy.value = {};
+            }
+
             bool allowed_to_update = true;
             resolve_if_list(instr, instr_name, [&](LstBase& list) {
                 auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
@@ -918,19 +925,19 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         // Destructive schema changes are not allowed by the resetting client.
         static_cast<void>(instr);
-        handle_error(util::format("Properties cannot be erased during client reset"));
+        handle_error(util::format("Properties cannot be erased during client reset recovery"));
     }
 
     void operator()(const Instruction::ArrayInsert& instr)
     {
         const char* instr_name = "ArrayInsert";
-        // FIXME: if this is a Lst<Mixed> linking to a nonexistant object, should this insert a null instead?
-        if (!check_links_exist(instr.value)) {
-            logger.warn("Discarding %1 which links to a deleted object", instr_name);
-        }
-        else if (auto obj = get_top_object(instr, instr_name)) {
-            bool allowed_to_insert = false;
+        if (auto obj = get_top_object(instr, instr_name)) {
             Instruction::ArrayInsert instr_copy = instr;
+            if (!check_links_exist(instr.value)) {
+                logger.warn("Discarding %1 which links to a deleted object", instr_name);
+                return;
+            }
+            bool allowed_to_insert = false;
             resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
                 size_t list_size = list.size();
                 auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
@@ -1004,11 +1011,13 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::SetInsert& instr)
     {
         const char* instr_name = "SetInsert";
-        if (!check_links_exist(instr.value)) {
-            logger.warn("Discarding a %1 which links to a deleted object", instr_name);
-        }
-        else if (get_top_object(instr, instr_name)) {
-            InstructionApplier::operator()(instr);
+        if (get_top_object(instr, instr_name)) {
+            Instruction::SetInsert instr_copy = instr;
+            if (!check_links_exist(instr.value)) {
+                logger.warn("Discarding a %1 which links to a deleted object", instr_name);
+                return;
+            }
+            InstructionApplier::operator()(instr_copy);
         }
         else {
             logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
