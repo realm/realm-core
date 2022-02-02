@@ -839,8 +839,8 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             // FIXME: The InstructionApplier uses obj->invalidate() rather than remove(). It should have the same net
             // effect, but that is not the case. Notably when erasing an object which has links from a Lst<Mixed> the
             // list size does not decrease because there is no hiding the unresolved (null) element.
-            InstructionApplier::operator()(instr);
-            // obj->remove();
+            // InstructionApplier::operator()(instr);
+            obj->remove();
         }
         // if the object doesn't exist, a local delete is a no-op.
     }

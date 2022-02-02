@@ -2233,8 +2233,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}},
                          {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
     }
-    SECTION("remote adds link to locally deleted object") {
+    SECTION("remote adds link to locally deleted object with link") {
         reset_collection({Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
+    }
+    SECTION("remote adds link to locally deleted object without link") {
+        reset_collection({RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
     if (test_mode == ClientResyncMode::Recover) {
