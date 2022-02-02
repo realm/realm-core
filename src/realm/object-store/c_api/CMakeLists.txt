@@ -5,6 +5,7 @@ set(REALM_FFI_SOURCES
     error.cpp
     notifications.cpp
     object.cpp
+    list.cpp
     query.cpp
     realm.cpp
     scheduler.cpp
