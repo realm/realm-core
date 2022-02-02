@@ -196,17 +196,17 @@ public:
 
     void async_write(const char* data, size_t size, WriteCompletionHandler handler) override
     {
-        m_pipe_out.async_write(data, size, handler);
+        m_pipe_out.async_write(data, size, std::move(handler));
     }
 
     void async_read(char* buffer, size_t size, ReadCompletionHandler handler) override
     {
-        m_pipe_in.async_read(buffer, size, handler);
+        m_pipe_in.async_read(buffer, size, std::move(handler));
     }
 
     void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler) override
     {
-        m_pipe_in.async_read_until(buffer, size, delim, handler);
+        m_pipe_in.async_read_until(buffer, size, delim, std::move(handler));
     }
 
     void websocket_handshake_completion_handler(const HTTPHeaders&) override

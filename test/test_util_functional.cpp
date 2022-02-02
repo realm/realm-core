@@ -56,6 +56,33 @@ TEST(Util_UniqueFunction)
     CHECK(func_moved);
 }
 
+TEST(Util_UniqueFunction_Target)
+{
+    struct Value1 {
+        int value;
+        void operator()() {}
+    };
+    struct Value2 {
+        int value;
+        void operator()() {}
+    };
+
+    Value1 v1 = {1};
+    Value2 v2 = {2};
+
+    UniqueFunction<void()> func;
+    CHECK_NOT(func.target<Value1>());
+    CHECK_NOT(func.target<Value2>());
+
+    func = v1;
+    CHECK_EQUAL(func.target<Value1>()->value, 1);
+    CHECK_NOT(func.target<Value2>());
+
+    func = v2;
+    CHECK_NOT(func.target<Value1>());
+    CHECK_EQUAL(func.target<Value2>()->value, 2);
+}
+
 } // namespace
 } // namespace realm::util
 

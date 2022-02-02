@@ -5830,11 +5830,11 @@ TEST(LangBindHelper_RemoveObject)
 TEST(LangBindHelper_callWithLock)
 {
     SHARED_GROUP_TEST_PATH(path);
-    DB::CallbackWithLock callback = [&](const std::string& realm_path) {
+    auto callback = [&](const std::string& realm_path) {
         CHECK(realm_path.compare(path) == 0);
     };
 
-    DB::CallbackWithLock callback_not_called = [&](const std::string&) {
+    auto callback_not_called = [&](const std::string&) {
         CHECK(false);
     };
 

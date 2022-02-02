@@ -19,6 +19,8 @@
 #ifndef REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
 #define REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
 
+#include <realm/util/function_ref.hpp>
+
 #include <functional>
 #include <memory>
 
@@ -33,10 +35,10 @@ struct EventLoop {
     static EventLoop& main();
 
     // Run the event loop until the given return predicate returns true
-    void run_until(std::function<bool()> predicate);
+    void run_until(util::FunctionRef<bool()> predicate);
 
     // Schedule execution of the given function on the event loop.
-    void perform(std::function<void()>);
+    void perform(util::UniqueFunction<void()>);
 
     EventLoop(EventLoop&&) = default;
     EventLoop& operator=(EventLoop&&) = default;

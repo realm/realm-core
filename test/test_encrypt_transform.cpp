@@ -141,7 +141,7 @@ TEST_IF(EncryptTransform_ServerHistory, false)
 
         ClientServerFixture::Config server_config;
         server_config.server_encryption_key = encryption_key1;
-        ClientServerFixture fixture{dir, test_context, server_config};
+        ClientServerFixture fixture{dir, test_context, std::move(server_config)};
         fixture.start();
 
         Session reference_session = fixture.make_session(reference_sg);

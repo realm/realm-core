@@ -883,126 +883,44 @@ TEST_CASE("C API") {
     CHECK(checked(realm_find_class(realm, "Bar", &found, &class_bar)));
     REQUIRE(found);
 
-    realm_property_info_t foo_int_property, foo_bool_property, foo_string_property, foo_binary_property,
-        foo_timestamp_property, foo_float_property, foo_double_property, foo_decimal_property, foo_object_id_property,
-        foo_uuid_property, foo_nullable_int_property, foo_nullable_bool_property, foo_nullable_string_property,
-        foo_nullable_binary_property, foo_nullable_timestamp_property, foo_nullable_float_property,
-        foo_nullable_double_property, foo_nullable_decimal_property, foo_nullable_object_id_property,
-        foo_nullable_uuid_property, foo_int_list_property, foo_bool_list_property, foo_string_list_property,
-        foo_binary_list_property, foo_timestamp_list_property, foo_float_list_property, foo_double_list_property,
-        foo_decimal_list_property, foo_object_id_list_property, foo_uuid_list_property,
-        foo_nullable_int_list_property, foo_nullable_bool_list_property, foo_nullable_string_list_property,
-        foo_nullable_binary_list_property, foo_nullable_timestamp_list_property, foo_nullable_float_list_property,
-        foo_nullable_double_list_property, foo_nullable_decimal_list_property, foo_nullable_object_id_list_property,
-        foo_nullable_uuid_list_property, foo_link_property, foo_link_list_property;
-    realm_property_info_t bar_int_property, bar_strings_property, bar_linking_objects_property;
+    std::map<std::string, realm_property_key_t> foo_properties;
+    for (const auto& p : all_property_types("Bar")) {
+        realm_property_info_t info;
+        bool found = false;
+        REQUIRE(realm_find_property(realm, class_foo.key, p.name, &found, &info));
+        REQUIRE(found);
+        CHECK(p.key == RLM_INVALID_PROPERTY_KEY);
+        CHECK(info.key != RLM_INVALID_PROPERTY_KEY);
+        CHECK(info.type == p.type);
+        CHECK(std::string{info.public_name} == p.public_name);
+        CHECK(info.collection_type == p.collection_type);
+        CHECK(std::string{info.link_target} == p.link_target);
+        CHECK(std::string{info.link_origin_property_name} == p.link_origin_property_name);
+        foo_properties[info.name] = info.key;
+    }
 
-    CHECK(realm_find_property(realm, class_foo.key, "int", &found, &foo_int_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "bool", &found, &foo_bool_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "string", &found, &foo_string_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "binary", &found, &foo_binary_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "timestamp", &found, &foo_timestamp_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "float", &found, &foo_float_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "double", &found, &foo_double_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "decimal", &found, &foo_decimal_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "object_id", &found, &foo_object_id_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "uuid", &found, &foo_uuid_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_int", &found, &foo_nullable_int_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_bool", &found, &foo_nullable_bool_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_string", &found, &foo_nullable_string_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_binary", &found, &foo_nullable_binary_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_timestamp", &found, &foo_nullable_timestamp_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_float", &found, &foo_nullable_float_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_double", &found, &foo_nullable_double_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_decimal", &found, &foo_nullable_decimal_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_object_id", &found, &foo_nullable_object_id_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_uuid", &found, &foo_nullable_uuid_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "int_list", &found, &foo_int_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "bool_list", &found, &foo_bool_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "string_list", &found, &foo_string_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "binary_list", &found, &foo_binary_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "timestamp_list", &found, &foo_timestamp_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "float_list", &found, &foo_float_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "double_list", &found, &foo_double_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "decimal_list", &found, &foo_decimal_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "object_id_list", &found, &foo_object_id_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "uuid_list", &found, &foo_uuid_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_int_list", &found, &foo_nullable_int_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_bool_list", &found, &foo_nullable_bool_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_string_list", &found,
-                              &foo_nullable_string_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_binary_list", &found,
-                              &foo_nullable_binary_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_timestamp_list", &found,
-                              &foo_nullable_timestamp_list_property));
-    CHECK(found);
-    CHECK(
-        realm_find_property(realm, class_foo.key, "nullable_float_list", &found, &foo_nullable_float_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_double_list", &found,
-                              &foo_nullable_double_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_decimal_list", &found,
-                              &foo_nullable_decimal_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_object_id_list", &found,
-                              &foo_nullable_object_id_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "nullable_uuid_list", &found, &foo_nullable_uuid_list_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "link", &found, &foo_link_property));
-    CHECK(found);
-    CHECK(realm_find_property(realm, class_foo.key, "link_list", &found, &foo_link_list_property));
-    CHECK(found);
+    std::map<std::string, realm_property_key_t> bar_properties;
+    {
+        realm_property_info_t info;
+        bool found = false;
+        REQUIRE(checked(realm_find_property(realm, class_bar.key, "int", &found, &info)));
+        REQUIRE(found);
+        bar_properties["int"] = info.key;
 
+        REQUIRE(checked(realm_find_property(realm, class_bar.key, "strings", &found, &info)));
+        REQUIRE(found);
+        bar_properties["strings"] = info.key;
 
-    CHECK(checked(realm_find_property(realm, class_bar.key, "int", &found, &bar_int_property)));
-    REQUIRE(found);
-    CHECK(checked(realm_find_property(realm, class_bar.key, "strings", &found, &bar_strings_property)));
-    REQUIRE(found);
-    CHECK(
-        checked(realm_find_property(realm, class_bar.key, "linking_objects", &found, &bar_linking_objects_property)));
-    REQUIRE(found);
+        REQUIRE(checked(realm_find_property(realm, class_bar.key, "linking_objects", &found, &info)));
+        REQUIRE(found);
+        bar_properties["linking_objects"] = info.key;
+    }
 
-    realm_property_key_t foo_int_key = foo_int_property.key;
-    realm_property_key_t foo_str_key = foo_string_property.key;
-    realm_property_key_t foo_links_key = foo_link_list_property.key;
-    realm_property_key_t bar_int_key = bar_int_property.key;
-    realm_property_key_t bar_strings_key = bar_strings_property.key;
+    realm_property_key_t foo_int_key = foo_properties["int"];
+    realm_property_key_t foo_str_key = foo_properties["string"];
+    realm_property_key_t foo_links_key = foo_properties["link_list"];
+    realm_property_key_t bar_int_key = bar_properties["int"];
+    realm_property_key_t bar_strings_key = bar_properties["strings"];
 
     SECTION("realm_freeze()") {
         auto realm2 = cptr_checked(realm_freeze(realm));
@@ -1053,12 +971,12 @@ TEST_CASE("C API") {
         bool found = false;
         CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "public_int", &found, &property)));
         CHECK(found);
-        CHECK(property.key == foo_int_property.key);
+        CHECK(property.key == foo_int_key);
 
         found = false;
         CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "string", &found, &property)));
         CHECK(found);
-        CHECK(property.key == foo_string_property.key);
+        CHECK(property.key == foo_properties["string"]);
 
         CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "i don't exist", &found, &property)));
         CHECK(!found);
@@ -1069,17 +987,17 @@ TEST_CASE("C API") {
         size_t num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties, 3, &num_found)));
         CHECK(num_found == 3);
-        CHECK(properties[0] == foo_int_property.key);
+        CHECK(properties[0] == foo_properties["int"]);
 
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 3, &num_found)));
         CHECK(num_found == 3);
-        CHECK(properties[2] == bar_linking_objects_property.key);
+        CHECK(properties[2] == bar_properties["linking_objects"]);
 
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 1, &num_found)));
         CHECK(num_found == 1);
-        CHECK(properties[0] == bar_int_property.key);
+        CHECK(properties[0] == bar_properties["int"]);
 
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
@@ -1096,8 +1014,8 @@ TEST_CASE("C API") {
 
     SECTION("realm_get_property()") {
         realm_property_info_t prop;
-        CHECK(checked(realm_get_property(realm, class_bar.key, bar_linking_objects_property.key, &prop)));
-        CHECK(prop.key == bar_linking_objects_property.key);
+        CHECK(checked(realm_get_property(realm, class_bar.key, bar_properties["linking_objects"], &prop)));
+        CHECK(prop.key == bar_properties["linking_objects"]);
         CHECK(std::string{prop.name} == "linking_objects");
 
         CHECK(!realm_get_property(realm, class_bar.key, 123123123, &prop));
@@ -1173,12 +1091,15 @@ TEST_CASE("C API") {
             CPtr<realm_object_t> obj3 = cptr_checked(realm_object_create(realm, class_foo.key));
             CHECK(obj3);
             CHECK(checked(realm_set_value(obj3.get(), foo_int_key, int_val2, false)));
+            CPtr<realm_object_t> obj4 = cptr_checked(realm_object_create(realm, class_foo.key));
+            CHECK(obj3);
+            CHECK(checked(realm_set_value(obj4.get(), foo_int_key, int_val1, false)));
         });
 
         size_t foo_count, bar_count;
         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &foo_count)));
         CHECK(checked(realm_get_num_objects(realm, class_bar.key, &bar_count)));
-        REQUIRE(foo_count == 2);
+        REQUIRE(foo_count == 3);
         REQUIRE(bar_count == 1);
 
         SECTION("realm_clone()") {
@@ -1201,7 +1122,7 @@ TEST_CASE("C API") {
             size_t num_foos, num_bars;
             CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_foos)));
             CHECK(checked(realm_get_num_objects(realm, class_bar.key, &num_bars)));
-            CHECK(num_foos == 2);
+            CHECK(num_foos == 3);
             CHECK(num_bars == 1);
 
             CHECK(checked(realm_get_num_objects(realm, class_bar.key, nullptr)));
@@ -1363,111 +1284,111 @@ TEST_CASE("C API") {
             realm_value_t link = rlm_link_val(class_bar.key, realm_object_get_key(obj2.get()));
 
             write([&]() {
-                CHECK(realm_set_value(obj1.get(), foo_int_property.key, integer, false));
-                CHECK(realm_set_value(obj1.get(), foo_bool_property.key, boolean, false));
-                CHECK(realm_set_value(obj1.get(), foo_string_property.key, string, false));
-                CHECK(realm_set_value(obj1.get(), foo_binary_property.key, binary, false));
-                CHECK(realm_set_value(obj1.get(), foo_timestamp_property.key, timestamp, false));
-                CHECK(realm_set_value(obj1.get(), foo_float_property.key, fnum, false));
-                CHECK(realm_set_value(obj1.get(), foo_double_property.key, dnum, false));
-                CHECK(realm_set_value(obj1.get(), foo_decimal_property.key, decimal, false));
-                CHECK(realm_set_value(obj1.get(), foo_object_id_property.key, object_id, false));
-                CHECK(realm_set_value(obj1.get(), foo_uuid_property.key, uuid, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["int"], integer, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["bool"], boolean, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["string"], string, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["binary"], binary, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["timestamp"], timestamp, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["float"], fnum, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["double"], dnum, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["decimal"], decimal, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["object_id"], object_id, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["uuid"], uuid, false));
 
-                CHECK(realm_set_value(obj1.get(), foo_nullable_int_property.key, integer, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_bool_property.key, boolean, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_string_property.key, string, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_binary_property.key, binary, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_timestamp_property.key, timestamp, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_float_property.key, fnum, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_double_property.key, dnum, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_decimal_property.key, decimal, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_object_id_property.key, object_id, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_uuid_property.key, uuid, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_int"], integer, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_bool"], boolean, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_string"], string, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_binary"], binary, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_timestamp"], timestamp, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_float"], fnum, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_double"], dnum, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_decimal"], decimal, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_object_id"], object_id, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_uuid"], uuid, false));
 
-                CHECK(realm_set_value(obj1.get(), foo_link_property.key, link, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["link"], link, false));
             });
 
             realm_value_t value;
 
-            CHECK(realm_get_value(obj1.get(), foo_int_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["int"], &value));
             CHECK(rlm_val_eq(value, integer));
-            CHECK(realm_get_value(obj1.get(), foo_bool_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["bool"], &value));
             CHECK(rlm_val_eq(value, boolean));
-            CHECK(realm_get_value(obj1.get(), foo_string_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["string"], &value));
             CHECK(rlm_val_eq(value, string));
-            CHECK(realm_get_value(obj1.get(), foo_binary_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["binary"], &value));
             CHECK(rlm_val_eq(value, binary));
-            CHECK(realm_get_value(obj1.get(), foo_timestamp_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["timestamp"], &value));
             CHECK(rlm_val_eq(value, timestamp));
-            CHECK(realm_get_value(obj1.get(), foo_float_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["float"], &value));
             CHECK(rlm_val_eq(value, fnum));
-            CHECK(realm_get_value(obj1.get(), foo_double_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["double"], &value));
             CHECK(rlm_val_eq(value, dnum));
-            CHECK(realm_get_value(obj1.get(), foo_decimal_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["decimal"], &value));
             CHECK(rlm_val_eq(value, decimal));
-            CHECK(realm_get_value(obj1.get(), foo_object_id_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["object_id"], &value));
             CHECK(rlm_val_eq(value, object_id));
-            CHECK(realm_get_value(obj1.get(), foo_uuid_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["uuid"], &value));
             CHECK(rlm_val_eq(value, uuid));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_int_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_int"], &value));
             CHECK(rlm_val_eq(value, integer));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_bool_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_bool"], &value));
             CHECK(rlm_val_eq(value, boolean));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_string_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_string"], &value));
             CHECK(rlm_val_eq(value, string));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_binary_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_binary"], &value));
             CHECK(rlm_val_eq(value, binary));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_timestamp_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_timestamp"], &value));
             CHECK(rlm_val_eq(value, timestamp));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_float_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_float"], &value));
             CHECK(rlm_val_eq(value, fnum));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_double_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_double"], &value));
             CHECK(rlm_val_eq(value, dnum));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_decimal_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_decimal"], &value));
             CHECK(rlm_val_eq(value, decimal));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_object_id_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_object_id"], &value));
             CHECK(rlm_val_eq(value, object_id));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_uuid_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_uuid"], &value));
             CHECK(rlm_val_eq(value, uuid));
-            CHECK(realm_get_value(obj1.get(), foo_link_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["link"], &value));
             CHECK(rlm_val_eq(value, link));
 
             write([&]() {
-                CHECK(realm_set_value(obj1.get(), foo_nullable_int_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_bool_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_string_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_binary_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_timestamp_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_float_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_double_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_decimal_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_object_id_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_nullable_uuid_property.key, null, false));
-                CHECK(realm_set_value(obj1.get(), foo_link_property.key, null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_int"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_bool"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_string"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_binary"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_timestamp"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_float"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_double"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_decimal"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_object_id"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["nullable_uuid"], null, false));
+                CHECK(realm_set_value(obj1.get(), foo_properties["link"], null, false));
             });
 
-            CHECK(realm_get_value(obj1.get(), foo_nullable_int_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_int"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_bool_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_bool"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_string_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_string"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_binary_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_binary"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_timestamp_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_timestamp"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_float_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_float"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_double_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_double"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_decimal_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_decimal"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_object_id_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_object_id"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_nullable_uuid_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["nullable_uuid"], &value));
             CHECK(rlm_val_eq(value, null));
-            CHECK(realm_get_value(obj1.get(), foo_link_property.key, &value));
+            CHECK(realm_get_value(obj1.get(), foo_properties["link"], &value));
             CHECK(rlm_val_eq(value, null));
         }
 
@@ -1669,6 +1590,63 @@ TEST_CASE("C API") {
                     CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
                 }
 
+                SECTION("realm_results_filter()") {
+                    auto q2 = cptr_checked(realm_query_parse(realm, class_foo.key, "int == 789", 0, nullptr));
+                    auto r2 = cptr_checked(realm_results_filter(r.get(), q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 0);
+                }
+
+                SECTION("realm_results_sort()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    auto p = cptr_checked(realm_results_get_object(r_all.get(), 0));
+                    CHECK(p.get());
+                    CHECK(realm_equals(p.get(), obj1.get()));
+                    auto r2 = cptr_checked(realm_results_sort(r_all.get(), "int DESCENDING, float ASCENDING"));
+                    p = cptr_checked(realm_results_get_object(r2.get(), 1));
+                    CHECK(p.get());
+                    CHECK(realm_equals(p.get(), obj1.get()));
+                }
+
+                SECTION("realm_results_distinct()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    size_t count;
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 3);
+                    auto r2 = cptr_checked(realm_results_distinct(r_all.get(), "int"));
+                    realm_results_count(r2.get(), &count);
+                    CHECK(count == 2);
+                }
+
+                SECTION("realm_results_limit()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    size_t count;
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 3);
+                    auto r2 = cptr_checked(realm_results_limit(r_all.get(), 1));
+                    realm_results_count(r2.get(), &count);
+                    CHECK(count == 1);
+                }
+
+                SECTION("realm_results_snapshot()") {
+                    auto r_all = cptr_checked(realm_object_find_all(realm, class_foo.key));
+                    auto r_snapshot = cptr_checked(realm_results_snapshot(r_all.get()));
+                    size_t count;
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 3);
+                    realm_results_count(r_snapshot.get(), &count);
+                    CHECK(count == 3);
+                    write([&]() {
+                        auto p = cptr_checked(realm_results_get_object(r_all.get(), 0));
+                        realm_object_delete(p.get());
+                    });
+                    realm_results_count(r_all.get(), &count);
+                    CHECK(count == 2);
+                    realm_results_count(r_snapshot.get(), &count);
+                    CHECK(count == 3);
+                }
+
                 SECTION("realm_results_min()") {
                     realm_value_t value = rlm_null();
                     CHECK(checked(realm_results_min(r.get(), foo_int_key, &value, &found)));
@@ -1724,15 +1702,15 @@ TEST_CASE("C API") {
                     write([&]() {
                         size_t num_objects;
                         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_objects)));
-                        CHECK(num_objects == 2);
+                        CHECK(num_objects == 3);
                         CHECK(checked(realm_results_delete_all(r.get())));
                         CHECK(checked(realm_get_num_objects(realm, class_foo.key, &num_objects)));
-                        CHECK(num_objects == 1);
+                        CHECK(num_objects == 2);
                     });
                 }
 
                 SECTION("lists") {
-                    auto list = cptr_checked(realm_get_list(obj1.get(), foo_link_list_property.key));
+                    auto list = cptr_checked(realm_get_list(obj1.get(), foo_properties["link_list"]));
                     cptr_checked(realm_query_parse_for_list(list.get(), "TRUEPREDICATE", 0, nullptr));
                 }
 
@@ -1882,35 +1860,36 @@ TEST_CASE("C API") {
                 realm_value_t object_id = rlm_object_id_val("abc123abc123");
                 realm_value_t uuid = rlm_uuid_val("01234567-9abc-4def-9012-3456789abcde");
 
-                auto int_list = cptr_checked(realm_get_list(obj1.get(), foo_int_list_property.key));
-                auto bool_list = cptr_checked(realm_get_list(obj1.get(), foo_bool_list_property.key));
-                auto string_list = cptr_checked(realm_get_list(obj1.get(), foo_string_list_property.key));
-                auto binary_list = cptr_checked(realm_get_list(obj1.get(), foo_binary_list_property.key));
-                auto timestamp_list = cptr_checked(realm_get_list(obj1.get(), foo_timestamp_list_property.key));
-                auto float_list = cptr_checked(realm_get_list(obj1.get(), foo_float_list_property.key));
-                auto double_list = cptr_checked(realm_get_list(obj1.get(), foo_double_list_property.key));
-                auto decimal_list = cptr_checked(realm_get_list(obj1.get(), foo_decimal_list_property.key));
-                auto object_id_list = cptr_checked(realm_get_list(obj1.get(), foo_object_id_list_property.key));
-                auto uuid_list = cptr_checked(realm_get_list(obj1.get(), foo_uuid_list_property.key));
-                auto nullable_int_list = cptr_checked(realm_get_list(obj1.get(), foo_nullable_int_list_property.key));
+                auto int_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["int_list"]));
+                auto bool_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["bool_list"]));
+                auto string_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["string_list"]));
+                auto binary_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["binary_list"]));
+                auto timestamp_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["timestamp_list"]));
+                auto float_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["float_list"]));
+                auto double_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["double_list"]));
+                auto decimal_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["decimal_list"]));
+                auto object_id_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["object_id_list"]));
+                auto uuid_list = cptr_checked(realm_get_list(obj1.get(), foo_properties["uuid_list"]));
+                auto nullable_int_list =
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_int_list"]));
                 auto nullable_bool_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_bool_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_bool_list"]));
                 auto nullable_string_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_string_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_string_list"]));
                 auto nullable_binary_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_binary_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_binary_list"]));
                 auto nullable_timestamp_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_timestamp_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_timestamp_list"]));
                 auto nullable_float_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_float_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_float_list"]));
                 auto nullable_double_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_double_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_double_list"]));
                 auto nullable_decimal_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_decimal_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_decimal_list"]));
                 auto nullable_object_id_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_object_id_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_object_id_list"]));
                 auto nullable_uuid_list =
-                    cptr_checked(realm_get_list(obj1.get(), foo_nullable_uuid_list_property.key));
+                    cptr_checked(realm_get_list(obj1.get(), foo_properties["nullable_uuid_list"]));
 
                 write([&]() {
                     CHECK(realm_list_insert(int_list.get(), 0, integer));
@@ -2316,7 +2295,7 @@ TEST_CASE("C API") {
             bar_obj = cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123)));
         });
 
-        auto list = cptr_checked(realm_get_list(foo_obj.get(), foo_int_list_property.key));
+        auto list = cptr_checked(realm_get_list(foo_obj.get(), foo_properties["int_list"]));
         auto results = cptr_checked(realm_object_find_all(realm, class_foo.key));
 
         SECTION("wrong thread") {
@@ -2480,7 +2459,7 @@ TEST_CASE("C API") {
                 CHECK(obj1);
             });
 
-            auto list = cptr_checked(realm_get_list(obj1.get(), bar_strings_property.key));
+            auto list = cptr_checked(realm_get_list(obj1.get(), bar_properties["strings"]));
             realm_list_size(list.get(), &count);
             CHECK(count == 0);
 

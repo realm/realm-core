@@ -32,7 +32,7 @@ AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinato
 {
 }
 
-void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception_ptr)> callback)
+void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)> callback)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (!m_session)
@@ -41,7 +41,7 @@ void AsyncOpenTask::start(std::function<void(ThreadSafeReference, std::exception
     m_session->revive_if_needed();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    m_session->wait_for_download_completion([callback, self, this](std::error_code ec) {
+    m_session->wait_for_download_completion([callback = std::move(callback), self, this](std::error_code ec) {
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
         {
             util::CheckedLockGuard lock(m_mutex);
@@ -97,11 +97,12 @@ void AsyncOpenTask::cancel()
 }
 
 uint64_t
-AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback> callback)
+AsyncOpenTask::register_download_progress_notifier(std::function<SyncSession::ProgressNotifierCallback>&& callback)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (m_session) {
-        auto token = m_session->register_progress_notifier(callback, SyncSession::ProgressDirection::download, false);
+        auto token = m_session->register_progress_notifier(std::move(callback),
+                                                           SyncSession::ProgressDirection::download, false);
         m_registered_callbacks.emplace_back(token);
         return token;
     }

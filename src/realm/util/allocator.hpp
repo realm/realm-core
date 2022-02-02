@@ -189,6 +189,7 @@ struct STLAllocator : detail::GetAllocator<Allocator> {
     {
     }
 
+    STLAllocator(const STLAllocator& other) noexcept = default;
     STLAllocator& operator=(const STLAllocator& other) noexcept = default;
 
     T* allocate(std::size_t n)

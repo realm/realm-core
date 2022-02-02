@@ -23,51 +23,40 @@
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
 
-#include <sstream>
-
 namespace realm::app {
 
 PushClient::~PushClient() = default;
 
-void PushClient::register_device(const std::string& registration_token, std::shared_ptr<SyncUser> sync_user,
-                                 std::function<void(util::Optional<AppError>)> completion_block)
+namespace {
+util::UniqueFunction<void(const Response&)>
+wrap_completion(util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
-    auto handler = [completion_block](const Response& response) {
-        if (auto error = AppUtils::check_for_errors(response)) {
-            return completion_block(error);
-        }
-        else {
-            return completion_block({});
-        }
+    return [completion = std::move(completion)](const Response& response) {
+        completion(AppUtils::check_for_errors(response));
     };
+}
+} // anonymous namespace
+
+void PushClient::register_device(const std::string& registration_token, const std::shared_ptr<SyncUser>& sync_user,
+                                 util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
+{
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
     std::string route = m_auth_request_client->url_for_path(push_route);
 
     bson::BsonDocument args{{"registrationToken", registration_token}};
-
-    std::stringstream s;
-    s << bson::Bson(args);
-
-    m_auth_request_client->do_authenticated_request({HttpMethod::put, route, m_timeout_ms, {}, s.str(), false},
-                                                    sync_user, handler);
+    m_auth_request_client->do_authenticated_request(
+        {HttpMethod::put, std::move(route), m_timeout_ms, {}, bson::Bson(args).to_string(), false}, sync_user,
+        wrap_completion(std::move(completion)));
 }
 
-void PushClient::deregister_device(std::shared_ptr<SyncUser> sync_user,
-                                   std::function<void(util::Optional<AppError>)> completion_block)
+void PushClient::deregister_device(const std::shared_ptr<SyncUser>& sync_user,
+                                   util::UniqueFunction<void(util::Optional<AppError>)>&& completion)
 {
-    auto handler = [completion_block](const Response& response) {
-        if (auto error = AppUtils::check_for_errors(response)) {
-            return completion_block(error);
-        }
-        else {
-            return completion_block({});
-        }
-    };
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
-    std::string route = m_auth_request_client->url_for_path(push_route);
 
-    m_auth_request_client->do_authenticated_request({HttpMethod::del, route, m_timeout_ms, {}, "", false}, sync_user,
-                                                    handler);
+    m_auth_request_client->do_authenticated_request(
+        {HttpMethod::del, m_auth_request_client->url_for_path(push_route), m_timeout_ms, {}, "", false}, sync_user,
+        wrap_completion(std::move(completion)));
 }
 
 } // namespace realm::app

@@ -21,17 +21,19 @@ struct EZConfig {
     std::mt19937_64& random;
     util::network::Service& service;
     std::string user_agent;
-    bool tcp_no_delay;
 };
 
 struct EZEndpoint {
     std::string address;
     port_type port;
-    std::string http_host; // Contents of `Host:` request header
-    std::string path;
+    std::string path;      // Includes auth token in query.
     std::string protocols; // separated with ", "
     bool is_ssl;
-    util::HTTPHeaders headers; // Includes both auth and "custom" headers
+
+    // The remaining fields are just passing through values from the SyncConfig. They can be ignored if SDK chooses
+    // not to support the related config options. This may be necessary when using websocket libraries without
+    // low-level control.
+    std::map<std::string, std::string> headers; // Only includes "custom" headers.
     bool verify_servers_ssl_certificate;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
@@ -87,7 +89,7 @@ class EZSocket {
 public:
     virtual ~EZSocket();
 
-    virtual void async_write_binary(const char* data, size_t size, std::function<void()>&& handler) = 0;
+    virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
 };
 
 class EZSocketFactory {

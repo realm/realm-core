@@ -667,7 +667,7 @@ RLM_API bool realm_app_call_function(const realm_app_t* app, const realm_user_t*
 {
     return wrap_err([&] {
         auto cb = [callback, userdata = SharedUserdata{userdata, FreeUserdata(userdata_free)}](
-                      util::Optional<AppError> error, util::Optional<bson::Bson> bson) {
+                      util::Optional<bson::Bson>&& bson, util::Optional<AppError> error) {
             if (error) {
                 realm_app_error_t c_error(to_capi(*error));
                 callback(userdata.get(), nullptr, &c_error);

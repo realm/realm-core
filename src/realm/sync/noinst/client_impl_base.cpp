@@ -111,7 +111,6 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
     , m_disable_upload_activation_delay{config.disable_upload_activation_delay}
     , m_dry_run{config.dry_run}
-    , m_tcp_no_delay{config.tcp_no_delay}
     , m_enable_default_port_hack{config.enable_default_port_hack}
     , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
@@ -122,7 +121,6 @@ ClientImpl::ClientImpl(ClientConfig config)
           m_random,
           m_service,
           get_user_agent_string(),
-          get_tcp_no_delay(),
       })
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
@@ -156,8 +154,6 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.fast_reconnect_limit); // Throws
     logger.debug("Config param: disable_upload_compaction = %1",
                  config.disable_upload_compaction); // Throws
-    logger.debug("Config param: tcp_no_delay = %1",
-                 config.tcp_no_delay); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
     logger.debug("User agent string: '%1'", get_user_agent_string());
@@ -648,25 +644,19 @@ void Connection::initiate_reconnect()
         sec_websocket_protocol = std::move(out).str();
     }
 
-    util::HTTPHeaders headers;
-    headers[m_authorization_header_name] = _impl::make_authorization_header(m_signed_access_token); // Throws
-
-    for (auto const& header : m_custom_http_headers)
-        headers[header.first] = header.second;
-
-    m_websocket = m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
-                                                              m_address,
-                                                              m_port,
-                                                              m_http_host,
-                                                              get_http_request_path(),
-                                                              std::move(sec_websocket_protocol),
-                                                              is_ssl(m_protocol_envelope),
-                                                              std::move(headers),
-                                                              m_verify_servers_ssl_certificate,
-                                                              m_ssl_trust_certificate_path,
-                                                              m_ssl_verify_callback,
-                                                              m_proxy_config,
-                                                          });
+    m_websocket =
+        m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
+                                                    m_address,
+                                                    m_port,
+                                                    get_http_request_path(),
+                                                    std::move(sec_websocket_protocol),
+                                                    is_ssl(m_protocol_envelope),
+                                                    {m_custom_http_headers.begin(), m_custom_http_headers.end()},
+                                                    m_verify_servers_ssl_certificate,
+                                                    m_ssl_trust_certificate_path,
+                                                    m_ssl_verify_callback,
+                                                    m_proxy_config,
+                                                });
 }
 
 

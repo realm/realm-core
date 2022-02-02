@@ -2,14 +2,17 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
+* 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * If a list of objects contains links to objects not included in the synchronized partition, the indices contained in CollectionChangeSet for that list may be wrong ([#5164](https://github.com/realm/realm-core/issues/5164), since v10.0.0)
 * Sending a QUERY message may fail with `Assertion failed: !m_unbind_message_sent` ([#5149](https://github.com/realm/realm-core/pull/5149), since v11.8.0)
 * Subscription names correctly distinguish an empty string from a nullptr ([#5160](https://github.com/realm/realm-core/pull/5160), since v11.8.0)
-* Fix an error when compiling a watchOS target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623))
+* Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
+* Fix some warnings when building with Xcode 13.3.
+* Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623))
  
 ### Breaking changes
 * None.
@@ -22,6 +25,10 @@
 ### Internals
 * SubscriptionStore's should be initialized with an implict empty SubscriptionSet so users can wait for query version zero to finish synchronizing. ((#5166)[https://github.com/realm/realm-core/pull/5166])
 * Fixed `Future::on_completion()` and added missing testing for it ((#5181)[https://github.com/realm/realm-core/pull/5181])
+* GenericNetworkTransport::send_request_to_server()'s signature has been changed to `void(Request&& request, util::UniqueFunction<void(const Response&)>&& completion)`. Subclasses implementing it will need to be updated.
+* `MongoClient` had a mixture of functions which took `void(Optional<T>, Optional<AppError>)` callbacks and functions which took `void(Optional<AppError>, Optional<T>)` callbacks. They now all have the error parameter last. Most of the error-first functions other than `call_function()` appear to have been unused.
+* Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
+* realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
 
 ----------------------------------------------
 

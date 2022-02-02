@@ -38,12 +38,12 @@ class EventLoopDispatcher<void(Args...)> {
 
 private:
     struct State {
-        State(std::function<void(Args...)> func)
+        State(util::UniqueFunction<void(Args...)> func)
             : func(std::move(func))
         {
         }
 
-        const std::function<void(Args...)> func;
+        const util::UniqueFunction<void(Args...)> func;
         std::queue<Tuple> invocations;
         std::mutex mutex;
         std::shared_ptr<util::Scheduler> scheduler;
@@ -52,7 +52,7 @@ private:
     const std::shared_ptr<util::Scheduler> m_scheduler = util::Scheduler::make_default();
 
 public:
-    EventLoopDispatcher(std::function<void(Args...)> func)
+    EventLoopDispatcher(util::UniqueFunction<void(Args...)> func)
         : m_state(std::make_shared<State>(std::move(func)))
     {
         m_scheduler->set_notify_callback([state = m_state] {
@@ -69,7 +69,7 @@ public:
         });
     }
 
-    const std::function<void(Args...)>& func() const
+    const util::UniqueFunction<void(Args...)>& func() const
     {
         return m_state->func;
     }
@@ -126,8 +126,8 @@ template <typename T, typename... Args>
 struct ExtractSignatureImpl<void (T::*)(Args...) const& noexcept> {
     using signature = void(Args...);
 };
-// Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
-// from something with that anyway.
+// Note: no && specializations since util::UniqueFunction doesn't support them, so you can't construct an
+// EventLoopDispatcher from something with that anyway.
 
 template <typename T>
 using ExtractSignature = typename ExtractSignatureImpl<T>::signature;

@@ -41,8 +41,8 @@ bool CollectionNotifier::any_related_table_was_modified(TransactionChangeInfo co
     return any_of(begin(m_related_tables), end(m_related_tables), check_related_table);
 }
 
-std::function<bool(ObjKey)> CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
-                                                                         ConstTableRef root_table)
+util::UniqueFunction<bool(ObjKey)> CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
+                                                                                ConstTableRef root_table)
 {
     // If new links were added to existing tables we need to recalculate our
     // related tables info. This'll also happen for schema changes that don't
@@ -90,7 +90,7 @@ std::function<bool(ObjKey)> CollectionNotifier::get_modification_checker(Transac
     return DeepChangeChecker(info, *root_table, m_related_tables, m_key_path_array, m_all_callbacks_filtered);
 }
 
-std::function<std::vector<ColKey>(ObjKey)>
+util::UniqueFunction<std::vector<ColKey>(ObjKey)>
 CollectionNotifier::get_object_modification_checker(TransactionChangeInfo const& info, ConstTableRef root_table)
 {
     return ObjectKeyPathChangeChecker(info, *root_table, m_related_tables, m_key_path_array,

@@ -127,7 +127,7 @@ public:
     }
 
 private:
-    std::function<void()> m_callback;
+    util::UniqueFunction<void()> m_callback;
     ALooper* m_looper = ALooper_forThread();
     pthread_t m_thread = pthread_self();
     bool m_initialized = false;

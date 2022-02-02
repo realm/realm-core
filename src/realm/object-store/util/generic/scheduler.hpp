@@ -51,8 +51,8 @@ public:
     {
         return false;
     }
-    void set_schedule_writes_callback(std::function<void()>) override {}
-    void set_schedule_completions_callback(std::function<void()>) override {}
+    void set_schedule_writes_callback(util::UniqueFunction<void()>) override {}
+    void set_schedule_completions_callback(util::UniqueFunction<void()>) override {}
 
 private:
     std::thread::id m_id = std::this_thread::get_id();

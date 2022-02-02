@@ -72,12 +72,14 @@ namespace _impl {
 struct TransformerImpl::Discriminant {
     timestamp_type timestamp;
     file_ident_type client_file_ident;
-    Discriminant(const Discriminant&) = default;
     Discriminant(timestamp_type t, file_ident_type p)
         : timestamp(t)
         , client_file_ident(p)
     {
     }
+
+    Discriminant(const Discriminant&) = default;
+    Discriminant& operator=(const Discriminant&) = default;
 
     bool operator<(const Discriminant& other) const
     {

@@ -1341,7 +1341,7 @@ public:
         m_completed_operations.clear();
     }
 
-    void report_event_loop_metrics(std::function<EventLoopMetricsHandler> handler)
+    void report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler> handler)
     {
 #ifdef REALM_UTIL_NETWORK_EVENT_LOOP_METRICS
         m_event_loop_metrics_timer.emplace(service);
@@ -1768,7 +1768,7 @@ void Service::reset() noexcept
 }
 
 
-void Service::report_event_loop_metrics(std::function<EventLoopMetricsHandler> handler)
+void Service::report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler> handler)
 {
     m_impl->report_event_loop_metrics(std::move(handler)); // Throws
 }

@@ -1,63 +1,62 @@
-#include <cstdint>
-#include <cmath>
-#include <cstring>
-#include <cstdio>
-#include <algorithm>
-#include <stdexcept>
-#include <locale>
-#include <vector>
-#include <queue>
-#include <map>
-#include <memory>
-#include <sstream>
-#include <chrono>
-#include <cctype>
-#include <condition_variable>
-#include <functional>
-#include <algorithm>
-#include <atomic>
-#include <thread>
+#include <realm/sync/noinst/server/server.hpp>
 
-#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
-#include <realm/util/value_reset_guard.hpp>
-#include <realm/util/scope_exit.hpp>
-#include <realm/util/safe_int_ops.hpp>
-#include <realm/util/memory_stream.hpp>
-#include <realm/util/random.hpp>
-#include <realm/util/bind_ptr.hpp>
-#include <realm/util/circular_buffer.hpp>
-#include <realm/util/optional.hpp>
-#include <realm/util/file.hpp>
-#include <realm/util/load_file.hpp>
-#include <realm/util/parent_dir.hpp>
-#include <realm/util/platform_info.hpp>
-#include <realm/util/scratch_allocator.hpp>
-#include <realm/util/base64.hpp>
-#include <realm/util/buffer_stream.hpp>
-#include <realm/util/json_parser.hpp>
-#include <realm/util/thread.hpp>
-#include <realm/util/thread_exec_guard.hpp>
-#include <realm/util/network_ssl.hpp>
-#include <realm/util/http.hpp>
-#include <realm/util/websocket.hpp>
-#include <realm/version.hpp>
-#include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/sync/noinst/compression.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/string_data.hpp>
+#include <realm/sync/changeset.hpp>
+#include <realm/sync/impl/clamped_hex_dump.hpp>
+#include <realm/sync/impl/clock.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/server/server_file_access_cache.hpp>
+#include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/server/access_control.hpp>
+#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
+#include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/server/server_impl_base.hpp>
 #include <realm/sync/noinst/server/vacuum.hpp>
-#include <realm/sync/impl/clock.hpp>
-#include <realm/sync/impl/clamped_hex_dump.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
-#include <realm/sync/noinst/server/access_control.hpp>
-#include <realm/sync/noinst/server/server.hpp>
-#include <realm/sync/changeset.hpp>
+#include <realm/util/base64.hpp>
+#include <realm/util/bind_ptr.hpp>
+#include <realm/util/buffer_stream.hpp>
+#include <realm/util/circular_buffer.hpp>
+#include <realm/util/file.hpp>
+#include <realm/util/http.hpp>
+#include <realm/util/json_parser.hpp>
+#include <realm/util/load_file.hpp>
+#include <realm/util/memory_stream.hpp>
+#include <realm/util/network_ssl.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/parent_dir.hpp>
+#include <realm/util/platform_info.hpp>
+#include <realm/util/random.hpp>
+#include <realm/util/safe_int_ops.hpp>
+#include <realm/util/scope_exit.hpp>
+#include <realm/util/scratch_allocator.hpp>
+#include <realm/util/thread.hpp>
+#include <realm/util/thread_exec_guard.hpp>
+#include <realm/util/value_reset_guard.hpp>
+#include <realm/util/websocket.hpp>
+#include <realm/version.hpp>
+
+#include <algorithm>
+#include <atomic>
+#include <cctype>
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <functional>
+#include <locale>
+#include <map>
+#include <memory>
+#include <queue>
+#include <sstream>
+#include <stdexcept>
+#include <thread>
+#include <vector>
 
 // NOTE: The protocol specification is in `/doc/protocol.md`
 
@@ -401,7 +400,7 @@ protected:
 
 class WorkerBox {
 public:
-    using JobType = std::function<void(WorkerState&)>;
+    using JobType = util::UniqueFunction<void(WorkerState&)>;
     void add_work(WorkerState& state, JobType job)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -1052,7 +1051,7 @@ public:
     void run();
     void stop() noexcept;
 
-    void report_event_loop_metrics(std::function<EventLoopMetricsHandler>);
+    void report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler>);
 
     HTTPConnection* get_http_connection(std::int_fast64_t conn_id) noexcept;
 
@@ -1144,7 +1143,7 @@ public:
 
     void recognize_external_change(const std::string& virt_path);
 
-    void stop_sync_and_wait_for_backup_completion(std::function<void(bool did_backup)> completion_handler,
+    void stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_backup)> completion_handler,
                                                   milliseconds_type timeout);
 
     void initiate_compact_realm(std::int_fast64_t conn_id, StringData virt_path);
@@ -1291,7 +1290,7 @@ private:
     void initiate_allocation_metrics_wait();
     void handle_allocation_metrics_wait();
 
-    void do_stop_sync_and_wait_for_backup_completion(std::function<void(bool did_complete)> completion_handler,
+    void do_stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_complete)> completion_handler,
                                                      milliseconds_type timeout);
 };
 
@@ -1485,37 +1484,34 @@ public:
 
     void async_write(const char* data, size_t size, util::websocket::WriteCompletionHandler handler) final override
     {
-        // FIXME: Use std::move() on type-erased handlers, or avoid type erasure altogether
         if (m_ssl_stream) {
-            m_ssl_stream->async_write(data, size, handler); // Throws
+            m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
         }
         else {
-            m_socket->async_write(data, size, handler); // Throws
+            m_socket->async_write(data, size, std::move(handler)); // Throws
         }
     }
 
     void async_read(char* buffer, size_t size, util::websocket::ReadCompletionHandler handler) final override
     {
-        // FIXME: Use std::move() on type-erased handlers, or avoid type erasure altogether
         if (m_ssl_stream) {
-            m_ssl_stream->async_read(buffer, size, *m_read_ahead_buffer, handler); // Throws
+            m_ssl_stream->async_read(buffer, size, *m_read_ahead_buffer, std::move(handler)); // Throws
         }
         else {
-            m_socket->async_read(buffer, size, *m_read_ahead_buffer, handler); // Throws
+            m_socket->async_read(buffer, size, *m_read_ahead_buffer, std::move(handler)); // Throws
         }
     }
 
     void async_read_until(char* buffer, size_t size, char delim,
                           util::websocket::ReadCompletionHandler handler) final override
     {
-        // FIXME: Use std::move() on type-erased handlers, or avoid type erasure altogether
         if (m_ssl_stream) {
             m_ssl_stream->async_read_until(buffer, size, delim, *m_read_ahead_buffer,
-                                           handler); // Throws
+                                           std::move(handler)); // Throws
         }
         else {
             m_socket->async_read_until(buffer, size, delim, *m_read_ahead_buffer,
-                                       handler); // Throws
+                                       std::move(handler)); // Throws
         }
     }
 
@@ -1611,8 +1607,6 @@ public:
                                 const UploadChangesets&);
 
     void receive_mark_message(session_ident_type, request_ident_type);
-
-    void receive_refresh_message(session_ident_type, std::string signed_user_token);
 
     void receive_unbind_message(session_ident_type);
 
@@ -1981,7 +1975,7 @@ private:
         // supposed to be mandatory, then that check ought to be delegated to
         // handle_request_for_sync(), as that will yield a sharper separation of
         // concerns.
-        if (path == "/realm-sync" || path.begins_with("/realm-sync/%2F")) {
+        if (path == "/realm-sync" || path.begins_with("/realm-sync?") || path.begins_with("/realm-sync/%2F")) {
             handle_request_for_sync(request); // Throws
         }
         else if (path.begins_with("/api/")) {
@@ -2516,11 +2510,11 @@ private:
 //   Protocol
 //   state                Will send              Can receive
 // -----------------------------------------------------------------------
-//   AllocatingIdent      none                   REFRESH, UNBIND
-//   SendIdent            IDENT                  REFRESH, UNBIND
-//   WaitForIdent         none                   IDENT, REFRESH, UNBIND
+//   AllocatingIdent      none                   UNBIND
+//   SendIdent            IDENT                  UNBIND
+//   WaitForIdent         none                   IDENT, UNBIND
 //   WaitForUnbind        DOWNLOAD, TRANSACT,    UPLOAD, TRANSACT, MARK,
-//                        MARK, ALLOC            REFRESH, ALLOC, UNBIND
+//                        MARK, ALLOC            ALLOC, UNBIND
 //   SendError            ERROR                  any
 //   WaitForUnbindErr     none                   any
 //   SendUnbound          UNBOUND                none
@@ -2793,18 +2787,6 @@ public:
         m_file_ident_request = m_server_file->request_file_ident(*this, proxy_file, client_type); // Throws
         m_send_ident_message = true;
         // Protocol state is now AllocatingIdent
-
-        return true;
-    }
-
-    bool receive_refresh_message(std::string signed_user_token)
-    {
-        // Protocol state must be AllocatingIdent, SendIdent, WaitForIdent, or WaitForUnbind.
-        REALM_ASSERT(!unbind_message_received());
-        REALM_ASSERT(!error_occurred());
-
-        logger.detail("Received: REFRESH(signed_user_token='%1')",
-                      short_token_fmt(signed_user_token)); // Throws
 
         return true;
     }
@@ -4955,7 +4937,7 @@ void ServerImpl::stop() noexcept
     m_service.stop();
 }
 
-void ServerImpl::report_event_loop_metrics(std::function<EventLoopMetricsHandler> handler)
+void ServerImpl::report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler> handler)
 {
     m_service.report_event_loop_metrics(std::move(handler)); // Throws
 }
@@ -5096,7 +5078,7 @@ void ServerImpl::initiate_accept()
     };
     bool is_ssl = bool(m_ssl_context);
     m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                 // Throws
-    m_acceptor.async_accept(m_next_http_conn->get_socket(), m_next_http_conn_endpoint, handler); // Throws
+    m_acceptor.async_accept(m_next_http_conn->get_socket(), m_next_http_conn_endpoint, std::move(handler)); // Throws
 }
 
 
@@ -5210,14 +5192,14 @@ void ServerImpl::recognize_external_change(const std::string& virt_path)
 }
 
 
-void ServerImpl::stop_sync_and_wait_for_backup_completion(std::function<void(bool did_backup)> completion_handler,
-                                                          milliseconds_type timeout)
+void ServerImpl::stop_sync_and_wait_for_backup_completion(
+    util::UniqueFunction<void(bool did_backup)> completion_handler, milliseconds_type timeout)
 {
     logger.info("stop_sync_and_wait_for_backup_completion() called with "
                 "timeout = %1",
                 timeout); // Throws
 
-    auto handler = [this, completion_handler = std::move(completion_handler), timeout] {
+    auto handler = [this, completion_handler = std::move(completion_handler), timeout]() mutable {
         do_stop_sync_and_wait_for_backup_completion(std::move(completion_handler),
                                                     timeout); // Throws
     };
@@ -5326,7 +5308,7 @@ void ServerImpl::initiate_allocation_metrics_wait()
             handle_allocation_metrics_wait();
         }
     };
-    m_allocation_metrics_timer.async_wait(std::chrono::seconds(1), handler); // Throws
+    m_allocation_metrics_timer.async_wait(std::chrono::seconds(1), std::move(handler)); // Throws
 }
 
 
@@ -5349,7 +5331,7 @@ void ServerImpl::handle_allocation_metrics_wait()
 }
 
 void ServerImpl::do_stop_sync_and_wait_for_backup_completion(
-    std::function<void(bool did_complete)> completion_handler, milliseconds_type timeout)
+    util::UniqueFunction<void(bool did_complete)> completion_handler, milliseconds_type timeout)
 {
     static_cast<void>(timeout);
     if (m_sync_stopped)
@@ -5588,28 +5570,6 @@ void SyncConnection::receive_mark_message(session_ident_type session_ident, requ
     bool success = sess.receive_mark_message(request_ident, error); // Throws
     if (REALM_UNLIKELY(!success))                                   // Throws
         protocol_error(error, &sess);                               // Throws
-}
-
-
-void SyncConnection::receive_refresh_message(session_ident_type session_ident, std::string signed_user_token)
-{
-    auto i = m_sessions.find(session_ident);
-    if (REALM_UNLIKELY(i == m_sessions.end())) {
-        bad_session_ident("REFRESH", session_ident); // Throws
-        return;
-    }
-    Session& sess = *i->second;
-    if (REALM_UNLIKELY(sess.unbind_message_received())) {
-        message_after_unbind("REFRESH", session_ident); // Throws
-        return;
-    }
-    if (REALM_UNLIKELY(sess.error_occurred())) {
-        // Protocol state is SendError or WaitForUnbindErr. In these states, all
-        // messages, other than UNBIND, must be ignored.
-        return;
-    }
-
-    sess.receive_refresh_message(std::move(signed_user_token)); // Throws
 }
 
 
@@ -5999,7 +5959,7 @@ uint_fast64_t Server::errors_seen() const noexcept
 }
 
 
-void Server::stop_sync_and_wait_for_backup_completion(std::function<void(bool did_backup)> completion_handler,
+void Server::stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_backup)> completion_handler,
                                                       milliseconds_type timeout)
 {
     m_impl->stop_sync_and_wait_for_backup_completion(std::move(completion_handler), timeout); // Throws

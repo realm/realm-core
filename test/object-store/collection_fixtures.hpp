@@ -472,7 +472,7 @@ struct LinkedCollectionBase {
     {
     }
 
-    void set_relation_updater(std::function<void()> updater)
+    void set_relation_updater(util::UniqueFunction<void()> updater)
     {
         m_relation_updater = std::move(updater);
     }

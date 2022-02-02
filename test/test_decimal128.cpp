@@ -34,6 +34,14 @@ TEST(Decimal_Basics)
         Decimal128 d = Decimal128(str);
         CHECK_EQUAL(d.to_string(), ref);
     };
+    auto test_double = [&](double val, const std::string& ref) {
+        Decimal128 d = Decimal128(val);
+        CHECK_EQUAL(d.to_string(), ref);
+    };
+    auto test_float = [&](float val, const std::string& ref) {
+        Decimal128 d = Decimal128(val);
+        CHECK_EQUAL(d.to_string(), ref);
+    };
     test_str("0", "0");
     test_str("0.000", "0E-3");
     test_str("0E-3", "0E-3");
@@ -57,6 +65,13 @@ TEST(Decimal_Basics)
     test_str("1.797e308", "1.797E308");                                 // largest double
     test_str_nan("0.0Q1");
     test_str_nan("0.0Eq");
+    test_float(7.6f, "7.600000");
+    test_double(10.5, "10.5");
+    test_double(12345.6789, "12345.6789000000");
+    test_double(9.99999999999999, "9.99999999999999");
+    test_double(0.1 / 1000 / 1000 / 1000 / 1000 / 1000 / 1000, "1.00000000000000E-19");
+    test_double(0.01 * 1000 * 1000 * 1000 * 1000 * 1000 * 1000, "1.00000000000000E16");
+    test_double(3.141592653589793238, "3.14159265358979"); // only 15 significant digits when converting from double
     Decimal128 pi = Decimal128("3.141592653589793238"); // 19 significant digits
     CHECK_EQUAL(pi.to_string(), "3.141592653589793238");
     Decimal128::Bid128 bid;

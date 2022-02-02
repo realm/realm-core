@@ -2258,7 +2258,7 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     }
 
     ClientServerFixture::Config config;
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
 
     std::string server_path = "/test";
     std::string server_realm_file = fixture.map_virtual_to_real_path(server_path);
@@ -3288,7 +3288,7 @@ TEST(Sync_SSL_Certificate_1)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3318,7 +3318,7 @@ TEST(Sync_SSL_Certificate_2)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3356,7 +3356,7 @@ TEST(Sync_SSL_Certificate_3)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3383,7 +3383,7 @@ TEST(Sync_SSL_Certificate_DER)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3563,7 +3563,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     Client::Config config;
     config.logger = &client_logger;
     config.reconnect_mode = ReconnectMode::testing;
-    config.tcp_no_delay = true;
     Client client(config);
 
     ThreadWrapper client_thread;
@@ -3721,7 +3720,6 @@ TEST(Sync_UploadDownloadProgress_1)
         Client::Config config;
         config.logger = &client_logger;
         config.reconnect_mode = ReconnectMode::testing;
-        config.tcp_no_delay = true;
         Client client(config);
 
         ThreadWrapper client_thread;
@@ -3997,7 +3995,6 @@ TEST(Sync_UploadDownloadProgress_3)
     Client::Config client_config;
     client_config.logger = &client_logger;
     client_config.reconnect_mode = ReconnectMode::testing;
-    client_config.tcp_no_delay = true;
     Client client(client_config);
 
     ThreadWrapper client_thread;
@@ -4149,7 +4146,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     ClientServerFixture::Config config;
     config.max_download_size = size_t(1e5);
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     Session session_1 = fixture.make_session(db_1);
@@ -4303,7 +4300,6 @@ TEST(Sync_UploadDownloadProgress_6)
     client_config.logger = &client_logger;
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
-    client_config.tcp_no_delay = true;
     Client client(client_config);
 
     ThreadWrapper client_thread;
@@ -4363,7 +4359,6 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     Client::Config config;
     config.logger = &test_context.logger;
     config.reconnect_mode = ReconnectMode::testing;
-    config.tcp_no_delay = true;
     Client client{config};
     Session session_1{client, db, nullptr};
     Session session_2{client, db, nullptr};
@@ -4384,7 +4379,7 @@ TEST(Sync_CancelReconnectDelay)
 
     // After connection-level error, and at session-level.
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
@@ -4406,7 +4401,7 @@ TEST(Sync_CancelReconnectDelay)
     // After connection-level error, and at client-level while connection
     // object exists (ConnectionImpl in clinet.cpp).
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
@@ -4428,7 +4423,7 @@ TEST(Sync_CancelReconnectDelay)
     // After connection-level error, and at client-level while connection object
     // does not exist (ConnectionImpl in clinet.cpp).
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         {
@@ -4461,7 +4456,7 @@ TEST(Sync_CancelReconnectDelay)
 
     // After session-level error, and at session-level.
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         // Add a session for the purpose of keeping the connection open
@@ -4484,7 +4479,7 @@ TEST(Sync_CancelReconnectDelay)
 
     // After session-level error, and at client-level.
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         // Add a session for the purpose of keeping the connection open
@@ -4910,7 +4905,7 @@ TEST(Sync_PingTimesOut)
         ClientServerFixture::Config config;
         config.client_ping_period = 0;  // send ping immediately
         config.client_pong_timeout = 0; // time out immediately
-        ClientServerFixture fixture(dir, test_context, config);
+        ClientServerFixture fixture(dir, test_context, std::move(config));
 
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(Client::Error::pong_timeout, ec);
@@ -4937,7 +4932,7 @@ TEST(Sync_ReconnectAfterPingTimeout)
     config.client_ping_period = 0;  // send ping immediately
     config.client_pong_timeout = 0; // time out immediately
 
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
@@ -4962,7 +4957,7 @@ TEST(Sync_UrgentPingIsSent)
         ClientServerFixture::Config config;
         config.client_pong_timeout = 0; // urgent pings time out immediately
 
-        ClientServerFixture fixture(dir, test_context, config);
+        ClientServerFixture fixture(dir, test_context, std::move(config));
 
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(Client::Error::pong_timeout, ec);
@@ -4990,7 +4985,7 @@ TEST(Sync_ServerDiscardDeadConnections)
     ClientServerFixture::Config config;
     config.server_connection_reaper_interval = 1; // discard dead connections quickly, FIXME: 0 will not work here :(
 
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
@@ -5115,7 +5110,7 @@ TEST(Sync_UploadLogCompactionEnabled)
 
     ClientServerFixture::Config config;
     config.disable_upload_compaction = false;
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     Session session_1 = fixture.make_session(db_1);
@@ -5177,7 +5172,7 @@ TEST(Sync_UploadLogCompactionDisabled)
     ClientServerFixture::Config config;
     config.disable_upload_compaction = true;
     config.disable_history_compaction = true;
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
     fixture.start();
 
     // Create a changeset with lots of overwrites of the
@@ -5667,13 +5662,14 @@ TEST(Sync_AuthorizationHeaderName)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db);
 
+    const char* authorization_header_name = "X-Alternative-Name";
     ClientServerFixture::Config config;
-    config.authorization_header_name = "X-Alternative-Name";
-    ClientServerFixture fixture(dir, test_context, config);
+    config.authorization_header_name = authorization_header_name;
+    ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
 
     Session::Config session_config;
-    session_config.authorization_header_name = config.authorization_header_name;
+    session_config.authorization_header_name = authorization_header_name;
 
     std::map<std::string, std::string> custom_http_headers;
     custom_http_headers["Header-Name-1"] = "Header-Value-1";
@@ -5695,7 +5691,7 @@ TEST(Sync_BadChangeset)
     {
         ClientServerFixture::Config config;
         config.disable_upload_compaction = true;
-        ClientServerFixture fixture(dir, test_context, config);
+        ClientServerFixture fixture(dir, test_context, std::move(config));
         fixture.start();
 
         {
@@ -5991,7 +5987,7 @@ TEST(Sync_ConcurrentHttpDeleteAndHttpCompact)
 {
     TEST_DIR(server_dir);
     ClientServerFixture::Config config;
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     for (int i = 0; i < 64; ++i) {
@@ -6025,7 +6021,7 @@ TEST(Sync_RunServerWithoutPublicKey)
     TEST_DIR(server_dir);
     ClientServerFixture::Config config;
     config.server_public_key_path = {};
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     // Server must accept an unsigned token when a public key is not passed to
@@ -6059,7 +6055,7 @@ TEST(Sync_ServerSideEncryption)
     {
         ClientServerFixture::Config config;
         config.server_encryption_key = crypt_key_2(always_encrypt);
-        ClientServerFixture fixture(server_dir, test_context, config);
+        ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
 
         Session session = fixture.make_bound_session(db, "/test");
@@ -6089,7 +6085,7 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
     ClientServerFixture::Config config;
     bool always_encrypt = true;
     config.server_encryption_key = crypt_key_2(always_encrypt);
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     {
@@ -6165,7 +6161,7 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     config.disable_upload_compaction = false;
     config.disable_download_compaction = false;
 
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
 
     {
@@ -6277,7 +6273,7 @@ TEST(Sync_ClientFileBlacklisting)
         ClientServerFixture::Config config;
         config.server_metrics = &metrics;
         config.client_file_blacklists["/test"].push_back(client_file_ident);
-        ClientServerFixture fixture(server_dir, test_context, config);
+        ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
         using ConnectionState = ConnectionState;
         using ErrorInfo = Session::ErrorInfo;

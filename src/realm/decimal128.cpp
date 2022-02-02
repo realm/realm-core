@@ -15,7 +15,6 @@
  * limitations under the License.
  *
  **************************************************************************/
-
 #include <realm/decimal128.hpp>
 
 #include <realm/string_data.hpp>
@@ -51,12 +50,60 @@ Decimal128::Decimal128()
     from_int64_t(0);
 }
 
-Decimal128::Decimal128(double val)
+Decimal128::Decimal128(double val, RoundTo rounding_precision)
 {
+    // The logic below is ported from MongoDB Decimal128 implementation
+    uint64_t largest_coeff = (rounding_precision == RoundTo::Digits7) ? 9999999 : 999999999999999;
     unsigned flags = 0;
-    BID_UINT128 tmp;
-    bid128_from_string(&tmp, util::to_string(val).data(), &flags);
-    memcpy(this, &tmp, sizeof(*this));
+    BID_UINT128 converted_value;
+    binary64_to_bid128(&converted_value, &val, &flags);
+    memcpy(this, &converted_value, sizeof(*this));
+
+    // If the precision is already less than 15 decimals, or val is infinity or NaN, there's no need to quantize
+    if ((get_coefficient_low() <= largest_coeff && get_coefficient_high() == 0) || std::isinf(val) ||
+        std::isnan(val)) {
+        return;
+    }
+
+    // Get the base2 exponent from val.
+    int base2Exp;
+    frexp(val, &base2Exp);
+
+    // As frexp normalizes val between 0.5 and 1.0 rather than 1.0 and 2.0, adjust.
+    base2Exp--;
+
+
+    // We will use base10Exp = base2Exp * 30103 / (100*1000) as lowerbound (using integer division).
+    //
+    // This formula is derived from the following, with base2Exp the binary exponent of val:
+    //   (1) 10**(base2Exp * log10(2)) == 2**base2Exp
+    //   (2) 0.30103 closely approximates log10(2)
+    //
+    // Exhaustive testing using Python shows :
+    //     { base2Exp * 30103 / (100 * 1000) == math.floor(math.log10(2**base2Exp))
+    //       for base2Exp in xrange(-1074, 1023) } == { True }
+    int base10Exp = (base2Exp * 30103) / (100 * 1000);
+
+    // As integer division truncates, rather than rounds down (as in Python), adjust accordingly.
+    if (base2Exp < 0)
+        base10Exp--;
+
+    int adjust = (rounding_precision == RoundTo::Digits7) ? 6 : 14;
+    BID_UINT128 q{1, BID_UINT64(base10Exp - adjust + DECIMAL_EXPONENT_BIAS_128) << 49};
+    BID_UINT128 quantizedResult;
+    bid128_quantize(&quantizedResult, &converted_value, &q, &flags);
+    memcpy(this, &quantizedResult, sizeof(*this));
+
+    // Check if the quantization was done correctly: m_valuem_value stores exactly 15
+    // decimal digits of precision (15 digits can fit into the low 64 bits of the decimal)
+    if (get_coefficient_low() > largest_coeff) {
+        // If we didn't precisely get 15 digits of precision, the original base 10 exponent
+        // guess was 1 off, so quantize once more with base10Exp + 1
+        adjust--;
+        BID_UINT128 q1{1, (BID_UINT64(base10Exp) - adjust + DECIMAL_EXPONENT_BIAS_128) << 49};
+        bid128_quantize(&quantizedResult, &converted_value, &q1, &flags);
+        memcpy(this, &quantizedResult, sizeof(*this));
+    }
 }
 
 void Decimal128::from_int64_t(int64_t val)
@@ -400,8 +447,8 @@ void Decimal128::unpack(Bid128& coefficient, int& exponent, bool& sign) const no
     int64_t exp = m_value.w[1] & 0x7fffffffffffffffull;
     exp >>= 49;
     exponent = int(exp) - DECIMAL_EXPONENT_BIAS_128;
-    coefficient.w[0] = m_value.w[0];
-    coefficient.w[1] = m_value.w[1] & 0x00003fffffffffffull;
+    coefficient.w[0] = get_coefficient_low();
+    coefficient.w[1] = get_coefficient_high();
 }
 
 } // namespace realm

@@ -238,7 +238,7 @@ void CopyReplication::sync(const Table* t, ObjKey obj_key)
                     m_current.table = src_obj.get_table().unchecked_ptr();
                     m_current.obj_key = src_obj.get_key();
                 },
-                nullptr);
+                [](auto) {});
         }
     }
 }

@@ -273,8 +273,8 @@ TEST(Network_AsyncConnectAndAsyncAccept)
         accepted = true;
         log("accepted");
     };
-    socket_1.async_connect(listening_endpoint, connect_handler);
-    acceptor.async_accept(socket_2, accept_handler);
+    socket_1.async_connect(listening_endpoint, std::move(connect_handler));
+    acceptor.async_accept(socket_2, std::move(accept_handler));
     service.run();
     CHECK(connected);
     CHECK(accepted);
@@ -442,7 +442,7 @@ TEST(Network_AsyncReadWriteLargeAmount)
         std::unique_ptr<char[]> buffer(new char[buffer_size]);
         size_t offset_in_chunk = 0;
         int chunk_index = 0;
-        std::function<void()> read_chunk = [&] {
+        realm::util::UniqueFunction<void()> read_chunk = [&] {
             auto handler = [&](std::error_code ec, size_t n) {
                 bool equal = true;
                 for (size_t i = 0; i < n; ++i) {
@@ -572,13 +572,13 @@ TEST(Network_CancelAsyncConnect)
         if (ec == error::operation_aborted)
             connect_was_canceled = true;
     };
-    socket.async_connect(ep, handler);
+    socket.async_connect(ep, std::move(handler));
     socket.cancel();
     service.run();
     CHECK(connect_was_canceled);
 
     connect_was_canceled = false;
-    socket.async_connect(ep, handler);
+    socket.async_connect(ep, std::move(handler));
     socket.close();
     service.run();
     CHECK(connect_was_canceled);
@@ -843,7 +843,7 @@ TEST(Network_SocketMixedAsyncSync)
             if (!ec)
                 is_connected = true;
         };
-        socket.async_connect(ep, connect_handler);
+        socket.async_connect(ep, std::move(connect_handler));
         service.run();
         CHECK(is_connected);
         network::ReadAheadBuffer rab;
@@ -897,7 +897,7 @@ TEST(Network_DeadlineTimer)
     // Check that the completion handler is executed
     bool completed = false;
     bool canceled = false;
-    auto wait_handler = [&](std::error_code ec) {
+    const auto wait_handler = [&](std::error_code ec) {
         if (!ec)
             completed = true;
         if (ec == error::operation_aborted)
@@ -1697,7 +1697,7 @@ TEST(Network_RepeatedCancelAndRestartRead)
         char read_buffer[read_buffer_size];
         size_t num_bytes_read = 0;
         bool end_of_input_seen = false;
-        std::function<void()> initiate_read = [&] {
+        realm::util::UniqueFunction<void()> initiate_read = [&] {
             auto handler = [&](std::error_code ec, size_t n) {
                 num_bytes_read += n;
                 if (ec == MiscExtErrors::end_of_input) {
@@ -1788,7 +1788,7 @@ TEST(Network_StressTest)
         std::uint_fast64_t microseconds_per_cancellation = 10;
         bool progress = false;
         bool read_done = false, write_done = false;
-        std::function<void()> shedule_cancellation = [&] {
+        realm::util::UniqueFunction<void()> shedule_cancellation = [&] {
             auto handler = [&](std::error_code ec) {
                 REALM_ASSERT(!ec || ec == error::operation_aborted);
                 if (ec == error::operation_aborted)
@@ -1815,7 +1815,7 @@ TEST(Network_StressTest)
         char* read_begin = read_buffer.get();
         char* read_end = read_buffer.get() + original_size;
         int num_read_cycles = 0;
-        std::function<void()> read = [&] {
+        realm::util::UniqueFunction<void()> read = [&] {
             if (read_begin == read_end) {
                 //                log("<R%1>", id);
                 CHECK(std::equal(read_original, read_original + original_size, read_buffer.get()));
@@ -1862,7 +1862,7 @@ TEST(Network_StressTest)
         const char* write_begin = write_original;
         const char* write_end = write_original + original_size;
         int num_write_cycles = 0;
-        std::function<void()> write = [&] {
+        realm::util::UniqueFunction<void()> write = [&] {
             if (write_begin == write_end) {
                 //                log("<W%1>", id);
                 ++num_write_cycles;
@@ -1959,7 +1959,7 @@ TEST(Network_Trigger_Basics)
     CHECK(was_triggered);
 
     // Check that retriggering from triggered function works
-    std::function<void()> func_2;
+    realm::util::UniqueFunction<void()> func_2;
     network::Trigger trigger_2{service, [&] {
                                    func_2();
                                }};

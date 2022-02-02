@@ -176,9 +176,9 @@ public:
     bool has_flx_subscription_store() const;
     SubscriptionStore* get_flx_subscription_store();
 
-    void set_sync_transact_handler(std::function<SyncTransactCallback>);
-    void set_progress_handler(std::function<ProgressHandler>);
-    void set_connection_state_change_listener(std::function<ConnectionStateChangeListener>);
+    void set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback>);
+    void set_progress_handler(util::UniqueFunction<ProgressHandler>);
+    void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
 
     void initiate();
     void initiate(ProtocolEnvelope, std::string server_address, port_type server_port, std::string virt_path,
@@ -233,9 +233,9 @@ private:
 
     util::Optional<ProxyConfig> m_proxy_config;
 
-    std::function<SyncTransactCallback> m_sync_transact_handler;
-    std::function<ProgressHandler> m_progress_handler;
-    std::function<ConnectionStateChangeListener> m_connection_state_change_listener;
+    util::UniqueFunction<SyncTransactCallback> m_sync_transact_handler;
+    util::UniqueFunction<ProgressHandler> m_progress_handler;
+    util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
@@ -485,7 +485,7 @@ void ClientImpl::start_keep_running_timer()
         if (ec != util::error::operation_aborted)
             start_keep_running_timer();
     };
-    m_keep_running_timer.async_wait(std::chrono::hours(1000), handler); // Throws
+    m_keep_running_timer.async_wait(std::chrono::hours(1000), std::move(handler)); // Throws
 }
 
 
@@ -861,14 +861,14 @@ SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 }
 
 
-inline void SessionWrapper::set_sync_transact_handler(std::function<SyncTransactCallback> handler)
+inline void SessionWrapper::set_sync_transact_handler(util::UniqueFunction<SyncTransactCallback> handler)
 {
     REALM_ASSERT(!m_initiated);
     m_sync_transact_handler = std::move(handler); // Throws
 }
 
 
-inline void SessionWrapper::set_progress_handler(std::function<ProgressHandler> handler)
+inline void SessionWrapper::set_progress_handler(util::UniqueFunction<ProgressHandler> handler)
 {
     REALM_ASSERT(!m_initiated);
     m_progress_handler = std::move(handler);
@@ -876,7 +876,7 @@ inline void SessionWrapper::set_progress_handler(std::function<ProgressHandler> 
 
 
 inline void
-SessionWrapper::set_connection_state_change_listener(std::function<ConnectionStateChangeListener> listener)
+SessionWrapper::set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener> listener)
 {
     REALM_ASSERT(!m_initiated);
     m_connection_state_change_listener = std::move(listener);
@@ -947,7 +947,8 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
     REALM_ASSERT(m_initiated);
 
     util::bind_ptr<SessionWrapper> self{this};
-    auto handler_2 = [self = std::move(self), handler = std::move(handler), upload_completion, download_completion] {
+    auto handler_2 = [self = std::move(self), handler = std::move(handler), upload_completion,
+                      download_completion]() mutable {
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess)) {
             // Already finalized
@@ -1338,7 +1339,6 @@ ClientImpl::Connection::Connection(ClientImpl& client, connection_ident_type ide
     , m_protocol_envelope{std::get<0>(endpoint)}
     , m_address{std::get<1>(endpoint)}
     , m_port{std::get<2>(endpoint)}
-    , m_http_host{util::make_http_host(is_ssl(m_protocol_envelope), m_address, m_port)} // Throws
     , m_verify_servers_ssl_certificate{verify_servers_ssl_certificate}
     , m_ssl_trust_certificate_path{std::move(ssl_trust_certificate_path)}
     , m_ssl_verify_callback{std::move(ssl_verify_callback)}
@@ -1398,7 +1398,15 @@ void ClientImpl::Connection::on_idle()
 
 std::string ClientImpl::Connection::get_http_request_path() const
 {
-    std::string path = m_http_request_path_prefix; // Throws (copy)
+    using namespace std::string_view_literals;
+    const auto param = m_http_request_path_prefix.find('?') == std::string::npos ? "?baas_at="sv : "&baas_at="sv;
+
+    std::string path;
+    path.reserve(m_http_request_path_prefix.size() + param.size() + m_signed_access_token.size());
+    path += m_http_request_path_prefix;
+    path += param;
+    path += m_signed_access_token;
+
     return path;
 }
 
@@ -1481,19 +1489,19 @@ Session::Session(Client& client, DBRef db, std::shared_ptr<SubscriptionStore> fl
 }
 
 
-void Session::set_sync_transact_callback(std::function<SyncTransactCallback> handler)
+void Session::set_sync_transact_callback(util::UniqueFunction<SyncTransactCallback> handler)
 {
     m_impl->set_sync_transact_handler(std::move(handler)); // Throws
 }
 
 
-void Session::set_progress_handler(std::function<ProgressHandler> handler)
+void Session::set_progress_handler(util::UniqueFunction<ProgressHandler> handler)
 {
     m_impl->set_progress_handler(std::move(handler)); // Throws
 }
 
 
-void Session::set_connection_state_change_listener(std::function<ConnectionStateChangeListener> listener)
+void Session::set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener> listener)
 {
     m_impl->set_connection_state_change_listener(std::move(listener)); // Throws
 }

@@ -18,7 +18,7 @@ public:
         initiate_resolve();
     }
 
-    void async_write_binary(const char* data, size_t size, std::function<void()>&& handler) override
+    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) override
     {
         m_websocket.async_write_binary(data, size, std::move(handler));
     }
@@ -115,10 +115,10 @@ void EZSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHand
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
-        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
+        m_ssl_stream->async_read(buffer, size, m_read_ahead_buffer, std::move(handler)); // Throws
     }
     else {
-        m_socket->async_read(buffer, size, m_read_ahead_buffer, handler); // Throws
+        m_socket->async_read(buffer, size, m_read_ahead_buffer, std::move(handler)); // Throws
     }
 }
 
@@ -127,10 +127,10 @@ void EZSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, 
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
-        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
+        m_ssl_stream->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler)); // Throws
     }
     else {
-        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, handler); // Throws
+        m_socket->async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler)); // Throws
     }
 }
 
@@ -139,10 +139,10 @@ void EZSocketImpl::async_write(const char* data, std::size_t size, WriteCompleti
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
-        m_ssl_stream->async_write(data, size, handler); // Throws
+        m_ssl_stream->async_write(data, size, std::move(handler)); // Throws
     }
     else {
-        m_socket->async_write(data, size, handler); // Throws
+        m_socket->async_write(data, size, std::move(handler)); // Throws
     }
 }
 
@@ -218,8 +218,6 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
     }
 
     REALM_ASSERT(m_socket);
-    if (m_config.tcp_no_delay)
-        m_socket->set_option(util::network::SocketBase::no_delay(true)); // Throws
     util::network::Endpoint ep_2 = m_socket->local_endpoint();
     logger().info("Connected to endpoint '%1:%2' (from '%3:%4')", ep.address(), ep.port(), ep_2.address(),
                   ep_2.port()); // Throws
@@ -334,10 +332,15 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
 
 void EZSocketImpl::initiate_websocket_handshake()
 {
-    HTTPHeaders headers = m_endpoint.headers;
+    auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_config.user_agent;
 
-    m_websocket.initiate_client_handshake(m_endpoint.path, m_endpoint.http_host, m_endpoint.protocols,
+    // Compute the value of the "Host" header.
+    const std::uint_fast16_t default_port = (m_endpoint.is_ssl ? 443 : 80);
+    auto host = m_endpoint.port == default_port ? m_endpoint.address
+                                                : util::format("%1:%2", m_endpoint.address, m_endpoint.port);
+
+    m_websocket.initiate_client_handshake(m_endpoint.path, std::move(host), m_endpoint.protocols,
                                           std::move(headers)); // Throws
 }
 } // namespace
