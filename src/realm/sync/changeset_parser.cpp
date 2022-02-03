@@ -293,12 +293,10 @@ void ChangesetParser::State::parse_one()
     if (t == InstrTypeInternString) {
         uint32_t index = read_int<uint32_t>();
         StringData str = read_string();
-        auto it1 = m_intern_strings.find(static_cast<std::string_view>(str));
-        if (it1 != m_intern_strings.end()) {
+        if (auto it = m_intern_strings.find(static_cast<std::string_view>(str)); it != m_intern_strings.end()) {
             parser_error("Unexpected intern string");
         }
-        auto it2 = m_valid_interned_strings.find(index);
-        if (it2 != m_valid_interned_strings.end()) {
+        if (auto it = m_valid_interned_strings.find(index); it != m_valid_interned_strings.end()) {
             parser_error("Unexpected intern index");
         }
         StringBufferRange range = m_handler.add_string_range(str);
