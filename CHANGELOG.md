@@ -14,7 +14,8 @@
 * Fix some warnings when building with Xcode 13.3.
  
 ### Breaking changes
-* None.
+* Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
+* Renamed SubscriptionSet::SupercededTag -> SupersededTag to correct typo.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
