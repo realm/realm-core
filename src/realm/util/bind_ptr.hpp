@@ -309,11 +309,11 @@ public:
         REALM_ASSERT(m_ref_count == 0);
     }
 
-    RefCountBase(const RefCountBase&) = delete;
-    RefCountBase(RefCountBase&&) = delete;
-
-    void operator=(const RefCountBase&) = delete;
-    void operator=(RefCountBase&&) = delete;
+    RefCountBase(const RefCountBase&)
+        : m_ref_count(0)
+    {
+    }
+    void operator=(const RefCountBase&) {}
 
 protected:
     void bind_ptr() const noexcept
@@ -350,11 +350,11 @@ public:
         REALM_ASSERT(m_ref_count == 0);
     }
 
-    AtomicRefCountBase(const AtomicRefCountBase&) = delete;
-    AtomicRefCountBase(AtomicRefCountBase&&) = delete;
-
-    void operator=(const AtomicRefCountBase&) = delete;
-    void operator=(AtomicRefCountBase&&) = delete;
+    AtomicRefCountBase(const AtomicRefCountBase&)
+        : m_ref_count(0)
+    {
+    }
+    void operator=(const AtomicRefCountBase&) {}
 
 protected:
     // FIXME: Operators ++ and -- as used below use
