@@ -38,12 +38,6 @@ struct MemStats {
     size_t array_count = 0;
 };
 
-#ifdef REALM_DEBUG
-template <class C, class T>
-std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats);
-#endif
-
-
 // Stores a value obtained from Array::get(). It is a ref if the least
 // significant bit is clear, otherwise it is a tagged integer. A tagged interger
 // is obtained from a logical integer value by left shifting by one bit position
