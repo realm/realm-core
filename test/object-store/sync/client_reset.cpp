@@ -179,10 +179,25 @@ TEST_CASE("sync: client reset", "[client reset]") {
     local_config.path = local_config.path + ".local";
     remote_config.path = remote_config.path + ".remote";
 
-    SECTION("should trigger error callback when mode is manual") {
+    SECTION("a client reset in manual mode can be handled") {
+        std::string orig_path, recovery_path;
         local_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         ThreadSafeSyncError err;
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            REQUIRE(error.is_client_reset_requested());
+            REQUIRE(error.user_info.size() >= 2);
+            auto orig_path_it = error.user_info.find(SyncError::c_original_file_path_key);
+            auto recovery_path_it = error.user_info.find(SyncError::c_recovery_file_path_key);
+            REQUIRE(orig_path_it != error.user_info.end());
+            REQUIRE(recovery_path_it != error.user_info.end());
+            orig_path = orig_path_it->second;
+            recovery_path = recovery_path_it->second;
+            REQUIRE(util::File::exists(orig_path));
+            REQUIRE(!util::File::exists(recovery_path));
+            bool did_reset_files = sync_manager.app()->sync_manager()->immediately_run_file_actions(orig_path);
+            REQUIRE(did_reset_files);
+            REQUIRE(!util::File::exists(orig_path));
+            REQUIRE(util::File::exists(recovery_path));
             err = error;
         };
 
@@ -195,7 +210,18 @@ TEST_CASE("sync: client reset", "[client reset]") {
             ->run();
 
         REQUIRE(err);
-        REQUIRE(err.value()->is_client_reset_requested());
+        SyncError error = *err.value();
+        REQUIRE(error.is_client_reset_requested());
+        REQUIRE(!util::File::exists(orig_path));
+        REQUIRE(util::File::exists(recovery_path));
+        local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
+            CAPTURE(err.message);
+            CAPTURE(local_config.path);
+            FAIL("Error handler should not have been called");
+        };
+        auto post_reset_realm = Realm::get_shared_realm(local_config);
+        wait_for_download(*post_reset_realm); // this should now succeed without any sync errors
+        REQUIRE(util::File::exists(orig_path));
     }
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
