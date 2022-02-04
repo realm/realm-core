@@ -1,3 +1,5 @@
+#include "realm/object-store/c_api/types.hpp"
+#include "realm/object-store/dictionary.hpp"
 #include <realm/object-store/c_api/util.hpp>
 
 namespace realm::c_api {
@@ -87,9 +89,14 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t* dict, realm_value_t key
 RLM_API bool realm_dictionary_erase(realm_dictionary_t* dict, realm_value_t key, bool* out_erased)
 {
     return wrap_err([&]() {
-        static_cast<void>(dict);
-        static_cast<void>(key);
-        static_cast<void>(out_erased);
+        bool erased = false;
+        if (key.type == RLM_TYPE_STRING) {
+            StringData k{key.string.data, key.string.size};
+            erased = dict->try_erase(k);
+        }
+
+        if (out_erased)
+            *out_erased = erased;
         return true;
     });
 }
@@ -101,6 +108,53 @@ RLM_API bool realm_dictionary_clear(realm_dictionary_t* dict)
         dict->remove_all();
         return true;
     });
+}
+
+RLM_API realm_dictionary_t* realm_dictionary_from_thread_safe_reference(const realm_t* realm,
+                                                                        realm_thread_safe_reference_t* tsr)
+{
+    return wrap_err([&]() {
+        auto stsr = dynamic_cast<realm_dictionary::thread_safe_reference*>(tsr);
+        if (!stsr) {
+            throw std::logic_error{"Thread safe reference type mismatch"};
+        }
+
+        auto dict = stsr->resolve<object_store::Dictionary>(*realm);
+        return new realm_dictionary_t{std::move(dict)};
+    });
+}
+
+RLM_API bool realm_dictionary_resolve_in(const realm_dictionary_t* from_dictionary, const realm_t* target_realm,
+                                         realm_dictionary_t** resolved)
+{
+    return wrap_err([&]() {
+        try {
+            const auto& realm = *target_realm;
+            auto frozen_dictionary = from_dictionary->freeze(realm);
+            if (frozen_dictionary.is_valid()) {
+                *resolved = new realm_dictionary_t{std::move(frozen_dictionary)};
+            }
+            else {
+                *resolved = nullptr;
+            }
+            return true;
+        }
+        catch (NoSuchTable&) {
+            *resolved = nullptr;
+            return true;
+        }
+        catch (KeyNotFound&) {
+            *resolved = nullptr;
+            return true;
+        }
+    });
+}
+
+RLM_API bool realm_dictionary_is_valid(const realm_dictionary_t* dictionary)
+{
+    if (!dictionary)
+        return false;
+    return dictionary->is_valid();
 }
 
 } // namespace realm::c_api

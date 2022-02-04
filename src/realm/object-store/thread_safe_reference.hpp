@@ -26,6 +26,9 @@ class List;
 class Object;
 class Realm;
 class Results;
+namespace object_store {
+class Dictionary;
+}
 
 // Opaque type-ereased wrapper for a Realm object which can be imported into another Realm
 class ThreadSafeReference {

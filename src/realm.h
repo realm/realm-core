@@ -1894,6 +1894,26 @@ RLM_API realm_dictionary_t* _realm_dictionary_from_native_copy(const void* pdict
 RLM_API realm_dictionary_t* _realm_dictionary_from_native_move(void* pdict, size_t n);
 
 /**
+ * Resolve the list in the context of a given Realm instance.
+ *
+ * This is equivalent to producing a thread-safe reference and resolving it in the frozen realm.
+ *
+ * If resolution is possible, a valid resolved object is produced at '*resolved*'.
+ * If resolution is not possible, but no error occurs, '*resolved' is set to NULL
+ *
+ * @return true if no error occurred.
+ */
+RLM_API bool realm_dictionary_resolve_in(const realm_dictionary_t* list, const realm_t* target_realm,
+                                         realm_dictionary_t** resolved);
+
+/**
+ * Check if a list is valid.
+ *
+ * @return True if the list is valid.
+ */
+RLM_API bool realm_dictionary_is_valid(const realm_dictionary_t*);
+
+/**
  * Get the size of a dictionary (the number of unique keys).
  *
  * This function may fail if the object owning the dictionary has been deleted.
@@ -1992,6 +2012,13 @@ RLM_API realm_notification_token_t*
 realm_dictionary_add_notification_callback(realm_dictionary_t*, void* userdata, realm_free_userdata_func_t free,
                                            realm_on_collection_change_func_t on_change,
                                            realm_callback_error_func_t on_error, realm_scheduler_t*);
+
+/**
+ * Get an dictionary from a thread-safe reference, potentially originating in a
+ * different `realm_t` instance
+ */
+RLM_API realm_dictionary_t* realm_dictionary_from_thread_safe_reference(const realm_t*,
+                                                                        realm_thread_safe_reference_t*);
 
 /**
  * Parse a query string and bind it to a table.
