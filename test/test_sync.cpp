@@ -579,8 +579,8 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code, bool, const std::string&) {
-            fixture.stop();
             did_fail = true;
+            fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
@@ -1601,8 +1601,8 @@ TEST(Sync_ReadFailureSimulation)
             auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
                 CHECK_EQUAL(_impl::SimulatedFailure::sync_client__read_head, ec);
                 CHECK_NOT(is_fatal);
-                fixture.stop();
                 client_side_read_did_fail = true;
+                fixture.stop();
             };
             fixture.set_client_side_error_handler(error_handler);
             Session session = fixture.make_bound_session(db, "/test");
@@ -5718,8 +5718,8 @@ TEST(Sync_BadChangeset)
             bool is_fatal = error_info->is_fatal;
             CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
             CHECK(is_fatal);
-            fixture.stop();
             did_fail = true;
+            fixture.stop();
         };
 
         Session session = fixture.make_session(db);
@@ -5730,6 +5730,49 @@ TEST(Sync_BadChangeset)
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK(did_fail);
+}
+
+
+TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
+{
+    TEST_DIR(dir);
+    TEST_CLIENT_DB(db);
+
+    bool did_fail = false;
+    {
+        ClientServerFixture::Config config;
+        config.disable_upload_compaction = true;
+        ClientServerFixture fixture(dir, test_context, std::move(config));
+        fixture.start();
+
+        {
+            Session session = fixture.make_bound_session(db);
+        }
+
+        {
+            WriteTransaction wt(db);
+            TableRef table = wt.add_table("class_table");
+            table->add_column(type_Int, "prógram");
+            table->add_column(type_Int, "program");
+            auto obj = table->create_object();
+            obj.add_int("program", 42);
+            wt.commit();
+        }
+
+        auto listener = [&](ConnectionState state, const Session::ErrorInfo*) {
+            if (state != ConnectionState::disconnected)
+                return;
+            did_fail = true;
+            fixture.stop();
+        };
+
+        Session session = fixture.make_session(db);
+        session.set_connection_state_change_listener(listener);
+        fixture.bind_session(session, "/test");
+
+        session.wait_for_upload_complete_or_client_stopped();
+    }
+    CHECK_NOT(did_fail);
 }
 
 
@@ -6285,8 +6328,8 @@ TEST(Sync_ClientFileBlacklisting)
             bool is_fatal = error_info->is_fatal;
             CHECK_EQUAL(sync::ProtocolError::client_file_blacklisted, ec);
             CHECK(is_fatal);
-            fixture.stop();
             did_fail = true;
+            fixture.stop();
         };
         Session session = fixture.make_session(db);
         session.set_connection_state_change_listener(listener);

@@ -1235,25 +1235,6 @@ void Array::set(size_t ndx, int64_t value)
     set_direct<width>(m_data, ndx, value);
 }
 
-
-// LCOV_EXCL_START ignore debug functions
-
-#ifdef REALM_DEBUG
-template <class C, class T>
-std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats)
-{
-    std::ostringstream out_2;
-    out_2.setf(std::ios::fixed);
-    out_2.precision(1);
-    double used_percent = 100.0 * stats.used / stats.allocated;
-    out_2 << "allocated = " << stats.allocated << ", used = " << stats.used << " (" << used_percent << "%), "
-          << "array_count = " << stats.array_count;
-    out << out_2.str();
-    return out;
-}
-#endif
-
-
 namespace {
 
 class MemStatsHandler : public Array::MemUsageHandler {

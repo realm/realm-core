@@ -808,11 +808,19 @@ std::vector<T> Set<T>::convert_to_set(const CollectionBase& rhs, bool nullable)
     std::vector<T> ret;
     ret.reserve(mixed.size());
     for (auto&& val : mixed) {
-        if (val.is_type(ColumnTypeTraits<T>::id)) {
-            ret.push_back(val.get<T>());
+        if constexpr (std::is_same_v<T, ObjKey>) {
+            static_cast<void>(nullable);
+            if (val.is_type(type_Link, type_TypedLink)) {
+                ret.push_back(val.get<ObjKey>());
+            }
         }
-        else if (val.is_null() && nullable) {
-            ret.push_back(BPlusTree<T>::default_value(true));
+        else {
+            if (val.is_type(ColumnTypeTraits<T>::id)) {
+                ret.push_back(val.get<T>());
+            }
+            else if (val.is_null() && nullable) {
+                ret.push_back(BPlusTree<T>::default_value(true));
+            }
         }
     }
     return ret;
@@ -1087,7 +1095,8 @@ inline bool LnkSet::is_null(size_t ndx) const
 inline Mixed LnkSet::get_any(size_t ndx) const
 {
     update_if_needed();
-    return m_set.get_any(virtual2real(ndx));
+    auto obj_key = m_set.get(virtual2real(ndx));
+    return ObjLink{get_target_table()->get_key(), obj_key};
 }
 
 inline std::pair<size_t, bool> LnkSet::insert_null()

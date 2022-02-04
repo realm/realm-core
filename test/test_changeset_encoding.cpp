@@ -259,3 +259,21 @@ TEST(ChangesetEncoding_Clear)
     CHECK_EQUAL(changeset, parsed);
     CHECK(**changeset.begin() == instr);
 }
+
+TEST(ChangesetEncoding_AccentWords)
+{
+    sync::ChangesetEncoder encoder;
+
+    encoder.intern_string("Prógram");
+    encoder.intern_string("Program");
+    // Bug #5193 caused "Program" to not be found as an intern string
+    // although it was just created before.
+    encoder.intern_string("Program");
+    auto& buffer = encoder.buffer();
+
+    using realm::_impl::SimpleNoCopyInputStream;
+    SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+    Changeset parsed;
+    // This will throw if a string is interned twice.
+    CHECK_NOTHROW(parse_changeset(stream, parsed));
+}

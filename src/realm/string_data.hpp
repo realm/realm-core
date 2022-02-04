@@ -166,7 +166,7 @@ public:
     explicit operator bool() const noexcept;
     explicit operator std::string_view() const noexcept
     {
-        return std::string_view(m_data);
+        return std::string_view(m_data, m_size);
     }
 
     /// If the StringData is NULL, the hash is 0. Otherwise, the function

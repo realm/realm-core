@@ -79,7 +79,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
 }
 
 /// Check that a mixed value can be inserted in a list.
-inline void check_value_assignable(const List& list, Mixed val)
+inline void check_value_assignable(const realm::object_store::Collection& list, Mixed val)
 {
     auto realm = list.get_realm();
     auto table_key = list.get_parent_table_key();
@@ -88,24 +88,10 @@ inline void check_value_assignable(const List& list, Mixed val)
     return check_value_assignable(realm, *table, col_key, val);
 }
 
-/// If the value is Mixed(ObjLink), and the target column is an strongly-typed
-/// link column, coerce it to Mixed(ObjKey). This is supposed to happen after
-/// calling `check_value_assignable()`.
-inline Mixed typed_link_to_objkey(Mixed val, ColKey col_key)
-{
-    if (col_key.get_type() == col_type_Link || col_key.get_type() == col_type_LinkList) {
-        if (val.is_type(type_TypedLink)) {
-            auto link = val.get<ObjLink>();
-            return link.get_obj_key();
-        }
-    }
-    return val;
-}
-
 /// If the value is Mixed(ObjKey), convert it to Mixed(ObjLink).
 inline Mixed objkey_to_typed_link(Mixed val, ColKey col_key, const Table& table)
 {
-    if (!val.is_null() && val.get_type() == type_Link) {
+    if (val.is_type(type_Link)) {
         auto target_table = table.get_link_target(col_key);
         return ObjLink{target_table->get_key(), val.get<ObjKey>()};
     }
