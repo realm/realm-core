@@ -602,13 +602,6 @@ public:
     {
         return db->get_version_of_latest_snapshot();
     }
-    DB::VersionID get_oldest_version_not_persisted()
-    {
-        if (m_oldest_version_not_persisted) {
-            return VersionID(m_oldest_version_not_persisted->m_version, m_oldest_version_not_persisted->m_reader_idx);
-        }
-        return {};
-    }
     /// Get a version id which may be used to request a different transaction locked to specific version.
     DB::VersionID get_version_of_current_transaction() const noexcept
     {
@@ -662,7 +655,7 @@ public:
     }
     bool is_async() noexcept
     {
-        std::unique_lock<std::mutex> lck(mtx);
+        std::unique_lock<std::mutex> lck(m_async_mutex);
         return m_async_stage != AsyncState::Idle;
     }
     TransactionRef duplicate();
@@ -707,7 +700,7 @@ public:
     // true if sync to disk has been requested
     bool is_synchronizing() noexcept
     {
-        std::unique_lock<std::mutex> lck(mtx);
+        std::unique_lock<std::mutex> lck(m_async_mutex);
         return m_async_stage == AsyncState::Syncing;
     }
 
@@ -715,21 +708,21 @@ public:
     // Returns TRUE if async stage is Idle
     bool wait_for_async_completion()
     {
-        std::unique_lock<std::mutex> lck(mtx);
+        std::unique_lock<std::mutex> lck(m_async_mutex);
         if (m_async_stage == Transaction::AsyncState::Syncing) {
-            waiting_for_sync = true;
-            do {
-                cv.wait(lck);
-            } while (waiting_for_sync);
+            m_waiting_for_sync = true;
+            m_async_cv.wait(lck, [this] {
+                return !m_waiting_for_sync;
+            });
         }
         else if (m_async_stage == Transaction::AsyncState::Requesting) {
-            waiting_for_write_lock = true;
-            do {
-                cv.wait(lck);
-            } while (waiting_for_write_lock);
+            m_waiting_for_write_lock = true;
+            m_async_cv.wait(lck, [this] {
+                return !m_waiting_for_write_lock;
+            });
         }
         if (m_commit_exception)
-            throw m_commit_exception;
+            std::rethrow_exception(m_commit_exception);
         return m_async_stage == Transaction::AsyncState::Idle;
     }
 
@@ -769,11 +762,11 @@ private:
     std::exception_ptr m_commit_exception;
 
     // Mutex is protecting access to members just below
-    std::mutex mtx;
-    std::condition_variable cv;
+    std::mutex m_async_mutex;
+    std::condition_variable m_async_cv;
     AsyncState m_async_stage = AsyncState::Idle;
-    bool waiting_for_write_lock = false;
-    bool waiting_for_sync = false;
+    bool m_waiting_for_write_lock = false;
+    bool m_waiting_for_sync = false;
 
     DB::TransactStage m_transact_stage = DB::transact_Ready;
 
