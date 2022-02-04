@@ -13,6 +13,7 @@
 * Subscription names correctly distinguish an empty string from a nullptr ([#5160](https://github.com/realm/realm-core/pull/5160), since v11.8.0)
 * Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
 * Fix some warnings when building with Xcode 13.3.
+* Using accented characters in class and field names may end the session ([#5196](https://github.com/realm/realm-core/pull/5196), since v10.2.0)
  
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
