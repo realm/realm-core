@@ -24,8 +24,8 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/subscriptions.hpp>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>

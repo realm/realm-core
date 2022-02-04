@@ -2318,6 +2318,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 REQUIRE(error.message == "Unable to refresh the user access token.");
             };
 
+            auto transport = static_cast<SynchronousTestTransport*>(app_config.transport.get());
+            transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(config.path);
             REQUIRE(user->is_logged_in());
@@ -2329,6 +2331,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                     called.store(true);
                     REQUIRE(err == make_error_code(ServiceErrorCode::invalid_session));
                 });
+                transport->unblock();
                 timed_wait_for([&] {
                     return called.load();
                 });

@@ -20,8 +20,8 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>

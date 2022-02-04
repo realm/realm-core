@@ -36,6 +36,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/sync/impl/sync_metadata.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #endif
 
 #include <realm/db.hpp>
@@ -724,12 +725,13 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
+        auto db = DB::create(sync::make_client_replication(), config.path);
+        auto write = db->start_write(); // block sync from writing until we cancel
+
         std::shared_ptr<AsyncOpenTask> task = Realm::get_synchronized_realm(config);
         std::shared_ptr<AsyncOpenTask> task2 = Realm::get_synchronized_realm(config);
         REQUIRE(task);
         REQUIRE(task2);
-        auto realm = Realm::get_shared_realm(config);
-        realm->begin_transaction(); // block sync from writing until we cancel
         task->register_download_progress_notifier([&](uint64_t, uint64_t) {
             std::lock_guard<std::mutex> guard(mutex);
             REQUIRE(!task1_completed);
@@ -755,7 +757,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             std::lock_guard<std::mutex> guard(mutex);
             task2_completed = true;
         });
-        realm->cancel_transaction(); // unblock sync
+        write = nullptr; // unblock sync
         util::EventLoop::main().run_until([&] {
             std::lock_guard<std::mutex> guard(mutex);
             return task2_completed;

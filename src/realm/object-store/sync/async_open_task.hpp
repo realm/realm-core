@@ -19,7 +19,7 @@
 #ifndef ASYNC_OPEN_TASK_HPP
 #define ASYNC_OPEN_TASK_HPP
 
-#include <realm/object-store/util/checked_mutex.hpp>
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/functional.hpp>
 
 #include <memory>
