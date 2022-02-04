@@ -175,7 +175,7 @@ void CopyReplication::dictionary_insert(const CollectionBase& coll, size_t, Mixe
             // Check if dictionary obj has embedded obj already
             auto tmp = dict.try_get(key);
             Obj embedded;
-            if (tmp && tmp->is_type(type_Link)) {
+            if (tmp && tmp->is_type(type_TypedLink)) {
                 ObjKey key = tmp->get<ObjKey>();
                 embedded = dest_target_table->get_object(key);
             }
