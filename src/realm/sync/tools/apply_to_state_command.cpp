@@ -37,11 +37,13 @@ struct DownloadMessage {
     realm::sync::SyncProgress progress;
     realm::sync::SaltedVersion latest_server_version;
     uint64_t downloadable_bytes;
+    realm::sync::DownloadBatchState batch_state;
+    int64_t query_version;
 
     Buffer<char> uncompressed_body_buffer;
     std::vector<realm::sync::Transformer::RemoteChangeset> changesets;
 
-    static DownloadMessage parse(HeaderLineParser& msg, Logger& logger);
+    static DownloadMessage parse(HeaderLineParser& msg, Logger& logger, bool is_flx_sync);
 };
 
 struct UploadMessage {
@@ -57,11 +59,11 @@ struct UploadMessage {
 
 using Message = mpark::variant<ServerIdentMessage, DownloadMessage, UploadMessage>;
 
-Message parse_message(HeaderLineParser& msg, Logger& logger)
+Message parse_message(HeaderLineParser& msg, Logger& logger, bool is_flx_sync)
 {
     auto message_type = msg.read_next<std::string_view>();
     if (message_type == "download") {
-        return DownloadMessage::parse(msg, logger);
+        return DownloadMessage::parse(msg, logger, is_flx_sync);
     }
     else if (message_type == "upload") {
         return UploadMessage::parse(msg, logger);
@@ -82,7 +84,7 @@ ServerIdentMessage ServerIdentMessage::parse(HeaderLineParser& msg)
     return ret;
 }
 
-DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger)
+DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bool is_flx_sync)
 {
     DownloadMessage ret;
 
@@ -93,6 +95,9 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger)
     ret.progress.latest_server_version.salt = msg.read_next<sync::salt_type>();
     ret.progress.upload.client_version = msg.read_next<sync::version_type>();
     ret.progress.upload.last_integrated_server_version = msg.read_next<sync::version_type>();
+    ret.query_version = is_flx_sync ? msg.read_next<int64_t>() : 0;
+    auto last_in_batch = is_flx_sync ? msg.read_next<bool>() : true;
+    ret.batch_state = last_in_batch ? sync::DownloadBatchState::LastInBatch : sync::DownloadBatchState::MoreToCome;
     ret.downloadable_bytes = msg.read_next<int64_t>();
     auto is_body_compressed = msg.read_next<bool>();
     auto uncompressed_body_size = msg.read_next<size_t>();
@@ -219,6 +224,7 @@ void print_usage(std::string_view program_name)
                  "                       state applied to.\n"
                  "  -i, --input          The file-system path a file containing UPLOAD, DOWNLOAD,\n"
                  "                       and IDENT messages to apply to the realm state\n"
+                 "  -f, --flx-sync       Flexible sync session\n"
                  "  --verbose            Print all messages including trace messages to stderr\n"
                  "  -v, --version        Show the version of the Realm Sync release that this\n"
                  "                       command belongs to."
@@ -235,6 +241,7 @@ int main(int argc, const char** argv)
     CliArgument encryption_key_arg(arg_parser, "encryption-key", 'e');
     CliArgument input_arg(arg_parser, "input", 'i');
     CliFlag verbose_arg(arg_parser, "verbose");
+    CliFlag flx_sync_arg(arg_parser, "flx-sync", 'f');
     auto arg_results = arg_parser.parse(argc, argv);
 
     std::unique_ptr<RootLogger> logger = std::make_unique<StderrLogger>(); // Throws
@@ -277,7 +284,7 @@ int main(int argc, const char** argv)
     while (!msg.at_end()) {
         Message message;
         try {
-            message = parse_message(msg, *logger);
+            message = parse_message(msg, *logger, bool(flx_sync_arg));
         }
         catch (const ProtocolCodecException& e) {
             logger->error("Error parsing input message file: %1", e.what());
@@ -290,7 +297,7 @@ int main(int argc, const char** argv)
                              history.integrate_server_changesets(
                                  download_message.progress, &download_message.downloadable_bytes,
                                  download_message.changesets.data(), download_message.changesets.size(), version_info,
-                                 sync::DownloadBatchState::LastInBatch, *logger, nullptr);
+                                 download_message.batch_state, *logger, nullptr);
                          },
                          [&](const UploadMessage& upload_message) {
                              for (const auto& changeset : upload_message.changesets) {
