@@ -28,8 +28,6 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#include <filesystem>
-
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
@@ -660,7 +658,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
         }
 
         SECTION("should change the action to delete if copy succeeds but delete fails") {
-            namespace fs = std::filesystem;
+            if (!chmod_supported(base_path)) {
+                return;
+            }
             // Create some Realms
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
@@ -670,13 +670,13 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             File::try_remove(DB::get_core_file(realm_path_3, DB::CoreFileType::Log));
             util::try_remove_dir_recursive(DB::get_core_file(realm_path_3, DB::CoreFileType::Management));
             // remove write permissions of the parent directory so that removing realm3 will fail
-            std::string realm3_dir = fs::path{realm_path_3}.parent_path();
-            auto original_perms = fs::status(realm3_dir).permissions();
-            fs::permissions(realm3_dir, original_perms & (~fs::perms::owner_write));
+            std::string realm3_dir = get_parent_directory(realm_path_3);
+            int original_perms = get_permissions(realm3_dir);
+            realm::chmod(realm3_dir, original_perms & (~0b010000000)); // without owner_write
             // run the actions
             TestSyncManager tsm({"bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption});
             // restore write permissions to the directory
-            fs::permissions(realm3_dir, original_perms);
+            realm::chmod(realm3_dir, original_perms);
             // Everything succeeded except deleting realm_path_3
             auto pending_actions = manager.all_pending_actions();
             REQUIRE(pending_actions.size() == 1);
