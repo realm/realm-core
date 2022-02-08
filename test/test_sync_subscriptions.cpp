@@ -389,4 +389,18 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
+TEST(Sync_EmptySubscriptionSetRefresh)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    SubscriptionStore store(fixture.db, [](int64_t) {});
+    // Because there are no subscription sets yet, get_latest should point to an empty object
+    auto latest = store.get_latest();
+    CHECK(latest.begin() == latest.end());
+    CHECK_EQUAL(latest.size(), 0);
+    auto out = latest.make_mutable_copy();
+    std::move(out).commit();
+    latest.refresh();
+}
+
 } // namespace realm::sync
