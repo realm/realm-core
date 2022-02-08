@@ -2,6 +2,7 @@ set(REALM_FFI_SOURCES
     ../../../realm.h
 
     config.cpp
+    dictionary.cpp
     error.cpp
     notifications.cpp
     object.cpp

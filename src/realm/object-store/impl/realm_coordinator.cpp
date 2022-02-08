@@ -362,6 +362,9 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         // Creating ExternalCommitHelper with mutex locked creates a potential deadlock
         // as the commit helper calls back on the Realm::on_change (not in the constructor,
         // but the thread sanitizer warns anyway)
+        // FIXME: this introduced a race condition, as getting a cached Realm requires
+        // that the lock be held from when the cache lookup is done until when the
+        // new Realm is added to the cache
         realm_lock.unlock_unchecked();
         std::unique_ptr<ExternalCommitHelper> notifier;
         try {

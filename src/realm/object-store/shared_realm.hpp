@@ -507,9 +507,9 @@ private:
     };
     std::vector<AsyncCommitDesc> m_async_commit_q;
     unsigned m_async_commit_handle = 0;
-    bool m_is_running_async_writes = false;
+    size_t m_is_running_async_writes = 0;
     bool m_notify_only = false;
-    bool m_is_running_async_commit_completions = false;
+    size_t m_is_running_async_commit_completions = 0;
     bool m_async_commit_barrier_requested = false;
     util::UniqueFunction<void(AsyncHandle, std::exception_ptr)> m_async_exception_handler;
     void run_writes_on_proper_thread();

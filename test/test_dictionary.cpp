@@ -194,7 +194,7 @@ TEST(Dictionary_Links)
         lady.invalidate(); // Make lady a tombstone :-(
         cmp(dict["Pet"], Mixed());
         lady = dogs->create_object_with_primary_key("lady");
-        cmp(dict["Pet"], Mixed(lady.get_key()));
+        cmp(dict["Pet"].get<ObjKey>(), lady.get_key());
 
         auto invalid_link = pluto.get_link();
         pluto.remove();
@@ -212,7 +212,7 @@ TEST(Dictionary_Links)
         cmp(dict["Pet"], Mixed());
         Obj pongo = dogs->create_object_with_primary_key("pongo");
         CHECK_EQUAL(pongo.get_backlink_count(), 1);
-        cmp(dict["Pet"], Mixed(pongo.get_key()));
+        cmp(dict["Pet"].get<ObjKey>(), pongo.get_key());
     }
 }
 
@@ -406,7 +406,7 @@ TEST(Dictionary_Aggregate)
     CHECK_EQUAL(ndx, realm::npos);
 }
 
-TEST(Dictionary_Performance)
+NONCONCURRENT_TEST(Dictionary_Performance)
 {
     size_t nb_reps = 1000;
 

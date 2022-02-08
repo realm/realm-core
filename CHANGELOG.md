@@ -4,7 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
 * 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
-* Sets supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
+* Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -14,6 +14,11 @@
 * Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
 * Fix some warnings when building with Xcode 13.3.
 * Using accented characters in class and field names may end the session ([#5196](https://github.com/realm/realm-core/pull/5196), since v10.2.0)
+* Calling `Realm::invalidate()` from inside `BindingContext::did_change()` could result in write transactions not being persisted to disk (since v11.8.0).
+* Calling `Realm::close()` or `Realm::invalidate()` from the async write callbacks could result in crashes (since v11.8.0).
+* Asynchronous writes did not work with queue-confined Realms (since v11.8.0).
+* Releasing all references to a Realm while an asynchronous write was in progress would sometimes result in use-after-frees (since v11.8.0).
+* Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state (since v11.8.0).
 * Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
  
 ### Breaking changes
@@ -32,6 +37,7 @@
 * `MongoClient` had a mixture of functions which took `void(Optional<T>, Optional<AppError>)` callbacks and functions which took `void(Optional<AppError>, Optional<T>)` callbacks. They now all have the error parameter last. Most of the error-first functions other than `call_function()` appear to have been unused.
 * Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
 * realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
+* Updated apply_to_state_command tool to support query based sync download messages. ([#5226](https://github.com/realm/realm-core/pull/5226))
 
 ----------------------------------------------
 

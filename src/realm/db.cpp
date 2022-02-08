@@ -2131,6 +2131,11 @@ void DB::finish_begin_write()
         throw std::runtime_error("Crash of other process detected, session restart required");
     }
 
+
+    {
+        std::lock_guard local_lock(m_mutex);
+        m_write_transaction_open = true;
+    }
     m_alloc.set_read_only(false);
 }
 
@@ -2143,6 +2148,7 @@ void DB::do_end_write() noexcept
 
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
 
+    REALM_ASSERT(m_write_transaction_open);
     m_alloc.set_read_only(true);
     m_write_transaction_open = false;
     m_writemutex.unlock();
@@ -2756,17 +2762,17 @@ TransactionRef DB::start_write(bool nonblocking)
 
 void DB::async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()>& when_acquired)
 {
-    std::unique_lock<std::mutex> lck(tr->mtx);
+    std::unique_lock<std::mutex> lck(tr->m_async_mutex);
     REALM_ASSERT(tr->m_async_stage == Transaction::AsyncState::Idle);
     tr->m_async_stage = Transaction::AsyncState::Requesting;
     std::weak_ptr<Transaction> weak_tr = tr;
     async_begin_write([weak_tr, cb = std::move(when_acquired)]() {
         if (auto tr = weak_tr.lock()) {
-            std::unique_lock<std::mutex> lck(tr->mtx);
+            std::unique_lock<std::mutex> lck(tr->m_async_mutex);
             tr->m_async_stage = Transaction::AsyncState::HasLock;
-            if (tr->waiting_for_write_lock) {
-                tr->waiting_for_write_lock = false;
-                tr->cv.notify_one();
+            if (tr->m_waiting_for_write_lock) {
+                tr->m_waiting_for_write_lock = false;
+                tr->m_async_cv.notify_one();
             }
             else if (cb) {
                 cb();
@@ -2949,7 +2955,7 @@ void DB::release_sync_agent()
 
 void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
 {
-    std::unique_lock<std::mutex> lck(mtx);
+    std::unique_lock<std::mutex> lck(m_async_mutex);
     if (m_async_stage == AsyncState::HasLock) {
         // Nothing to commit to disk - just release write lock
         m_async_stage = AsyncState::Idle;
@@ -2979,11 +2985,11 @@ void Transaction::async_end(util::UniqueFunction<void()> when_synchronized)
                 m_commit_exception = std::current_exception();
             }
 
-            std::unique_lock<std::mutex> lck(mtx);
+            std::unique_lock<std::mutex> lck(m_async_mutex);
             m_async_stage = AsyncState::Idle;
-            if (waiting_for_sync) {
-                waiting_for_sync = false;
-                cv.notify_one();
+            if (m_waiting_for_sync) {
+                m_waiting_for_sync = false;
+                m_async_cv.notify_one();
             }
             else if (cb) {
                 cb();

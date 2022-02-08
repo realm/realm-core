@@ -304,7 +304,7 @@ TEST(BPlusTree_Destruction)
     tree.destroy();
 }
 
-TEST(BPlusTree_Performance)
+NONCONCURRENT_TEST(BPlusTree_Performance)
 {
     // We try to optimize for add and sequential lookup
     int nb_rows = 5000;

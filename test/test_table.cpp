@@ -3443,7 +3443,7 @@ TEST(Table_QuickSort2)
     std::cout << "    time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_reps << " ns/rep" << std::endl;
 }
 
-TEST(Table_object_sequential)
+NONCONCURRENT_TEST(Table_object_sequential)
 {
 #ifdef PERFORMACE_TESTING
     int nb_rows = 10'000'000;
@@ -3593,7 +3593,7 @@ TEST(Table_object_sequential)
     CALLGRIND_STOP_INSTRUMENTATION;
 }
 
-TEST(Table_object_seq_rnd)
+NONCONCURRENT_TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
     size_t rows = 1'000'000;
@@ -3708,8 +3708,7 @@ TEST(Table_object_seq_rnd)
     }
 }
 
-
-TEST(Table_object_random)
+NONCONCURRENT_TEST(Table_object_random)
 {
 #ifdef PERFORMACE_TESTING
     int nb_rows = 1'000'000;

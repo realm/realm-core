@@ -181,6 +181,12 @@ Obj Dictionary::insert_embedded(StringData key)
     return dict().create_and_insert_linked_object(key);
 }
 
+std::pair<size_t, bool> Dictionary::insert_any(StringData key, Mixed value)
+{
+    auto [it, inserted] = dict().insert(key, value);
+    return std::make_pair(it.get_position(), inserted);
+}
+
 void Dictionary::erase(StringData key)
 {
     verify_in_transaction();
@@ -332,7 +338,13 @@ NotificationToken Dictionary::add_key_based_notification_callback(CBFunc cb, Key
 
 Dictionary Dictionary::freeze(const std::shared_ptr<Realm>& frozen_realm) const
 {
-    return Dictionary(frozen_realm, frozen_realm->import_copy_of(*m_coll_base));
+    auto frozen_dictionary(frozen_realm->import_copy_of(*m_coll_base));
+    if (frozen_dictionary) {
+        return Dictionary(frozen_realm, std::move(frozen_dictionary));
+    }
+    else {
+        return Dictionary{};
+    }
 }
 
 } // namespace object_store

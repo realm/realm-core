@@ -86,15 +86,7 @@ public:
     // adds entry if key is not found
     const Mixed operator[](Mixed key);
 
-    Obj get_object(StringData key)
-    {
-        auto val = try_get(key);
-        Obj obj;
-        if (val && (*val).is_type(type_Link)) {
-            return get_target_table()->get_object((*val).get<ObjKey>());
-        }
-        return obj;
-    }
+    Obj get_object(StringData key);
 
     bool contains(Mixed key) const noexcept;
     Iterator find(Mixed key) const noexcept;
@@ -227,9 +219,10 @@ public:
         return ret;
     }
 
+    using ClusterTree::Iterator::get_position;
+
 private:
     friend class Dictionary;
-    using ClusterTree::Iterator::get_position;
 
     DataType m_key_type;
 

@@ -695,6 +695,16 @@ const Mixed Dictionary::operator[](Mixed key)
     return *ret;
 }
 
+Obj Dictionary::get_object(StringData key)
+{
+    if (auto val = try_get(key)) {
+        if ((*val).is_type(type_TypedLink)) {
+            return get_table()->get_parent_group()->get_object((*val).get_link());
+        }
+    }
+    return {};
+}
+
 bool Dictionary::contains(Mixed key) const noexcept
 {
     if (size() == 0) {
@@ -994,9 +1004,6 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
         if (key.is_unresolved()) {
             return {};
         }
-        if (m_col_key.get_type() == col_type_Link) {
-            return key;
-        }
     }
     return val;
 }
@@ -1113,7 +1120,7 @@ DictionaryLinkValues::DictionaryLinkValues(const Dictionary& source)
 ObjKey DictionaryLinkValues::get_key(size_t ndx) const
 {
     Mixed val = m_source.get_any(ndx);
-    if (val.is_type(type_Link)) {
+    if (val.is_type(type_Link, type_TypedLink)) {
         return val.get<ObjKey>();
     }
     return {};
@@ -1124,14 +1131,14 @@ ObjKey DictionaryLinkValues::get_key(size_t ndx) const
 bool DictionaryLinkValues::is_obj_valid(size_t ndx) const noexcept
 {
     Mixed val = m_source.get_any(ndx);
-    return val.is_type(type_Link);
+    return val.is_type(type_TypedLink);
 }
 
 Obj DictionaryLinkValues::get_object(size_t row_ndx) const
 {
     Mixed val = m_source.get_any(row_ndx);
-    if (val.is_type(type_Link)) {
-        return get_target_table()->get_object(val.get<ObjKey>());
+    if (val.is_type(type_TypedLink)) {
+        return get_table()->get_parent_group()->get_object(val.get_link());
     }
     return {};
 }
