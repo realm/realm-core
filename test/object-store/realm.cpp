@@ -167,6 +167,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             config.initialization_function = [](auto) {};
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
+        SECTION("in-memory encrypted realms are rejected") {
+            config.in_memory = true;
+            config.encryption_key = make_test_encryption_key();
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
     }
 
     SECTION("should reject mismatched config") {
