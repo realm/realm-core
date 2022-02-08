@@ -398,9 +398,11 @@ TEST(Sync_EmptySubscriptionSetRefresh)
     auto latest = store.get_latest();
     CHECK(latest.begin() == latest.end());
     CHECK_EQUAL(latest.size(), 0);
-    auto out = latest.make_mutable_copy();
-    std::move(out).commit();
-    latest.refresh();
+    auto new_set = std::move(latest.make_mutable_copy()).commit();
+    new_set.get_state_change_notification(SubscriptionSet::State::Complete)
+        .get_async([new_set](StatusWith<SubscriptionSet::State>) mutable noexcept {
+            new_set.refresh();
+        });
 }
 
 } // namespace realm::sync
