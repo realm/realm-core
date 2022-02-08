@@ -529,6 +529,46 @@ void SyncSession::create_sync_session()
     do_create_sync_session();
 }
 
+sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy)
+{
+    sync::Session::Config::ClientReset config;
+    config.discard_local = (session_config.client_resync_mode == ClientResyncMode::DiscardLocal);
+    config.notify_after_client_reset = [&session_config](std::string local_path, VersionID previous_version) {
+        REALM_ASSERT(!local_path.empty());
+        SharedRealm frozen_before, active_after;
+        if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            auto local_config = local_coordinator->get_config();
+            active_after = local_coordinator->get_realm(local_config, util::none);
+            local_config.scheduler = nullptr;
+            frozen_before = local_coordinator->get_realm(local_config, previous_version);
+            REALM_ASSERT(active_after);
+            REALM_ASSERT(!active_after->is_frozen());
+            REALM_ASSERT(frozen_before);
+            REALM_ASSERT(frozen_before->is_frozen());
+        }
+        if (session_config.notify_after_client_reset) {
+            session_config.notify_after_client_reset(frozen_before, active_after);
+        }
+    };
+    config.notify_before_client_reset = [&session_config](std::string local_path) {
+        REALM_ASSERT(!local_path.empty());
+        SharedRealm frozen_local;
+        Realm::Config local_config;
+        if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            local_config = local_coordinator->get_config();
+            local_config.scheduler = nullptr;
+            frozen_local = local_coordinator->get_realm(local_config, VersionID());
+            REALM_ASSERT(frozen_local);
+            REALM_ASSERT(frozen_local->is_frozen());
+        }
+        if (session_config.notify_before_client_reset) {
+            session_config.notify_before_client_reset(frozen_local);
+        }
+    };
+    config.fresh_copy = std::move(fresh_copy);
+    return config;
+}
+
 void SyncSession::do_create_sync_session()
 {
     sync::Session::Config session_config;
@@ -558,42 +598,7 @@ void SyncSession::do_create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        sync::Session::Config::ClientReset config;
-        config.discard_local = (m_config.client_resync_mode == ClientResyncMode::DiscardLocal);
-        config.notify_after_client_reset = [this](std::string local_path, VersionID previous_version) {
-            REALM_ASSERT(!local_path.empty());
-            SharedRealm frozen_before, active_after;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                auto local_config = local_coordinator->get_config();
-                active_after = local_coordinator->get_realm(local_config, util::none);
-                local_config.scheduler = nullptr;
-                frozen_before = local_coordinator->get_realm(local_config, previous_version);
-                REALM_ASSERT(active_after);
-                REALM_ASSERT(!active_after->is_frozen());
-                REALM_ASSERT(frozen_before);
-                REALM_ASSERT(frozen_before->is_frozen());
-            }
-            if (m_config.notify_after_client_reset) {
-                m_config.notify_after_client_reset(frozen_before, active_after);
-            }
-        };
-        config.notify_before_client_reset = [this](std::string local_path) {
-            REALM_ASSERT(!local_path.empty());
-            SharedRealm frozen_local;
-            Realm::Config local_config;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                local_config = local_coordinator->get_config();
-                local_config.scheduler = nullptr;
-                frozen_local = local_coordinator->get_realm(local_config, VersionID());
-                REALM_ASSERT(frozen_local);
-                REALM_ASSERT(frozen_local->is_frozen());
-            }
-            if (m_config.notify_before_client_reset) {
-                m_config.notify_before_client_reset(frozen_local);
-            }
-        };
-        config.fresh_copy = std::move(m_client_reset_fresh_copy);
-        session_config.client_reset_config = std::move(config);
+        session_config.client_reset_config = make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy));
         m_force_client_reset = false;
     }
 
