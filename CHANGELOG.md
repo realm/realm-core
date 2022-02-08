@@ -19,6 +19,7 @@
 * Asynchronous writes did not work with queue-confined Realms (since v11.8.0).
 * Releasing all references to a Realm while an asynchronous write was in progress would sometimes result in use-after-frees (since v11.8.0).
 * Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state (since v11.8.0).
+* Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
  
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
