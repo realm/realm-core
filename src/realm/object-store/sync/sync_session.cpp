@@ -573,7 +573,9 @@ void SyncSession::do_create_sync_session()
                 REALM_ASSERT(frozen_before);
                 REALM_ASSERT(frozen_before->is_frozen());
             }
-            m_config.notify_after_client_reset(frozen_before, active_after);
+            if (m_config.notify_after_client_reset) {
+                m_config.notify_after_client_reset(frozen_before, active_after);
+            }
         };
         config.notify_before_client_reset = [this](std::string local_path) {
             REALM_ASSERT(!local_path.empty());
@@ -586,7 +588,9 @@ void SyncSession::do_create_sync_session()
                 REALM_ASSERT(frozen_local);
                 REALM_ASSERT(frozen_local->is_frozen());
             }
-            m_config.notify_before_client_reset(frozen_local);
+            if (m_config.notify_before_client_reset) {
+                m_config.notify_before_client_reset(frozen_local);
+            }
         };
         config.fresh_copy = std::move(m_client_reset_fresh_copy);
         session_config.client_reset_config = std::move(config);

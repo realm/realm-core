@@ -341,6 +341,14 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
         }
 
+        SECTION("can be reset without notifiers") {
+            local_config.sync_config->notify_before_client_reset = nullptr;
+            local_config.sync_config->notify_after_client_reset = nullptr;
+            make_reset(local_config, remote_config)->run();
+            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(after_callback_invocations == 0);
+        }
+
         SECTION("an interrupted reset can recover on the next session") {
             struct SessionInterruption : public std::runtime_error {
                 using std::runtime_error::runtime_error;
