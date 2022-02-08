@@ -172,6 +172,7 @@ public:
     Action action() const;
     std::string url() const;
     void remove();
+    void set_action(Action new_action);
 
     // INTERNAL USE ONLY
     SyncFileActionMetadata(Schema schema, SharedRealm realm, const Obj& obj);

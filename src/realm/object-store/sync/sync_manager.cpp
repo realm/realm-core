@@ -180,7 +180,7 @@ bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 }
 
 // Perform a file action. Returns whether or not the file action can be removed.
-bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
+bool SyncManager::run_file_action(SyncFileActionMetadata& md)
 {
     switch (md.action()) {
         case SyncFileActionMetadata::Action::DeleteRealm:
@@ -198,8 +198,14 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
             if (new_name && !util::File::exists(*new_name) &&
                 m_file_manager->copy_realm_file(original_name, *new_name)) {
                 // We successfully copied the Realm file to the recovery directory.
-                m_file_manager->remove_realm(original_name);
-                return true;
+                bool did_remove = m_file_manager->remove_realm(original_name);
+                // if the copy succeeded but not the delete, then running BackupThenDelete
+                // a second time would fail, so change this action to just delete the originall file.
+                if (did_remove) {
+                    return true;
+                }
+                md.set_action(SyncFileActionMetadata::Action::DeleteRealm);
+                return false;
             }
             return false;
     }

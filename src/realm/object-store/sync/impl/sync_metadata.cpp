@@ -755,4 +755,13 @@ void SyncFileActionMetadata::remove()
     m_realm = nullptr;
 }
 
+void SyncFileActionMetadata::set_action(Action new_action)
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_obj.set<Int>(m_schema.idx_action, static_cast<Int>(new_action));
+    m_realm->commit_transaction();
+}
+
 } // namespace realm
