@@ -27,6 +27,8 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
+#include <set>
+#include <map>
 
 namespace realm {
 namespace _impl {
@@ -123,6 +125,7 @@ public:
         : m_impl(make_impl(std::move(cb)))
     {
     }
+
     template <typename Callback>
     CollectionChangeCallback& operator=(Callback cb)
     {
@@ -244,6 +247,8 @@ private:
 
     std::shared_ptr<Base> m_impl;
 };
+
+
 } // namespace realm
 
 #endif // REALM_COLLECTION_NOTIFICATIONS_HPP

@@ -24,6 +24,7 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/sectioned_results.hpp>
 
 #include <realm/set.hpp>
 
@@ -1153,6 +1154,14 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     for (auto& keypath : keypaths)
         column_keys.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
     return distinct({std::move(column_keys)});
+}
+
+SectionedResults Results::sectioned_results(const std::string& key_path,
+                                            bool ascending,
+                                            util::UniqueFunction<bool(Mixed first, Mixed second)> comparison_func)
+{
+    auto sorted = this->sort(std::vector<std::pair<std::string, bool>>({{key_path, ascending}}));
+    return SectionedResults(sorted, std::move(comparison_func));
 }
 
 Results Results::snapshot() const&
