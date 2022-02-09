@@ -182,8 +182,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         throw std::logic_error("Specifying both memory buffer and path is invalid");
     if (!config.realm_data.is_null() && !config.encryption_key.empty())
         throw std::logic_error("Memory buffers do not support encryption");
-    if (config.in_memory && !config.encryption_key.empty())
+    if (config.in_memory && !config.encryption_key.empty()) {
         throw std::logic_error("Encryption is not supported for in-memory realms");
+    }
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
 
