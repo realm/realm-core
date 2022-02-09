@@ -34,8 +34,11 @@
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
 
+#include <iostream>
+
 namespace realm {
 class Mixed;
+class SectionedResults;
 
 namespace _impl {
 class ResultsNotifierBase;
@@ -60,6 +63,10 @@ public:
     Results& operator=(Results&&);
     Results(const Results&);
     Results& operator=(const Results&);
+
+    SectionedResults sectioned_results(const std::string& key_path,
+                                       bool ascending,
+                                       util::UniqueFunction<bool(Mixed first, Mixed second)> comparison_func);
 
     // Get the Realm
     std::shared_ptr<Realm> get_realm() const
@@ -374,7 +381,8 @@ private:
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
     enum class EvaluateMode { Count, Snapshot, Normal };
-    void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
+    bool ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
+    friend class realm::SectionedResults;
 
     // Shared logic between freezing and thawing Results as the Core API is the same.
     Results import_copy_into_realm(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);

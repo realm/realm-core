@@ -84,7 +84,8 @@ protected:
     friend class Group;
     friend class Table;
     friend class ClusterTree;
-
+    friend class SectionedResults;
+    
     Table* m_table = nullptr;
     uint64_t m_instance_version = 0;
 };
