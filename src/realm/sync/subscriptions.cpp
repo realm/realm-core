@@ -533,7 +533,7 @@ public:
 };
 } // namespace
 
-SubscriptionStoreRef SubscriptionStore::create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set) 
+SubscriptionStoreRef SubscriptionStore::create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
 {
     return std::make_shared<SubscriptionStoreInit>(std::move(db), std::move(on_new_subscription_set));
 }
@@ -728,7 +728,8 @@ MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version
 {
     auto tr = m_db->start_write();
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
-    return MutableSubscriptionSet(weak_from_this(), std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
+    return MutableSubscriptionSet(weak_from_this(), std::move(tr),
+                                  sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }
 
 SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
@@ -742,7 +743,8 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_keys->table);
     try {
-        return SubscriptionSet(weak_from_this(), std::move(tr), sub_sets->get_object_with_primary_key(Mixed{version_id}));
+        return SubscriptionSet(weak_from_this(), std::move(tr),
+                               sub_sets->get_object_with_primary_key(Mixed{version_id}));
     }
     catch (const KeyNotFound&) {
         std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
