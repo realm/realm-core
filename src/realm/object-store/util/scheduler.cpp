@@ -32,6 +32,10 @@
 #include <realm/object-store/util/android/scheduler.hpp>
 #endif
 
+#if REALM_ENABLE_TEST_SCHEDULER
+#include <realm/object-store/util/generic/test_scheduler.hpp>
+#endif
+
 #include <realm/object-store/util/generic/scheduler.hpp>
 
 namespace realm {
@@ -106,6 +110,8 @@ std::shared_ptr<Scheduler> Scheduler::make_platform_default()
     return make_runloop(nullptr);
 #elif REALM_ANDROID
     return make_alooper();
+#elif defined(REALM_ENABLE_TEST_SCHEDULER)
+    return make_test_scheduler();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
                     "Scheduler::set_default_factory()");
@@ -117,6 +123,14 @@ std::shared_ptr<Scheduler> Scheduler::make_generic()
 {
     return std::make_shared<GenericScheduler>();
 }
+
+#ifdef REALM_ENABLE_TEST_SCHEDULER
+std::shared_ptr<Scheduler> Scheduler::make_test_scheduler()
+{
+    static std::shared_ptr<Scheduler> g_test_scheduler = std::make_shared<TestScheduler>();
+    return g_test_scheduler;
+}
+#endif
 
 std::shared_ptr<Scheduler> Scheduler::make_frozen(VersionID version)
 {

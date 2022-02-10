@@ -100,6 +100,10 @@ functions:
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
           fi
 
+          if [[ -n "${use_test_scheduler|}" ]]; then
+              set_cmake_var realm_vars REALM_ENABLE_TEST_SCHEDULER BOOL On
+          fi
+
           if [[ -n "${cmake_build_type|}" ]]; then
               set_cmake_var realm_vars CMAKE_BUILD_TYPE STRING "${cmake_build_type}"
           fi
@@ -455,7 +459,7 @@ tasks:
       test_filter: SyncTests
 
 - name: object-store-tests
-  tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
@@ -842,6 +846,7 @@ buildvariants:
     package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
+    use_test_scheduler: On
     build_zlib: On
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
@@ -863,6 +868,7 @@ buildvariants:
     package_flags: "-C Release"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
+    use_test_scheduler: On
     build_zlib: On
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:

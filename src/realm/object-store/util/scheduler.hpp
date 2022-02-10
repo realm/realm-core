@@ -123,6 +123,10 @@ public:
     /// cannot deliver notifications.
     static std::shared_ptr<Scheduler> make_generic();
 
+#ifdef REALM_ENABLE_TEST_SCHEDULER
+    static std::shared_ptr<Scheduler> make_test_scheduler();
+#endif
+
     /// Create a scheduler for frozen Realms. This scheduler does not support
     /// notifications and does not perform any thread checking.
     static std::shared_ptr<Scheduler> make_frozen(VersionID version);

@@ -22,6 +22,7 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/util/features.h>
 
+#include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <vector>
@@ -31,7 +32,7 @@
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
-#else
+#elif !defined(REALM_ENABLE_TEST_SCHEDULER)
 #error "No EventLoop implementation selected, tests will fail"
 #endif
 
@@ -96,6 +97,13 @@ private:
     }
 
     util::CFPtr<CFRunLoopRef> m_loop;
+#elif defined(REALM_ENABLE_TEST_SCHEDULER)
+    Impl(std::shared_ptr<TestScheduler> scheduler)
+        : m_scheduler(std::move(scheduler))
+    {
+    }
+
+    std::shared_ptr<TestScheduler> m_scheduler;
 #endif
 };
 
@@ -252,8 +260,31 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> func)
     CFRunLoopWakeUp(m_loop.get());
 }
 
-#else
+#elif defined(REALM_ENABLE_TEST_SCHEDULER)
 
+bool EventLoop::has_implementation()
+{
+    return true;
+}
+
+std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
+{
+    return std::make_unique<Impl>(Scheduler::make_test_scheduler());
+}
+
+EventLoop::Impl::~Impl() = default;
+
+void EventLoop::Impl::run_until(util::FunctionRef<bool()> cb)
+{
+    m_scheduler->run_until(std::move(cb));
+}
+
+void EventLoop::Impl::perform(util::UniqueFunction<void()> cb)
+{
+    m_scheduler->perform(std::move(cb));
+}
+
+#else
 bool EventLoop::has_implementation()
 {
     return false;
@@ -265,11 +296,11 @@ std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
 EventLoop::Impl::~Impl() = default;
 void EventLoop::Impl::run_until(util::FunctionRef<bool()>)
 {
-    printf("WARNING: there is no event loop implementation and nothing is happening.\n");
+    std::cerr << "WARNING: there is no event loop implementation and nothing is happening." << std::endl;
 }
 void EventLoop::Impl::perform(util::UniqueFunction<void()>)
 {
-    printf("WARNING: there is no event loop implementation and nothing is happening.\n");
+    std::cerr << "WARNING: there is no event loop implementation and nothing is happening." << std::endl;
 }
 
 #endif
