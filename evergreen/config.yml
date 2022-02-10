@@ -584,7 +584,7 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - "!.disabled_on_windows .test_suite"
+  - .test_suite
   - package
 
 - name: compile_test_windows
@@ -599,7 +599,7 @@ task_groups:
   - func: "run hang analyzer"
   tasks:
   - compile
-  - "!.disabled_on_windows .test_suite"
+  - .test_suite
 
 - name: compile_test
   max_hosts: 1
