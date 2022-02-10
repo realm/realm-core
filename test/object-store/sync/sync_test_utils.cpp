@@ -256,7 +256,8 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> 
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
 
-// fake discard local mode by turning off sync and calling transfer group directly
+// Run through the client reset steps manually without involving a sync server.
+// Useful for speed and when integration testing is not available on a platform.
 struct FakeLocalClientReset : public TestClientReset {
     FakeLocalClientReset(const Realm::Config& local_config, const Realm::Config& remote_config)
         : TestClientReset(local_config, remote_config)

@@ -18,11 +18,16 @@ struct FlatMap {
     using value_type = std::pair<K, V>;
     using key_type = K;
     using mapped_type = V;
+    using container_type = Container;
     FlatMap() {}
     FlatMap(const FlatMap&) = default;
     FlatMap(FlatMap&&) = default;
     FlatMap& operator=(const FlatMap&) = default;
     FlatMap& operator=(FlatMap&&) = default;
+    FlatMap(Container&& values)
+        : m_data(std::move(values))
+    {
+    }
 
     V& at(K key)
     {

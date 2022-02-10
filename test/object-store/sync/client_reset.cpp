@@ -37,6 +37,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/util/flat_map.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -2294,8 +2295,37 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         }
     }
 }
-/*
-TEST_CASE("client reset with embedded object", "[client reset][discard local][embedded objects]") {
+
+template <typename T>
+void set_array_values(std::vector<T>& from, const std::vector<T>& to)
+{
+    size_t sz = to.size();
+    size_t list_sz = from.size();
+    if (sz < list_sz) {
+        from.resize(sz);
+        list_sz = sz;
+    }
+    size_t i = 0;
+    while (i < list_sz) {
+        from[i] = to[i];
+        i++;
+    }
+    while (i < sz) {
+        from.push_back(to[i]);
+        i++;
+    }
+}
+
+template <typename T>
+void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
+{
+    auto it = from.begin();
+    for (auto val : to) {
+        it = ++from.insert(it, val);
+    }
+}
+
+TEST_CASE("client reset with embedded object", "[client reset][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -2303,7 +2333,9 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
+    config.sync_config->client_resync_mode = test_mode;
 
     ObjectSchema shared_class = {"object",
                                  {
@@ -2337,21 +2369,64 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
          }},
     };
     struct SecondLevelEmbeddedContent {
-        std::vector<std::pair<std::string, std::string>> dict_values = {{"key A", random_string(10)},
-                                                                        {"key B", random_string(10)}};
+        using DictType = util::FlatMap<std::string, std::string>;
+        DictType dict_values = DictType::container_type{{"key A", random_string(10)}, {"key B", random_string(10)}};
         Timestamp datetime = Timestamp{random_int(), 0};
         util::Optional<Mixed> pk_of_linked_object;
+        void apply_recovery_from(const SecondLevelEmbeddedContent& other)
+        {
+            datetime = other.datetime;
+            pk_of_linked_object = other.pk_of_linked_object;
+            for (auto it : other.dict_values) {
+                dict_values[it.first] = it.second;
+            }
+        }
     };
     struct EmbeddedContent {
         std::string name = random_string(10);
         std::vector<Int> array_vals = {random_int(), random_int(), random_int()};
         util::Optional<SecondLevelEmbeddedContent> second_level = SecondLevelEmbeddedContent();
+        void apply_recovery_from(const EmbeddedContent& other)
+        {
+            name = other.name;
+            combine_array_values(array_vals, other.array_vals);
+            if (second_level && other.second_level) {
+                second_level->apply_recovery_from(*other.second_level);
+            }
+            else {
+                second_level = other.second_level;
+            }
+        }
     };
     struct TopLevelContent {
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
-        std::vector<std::pair<std::string, util::Optional<EmbeddedContent>>> dict_values = {
-            {"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
+        DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+
+        void apply_recovery_from(const TopLevelContent& other)
+        {
+            link_value = other.link_value;
+            combine_array_values(array_values, other.array_values);
+            for (auto it = dict_values.begin(); it != dict_values.end();) {
+                auto existing = other.dict_values.find(it->first);
+                if (existing == other.dict_values.end()) {
+                    it = dict_values.erase(it);
+                }
+                else {
+                    ++it;
+                }
+            }
+            for (auto it : other.dict_values) {
+                dict_values[it.first] = it.second;
+            }
+            if (link_value && other.link_value) {
+                link_value->apply_recovery_from(*other.link_value);
+            }
+            else {
+                link_value = other.link_value;
+            }
+        }
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
@@ -2457,19 +2532,17 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
         }
         auto dict = obj.get_dictionary("embedded_dict");
         for (auto it = dict.begin(); it != dict.end(); ++it) {
-            if (std::find_if(content.dict_values.begin(), content.dict_values.end(), [&](auto& dict_val) {
-                    return (*it).first == dict_val.first;
-                }) != content.dict_values.end()) {
+            if (content.dict_values.find((*it).first.get_string()) != content.dict_values.end()) {
                 dict.erase(it);
             }
         }
-        for (size_t i = 0; i < content.dict_values.size(); ++i) {
-            if (content.dict_values[i].second) {
-                Obj embedded = dict.create_and_insert_linked_object(content.dict_values[i].first);
-                set_embedded(embedded, *(content.dict_values[i].second));
+        for (auto it : content.dict_values) {
+            if (it.second) {
+                Obj embedded = dict.create_and_insert_linked_object(it.first);
+                set_embedded(embedded, *it.second);
             }
             else {
-                dict.insert(content.dict_values[i].first, Mixed{});
+                dict.insert(it.first, Mixed{});
             }
         }
     };
@@ -2504,22 +2577,35 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     auto reset_embedded_object = [&](TopLevelContent local_content, TopLevelContent remote_content) {
         test_reset
             ->make_local_changes([&](SharedRealm local) {
+                advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
                 set_content(obj, local_content);
             })
             ->make_remote_changes([&](SharedRealm remote) {
+                advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
                 set_content(obj, remote_content);
             })
             ->on_post_reset([&](SharedRealm local) {
+                advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
-                check_content(obj, remote_content);
+                if (test_mode == ClientResyncMode::Recover) {
+                    TopLevelContent expected = remote_content;
+                    expected.apply_recovery_from(local_content);
+                    check_content(obj, expected);
+                }
+                else if (test_mode == ClientResyncMode::DiscardLocal) {
+                    check_content(obj, remote_content);
+                }
+                else {
+                    REALM_UNREACHABLE();
+                }
             })
             ->run();
     };
@@ -2533,7 +2619,7 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
         embedded_link.set<String>("name", "initial name");
     });
 
-    SECTION("no change") {
+    SECTION("identical changes") {
         TopLevelContent state;
         reset_embedded_object(state, state);
     }
@@ -2564,9 +2650,9 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     SECTION("add additional embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
-        remote.dict_values.push_back({"new key1", {EmbeddedContent{}}});
-        remote.dict_values.push_back({"new key2", {EmbeddedContent{}}});
-        remote.dict_values.push_back({"new key3", {}});
+        remote.dict_values["new key1"] = {EmbeddedContent{}};
+        remote.dict_values["new key2"] = {EmbeddedContent{}};
+        remote.dict_values["new key3"] = {};
         remote.array_values.push_back({EmbeddedContent{}});
         remote.array_values.push_back({});
         remote.array_values.push_back({EmbeddedContent{}});
@@ -2575,9 +2661,9 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     SECTION("remove some embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
-        local.dict_values.push_back({"new key1", {EmbeddedContent{}}});
-        local.dict_values.push_back({"new key2", {EmbeddedContent{}}});
-        local.dict_values.push_back({"new key3", {}});
+        local.dict_values["new key1"] = {EmbeddedContent{}};
+        local.dict_values["new key2"] = {EmbeddedContent{}};
+        local.dict_values["new key3"] = {};
         local.array_values.push_back({EmbeddedContent{}});
         local.array_values.push_back({});
         local.array_values.push_back({EmbeddedContent{}});
@@ -2604,12 +2690,14 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
 
         test_reset
             ->make_remote_changes([&](SharedRealm remote) {
+                advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 REQUIRE(table->size() == 1);
                 set_content(obj, remote_content);
             })
             ->on_post_reset([&](SharedRealm local) {
+                advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
@@ -2628,9 +2716,22 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             REQUIRE(table->size() == 1);
             set_content(obj, local_content);
         });
-        REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
-                                               "{EmbeddedObject, EmbeddedObject2, TopLevel}");
+        if (test_mode == ClientResyncMode::DiscardLocal) {
+            REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
+                                                   "{EmbeddedObject, EmbeddedObject2, TopLevel}");
+        }
+        else {
+            // In recovery mode, AddTable should succeed if the server is in dev mode, and fail
+            // if the server is in production which in that case the changes will be rejected.
+            // Since this is a fake reset, it always succeeds here.
+            test_reset
+                ->on_post_reset([&](SharedRealm local) {
+                    TableRef table = get_table(*local, "TopLevel");
+                    REQUIRE(table->size() == 1);
+                })
+                ->run();
+        }
     }
 }
-*/
+
 } // namespace realm
