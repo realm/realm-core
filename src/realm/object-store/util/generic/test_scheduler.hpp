@@ -18,19 +18,26 @@
 
 #pragma once
 
-#include <deque>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/scope_exit.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 
-namespace realm {
+namespace realm::util {
 
 class TestScheduler : public util::Scheduler {
 public:
     TestScheduler() = default;
+
+    ~TestScheduler()
+    {
+        get_global_work_queue()->clear_for(m_id);
+    }
 
     bool is_on_thread() const noexcept override
     {
@@ -39,7 +46,7 @@ public:
     bool is_same_as(const Scheduler* other) const noexcept override
     {
         auto o = dynamic_cast<const TestScheduler*>(other);
-        return (o && (o->m_id == m_id));
+        return (o && o->m_id == m_id);
     }
 
     bool can_deliver_notifications() const noexcept override
@@ -59,6 +66,9 @@ public:
 
     void set_notify_callback(std::function<void()> cb) override
     {
+        if (m_notification_cb) {
+            return;
+        }
         m_notification_cb = std::move(cb);
     }
 
@@ -78,8 +88,7 @@ public:
             return;
         }
 
-        std::lock_guard<std::mutex> lk(m_work_items_mutex);
-        m_work_items.push_back(WorkItem(util::FunctionRef<void()>(m_notification_cb)));
+        get_global_work_queue()->add_item(WorkItem(m_id, util::FunctionRef<void()>(m_notification_cb)));
     }
 
     void schedule_writes() override
@@ -88,8 +97,7 @@ public:
             return;
         }
 
-        std::lock_guard<std::mutex> lk(m_work_items_mutex);
-        m_work_items.push_back(WorkItem(util::FunctionRef<void()>(m_write_cb)));
+        get_global_work_queue()->add_item(WorkItem(m_id, util::FunctionRef<void()>(m_write_cb)));
     }
 
     void schedule_completions() override
@@ -98,50 +106,83 @@ public:
             return;
         }
 
-        std::lock_guard<std::mutex> lk(m_work_items_mutex);
-        m_work_items.push_back(WorkItem(util::FunctionRef<void()>(m_completion_cb)));
+        get_global_work_queue()->add_item(WorkItem(m_id, util::FunctionRef<void()>(m_completion_cb)));
     }
 
     void perform(util::UniqueFunction<void()> cb)
     {
-        std::lock_guard<std::mutex> lk(m_work_items_mutex);
-        m_work_items.push_back(WorkItem(std::move(cb)));
+        get_global_work_queue()->add_item(WorkItem(m_id, std::move(cb)));
     }
 
-    void run_until(util::UniqueFunction<bool()> pred)
+    void run_until(util::FunctionRef<bool()> pred)
     {
         while (!pred()) {
-            std::unique_lock<std::mutex> lk(m_work_items_mutex);
-            auto front = std::move(m_work_items.front());
-            m_work_items.pop_front();
-            front.cb();
+            get_global_work_queue()->process_work_items();
         }
     }
 
 private:
-    util::UniqueFunction<void()> m_notification_cb;
-    util::UniqueFunction<void()> m_write_cb;
-    util::UniqueFunction<void()> m_completion_cb;
-
     struct WorkItem {
-        explicit WorkItem(util::FunctionRef<void()> ref)
-            : cb(ref)
+        explicit WorkItem(std::thread::id owner, util::FunctionRef<void()> ref)
+            : owner(owner)
+            , cb(ref)
         {
         }
 
-        explicit WorkItem(util::UniqueFunction<void()> fn)
-            : owned(std::move(fn))
+        explicit WorkItem(std::thread::id owner, util::UniqueFunction<void()> fn)
+            : owner(owner)
+            , owned(std::move(fn))
             , cb(owned)
         {
         }
 
+        std::thread::id owner;
         util::UniqueFunction<void()> owned;
         util::FunctionRef<void()> cb;
     };
-    std::mutex m_work_items_mutex;
-    std::deque<WorkItem> m_work_items;
 
+    struct WorkQueue {
+        mutable std::mutex m_mutex;
+        std::vector<WorkItem> m_work_items;
+
+        void add_item(WorkItem item)
+        {
+            std::lock_guard<std::mutex> lk(m_mutex);
+            m_work_items.push_back(std::move(item));
+        }
+
+        void clear_for(std::thread::id owner)
+        {
+            std::lock_guard<std::mutex> lk(m_mutex);
+            m_work_items.erase(std::remove_if(m_work_items.begin(), m_work_items.end(),
+                                              [&](const auto& item) {
+                                                  return (item.owner == owner);
+                                              }),
+                               m_work_items.end());
+        }
+
+        void process_work_items()
+        {
+            std::unique_lock<std::mutex> lk(m_mutex);
+            std::vector<WorkItem> items;
+            std::swap(m_work_items, items);
+            lk.unlock();
+            for (auto& item : items) {
+                item.cb();
+            }
+        }
+    };
+
+    const std::shared_ptr<WorkQueue>& get_global_work_queue()
+    {
+        static std::shared_ptr<WorkQueue> g_work_queue = std::make_shared<WorkQueue>();
+        return g_work_queue;
+    }
+
+    util::UniqueFunction<void()> m_notification_cb;
+    util::UniqueFunction<void()> m_write_cb;
+    util::UniqueFunction<void()> m_completion_cb;
     std::thread::id m_id = std::this_thread::get_id();
 };
 
-} // namespace realm
+} // namespace realm::util

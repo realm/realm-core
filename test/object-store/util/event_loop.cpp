@@ -27,6 +27,9 @@
 #include <stdexcept>
 #include <vector>
 
+#ifdef REALM_ENABLE_TEST_SCHEDULER
+#include "realm/object-store/util/generic/test_scheduler.hpp"
+#endif
 #if REALM_USE_UV
 #include <uv.h>
 #elif REALM_PLATFORM_APPLE
@@ -90,6 +93,13 @@ private:
     std::mutex m_mutex;
     uv_loop_t* m_loop;
     uv_async_t m_perform_work;
+#elif defined(REALM_ENABLE_TEST_SCHEDULER)
+    Impl(std::shared_ptr<util::TestScheduler> scheduler)
+        : m_scheduler(std::move(scheduler))
+    {
+    }
+
+    std::shared_ptr<util::TestScheduler> m_scheduler;
 #elif REALM_PLATFORM_APPLE
     Impl(util::CFPtr<CFRunLoopRef> loop)
         : m_loop(std::move(loop))
@@ -97,13 +107,6 @@ private:
     }
 
     util::CFPtr<CFRunLoopRef> m_loop;
-#elif defined(REALM_ENABLE_TEST_SCHEDULER)
-    Impl(std::shared_ptr<TestScheduler> scheduler)
-        : m_scheduler(std::move(scheduler))
-    {
-    }
-
-    std::shared_ptr<TestScheduler> m_scheduler;
 #endif
 };
 
@@ -210,7 +213,7 @@ void EventLoop::Impl::perform(util::UniqueFunction<void()> f)
     uv_async_send(&m_perform_work);
 }
 
-#elif REALM_PLATFORM_APPLE
+#elif REALM_PLATFORM_APPLE && !defined(REALM_ENABLE_TEST_SCHEDULER)
 
 bool EventLoop::has_implementation()
 {
@@ -269,7 +272,8 @@ bool EventLoop::has_implementation()
 
 std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
 {
-    return std::make_unique<Impl>(Scheduler::make_test_scheduler());
+    return std::unique_ptr<Impl>(
+        new Impl(std::dynamic_pointer_cast<util::TestScheduler>(Scheduler::make_test_scheduler())));
 }
 
 EventLoop::Impl::~Impl() = default;

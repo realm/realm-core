@@ -103,15 +103,15 @@ std::shared_ptr<Scheduler> Scheduler::make_default()
 
 std::shared_ptr<Scheduler> Scheduler::make_platform_default()
 {
-#if REALM_USE_UV
+#ifdef REALM_ENABLE_TEST_SCHEDULER
+    return make_test_scheduler();
+#elif REALM_USE_UV
     return make_uv();
 #else
 #if REALM_PLATFORM_APPLE
     return make_runloop(nullptr);
 #elif REALM_ANDROID
     return make_alooper();
-#elif defined(REALM_ENABLE_TEST_SCHEDULER)
-    return make_test_scheduler();
 #else
     REALM_TERMINATE("No built-in scheduler implementation for this platform. Register your own with "
                     "Scheduler::set_default_factory()");
@@ -127,8 +127,7 @@ std::shared_ptr<Scheduler> Scheduler::make_generic()
 #ifdef REALM_ENABLE_TEST_SCHEDULER
 std::shared_ptr<Scheduler> Scheduler::make_test_scheduler()
 {
-    static std::shared_ptr<Scheduler> g_test_scheduler = std::make_shared<TestScheduler>();
-    return g_test_scheduler;
+    return std::make_shared<TestScheduler>();
 }
 #endif
 

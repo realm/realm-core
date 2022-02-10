@@ -1868,7 +1868,9 @@ TEST_CASE("object") {
     if (!util::EventLoop::has_implementation())
         return;
     SECTION("defaults do not override values explicitly passed to create()") {
-        TestSyncManager init_sync_manager({}, {false});
+        TestSyncManager::Config tsmc;
+        tsmc.verbose_sync_client_logging = true;
+        TestSyncManager init_sync_manager(tsmc, {false});
         auto& server = init_sync_manager.sync_server();
         SyncTestFile config1(init_sync_manager.app(), "shared");
         config1.schema = config.schema;
