@@ -37,6 +37,7 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/util/flat_map.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -1988,9 +1989,9 @@ private:
 
 } // namespace test_instructions
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][collections]", cf::ListOfObjects,
-                   cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks, cf::DictionaryOfObjects,
-                   cf::DictionaryOfMixedLinks)
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][links][collections]",
+                   cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
+                   cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
     if (!util::EventLoop::has_implementation())
         return;
@@ -2362,8 +2363,40 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][links][c
         }
     }
 }
-/*
-TEST_CASE("client reset with embedded object", "[client reset][discard local][embedded objects]") {
+
+template <typename T>
+void set_embedded_list(const std::vector<T>& array_values, LnkLst& list)
+{
+    for (size_t i = 0; i < array_values.size(); ++i) {
+        Obj link;
+        if (i >= list.size()) {
+            link = list.create_and_insert_linked_object(list.size());
+        }
+        else {
+            link = list.get_object(i);
+        }
+        array_values[i].assign_to(link);
+    }
+    if (list.size() > array_values.size()) {
+        if (array_values.size() == 0) {
+            list.clear();
+        }
+        else {
+            list.remove(array_values.size(), list.size());
+        }
+    }
+}
+
+template <typename T>
+void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
+{
+    auto it = from.begin();
+    for (auto val : to) {
+        it = ++from.insert(it, val);
+    }
+}
+
+TEST_CASE("client reset with embedded object", "[client reset][local][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -2371,7 +2404,9 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
+    config.sync_config->client_resync_mode = test_mode;
 
     ObjectSchema shared_class = {"object",
                                  {
@@ -2395,31 +2430,315 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
              {"array", PropertyType::Int | PropertyType::Array},
              {"name", PropertyType::String | PropertyType::Nullable},
              {"link_to_embedded_object2", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject2"},
+             {"array_of_seconds", PropertyType::Object | PropertyType::Array, "EmbeddedObject2"},
+             {"int_value", PropertyType::Int},
          }},
         {"EmbeddedObject2",
          ObjectSchema::IsEmbedded{true},
          {
              {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
+             {"set_of_ids", PropertyType::Set | PropertyType::ObjectId | PropertyType::Nullable},
              {"date", PropertyType::Date},
              {"top_level_link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
          }},
     };
     struct SecondLevelEmbeddedContent {
-        std::vector<std::pair<std::string, std::string>> dict_values = {{"key A", random_string(10)},
-                                                                        {"key B", random_string(10)}};
+        using DictType = util::FlatMap<std::string, std::string>;
+        DictType dict_values = DictType::container_type{{"key A", random_string(10)}, {"key B", random_string(10)}};
+        std::set<ObjectId> set_of_objects = {ObjectId::gen(), ObjectId::gen()};
         Timestamp datetime = Timestamp{random_int(), 0};
         util::Optional<Mixed> pk_of_linked_object;
+        void apply_recovery_from(const SecondLevelEmbeddedContent& other)
+        {
+            datetime = other.datetime;
+            pk_of_linked_object = other.pk_of_linked_object;
+            for (auto it : other.dict_values) {
+                dict_values[it.first] = it.second;
+            }
+            for (auto oid : other.set_of_objects) {
+                set_of_objects.insert(oid);
+            }
+        }
+        void test(const SecondLevelEmbeddedContent& other) const
+        {
+            REQUIRE(datetime == other.datetime);
+            REQUIRE(pk_of_linked_object == other.pk_of_linked_object);
+            REQUIRE(set_of_objects == other.set_of_objects);
+            REQUIRE(dict_values.size() == other.dict_values.size());
+            for (auto kv : dict_values) {
+                INFO("dict_value: (" << kv.first << ", " << kv.second << ")");
+                auto it = other.dict_values.find(kv.first);
+                REQUIRE(it != other.dict_values.end());
+                REQUIRE(it->second == kv.second);
+            }
+        }
+        static SecondLevelEmbeddedContent get_from(Obj second)
+        {
+            REALM_ASSERT(second.is_valid());
+            SecondLevelEmbeddedContent content{};
+            content.datetime = second.get<Timestamp>("date");
+            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+            ObjKey actual_link = second.get<ObjKey>(top_link_col);
+            if (actual_link) {
+                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                Obj actual_top_obj = top_table->get_object(actual_link);
+                content.pk_of_linked_object = Mixed{actual_top_obj.get_primary_key()};
+            }
+            Dictionary dict = second.get_dictionary("notes");
+            content.dict_values.clear();
+            for (auto it : dict) {
+                content.dict_values.insert({it.first.get_string(), it.second.get_string()});
+            }
+            Set<ObjectId> set = second.get_set<ObjectId>("set_of_ids");
+            content.set_of_objects.clear();
+            for (auto oid : set) {
+                content.set_of_objects.insert(oid);
+            }
+            return content;
+        }
+        void assign_to(Obj second) const
+        {
+            if (second.get<Timestamp>("date") != datetime) {
+                second.set("date", datetime);
+            }
+            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+            if (pk_of_linked_object) {
+                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                ObjKey top_link = top_table->find_primary_key(*(pk_of_linked_object));
+                second.set(top_link_col, top_link);
+            }
+            else {
+                if (!second.is_null(top_link_col)) {
+                    second.set_null(top_link_col);
+                }
+            }
+            Dictionary dict = second.get_dictionary("notes");
+            for (auto it = dict.begin(); it != dict.end(); ++it) {
+                if (std::find_if(dict_values.begin(), dict_values.end(), [&](auto& pair) {
+                        return pair.first == (*it).first.get_string();
+                    }) == dict_values.end()) {
+                    dict.erase(it);
+                }
+            }
+            for (auto& it : dict_values) {
+                auto existing = dict.find(it.first);
+                if (existing == dict.end() || (*existing).second.get_string() != it.second) {
+                    dict.insert(it.first, it.second);
+                }
+            }
+            Set<ObjectId> set = second.get_set<ObjectId>("set_of_ids");
+            if (set_of_objects.empty()) {
+                set.clear();
+            }
+            else {
+                std::vector<size_t> indices, to_remove;
+                set.sort(indices);
+                for (size_t ndx : indices) {
+                    if (set_of_objects.count(set.get(ndx)) == 0) {
+                        to_remove.push_back(ndx);
+                    }
+                }
+                std::sort(to_remove.rbegin(), to_remove.rend());
+                for (auto ndx : to_remove) {
+                    set.erase(set.get(ndx));
+                }
+                for (auto oid : set_of_objects) {
+                    if (set.find(oid) == realm::npos) {
+                        set.insert(oid);
+                    }
+                }
+            }
+        }
     };
+
     struct EmbeddedContent {
         std::string name = random_string(10);
+        int64_t int_value = random_int();
         std::vector<Int> array_vals = {random_int(), random_int(), random_int()};
         util::Optional<SecondLevelEmbeddedContent> second_level = SecondLevelEmbeddedContent();
+        std::vector<SecondLevelEmbeddedContent> array_of_seconds = {};
+        void apply_recovery_from(const EmbeddedContent& other)
+        {
+            name = other.name;
+            int_value = other.int_value;
+            combine_array_values(array_vals, other.array_vals);
+            if (second_level && other.second_level) {
+                second_level->apply_recovery_from(*other.second_level);
+            }
+            else {
+                second_level = other.second_level;
+            }
+        }
+        void test(const EmbeddedContent& other) const
+        {
+            INFO("Checking EmbeddedContent" << name);
+            REQUIRE(name == other.name);
+            REQUIRE(int_value == other.int_value);
+            REQUIRE(array_vals == other.array_vals);
+            REQUIRE(array_of_seconds.size() == other.array_of_seconds.size());
+            for (size_t i = 0; i < array_of_seconds.size(); ++i) {
+                array_of_seconds[i].test(other.array_of_seconds[i]);
+            }
+            if (!second_level) {
+                REQUIRE(!other.second_level);
+            }
+            else {
+                REQUIRE(!!other.second_level);
+                second_level->test(*other.second_level);
+            }
+        }
+        static util::Optional<EmbeddedContent> get_from(Obj embedded)
+        {
+            util::Optional<EmbeddedContent> value;
+            if (embedded.is_valid()) {
+                value = EmbeddedContent{};
+                value->name = embedded.get_any("name").get<StringData>();
+                value->int_value = embedded.get_any("int_value").get<Int>();
+                ColKey list_col = embedded.get_table()->get_column_key("array");
+                value->array_vals = embedded.get_list_values<Int>(list_col);
+
+                ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+                Obj second = embedded.get_linked_object(link2_col);
+                value->second_level = util::none;
+                if (second.is_valid()) {
+                    value->second_level = SecondLevelEmbeddedContent::get_from(second);
+                }
+                auto list = embedded.get_linklist("array_of_seconds");
+                for (size_t i = 0; i < list.size(); ++i) {
+                    value->array_of_seconds.push_back(SecondLevelEmbeddedContent::get_from(list.get_object(i)));
+                }
+            }
+            return value;
+        }
+        void assign_to(Obj embedded) const
+        {
+            if (embedded.get<StringData>("name") != name) {
+                embedded.set<StringData>("name", name);
+            }
+            if (embedded.get<Int>("int_value") != int_value) {
+                embedded.set<Int>("int_value", int_value);
+            }
+            ColKey list_col = embedded.get_table()->get_column_key("array");
+            if (embedded.get_list_values<Int>(list_col) != array_vals) {
+                embedded.set_list_values<Int>(list_col, array_vals);
+            }
+            ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+            if (second_level) {
+                Obj second = embedded.get_linked_object(link2_col);
+                if (!second) {
+                    second = embedded.create_and_set_linked_object(link2_col);
+                }
+                second_level->assign_to(second);
+            }
+            else {
+                embedded.set_null(link2_col);
+            }
+            auto list = embedded.get_linklist("array_of_seconds");
+            set_embedded_list(array_of_seconds, list);
+        }
     };
     struct TopLevelContent {
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
-        std::vector<std::pair<std::string, util::Optional<EmbeddedContent>>> dict_values = {
-            {"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
+        DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        void apply_recovery_from(const TopLevelContent& other)
+        {
+            combine_array_values(array_values, other.array_values);
+            for (auto it : other.dict_values) {
+                dict_values[it.first] = it.second;
+            }
+            if (link_value && other.link_value) {
+                link_value->apply_recovery_from(*other.link_value);
+            }
+            else if (link_value) {
+                link_value = other.link_value;
+            }
+            // assuming starting from an initial value, if the link_value is null, then it was intentionally deleted.
+        }
+        void test(const TopLevelContent& other) const
+        {
+            if (link_value) {
+                INFO("checking TopLevelContent.link_value");
+                REQUIRE(!!other.link_value);
+                link_value->test(*other.link_value);
+            }
+            else {
+                REQUIRE(!other.link_value);
+            }
+            REQUIRE(array_values.size() == other.array_values.size());
+            for (size_t i = 0; i < array_values.size(); ++i) {
+                INFO("checking array_values: " << i);
+                array_values[i].test(other.array_values[i]);
+            }
+            REQUIRE(dict_values.size() == other.dict_values.size());
+            for (auto it : dict_values) {
+                INFO("checking dict_values: " << it.first);
+                auto found = other.dict_values.find(it.first);
+                REQUIRE(found != other.dict_values.end());
+                if (it.second) {
+                    REQUIRE(!!found->second);
+                    it.second->test(*found->second);
+                }
+                else {
+                    REQUIRE(!found->second);
+                }
+            }
+        }
+        static TopLevelContent get_from(Obj obj)
+        {
+            TopLevelContent content;
+            Obj embedded_link = obj.get_linked_object("embedded_obj");
+            content.link_value = EmbeddedContent::get_from(embedded_link);
+            auto list = obj.get_linklist("array_of_objs");
+            content.array_values.clear();
+
+            for (size_t i = 0; i < list.size(); ++i) {
+                Obj link = list.get_object(i);
+                content.array_values.push_back(*EmbeddedContent::get_from(link));
+            }
+            auto dict = obj.get_dictionary("embedded_dict");
+            content.dict_values.clear();
+            for (auto it : dict) {
+                Obj link = dict.get_object(it.first.get_string());
+                content.dict_values.insert({it.first.get_string(), EmbeddedContent::get_from(link)});
+            }
+            return content;
+        }
+        void assign_to(Obj obj) const
+        {
+            ColKey link_col = obj.get_table()->get_column_key("embedded_obj");
+            if (!link_value) {
+                obj.set_null(link_col);
+            }
+            else {
+                Obj embedded_link = obj.get_linked_object(link_col);
+                if (!embedded_link) {
+                    embedded_link = obj.create_and_set_linked_object(link_col);
+                }
+                link_value->assign_to(embedded_link);
+            }
+            auto list = obj.get_linklist("array_of_objs");
+            set_embedded_list(array_values, list);
+            auto dict = obj.get_dictionary("embedded_dict");
+            for (auto it = dict.begin(); it != dict.end(); ++it) {
+                if (dict_values.find((*it).first.get_string()) == dict_values.end()) {
+                    dict.erase(it);
+                }
+            }
+            for (auto it : dict_values) {
+                if (it.second) {
+                    auto embedded = dict.get_object(it.first);
+                    if (!embedded) {
+                        embedded = dict.create_and_insert_linked_object(it.first);
+                    }
+                    it.second->assign_to(embedded);
+                }
+                else {
+                    dict.insert(it.first, Mixed{});
+                }
+            }
+        }
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
@@ -2428,166 +2747,43 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
 
-    auto set_embedded = [](Obj embedded, const EmbeddedContent& value) {
-        embedded.set<StringData>("name", value.name);
-        ColKey list_col = embedded.get_table()->get_column_key("array");
-        embedded.set_list_values<Int>(list_col, value.array_vals);
-        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
-        if (value.second_level) {
-            Obj second = embedded.get_linked_object(link2_col);
-            if (!second) {
-                second = embedded.create_and_set_linked_object(link2_col);
-            }
-            second.set("date", value.second_level->datetime);
-            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
-            if (value.second_level->pk_of_linked_object) {
-                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
-                ObjKey top_link = top_table->find_primary_key(*(value.second_level->pk_of_linked_object));
-                second.set(top_link_col, top_link);
-            }
-            else {
-                second.set_null(top_link_col);
-            }
-            Dictionary dict = second.get_dictionary("notes");
-            for (auto it = dict.begin(); it != dict.end(); ++it) {
-                if (std::find_if(value.second_level->dict_values.begin(), value.second_level->dict_values.end(),
-                                 [&](auto& pair) {
-                                     return pair.first == (*it).first.get_string();
-                                 }) == value.second_level->dict_values.end()) {
-                    dict.erase(it);
-                }
-            }
-            for (auto& it : value.second_level->dict_values) {
-                dict.insert(it.first, it.second);
-            }
-        }
-        else {
-            embedded.set_null(link2_col);
-        }
+    auto get_top_object = [](SharedRealm realm) {
+        advance_and_notify(*realm);
+        TableRef table = get_table(*realm, "TopLevel");
+        REQUIRE(table->size() == 1);
+        Obj obj = *table->begin();
+        return obj;
     };
 
-    auto check_embedded = [](Obj embedded, const EmbeddedContent& value) {
-        REQUIRE(embedded.get_any("name").get<StringData>() == value.name);
-        ColKey list_col = embedded.get_table()->get_column_key("array");
-        REQUIRE(embedded.get_list_values<Int>(list_col) == value.array_vals);
-
-        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
-        Obj second = embedded.get_linked_object(link2_col);
-        if (value.second_level) {
-            REQUIRE(second);
-            REQUIRE(second.get<Timestamp>("date") == value.second_level->datetime);
-            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
-            ObjKey actual_link = second.get<ObjKey>(top_link_col);
-            if (!value.second_level->pk_of_linked_object) {
-                REQUIRE(!actual_link);
-            }
-            else {
-                REQUIRE(actual_link);
-                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
-                Obj actual_top_obj = top_table->get_object(actual_link);
-                REQUIRE(actual_top_obj.get_primary_key() == *(value.second_level->pk_of_linked_object));
-            }
-            Dictionary dict = second.get_dictionary("notes");
-            REQUIRE(dict.size() == value.second_level->dict_values.size());
-            for (auto& pair : value.second_level->dict_values) {
-                util::Optional<Mixed> actual = dict.try_get(pair.first);
-                REQUIRE(actual);
-                REQUIRE(actual->get_string() == pair.second);
-            }
-        }
-        else {
-            REQUIRE(!second);
-        }
-    };
-
-    auto set_content = [&](Obj obj, const TopLevelContent& content) {
-        ColKey link_col = obj.get_table()->get_column_key("embedded_obj");
-        if (!content.link_value) {
-            obj.set_null(link_col);
-        }
-        else {
-            Obj embedded_link = obj.get_linked_object(link_col);
-            if (!embedded_link) {
-                embedded_link = obj.create_and_set_linked_object(link_col);
-            }
-            set_embedded(embedded_link, *content.link_value);
-        }
-        auto list = obj.get_linklist("array_of_objs");
-        for (size_t i = 0; i < content.array_values.size(); ++i) {
-            Obj link;
-            if (i >= list.size()) {
-                link = list.create_and_insert_linked_object(list.size());
-            }
-            else {
-                link = list.get_object(i);
-            }
-            set_embedded(link, content.array_values[i]);
-        }
-        auto dict = obj.get_dictionary("embedded_dict");
-        for (auto it = dict.begin(); it != dict.end(); ++it) {
-            if (std::find_if(content.dict_values.begin(), content.dict_values.end(), [&](auto& dict_val) {
-                    return (*it).first == dict_val.first;
-                }) != content.dict_values.end()) {
-                dict.erase(it);
-            }
-        }
-        for (size_t i = 0; i < content.dict_values.size(); ++i) {
-            if (content.dict_values[i].second) {
-                Obj embedded = dict.create_and_insert_linked_object(content.dict_values[i].first);
-                set_embedded(embedded, *(content.dict_values[i].second));
-            }
-            else {
-                dict.insert(content.dict_values[i].first, Mixed{});
-            }
-        }
-    };
-    auto check_content = [&](Obj obj, const TopLevelContent& content) {
-        Obj embedded_link = obj.get_linked_object("embedded_obj");
-        if (content.link_value) {
-            REQUIRE(embedded_link);
-            check_embedded(embedded_link, *content.link_value);
-        }
-        else {
-            REQUIRE(!embedded_link);
-        }
-        auto list = obj.get_linklist("array_of_objs");
-        REQUIRE(list.size() == content.array_values.size());
-        for (size_t i = 0; i < content.array_values.size(); ++i) {
-            Obj link = list.get_object(i);
-            check_embedded(link, content.array_values[i]);
-        }
-        auto dict = obj.get_dictionary("embedded_dict");
-        REQUIRE(dict.size() == content.dict_values.size());
-        for (auto& val : content.dict_values) {
-            Obj embedded = dict.get_object(val.first);
-            if (val.second) {
-                check_embedded(embedded, *val.second);
-            }
-            else {
-                REQUIRE(!embedded);
-            }
-        }
-    };
-
-    auto reset_embedded_object = [&](TopLevelContent local_content, TopLevelContent remote_content) {
+    using StateList = std::vector<TopLevelContent>;
+    auto reset_embedded_object = [&](StateList local_content, StateList remote_content,
+                                     TopLevelContent expected_recovered) {
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
-                TableRef table = get_table(*local, "TopLevel");
-                REQUIRE(table->size() == 1);
-                Obj obj = *table->begin();
-                set_content(obj, local_content);
+            ->make_local_changes([&](SharedRealm local_realm) {
+                Obj obj = get_top_object(local_realm);
+                for (auto& s : local_content) {
+                    s.assign_to(obj);
+                }
             })
-            ->make_remote_changes([&](SharedRealm remote) {
-                TableRef table = get_table(*remote, "TopLevel");
-                REQUIRE(table->size() == 1);
-                Obj obj = *table->begin();
-                set_content(obj, remote_content);
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                Obj obj = get_top_object(remote_realm);
+                for (auto& s : remote_content) {
+                    s.assign_to(obj);
+                }
             })
-            ->on_post_reset([&](SharedRealm local) {
-                TableRef table = get_table(*local, "TopLevel");
-                REQUIRE(table->size() == 1);
-                Obj obj = *table->begin();
-                check_content(obj, remote_content);
+            ->on_post_reset([&](SharedRealm local_realm) {
+                Obj obj = get_top_object(local_realm);
+                TopLevelContent actual = TopLevelContent::get_from(obj);
+                if (test_mode == ClientResyncMode::Recover) {
+                    actual.test(expected_recovered);
+                }
+                else if (test_mode == ClientResyncMode::DiscardLocal) {
+                    REQUIRE(remote_content.size() > 0);
+                    actual.test(remote_content.back());
+                }
+                else {
+                    REALM_UNREACHABLE();
+                }
             })
             ->run();
     };
@@ -2601,15 +2797,19 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
         embedded_link.set<String>("name", "initial name");
     });
 
-    SECTION("no change") {
+    SECTION("identical changes") {
         TopLevelContent state;
-        reset_embedded_object(state, state);
+        TopLevelContent expected_recovered = state;
+        expected_recovered.apply_recovery_from(state);
+        reset_embedded_object({state}, {state}, expected_recovered);
     }
     SECTION("modify every embedded property") {
         TopLevelContent local, remote;
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("nullify embedded links") {
+    SECTION("remote nullifies embedded links") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.link_value.reset();
@@ -2617,9 +2817,11 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             val.second.reset();
         }
         remote.array_values.clear();
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("populate embedded links") {
+    SECTION("local nullifies embedded links") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.link_value.reset();
@@ -2627,41 +2829,620 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             val.second.reset();
         }
         local.array_values.clear();
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("add additional embedded objects") {
+    SECTION("remote adds embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
-        remote.dict_values.push_back({"new key1", {EmbeddedContent{}}});
-        remote.dict_values.push_back({"new key2", {EmbeddedContent{}}});
-        remote.dict_values.push_back({"new key3", {}});
+        remote.dict_values["new key1"] = {EmbeddedContent{}};
+        remote.dict_values["new key2"] = {EmbeddedContent{}};
+        remote.dict_values["new key3"] = {};
         remote.array_values.push_back({EmbeddedContent{}});
         remote.array_values.push_back({});
         remote.array_values.push_back({EmbeddedContent{}});
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("remove some embedded objects") {
+    SECTION("local adds some embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
-        local.dict_values.push_back({"new key1", {EmbeddedContent{}}});
-        local.dict_values.push_back({"new key2", {EmbeddedContent{}}});
-        local.dict_values.push_back({"new key3", {}});
+        local.dict_values["new key1"] = {EmbeddedContent{}};
+        local.dict_values["new key2"] = {EmbeddedContent{}};
+        local.dict_values["new key3"] = {};
         local.array_values.push_back({EmbeddedContent{}});
         local.array_values.push_back({});
         local.array_values.push_back({EmbeddedContent{}});
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("add a top level link cycle") {
+    SECTION("both add conflicting embedded objects") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        local.dict_values["new key1"] = {EmbeddedContent{}};
+        local.dict_values["new key2"] = {EmbeddedContent{}};
+        local.dict_values["new key3"] = {};
+        local.array_values.push_back({EmbeddedContent{}});
+        local.array_values.push_back({});
+        local.array_values.push_back({EmbeddedContent{}});
+        remote.dict_values["new key1"] = {EmbeddedContent{}};
+        remote.dict_values["new key2"] = {EmbeddedContent{}};
+        remote.dict_values["new key3"] = {};
+        remote.array_values.push_back({EmbeddedContent{}});
+        remote.array_values.push_back({});
+        remote.array_values.push_back({EmbeddedContent{}});
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies an embedded object which is removed by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->name = "modified value";
+        remote.link_value = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies a deep embedded object which is removed by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->second_level->datetime = Timestamp{1, 1};
+        remote.link_value = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies a deep embedded object which is removed at the second level by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->second_level->datetime = Timestamp{1, 1};
+        remote.link_value->second_level = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("with shared initial state") {
+        TopLevelContent initial;
+        initial.link_value = util::none;
+        test_reset->setup([&](SharedRealm realm) {
+            auto table = get_table(*realm, "TopLevel");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            initial.assign_to(obj);
+        });
+        TopLevelContent local = initial;
+        TopLevelContent remote = initial;
+
+        SECTION("local modifications to an embedded object through a dictionary which is removed by the remote are "
+                "ignored") {
+            local.dict_values["foo"]->name = "modified";
+            local.dict_values["foo"]->second_level->datetime = Timestamp{1, 1};
+            local.dict_values["foo"]->array_vals.push_back(random_int());
+            local.dict_values["foo"]->array_vals.erase(local.dict_values["foo"]->array_vals.begin());
+            local.dict_values["foo"]->second_level->dict_values.erase(
+                local.dict_values["foo"]->second_level->dict_values.begin());
+            local.dict_values["foo"]->second_level->set_of_objects.clear();
+            remote.dict_values["foo"] = util::none;
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local modifications to an embedded object through a linklist element which is removed by the remote "
+                "triggers a list copy") {
+            local.array_values.begin()->name = "modified";
+            local.array_values.begin()->second_level->datetime = Timestamp{1, 1};
+            local.array_values.begin()->array_vals.push_back(random_int());
+            local.array_values.begin()->array_vals.erase(local.array_values.begin()->array_vals.begin());
+            local.array_values.begin()->second_level->dict_values.erase(
+                local.array_values.begin()->second_level->dict_values.begin());
+            local.array_values.begin()->second_level->set_of_objects.clear();
+            remote.array_values.erase(remote.array_values.begin());
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local modifications to an embedded object through a linklist cleared by the remote triggers a list "
+                "copy") {
+            local.array_values.begin()->name = "modified";
+            local.array_values.begin()->second_level->datetime = Timestamp{1, 1};
+            local.array_values.begin()->array_vals.push_back(random_int());
+            local.array_values.begin()->array_vals.erase(local.array_values.begin()->array_vals.begin());
+            local.array_values.begin()->second_level->dict_values.erase(
+                local.array_values.begin()->second_level->dict_values.begin());
+            local.array_values.begin()->second_level->set_of_objects.clear();
+            remote.array_values.clear();
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("inserting an embedded object into a list which has indices modified by the remote") {
+            EmbeddedContent new_element{};
+            local.array_values.insert(local.array_values.end(), new_element);
+            remote.array_values.erase(remote.array_values.begin());
+            remote.array_values.erase(remote.array_values.begin());
+            TopLevelContent expected_recovered = remote;
+            expected_recovered.array_values.insert(expected_recovered.array_values.end(), new_element);
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local list clear removes remotely inserted objects") {
+            EmbeddedContent new_element_local, new_element_remote;
+            local.array_values.clear();
+            TopLevelContent local2 = local;
+            local2.array_values.push_back(new_element_local);
+            remote.array_values.erase(remote.array_values.begin());
+            remote.array_values.push_back(new_element_remote); // lost via local.clear()
+            TopLevelContent expected_recovered = local2;
+            reset_embedded_object({local, local2}, {remote}, expected_recovered);
+        }
+        SECTION("local modification of a dictionary value which is removed by the remote") {
+            local.dict_values["foo"] = EmbeddedContent{};
+            remote.dict_values.erase("foo");
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local delete of a dictionary value which is removed by the remote") {
+            local.dict_values.erase("foo");
+            remote.dict_values.erase("foo");
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local delete of a dictionary value which is modified by the remote") {
+            local.dict_values.erase("foo");
+            remote.dict_values["foo"] = EmbeddedContent{};
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("both modify a dictionary value") {
+            EmbeddedContent new_local, new_remote;
+            local.dict_values["foo"] = new_local;
+            remote.dict_values["foo"] = new_remote;
+            TopLevelContent expected_recovered = remote;
+            expected_recovered.dict_values["foo"]->apply_recovery_from(*local.dict_values["foo"]);
+            // a verbatim list copy is triggered by modifications to items which were not just inserted
+            expected_recovered.dict_values["foo"]->array_vals = local.dict_values["foo"]->array_vals;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        std::vector<std::string> keys = {"new key", "", "\0"};
+        for (auto key : keys) {
+            SECTION(util::format("both add the same dictionary key: '%1'", key)) {
+                EmbeddedContent new_local, new_remote;
+                local.dict_values[key] = new_local;
+                remote.dict_values[key] = new_remote;
+                TopLevelContent expected_recovered = remote;
+                expected_recovered.dict_values[key]->apply_recovery_from(*local.dict_values[key]);
+                // a verbatim list copy is triggered by modifications to items which were not just inserted
+                expected_recovered.dict_values[key]->array_vals = local.dict_values[key]->array_vals;
+                expected_recovered.dict_values[key]->second_level = local.dict_values[key]->second_level;
+                reset_embedded_object({local}, {remote}, expected_recovered);
+            }
+        }
+        SECTION("deep modifications to inserted and swaped list items are recovered") {
+            EmbeddedContent local_added_at_begin, local_added_at_end, local_added_before_end, remote_added;
+            size_t list_end = initial.array_values.size();
+            test_reset
+                ->make_local_changes([&](SharedRealm local) {
+                    Obj obj = get_top_object(local);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(list_end - 1);
+                    local_added_before_end.assign_to(embedded); // this item is needed here so that move does not
+                                                                // trigger a copy of the list
+                    embedded = list.create_and_insert_linked_object(list_end);
+                    local_added_at_end.assign_to(embedded);
+                    local->commit_transaction();
+                    local->begin_transaction();
+                    list.swap(0,
+                              list_end); // generates two move instructions, move(0, list_end), move(list_end - 1, 0)
+                    local->commit_transaction();
+                    local->begin_transaction();
+                    local_added_at_end.name = "should be at begin now";
+                    local_added_at_begin.name = "should be at end now";
+                    local_added_at_end.assign_to(list.get_object(0));
+                    local_added_at_begin.assign_to(list.get_object(list_end));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_added.name = "remote added at zero, should end up in the middle of the list";
+                    remote_added.assign_to(list.create_and_insert_linked_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 4);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        EmbeddedContent embedded_3 = *EmbeddedContent::get_from(list.get_object(3));
+                        embedded_0.test(local_added_at_end); // local added at end, moved to 0
+                        embedded_1.test(remote_added); // remote added at 0, bumped to 1 by recovered insert at 0
+                        embedded_2.test(local_added_before_end); // local added at 2, not moved
+                        embedded_3.test(local_added_at_begin);   // local added at 0, moved to end
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("deep modifications to inserted and moved list items are recovered") {
+            EmbeddedContent local_added_at_begin, local_added_at_end, remote_added;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(list.size());
+                    local_added_at_end.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    advance_and_notify(*local_realm);
+                    local_realm->begin_transaction();
+                    list.move(list.size() - 1, 0);
+                    local_realm->commit_transaction();
+                    advance_and_notify(*local_realm);
+                    local_realm->begin_transaction();
+                    local_added_at_end.name = "added at end, moved to 0";
+                    local_added_at_begin.name = "added at 0, bumped to 1";
+                    local_added_at_end.assign_to(list.get_object(0));
+                    local_added_at_begin.assign_to(list.get_object(1));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_added.name = "remote added at zero, should end up at the end of the list";
+                    remote_added.assign_to(list.create_and_insert_linked_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 3);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        embedded_0.test(local_added_at_end);   // local added at end, moved to 0
+                        embedded_1.test(local_added_at_begin); // local added at begin, bumped up by move
+                        embedded_2.test(
+                            remote_added); // remote added at 0, bumped to 2 by recovered insert at 0 and move to 0
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("removing an added list item does not trigger a list copy") {
+            EmbeddedContent local_added_at_begin;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    list.remove(0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    actual.test(remote);
+                })
+                ->run();
+        }
+        SECTION("removing a preexisting list item triggers a list copy") {
+            EmbeddedContent remote_updated_item_0;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0);
+                    local = TopLevelContent::get_from(obj);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(1, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_updated_item_0.assign_to(list.get_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        actual.test(local);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("adding and removing a list item when the remote removes the base object has no effect") {
+            EmbeddedContent local_added_at_begin;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    list.remove(0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    obj.remove();
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    advance_and_notify(*local_realm);
+                    TableRef table = get_table(*local_realm, "TopLevel");
+                    REQUIRE(table->size() == 0);
+                })
+                ->run();
+        }
+        SECTION("removing a preexisting list item when the remote removes the base object has no effect") {
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    obj.remove();
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    advance_and_notify(*local_realm);
+                    TableRef table = get_table(*local_realm, "TopLevel");
+                    REQUIRE(table->size() == 0);
+                })
+                ->run();
+        }
+        SECTION("modifications to an embedded object are ignored when the base object is removed") {
+            EmbeddedContent local_modifications;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    local_modifications.assign_to(list.get_object(0));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    obj.remove();
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    advance_and_notify(*local_realm);
+                    TableRef table = get_table(*local_realm, "TopLevel");
+                    REQUIRE(table->size() == 0);
+                })
+                ->run();
+        }
+        SECTION("changes made through two layers of embedded lists can be recovered") {
+            EmbeddedContent local_added_at_0, local_added_at_1, remote_added;
+            local_added_at_0.name = "added at 0, moved to 1";
+            local_added_at_0.array_of_seconds = {{}, {}};
+            local_added_at_1.name = "added at 1, bumped to 0";
+            local_added_at_1.array_of_seconds = {{}, {}, {}};
+            remote_added.array_of_seconds = {{}, {}};
+            SecondLevelEmbeddedContent modified, inserted;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_0.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(1);
+                    local_added_at_1.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    auto list_of_seconds = embedded.get_linklist("array_of_seconds");
+                    list_of_seconds.move(0, 1);
+                    std::iter_swap(local_added_at_1.array_of_seconds.begin(),
+                                   local_added_at_1.array_of_seconds.begin() + 1);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    list.move(0, 1);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    modified.assign_to(list_of_seconds.get_object(0));
+                    auto new_second = list_of_seconds.create_and_insert_linked_object(0);
+                    inserted.assign_to(new_second);
+                    local_added_at_1.array_of_seconds[0] = modified;
+                    local_added_at_1.array_of_seconds.insert(local_added_at_1.array_of_seconds.begin(), inserted);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_added.name = "remote added at zero, should end up at the end of the list";
+                    remote_added.assign_to(list.create_and_insert_linked_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 3);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        embedded_0.test(local_added_at_1); // local added at end, moved to 0
+                        embedded_1.test(local_added_at_0); // local added at begin, bumped up by move
+                        embedded_2.test(remote_added);     // remote added at 0, bumped to 2 by recovered
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("insertions to a preexisting object through two layers of embedded lists triggers a list copy") {
+            SecondLevelEmbeddedContent local_added, remote_added;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    local_added.assign_to(
+                        list.get_object(0).get_linklist("array_of_seconds").create_and_insert_linked_object(0));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    remote_added.assign_to(
+                        list.get_object(0).get_linklist("array_of_seconds").create_and_insert_linked_object(0));
+                    list.move(0, 1);
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 3);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        REQUIRE(embedded_0.array_of_seconds.size() == 1);
+                        embedded_0.array_of_seconds[0].test(local_added);
+                        REQUIRE(embedded_1.array_of_seconds.size() ==
+                                0); // remote changes overwritten by local list copy
+                        REQUIRE(embedded_2.array_of_seconds.size() == 0);
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+
+        SECTION("modifications to a preexisting object through two layers of embedded lists triggers a list copy") {
+            SecondLevelEmbeddedContent preexisting_item, local_modified, remote_added;
+            initial.array_values[0].array_of_seconds.push_back(preexisting_item);
+            const size_t initial_item_pos = initial.array_values[0].array_of_seconds.size() - 1;
+            local = initial;
+            remote = initial;
+            local.array_values[0].array_of_seconds[initial_item_pos] = local_modified;
+            remote.array_values[0].array_of_seconds.push_back(remote_added); // overwritten by local!
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+
+        SECTION("add int") {
+            auto add_to_dict_item = [&](SharedRealm realm, std::string key, int64_t addition) {
+                Obj obj = get_top_object(realm);
+                auto dict = obj.get_dictionary("embedded_dict");
+                auto embedded = dict.get_object(key);
+                REQUIRE(!!embedded);
+                embedded.add_int("int_value", addition);
+                return TopLevelContent::get_from(obj);
+            };
+            TopLevelContent expected_recovered;
+            const std::string existing_key = "foo";
+
+            test_reset->on_post_reset([&](SharedRealm local_realm) {
+                Obj obj = get_top_object(local_realm);
+                TopLevelContent actual = TopLevelContent::get_from(obj);
+                actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
+            });
+            int64_t initial_value = initial.dict_values[existing_key]->int_value;
+            int64_t addition = random_int();
+            SECTION("local add_int to an existing dictionary item") {
+                INFO("adding " << initial_value << " with " << addition);
+                expected_recovered = initial;
+                expected_recovered.dict_values[existing_key]->int_value += addition;
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->run();
+            }
+            SECTION("local and remote both create the same dictionary item and add to it") {
+                int64_t remote_addition = random_int();
+                INFO("adding " << initial_value << " with local " << addition << " and remote " << remote_addition);
+                expected_recovered = initial;
+                expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote) {
+                        initial = add_to_dict_item(remote, existing_key, remote_addition);
+                    })
+                    ->run();
+            }
+            SECTION("local add_int on a dictionary item which the remote removed is ignored") {
+                INFO("adding " << initial_value << " with " << addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote_realm) {
+                        Obj obj = get_top_object(remote_realm);
+                        auto dict = obj.get_dictionary("embedded_dict");
+                        dict.erase(Mixed{existing_key});
+                        initial = TopLevelContent::get_from(obj);
+                        expected_recovered = initial;
+                    })
+                    ->run();
+            }
+            SECTION("local add_int on a dictionary item when the entire root object is removed by the remote removed "
+                    "is ignored") {
+                INFO("adding " << initial_value << " with " << addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote_realm) {
+                        Obj obj = get_top_object(remote_realm);
+                        TableRef table = obj.get_table();
+                        obj.remove();
+                        REQUIRE(table->size() == 0);
+                    })
+                    ->on_post_reset([&](SharedRealm local_realm) {
+                        advance_and_notify(*local_realm);
+                        TableRef table = get_table(*local_realm, "TopLevel");
+                        REQUIRE(table->size() == 0);
+                    })
+                    ->run();
+            }
+        }
+    }
+    SECTION("remote adds a top level link cycle") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        // the remote change exists because no local instruction set the value to anything (default)
+        expected_recovered.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("remove a top level link cycle") {
+    SECTION("local adds a top level link cycle") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
     SECTION("server adds embedded object classes") {
         SyncTestFile config2(init_sync_manager.app(), "default");
@@ -2672,16 +3453,19 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
 
         test_reset
             ->make_remote_changes([&](SharedRealm remote) {
+                advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 REQUIRE(table->size() == 1);
-                set_content(obj, remote_content);
+                remote_content.assign_to(obj);
             })
             ->on_post_reset([&](SharedRealm local) {
+                advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
-                check_content(obj, remote_content);
+                TopLevelContent actual = TopLevelContent::get_from(obj);
+                actual.test(remote_content);
             })
             ->run();
     }
@@ -2694,11 +3478,24 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             TableRef table = get_table(*local, "TopLevel");
             auto obj = table->create_object_with_primary_key(pk_val);
             REQUIRE(table->size() == 1);
-            set_content(obj, local_content);
+            local_content.assign_to(obj);
         });
-        REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
-                                               "{EmbeddedObject, EmbeddedObject2, TopLevel}");
+        if (test_mode == ClientResyncMode::DiscardLocal) {
+            REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
+                                                   "{EmbeddedObject, EmbeddedObject2, TopLevel}");
+        }
+        else {
+            // In recovery mode, AddTable should succeed if the server is in dev mode, and fail
+            // if the server is in production which in that case the changes will be rejected.
+            // Since this is a fake reset, it always succeeds here.
+            test_reset
+                ->on_post_reset([&](SharedRealm local) {
+                    TableRef table = get_table(*local, "TopLevel");
+                    REQUIRE(table->size() == 1);
+                })
+                ->run();
+        }
     }
 }
-*/
+
 } // namespace realm

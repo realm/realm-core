@@ -80,6 +80,7 @@ protected:
                          util::UniqueFunction<void(LstBase&)>);
     bool check_links_exist(const Instruction::Payload& payload);
     bool allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name);
+    std::string print(const Instruction::PathInstruction& instr) const;
 
 private:
     const Changeset* m_log = nullptr;
