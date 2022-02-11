@@ -92,7 +92,7 @@ else()
 endif()
 
 if(WIN32 AND NOT WINDOWS_STORE)
-    target_link_libraries(Sync INTERFACE Mincore.lib)
+    target_link_libraries(Sync INTERFACE Version.lib)
 endif()
 
 install(TARGETS Sync EXPORT realm
