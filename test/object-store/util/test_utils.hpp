@@ -56,6 +56,11 @@ static inline int64_t random_int()
     return rng();
 }
 
+bool chmod_supported(const std::string& path);
+int get_permissions(const std::string& path);
+void chmod(const std::string& path, int permissions);
+std::string get_parent_directory(const std::string& path);
+
 } // namespace realm
 
 #define REQUIRE_DIR_EXISTS(macro_path)                                                                               \

@@ -254,7 +254,7 @@ private:
 
     mutable util::CheckedMutex m_mutex;
 
-    bool run_file_action(const SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
+    bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Create a new logger of the type which will be used by the sync client

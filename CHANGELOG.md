@@ -19,6 +19,7 @@
 * Asynchronous writes did not work with queue-confined Realms (since v11.8.0).
 * Releasing all references to a Realm while an asynchronous write was in progress would sometimes result in use-after-frees (since v11.8.0).
 * Fixed a fatal sync error "Automatic recovery failed" during DiscardLocal client reset if the reset notifier callbacks were not set to something. ([#5223](https://github.com/realm/realm-core/issues/5223), since v11.5.0)
+* Fixed running file action BackUpThenDeleteRealm which could silently fail to delete the Realm as long as the copy succeeded. If this happens now, the action is changed to DeleteRealm. ([#5180](https://github.com/realm/realm-core/issues/5180), since the beginning)
 * Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state (since v11.8.0).
 * Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
 * Check, when opening a realm, that in-memory realms are not encrypted ([#5195](https://github.com/realm/realm-core/issues/5195))
