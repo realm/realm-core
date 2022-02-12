@@ -757,8 +757,14 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 ObjKey key = obj_key_it.first;
                 if (auto local_obj = local_table->try_get_object(key)) {
                     try {
-                        Mixed pk = local_obj.get_primary_key();
-                        Obj remote_obj = remote_table->get_object_with_primary_key(pk); // throws
+                        Obj remote_obj;
+                        if (remote_table->is_embedded()) {
+                            remote_obj = remote_table->get_object(local_obj.get_key());
+                        }
+                        else {
+                            Mixed pk = local_obj.get_primary_key();
+                            remote_obj = remote_table->get_object_with_primary_key(pk); // throws
+                        }
                         for (auto& list_trackers : obj_key_it.second) {
                             if (list_trackers.second.requires_manual_copy()) {
                                 ColKey local_col_key = list_trackers.first;
@@ -772,8 +778,8 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                                 REALM_ASSERT(local_list);
                                 InterRealmValueConverter value_converter(local_table, local_col_key, remote_table,
                                                                          remote_col_key, embedded_object_tracker);
-                                logger.debug("Recovery overwrites list for %1.%2 size: %3 -> %4", table_name, pk,
-                                             remote_list->size(), local_list->size());
+                                logger.debug("Recovery overwrites list for %1.%2 size: %3 -> %4", table_name,
+                                             remote_obj.get_primary_key(), remote_list->size(), local_list->size());
                                 copy_list(local_obj, remote_obj, value_converter, nullptr);
                             }
                         }
@@ -803,6 +809,210 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         auto string = log->try_get_string(range);
         REALM_ASSERT(string);
         return *string;
+    }
+
+    bool translate_list_element(LstBase& list, uint32_t index, Instruction::Path::iterator begin,
+                                Instruction::Path::const_iterator end, const char* instr_name,
+                                util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback,
+                                bool ignore_missing_dict_keys)
+    {
+        if (begin == end) {
+            return list_callback(list, index);
+        }
+
+        auto col = list.get_col_key();
+        auto field_name = list.get_table()->get_column_name(col);
+
+        if (col.get_type() == col_type_LinkList) {
+            auto target = list.get_table()->get_link_target(col);
+            if (!target->is_embedded()) {
+                handle_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", instr_name,
+                                          field_name, list.get_table()->get_name(), index));
+            }
+
+            REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
+            auto& link_list = static_cast<LnkLst&>(list);
+            auto obj = link_list.get_obj();
+            auto list_tracker = m_tables[obj.get_table()->get_key()][obj.get_key()][col];
+            uint32_t translated_ndx = uint32_t(-1);
+            if (!list_tracker.update(index, translated_ndx)) {
+                return false;
+            }
+            REALM_ASSERT(translated_ndx != uint32_t(-1));
+            REALM_ASSERT_EX(translated_ndx < link_list.size(), translated_ndx, link_list.size());
+            *(begin - 1) = translated_ndx;
+
+            auto embedded_object = link_list.get_object(translated_ndx);
+            if (auto pfield = mpark::get_if<InternString>(&*begin)) {
+                ++begin;
+                return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
+                                       ignore_missing_dict_keys);
+            }
+            else {
+                handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
+            }
+        }
+        else {
+            handle_error(util::format(
+                "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
+                instr_name, field_name, list.get_table()->get_name(), col.get_type()));
+        }
+        REALM_UNREACHABLE();
+        return false;
+    }
+
+    bool translate_dictionary_element(Dictionary& dict, InternString key, Instruction::Path::iterator begin,
+                                      Instruction::Path::const_iterator end, const char* instr_name,
+                                      util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback,
+                                      bool ignore_missing_dict_keys)
+    {
+        StringData string_key = get_string(key);
+        if (begin == end) {
+            if (ignore_missing_dict_keys && dict.find(Mixed{string_key}) == dict.end()) {
+                return false;
+            }
+            return true;
+        }
+
+        auto col = dict.get_col_key();
+        auto table = dict.get_table();
+        auto field_name = table->get_column_name(col);
+
+        if (col.get_type() == col_type_Link) {
+            auto target = dict.get_target_table();
+            if (!target->is_embedded()) {
+                handle_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", instr_name,
+                                          field_name, table->get_name(), string_key));
+            }
+
+            auto embedded_object = dict.get_object(string_key);
+            if (!embedded_object) {
+                logger.warn("Discarding a local %1 made to an embedded object which no longer exists through "
+                            "dictionary key '%2.%3[%4]'",
+                            instr_name, table->get_name(), table->get_column_name(col), string_key);
+                return false; // discard this instruction as it operates over a non-existant link
+            }
+
+            if (auto pfield = mpark::get_if<InternString>(&*begin)) {
+                ++begin;
+                return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
+                                       ignore_missing_dict_keys);
+            }
+            else {
+                handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
+            }
+        }
+        else {
+            handle_error(util::format(
+                "%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
+                instr_name, field_name, table->get_name(), col.get_type()));
+        }
+    }
+
+    bool translate_field(Obj& obj, InternString field, Instruction::Path::iterator begin,
+                         Instruction::Path::const_iterator end, const char* instr_name,
+                         util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback, bool ignore_missing_dict_keys)
+    {
+        auto field_name = get_string(field);
+        ColKey col = obj.get_table()->get_column_key(field_name);
+        if (!col) {
+            handle_error(util::format("%1 instruction for path '%2.%3' could not be found", instr_name,
+                                      obj.get_table()->get_name(), field_name));
+        }
+
+        if (begin == end) {
+            if (col.is_list()) {
+                auto list = obj.get_listbase_ptr(col);
+                return list_callback(*list, uint32_t(-1));
+            }
+            return true;
+        }
+
+        if (col.is_list()) {
+            if (auto pindex = mpark::get_if<uint32_t>(&*begin)) {
+                // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
+                // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
+                // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
+                // links.
+                std::unique_ptr<LstBase> list;
+                if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
+                    auto table = obj.get_table();
+                    if (!table->get_link_target(col)->is_embedded()) {
+                        list = obj.get_list_ptr<ObjKey>(col);
+                    }
+                    else {
+                        list = obj.get_listbase_ptr(col);
+                    }
+                }
+                else {
+                    list = obj.get_listbase_ptr(col);
+                }
+                ++begin;
+                return translate_list_element(*list, *pindex, begin, end, instr_name, std::move(list_callback),
+                                              ignore_missing_dict_keys);
+            }
+            else {
+                handle_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", instr_name,
+                                          field_name, obj.get_table()->get_name()));
+            }
+        }
+        else if (col.is_dictionary()) {
+            if (auto pkey = mpark::get_if<InternString>(&*begin)) {
+                auto dict = obj.get_dictionary(col);
+                ++begin;
+                return translate_dictionary_element(dict, *pkey, begin, end, instr_name, std::move(list_callback),
+                                                    ignore_missing_dict_keys);
+            }
+            else {
+                handle_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'",
+                                          instr_name, field_name, obj.get_table()->get_name()));
+            }
+        }
+        else if (col.get_type() == col_type_Link) {
+            auto target = obj.get_table()->get_link_target(col);
+            if (!target->is_embedded()) {
+                handle_error(util::format("%1: Reference through non-embedded link in field '%2' in class '%3'",
+                                          instr_name, field_name, obj.get_table()->get_name()));
+            }
+            if (obj.is_null(col)) {
+                logger.warn(
+                    "Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'",
+                    instr_name, obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
+                return false; // discard this instruction as it operates over a null link
+            }
+
+            auto embedded_object = obj.get_linked_object(col);
+            if (auto pfield = mpark::get_if<InternString>(&*begin)) {
+                ++begin;
+                return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
+                                       ignore_missing_dict_keys);
+            }
+            else {
+                handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
+            }
+        }
+        else {
+            handle_error(util::format("%1: Resolving path through unstructured field '%3.%2' of type %4", instr_name,
+                                      field_name, obj.get_table()->get_name(), col.get_type()));
+        }
+        REALM_UNREACHABLE();
+    }
+
+    bool translate_path(instr::PathInstruction& instr, const char* instr_name,
+                        util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback,
+                        bool ignore_missing_dict_keys = false)
+    {
+        Obj obj;
+        if (auto mobj = get_top_object(instr, instr_name)) {
+            obj = std::move(*mobj);
+        }
+        else {
+            logger.warn("Cannot recover '%1' which operates on a deleted object", instr_name);
+            return false;
+        }
+
+        return translate_field(obj, instr.field, instr.path.begin(), instr.path.end(), instr_name,
+                               std::move(list_callback), ignore_missing_dict_keys);
     }
 
     void operator()(const Instruction::AddTable& instr)
@@ -848,8 +1058,20 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::Update& instr)
     {
         const char* instr_name = "Update";
-        if (auto obj = get_top_object(instr, instr_name)) {
-            Instruction::Update instr_copy = instr;
+        Instruction::Update instr_copy = instr;
+        const bool dictionary_erase = instr.value.type == instr::Payload::Type::Erased;
+        if (translate_path(
+                instr_copy, instr_name,
+                [&](LstBase& list, uint32_t index) {
+                    auto obj = list.get_obj();
+                    auto& list_tracker = m_tables[obj.get_table()->get_key()][obj.get_key()][list.get_col_key()];
+                    uint32_t translated_ndx;
+                    bool allowed_to_update = list_tracker.update(instr.index(), index);
+                    instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                    instr_copy.path.back() = translated_ndx;
+                    return allowed_to_update;
+                },
+                dictionary_erase)) {
             if (!check_links_exist(instr.value)) {
                 if (!allows_null_links(instr, instr_name)) {
                     logger.warn("Discarding an update which links to a deleted object");
@@ -857,52 +1079,35 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 }
                 instr_copy.value = {};
             }
-
-            bool allowed_to_update = true;
-            resolve_if_list(instr, instr_name, [&](LstBase& list) {
-                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
-                uint32_t translated_ndx;
-                allowed_to_update = list_tracker.update(instr.index(), translated_ndx);
-                instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                instr_copy.path.back() = translated_ndx;
-            });
-            if (allowed_to_update) {
-                try {
-                    InstructionApplier::operator()(instr_copy);
-                }
-                catch (const KeyNotFound& e) {
-                    logger.warn("Discarding an update to a non existing object/key for object '%1' in '%2': '%3'",
-                                obj->get_primary_key(), obj->get_table()->get_name(), e.what());
-                }
-            }
-        }
-        else {
-            logger.warn("Discarding a local Update made to an object which no longer exists");
+            InstructionApplier::operator()(instr_copy); // FIXME: catch KeyNotFound exceptions?
         }
     }
 
     void operator()(const Instruction::AddInteger& instr)
     {
-        if (get_top_object(instr, "AddInteger")) {
-            InstructionApplier::operator()(instr);
-        }
-        else {
-            logger.warn("Discarding a local AddInteger modification made to an object which no longer exists");
+        const char* instr_name = "AddInteger";
+        Instruction::AddInteger instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t) {
+                REALM_UNREACHABLE();
+                return true;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
     void operator()(const Instruction::Clear& instr)
     {
         const char* instr_name = "Clear";
-        if (auto obj = get_top_object(instr, instr_name)) {
-            resolve_if_list(instr, instr_name, [&](LstBase& list) {
-                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+        Instruction::Clear instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t ndx) {
+                REALM_ASSERT(ndx == uint32_t(-1));
+                auto obj = list.get_obj();
+                auto& list_tracker = m_tables[obj.get_table()->get_key()][obj.get_key()][list.get_col_key()];
                 list_tracker.clear();
-            });
-            InstructionApplier::operator()(instr);
-        }
-        else {
-            logger.warn("Discarding a local %1 instruction made to an object which no longer exists", instr_name);
+                // Clear.prior_size is ignored and always zero
+                return true;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
@@ -931,107 +1136,96 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     void operator()(const Instruction::ArrayInsert& instr)
     {
         const char* instr_name = "ArrayInsert";
-        if (auto obj = get_top_object(instr, instr_name)) {
-            Instruction::ArrayInsert instr_copy = instr;
-            if (!check_links_exist(instr.value)) {
-                logger.warn("Discarding %1 which links to a deleted object", instr_name);
-                return;
-            }
-            bool allowed_to_insert = false;
-            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
-                size_t list_size = list.size();
-                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
-                uint32_t translated_index;
-                allowed_to_insert = list_tracker.insert(static_cast<uint32_t>(index), list_size, translated_index);
-                if (allowed_to_insert) {
-                    instr_copy.prior_size = static_cast<uint32_t>(list_size);
-                    instr_copy.path.back() = translated_index;
-                }
-            });
-            if (allowed_to_insert) {
-                InstructionApplier::operator()(instr_copy);
-            }
+        if (!check_links_exist(instr.value)) {
+            logger.warn("Discarding %1 which links to a deleted object", instr_name);
+            return;
         }
-        else {
-            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
+        Instruction::ArrayInsert instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index) {
+                REALM_ASSERT(index != uint32_t(-1));
+                size_t list_size = list.size();
+                auto obj = list.get_obj();
+                auto& list_tracker = m_tables[obj.get_table()->get_key()][obj.get_key()][list.get_col_key()];
+                uint32_t translated_index;
+                bool allowed_to_insert =
+                    list_tracker.insert(static_cast<uint32_t>(index), list_size, translated_index);
+                if (allowed_to_insert) {
+                    instr_copy.path.back() = translated_index;
+                    instr_copy.prior_size = static_cast<uint32_t>(list_size);
+                }
+                return allowed_to_insert;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
     void operator()(const Instruction::ArrayMove& instr)
     {
         const char* instr_name = "ArrayMove";
-        if (auto obj = get_top_object(instr, instr_name)) {
-            bool allowed_to_move = false;
-            Instruction::ArrayMove instr_copy = instr;
-            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
+        Instruction::ArrayMove instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index) {
+                REALM_ASSERT(index != uint32_t(-1));
                 size_t lst_size = list.size();
-                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+                auto obj = list.get_obj();
+                auto& list_tracker = m_tables[obj.get_table()->get_key()][obj.get_key()][list.get_col_key()];
                 uint32_t translated_from, translated_to;
-                allowed_to_move = list_tracker.move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
-                                                    translated_from, translated_to);
+                bool allowed_to_move = list_tracker.move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
+                                                         translated_from, translated_to);
                 if (allowed_to_move) {
                     instr_copy.prior_size = static_cast<uint32_t>(lst_size);
                     instr_copy.path.back() = translated_from;
                     instr_copy.ndx_2 = translated_to;
                 }
-            });
-            if (allowed_to_move) {
-                InstructionApplier::operator()(instr_copy);
-            }
-        }
-        else {
-            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
+                return allowed_to_move;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
     void operator()(const Instruction::ArrayErase& instr)
     {
         const char* instr_name = "ArrayErase";
-        if (auto obj = get_top_object(instr, instr_name)) {
-            Instruction::ArrayErase instr_copy = instr;
-            bool allowed_to_delete = false;
-            resolve_list(instr, instr_name, [&](LstBase& list, size_t index) {
-                auto& list_tracker = m_tables[obj->get_table()->get_key()][obj->get_key()][list.get_col_key()];
+        Instruction::ArrayErase instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index) {
+                auto obj = list.get_obj();
+                auto& list_tracker = m_tables[obj.get_table()->get_key()][obj.get_key()][list.get_col_key()];
                 uint32_t translated_index;
-                allowed_to_delete = list_tracker.remove(static_cast<uint32_t>(index), translated_index);
+                bool allowed_to_delete = list_tracker.remove(static_cast<uint32_t>(index), translated_index);
                 if (allowed_to_delete) {
                     instr_copy.prior_size = static_cast<uint32_t>(list.size());
                     instr_copy.path.back() = translated_index;
                 }
-            });
-            if (allowed_to_delete) {
-                InstructionApplier::operator()(instr_copy);
-            }
-        }
-        else {
-            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
+                return allowed_to_delete;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
     void operator()(const Instruction::SetInsert& instr)
     {
         const char* instr_name = "SetInsert";
-        if (get_top_object(instr, instr_name)) {
-            Instruction::SetInsert instr_copy = instr;
-            if (!check_links_exist(instr.value)) {
-                logger.warn("Discarding a %1 which links to a deleted object", instr_name);
-                return;
-            }
-            InstructionApplier::operator()(instr_copy);
+        if (!check_links_exist(instr.value)) {
+            logger.warn("Discarding a %1 which links to a deleted object", instr_name);
+            return;
         }
-        else {
-            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
+        Instruction::SetInsert instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t) {
+                REALM_UNREACHABLE(); // there is validation before this point
+                return false;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
     void operator()(const Instruction::SetErase& instr)
     {
         const char* instr_name = "SetErase";
-        if (get_top_object(instr, instr_name)) {
-            InstructionApplier::operator()(instr);
-        }
-        else {
-            logger.warn("Discarding a local %1 made to an object which no longer exists", instr_name);
+        Instruction::SetErase instr_copy = instr;
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t) {
+                REALM_UNREACHABLE(); // there is validation before this point
+                return false;
+            })) {
+            InstructionApplier::operator()(instr_copy);
         }
     }
 };

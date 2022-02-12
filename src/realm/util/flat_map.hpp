@@ -25,8 +25,10 @@ struct FlatMap {
     FlatMap& operator=(const FlatMap&) = default;
     FlatMap& operator=(FlatMap&&) = default;
     FlatMap(Container&& values)
-        : m_data(std::move(values))
     {
+        for (auto v : values) {
+            insert(v);
+        }
     }
 
     V& at(K key)

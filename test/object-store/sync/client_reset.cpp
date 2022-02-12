@@ -2406,26 +2406,17 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
 
         void apply_recovery_from(const TopLevelContent& other)
         {
-            link_value = other.link_value;
             combine_array_values(array_values, other.array_values);
-            for (auto it = dict_values.begin(); it != dict_values.end();) {
-                auto existing = other.dict_values.find(it->first);
-                if (existing == other.dict_values.end()) {
-                    it = dict_values.erase(it);
-                }
-                else {
-                    ++it;
-                }
-            }
             for (auto it : other.dict_values) {
                 dict_values[it.first] = it.second;
             }
             if (link_value && other.link_value) {
                 link_value->apply_recovery_from(*other.link_value);
             }
-            else {
+            else if (link_value) {
                 link_value = other.link_value;
             }
+            // assuming starting from an initial value, if the link_value is null, then it was intentionally deleted.
         }
     };
 
@@ -2532,13 +2523,16 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
         }
         auto dict = obj.get_dictionary("embedded_dict");
         for (auto it = dict.begin(); it != dict.end(); ++it) {
-            if (content.dict_values.find((*it).first.get_string()) != content.dict_values.end()) {
+            if (content.dict_values.find((*it).first.get_string()) == content.dict_values.end()) {
                 dict.erase(it);
             }
         }
         for (auto it : content.dict_values) {
             if (it.second) {
-                Obj embedded = dict.create_and_insert_linked_object(it.first);
+                auto embedded = dict.get_object(it.first);
+                if (!embedded) {
+                    embedded = dict.create_and_insert_linked_object(it.first);
+                }
                 set_embedded(embedded, *it.second);
             }
             else {
@@ -2549,7 +2543,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
     auto check_content = [&](Obj obj, const TopLevelContent& content) {
         Obj embedded_link = obj.get_linked_object("embedded_obj");
         if (content.link_value) {
-            REQUIRE(embedded_link);
+            REQUIRE(embedded_link.is_valid());
             check_embedded(embedded_link, *content.link_value);
         }
         else {
@@ -2596,9 +2590,9 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
                 if (test_mode == ClientResyncMode::Recover) {
-                    TopLevelContent expected = remote_content;
-                    expected.apply_recovery_from(local_content);
-                    check_content(obj, expected);
+                    TopLevelContent expected_recovered = remote_content;
+                    expected_recovered.apply_recovery_from(local_content);
+                    check_content(obj, expected_recovered);
                 }
                 else if (test_mode == ClientResyncMode::DiscardLocal) {
                     check_content(obj, remote_content);
@@ -2621,13 +2615,14 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
 
     SECTION("identical changes") {
         TopLevelContent state;
+        TopLevelContent recovered = state;
         reset_embedded_object(state, state);
     }
     SECTION("modify every embedded property") {
         TopLevelContent local, remote;
         reset_embedded_object(local, remote);
     }
-    SECTION("nullify embedded links") {
+    SECTION("remote nullifies embedded links") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.link_value.reset();
