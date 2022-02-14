@@ -13,8 +13,8 @@ using namespace realm::fixtures;
 
 #if REALM_ENABLE_ENCRYPTION
 
-const size_t num_rows = 100;
-void populate(DBRef& sg)
+static const size_t num_rows = 100;
+static void populate(DBRef& sg)
 {
     WriteTransaction wt{sg};
     TableRef t = wt.add_table("table");
@@ -28,7 +28,7 @@ void populate(DBRef& sg)
     wt.commit();
 }
 
-bool verify_populated(DBRef& sg)
+static bool verify_populated(DBRef& sg)
 {
     auto rt = sg->start_read();
     auto table_key = rt->find_table("table");

@@ -2325,7 +2325,7 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(2, q8.count());
 }
 
-void construct_all_types_table(Table& table)
+static void construct_all_types_table(Table& table)
 {
     table.add_column(type_Int, "int");
     table.add_column(type_Float, "float");

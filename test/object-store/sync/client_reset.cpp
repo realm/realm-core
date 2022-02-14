@@ -77,16 +77,22 @@ struct StringMaker<ThreadSafeSyncError> {
 };
 } // namespace Catch
 
-namespace realm {
-struct PartitionPair {
-    std::string property_name;
-    std::string value;
-};
+using namespace realm;
 
+namespace {
 TableRef get_table(Realm& realm, StringData object_type)
 {
     return ObjectStore::table_for_object_type(realm.read_group(), object_type);
 }
+} // anonymous namespace
+
+#if REALM_ENABLE_AUTH_TESTS
+
+namespace {
+struct PartitionPair {
+    std::string property_name;
+    std::string value;
+};
 
 Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
                   util::Optional<int64_t> primary_key = util::none)
@@ -97,8 +103,7 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
     FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
-
-#if REALM_ENABLE_AUTH_TESTS
+} // anonymous namespace
 
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
@@ -2074,5 +2079,3 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
                                                "{EmbeddedObject, EmbeddedObject2, TopLevel}");
     }
 }
-
-} // namespace realm

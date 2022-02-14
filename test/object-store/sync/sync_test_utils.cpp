@@ -200,6 +200,7 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
 #endif // REALM_ENABLE_SYNC
 
 namespace reset_utils {
+namespace {
 
 struct Partition {
     std::string property_name;
@@ -302,6 +303,7 @@ struct FakeLocalClientReset : public TestClientReset {
         }
     }
 };
+} // anonymous namespace
 
 #if REALM_ENABLE_SYNC
 

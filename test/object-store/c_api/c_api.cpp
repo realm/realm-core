@@ -17,6 +17,7 @@ using namespace realm;
 
 extern "C" int realm_c_api_tests(const char* file);
 
+namespace {
 template <class T>
 T checked(T x)
 {
@@ -215,6 +216,7 @@ CPtr<T> clone_cptr(const T* ptr)
     void* clone = realm_clone(ptr);
     return CPtr<T>{static_cast<T*>(clone)};
 }
+} // anonymous namespace
 
 #define CHECK_ERR(err)                                                                                               \
     do {                                                                                                             \
@@ -442,6 +444,8 @@ TEST_CASE("C API (non-database)") {
     }
 }
 
+namespace {
+
 /// Generate realm_property_info_t for all possible property types.
 std::vector<realm_property_info_t> all_property_types(const char* link_target)
 {
@@ -591,23 +595,10 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     // properties.push_back(mixed);
     // properties.push_back(mixed_list);
 
-    // FIXME: Object Store schema handling does not support TypedLink yet.
-    // realm_property_info_t typed_link{
-    //     "typed_link", "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_NONE,
-    //     "",           "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
-    // };
-    // realm_property_info_t typed_link_list{
-    //     "typed_link_list",   "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_LIST, "", "",
-    //     RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
-    // };
-
-    // properties.push_back(typed_link);
-    // properties.push_back(typed_link_list);
-
     return properties;
 }
 
-static CPtr<realm_schema_t> make_schema()
+CPtr<realm_schema_t> make_schema()
 {
     auto foo_properties = all_property_types("Bar");
 
@@ -726,6 +717,8 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
     ++userdata->num_compact_on_launch;
     return false;
 }
+
+} // anonymous namespace
 
 TEST_CASE("C API") {
     TestFile test_file;

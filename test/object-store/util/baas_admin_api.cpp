@@ -543,7 +543,7 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
     return *sync_service;
 }
 
-nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
+static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
     return nlohmann::json{
         {"database_name", config.database_name}, {"partition", config.partition}, {"state", config.state}};
