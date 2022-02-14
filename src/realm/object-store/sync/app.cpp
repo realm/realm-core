@@ -452,9 +452,27 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 
     do_authenticated_request(
         std::move(req), sync_user,
-        [completion = std::move(completion), this, sync_user](const Response& profile_response) {
+        [completion = std::move(completion), weak_app = weak_from_this(),
+         sync_user](const Response& profile_response) {
             if (auto error = AppUtils::check_for_errors(profile_response)) {
                 return completion(nullptr, std::move(error));
+            }
+
+            // No-op if the app has been deallocated or the user has been removed.
+            auto app = weak_app.lock();
+            if (!app) {
+                return completion(
+                    nullptr,
+                    AppError(make_client_error_code(ClientErrorCode::app_deallocated),
+                             util::format("Cannot update profile of user '%1' because the app has been deallocated",
+                                          sync_user->identity())));
+            }
+            if (sync_user->state() == SyncUser::State::Removed) {
+                return completion(
+                    nullptr,
+                    AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                             util::format("Cannot update profile of user '%1' because the user has been removed",
+                                          sync_user->identity())));
             }
 
             try {
@@ -472,8 +490,8 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
                 sync_user->update_identities(identities);
                 sync_user->update_user_profile(SyncUserProfile(get<BsonDocument>(profile_json, "data")));
                 sync_user->set_state(SyncUser::State::LoggedIn);
-                m_sync_manager->set_current_user(sync_user->identity());
-                emit_change_to_subscribers(*this);
+                app->m_sync_manager->set_current_user(sync_user->identity());
+                app->emit_change_to_subscribers(*app);
             }
             catch (const AppError& err) {
                 return completion(nullptr, err);
@@ -662,12 +680,12 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     req.timeout_ms = m_request_timeout_ms;
     req.url = url_for_path("/auth/delete");
     do_authenticated_request(std::move(req), user,
-                             [anchor = shared_from_this(), completion = std::move(completion), this,
+                             [anchor = shared_from_this(), completion = std::move(completion),
                               identitiy = user->identity()](const Response& response) {
                                  auto error = AppUtils::check_for_errors(response);
                                  if (!error) {
                                      anchor->emit_change_to_subscribers(*anchor);
-                                     m_sync_manager->delete_user(identitiy);
+                                     anchor->m_sync_manager->delete_user(identitiy);
                                  }
                                  completion(error);
                              });
