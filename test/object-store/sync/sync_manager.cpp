@@ -349,7 +349,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     }
 
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path = normalise_path( base_path + "mongodb-realm/" + expected_clean_app_id + "/");
+    const std::string manager_path = normalise_path(base_path + "mongodb-realm/" + expected_clean_app_id + "/");
 
     struct TestPath {
         std::string partition;

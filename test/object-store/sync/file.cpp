@@ -152,7 +152,8 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string app_id = "test_app_id*$#@!%1";
     const std::string partition = random_string(10);
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path = normalise_path(base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/");
+    const std::string manager_path =
+        normalise_path(base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/");
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
@@ -167,7 +168,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
         SECTION("getting a Realm path") {
             auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
-            REQUIRE (normalise_path(expected_paths.current_preferred_path) == actual);
+            REQUIRE(normalise_path(expected_paths.current_preferred_path) == actual);
         }
 
         SECTION("deleting a Realm for a valid user") {
