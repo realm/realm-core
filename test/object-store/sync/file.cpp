@@ -38,10 +38,10 @@ static const std::string base_path = util::make_temp_dir() + "realm_objectstore_
 static void prepare_sync_manager_test()
 {
     // Remove the base directory in /tmp where all test-related file status lives.
-    try_remove_dir_recursive(base_path);
+    try_remove_dir_recursive(normalise_path(base_path));
     const std::string manager_path = base_path + "syncmanager/";
     util::make_dir(base_path);
-    util::make_dir(manager_path);
+    util::make_dir(normalise_path(manager_path));
 }
 
 TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
@@ -83,42 +83,42 @@ TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
 TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
     SECTION("properly concatenates a path when the path has a trailing slash") {
         const std::string expected = "/foo/bar";
-        const std::string path = "/foo/";
+        const std::string path = "/foo";
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates a path when the component has a leading slash") {
         const std::string expected = "/foo/bar";
         const std::string path = "/foo";
-        const std::string component = "/bar";
+        const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates a path when both arguments have slashes") {
         const std::string expected = "/foo/bar";
-        const std::string path = "/foo/";
-        const std::string component = "/bar";
+        const std::string path = "/foo";
+        const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates a directory path when the component doesn't have a trailing slash") {
         const std::string expected = "/foo/bar/";
-        const std::string path = "/foo/";
-        const std::string component = "/bar";
+        const std::string path = "/foo";
+        const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component, FilePathType::Directory);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates a directory path when the component has a trailing slash") {
         const std::string expected = "/foo/bar/";
-        const std::string path = "/foo/";
-        const std::string component = "/bar/";
+        const std::string path = "/foo";
+        const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component, FilePathType::Directory);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates an extension when the path has a trailing dot") {
@@ -126,7 +126,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo.";
         const std::string component = "management";
         auto actual = file_path_by_appending_extension(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates a path when the extension has a leading dot") {
@@ -134,7 +134,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = ".management";
         auto actual = file_path_by_appending_extension(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 
     SECTION("properly concatenates a path when both arguments have dots") {
@@ -142,7 +142,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo.";
         const std::string component = ".management";
         auto actual = file_path_by_appending_extension(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(normalise_path(actual) == normalise_path(expected));
     }
 }
 
@@ -152,12 +152,12 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string app_id = "test_app_id*$#@!%1";
     const std::string partition = random_string(10);
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path = base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/";
+    const std::string manager_path = normalise_path(base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/");
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
-    std::string manager_base_path = base_path + "syncmanager/";
+    std::string manager_base_path = normalise_path(base_path + "syncmanager/");
     auto manager = SyncFileManager(manager_base_path, app_id);
 
     SECTION("Realm path APIs") {
@@ -167,7 +167,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
         SECTION("getting a Realm path") {
             auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
-            REQUIRE(expected_paths.current_preferred_path == actual);
+            REQUIRE (normalise_path(expected_paths.current_preferred_path) == actual);
         }
 
         SECTION("deleting a Realm for a valid user") {
@@ -198,7 +198,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(File::exists(expected_paths.fallback_hashed_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
             auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
-            REQUIRE(actual == expected_paths.fallback_hashed_path);
+            REQUIRE(normalise_path(actual) == normalise_path(expected_paths.fallback_hashed_path));
             REQUIRE(File::exists(expected_paths.fallback_hashed_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
             manager.remove_user_realms(identity, {expected_paths.fallback_hashed_path});
@@ -252,7 +252,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     }
 
     SECTION("Utility path APIs") {
-        auto metadata_dir = manager_path + "server-utility/metadata/";
+        auto metadata_dir = manager_path + normalise_path("server-utility/metadata/");
 
         SECTION("getting the metadata path") {
             auto path = manager.metadata_path();

@@ -131,21 +131,22 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     }
     std::string clean_name = name ? util::make_percent_encoded_string(*name) : cleaned_partition;
     std::string cleaned_app_id = util::make_percent_encoded_string(app_id);
-    std::string manager_path = util::format("%1mongodb-realm/%2/", base_path, cleaned_app_id);
-    std::string preferred_name = util::format("%1%2/%3", manager_path, identity, clean_name);
-    current_preferred_path = util::format("%1.realm", preferred_name);
-    fallback_hashed_path = util::format("%1%2.realm", manager_path, do_hash(preferred_name));
+    std::string manager_path = normalise_path(util::format("%1mongodb-realm/%2/", base_path, cleaned_app_id));
+    std::string preferred_name = normalise_path(util::format("%1%2/%3", manager_path, identity, clean_name));
+    current_preferred_path = normalise_path(util::format("%1.realm", preferred_name));
+    fallback_hashed_path = normalise_path(util::format("%1%2.realm", manager_path, do_hash(preferred_name)));
 
-    legacy_sync_directories_to_make.push_back(util::format("%1%2", manager_path, local_identity));
+    legacy_sync_directories_to_make.push_back(normalise_path(util::format("%1%2", manager_path, local_identity)));
     std::string encoded_partition = util::make_percent_encoded_string(partition);
-    legacy_local_id_path = util::format("%1%2/%3.realm", manager_path, local_identity,
-                                        name ? util::make_percent_encoded_string(*name) : encoded_partition);
-    std::string dir_builder = util::format("%1realm-object-server", manager_path);
+    legacy_local_id_path =
+        normalise_path(util::format("%1%2/%3.realm", manager_path, local_identity,
+                                        name ? util::make_percent_encoded_string(*name) : encoded_partition));
+    std::string dir_builder = normalise_path(util::format("%1realm-object-server", manager_path));
     legacy_sync_directories_to_make.push_back(dir_builder);
-    dir_builder = util::format("%1/%2", dir_builder, local_identity);
+    dir_builder = normalise_path(util::format("%1/%2", dir_builder, local_identity));
     legacy_sync_directories_to_make.push_back(dir_builder);
-    legacy_sync_path =
-        util::format("%1/%2", dir_builder, name ? util::make_percent_encoded_string(*name) : cleaned_partition);
+    legacy_sync_path = normalise_path(util::format(
+        "%1/%2", dir_builder, name ? util::make_percent_encoded_string(*name) : cleaned_partition));
 }
 
 #if REALM_ENABLE_SYNC
