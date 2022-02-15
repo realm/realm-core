@@ -38,6 +38,7 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <filesystem>
 
 #ifdef _WIN32
 #include <io.h>
@@ -58,6 +59,7 @@ inline static int mkstemp(char* _template)
 #include <map>
 #endif
 
+namespace fs = std::filesystem;
 using namespace realm;
 
 TestFile::TestFile()
@@ -67,7 +69,7 @@ TestFile::TestFile()
     if (m_temp_dir.size() == 0 || m_temp_dir[m_temp_dir.size() - 1] != '/') {
         m_temp_dir = m_temp_dir + "/";
     }
-    path = normalise_path(util::format("%1realm.XXXXXX", m_temp_dir));
+    path = fs::path(util::format("%1realm.XXXXXX", m_temp_dir));
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;

@@ -27,14 +27,6 @@
 
 namespace realm {
 
-inline std::string normalise_path(std::string path)
-{
-#ifdef _WIN32
-    std::replace(path.begin(), path.end(), '/', '\\');
-#endif
-    return path;
-}
-
 /// Open a Realm at a given path, creating its files.
 bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);

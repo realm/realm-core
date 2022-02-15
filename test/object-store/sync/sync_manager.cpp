@@ -28,11 +28,14 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#include <filesystem>
+
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
+namespace fs = std::filesystem;
 
-static const std::string base_path = normalise_path(util::make_temp_dir() + "realm_objectstore_sync_manager/");
+static const std::string base_path = fs::path(util::make_temp_dir() + "realm_objectstore_sync_manager/");
 static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
@@ -90,7 +93,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
                                                                       ENCODE_FAKE_JWT("not_a_real_token"),
                                                                       auth_server_url, dummy_device_id);
         SyncConfig config(user, bson::Bson{});
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -100,7 +103,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         const auto expected = base_path + "mongodb-realm/app_id/" + server_identity +
                               "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
         SyncConfig config(user, bson::Bson{});
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == fs::path(expected));
 
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/" + server_identity + "/");
@@ -111,7 +114,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         const bson::Bson partition("string-partition-value&^#");
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/s_string-partition-value%26%5E%23.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -122,7 +125,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE(name_too_long.length() == 500);
         const bson::Bson partition(name_too_long);
         SyncConfig config(user, partition);
-        const std::string expected_prefix = normalise_path(base_path + "mongodb-realm/app_id/");
+        const std::string expected_prefix = fs::path(base_path + "mongodb-realm/app_id/");
         const std::string expected_suffix = ".realm";
         std::string actual = init_sync_manager.app()->sync_manager()->path_for_realm(config);
         size_t expected_length = expected_prefix.length() + 64 + expected_suffix.length();
@@ -136,7 +139,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         const bson::Bson partition(int32_t(-25));
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/i_-25.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -146,7 +149,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         const bson::Bson partition(int64_t(1.15e18)); // > 32 bits
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/l_1150000000000000000.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -156,7 +159,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         const bson::Bson partition(ObjectId("0123456789abcdefffffffff"));
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/o_0123456789abcdefffffffff.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -167,7 +170,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         SyncConfig config(user, partition);
         const auto expected =
             base_path + "mongodb-realm/app_id/foobarbaz/u_3b241101-e2bb-4255-8caf-4136c566a961.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -178,7 +181,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE(partition.type() == bson::Bson::Type::Null);
         SyncConfig config(user, partition);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/null.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -187,7 +190,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
         SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/flx_sync_default.realm";
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == normalise_path(expected));
+        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == fs::path(expected));
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
@@ -349,7 +352,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     }
 
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path = normalise_path(base_path + "mongodb-realm/" + expected_clean_app_id + "/");
+    const std::string manager_path = fs::path(base_path + "mongodb-realm/" + expected_clean_app_id + "/");
 
     struct TestPath {
         std::string partition;
