@@ -1031,6 +1031,11 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
 RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 
 /**
+ * Get the schema version for this realm.
+ */
+RLM_API uint64_t realm_get_schema_version(const realm_t* realm);
+
+/**
  * Update the schema of an open realm.
  *
  * This is equivalent to calling `realm_update_schema_advanced(realm, schema, 0,
