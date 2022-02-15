@@ -2359,11 +2359,13 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
              {"array", PropertyType::Int | PropertyType::Array},
              {"name", PropertyType::String | PropertyType::Nullable},
              {"link_to_embedded_object2", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject2"},
+             {"int_value", PropertyType::Int},
          }},
         {"EmbeddedObject2",
          ObjectSchema::IsEmbedded{true},
          {
              {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
+             {"set_of_ids", PropertyType::Set | PropertyType::ObjectId | PropertyType::Nullable},
              {"date", PropertyType::Date},
              {"top_level_link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
          }},
@@ -2371,6 +2373,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
     struct SecondLevelEmbeddedContent {
         using DictType = util::FlatMap<std::string, std::string>;
         DictType dict_values = DictType::container_type{{"key A", random_string(10)}, {"key B", random_string(10)}};
+        std::set<ObjectId> set_of_objects = {ObjectId::gen(), ObjectId::gen()};
         Timestamp datetime = Timestamp{random_int(), 0};
         util::Optional<Mixed> pk_of_linked_object;
         void apply_recovery_from(const SecondLevelEmbeddedContent& other)
@@ -2380,15 +2383,33 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             for (auto it : other.dict_values) {
                 dict_values[it.first] = it.second;
             }
+            for (auto oid : other.set_of_objects) {
+                set_of_objects.insert(oid);
+            }
+        }
+        void test(const SecondLevelEmbeddedContent& other) const
+        {
+            REQUIRE(datetime == other.datetime);
+            REQUIRE(pk_of_linked_object == other.pk_of_linked_object);
+            REQUIRE(set_of_objects == other.set_of_objects);
+            REQUIRE(dict_values.size() == other.dict_values.size());
+            for (auto kv : dict_values) {
+                INFO("dict_value: (" << kv.first << ", " << kv.second << ")");
+                auto it = other.dict_values.find(kv.first);
+                REQUIRE(it != other.dict_values.end());
+                REQUIRE(it->second == kv.second);
+            }
         }
     };
     struct EmbeddedContent {
         std::string name = random_string(10);
+        int64_t int_value = random_int();
         std::vector<Int> array_vals = {random_int(), random_int(), random_int()};
         util::Optional<SecondLevelEmbeddedContent> second_level = SecondLevelEmbeddedContent();
         void apply_recovery_from(const EmbeddedContent& other)
         {
             name = other.name;
+            int_value = int_value + other.int_value; // an effect of using add_int()
             combine_array_values(array_vals, other.array_vals);
             if (second_level && other.second_level) {
                 second_level->apply_recovery_from(*other.second_level);
@@ -2397,13 +2418,26 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
                 second_level = other.second_level;
             }
         }
+        void test(const EmbeddedContent& other) const
+        {
+            INFO("Checking EmbeddedContent" << name);
+            REQUIRE(name == other.name);
+            REQUIRE(int_value == other.int_value);
+            REQUIRE(array_vals == other.array_vals);
+            if (!second_level) {
+                REQUIRE(!other.second_level);
+            }
+            else {
+                REQUIRE(!!other.second_level);
+                second_level->test(*other.second_level);
+            }
+        }
     };
     struct TopLevelContent {
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
         using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
         DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
-
         void apply_recovery_from(const TopLevelContent& other)
         {
             combine_array_values(array_values, other.array_values);
@@ -2418,6 +2452,35 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             }
             // assuming starting from an initial value, if the link_value is null, then it was intentionally deleted.
         }
+        void test(const TopLevelContent& other) const
+        {
+            if (link_value) {
+                INFO("checking TopLevelContent.link_value");
+                REQUIRE(!!other.link_value);
+                link_value->test(*other.link_value);
+            }
+            else {
+                REQUIRE(!other.link_value);
+            }
+            REQUIRE(array_values.size() == other.array_values.size());
+            for (size_t i = 0; i < array_values.size(); ++i) {
+                INFO("checking array_values: " << i);
+                array_values[i].test(other.array_values[i]);
+            }
+            REQUIRE(dict_values.size() == other.dict_values.size());
+            for (auto it : dict_values) {
+                INFO("checking dict_values: " << it.first);
+                auto found = other.dict_values.find(it.first);
+                REQUIRE(found != other.dict_values.end());
+                if (it.second) {
+                    REQUIRE(!!found->second);
+                    it.second->test(*found->second);
+                }
+                else {
+                    REQUIRE(!found->second);
+                }
+            }
+        }
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
@@ -2428,6 +2491,9 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
 
     auto set_embedded = [](Obj embedded, const EmbeddedContent& value) {
         embedded.set<StringData>("name", value.name);
+        int64_t existing_int = embedded.get<Int>("int_value");
+        int64_t difference = value.int_value - existing_int;
+        embedded.add_int("int_value", difference);
         ColKey list_col = embedded.get_table()->get_column_key("array");
         embedded.set_list_values<Int>(list_col, value.array_vals);
         ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
@@ -2458,44 +2524,67 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             for (auto& it : value.second_level->dict_values) {
                 dict.insert(it.first, it.second);
             }
+            Set<ObjectId> set = second.get_set<ObjectId>("set_of_ids");
+            if (value.second_level->set_of_objects.empty()) {
+                set.clear();
+            }
+            else {
+                std::vector<size_t> indices, to_remove;
+                set.sort(indices);
+                for (size_t ndx : indices) {
+                    if (value.second_level->set_of_objects.count(set.get(ndx)) == 0) {
+                        to_remove.push_back(ndx);
+                    }
+                }
+                std::sort(to_remove.rbegin(), to_remove.rend());
+                for (auto ndx : to_remove) {
+                    set.erase(set.get(ndx));
+                }
+                for (auto oid : value.second_level->set_of_objects) {
+                    set.insert(oid);
+                }
+            }
         }
         else {
             embedded.set_null(link2_col);
         }
     };
 
-    auto check_embedded = [](Obj embedded, const EmbeddedContent& value) {
-        REQUIRE(embedded.get_any("name").get<StringData>() == value.name);
-        ColKey list_col = embedded.get_table()->get_column_key("array");
-        REQUIRE(embedded.get_list_values<Int>(list_col) == value.array_vals);
+    auto get_embedded_from = [](Obj embedded) {
+        util::Optional<EmbeddedContent> value;
+        if (embedded.is_valid()) {
+            value = EmbeddedContent{};
+            value->name = embedded.get_any("name").get<StringData>();
+            value->int_value = embedded.get_any("int_value").get<Int>();
+            ColKey list_col = embedded.get_table()->get_column_key("array");
+            value->array_vals = embedded.get_list_values<Int>(list_col);
 
-        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
-        Obj second = embedded.get_linked_object(link2_col);
-        if (value.second_level) {
-            REQUIRE(second);
-            REQUIRE(second.get<Timestamp>("date") == value.second_level->datetime);
-            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
-            ObjKey actual_link = second.get<ObjKey>(top_link_col);
-            if (!value.second_level->pk_of_linked_object) {
-                REQUIRE(!actual_link);
-            }
-            else {
-                REQUIRE(actual_link);
-                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
-                Obj actual_top_obj = top_table->get_object(actual_link);
-                REQUIRE(actual_top_obj.get_primary_key() == *(value.second_level->pk_of_linked_object));
-            }
-            Dictionary dict = second.get_dictionary("notes");
-            REQUIRE(dict.size() == value.second_level->dict_values.size());
-            for (auto& pair : value.second_level->dict_values) {
-                util::Optional<Mixed> actual = dict.try_get(pair.first);
-                REQUIRE(actual);
-                REQUIRE(actual->get_string() == pair.second);
+            ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+            Obj second = embedded.get_linked_object(link2_col);
+            value->second_level = util::none;
+            if (second.is_valid()) {
+                value->second_level = SecondLevelEmbeddedContent{};
+                value->second_level->datetime = second.get<Timestamp>("date");
+                ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+                ObjKey actual_link = second.get<ObjKey>(top_link_col);
+                if (actual_link) {
+                    TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                    Obj actual_top_obj = top_table->get_object(actual_link);
+                    value->second_level->pk_of_linked_object = Mixed{actual_top_obj.get_primary_key()};
+                }
+                Dictionary dict = second.get_dictionary("notes");
+                value->second_level->dict_values.clear();
+                for (auto it : dict) {
+                    value->second_level->dict_values.insert({it.first.get_string(), it.second.get_string()});
+                }
+                Set<ObjectId> set = second.get_set<ObjectId>("set_of_ids");
+                value->second_level->set_of_objects.clear();
+                for (auto oid : set) {
+                    value->second_level->set_of_objects.insert(oid);
+                }
             }
         }
-        else {
-            REQUIRE(!second);
-        }
+        return value;
     };
 
     auto set_content = [&](Obj obj, const TopLevelContent& content) {
@@ -2521,6 +2610,14 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             }
             set_embedded(link, content.array_values[i]);
         }
+        if (list.size() > content.array_values.size()) {
+            if (content.array_values.size() == 0) {
+                list.clear();
+            }
+            else {
+                list.remove(content.array_values.size(), list.size());
+            }
+        }
         auto dict = obj.get_dictionary("embedded_dict");
         for (auto it = dict.begin(); it != dict.end(); ++it) {
             if (content.dict_values.find((*it).first.get_string()) == content.dict_values.end()) {
@@ -2540,62 +2637,60 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             }
         }
     };
-    auto check_content = [&](Obj obj, const TopLevelContent& content) {
+    auto get_content_from = [&](Obj obj) {
+        TopLevelContent content;
         Obj embedded_link = obj.get_linked_object("embedded_obj");
-        if (content.link_value) {
-            REQUIRE(embedded_link.is_valid());
-            check_embedded(embedded_link, *content.link_value);
-        }
-        else {
-            REQUIRE(!embedded_link);
-        }
+        content.link_value = get_embedded_from(embedded_link);
         auto list = obj.get_linklist("array_of_objs");
-        REQUIRE(list.size() == content.array_values.size());
-        for (size_t i = 0; i < content.array_values.size(); ++i) {
+        content.array_values.clear();
+
+        for (size_t i = 0; i < list.size(); ++i) {
             Obj link = list.get_object(i);
-            check_embedded(link, content.array_values[i]);
+            content.array_values.push_back(*get_embedded_from(link));
         }
         auto dict = obj.get_dictionary("embedded_dict");
-        REQUIRE(dict.size() == content.dict_values.size());
-        for (auto& val : content.dict_values) {
-            Obj embedded = dict.get_object(val.first);
-            if (val.second) {
-                check_embedded(embedded, *val.second);
-            }
-            else {
-                REQUIRE(!embedded);
-            }
+        content.dict_values.clear();
+        for (auto it : dict) {
+            Obj link = dict.get_object(it.first.get_string());
+            content.dict_values.insert({it.first.get_string(), get_embedded_from(link)});
         }
+        return content;
     };
 
-    auto reset_embedded_object = [&](TopLevelContent local_content, TopLevelContent remote_content) {
+    using StateList = std::vector<TopLevelContent>;
+    auto reset_embedded_object = [&](StateList local_content, StateList remote_content,
+                                     TopLevelContent expected_recovered) {
         test_reset
             ->make_local_changes([&](SharedRealm local) {
                 advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
-                set_content(obj, local_content);
+                for (auto& s : local_content) {
+                    set_content(obj, s);
+                }
             })
             ->make_remote_changes([&](SharedRealm remote) {
                 advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
-                set_content(obj, remote_content);
+                for (auto& s : remote_content) {
+                    set_content(obj, s);
+                }
             })
             ->on_post_reset([&](SharedRealm local) {
                 advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
+                TopLevelContent actual = get_content_from(obj);
                 if (test_mode == ClientResyncMode::Recover) {
-                    TopLevelContent expected_recovered = remote_content;
-                    expected_recovered.apply_recovery_from(local_content);
-                    check_content(obj, expected_recovered);
+                    actual.test(expected_recovered);
                 }
                 else if (test_mode == ClientResyncMode::DiscardLocal) {
-                    check_content(obj, remote_content);
+                    REQUIRE(remote_content.size() > 0);
+                    actual.test(remote_content.back());
                 }
                 else {
                     REALM_UNREACHABLE();
@@ -2615,12 +2710,15 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
 
     SECTION("identical changes") {
         TopLevelContent state;
-        TopLevelContent recovered = state;
-        reset_embedded_object(state, state);
+        TopLevelContent expected_recovered = state;
+        expected_recovered.apply_recovery_from(state);
+        reset_embedded_object({state}, {state}, expected_recovered);
     }
     SECTION("modify every embedded property") {
         TopLevelContent local, remote;
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
     SECTION("remote nullifies embedded links") {
         TopLevelContent local;
@@ -2630,9 +2728,11 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             val.second.reset();
         }
         remote.array_values.clear();
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("populate embedded links") {
+    SECTION("local nullifies embedded links") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.link_value.reset();
@@ -2640,9 +2740,11 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             val.second.reset();
         }
         local.array_values.clear();
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("add additional embedded objects") {
+    SECTION("remote adds embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.dict_values["new key1"] = {EmbeddedContent{}};
@@ -2651,9 +2753,11 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
         remote.array_values.push_back({EmbeddedContent{}});
         remote.array_values.push_back({});
         remote.array_values.push_back({EmbeddedContent{}});
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("remove some embedded objects") {
+    SECTION("local adds some embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.dict_values["new key1"] = {EmbeddedContent{}};
@@ -2662,19 +2766,138 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
         local.array_values.push_back({EmbeddedContent{}});
         local.array_values.push_back({});
         local.array_values.push_back({EmbeddedContent{}});
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("add a top level link cycle") {
+    SECTION("both add conflicting embedded objects") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        local.dict_values["new key1"] = {EmbeddedContent{}};
+        local.dict_values["new key2"] = {EmbeddedContent{}};
+        local.dict_values["new key3"] = {};
+        local.array_values.push_back({EmbeddedContent{}});
+        local.array_values.push_back({});
+        local.array_values.push_back({EmbeddedContent{}});
+        remote.dict_values["new key1"] = {EmbeddedContent{}};
+        remote.dict_values["new key2"] = {EmbeddedContent{}};
+        remote.dict_values["new key3"] = {};
+        remote.array_values.push_back({EmbeddedContent{}});
+        remote.array_values.push_back({});
+        remote.array_values.push_back({EmbeddedContent{}});
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies an embedded object which is removed by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->name = "modified value";
+        remote.link_value = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies a deep embedded object which is removed by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->second_level->datetime = Timestamp{1, 1};
+        remote.link_value = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies a deep embedded object which is removed at the second level by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->second_level->datetime = Timestamp{1, 1};
+        remote.link_value->second_level = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("with shared initial state") {
+        TopLevelContent initial;
+        initial.link_value = util::none;
+        test_reset->setup([&](SharedRealm realm) {
+            auto table = get_table(*realm, "TopLevel");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            set_content(obj, initial);
+        });
+        TopLevelContent local = initial;
+        TopLevelContent remote = initial;
+
+        SECTION("local modifications to an embedded object through a dictionary which is removed by the remote are "
+                "ignored") {
+            local.dict_values["foo"]->name = "modified";
+            local.dict_values["foo"]->second_level->datetime = Timestamp{1, 1};
+            local.dict_values["foo"]->array_vals.push_back(random_int());
+            local.dict_values["foo"]->array_vals.erase(local.dict_values["foo"]->array_vals.begin());
+            local.dict_values["foo"]->second_level->dict_values.erase(
+                local.dict_values["foo"]->second_level->dict_values.begin());
+            local.dict_values["foo"]->second_level->set_of_objects.clear();
+            remote.dict_values["foo"] = util::none;
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local modifications to an embedded object through a linklist element which is removed by the remote "
+                "are ignored") {
+            local.array_values.begin()->name = "modified";
+            local.array_values.begin()->second_level->datetime = Timestamp{1, 1};
+            local.array_values.begin()->array_vals.push_back(random_int());
+            local.array_values.begin()->array_vals.erase(local.array_values.begin()->array_vals.begin());
+            local.array_values.begin()->second_level->dict_values.erase(
+                local.array_values.begin()->second_level->dict_values.begin());
+            local.array_values.begin()->second_level->set_of_objects.clear();
+            remote.array_values.erase(remote.array_values.begin());
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local modifications to an embedded object through a linklist cleared by the remote are ignored") {
+            local.array_values.begin()->name = "modified";
+            local.array_values.begin()->second_level->datetime = Timestamp{1, 1};
+            local.array_values.begin()->array_vals.push_back(random_int());
+            local.array_values.begin()->array_vals.erase(local.array_values.begin()->array_vals.begin());
+            local.array_values.begin()->second_level->dict_values.erase(
+                local.array_values.begin()->second_level->dict_values.begin());
+            local.array_values.begin()->second_level->set_of_objects.clear();
+            remote.array_values.clear();
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("inserting an embedded object into a list which has indices modified by the remote") {
+            EmbeddedContent new_element{};
+            local.array_values.insert(local.array_values.end(), new_element);
+            remote.array_values.erase(remote.array_values.begin());
+            remote.array_values.erase(remote.array_values.begin());
+            TopLevelContent expected_recovered = remote;
+            expected_recovered.array_values.insert(expected_recovered.array_values.end(), new_element);
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local list clear removes remotely inserted objects") {
+            EmbeddedContent new_element_local, new_element_remote;
+            local.array_values.clear();
+            TopLevelContent local2 = local;
+            local2.array_values.push_back(new_element_local);
+            remote.array_values.erase(remote.array_values.begin());
+            remote.array_values.push_back(new_element_remote); // lost via local.clear()
+            TopLevelContent expected_recovered = local2;
+            reset_embedded_object({local, local2}, {remote}, expected_recovered);
+        }
+    }
+    SECTION("remote adds a top level link cycle") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("remove a top level link cycle") {
+    SECTION("local adds a top level link cycle") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
     SECTION("server adds embedded object classes") {
         SyncTestFile config2(init_sync_manager.app(), "default");
@@ -2696,7 +2919,8 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
-                check_content(obj, remote_content);
+                TopLevelContent actual = get_content_from(obj);
+                actual.test(remote_content);
             })
             ->run();
     }

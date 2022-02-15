@@ -1079,7 +1079,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 }
                 instr_copy.value = {};
             }
-            InstructionApplier::operator()(instr_copy); // FIXME: catch KeyNotFound exceptions?
+            InstructionApplier::operator()(instr_copy);
         }
     }
 
