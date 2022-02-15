@@ -41,7 +41,7 @@ static void prepare_sync_manager_test()
 {
     // Remove the base directory in /tmp where all test-related file status lives.
     try_remove_dir_recursive(fs::path(base_path));
-    //const std::string manager_path = base_path + "syncmanager/";
+    // const std::string manager_path = base_path + "syncmanager/";
     util::make_dir(base_path);
     const fs::path manager_path = base_path + "syncmanager/";
     util::make_dir(manager_path);
@@ -155,8 +155,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string app_id = "test_app_id*$#@!%1";
     const std::string partition = random_string(10);
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path =
-        fs::path(base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/");
+    const std::string manager_path = fs::path(base_path + "syncmanager/mongodb-realm/" + expected_clean_app_id + "/");
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);

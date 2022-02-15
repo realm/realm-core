@@ -143,7 +143,7 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     std::string encoded_partition = util::make_percent_encoded_string(partition);
     legacy_local_id_path =
         fs::path(util::format("%1%2/%3.realm", manager_path, local_identity,
-                                    name ? util::make_percent_encoded_string(*name) : encoded_partition));
+                              name ? util::make_percent_encoded_string(*name) : encoded_partition));
     std::string dir_builder = fs::path(util::format("%1realm-object-server", manager_path));
     legacy_sync_directories_to_make.push_back(dir_builder);
     dir_builder = fs::path(util::format("%1/%2", dir_builder, local_identity));
