@@ -69,7 +69,7 @@ TestFile::TestFile()
     if (m_temp_dir.size() == 0 || m_temp_dir[m_temp_dir.size() - 1] != '/') {
         m_temp_dir = m_temp_dir + "/";
     }
-    path = fs::path(util::format("%1realm.XXXXXX", m_temp_dir));
+    path = fs::path(util::format("%1realm.XXXXXX", m_temp_dir)).string();
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;
