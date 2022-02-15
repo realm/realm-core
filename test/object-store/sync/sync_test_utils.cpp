@@ -140,12 +140,22 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     fallback_hashed_path = fs::path(manager_path).operator/=(do_hash(preferred_name)).operator+=(".realm");
     legacy_sync_directories_to_make.push_back(fs::path(manager_path).operator/=(local_identity).string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
-    legacy_local_id_path = fs::path(manager_path).operator/=(local_identity).operator/=(name ? util::make_percent_encoded_string(*name) : encoded_partition).operator+=(".realm").string();
+    legacy_local_id_path = fs::path(manager_path)
+                               .
+                               operator/=(local_identity)
+                               .
+                               operator/=(name ? util::make_percent_encoded_string(*name) : encoded_partition)
+                               .
+                               operator+=(".realm")
+                               .string();
     auto dir_builder = fs::path(manager_path).operator/=("realm-object-server").string();
     legacy_sync_directories_to_make.push_back(dir_builder);
     dir_builder = fs::path(dir_builder).operator/=(local_identity).string();
     legacy_sync_directories_to_make.push_back(dir_builder);
-    legacy_sync_path = fs::path(dir_builder).operator/=(name ? util::make_percent_encoded_string(*name) : cleaned_partition).string();
+    legacy_sync_path = fs::path(dir_builder)
+                           .
+                           operator/=(name ? util::make_percent_encoded_string(*name) : cleaned_partition)
+                           .string();
 }
 
 #if REALM_ENABLE_SYNC

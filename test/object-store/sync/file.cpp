@@ -28,7 +28,6 @@
 #include <realm/util/sha_crypto.hpp>
 
 #include <fstream>
-#include <iostream>
 #include <filesystem>
 
 using namespace realm;
@@ -36,7 +35,8 @@ using namespace realm::util;
 using File = realm::util::File;
 namespace fs = std::filesystem;
 
-static const std::string base_path = fs::path(util::make_temp_dir()).operator/=("realm_objectstore_sync_file").string();
+static const std::string base_path =
+    fs::path(util::make_temp_dir()).operator/=("realm_objectstore_sync_file").string();
 
 static void prepare_sync_manager_test()
 {
@@ -154,7 +154,14 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string app_id = "test_app_id*$#@!%1";
     const std::string partition = random_string(10);
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path = fs::path(base_path).operator/=("syncmanager") .operator/=("mongodb-realm").operator/=(expected_clean_app_id).string();
+    const std::string manager_path = fs::path(base_path)
+                                         .
+                                         operator/=("syncmanager")
+                                         .
+                                         operator/=("mongodb-realm")
+                                         .
+                                         operator/=(expected_clean_app_id)
+                                         .string();
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
