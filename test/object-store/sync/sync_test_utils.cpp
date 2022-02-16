@@ -137,7 +137,7 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     std::string manager_path = fs::path(base_path).operator/=("mongodb-realm").operator/=(cleaned_app_id).string();
     std::string preferred_name = fs::path(manager_path).operator/=(identity).operator/=(clean_name).string();
     current_preferred_path = fs::path(preferred_name).operator+=(".realm").string();
-    fallback_hashed_path = fs::path(manager_path).operator/=(do_hash(preferred_name)).operator+=(".realm");
+    fallback_hashed_path = fs::path(manager_path).operator/=(do_hash(preferred_name)).operator+=(".realm").string();
     legacy_sync_directories_to_make.push_back(fs::path(manager_path).operator/=(local_identity).string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
     legacy_local_id_path = fs::path(manager_path)

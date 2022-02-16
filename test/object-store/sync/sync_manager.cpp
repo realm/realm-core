@@ -123,8 +123,14 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
 
         // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(
-            fs::path(base_path).operator/=("mongodb-realm").operator/=("app_id").operator/=(server_identity));
+        REQUIRE_DIR_EXISTS(fs::path(base_path)
+                               .
+                               operator/=("mongodb-realm")
+                               .
+                               operator/=("app_id")
+                               .
+                               operator/=(server_identity)
+                               .string());
     }
 
     SECTION("should produce the expected path for a string partition") {

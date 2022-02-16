@@ -88,7 +88,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates a path when the component has a leading slash") {
@@ -96,7 +96,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates a path when both arguments have slashes") {
@@ -104,7 +104,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates a directory path when the component doesn't have a trailing slash") {
@@ -112,7 +112,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component, FilePathType::Directory);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates a directory path when the component has a trailing slash") {
@@ -120,7 +120,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component, FilePathType::Directory);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates an extension when the path has a trailing dot") {
@@ -128,7 +128,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo.";
         const std::string component = "management";
         auto actual = file_path_by_appending_extension(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates a path when the extension has a leading dot") {
@@ -136,7 +136,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo";
         const std::string component = ".management";
         auto actual = file_path_by_appending_extension(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 
     SECTION("properly concatenates a path when both arguments have dots") {
@@ -144,7 +144,7 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
         const std::string path = "/foo.";
         const std::string component = ".management";
         auto actual = file_path_by_appending_extension(path, component);
-        REQUIRE(actual == expected);
+        REQUIRE(fs::path(actual) == expected);
     }
 }
 
