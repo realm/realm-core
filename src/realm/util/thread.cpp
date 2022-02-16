@@ -203,15 +203,6 @@ REALM_NORETURN void Mutex::lock_failed(int err) noexcept
 }
 
 
-bool RobustMutex::is_robust_on_this_platform() noexcept
-{
-#ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
-    return true;
-#else
-    return false;
-#endif
-}
-
 bool RobustMutex::low_level_lock()
 {
 #ifdef _WIN32

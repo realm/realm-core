@@ -47,6 +47,11 @@ private:
                                             std::negation<std::is_same<std::decay_t<Functor>, UniqueFunction>>>,
                          int>;
 
+    struct Impl {
+        virtual ~Impl() noexcept = default;
+        virtual RetType call(Args&&... args) = 0;
+    };
+
 public:
     using result_type = RetType;
 
@@ -103,6 +108,24 @@ public:
         return nullptr;
     }
 
+    /// Release ownership of the owned implementation pointer, if any.
+    ///
+    /// If not null, the returned pointer _must_ be used at a later point to
+    /// construct a new UniqueFunction. This can be used to move UniqueFunction
+    /// instances over API boundaries which do not support C++ move semantics.
+    Impl* release()
+    {
+        return impl.release();
+    }
+
+    /// Construct a UniqueFunction using a pointer returned by release().
+    ///
+    /// This takes ownership of the passed pointer.
+    UniqueFunction(Impl* impl)
+        : impl(impl)
+    {
+    }
+
     // Needed to make `std::is_convertible<util::UniqueFunction<...>, std::function<...>>` be
     // `std::false_type`.  `UniqueFunction` objects are not convertible to any kind of
     // `std::function` object, since the latter requires a copy constructor, which the former does
@@ -115,11 +138,6 @@ public:
     operator std::function<Signature>() const = delete;
 
 private:
-    struct Impl {
-        virtual ~Impl() noexcept = default;
-        virtual RetType call(Args&&... args) = 0;
-    };
-
     // These overload helpers are needed to squelch problems in the `T ()` -> `void ()` case.
     template <typename Functor>
     static void call_regular_void(const std::true_type is_void, Functor& f, Args&&... args)

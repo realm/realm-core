@@ -120,6 +120,11 @@ public:
     CheckedLockGuard(CheckedLockGuard&&) = delete;
     CheckedLockGuard& operator=(CheckedLockGuard&&) = delete;
 
+    Impl& native_handle()
+    {
+        return m_impl;
+    }
+
 private:
     Impl m_impl;
 };

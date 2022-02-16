@@ -16,11 +16,12 @@
  *
  **************************************************************************/
 
-#include <memory>
 #include <algorithm>
+#include <atomic>
+#include <memory>
+#include <random>
 #include <stdexcept>
 #include <system_error>
-#include <random>
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
@@ -84,6 +85,9 @@ struct RandomPrimeMode : PrimeMode {
     }
 };
 
+std::atomic<bool> g_thread_local = {true};
+PrimeState g_prime_state;
+
 #if !USE_PTHREADS_IMPL
 
 
@@ -91,7 +95,7 @@ thread_local PrimeState t_prime_state;
 
 PrimeState& get() noexcept
 {
-    return t_prime_state;
+    return g_thread_local ? t_prime_state : g_prime_state;
 }
 
 
@@ -118,6 +122,9 @@ void create() noexcept
 
 PrimeState& get() noexcept
 {
+    if (!g_thread_local) {
+        return g_prime_state;
+    }
     pthread_once(&key_once, &create);
     void* ptr = pthread_getspecific(key);
     PrimeState* prime_state = static_cast<PrimeState*>(ptr);
@@ -185,6 +192,11 @@ void SimulatedFailure::do_trigger_mmap(size_t size)
         throw std::bad_alloc();
 }
 
+void SimulatedFailure::do_set_thread_local(bool tl)
+{
+    g_thread_local = tl;
+}
+
 #endif // REALM_ENABLE_SIMULATED_FAILURE
 
 
@@ -208,6 +220,8 @@ std::string ErrorCategory::message(int value) const
     switch (SimulatedFailure::FailureType(value)) {
         case SimulatedFailure::generic:
             return "Simulated failure (generic)";
+        case SimulatedFailure::group_writer__commit:
+            return "Simulated failure (group_writer__commit)";
         case SimulatedFailure::slab_alloc__reset_free_space_tracking:
             return "Simulated failure (slab_alloc__reset_free_space_tracking)";
         case SimulatedFailure::slab_alloc__remap:
