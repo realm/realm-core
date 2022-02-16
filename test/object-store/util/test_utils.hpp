@@ -25,17 +25,6 @@
 
 #include <functional>
 
-#if defined __has_include
-#if __has_include(<filesystem>)
-#include <filesystem>
-namespace fs = std::filesystem;
-#elif __has_include(<experimental/filesystem>)
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#endif
-#endif
-
-
 namespace realm {
 
 /// Open a Realm at a given path, creating its files.
@@ -72,6 +61,44 @@ int get_permissions(const std::string& path);
 void chmod(const std::string& path, int permissions);
 std::string get_parent_directory(const std::string& path);
 
+namespace test::fs {
+// basic path support for osx platforms with deployment target set to 10.9 (10.15 is needed in order to use std::fs)
+class Path {
+public:
+    Path(std::string path)
+        : m_path(std::move(path))
+    {
+    }
+    Path& operator/=(const std::string& path)
+    {
+        m_path += "/";
+        m_path += path;
+        return *this;
+    }
+    Path& append(const std::string& path)
+    {
+        return operator/=(path);
+    }
+    Path& operator+=(const std::string& path)
+    {
+        m_path += path;
+        return *this;
+    }
+    friend bool operator==(const Path& x, const Path& y)
+    {
+        return x.m_path == y.m_path;
+    }
+    const std::string& string()
+    {
+        return m_path;
+    }
+
+private:
+    std::string m_path;
+};
+using path = Path;
+} // namespace test::fs
+
 } // namespace realm
 
 #define REQUIRE_DIR_EXISTS(macro_path)                                                                               \
@@ -101,5 +128,12 @@ std::string get_parent_directory(const std::string& path);
 #define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
+
+#ifdef OSX_OBJECT_STORE_TEST_FS_SUPPORT
+namespace fs = realm::test::fs;
+#elif __has_include(<filesystem>)
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
 
 #endif // REALM_TEST_UTILS_HPP
