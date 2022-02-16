@@ -4378,3 +4378,102 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
         CHECK(profile.max_age() == "100");
     }
 }
+
+TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
+    AsyncMockNetworkTransport mock_transport_worker;
+    enum class TestState { unknown, location, login, profile };
+    struct TestStateBundle {
+        void advance_to(TestState new_state)
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            state = new_state;
+            cond.notify_one();
+        }
+
+        TestState get() const
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            return state;
+        }
+
+        void wait_for(TestState new_state)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk, [&] {
+                return state == new_state;
+            });
+        }
+
+        mutable std::mutex mutex;
+        std::condition_variable cond;
+
+        TestState state = TestState::unknown;
+    } state;
+    struct transport : public GenericNetworkTransport {
+        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+            : mock_transport_worker(worker)
+            , state(state)
+        {
+        }
+
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+
+        {
+            std::cerr << request.url << std::endl;
+            if (request.url.find("/login") != std::string::npos) {
+                CHECK(state.get() == TestState::location);
+                state.advance_to(TestState::login);
+                mock_transport_worker.add_work_item(
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
+                    std::move(completion_block));
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                CHECK(state.get() == TestState::login);
+                state.advance_to(TestState::profile);
+                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                    std::move(completion_block));
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                CHECK(state.get() == TestState::unknown);
+                state.advance_to(TestState::location);
+                mock_transport_worker.add_work_item(
+                    Response{200,
+                             0,
+                             {},
+                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                    std::move(completion_block));
+            }
+        }
+
+        AsyncMockNetworkTransport& mock_transport_worker;
+        TestStateBundle& state;
+    };
+
+    TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
+    auto app = sync_manager.app();
+
+    Optional<AppError> cur_error;
+    std::mutex mutex;
+    // Profile will be refreshed only after logging in.
+    app->log_in_with_credentials(AppCredentials::anonymous(),
+                                 [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+                                     std::lock_guard lock(mutex);
+                                     CHECK(!user);
+                                     REQUIRE(error);
+                                     cur_error = std::move(error);
+                                 });
+    // Remove the user when /profile request is sent to server.
+    state.wait_for(TestState::profile);
+    app->sync_manager()->reset_for_testing();
+
+    util::EventLoop::main().run_until([&] {
+        std::lock_guard lock(mutex);
+        return bool(cur_error);
+    });
+    CHECK(cur_error);
+
+    mock_transport_worker.mark_complete();
+}
