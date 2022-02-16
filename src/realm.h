@@ -1002,6 +1002,8 @@ RLM_API realm_schema_t* realm_get_schema(const realm_t*);
 
 /**
  * Get the schema version for this realm.
+ *
+ * This function cannot fail.
  */
 RLM_API uint64_t realm_get_schema_version(const realm_t* realm);
 
