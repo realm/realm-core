@@ -4381,7 +4381,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
 
 TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, profile };
+    enum class TestState { unknown, location, login, profile, user_removed };
     struct TestStateBundle {
         void advance_to(TestState new_state)
         {
@@ -4431,6 +4431,7 @@ TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
             else if (request.url.find("/profile") != std::string::npos) {
                 CHECK(state.get() == TestState::login);
                 state.advance_to(TestState::profile);
+                state.wait_for(TestState::user_removed);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion_block));
             }
@@ -4468,6 +4469,7 @@ TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
     // Remove the user when /profile request is sent to server.
     state.wait_for(TestState::profile);
     app->sync_manager()->reset_for_testing();
+    state.advance_to(TestState::user_removed);
 
     util::EventLoop::main().run_until([&] {
         std::lock_guard lock(mutex);
