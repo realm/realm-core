@@ -170,11 +170,16 @@ const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anyt
 //
 
 template <typename T>
-bool atomic_double_inc_if_even(std::atomic<T>& counter)
+bool atomic_double_inc_if_even(std::atomic<T>& counter, bool fail_on_zero = false)
 {
     T oldval = counter.fetch_add(2, std::memory_order_acquire);
+    if (fail_on_zero && (oldval == 0)) {
+        // back out
+        counter.fetch_sub(2, std::memory_order_relaxed);
+        throw DB::BadVersion();
+    }
     if (oldval & 1) {
-        // oooops! was odd, adjust
+        // oooops! was odd or zero when not allowed, back out
         counter.fetch_sub(2, std::memory_order_relaxed);
         return false;
     }
@@ -556,7 +561,7 @@ struct alignas(8) DB::SharedInfo {
 DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
-    , shared_writemutex() // Throws
+    , shared_writemutex()   // Throws
     , shared_controlmutex() // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
@@ -2023,7 +2028,7 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 
         // if the entry is stale and has been cleared by the cleanup process,
         // the requested version is no longer available
-        while (!atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
+        while (!atomic_double_inc_if_even(r.count, true)) { // <-- most of the exec time spent here!
             // we failed to lock the version. This could be because the version
             // is being cleaned up, but also because the cleanup is probing for access
             // to it. If it's being probed, the tail ptr of the ringbuffer will point
@@ -2170,7 +2175,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
         // fails. The application then has the option of terminating the
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(current_version); // Throws
+        new_version = repl->prepare_commit(current_version);        // Throws
         low_level_commit(new_version, transaction, commit_to_disk); // Throws
         repl->finalize_commit();
     }
