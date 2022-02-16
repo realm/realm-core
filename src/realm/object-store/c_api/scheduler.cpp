@@ -18,64 +18,15 @@ using namespace realm::util;
 namespace realm::c_api {
 namespace {
 
-// A callback coming from C++ code registered in a scheduler created by
-// `realm_scheduler_new()`.
-struct NotifyCppCallback {
-    std::function<void()> m_callback;
-};
-
-void free_notify_cpp_callback(void* ptr)
-{
-    delete static_cast<NotifyCppCallback*>(ptr);
-}
-
-void invoke_notify_cpp_callback(void* ptr)
-{
-    static_cast<NotifyCppCallback*>(ptr)->m_callback();
-}
-
-// A callback coming from C code registered in a scheduler defined in C++ code.
-struct NotifyCAPICallback {
-    struct Inner {
-        void* m_userdata = nullptr;
-        realm_free_userdata_func_t m_free = nullptr;
-        realm_scheduler_notify_func_t m_notify = nullptr;
-
-        ~Inner()
-        {
-            if (m_free)
-                m_free(m_userdata);
-        }
-    };
-
-    // Indirection because we are wrapping ourselves in an `std::function`,
-    // which must be copyable.
-    std::shared_ptr<Inner> m_inner;
-
-    NotifyCAPICallback(void* userdata, realm_free_userdata_func_t free_func, realm_scheduler_notify_func_t notify)
-        : m_inner(std::make_shared<Inner>())
-    {
-        m_inner->m_userdata = userdata;
-        m_inner->m_free = free_func;
-        m_inner->m_notify = notify;
-    }
-
-    void operator()()
-    {
-        if (m_inner->m_notify)
-            m_inner->m_notify(m_inner->m_userdata);
-    }
-};
-
 struct CAPIScheduler : Scheduler {
     void* m_userdata = nullptr;
     realm_free_userdata_func_t m_free = nullptr;
     realm_scheduler_notify_func_t m_notify = nullptr;
     realm_scheduler_is_on_thread_func_t m_is_on_thread = nullptr;
     realm_scheduler_is_same_as_func_t m_is_same_as = nullptr;
-    realm_scheduler_can_deliver_notifications_func_t m_can_deliver_notifications = nullptr;
-    realm_scheduler_set_notify_callback_func_t m_set_notify_callback = nullptr;
+    realm_scheduler_can_deliver_notifications_func_t m_can_invoke = nullptr;
 
+    InvocationQueue m_queue;
 
     CAPIScheduler() = default;
     CAPIScheduler(CAPIScheduler&& other)
@@ -83,8 +34,7 @@ struct CAPIScheduler : Scheduler {
         , m_free(std::exchange(other.m_free, nullptr))
         , m_notify(std::exchange(other.m_notify, nullptr))
         , m_is_on_thread(std::exchange(other.m_is_on_thread, nullptr))
-        , m_can_deliver_notifications(std::exchange(other.m_can_deliver_notifications, nullptr))
-        , m_set_notify_callback(std::exchange(other.m_set_notify_callback, nullptr))
+        , m_can_invoke(std::exchange(other.m_can_invoke, nullptr))
     {
     }
 
@@ -94,10 +44,12 @@ struct CAPIScheduler : Scheduler {
             m_free(m_userdata);
     }
 
-    void notify() final
+    void invoke(util::UniqueFunction<void()>&& fn) final
     {
-        if (m_notify)
+        if (m_notify) {
+            m_queue.push(std::move(fn));
             m_notify(m_userdata);
+        }
     }
 
     bool is_on_thread() const noexcept final
@@ -112,8 +64,7 @@ struct CAPIScheduler : Scheduler {
         if (auto rhs = dynamic_cast<const CAPIScheduler*>(other)) {
             bool same_callbacks = m_free == rhs->m_free && m_notify == rhs->m_notify &&
                                   m_is_same_as == rhs->m_is_same_as && m_is_on_thread == rhs->m_is_on_thread &&
-                                  m_can_deliver_notifications == rhs->m_can_deliver_notifications &&
-                                  m_set_notify_callback == rhs->m_set_notify_callback;
+                                  m_can_invoke == rhs->m_can_invoke;
             if (same_callbacks && m_userdata == rhs->m_userdata) {
                 return true;
             }
@@ -124,19 +75,11 @@ struct CAPIScheduler : Scheduler {
         return false;
     }
 
-    bool can_deliver_notifications() const noexcept final
+    bool can_invoke() const noexcept final
     {
-        if (m_can_deliver_notifications)
-            return m_can_deliver_notifications(m_userdata);
+        if (m_can_invoke)
+            return m_can_invoke(m_userdata);
         return false;
-    }
-
-    void set_notify_callback(std::function<void()> callback) final
-    {
-        if (m_set_notify_callback) {
-            auto ptr = new NotifyCppCallback{std::move(callback)};
-            m_set_notify_callback(m_userdata, ptr, free_notify_cpp_callback, invoke_notify_cpp_callback);
-        }
     }
 };
 
@@ -184,8 +127,7 @@ RLM_API realm_scheduler_t*
 realm_scheduler_new(void* userdata, realm_free_userdata_func_t free_func, realm_scheduler_notify_func_t notify_func,
                     realm_scheduler_is_on_thread_func_t is_on_thread_func,
                     realm_scheduler_is_same_as_func_t is_same_as,
-                    realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications_func,
-                    realm_scheduler_set_notify_callback_func_t set_notify_callback_func)
+                    realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications_func)
 {
     return wrap_err([&]() {
         auto capi_scheduler = std::make_shared<CAPIScheduler>();
@@ -194,10 +136,16 @@ realm_scheduler_new(void* userdata, realm_free_userdata_func_t free_func, realm_
         capi_scheduler->m_notify = notify_func;
         capi_scheduler->m_is_on_thread = is_on_thread_func;
         capi_scheduler->m_is_same_as = is_same_as;
-        capi_scheduler->m_can_deliver_notifications = can_deliver_notifications_func;
-        capi_scheduler->m_set_notify_callback = set_notify_callback_func;
+        capi_scheduler->m_can_invoke = can_deliver_notifications_func;
         return new realm_scheduler_t(std::move(capi_scheduler));
     });
+}
+
+RLM_API void realm_scheduler_perform_work(realm_scheduler_t* scheduler)
+{
+    if (auto capi_scheduler = dynamic_cast<CAPIScheduler*>(scheduler->get())) {
+        capi_scheduler->m_queue.invoke_all();
+    }
 }
 
 RLM_API realm_scheduler_t* realm_scheduler_make_default()
@@ -252,41 +200,6 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
         s_default_factory_set = true;
         return true;
 #endif
-    });
-}
-
-RLM_API void realm_scheduler_notify(realm_scheduler_t* scheduler)
-{
-    (*scheduler)->notify();
-}
-
-RLM_API bool realm_scheduler_is_on_thread(const realm_scheduler_t* scheduler)
-{
-    return (*scheduler)->is_on_thread();
-}
-
-RLM_API bool realm_scheduler_can_deliver_notifications(const realm_scheduler_t* scheduler)
-{
-    return (*scheduler)->can_deliver_notifications();
-}
-
-RLM_API bool realm_scheduler_set_notify_callback(realm_scheduler_t* scheduler, void* userdata,
-                                                 realm_free_userdata_func_t free_func,
-                                                 realm_scheduler_notify_func_t notify_func)
-{
-    return wrap_err([&]() {
-        auto capi_scheduler = dynamic_cast<CAPIScheduler*>(scheduler->get());
-        if (capi_scheduler) {
-            // Avoid needless roundtrips through the std::function wrappers.
-            if (capi_scheduler->m_set_notify_callback) {
-                capi_scheduler->m_set_notify_callback(capi_scheduler->m_userdata, userdata, free_func, notify_func);
-            }
-        }
-        else {
-            NotifyCAPICallback callback{userdata, free_func, notify_func};
-            (*scheduler)->set_notify_callback(std::move(callback));
-        }
-        return true;
     });
 }
 

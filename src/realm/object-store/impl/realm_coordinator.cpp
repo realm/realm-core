@@ -379,6 +379,13 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         realm_lock.lock_unchecked();
         if (!m_notifier)
             m_notifier = std::move(notifier);
+        else {
+            // The notifier may be waiting on m_realm_mutex, in which case
+            // destroying it with m_realm_mutex held will deadlock
+            realm_lock.unlock_unchecked();
+            notifier.reset();
+            realm_lock.lock_unchecked();
+        }
     }
     m_weak_realm_notifiers.emplace_back(realm, config.cache);
 
@@ -516,7 +523,6 @@ void RealmCoordinator::open_db()
 #endif
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
-    DBOptions options;
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
@@ -534,6 +540,8 @@ void RealmCoordinator::open_db()
             history = make_in_realm_history();
         }
 
+        DBOptions options;
+        options.enable_async_writes = true;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
 
@@ -813,13 +821,15 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
         SyncSession::Internal::nonsync_transact_notify(*m_sync_session, new_version.version);
     }
 #endif
-    if (realm.m_binding_context) {
-        realm.m_binding_context->did_change({}, {});
-    }
-
     if (m_notifier) {
         m_notifier->notify_others();
     }
+
+    if (realm.m_binding_context) {
+        realm.m_binding_context->did_change({}, {});
+    }
+    // note: no longer safe to access `realm` or `this` after this point as
+    // did_change() may have closed the Realm.
 }
 
 void RealmCoordinator::enable_wait_for_change()
@@ -1298,4 +1308,15 @@ bool RealmCoordinator::compact()
 void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_overwrite)
 {
     m_db->write_copy(path, key.data(), allow_overwrite);
+}
+
+void RealmCoordinator::async_request_write_mutex(Realm& realm)
+{
+    auto tr = Realm::Internal::get_transaction_ref(realm);
+    m_db->async_request_write_mutex(tr, [realm = realm.shared_from_this()]() mutable {
+        auto& scheduler = *realm->scheduler();
+        scheduler.invoke([realm = std::move(realm)] {
+            Realm::Internal::run_writes(*realm);
+        });
+    });
 }

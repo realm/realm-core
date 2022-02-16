@@ -114,7 +114,7 @@ EventLoop::~EventLoop() = default;
 
 void EventLoop::run_until(util::FunctionRef<bool()> predicate)
 {
-    return m_impl->run_until(std::move(predicate));
+    return m_impl->run_until(predicate);
 }
 
 void EventLoop::perform(util::UniqueFunction<void()> function)

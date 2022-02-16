@@ -22,14 +22,16 @@
 #include <iostream>
 #endif
 
+#include <realm/group_writer.hpp>
+
+#include <realm/alloc_slab.hpp>
+#include <realm/db.hpp>
+#include <realm/disable_sync_to_disk.hpp>
+#include <realm/impl/destroy_guard.hpp>
+#include <realm/impl/simulated_failure.hpp>
+#include <realm/metrics/metric_timer.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/group_writer.hpp>
-#include <realm/db.hpp>
-#include <realm/alloc_slab.hpp>
-#include <realm/disable_sync_to_disk.hpp>
-#include <realm/metrics/metric_timer.hpp>
-#include <realm/impl/destroy_guard.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -902,6 +904,9 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
 
 void GroupWriter::commit(ref_type new_top_ref)
 {
+    using _impl::SimulatedFailure;
+    SimulatedFailure::trigger(SimulatedFailure::group_writer__commit); // Throws
+
     MapWindow* window = get_window(0, sizeof(SlabAlloc::Header));
     SlabAlloc::Header& file_header = *reinterpret_cast<SlabAlloc::Header*>(window->translate(0));
     window->encryption_read_barrier(&file_header, sizeof file_header);

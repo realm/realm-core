@@ -33,7 +33,7 @@
 #endif
 
 // Condvar Emulation is required if RobustMutex emulation is enabled
-#if defined(REALM_ROBUST_MUTEX_EMULATION) || defined(_WIN32)
+#if REALM_ROBUST_MUTEX_EMULATION || defined(_WIN32)
 #define REALM_CONDVAR_EMULATION
 #endif
 

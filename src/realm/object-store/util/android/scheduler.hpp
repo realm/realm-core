@@ -91,7 +91,7 @@ public:
             ::close(m_message_pipe.write);
             ::close(m_message_pipe.read);
             {
-                std::unique_lock<std::mutex> lock(s_schedulers_mutex);
+                std::lock_guard lock(s_schedulers_mutex);
                 s_live_schedulers.erase(std::remove(s_live_schedulers.begin(), s_live_schedulers.end(), this),
                                         s_live_schedulers.end());
             }
@@ -99,20 +99,17 @@ public:
         ALooper_release(m_looper);
     }
 
-    void set_notify_callback(std::function<void()> fn) override
+    void invoke(util::UniqueFunction<void()>&& fn) override
     {
-        m_callback = std::move(fn);
-    }
-
-    void notify() override
-    {
-        if (m_looper) {
-            init();
-            notify_fd(m_message_pipe.write);
+        if (!m_looper) {
+            return;
         }
+        init();
+        m_queue.push(std::move(fn));
+        notify_fd(m_message_pipe.write);
     }
 
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return true;
     }
@@ -127,7 +124,7 @@ public:
     }
 
 private:
-    util::UniqueFunction<void()> m_callback;
+    InvocationQueue m_queue;
     ALooper* m_looper = ALooper_forThread();
     pthread_t m_thread = pthread_self();
     bool m_initialized = false;
@@ -145,7 +142,7 @@ private:
         m_initialized = true;
 
         {
-            std::unique_lock<std::mutex> lock(s_schedulers_mutex);
+            std::lock_guard lock(s_schedulers_mutex);
             s_live_schedulers.push_back(this);
         }
 
@@ -181,7 +178,7 @@ private:
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
             std::shared_ptr<ALooperScheduler> shared;
             {
-                std::lock_guard<std::mutex> lock(s_schedulers_mutex);
+                std::lock_guard lock(s_schedulers_mutex);
                 if (std::find(s_live_schedulers.begin(), s_live_schedulers.end(), data) != s_live_schedulers.end()) {
                     // Even if the weak_ptr can be found in the list, the object still can be destroyed in between.
                     // But share_ptr can ensure we either have a valid pointer or the object has gone.
@@ -196,7 +193,7 @@ private:
                 std::vector<uint8_t> buff(1024);
                 read(fd, buff.data(), buff.size());
                 // By holding a shared_ptr, this object won't be destroyed in the m_callback.
-                shared->m_callback();
+                shared->m_queue.invoke_all();
             }
         }
 

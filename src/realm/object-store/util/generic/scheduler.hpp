@@ -16,8 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <thread>
 #include <realm/object-store/util/scheduler.hpp>
+
+#include <thread>
 
 namespace realm::util {
 class GenericScheduler : public realm::util::Scheduler {
@@ -33,26 +34,12 @@ public:
         auto o = dynamic_cast<const GenericScheduler*>(other);
         return (o && (o->m_id == m_id));
     }
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return false;
     }
 
-    void set_notify_callback(std::function<void()>) override {}
-    void notify() override {}
-
-    void schedule_writes() override {}
-    void schedule_completions() override {}
-    bool can_schedule_writes() const noexcept override
-    {
-        return false;
-    }
-    bool can_schedule_completions() const noexcept override
-    {
-        return false;
-    }
-    void set_schedule_writes_callback(util::UniqueFunction<void()>) override {}
-    void set_schedule_completions_callback(util::UniqueFunction<void()>) override {}
+    void invoke(UniqueFunction<void()>&&) override {}
 
 private:
     std::thread::id m_id = std::this_thread::get_id();

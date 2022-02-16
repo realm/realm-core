@@ -18,12 +18,39 @@
 
 #include <realm/util/interprocess_mutex.hpp>
 
-#ifdef REALM_ROBUST_MUTEX_EMULATION
-
 using namespace realm::util;
+
+#if REALM_ROBUST_MUTEX_EMULATION
 
 std::once_flag InterprocessMutex::s_init_flag;
 std::map<File::UniqueID, std::weak_ptr<InterprocessMutex::LockInfo>>* InterprocessMutex::s_info_map;
 Mutex* InterprocessMutex::s_mutex;
 
-#endif
+#endif // REALM_ROBUST_MUTEX_EMULATION
+
+#if REALM_PLATFORM_APPLE
+SemaphoreMutex::SemaphoreMutex() noexcept
+    : m_semaphore(dispatch_semaphore_create(1))
+{
+}
+
+SemaphoreMutex::~SemaphoreMutex() noexcept
+{
+    dispatch_release(m_semaphore);
+}
+
+void SemaphoreMutex::lock() noexcept
+{
+    dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_FOREVER);
+}
+
+bool SemaphoreMutex::try_lock() noexcept
+{
+    return dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_NOW) == 0;
+}
+
+void SemaphoreMutex::unlock() noexcept
+{
+    dispatch_semaphore_signal(m_semaphore);
+}
+#endif // REALM_PLATFORM_APPLE
