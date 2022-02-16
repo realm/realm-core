@@ -28,12 +28,9 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#include <filesystem>
-
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
-namespace fs = std::filesystem;
 
 static const std::string base_path =
     fs::path(util::make_temp_dir()).operator/=("realm_objectstore_sync_manager").string();

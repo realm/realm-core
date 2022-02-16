@@ -29,9 +29,6 @@
 #include <realm/util/hex_dump.hpp>
 #include <realm/util/sha_crypto.hpp>
 
-#include <filesystem>
-namespace fs = std::filesystem;
-
 namespace realm {
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)

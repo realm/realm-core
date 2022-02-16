@@ -38,7 +38,6 @@
 
 #include <cstdlib>
 #include <iostream>
-#include <filesystem>
 
 #ifdef _WIN32
 #include <io.h>
@@ -59,7 +58,6 @@ inline static int mkstemp(char* _template)
 #include <map>
 #endif
 
-namespace fs = std::filesystem;
 using namespace realm;
 
 TestFile::TestFile()

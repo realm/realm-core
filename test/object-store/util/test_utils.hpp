@@ -25,6 +25,17 @@
 
 #include <functional>
 
+#if defined __has_include
+#if __has_include(<filesystem>)
+#include <filesystem>
+namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#endif
+#endif
+
+
 namespace realm {
 
 /// Open a Realm at a given path, creating its files.

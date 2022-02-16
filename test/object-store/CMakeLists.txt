@@ -73,6 +73,12 @@ endif()
 
 target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+        target_link_libraries(ObjectStoreTests stdc++fs)
+    endif()
+endif()
+
 create_coverage_target(generate-coverage ObjectStoreTests)
 
 add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
