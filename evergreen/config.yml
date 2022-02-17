@@ -766,9 +766,9 @@ buildvariants:
     distros:
     - ubuntu2004-arm64-large
 
-- name: macos-1015
+- name: macos-1100
   display_name: "MacOS 11 x86_64"
-  run_on: macos-1015
+  run_on: macos-1100
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
@@ -780,9 +780,9 @@ buildvariants:
   - name: compile_test
   - name: swift-build-and-test
 
-- name: macos-1015-release
+- name: macos-1011-release
   display_name: "MacOS 11 x86_64 (Release build)"
-  run_on: macos-1015
+  run_on: macos-1011
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
