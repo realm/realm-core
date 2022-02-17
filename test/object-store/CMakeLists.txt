@@ -153,5 +153,9 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
 endif()
 
+if(APPLE)
+    target_compile_definitions(ObjectStoreTests PRIVATE _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS)
+endif()
+
 add_subdirectory(notifications-fuzzer)
 add_subdirectory(benchmarks)
