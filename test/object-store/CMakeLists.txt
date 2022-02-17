@@ -73,17 +73,9 @@ endif()
 
 target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
-#link stdc++fs for g++8
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
         target_link_libraries(ObjectStoreTests stdc++fs)
-    endif()
-endif()
-
-#avoid to include std::filesystem for OSX since deployment target does not have support for it
-if(DEFINED CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET)
-    if(${CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET} LESS "10.15")
-        add_compile_definitions(OSX_OBJECT_STORE_TEST_FS_SUPPORT)
     endif()
 endif()
 
