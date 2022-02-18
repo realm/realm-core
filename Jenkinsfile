@@ -257,7 +257,7 @@ def doCheckInDocker(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
             def sourcesDir = pwd()
-            def buildEnv = docker.build 'realm-core-linux:18.04'
+            def buildEnv = docker.build 'realm-core-linux:21.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             if (options.useEncryption) {
@@ -378,12 +378,12 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            docker.build('realm-core-generic:gcc-10', '-f generic.Dockerfile .').inside {
+            docker.build('realm-core-generic:gcc-11', '-f generic.Dockerfile .').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-10 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   scl enable devtoolset-11 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -429,7 +429,7 @@ def doCheckValgrind() {
     return {
         rlmNode('docker') {
             getArchive()
-            def buildEnv = docker.build 'realm-core-linux:18.04'
+            def buildEnv = docker.build 'realm-core-linux:21.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
@@ -669,7 +669,7 @@ def buildPerformance() {
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      docker.build('realm-core-linux:18.04').inside {
+      docker.build('realm-core-linux:21.04').inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -847,7 +847,7 @@ def doBuildCoverage() {
   return {
     rlmNode('docker') {
       getArchive()
-      docker.build('realm-core-linux:18.04').inside {
+      docker.build('realm-core-linux:21.04').inside {
         def workspace = pwd()
         sh """
           mkdir build

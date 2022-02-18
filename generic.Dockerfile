@@ -1,26 +1,17 @@
 FROM centos:7
 
-ARG CMAKE_VERSION=3.21.3
+ARG CMAKE_VERSION=3.22.2
 
-# Add the Oracle Linux Software Collections repository
-RUN echo $' \n\
-[ol7_software_collections] \n\
-name=Software Collection packages for Oracle Linux 7 (\$basearch) \n\
-baseurl=http://yum.oracle.com/repo/OracleLinux/OL7/SoftwareCollections/\$basearch/ \n\
-gpgkey=https://yum.oracle.com/RPM-GPG-KEY-oracle-ol7 \n\
-gpgcheck=1 \n\
-enabled=1 \n\
-' > /etc/yum.repos.d/OracleLinux-Software-Collections.repo
-
-# Add the EPEL repository
+# Add the EPEL and CentOS SCLo RH repositories
 RUN yum -y install \
+      centos-release-scl-rh \
       epel-release
 
 RUN yum -y install \
       chrpath \
-      devtoolset-10-binutils \
-      devtoolset-10-gcc \
-      devtoolset-10-gcc-c++ \
+      devtoolset-11-binutils \
+      devtoolset-11-gcc \
+      devtoolset-11-gcc-c++ \
       git \
       ninja-build \
       unzip \
