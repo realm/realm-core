@@ -306,9 +306,8 @@ tasks:
             export DEVELOPER_DIR="${xcode_developer_dir}"
         fi
 
-        #temporary disalbe tests for swift, a new pr will be placed to fix this
-        #xcrun swift build
-        #xcrun swift run ObjectStoreTests
+        xcrun swift build
+        xcrun swift run ObjectStoreTests
 
 - name: bloaty
   commands:
