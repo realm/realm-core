@@ -2409,7 +2409,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
         void apply_recovery_from(const EmbeddedContent& other)
         {
             name = other.name;
-            int_value = int_value + other.int_value; // an effect of using add_int()
+            int_value = other.int_value;
             combine_array_values(array_vals, other.array_vals);
             if (second_level && other.second_level) {
                 second_level->apply_recovery_from(*other.second_level);
@@ -2491,9 +2491,7 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
 
     auto set_embedded = [](Obj embedded, const EmbeddedContent& value) {
         embedded.set<StringData>("name", value.name);
-        int64_t existing_int = embedded.get<Int>("int_value");
-        int64_t difference = value.int_value - existing_int;
-        embedded.add_int("int_value", difference);
+        embedded.set<Int>("int_value", value.int_value);
         ColKey list_col = embedded.get_table()->get_column_key("array");
         embedded.set_list_values<Int>(list_col, value.array_vals);
         ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
@@ -2502,7 +2500,9 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             if (!second) {
                 second = embedded.create_and_set_linked_object(link2_col);
             }
-            second.set("date", value.second_level->datetime);
+            if (second.get<Timestamp>("date") != value.second_level->datetime) {
+                second.set("date", value.second_level->datetime);
+            }
             ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
             if (value.second_level->pk_of_linked_object) {
                 TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
@@ -2881,6 +2881,124 @@ TEST_CASE("client reset with embedded object", "[client reset][embedded objects]
             remote.array_values.push_back(new_element_remote); // lost via local.clear()
             TopLevelContent expected_recovered = local2;
             reset_embedded_object({local, local2}, {remote}, expected_recovered);
+        }
+        SECTION("local modification of a dictionary value which is removed by the remote") {
+            local.dict_values["foo"] = EmbeddedContent{};
+            remote.dict_values.erase("foo");
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local delete of a dictionary value which is removed by the remote") {
+            local.dict_values.erase("foo");
+            remote.dict_values.erase("foo");
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local delete of a dictionary value which is modified by the remote") {
+            local.dict_values.erase("foo");
+            remote.dict_values["foo"] = EmbeddedContent{};
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("both modify a dictionary value") {
+            EmbeddedContent new_local, new_remote;
+            local.dict_values["foo"] = new_local;
+            remote.dict_values["foo"] = new_remote;
+            TopLevelContent expected_recovered = remote;
+            expected_recovered.dict_values["foo"]->apply_recovery_from(*local.dict_values["foo"]);
+            // a verbatim list copy is triggered by modifications to items which were not just inserted
+            expected_recovered.dict_values["foo"]->array_vals = local.dict_values["foo"]->array_vals;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("add int") {
+            auto add_to_dict_item = [&](SharedRealm realm, std::string key, int64_t addition) {
+                advance_and_notify(*realm);
+                TableRef table = get_table(*realm, "TopLevel");
+                REQUIRE(table->size() == 1);
+                Obj obj = *table->begin();
+                auto dict = obj.get_dictionary("embedded_dict");
+                auto embedded = dict.get_object(key);
+                REQUIRE(!!embedded);
+                embedded.add_int("int_value", addition);
+                return get_content_from(obj);
+            };
+            TopLevelContent expected_recovered;
+            const std::string existing_key = "foo";
+
+            test_reset->on_post_reset([&](SharedRealm local) {
+                advance_and_notify(*local);
+                TableRef table = get_table(*local, "TopLevel");
+                REQUIRE(table->size() == 1);
+                Obj obj = *table->begin();
+                TopLevelContent actual = get_content_from(obj);
+                actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
+            });
+            int64_t initial_value = initial.dict_values[existing_key]->int_value;
+            int64_t addition = random_int();
+            SECTION("local add_int to an existing dictionary item") {
+                INFO("adding " << initial_value << " with " << addition);
+                expected_recovered = initial;
+                expected_recovered.dict_values[existing_key]->int_value += addition;
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->run();
+            }
+            SECTION("local and remote both create the same dictionary item and add to it") {
+                int64_t remote_addition = random_int();
+                INFO("adding " << initial_value << " with local " << addition << " and remote " << remote_addition);
+                expected_recovered = initial;
+                expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote) {
+                        initial = add_to_dict_item(remote, existing_key, remote_addition);
+                    })
+                    ->run();
+            }
+            SECTION("local add_int on a dictionary item which the remote removed is ignored") {
+                INFO("adding " << initial_value << " with " << addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote) {
+                        advance_and_notify(*remote);
+                        TableRef table = get_table(*remote, "TopLevel");
+                        REQUIRE(table->size() == 1);
+                        Obj obj = *table->begin();
+                        auto dict = obj.get_dictionary("embedded_dict");
+                        dict.erase(Mixed{existing_key});
+                        initial = get_content_from(obj);
+                        expected_recovered = initial;
+                    })
+                    ->run();
+            }
+            SECTION("local add_int on a dictionary item when the entire root object is removed by the remote removed "
+                    "is ignored") {
+                INFO("adding " << initial_value << " with " << addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote) {
+                        advance_and_notify(*remote);
+                        TableRef table = get_table(*remote, "TopLevel");
+                        REQUIRE(table->size() == 1);
+                        Obj obj = *table->begin();
+                        obj.remove();
+                        REQUIRE(table->size() == 0);
+                    })
+                    ->on_post_reset([&](SharedRealm local) {
+                        advance_and_notify(*local);
+                        TableRef table = get_table(*local, "TopLevel");
+                        REQUIRE(table->size() == 0);
+                    })
+                    ->run();
+            }
         }
     }
     SECTION("remote adds a top level link cycle") {

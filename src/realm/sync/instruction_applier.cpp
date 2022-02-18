@@ -884,6 +884,14 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
     return allows_nulls;
 }
 
+std::string InstructionApplier::print(const Instruction::PathInstruction& instr) const
+{
+    REALM_ASSERT(m_log);
+    std::stringstream ss;
+    m_log->print_path(ss, instr.table, instr.object, instr.field, &instr.path);
+    return ss.str();
+}
+
 bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
 {
     bool valid_payload = true;
