@@ -767,7 +767,7 @@ buildvariants:
     - ubuntu2004-arm64-large
 
 - name: macos-1015
-  display_name: "MacOS 11 x86_64"
+  display_name: "MacOS 10.15 x86_64"
   run_on: macos-1015
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
@@ -775,7 +775,7 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test
   - name: swift-build-and-test
@@ -786,7 +786,7 @@ buildvariants:
   run_on: macos-1100
 =======
 - name: macos-1015-release
-  display_name: "MacOS 11 x86_64 (Release build)"
+  display_name: "MacOS 10.15 x86_64 (Release build)"
   run_on: macos-1015
 >>>>>>> 298c35523 (Revert "fix run_on macos version for evergreen")
   expansions:
@@ -796,7 +796,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
@@ -812,7 +812,7 @@ buildvariants:
     cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test
     distros:
@@ -829,7 +829,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
   tasks:
   - name: compile_test_and_package
   - name: benchmarks

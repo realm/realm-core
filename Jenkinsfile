@@ -721,7 +721,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir("build-macosx-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.2.1.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -742,7 +742,7 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.2.1.app/Contents/Developer']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -788,7 +788,7 @@ def doBuildMacOsCatalyst(String buildType) {
             getArchive()
 
             dir("build-maccatalyst-${buildType}") {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.2.1.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     sh """
                             rm -rf *
                             cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
@@ -822,7 +822,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         rlmNode('osx') {
             getArchive()
 
-            withEnv(["DEVELOPER_DIR=/Applications/Xcode-13.2.1.app/Contents/Developer/"]) {
+            withEnv(["DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/"]) {
                 retry(3) {
                     timeout(time: 45, unit: 'MINUTES') {
                         sh """
