@@ -34,14 +34,15 @@ using namespace realm::util;
 using File = realm::util::File;
 
 static const std::string base_path =
-    fs::path(util::make_temp_dir()).operator/=("realm_objectstore_sync_file").string();
+    fs::path{util::make_temp_dir() + "/realm_objectstore_sync_file"}.make_preferred().string();
+;
 
 static void prepare_sync_manager_test()
 {
     // Remove the base directory in /tmp where all test-related file status lives.
     try_remove_dir_recursive(base_path);
     util::make_dir(base_path);
-    util::make_dir(fs::path(base_path).operator/=("syncmanager").string());
+    util::make_dir(fs::path{base_path + "/syncmanager"}.make_preferred().string());
 }
 
 TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
@@ -152,19 +153,13 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string app_id = "test_app_id*$#@!%1";
     const std::string partition = random_string(10);
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path = fs::path(base_path)
-                                         .
-                                         operator/=("syncmanager")
-                                         .
-                                         operator/=("mongodb-realm")
-                                         .
-                                         operator/=(expected_clean_app_id)
-                                         .string();
+    const std::string manager_path =
+        fs::path{base_path + "/syncmanager/mongodb-realm/" + expected_clean_app_id}.make_preferred().string();
     prepare_sync_manager_test();
     auto cleanup = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
     });
-    std::string manager_base_path = fs::path(base_path).operator/=("syncmanager").string();
+    std::string manager_base_path = fs::path{base_path + "/syncmanager"}.make_preferred().string();
     auto manager = SyncFileManager(manager_base_path, app_id);
 
     SECTION("Realm path APIs") {
@@ -214,7 +209,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
         SECTION("legacy local identity path is detected and used") {
             util::try_make_dir(manager_path);
-            util::try_make_dir(fs::path(manager_path).operator/=(local_identity).string());
+            util::try_make_dir(fs::path{manager_path + "/" + local_identity}.make_preferred().string());
             REQUIRE(!File::exists(expected_paths.legacy_local_id_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
             REQUIRE(create_dummy_realm(expected_paths.legacy_local_id_path));
@@ -259,11 +254,11 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     }
 
     SECTION("Utility path APIs") {
-        auto metadata_dir = fs::path(manager_path).operator/=("server-utility").operator/=("metadata");
+        auto metadata_dir = fs::path{manager_path + "/server-utility/metadata"};
 
         SECTION("getting the metadata path") {
             auto path = manager.metadata_path();
-            REQUIRE(path == (metadata_dir.operator/=("sync_metadata.realm").string()));
+            REQUIRE(path == metadata_dir.append("sync_metadata.realm").make_preferred().string());
         }
 
         SECTION("removing the metadata Realm") {

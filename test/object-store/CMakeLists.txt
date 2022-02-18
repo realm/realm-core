@@ -154,9 +154,7 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
 endif()
 
 if(APPLE)
-    #bump macosx-version-min in order to support filesystem
-    target_compile_options(ObjectStoreTests PRIVATE -mmacosx-version-min=10.15)
-    target_link_options(ObjectStoreTests PRIVATE -mmacosx-version-min=10.15)
+    target_compile_definitions(ObjectStoreTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
 endif()
 
 add_subdirectory(notifications-fuzzer)
