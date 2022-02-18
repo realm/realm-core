@@ -1,0 +1,20 @@
+{
+    "name": "realm-core",
+    "version-string": "1.0.0",
+    "dependencies": [
+        {
+            "name": "openssl",
+            "platform": "android | linux | windows"
+        },
+        {
+            "name": "zlib",
+            "platform": "windows"
+        }
+    ],
+    "features": {
+        "tests": {
+            "description": "Build tests",
+            "dependencies": ["libuv"]
+        }
+    }
+}
