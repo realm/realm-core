@@ -41,6 +41,8 @@ SyncClientTimeouts::SyncClientTimeouts()
 {
 }
 
+SyncManager::SyncManager() = default;
+
 void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sync_route,
                             const SyncClientConfig& config)
 {
@@ -178,7 +180,7 @@ bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 }
 
 // Perform a file action. Returns whether or not the file action can be removed.
-bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
+bool SyncManager::run_file_action(SyncFileActionMetadata& md)
 {
     switch (md.action()) {
         case SyncFileActionMetadata::Action::DeleteRealm:
@@ -196,8 +198,14 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
             if (new_name && !util::File::exists(*new_name) &&
                 m_file_manager->copy_realm_file(original_name, *new_name)) {
                 // We successfully copied the Realm file to the recovery directory.
-                m_file_manager->remove_realm(original_name);
-                return true;
+                bool did_remove = m_file_manager->remove_realm(original_name);
+                // if the copy succeeded but not the delete, then running BackupThenDelete
+                // a second time would fail, so change this action to just delete the originall file.
+                if (did_remove) {
+                    return true;
+                }
+                md.set_action(SyncFileActionMetadata::Action::DeleteRealm);
+                return false;
             }
             return false;
     }
@@ -308,7 +316,7 @@ util::Logger::Level SyncManager::log_level() const noexcept
     return m_config.log_level;
 }
 
-bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const
+bool SyncManager::perform_metadata_update(util::FunctionRef<void(const SyncMetadataManager&)> update_function) const
 {
     util::CheckedLockGuard lock(m_file_system_mutex);
     if (!m_metadata_manager) {
@@ -452,6 +460,41 @@ void SyncManager::remove_user(const std::string& user_id)
     }
 }
 
+void SyncManager::delete_user(const std::string& user_id)
+{
+    util::CheckedLockGuard lock(m_user_mutex);
+    // Avoid itterating over m_users twice by not calling `get_user_for_identity`.
+    auto it = std::find_if(m_users.begin(), m_users.end(), [&user_id](auto& user) {
+        return user->identity() == user_id;
+    });
+    auto user = it == m_users.end() ? nullptr : *it;
+
+    if (!user)
+        return;
+
+    // Deletion should happen immediately, not when we do the cleanup
+    // task on next launch.
+    m_users.erase(it);
+    user->detach_from_sync_manager();
+
+    if (m_current_user && m_current_user->identity() == user->identity())
+        m_current_user = nullptr;
+
+    util::CheckedLockGuard fs_lock(m_file_system_mutex);
+    if (!m_metadata_manager)
+        return;
+
+    auto users = m_metadata_manager->all_unmarked_users();
+    for (size_t i = 0; i < users.size(); i++) {
+        auto metadata = users.get(i);
+        if (user->identity() == metadata.identity()) {
+            m_file_manager->remove_user_realms(metadata.identity(), metadata.realm_file_paths());
+            metadata.remove();
+            break;
+        }
+    }
+}
+
 SyncManager::~SyncManager()
 {
     // Grab a vector of the current sessions under a lock so we can shut them down. We have to make a copy because
@@ -546,8 +589,16 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
 
         // Attempt to make a nicer filename which will ease debugging when
         // locating files in the filesystem.
-        std::string file_name =
-            (custom_file_name) ? custom_file_name.value() : string_from_partition(config.partition_value);
+        auto file_name = [&]() -> std::string {
+            if (custom_file_name) {
+                return *custom_file_name;
+            }
+            if (config.flx_sync_requested) {
+                REALM_ASSERT_DEBUG(config.partition_value.empty());
+                return "flx_sync_default";
+            }
+            return string_from_partition(config.partition_value);
+        }();
         path = m_file_manager->realm_file_path(user->identity(), user->local_identity(), file_name,
                                                config.partition_value);
     }

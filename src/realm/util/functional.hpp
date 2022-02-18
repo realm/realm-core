@@ -16,14 +16,15 @@
  *
  **************************************************************************/
 
-#pragma once
+#ifndef REALM_UTIL_FUNCTIONAL
+#define REALM_UTIL_FUNCTIONAL
+
+#include <realm/util/assert.hpp>
+#include <realm/util/type_traits.hpp>
 
 #include <functional>
 #include <memory>
 #include <type_traits>
-
-#include "realm/util/assert.hpp"
-#include "realm/util/type_traits.hpp"
 
 namespace realm::util {
 
@@ -40,17 +41,15 @@ class UniqueFunction;
 template <typename RetType, typename... Args>
 class UniqueFunction<RetType(Args...)> {
 private:
-    // `TagTypeBase` is used as a base for the `TagType` type, to prevent it from being an
-    // aggregate.
-    struct TagTypeBase {
-    protected:
-        TagTypeBase() = default;
-    };
-    // `TagType` is used as a placeholder type in parameter lists for `enable_if` clauses.  They
-    // have to be real parameters, not template parameters, due to MSVC limitations.
-    class TagType : TagTypeBase {
-        TagType() = default;
-        friend UniqueFunction;
+    template <typename Functor>
+    using EnableIfCallable =
+        std::enable_if_t<std::conjunction_v<std::is_invocable_r<RetType, Functor, Args...>,
+                                            std::negation<std::is_same<std::decay_t<Functor>, UniqueFunction>>>,
+                         int>;
+
+    struct Impl {
+        virtual ~Impl() noexcept = default;
+        virtual RetType call(Args&&... args) = 0;
     };
 
 public:
@@ -76,18 +75,14 @@ public:
         a.swap(b);
     }
 
-    template <typename Functor>
+    template <typename Functor, EnableIfCallable<Functor> = 0>
     /* implicit */
-    UniqueFunction(
-        Functor&& functor,
-        // The remaining arguments here are only for SFINAE purposes to enable this ctor when our
-        // requirements are met.  They must be concrete parameters not template parameters to work
-        // around bugs in some compilers that we presently use.  We may be able to revisit this
-        // design after toolchain upgrades for C++17.
-        std::enable_if_t<std::is_invocable_r<RetType, Functor, Args...>::value, TagType> = make_tag(),
-        std::enable_if_t<std::is_move_constructible<Functor>::value, TagType> = make_tag(),
-        std::enable_if_t<!std::is_same<std::decay_t<Functor>, UniqueFunction>::value, TagType> = make_tag())
-        : impl(make_impl(std::forward<Functor>(functor)))
+    UniqueFunction(Functor&& functor)
+        // This does not use make_unique() because
+        // std::unique_ptr<Base>(std::make_unique<Derived>()) results in
+        // std::unique_ptr<Derived> being instantiated, which can have
+        // surprisingly negative effects on debug build performance.
+        : impl(new SpecificImpl<std::decay_t<Functor>>(std::forward<Functor>(functor)))
     {
     }
 
@@ -104,31 +99,45 @@ public:
         return static_cast<bool>(this->impl);
     }
 
-    // Needed to make `std::is_convertible<mongo::UniqueFunction<...>, std::function<...>>` be
-    // `std::false_type`.  `mongo::UniqueFunction` objects are not convertible to any kind of
+    template <typename T>
+    const T* target() const noexcept
+    {
+        if (impl && typeid(*impl) == typeid(SpecificImpl<T>)) {
+            return &static_cast<SpecificImpl<T>*>(impl.get())->f;
+        }
+        return nullptr;
+    }
+
+    /// Release ownership of the owned implementation pointer, if any.
+    ///
+    /// If not null, the returned pointer _must_ be used at a later point to
+    /// construct a new UniqueFunction. This can be used to move UniqueFunction
+    /// instances over API boundaries which do not support C++ move semantics.
+    Impl* release()
+    {
+        return impl.release();
+    }
+
+    /// Construct a UniqueFunction using a pointer returned by release().
+    ///
+    /// This takes ownership of the passed pointer.
+    UniqueFunction(Impl* impl)
+        : impl(impl)
+    {
+    }
+
+    // Needed to make `std::is_convertible<util::UniqueFunction<...>, std::function<...>>` be
+    // `std::false_type`.  `UniqueFunction` objects are not convertible to any kind of
     // `std::function` object, since the latter requires a copy constructor, which the former does
     // not provide.  If you see a compiler error which references this line, you have tried to
     // assign a `UniqueFunction` object to a `std::function` object which is impossible -- please
     // check your variables and function signatures.
-    //
-    // NOTE: This is not quite able to disable all `std::function` conversions on MSVC, at this
-    // time.
+    template <typename Signature>
+    operator std::function<Signature>() = delete;
     template <typename Signature>
     operator std::function<Signature>() const = delete;
 
 private:
-    // The `TagType` type cannot be constructed as a default function-parameter in Clang.  So we use
-    // a static member function that initializes that default parameter.
-    static TagType make_tag()
-    {
-        return {};
-    }
-
-    struct Impl {
-        virtual ~Impl() noexcept = default;
-        virtual RetType call(Args&&... args) = 0;
-    };
-
     // These overload helpers are needed to squelch problems in the `T ()` -> `void ()` case.
     template <typename Functor>
     static void call_regular_void(const std::true_type is_void, Functor& f, Args&&... args)
@@ -147,24 +156,20 @@ private:
     }
 
     template <typename Functor>
-    static auto make_impl(Functor&& functor)
-    {
-        struct SpecificImpl : Impl {
-            explicit SpecificImpl(Functor&& func)
-                : f(std::forward<Functor>(func))
-            {
-            }
+    struct SpecificImpl : Impl {
+        template <typename F>
+        explicit SpecificImpl(F&& func)
+            : f(std::forward<F>(func))
+        {
+        }
 
-            RetType call(Args&&... args) override
-            {
-                return call_regular_void(std::is_void<RetType>(), f, std::forward<Args>(args)...);
-            }
+        RetType call(Args&&... args) override
+        {
+            return call_regular_void(std::is_void<RetType>(), f, std::forward<Args>(args)...);
+        }
 
-            std::decay_t<Functor> f;
-        };
-
-        return std::make_unique<SpecificImpl>(std::forward<Functor>(functor));
-    }
+        Functor f;
+    };
 
     std::unique_ptr<Impl> impl;
 };
@@ -223,3 +228,5 @@ bool operator!=(std::nullptr_t, const UniqueFunction<Signature>& rhs) noexcept
 }
 
 } // namespace realm::util
+
+#endif // REALM_UTIL_FUNCTIONAL

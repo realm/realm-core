@@ -1,8 +1,7 @@
 #ifndef REALM_TEST_UTIL_COMPARE_GROUPS_HPP
 #define REALM_TEST_UTIL_COMPARE_GROUPS_HPP
 
-#include <functional>
-
+#include <realm/util/functional.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -22,7 +21,7 @@ bool compare_groups(const Transaction& group_1, const Transaction& group_2);
 bool compare_groups(const Transaction& group_1, const Transaction& group_2, util::Logger&);
 
 bool compare_groups(const Transaction& group_1, const Transaction& group_2,
-                    std::function<bool(StringData table_name)> filter_func, util::Logger&);
+                    util::FunctionRef<bool(StringData table_name)> filter_func, util::Logger&);
 
 
 // Implementation

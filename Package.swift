@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.7.0"
+let versionStr = "11.9.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -173,7 +173,6 @@ let bidExcludes: [String] = [
     "bid128_noncomp.c",
     "bid128_pow.c",
     "bid128_quantexpd.c",
-    "bid128_quantize.c",
     "bid128_quantumd.c",
     "bid128_rem.c",
     "bid128_round_integral.c",
@@ -329,7 +328,6 @@ let bidExcludes: [String] = [
     "bid64_to_uint32.c",
     "bid64_to_uint64.c",
     "bid64_to_uint8.c",
-    "bid_binarydecimal.c",
     "bid_dpd.c",
     "bid_feclearexcept.c",
     "bid_fegetexceptflag.c",
@@ -407,6 +405,7 @@ let headers: [String] = [
     "realm/history.hpp",
     "realm/impl/array_writer.hpp",
     "realm/impl/cont_transact_hist.hpp",
+    "realm/impl/copy_replication.hpp",
     "realm/impl/destroy_guard.hpp",
     "realm/impl/input_stream.hpp",
     "realm/impl/output_stream.hpp",
@@ -497,7 +496,6 @@ let headers: [String] = [
     "realm/object-store/util/bson/min_key.hpp",
     "realm/object-store/util/bson/mongo_timestamp.hpp",
     "realm/object-store/util/bson/regular_expression.hpp",
-    "realm/object-store/util/checked_mutex.hpp",
     "realm/object-store/util/copyable_atomic.hpp",
     "realm/object-store/util/event_loop_dispatcher.hpp",
     "realm/object-store/util/generic/scheduler.hpp",
@@ -592,6 +590,7 @@ let headers: [String] = [
     "realm/util/call_with_tuple.hpp",
     "realm/util/cf_ptr.hpp",
     "realm/util/cf_str.hpp",
+    "realm/util/checked_mutex.hpp",
     "realm/util/circular_buffer.hpp",
     "realm/util/cli_args.hpp",
     "realm/util/copy_dir_recursive.hpp",
@@ -776,6 +775,8 @@ let package = Package(
             exclude: [
                 "CMakeLists.txt",
                 "conversion.hpp",
+                "error.hpp",
+                "realm.hpp",
                 "logging.hpp",
                 "realm.c",
                 "types.hpp",

@@ -111,7 +111,6 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_fast_reconnect_limit{config.fast_reconnect_limit}
     , m_disable_upload_activation_delay{config.disable_upload_activation_delay}
     , m_dry_run{config.dry_run}
-    , m_tcp_no_delay{config.tcp_no_delay}
     , m_enable_default_port_hack{config.enable_default_port_hack}
     , m_disable_upload_compaction{config.disable_upload_compaction}
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
@@ -122,7 +121,6 @@ ClientImpl::ClientImpl(ClientConfig config)
           m_random,
           m_service,
           get_user_agent_string(),
-          get_tcp_no_delay(),
       })
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
@@ -156,8 +154,6 @@ ClientImpl::ClientImpl(ClientConfig config)
                  config.fast_reconnect_limit); // Throws
     logger.debug("Config param: disable_upload_compaction = %1",
                  config.disable_upload_compaction); // Throws
-    logger.debug("Config param: tcp_no_delay = %1",
-                 config.tcp_no_delay); // Throws
     logger.debug("Config param: disable_sync_to_disk = %1",
                  config.disable_sync_to_disk); // Throws
     logger.debug("User agent string: '%1'", get_user_agent_string());
@@ -301,21 +297,18 @@ void Connection::cancel_reconnect_delay()
 }
 
 
-void Connection::websocket_handshake_completion_handler(const HTTPHeaders& headers)
+void Connection::websocket_handshake_completion_handler(const std::string& protocol)
 {
-    auto i = headers.find("Sec-WebSocket-Protocol");
-    if (i != headers.end()) {
-        std::string_view value = i->second;
+    if (!protocol.empty()) {
         std::string_view expected_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
-
         // FIXME: Use std::string_view::begins_with() in C++20.
         auto prefix_matches = [&](std::string_view other) {
-            return value.size() >= other.size() && (value.substr(0, other.size()) == other);
+            return protocol.size() >= other.size() && (protocol.substr(0, other.size()) == other);
         };
         if (prefix_matches(expected_prefix)) {
             util::MemoryInputStream in;
-            in.set_buffer(value.data() + expected_prefix.size(), value.data() + value.size());
+            in.set_buffer(protocol.data() + expected_prefix.size(), protocol.data() + protocol.size());
             in.imbue(std::locale::classic());
             in.unsetf(std::ios_base::skipws);
             int value_2 = 0;
@@ -331,7 +324,7 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
                 }
             }
         }
-        logger.error("Bad protocol info from server: '%1'", value); // Throws
+        logger.error("Bad protocol info from server: '%1'", protocol); // Throws
     }
     else {
         logger.error("Missing protocol info from server"); // Throws
@@ -342,20 +335,13 @@ void Connection::websocket_handshake_completion_handler(const HTTPHeaders& heade
 }
 
 
-void Connection::websocket_read_error_handler(std::error_code ec)
+void Connection::websocket_read_or_write_error_handler(std::error_code ec)
 {
-    read_error(ec); // Throws
+    read_or_write_error(ec); // Throws
 }
 
 
-void Connection::websocket_write_error_handler(std::error_code ec)
-{
-    write_error(ec); // Throws
-}
-
-
-void Connection::websocket_handshake_error_handler(std::error_code ec, const HTTPHeaders*,
-                                                   const std::string_view* body)
+void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
 {
     bool is_fatal;
     if (ec == util::websocket::Error::bad_response_3xx_redirection ||
@@ -413,7 +399,7 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
     std::error_code ec;
     using sf = SimulatedFailure;
     if (sf::trigger(sf::sync_client__read_head, ec)) {
-        read_error(ec);
+        read_or_write_error(ec);
         return bool(m_websocket);
     }
 
@@ -490,16 +476,13 @@ void Connection::initiate_reconnect_wait()
             switch (*m_reconnect_info.m_reason) {
                 case ConnectionTerminationReason::closed_voluntarily:
                 case ConnectionTerminationReason::read_or_write_error:
-                case ConnectionTerminationReason::premature_end_of_input:
                 case ConnectionTerminationReason::pong_timeout:
                     // Minimum delay after successful connect operation
                     delay = min_delay;
                     break;
-                case ConnectionTerminationReason::resolve_operation_failed:
                 case ConnectionTerminationReason::connect_operation_failed:
                 case ConnectionTerminationReason::http_response_says_nonfatal_error:
                 case ConnectionTerminationReason::sync_connect_timeout:
-                case ConnectionTerminationReason::http_tunnel_failed:
                     // The last attempt at establishing a connection failed. In
                     // this case, the reconnect delay will increase with the
                     // number of consecutive failures.
@@ -661,25 +644,19 @@ void Connection::initiate_reconnect()
         sec_websocket_protocol = std::move(out).str();
     }
 
-    util::HTTPHeaders headers;
-    headers[m_authorization_header_name] = _impl::make_authorization_header(m_signed_access_token); // Throws
-
-    for (auto const& header : m_custom_http_headers)
-        headers[header.first] = header.second;
-
-    m_websocket = m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
-                                                              m_address,
-                                                              m_port,
-                                                              m_http_host,
-                                                              get_http_request_path(),
-                                                              std::move(sec_websocket_protocol),
-                                                              is_ssl(m_protocol_envelope),
-                                                              std::move(headers),
-                                                              m_verify_servers_ssl_certificate,
-                                                              m_ssl_trust_certificate_path,
-                                                              m_ssl_verify_callback,
-                                                              m_proxy_config,
-                                                          });
+    m_websocket =
+        m_client.m_socket_factory.connect(this, util::websocket::EZEndpoint{
+                                                    m_address,
+                                                    m_port,
+                                                    get_http_request_path(),
+                                                    std::move(sec_websocket_protocol),
+                                                    is_ssl(m_protocol_envelope),
+                                                    {m_custom_http_headers.begin(), m_custom_http_headers.end()},
+                                                    m_verify_servers_ssl_certificate,
+                                                    m_ssl_trust_certificate_path,
+                                                    m_ssl_verify_callback,
+                                                    m_proxy_config,
+                                                });
 }
 
 
@@ -1000,32 +977,12 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 }
 
 
-void Connection::websocket_resolve_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::resolve_operation_failed;
-    logger.error("Failed to resolve '%1:%2': %3", m_address, m_port, ec.message()); // Throws
-    // FIXME: Should some DNS lookup errors be considered fatal (persistent)?
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec, is_fatal, custom_message); // Throws
-}
-
-
-void Connection::websocket_tcp_connect_error_handler(std::error_code ec)
+void Connection::websocket_connect_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-    logger.error("Failed to connect to '%1:%2': All endpoints failed", m_address, m_port); // Throws
-    // FIXME: Should some TCP connect errors be considered fatal (persistent)?
     bool is_fatal = false;
     StringData* custom_message = nullptr;
     involuntary_disconnect(ec, is_fatal, custom_message); // Throws
-}
-
-void Connection::websocket_http_tunnel_error_handler(std::error_code ec)
-{
-    logger.error("Failed to establish HTTP tunnel: %1", ec.message());
-    m_reconnect_info.m_reason = ConnectionTerminationReason::http_tunnel_failed;
-    close_due_to_client_side_error(ClientError::http_tunnel_failed, true); // Throws
 }
 
 void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
@@ -1043,7 +1000,7 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
         is_fatal = true;
     }
     else {
-        m_reconnect_info.m_reason = determine_connection_termination_reason(ec);
+        m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
         ec2 = ec;
         is_fatal = false;
     }
@@ -1051,20 +1008,10 @@ void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
 }
 
 
-void Connection::read_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec)
 {
-    m_reconnect_info.m_reason = determine_connection_termination_reason(ec);
-    logger.error("Reading failed: %1", ec.message()); // Throws
-    bool is_fatal = false;                            // A read error is most likely not a persistent problem
-    close_due_to_client_side_error(ec, is_fatal);     // Throws
-}
-
-
-void Connection::write_error(std::error_code ec)
-{
-    m_reconnect_info.m_reason = determine_connection_termination_reason(ec);
-    logger.error("Writing failed: %1", ec.message()); // Throws
-    bool is_fatal = false;                            // A write error is most likely not a persistent problem
+    m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
+    bool is_fatal = false;
     close_due_to_client_side_error(ec, is_fatal);     // Throws
 }
 
@@ -1410,19 +1357,6 @@ void Connection::enlist_to_send(Session* sess)
 }
 
 
-auto Connection::determine_connection_termination_reason(std::error_code ec) noexcept -> ConnectionTerminationReason
-{
-    if (ec == util::MiscExtErrors::premature_end_of_input)
-        return ConnectionTerminationReason::premature_end_of_input;
-
-    // FIXME: We need to identify SSL protocol violations here (by inspecting
-    // the error code), and return
-    // ConnectionTerminationReason::ssl_protocol_violation in those cases.
-
-    return ConnectionTerminationReason::read_or_write_error;
-}
-
-
 void Session::cancel_resumption_delay()
 {
     REALM_ASSERT(m_state == Active);
@@ -1443,73 +1377,64 @@ void Session::cancel_resumption_delay()
 }
 
 
-bool Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
+void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
-                                   IntegrationError& error, DownloadBatchState download_batch_state)
+                                   DownloadBatchState download_batch_state)
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
         if (download_batch_state != DownloadBatchState::LastInBatch) {
-            logger.error("received empty download message that was not the last in batch");
-            return false;
+            throw IntegrationException(ClientError::bad_progress,
+                                       "received empty download message that was not the last in batch");
         }
         history.set_sync_progress(progress, &downloadable_bytes, version_info); // Throws
-        return true;
+        return;
     }
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
-    bool success = history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets,
-                                                       version_info, error, download_batch_state, logger,
-                                                       get_transact_reporter()); // Throws
-    if (REALM_LIKELY(success)) {
-        if (num_changesets == 1) {
-            logger.debug("1 remote changeset integrated, producing client version %1",
-                         version_info.sync_version.version); // Throws
-        }
-        else {
-            logger.debug("%2 remote changesets integrated, producing client version %1",
-                         version_info.sync_version.version, num_changesets); // Throws
-        }
+    history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
+                                        download_batch_state, logger, get_transact_reporter()); // Throws
+    if (num_changesets == 1) {
+        logger.debug("1 remote changeset integrated, producing client version %1",
+                     version_info.sync_version.version); // Throws
     }
-    return success;
+    else {
+        logger.debug("%2 remote changesets integrated, producing client version %1",
+                     version_info.sync_version.version, num_changesets); // Throws
+    }
 }
 
 
-void Session::on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                       IntegrationError error, DownloadBatchState batch_state)
+void Session::on_integration_failure(const IntegrationException& error, DownloadBatchState batch_state)
 {
     REALM_ASSERT(m_state == Active);
-
-    if (REALM_LIKELY(success)) {
-        REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
-        m_download_batch_state = batch_state;
-        if (m_download_batch_state != DownloadBatchState::LastInBatch) {
-            return;
-        }
-        m_download_progress = download_progress;
-        do_recognize_sync_version(client_version); // Allows upload process to resume
-        check_for_download_completion();           // Throws
-
-        // Since the deactivation process has not been initiated, the UNBIND
-        // message cannot have been sent unless an ERROR message was received.
-        REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-        if (m_ident_message_sent && !m_error_message_received)
-            ensure_enlisted_to_send(); // Throws
-        return;
-    }
-
     if (batch_state == DownloadBatchState::LastInBatch) {
         m_progress.download = m_download_progress;
     }
-    switch (error) {
-        case IntegrationError::bad_origin_file_ident:
-            m_conn.close_due_to_protocol_error(ClientError::bad_origin_file_ident);
-            return;
-        case IntegrationError::bad_changeset:
-            break;
+    logger.error("Failed to integrate downloaded changesets: %1", error.what());
+    m_conn.close_due_to_protocol_error(error.code());
+}
+
+void Session::on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
+                                       DownloadBatchState batch_state)
+{
+    REALM_ASSERT(m_state == Active);
+    REALM_ASSERT(download_progress.server_version >= m_download_progress.server_version);
+    m_download_batch_state = batch_state;
+    if (m_download_batch_state != DownloadBatchState::LastInBatch) {
+        return;
     }
-    m_conn.close_due_to_protocol_error(ClientError::bad_changeset);
+    m_download_progress = download_progress;
+    do_recognize_sync_version(client_version); // Allows upload process to resume
+    check_for_download_completion();           // Throws
+
+    // Since the deactivation process has not been initiated, the UNBIND
+    // message cannot have been sent unless an ERROR message was received.
+    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
+    if (m_ident_message_sent && !m_error_message_received) {
+        ensure_enlisted_to_send(); // Throws
+    }
 }
 
 
@@ -1660,9 +1585,6 @@ void Session::send_message()
     if (!m_bind_message_sent)
         return send_bind_message(); // Throws
 
-    if (!m_access_token_sent)
-        return send_refresh_message(); // Throws
-
     if (!m_ident_message_sent) {
         if (have_client_file_ident())
             send_ident_message(); // Throws
@@ -1672,16 +1594,35 @@ void Session::send_message()
     if (m_target_download_mark > m_last_download_mark_sent)
         return send_mark_message(); // Throws
 
-    if (m_pending_query_message) {
+    auto check_pending_flx_version = [&]() -> bool {
+        if (!m_is_flx_sync_session) {
+            return false;
+        }
+
+        if (!m_allow_upload) {
+            return false;
+        }
+
+        m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
+            m_last_sent_flx_query_version, m_upload_progress.client_version);
+
+        if (!m_pending_flx_sub_set) {
+            return false;
+        }
+
+        return m_upload_progress.client_version >= m_pending_flx_sub_set->snapshot_version;
+    };
+
+    if (check_pending_flx_version()) {
         return send_query_change_message(); // throws
     }
 
     REALM_ASSERT(m_upload_progress.client_version <= m_upload_target_version);
     REALM_ASSERT(m_upload_target_version <= m_last_version_available);
     if (m_allow_upload && m_download_batch_state == DownloadBatchState::LastInBatch &&
-        (m_upload_target_version > m_upload_progress.client_version))
-        send_upload_message(); // Throws
-    return;
+        (m_upload_target_version > m_upload_progress.client_version)) {
+        return send_upload_message(); // Throws
+    }
 }
 
 
@@ -1691,7 +1632,6 @@ void Session::send_bind_message()
 
     session_ident_type session_ident = m_ident;
     const std::string& path = get_virt_path();
-    const std::string& signed_access_token = get_signed_access_token();
     bool need_client_file_ident = !have_client_file_ident();
     const bool is_subserver = false;
 
@@ -1699,12 +1639,13 @@ void Session::send_bind_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     int protocol_version = m_conn.get_negotiated_protocol_version();
     OutputBuffer& out = m_conn.get_output_buffer();
-    protocol.make_bind_message(protocol_version, out, session_ident, path, signed_access_token,
-                               need_client_file_ident, is_subserver);   // Throws
+    // Discard the token since it's ignored by the server.
+    std::string empty_access_token{};
+    protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
+                               is_subserver);                           // Throws
     m_conn.initiate_write_message(out, this);                           // Throws
 
     m_bind_message_sent = true;
-    m_access_token_sent = true;
 
     // Ready to send the IDENT message if the file identifier pair is already
     // available.
@@ -1726,7 +1667,7 @@ void Session::send_ident_message()
     session_ident_type session_ident = m_ident;
 
     if (m_is_flx_sync_session) {
-        const auto active_query_set = get_or_create_flx_subscription_store()->get_active();
+        const auto active_query_set = get_flx_subscription_store()->get_active();
         const auto active_query_body = active_query_set.to_ext_json();
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
@@ -1760,13 +1701,15 @@ void Session::send_query_change_message()
     REALM_ASSERT(m_state == Active);
     REALM_ASSERT(m_ident_message_sent);
     REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(m_pending_query_message);
+    REALM_ASSERT(m_pending_flx_sub_set);
+    REALM_ASSERT(m_pending_flx_sub_set->query_version > m_last_sent_flx_query_version);
 
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
         return;
     }
 
-    auto latest_sub_set = get_or_create_flx_subscription_store()->get_latest();
+    auto sub_store = get_flx_subscription_store();
+    auto latest_sub_set = sub_store->get_by_version(m_pending_flx_sub_set->query_version);
     auto latest_queries = latest_sub_set.to_ext_json();
     logger.debug("Sending: QUERY(query_version=%1, query_size=%2, query=\"%3\"", latest_sub_set.version(),
                  latest_queries.size(), latest_queries);
@@ -1776,7 +1719,10 @@ void Session::send_query_change_message()
     ClientProtocol& protocol = m_conn.get_client_protocol();
     protocol.make_query_change_message(out, session_ident, latest_sub_set.version(), latest_queries);
     m_conn.initiate_write_message(out, this);
-    m_pending_query_message = false;
+
+    m_last_sent_flx_query_version = latest_sub_set.version();
+    m_pending_flx_sub_set =
+        sub_store->get_next_pending_version(m_last_sent_flx_query_version, m_pending_flx_sub_set->snapshot_version);
 
     enlist_to_send(); // throws
 }
@@ -1791,11 +1737,24 @@ void Session::send_upload_message()
     if (REALM_UNLIKELY(get_client().is_dry_run()))
         return;
 
+    auto target_upload_version = m_upload_target_version;
+    if (m_is_flx_sync_session) {
+        if (!m_pending_flx_sub_set || m_pending_flx_sub_set->snapshot_version < m_upload_progress.client_version) {
+            m_pending_flx_sub_set = get_flx_subscription_store()->get_next_pending_version(
+                m_last_sent_flx_query_version, m_upload_progress.client_version);
+        }
+        if (m_pending_flx_sub_set && m_pending_flx_sub_set->snapshot_version < m_upload_target_version) {
+            logger.trace("Limiting UPLOAD message up to version %1 to send QUERY version %2",
+                         m_pending_flx_sub_set->snapshot_version, m_pending_flx_sub_set->query_version);
+            target_upload_version = m_pending_flx_sub_set->snapshot_version;
+        }
+    }
+
     const ClientReplication& repl = access_realm(); // Throws
 
     std::vector<UploadChangeset> uploadable_changesets;
     version_type locked_server_version = 0;
-    repl.get_history().find_uploadable_changesets(m_upload_progress, m_upload_target_version, uploadable_changesets,
+    repl.get_history().find_uploadable_changesets(m_upload_progress, target_upload_version, uploadable_changesets,
                                                   locked_server_version); // Throws
 
     if (uploadable_changesets.empty()) {
@@ -1918,36 +1877,6 @@ void Session::send_mark_message()
 }
 
 
-void Session::send_refresh_message()
-{
-    REALM_ASSERT(m_state == Active);
-    REALM_ASSERT(m_bind_message_sent);
-    REALM_ASSERT(!m_unbind_message_sent);
-    REALM_ASSERT(!m_access_token_sent);
-
-    const std::string& signed_access_token = get_signed_access_token();
-    std::size_t signed_access_token_size = signed_access_token.size();
-
-    logger.debug("Sending: REFRESH(signed_user_token_size=%1)",
-                 signed_access_token_size); // Throws
-
-    ClientProtocol& protocol = m_conn.get_client_protocol();
-    OutputBuffer& out = m_conn.get_output_buffer();
-    session_ident_type session_ident = get_ident();
-    protocol.make_refresh_message(out, session_ident, signed_access_token); // Throws
-    m_conn.initiate_write_message(out, this);                               // Throws
-
-    m_access_token_sent = true;
-
-    // If the IDENT message has not yet been sent, is now ready to be sent if the
-    // file identifier pair has become available. If IDENT message has been
-    // sent, various other messages may be waiting to be sent, but in that case,
-    // we also have the file identifier pair.
-    if (have_client_file_ident())
-        enlist_to_send(); // Throws
-}
-
-
 void Session::send_unbind_message()
 {
     REALM_ASSERT(m_state == Deactivating || m_error_message_received);
@@ -1995,7 +1924,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
     m_client_file_ident = client_file_ident;
 
     if (REALM_UNLIKELY(get_client().is_dry_run())) {
-        // Ready to send the IDENT (or REFRESH) message
+        // Ready to send the IDENT message
         ensure_enlisted_to_send(); // Throws
         return std::error_code{};  // Success
     }
@@ -2062,7 +1991,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         this->m_progress.upload.client_version = 0;
     }
 
-    // Ready to send the IDENT (or REFRESH) message
+    // Ready to send the IDENT message
     ensure_enlisted_to_send(); // Throws
     return std::error_code{};  // Success
 }
@@ -2143,9 +2072,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    if (query_version != 0) {
-        on_flx_sync_progress(query_version, batch_state);
-    }
+    on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.

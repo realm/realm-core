@@ -24,8 +24,8 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/subscriptions.hpp>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/version_id.hpp>
 
 #include <mutex>
@@ -78,7 +78,7 @@ private:
         bool is_streaming;
         bool is_download;
 
-        std::function<void()> create_invocation(const Progress&, bool&);
+        util::UniqueFunction<void()> create_invocation(const Progress&, bool&);
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
@@ -130,11 +130,11 @@ public:
     // Register a callback that will be called when all pending uploads have completed.
     // The callback is run asynchronously, and upon whatever thread the underlying sync client
     // chooses to run it on.
-    void wait_for_upload_completion(std::function<void(std::error_code)> callback);
+    void wait_for_upload_completion(util::UniqueFunction<void(std::error_code)>&& callback);
 
     // Register a callback that will be called when all pending downloads have been completed.
     // Works the same way as `wait_for_upload_completion()`.
-    void wait_for_download_completion(std::function<void(std::error_code)> callback);
+    void wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback);
 
     // Register a notifier that updates the app regarding progress.
     //
@@ -154,7 +154,7 @@ public:
     //
     // Note that bindings should dispatch the callback onto a separate thread or queue
     // in order to avoid blocking the sync client.
-    uint64_t register_progress_notifier(std::function<ProgressNotifierCallback>, ProgressDirection,
+    uint64_t register_progress_notifier(std::function<ProgressNotifierCallback>&&, ProgressDirection,
                                         bool is_streaming);
 
     // Unregister a previously registered notifier. If the token is invalid,
@@ -163,7 +163,7 @@ public:
 
     // Registers a callback that is invoked when the the underlying sync session changes
     // its connection state
-    uint64_t register_connection_change_callback(std::function<ConnectionStateChangeCallback>);
+    uint64_t register_connection_change_callback(std::function<ConnectionStateChangeCallback>&&);
 
     // Unregisters a previously registered callback. If the token is invalid,
     // this method does nothing
@@ -235,7 +235,8 @@ public:
     class Internal {
         friend class _impl::RealmCoordinator;
 
-        static void set_sync_transact_callback(SyncSession& session, std::function<TransactionCallback> callback)
+        static void set_sync_transact_callback(SyncSession& session,
+                                               util::UniqueFunction<TransactionCallback> callback)
         {
             session.set_sync_transact_callback(std::move(callback));
         }
@@ -265,7 +266,8 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
-    using CompletionCallbacks = std::map<int64_t, std::pair<ProgressDirection, std::function<void(std::error_code)>>>;
+    using CompletionCallbacks =
+        std::map<int64_t, std::pair<ProgressDirection, util::UniqueFunction<void(std::error_code)>>>;
 
     class ConnectionChangeNotifier {
     public:
@@ -304,8 +306,10 @@ private:
     // }
 
     std::shared_ptr<SyncManager> sync_manager() const;
+    std::shared_ptr<sync::SubscriptionStore> make_flx_subscription_store();
 
-    static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
+    static util::UniqueFunction<void(util::Optional<app::AppError>)>
+    handle_refresh(const std::shared_ptr<SyncSession>&);
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
 
@@ -318,8 +322,9 @@ private:
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup);
     std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+    void handle_new_flx_sync_query(int64_t version);
 
-    void set_sync_transact_callback(std::function<TransactionCallback>);
+    void set_sync_transact_callback(util::UniqueFunction<TransactionCallback>);
     void nonsync_transact_notify(VersionID::version_type);
 
     void create_sync_session();
@@ -334,10 +339,10 @@ private:
     void become_waiting_for_access_token(std::unique_lock<std::mutex>&);
 
 
-    void add_completion_callback(const std::unique_lock<std::mutex>&, std::function<void(std::error_code)> callback,
-                                 ProgressDirection direction);
+    void add_completion_callback(const std::unique_lock<std::mutex>&,
+                                 util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction);
 
-    std::function<TransactionCallback> m_sync_transact_callback;
+    util::UniqueFunction<TransactionCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;
 
@@ -351,6 +356,7 @@ private:
 
     SyncConfig m_config;
     std::shared_ptr<DB> m_db;
+    std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
     bool m_force_client_reset = false;
     DBRef m_client_reset_fresh_copy;
     _impl::SyncClient& m_client;

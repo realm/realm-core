@@ -2,20 +2,18 @@
 #ifndef REALM_UTIL_WEBSOCKET_HPP
 #define REALM_UTIL_WEBSOCKET_HPP
 
+#include <realm/util/functional.hpp>
+#include <realm/util/http.hpp>
+#include <realm/util/logger.hpp>
+
 #include <random>
 #include <system_error>
 #include <map>
 
-#include <realm/util/logger.hpp>
-#include <realm/util/http.hpp>
+namespace realm::util::websocket {
 
-
-namespace realm {
-namespace util {
-namespace websocket {
-
-using WriteCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
-using ReadCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
+using WriteCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
+using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
 
 class Config {
 public:
@@ -128,7 +126,7 @@ public:
 
     /// The async_write_* functions send frames. Only one frame should be sent at a time,
     /// meaning that the user must wait for the handler to be called before sending the next frame.
-    /// The handler is type std::function<void()> and is called when the frame has been successfully
+    /// The handler is type util::UniqueFunction<void()> and is called when the frame has been successfully
     /// sent. In case of errors, the Config::websocket_write_error_handler() is called.
 
     /// async_write_frame() sends a single frame with this content:
@@ -143,7 +141,8 @@ public:
     /// FIXME: Guarantee no callback reentrance, i.e., that the completion
     /// handler, or the error handler in case an error occurs, is never called
     /// from within the execution of async_write_frame().
-    void async_write_frame(bool fin, Opcode opcode, const char* data, size_t size, std::function<void()> handler);
+    void async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
+                           util::UniqueFunction<void()> handler);
 
     //@{
     /// Five utility functions used to send whole messages. These five
@@ -156,11 +155,11 @@ public:
     /// from within the execution of async_write_text(), and its friends. This
     /// is already assumed by the client and server implementations of the sync
     /// protocol.
-    void async_write_text(const char* data, size_t size, std::function<void()> handler);
-    void async_write_binary(const char* data, size_t size, std::function<void()> handler);
-    void async_write_close(const char* data, size_t size, std::function<void()> handler);
-    void async_write_ping(const char* data, size_t size, std::function<void()> handler);
-    void async_write_pong(const char* data, size_t size, std::function<void()> handler);
+    void async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler);
+    void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler);
+    void async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler);
+    void async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler);
+    void async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler);
     //@}
 
     /// stop() stops the socket. The socket will stop processing incoming data,
@@ -221,9 +220,7 @@ const std::error_category& error_category() noexcept;
 
 std::error_code make_error_code(Error) noexcept;
 
-} // namespace websocket
-} // namespace util
-} // namespace realm
+} // namespace realm::util::websocket
 
 namespace std {
 

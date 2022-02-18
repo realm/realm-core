@@ -1454,13 +1454,11 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 size_t sz = cluster->node_size();
                 auto offset = cluster->get_offset();
                 auto key_values = cluster->get_key_array();
-                for (size_t i = 0; (i < sz); i++) {
+                for (size_t i = 0; (i < sz) && limit; i++) {
                     refs.add(ObjKey(key_values->get(i) + offset));
-                    // Stop if limit is reached
-                    if (--limit == 0)
-                        return true;
+                    --limit;
                 }
-                return false;
+                return limit == 0;
             };
 
             m_table->traverse_clusters(f);
@@ -1479,18 +1477,20 @@ void Query::do_find_all(TableView& ret, size_t limit) const
 
                 auto keys = node->index_based_keys();
                 for (auto key : keys) {
+                    if (limit == 0)
+                        break;
                     if (pn->m_children.empty()) {
                         // No more conditions - just add key
                         refs.add(key);
+                        limit--;
                     }
                     else {
                         auto obj = m_table->get_object(key);
                         if (eval_object(obj)) {
                             refs.add(key);
+                            limit--;
                         }
                     }
-                    if (--limit == 0)
-                        break;
                 }
                 return;
             }
@@ -1504,7 +1504,7 @@ void Query::do_find_all(TableView& ret, size_t limit) const
                 st.m_key_offset = cluster->get_offset();
                 st.m_key_values = cluster->get_key_array();
                 aggregate_internal(node, &st, 0, e, nullptr);
-                // Stop if limit or end is reached
+                // Stop if limit is reached
                 return st.match_count() == st.limit();
             };
 
@@ -1519,7 +1519,7 @@ TableView Query::find_all(size_t limit)
     std::unique_ptr<MetricTimer> metric_timer = QueryInfo::track(this, QueryInfo::type_FindAll);
 #endif
 
-    TableView ret(m_table, *this, limit);
+    TableView ret(*this, limit);
     if (m_ordering) {
         ret.apply_descriptor_ordering(*m_ordering);
     }
@@ -1640,7 +1640,7 @@ TableView Query::find_all(const DescriptorOrdering& descriptor)
         return find_all(min_limit);
     }
 
-    TableView ret(m_table, *this, default_limit);
+    TableView ret(*this, default_limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret;
 }
@@ -1664,7 +1664,7 @@ size_t Query::count(const DescriptorOrdering& descriptor)
         return do_count(limit);
     }
 
-    TableView ret(m_table, *this, limit);
+    TableView ret(*this, limit);
     ret.apply_descriptor_ordering(descriptor);
     return ret.size();
 }

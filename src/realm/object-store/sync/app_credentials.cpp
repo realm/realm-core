@@ -19,11 +19,7 @@
 #include <realm/object-store/sync/app_credentials.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
 
-#include <external/json/json.hpp>
-#include <sstream>
-
-namespace realm {
-namespace app {
+namespace realm::app {
 
 std::string const kAppProviderKey = "provider";
 
@@ -96,10 +92,21 @@ AuthProvider enum_from_provider_type(const IdentityProvider& provider)
     }
 }
 
-AppCredentials::AppCredentials(AuthProvider provider, std::function<std::string()> factory)
+AppCredentials::AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload)
     : m_provider(provider)
-    , m_payload_factory(factory)
+    , m_payload(std::move(payload))
 {
+}
+
+AppCredentials::AppCredentials(AuthProvider provider,
+                               std::initializer_list<std::pair<const char*, bson::Bson>> values)
+    : m_provider(provider)
+    , m_payload(std::make_unique<bson::BsonDocument>())
+{
+    (*m_payload)[kAppProviderKey] = provider_type_from_enum(provider);
+    for (auto& [key, value] : values) {
+        (*m_payload)[key] = std::move(value);
+    }
 }
 
 AuthProvider AppCredentials::provider() const
@@ -112,93 +119,87 @@ std::string AppCredentials::provider_as_string() const
     return provider_type_from_enum(m_provider);
 }
 
+bson::BsonDocument AppCredentials::serialize_as_bson() const
+{
+    return *m_payload;
+}
+
 std::string AppCredentials::serialize_as_json() const
 {
-    return m_payload_factory();
+    return bson::Bson(*m_payload).to_string();
 }
 
 AppCredentials AppCredentials::anonymous()
 {
-    return AppCredentials(AuthProvider::ANONYMOUS, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderAnonymous}}).dump();
-    });
+    return AppCredentials(AuthProvider::ANONYMOUS, {});
 }
 
 AppCredentials AppCredentials::apple(AppCredentialsToken id_token)
 {
-    return AppCredentials(AuthProvider::APPLE, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderApple}, {"id_token", id_token}}).dump();
-    });
+    return AppCredentials(AuthProvider::APPLE, {{"id_token", id_token}});
 }
 
 AppCredentials AppCredentials::facebook(AppCredentialsToken access_token)
 {
-    return AppCredentials(AuthProvider::FACEBOOK, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderFacebook}, {"accessToken", access_token}}).dump();
-    });
+    return AppCredentials(AuthProvider::FACEBOOK, {{"accessToken", access_token}});
 }
 
 AppCredentials AppCredentials::google(AuthCode&& auth_token)
 {
-    return AppCredentials(AuthProvider::GOOGLE, [auth_token = std::move(auth_token)] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderGoogle}, {"authCode", auth_token}}).dump();
-    });
+    return AppCredentials(AuthProvider::GOOGLE, {{"authCode", bson::Bson(auth_token)}});
 }
 
 AppCredentials AppCredentials::google(IdToken&& id_token)
 {
-    return AppCredentials(AuthProvider::GOOGLE, [id_token = std::move(id_token)] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderGoogle}, {"id_token", id_token}}).dump();
-    });
+    return AppCredentials(AuthProvider::GOOGLE, {{"id_token", bson::Bson(id_token)}});
 }
 
 AppCredentials AppCredentials::custom(AppCredentialsToken token)
 {
-    return AppCredentials(AuthProvider::CUSTOM, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderCustom}, {"token", token}}).dump();
-    });
+    return AppCredentials(AuthProvider::CUSTOM, {{"token", token}});
 }
 
 AppCredentials AppCredentials::username_password(std::string username, std::string password)
 {
-    return AppCredentials(AuthProvider::USERNAME_PASSWORD, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderUsernamePassword},
-                               {"username", username},
-                               {"password", password}})
-            .dump();
-    });
+    return AppCredentials(AuthProvider::USERNAME_PASSWORD, {{"username", username}, {"password", password}});
 }
 
 AppCredentials AppCredentials::function(const bson::BsonDocument& payload)
 {
-    return AppCredentials(AuthProvider::FUNCTION, [=] {
-        std::stringstream output;
-        output << bson::Bson(payload);
-        return output.str();
-    });
+    return AppCredentials(AuthProvider::FUNCTION, std::make_unique<bson::BsonDocument>(payload));
 }
 
 AppCredentials AppCredentials::function(const std::string& serialized_payload)
 {
-    return AppCredentials(AuthProvider::FUNCTION, [=] {
-        return serialized_payload;
-    });
+    return AppCredentials(
+        AuthProvider::FUNCTION,
+        std::make_unique<bson::BsonDocument>(static_cast<bson::BsonDocument>(bson::parse(serialized_payload))));
 }
 
 
 AppCredentials AppCredentials::user_api_key(std::string api_key)
 {
-    return AppCredentials(AuthProvider::USER_API_KEY, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderUserAPIKey}, {"key", api_key}}).dump();
-    });
+    return AppCredentials(AuthProvider::USER_API_KEY, {{"key", api_key}});
 }
 
 AppCredentials AppCredentials::server_api_key(std::string api_key)
 {
-    return AppCredentials(AuthProvider::SERVER_API_KEY, [=] {
-        return nlohmann::json({{kAppProviderKey, IdentityProviderServerAPIKey}, {"key", api_key}}).dump();
-    });
+    return AppCredentials(AuthProvider::SERVER_API_KEY, {{"key", api_key}});
 }
 
-} // namespace app
-} // namespace realm
+AppCredentials::AppCredentials(const AppCredentials& credentials)
+    : m_provider(credentials.m_provider)
+    , m_payload(std::make_unique<bson::BsonDocument>(*credentials.m_payload))
+{
+}
+
+AppCredentials& AppCredentials::operator=(const AppCredentials& credentials)
+{
+    if (&credentials != this) {
+        m_payload = std::make_unique<bson::BsonDocument>(*credentials.m_payload);
+        m_provider = credentials.m_provider;
+    }
+    return *this;
+}
+
+} // namespace realm::app

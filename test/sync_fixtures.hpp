@@ -292,8 +292,8 @@ private:
 // is used to retrieve the result afterwards.
 class HTTPRequestClient {
 public:
-    using WriteCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
-    using ReadCompletionHandler = std::function<void(std::error_code, size_t num_bytes_transferred)>;
+    using WriteCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
+    using ReadCompletionHandler = util::UniqueFunction<void(std::error_code, size_t num_bytes_transferred)>;
 
     util::PrefixLogger logger;
 
@@ -322,17 +322,17 @@ public:
 
     void async_write(const char* data, size_t size, WriteCompletionHandler handler)
     {
-        m_socket.async_write(data, size, handler);
+        m_socket.async_write(data, size, std::move(handler));
     }
 
     void async_read_until(char* buffer, size_t size, char delim, ReadCompletionHandler handler)
     {
-        m_socket.async_read_until(buffer, size, delim, m_read_ahead_buffer, handler);
+        m_socket.async_read_until(buffer, size, delim, m_read_ahead_buffer, std::move(handler));
     }
 
     void async_read(char* buffer, size_t size, ReadCompletionHandler handler)
     {
-        m_socket.async_read(buffer, size, m_read_ahead_buffer, handler);
+        m_socket.async_read(buffer, size, m_read_ahead_buffer, std::move(handler));
     }
 
 private:
@@ -545,7 +545,6 @@ public:
             config_2.ping_keepalive_period = config.client_ping_period;
             config_2.pong_keepalive_timeout = config.client_pong_timeout;
             config_2.disable_upload_compaction = config.disable_upload_compaction;
-            config_2.tcp_no_delay = true;
             config_2.one_connection_per_session = config.one_connection_per_session;
             config_2.disable_upload_activation_delay = config.disable_upload_activation_delay;
             m_clients[i] = std::make_unique<Client>(std::move(config_2));
@@ -647,7 +646,7 @@ public:
         //  connections, while the MongoDB/Stitch-based Sync server does not.
         config.service_identifier = "/realm-sync";
 
-        Session session{*m_clients[client_index], std::move(db), std::move(config)};
+        Session session{*m_clients[client_index], std::move(db), nullptr, std::move(config)};
         if (m_connection_state_change_listeners[client_index]) {
             session.set_connection_state_change_listener(m_connection_state_change_listeners[client_index]);
         }
@@ -986,7 +985,7 @@ public:
     void empty_transact();
     void nonempty_transact();
 
-    using TransactFunc = std::function<bool(Transaction&)>;
+    using TransactFunc = util::FunctionRef<bool(Transaction&)>;
 
     /// Perform a non-serialized transaction synchronously.
     bool transact(TransactFunc);
@@ -1016,7 +1015,7 @@ private:
     DBRef m_db;
     sync::Session m_session;
 
-    void setup_error_handler(std::function<ErrorHandler>);
+    void setup_error_handler(util::UniqueFunction<ErrorHandler>);
 };
 
 
@@ -1111,7 +1110,7 @@ inline version_type RealmFixture::get_last_integrated_server_version() const
     return progress.download.server_version;
 }
 
-inline void RealmFixture::setup_error_handler(std::function<ErrorHandler> handler)
+inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler> handler)
 {
     using ErrorInfo = Session::ErrorInfo;
     auto listener = [handler = std::move(handler)](ConnectionState state, const ErrorInfo* error_info) {

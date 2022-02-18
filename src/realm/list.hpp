@@ -207,6 +207,16 @@ public:
         return update_if_needed() != UpdateStatus::Detached;
     }
 
+    size_t translate_index(size_t ndx) const noexcept override
+    {
+        if constexpr (std::is_same_v<T, ObjKey>) {
+            return _impl::virtual2real(m_tree.get(), ndx);
+        }
+        else {
+            return ndx;
+        }
+    }
+
 protected:
     // Friend because it needs access to `m_tree` in the implementation of
     // `ObjCollectionBase::get_mutable_tree()`.
@@ -834,12 +844,12 @@ T Lst<T>::set(size_t ndx, T value)
 
     // get will check for ndx out of bounds
     T old = get(ndx);
+    if (Replication* repl = this->m_obj.get_replication()) {
+        repl->list_set(*this, ndx, value);
+    }
     if (old != value) {
         do_set(ndx, value);
         bump_content_version();
-    }
-    if (Replication* repl = this->m_obj.get_replication()) {
-        repl->list_set(*this, ndx, value);
     }
     return old;
 }
@@ -850,13 +860,14 @@ void Lst<T>::insert(size_t ndx, T value)
     if (value_is_null(value) && !m_nullable)
         throw LogicError(LogicError::column_not_nullable);
 
-    if (ndx > size())
+    auto sz = size();
+    if (ndx > sz)
         throw std::out_of_range("Index out of range");
 
     ensure_created();
 
     if (Replication* repl = this->m_obj.get_replication()) {
-        repl->list_insert(*this, ndx, value);
+        repl->list_insert(*this, ndx, value, sz);
     }
     do_insert(ndx, value);
     bump_content_version();

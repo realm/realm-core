@@ -102,7 +102,14 @@ public:
     /// Pop the last entry of the map
     void pop_back();
 
-    const std::vector<std::string> keys() const;
+    const std::vector<std::string>& keys() const noexcept
+    {
+        return m_keys;
+    }
+    const std::unordered_map<std::string, T>& entries() const noexcept
+    {
+        return m_map;
+    }
 
 private:
     template <typename V>
@@ -256,12 +263,6 @@ void IndexedMap<T>::pop_back()
     auto last_key = m_keys.back();
     m_keys.pop_back();
     m_map.erase(last_key);
-}
-
-template <typename T>
-const std::vector<std::string> IndexedMap<T>::keys() const
-{
-    return m_keys;
 }
 
 } // namespace bson

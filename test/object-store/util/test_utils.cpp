@@ -26,6 +26,16 @@
 #include <external/json/json.hpp>
 
 #include <iostream>
+#include <sys/stat.h>
+#ifndef _WIN32
+#include <unistd.h>
+#include <sys/types.h>
+#endif
+
+#if REALM_PLATFORM_APPLE
+#include <sys/mount.h>
+#include <sys/param.h>
+#endif
 
 namespace realm {
 
@@ -62,7 +72,7 @@ std::vector<char> make_test_encryption_key(const char start)
 // FIXME: Catch2 limitation on old compilers (currently our android CI)
 // https://github.com/catchorg/Catch2/blob/master/docs/limitations.md#clangg----skipping-leaf-sections-after-an-exception
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
-                                          std::function<void()> func)
+                                          util::FunctionRef<void()> func)
 {
     if (did_run_a_section) {
         func();
@@ -99,6 +109,77 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
     std::string suffix = "Et9HFtf9R3GEMA0IICOfFMVXY7kkTX1wr4qCyhIf58U";
     return encoded_prefix + "." + encoded_body + "." + suffix;
+}
+
+bool file_is_on_exfat(const std::string& path)
+{
+#if REALM_PLATFORM_APPLE
+    if (path.empty())
+        return false;
+
+    struct statfs fsbuf;
+    int ret = statfs(path.c_str(), &fsbuf);
+    REALM_ASSERT_RELEASE(ret == 0);
+    // The documentation and headers helpfully don't list any of the values of
+    // f_type or provide constants for them
+    return fsbuf.f_type == 28 /* exFAT */;
+#else
+    static_cast<void>(path);
+    return false;
+#endif
+}
+
+bool chmod_supported(const std::string& path)
+{
+#ifndef _WIN32
+    if (getuid() == 0) {
+        return false; // running as root
+    }
+    if (file_is_on_exfat(path)) {
+        return false;
+    }
+    return true;
+#else
+    static_cast<void>(path);
+    return false;
+#endif
+}
+
+int get_permissions(const std::string& path)
+{
+    int perms = 0;
+#ifndef _WIN32
+    REALM_ASSERT(!path.empty());
+    struct stat statbuf;
+    int ret = ::stat(path.c_str(), &statbuf);
+    REALM_ASSERT_EX(ret == 0, ret, errno);
+    perms = statbuf.st_mode;
+#else
+    static_cast<void>(path);
+#endif
+    return perms;
+}
+
+void chmod(const std::string& path, int permissions)
+{
+#ifndef _WIN32
+    int ret = ::chmod(path.c_str(), permissions);
+    REALM_ASSERT_EX(ret == 0, ret, errno);
+#else
+    static_cast<void>(path);
+    static_cast<void>(permissions);
+#endif
+}
+
+std::string get_parent_directory(const std::string& path)
+{
+    std::string parent;
+    size_t last_sep_pos = path.rfind('/', path.size());
+    if (last_sep_pos != std::string::npos) {
+        parent = path.substr(0, last_sep_pos);
+    }
+    REALM_ASSERT_EX(!parent.empty(), path);
+    return parent;
 }
 
 } // namespace realm

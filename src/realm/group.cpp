@@ -18,7 +18,6 @@
 
 #include <new>
 #include <algorithm>
-#include <set>
 #include <fstream>
 
 #ifdef REALM_DEBUG
@@ -1423,19 +1422,21 @@ void Group::update_refs(ref_type top_ref) noexcept
 
 bool Group::operator==(const Group& g) const
 {
-    auto keys_this = get_table_keys();
-    auto keys_g = g.get_table_keys();
-    size_t n = keys_this.size();
-    if (n != keys_g.size())
-        return false;
-    for (size_t i = 0; i < n; ++i) {
-        const StringData& table_name_1 = get_table_name(keys_this[i]);
-        const StringData& table_name_2 = g.get_table_name(keys_g[i]);
-        if (table_name_1 != table_name_2)
-            return false;
+    for (auto tk : get_table_keys()) {
+        const StringData& table_name = get_table_name(tk);
 
-        ConstTableRef table_1 = get_table(keys_this[i]);
-        ConstTableRef table_2 = g.get_table(keys_g[i]);
+        ConstTableRef table_1 = get_table(tk);
+        ConstTableRef table_2 = g.get_table(table_name);
+        if (!table_2)
+            return false;
+        if (table_1->get_primary_key_column().get_type() != table_2->get_primary_key_column().get_type()) {
+            return false;
+        }
+        if (table_1->is_embedded() != table_2->is_embedded())
+            return false;
+        if (table_1->is_embedded())
+            continue;
+
         if (*table_1 != *table_2)
             return false;
     }
@@ -1685,10 +1686,6 @@ public:
     {
         return true; // No-op
     }
-    bool dictionary_clear(size_t)
-    {
-        return true; // No-op
-    }
 
     bool set_insert(size_t)
     {
@@ -1847,6 +1844,18 @@ void Group::prepare_top_for_history(int history_type, int history_schema_version
         }
         m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(history_type));              // Throws
         m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+}
+
+void Group::clear_history()
+{
+    bool has_history = (m_top.is_attached() && m_top.size() > s_hist_type_ndx);
+    if (has_history) {
+        auto hist_ref = m_top.get_as_ref(s_hist_ref_ndx);
+        Array::destroy_deep(hist_ref, m_top.get_alloc());
+        m_top.set(s_hist_type_ndx, RefOrTagged::make_tagged(Replication::hist_None)); // Throws
+        m_top.set(s_hist_version_ndx, RefOrTagged::make_tagged(0));                   // Throws
+        m_top.set(s_hist_ref_ndx, 0);                                                 // Throws
     }
 }
 

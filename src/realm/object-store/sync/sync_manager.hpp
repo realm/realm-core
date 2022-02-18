@@ -20,8 +20,8 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/sync/config.hpp>
@@ -155,7 +155,7 @@ public:
     void wait_for_sessions_to_terminate() REQUIRES(!m_mutex);
 
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
-    bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const
+    bool perform_metadata_update(util::FunctionRef<void(const SyncMetadataManager&)> update_function) const
         REQUIRES(!m_file_system_mutex);
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
@@ -181,6 +181,9 @@ public:
 
     // Removes a user
     void remove_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
+
+    // Permanently deletes a user.
+    void delete_user(const std::string& user_id) REQUIRES(!m_user_mutex, !m_file_system_mutex);
 
     // Get the default path for a Realm for the given configuration.
     // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
@@ -219,7 +222,7 @@ public:
         return m_app;
     }
 
-    SyncManager() = default;
+    SyncManager();
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
@@ -251,7 +254,7 @@ private:
 
     mutable util::CheckedMutex m_mutex;
 
-    bool run_file_action(const SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
+    bool run_file_action(SyncFileActionMetadata&) REQUIRES(m_file_system_mutex);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Create a new logger of the type which will be used by the sync client

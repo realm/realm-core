@@ -38,6 +38,8 @@
 #include "test.hpp"
 #include "test_table_helper.hpp"
 
+#include <external/json/json.hpp>
+
 using namespace realm;
 using namespace realm::util;
 
@@ -1485,21 +1487,15 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
             std::ofstream expect("expect_test_upgrade_database_9_to_10.json");
             sg->start_read()->to_json(expect, 0);
         }
+        nlohmann::json expected;
+        nlohmann::json actual;
+        std::ifstream expect("expect_test_upgrade_database_9_to_10.json");
+        expect >> expected;
+
         std::stringstream out;
         sg->start_read()->to_json(out, 0);
-        std::ifstream expect("expect_test_upgrade_database_9_to_10.json");
-        std::string str1;
-        std::string str2;
-        expect >> str1;
-        out >> str2;
-        while (expect) {
-            if (str1 != str2) {
-                CHECK_EQUAL(str1, str2);
-                break;
-            }
-            expect >> str1;
-            out >> str2;
-        }
+        out >> actual;
+        CHECK(actual == expected);
     }
 
 #else

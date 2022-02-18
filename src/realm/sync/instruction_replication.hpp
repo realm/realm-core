@@ -56,7 +56,7 @@ public:
     void set(const Table*, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction variant) final;
 
     void list_set(const CollectionBase& list, size_t list_ndx, Mixed value) final;
-    void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value) final;
+    void list_insert(const CollectionBase& list, size_t list_ndx, Mixed value, size_t prior_size) final;
     void list_move(const CollectionBase&, size_t from_link_ndx, size_t to_link_ndx) final;
     void list_erase(const CollectionBase&, size_t link_ndx) final;
     void list_clear(const CollectionBase&) final;

@@ -983,7 +983,7 @@ public:
         has_run_twice = will_run.get_future();
     }
 
-    std::function<int64_t()> current_target_getter(size_t) override
+    util::UniqueFunction<int64_t()> current_target_getter(size_t) override
     {
         return []() { return realm::util::PageReclaimGovernor::no_match; };
     }

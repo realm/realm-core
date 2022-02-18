@@ -660,7 +660,7 @@ public:
     }
 
     void async_write_frame(bool fin, int opcode, const char* data, size_t size,
-                           std::function<void()> write_completion_handler)
+                           util::UniqueFunction<void()> write_completion_handler)
     {
         REALM_ASSERT(!m_stopped);
 
@@ -710,8 +710,8 @@ public:
             m_write_buffer.shrink_to_fit();
         }
 
-        auto handler = m_write_completion_handler;
-        m_write_completion_handler = std::function<void()>{};
+        auto handler = std::move(m_write_completion_handler);
+        m_write_completion_handler = nullptr;
         handler();
     }
 
@@ -739,7 +739,7 @@ private:
     std::vector<char> m_write_buffer;
     static const size_t s_write_buffer_stable_size = 2048;
 
-    std::function<void()> m_write_completion_handler;
+    util::UniqueFunction<void()> m_write_completion_handler;
 
     void error_client_malformed_response()
     {
@@ -1200,34 +1200,34 @@ void websocket::Socket::initiate_server_websocket_after_handshake()
 }
 
 void websocket::Socket::async_write_frame(bool fin, Opcode opcode, const char* data, size_t size,
-                                          std::function<void()> handler)
+                                          util::UniqueFunction<void()> handler)
 {
-    m_impl->async_write_frame(fin, int(opcode), data, size, handler);
+    m_impl->async_write_frame(fin, int(opcode), data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_text(const char* data, size_t size, std::function<void()> handler)
+void websocket::Socket::async_write_text(const char* data, size_t size, util::UniqueFunction<void()> handler)
 {
-    async_write_frame(true, Opcode::text, data, size, handler);
+    async_write_frame(true, Opcode::text, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_binary(const char* data, size_t size, std::function<void()> handler)
+void websocket::Socket::async_write_binary(const char* data, size_t size, util::UniqueFunction<void()> handler)
 {
-    async_write_frame(true, Opcode::binary, data, size, handler);
+    async_write_frame(true, Opcode::binary, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_close(const char* data, size_t size, std::function<void()> handler)
+void websocket::Socket::async_write_close(const char* data, size_t size, util::UniqueFunction<void()> handler)
 {
-    async_write_frame(true, Opcode::close, data, size, handler);
+    async_write_frame(true, Opcode::close, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_ping(const char* data, size_t size, std::function<void()> handler)
+void websocket::Socket::async_write_ping(const char* data, size_t size, util::UniqueFunction<void()> handler)
 {
-    async_write_frame(true, Opcode::ping, data, size, handler);
+    async_write_frame(true, Opcode::ping, data, size, std::move(handler));
 }
 
-void websocket::Socket::async_write_pong(const char* data, size_t size, std::function<void()> handler)
+void websocket::Socket::async_write_pong(const char* data, size_t size, util::UniqueFunction<void()> handler)
 {
-    async_write_frame(true, Opcode::pong, data, size, handler);
+    async_write_frame(true, Opcode::pong, data, size, std::move(handler));
 }
 
 void websocket::Socket::stop() noexcept

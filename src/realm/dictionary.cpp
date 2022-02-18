@@ -456,16 +456,11 @@ void Dictionary::sort(std::vector<size_t>& indices, bool ascending) const
     align_indices(indices);
     auto b = indices.begin();
     auto e = indices.end();
-    if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_any(i1) < get_any(i2);
-        });
-    }
-    else {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_any(i1) > get_any(i2);
-        });
-    }
+    std::sort(b, e, [this, ascending](size_t i1, size_t i2) {
+        auto v1 = get_any(i1);
+        auto v2 = get_any(i2);
+        return ascending ? v1 < v2 : v2 < v1;
+    });
 }
 
 void Dictionary::distinct(std::vector<size_t>& indices, util::Optional<bool> ascending) const
@@ -491,16 +486,11 @@ void Dictionary::sort_keys(std::vector<size_t>& indices, bool ascending) const
     align_indices(indices);
     auto b = indices.begin();
     auto e = indices.end();
-    if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_key(i1) < get_key(i2);
-        });
-    }
-    else {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return get_key(i1) > get_key(i2);
-        });
-    }
+    std::sort(b, e, [this, ascending](size_t i1, size_t i2) {
+        auto k1 = get_key(i1);
+        auto k2 = get_key(i2);
+        return ascending ? k1 < k2 : k2 < k1;
+    });
 }
 
 void Dictionary::distinct_keys(std::vector<size_t>& indices, util::Optional<bool>) const
@@ -703,6 +693,16 @@ const Mixed Dictionary::operator[](Mixed key)
     }
 
     return *ret;
+}
+
+Obj Dictionary::get_object(StringData key)
+{
+    if (auto val = try_get(key)) {
+        if ((*val).is_type(type_TypedLink)) {
+            return get_table()->get_parent_group()->get_object((*val).get_link());
+        }
+    }
+    return {};
 }
 
 bool Dictionary::contains(Mixed key) const noexcept
@@ -1004,9 +1004,6 @@ Mixed Dictionary::do_get(const ClusterNode::State& s) const
         if (key.is_unresolved()) {
             return {};
         }
-        if (m_col_key.get_type() == col_type_Link) {
-            return key;
-        }
     }
     return val;
 }
@@ -1123,7 +1120,7 @@ DictionaryLinkValues::DictionaryLinkValues(const Dictionary& source)
 ObjKey DictionaryLinkValues::get_key(size_t ndx) const
 {
     Mixed val = m_source.get_any(ndx);
-    if (val.is_type(type_Link)) {
+    if (val.is_type(type_Link, type_TypedLink)) {
         return val.get<ObjKey>();
     }
     return {};
@@ -1134,14 +1131,14 @@ ObjKey DictionaryLinkValues::get_key(size_t ndx) const
 bool DictionaryLinkValues::is_obj_valid(size_t ndx) const noexcept
 {
     Mixed val = m_source.get_any(ndx);
-    return val.is_type(type_Link);
+    return val.is_type(type_TypedLink);
 }
 
 Obj DictionaryLinkValues::get_object(size_t row_ndx) const
 {
     Mixed val = m_source.get_any(row_ndx);
-    if (val.is_type(type_Link)) {
-        return get_target_table()->get_object(val.get<ObjKey>());
+    if (val.is_type(type_TypedLink)) {
+        return get_table()->get_parent_group()->get_object(val.get_link());
     }
     return {};
 }

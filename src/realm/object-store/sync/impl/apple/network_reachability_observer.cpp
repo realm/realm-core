@@ -48,8 +48,8 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
 
 } // namespace
 
-NetworkReachabilityObserver::NetworkReachabilityObserver(util::Optional<std::string> hostname,
-                                                         std::function<void(const NetworkReachabilityStatus)> handler)
+NetworkReachabilityObserver::NetworkReachabilityObserver(
+    util::Optional<std::string> hostname, util::UniqueFunction<void(const NetworkReachabilityStatus)> handler)
     : m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", DISPATCH_QUEUE_SERIAL))
     , m_change_handler(std::move(handler))
 {

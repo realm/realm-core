@@ -20,9 +20,10 @@
 #define REALM_BACKGROUND_COLLECTION_HPP
 
 #include <realm/object-store/impl/deep_change_checker.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 
 #include <realm/util/assert.hpp>
+#include <realm/util/checked_mutex.hpp>
+#include <realm/util/functional.hpp>
 #include <realm/version_id.hpp>
 #include <realm/table_ref.hpp>
 
@@ -187,13 +188,13 @@ protected:
     bool any_related_table_was_modified(TransactionChangeInfo const&) const noexcept;
 
     // Creates and returns a `DeepChangeChecker` or `KeyPathChecker` depending on the given KeyPathArray.
-    std::function<bool(ObjKey)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef)
+    util::UniqueFunction<bool(ObjKey)> get_modification_checker(TransactionChangeInfo const&, ConstTableRef)
         REQUIRES(!m_callback_mutex);
 
     // Creates and returns a `ObjectKeyPathChangeChecker` which behaves slightly different that `DeepChangeChecker`
     // and `KeyPathChecker` which are used for `Collection`s.
-    std::function<std::vector<ColKey>(ObjKey)> get_object_modification_checker(TransactionChangeInfo const&,
-                                                                               ConstTableRef)
+    util::UniqueFunction<std::vector<ColKey>(ObjKey)> get_object_modification_checker(TransactionChangeInfo const&,
+                                                                                      ConstTableRef)
         REQUIRES(!m_callback_mutex);
 
     // Returns a vector containing all `KeyPathArray`s from all `NotificationCallback`s attached to this notifier.

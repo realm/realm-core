@@ -114,6 +114,11 @@ public:
         return get_obj().get_target_table(get_col_key());
     }
 
+    virtual size_t translate_index(size_t ndx) const noexcept
+    {
+        return ndx;
+    }
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -461,6 +466,7 @@ namespace _impl {
 /// Translate from condensed index to uncondensed index in collections that hide
 /// tombstones.
 size_t virtual2real(const std::vector<size_t>& vec, size_t ndx) noexcept;
+size_t virtual2real(const BPlusTree<ObjKey>* tree, size_t ndx) noexcept;
 
 /// Translate from uncondensed index to condensed into in collections that hide
 /// tombstones.

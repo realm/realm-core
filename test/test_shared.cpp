@@ -50,6 +50,7 @@
 #include <realm/util/thread.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/impl/simulated_failure.hpp>
+#include <realm/impl/copy_replication.hpp>
 
 #include "fuzz_group.hpp"
 
@@ -281,7 +282,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
     // Idea for solution: Install a custom signal handler for SIGABRT and
     // friends, and kill all spawned child processes from it. See `man abort`.
 
-    CHECK(RobustMutex::is_robust_on_this_platform());
+    CHECK(RobustMutex::is_robust_on_this_platform);
     const int num_processes = 50;
     SHARED_GROUP_TEST_PATH(path);
     DBRef sg = DB::create(path, false, DBOptions(crypt_key()));
@@ -1561,7 +1562,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 {
     // Abort if robust mutexes are not supported on the current
     // platform. Otherwise we would probably get into a dead-lock.
-    if (!RobustMutex::is_robust_on_this_platform())
+    if (!RobustMutex::is_robust_on_this_platform)
         return;
 
     // This test can only be conducted by spawning independent
@@ -3085,7 +3086,7 @@ NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
 
     // Should use the specified temp dir.
     const std::string test_dir2 = "/test2-temp";
-    DBOptions options2(DBOptions::Durability::Full, nullptr, true, std::function<void(int, int)>(), test_dir2);
+    DBOptions options2(DBOptions::Durability::Full, nullptr, true, nullptr, test_dir2);
     CHECK(options2.temp_dir.compare(test_dir2) == 0);
 
     DBOptions::set_sys_tmp_dir(initial_system_dir);
@@ -4064,6 +4065,399 @@ TEST(Shared_WriteCopy)
     auto hist = make_in_realm_history();
     DBRef db = DB::create(*hist, path3);
     CHECK_EQUAL(db->start_read()->get_table("foo")->size(), 1);
+}
+
+TEST(Shared_CompareGroups)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+
+    DBRef db1 = DB::create(make_in_realm_history(), path1);
+    DBRef db2 = DB::create(make_in_realm_history(), path2);
+
+    {
+        // Create schema in DB1
+        auto wt = db1->start_write();
+        auto embedded = wt->add_embedded_table("class_Embedded");
+        embedded->add_column(type_Float, "float");
+        // Embedded in embedded
+        embedded->add_column_dictionary(*embedded, "additional");
+        wt->add_embedded_table("class_AnotherEmbedded");
+
+        auto baas = wt->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
+
+        baas->add_column(type_Bool, "bool");
+        baas->add_column_list(type_Int, "list");
+        baas->add_column_set(type_Int, "set");
+        baas->add_column_dictionary(type_Int, "dictionary");
+        baas->add_column(*embedded, "embedded");
+        baas->add_column(type_Mixed, "any", true);
+        baas->add_column(*foos, "link");
+
+        foos->add_column(type_String, "str");
+        foos->add_column_list(*embedded, "list_of_embedded");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+        foos->add_column_list(*baas, "link_list");
+        wt->commit();
+    }
+    {
+        // Create schema in DB2 - slightly different
+        auto wt = db2->start_write();
+        auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
+
+        auto embedded = wt->add_embedded_table("class_Embedded");
+        embedded->add_column(type_Float, "float");
+        // Embedded in embedded
+        embedded->add_column_dictionary(*embedded, "additional");
+
+        auto baas = wt->add_table_with_primary_key("class_Baa", type_Int, "_id");
+
+        baas->add_column_set(type_Int, "set");
+        baas->add_column(type_Mixed, "any", true);
+        baas->add_column_dictionary(type_Int, "dictionary");
+        baas->add_column(*embedded, "embedded");
+        baas->add_column(type_Bool, "bool");
+        baas->add_column(*foos, "link");
+        baas->add_column_list(type_Int, "list");
+
+        foos->add_column_list(*embedded, "list_of_embedded");
+        foos->add_column(type_String, "str");
+        foos->add_column_list(*baas, "link_list");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+
+        wt->add_embedded_table("class_AnotherEmbedded");
+        wt->commit();
+    }
+    auto create_objects = [&](DBRef db) {
+        auto wt = db->start_write();
+
+        auto foos = wt->get_table("class_Foo");
+        auto baas = wt->get_table("class_Baa");
+
+        auto foo = foos->create_object_with_primary_key("123").set("str", "Hello");
+        auto children = foo.get_linklist("list_of_embedded");
+        children.create_and_insert_linked_object(0).set("float", 10.f);
+        children.create_and_insert_linked_object(1).set("float", 20.f);
+
+        auto baa = baas->create_object_with_primary_key(999);
+        baa.set("link", foo.get_key());
+        baa.set("bool", true);
+        auto obj = baa.create_and_set_linked_object(baas->get_column_key("embedded"));
+        obj.set("float", 42.f);
+        auto additional = obj.get_dictionary("additional");
+        additional.create_and_insert_linked_object("One").set("float", 1.f);
+        additional.create_and_insert_linked_object("Two").set("float", 2.f);
+        additional.create_and_insert_linked_object("Three").set("float", 3.f);
+
+        foo.get_linklist("link_list").add(baa.get_key());
+
+        // Basic collections
+        auto list = baa.get_list<Int>("list");
+        list.add(1);
+        list.add(2);
+        list.add(3);
+        auto set = baa.get_set<Int>("set");
+        set.insert(4);
+        set.insert(5);
+        set.insert(6);
+        auto dict = baa.get_dictionary("dictionary");
+        dict.insert("key7", 7);
+        dict.insert("key8", 8);
+        dict.insert("key9", 9);
+
+        wt->commit();
+    };
+    create_objects(db1);
+    create_objects(db2);
+    CHECK(*db1->start_read() == *db2->start_read());
+    {
+        auto wt = db2->start_write();
+        auto baas = wt->get_table("class_Baa");
+        auto obj = baas->get_object_with_primary_key(999);
+        auto embedded = obj.get_linked_object("embedded");
+        embedded.get_dictionary("additional").get_object("One").set("float", 555.f);
+        wt->commit();
+    }
+    CHECK_NOT(*db1->start_read() == *db2->start_read());
+}
+
+TEST(Shared_CopyReplication)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+
+    DBRef db2 = DB::create(make_in_realm_history(), path2);
+    auto wt = db2->start_write();
+
+    impl::CopyReplication repl(wt);
+    DBRef db1 = DB::create(repl, path1);
+    auto tr = db1->start_write();
+
+    // First create the local realm
+    {
+        // Create schema
+        auto embedded = tr->add_embedded_table("class_Embedded");
+        embedded->add_column(type_Float, "float");
+        // Embedded in embedded
+        embedded->add_column_dictionary(*embedded, "additional");
+        tr->add_embedded_table("class_AnotherEmbedded");
+
+        auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+
+        baas->add_column(type_Bool, "bool");
+        baas->add_column_list(type_Int, "list");
+        baas->add_column_set(type_Int, "set");
+        baas->add_column_dictionary(type_Int, "dictionary");
+        baas->add_column(*embedded, "embedded");
+        baas->add_column(type_Mixed, "any", true);
+        baas->add_column(*foos, "link");
+
+        foos->add_column(type_String, "str");
+        foos->add_column_list(*embedded, "list_of_embedded");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+        foos->add_column_list(*baas, "link_list");
+
+
+        /* Create local objects */
+        auto foo = foos->create_object_with_primary_key("123").set("str", "Hello");
+        auto children = foo.get_linklist("list_of_embedded");
+        children.create_and_insert_linked_object(0).set("float", 10.f);
+        children.create_and_insert_linked_object(1).set("float", 20.f);
+
+        auto baa = baas->create_object_with_primary_key(999);
+        baa.set("link", foo.get_key());
+        auto obj = baa.create_and_set_linked_object(baas->get_column_key("embedded"));
+        obj.set("float", 42.f);
+        auto additional = obj.get_dictionary("additional");
+
+        foo.get_linklist("link_list").add(baa.get_key());
+
+        // Basic collections
+        auto list = baa.get_list<Int>("list");
+        list.add(1);
+        list.add(2);
+        list.add(3);
+        auto set = baa.get_set<Int>("set");
+        set.insert(4);
+        set.insert(5);
+        set.insert(6);
+        auto dict = baa.get_dictionary("dictionary");
+        dict.insert("key7", 7);
+        dict.insert("key8", 8);
+        dict.insert("key9", 9);
+
+        additional.create_and_insert_linked_object("One").set("float", 1.f);
+        additional.create_and_insert_linked_object("Two").set("float", 2.f);
+        auto embedded_obj = additional.create_and_insert_linked_object("Three");
+
+        auto baa1 = baas->create_object_with_primary_key(666).set("link", foo.get_key());
+        obj = baa1.create_and_set_linked_object(baas->get_column_key("embedded"));
+        additional = obj.get_dictionary("additional");
+        additional.create_and_insert_linked_object("Item").set("float", 100.f);
+        obj.set("float", 35.f);
+        foo = foos->create_object_with_primary_key("456");
+        auto any_list = foo.get_list<Mixed>("list_of_any");
+        any_list.add(Mixed(baa1.get_link()));
+        any_list.add(Mixed(foo.get_link()));
+        foos->create_object_with_primary_key("789");
+        baa1.set("any", Mixed(foo.get_link()));
+        baa.set("bool", true);
+        embedded_obj.set("float", 3.f);
+    }
+    tr->commit();
+
+    wt->commit_and_continue_as_read();
+    auto rt = db1->start_read();
+    CHECK(*rt == *wt);
+}
+
+TEST(Shared_WriteTo)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+
+    DBRef db1 = DB::create(make_in_realm_history(), path1);
+    auto tr = db1->start_write();
+
+    // First create the local realm
+    {
+        // Create schema
+        auto embedded = tr->add_embedded_table("class_Embedded");
+        embedded->add_column(type_Float, "float");
+        // Embedded in embedded
+        embedded->add_column_dictionary(*embedded, "additional");
+        tr->add_embedded_table("class_AnotherEmbedded");
+
+        auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+
+        baas->add_column(type_Bool, "bool");
+        baas->add_column_list(type_Int, "list");
+        baas->add_column_set(type_Int, "set");
+        baas->add_column_dictionary(type_Int, "dictionary");
+        baas->add_column(*embedded, "embedded");
+        baas->add_column(type_Mixed, "any", true);
+        baas->add_column(*foos, "link");
+
+        auto col_str = foos->add_column(type_String, "str");
+        foos->add_search_index(col_str);
+        foos->add_column_list(*embedded, "list_of_embedded");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+        foos->add_column_list(*baas, "link_list");
+
+
+        /* Create local objects */
+        auto foo = foos->create_object_with_primary_key("123").set("str", "Hello");
+        auto children = foo.get_linklist("list_of_embedded");
+        children.create_and_insert_linked_object(0).set("float", 10.f);
+        children.create_and_insert_linked_object(1).set("float", 20.f);
+
+        auto baa = baas->create_object_with_primary_key(999);
+        baa.set("link", foo.get_key());
+        auto obj = baa.create_and_set_linked_object(baas->get_column_key("embedded"));
+        obj.set("float", 42.f);
+        auto additional = obj.get_dictionary("additional");
+        additional.create_and_insert_linked_object("One").set("float", 1.f);
+        additional.create_and_insert_linked_object("Two").set("float", 2.f);
+        additional.create_and_insert_linked_object("Three").set("float", 3.f);
+
+        foo.get_linklist("link_list").add(baa.get_key());
+
+        // Basic collections
+        auto list = baa.get_list<Int>("list");
+        list.add(1);
+        list.add(2);
+        list.add(3);
+        auto set = baa.get_set<Int>("set");
+        set.insert(4);
+        set.insert(5);
+        set.insert(6);
+        auto dict = baa.get_dictionary("dictionary");
+        dict.insert("key7", 7);
+        dict.insert("key8", 8);
+        dict.insert("key9", 9);
+
+        auto baa1 = baas->create_object_with_primary_key(666).set("link", foo.get_key());
+        obj = baa1.create_and_set_linked_object(baas->get_column_key("embedded"));
+        additional = obj.get_dictionary("additional");
+        additional.create_and_insert_linked_object("Item").set("float", 100.f);
+        obj.set("float", 35.f);
+        foo = foos->create_object_with_primary_key("456");
+        auto any_list = foo.get_list<Mixed>("list_of_any");
+        any_list.add(Mixed(baa1.get_link()));
+        any_list.add(Mixed(foo.get_link()));
+        foos->create_object_with_primary_key("789");
+        baa1.set("any", Mixed(foo.get_link()));
+        baa.set("bool", true);
+    }
+    tr->commit_and_continue_as_read();
+    // tr->to_json(std::cout);
+
+
+    // Create remote db
+    DBRef db2 = DB::create(make_in_realm_history(), path2);
+    {
+        auto wt = db2->start_write();
+
+        // Create schema - where some columns are missing. This will cause the
+        // ColKeys to be different
+        auto embedded = wt->add_embedded_table("class_Embedded");
+        embedded->add_column(type_Float, "float");
+        // Embedded in embedded
+        embedded->add_column_dictionary(*embedded, "additional");
+
+        auto baas = wt->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        baas->add_column(*embedded, "embedded");
+
+        auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+
+        baas->create_object_with_primary_key(333);
+        auto baa = baas->create_object_with_primary_key(666);
+        auto obj = baa.create_and_set_linked_object(baas->get_column_key("embedded"));
+        obj.set("float", 99.f);
+        auto additional = obj.get_dictionary("additional");
+        additional.create_and_insert_linked_object("Item").set("float", 200.f);
+        foos->create_object_with_primary_key("789").get_list<Mixed>("list_of_any").add(Mixed(baa.get_link()));
+        wt->commit();
+    }
+
+    // Copy local object over
+    auto dest = db2->start_write();
+    tr->copy_to(dest);
+    dest->commit_and_continue_as_read();
+
+    // The difference between the two realms should now be that the remote db has an
+    // extra baa object with pk 333.
+    CHECK_NOT(*tr == *dest);
+    tr->promote_to_write();
+    // So if we add this to the local realm, they should match
+    tr->get_table("class_Baa")->create_object_with_primary_key(333);
+    tr->commit_and_continue_as_read();
+    CHECK(*tr == *dest);
+}
+
+TEST(Shared_WriteToFail)
+{
+    SHARED_GROUP_TEST_PATH(path1);
+    SHARED_GROUP_TEST_PATH(path2);
+
+    DBRef db1 = DB::create(make_in_realm_history(), path1);
+    auto tr = db1->start_write();
+
+    // First create the local realm
+    {
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+
+        foos->add_column(type_String, "classification");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+
+        /* Create local objects */
+        auto foo = foos->create_object_with_primary_key("anders.andk@andeby.io").set("classification", "Duck");
+        auto any_list = foo.get_list<Mixed>("list_of_any");
+        any_list.add(Mixed(17));
+        any_list.add(Mixed("Hello"));
+    }
+    tr->commit_and_continue_as_read();
+    // tr->to_json(std::cout);
+
+    ColKey col_fail;
+    // Create remote db
+    DBRef db2 = DB::create(make_in_realm_history(), path2);
+    {
+        auto wt = db2->start_write();
+        auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
+        col_fail = foos->add_column(type_Int, "classification");
+        foos->add_column_list(type_Mixed, "list_of_any", true);
+        wt->commit();
+    }
+
+    auto dest = db2->start_write();
+    std::string message;
+
+    CHECK_THROW_ANY_GET_MESSAGE(tr->copy_to(dest), message);
+    CHECK_EQUAL(message, "Incompatible property: class_Foo::classification");
+
+    auto foos = dest->get_table("class_Foo");
+    foos->remove_column(col_fail);
+    col_fail = foos->add_column(type_String, "classification", true); // Now nullable
+    dest->commit();
+    dest = db2->start_write();
+
+    CHECK_THROW_ANY_GET_MESSAGE(tr->copy_to(dest), message);
+    CHECK_EQUAL(message, "Incompatible property: class_Foo::classification");
+
+    foos = dest->get_table("class_Foo");
+    foos->remove_column(col_fail);
+    col_fail = foos->add_column(type_String, "classification");
+    dest->commit();
+    dest = db2->start_write();
+    tr->copy_to(dest);
+    dest->commit_and_continue_as_read();
+
+    CHECK(*tr == *dest);
 }
 
 #endif // TEST_SHARED

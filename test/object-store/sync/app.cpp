@@ -69,30 +69,26 @@ using util::Optional;
 using namespace std::string_view_literals;
 
 namespace {
-std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app,
-                                 app::AppCredentials credentials = app::AppCredentials::anonymous())
+std::shared_ptr<SyncUser> log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
 {
     std::shared_ptr<SyncUser> user;
-    app->log_in_with_credentials(credentials,
-                                 [&](std::shared_ptr<SyncUser> user_arg, util::Optional<app::AppError> error) {
-                                     REQUIRE_FALSE(error);
-                                     REQUIRE(user_arg);
-                                     user = std::move(user_arg);
-                                 });
+    app->log_in_with_credentials(credentials, [&](std::shared_ptr<SyncUser> user_arg, Optional<AppError> error) {
+        REQUIRE_FALSE(error);
+        REQUIRE(user_arg);
+        user = std::move(user_arg);
+    });
     REQUIRE(user);
     return user;
 }
 
-app::AppError failed_log_in(std::shared_ptr<App> app,
-                            app::AppCredentials credentials = app::AppCredentials::anonymous())
+AppError failed_log_in(std::shared_ptr<App> app, AppCredentials credentials = AppCredentials::anonymous())
 {
-    util::Optional<app::AppError> err;
-    app->log_in_with_credentials(credentials,
-                                 [&](std::shared_ptr<SyncUser> user, util::Optional<app::AppError> error) {
-                                     REQUIRE(error);
-                                     REQUIRE_FALSE(user);
-                                     err = error;
-                                 });
+    Optional<AppError> err;
+    app->log_in_with_credentials(credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+        REQUIRE(error);
+        REQUIRE_FALSE(user);
+        err = error;
+    });
     REQUIRE(err);
     return *err;
 }
@@ -218,18 +214,18 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 
     bool processed = false;
 
-    client.register_email(email, password, [&](Optional<app::AppError> error) {
+    client.register_email(email, password, [&](Optional<AppError> error) {
         CAPTURE(email);
         CAPTURE(password);
         REQUIRE_FALSE(error); // first registration success
     });
 
     SECTION("double registration should fail") {
-        client.register_email(email, password, [&](Optional<app::AppError> error) {
+        client.register_email(email, password, [&](Optional<AppError> error) {
             // Error returned states the account has already been created
             REQUIRE(error);
             CHECK(error->message == "name already in use");
-            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::account_name_in_use);
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::account_name_in_use);
             CHECK(!error->link_to_server_logs.empty());
             CHECK(error->link_to_server_logs.find(base_url) != std::string::npos);
             processed = true;
@@ -240,10 +236,10 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     SECTION("double registration should fail") {
         // the server registration function will reject emails that do not contain "realm_tests_do_autoverify"
         std::string email_to_reject = util::format("%1@%2.com", random_string(10), random_string(10));
-        client.register_email(email_to_reject, password, [&](Optional<app::AppError> error) {
+        client.register_email(email_to_reject, password, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == util::format("failed to confirm user %1", email_to_reject));
-            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::bad_request);
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::bad_request);
             processed = true;
         });
         CHECK(processed);
@@ -255,8 +251,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("cannot login with wrong password") {
-        app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, "boogeyman"),
-                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        app->log_in_with_credentials(AppCredentials::username_password(email, "boogeyman"),
+                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<AppError> error) {
                                          CHECK(!user);
                                          REQUIRE(error);
                                          REQUIRE(error->error_code.value() ==
@@ -267,7 +263,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("confirm user") {
-        client.confirm_user("a_token", "a_token_id", [&](Optional<app::AppError> error) {
+        client.confirm_user("a_token", "a_token_id", [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "invalid token data");
             processed = true;
@@ -276,7 +272,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("resend confirmation email") {
-        client.resend_confirmation_email(email, [&](Optional<app::AppError> error) {
+        client.resend_confirmation_email(email, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "already confirmed");
             processed = true;
@@ -285,7 +281,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("reset password invalid tokens") {
-        client.reset_password(password, "token_sample", "token_id_sample", [&](Optional<app::AppError> error) {
+        client.reset_password(password, "token_sample", "token_id_sample", [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "invalid token data");
             CHECK(!error->link_to_server_logs.empty());
@@ -299,7 +295,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         // the imported test app will accept password reset if the password contains "realm_tests_do_reset" via a
         // function
         std::string accepted_new_password = util::format("realm_tests_do_reset%1", random_string(10));
-        client.call_reset_password_function(email, accepted_new_password, {}, [&](Optional<app::AppError> error) {
+        client.call_reset_password_function(email, accepted_new_password, {}, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
             processed = true;
         });
@@ -308,31 +304,30 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 
     SECTION("reset password function failure") {
         std::string rejected_password = util::format("%1", random_string(10));
-        client.call_reset_password_function(
-            email, rejected_password, {"foo", "bar"}, [&](Optional<app::AppError> error) {
-                REQUIRE(error);
-                CHECK(error->message == util::format("failed to reset password for user %1", email));
-                CHECK(error->is_service_error());
-                processed = true;
-            });
+        client.call_reset_password_function(email, rejected_password, {"foo", "bar"}, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == util::format("failed to reset password for user %1", email));
+            CHECK(error->is_service_error());
+            processed = true;
+        });
         CHECK(processed);
     }
 
     SECTION("reset password function for invalid user fails") {
         client.call_reset_password_function(util::format("%1@%2.com", random_string(5), random_string(5)), password,
-                                            {"foo", "bar"}, [&](Optional<app::AppError> error) {
+                                            {"foo", "bar"}, [&](Optional<AppError> error) {
                                                 REQUIRE(error);
                                                 CHECK(error->message == "user not found");
                                                 CHECK(error->is_service_error());
-                                                CHECK(app::ServiceErrorCode(error->error_code.value()) ==
-                                                      app::ServiceErrorCode::user_not_found);
+                                                CHECK(ServiceErrorCode(error->error_code.value()) ==
+                                                      ServiceErrorCode::user_not_found);
                                                 processed = true;
                                             });
         CHECK(processed);
     }
 
     SECTION("retry custom confirmation") {
-        client.retry_custom_confirmation(email, [&](Optional<app::AppError> error) {
+        client.retry_custom_confirmation(email, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "already confirmed");
             processed = true;
@@ -342,11 +337,11 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 
     SECTION("retry custom confirmation for invalid user fails") {
         client.retry_custom_confirmation(
-            util::format("%1@%2.com", random_string(5), random_string(5)), [&](Optional<app::AppError> error) {
+            util::format("%1@%2.com", random_string(5), random_string(5)), [&](Optional<AppError> error) {
                 REQUIRE(error);
                 CHECK(error->message == "user not found");
                 CHECK(error->is_service_error());
-                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::user_not_found);
+                CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::user_not_found);
                 processed = true;
             });
         CHECK(processed);
@@ -356,23 +351,23 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         CHECK(app->sync_manager()->all_users().size() == 0);
         CHECK(app->sync_manager()->get_current_user() == nullptr);
 
-        auto user = log_in(app, app::AppCredentials::username_password(email, password));
+        auto user = log_in(app, AppCredentials::username_password(email, password));
         CHECK(user->user_profile().email() == email);
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
-        app->remove_user(user, [&](Optional<app::AppError> error) {
+        app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
         CHECK(user->state() == SyncUser::State::Removed);
 
-        log_in(app, app::AppCredentials::username_password(email, password));
+        log_in(app, AppCredentials::username_password(email, password));
         CHECK(user->state() == SyncUser::State::Removed);
         CHECK(app->current_user() != user);
         user = app->current_user();
         CHECK(user->user_profile().email() == email);
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
-        app->remove_user(user, [&](Optional<app::AppError> error) {
+        app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE(!error);
             CHECK(app->sync_manager()->all_users().size() == 0);
             processed = true;
@@ -399,18 +394,17 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         std::shared_ptr<SyncUser> logged_in_user = app->current_user();
         auto api_key_name = util::format("%1", random_string(15));
         client.create_api_key(api_key_name, logged_in_user,
-                              [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                              [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
                                   REQUIRE_FALSE(error);
                                   CHECK(user_api_key.name == api_key_name);
                                   api_key = user_api_key;
                               });
 
-        client.fetch_api_key(api_key.id, logged_in_user,
-                             [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                 REQUIRE_FALSE(error);
-                                 CHECK(user_api_key.name == api_key_name);
-                                 CHECK(user_api_key.id == api_key.id);
-                             });
+        client.fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.name == api_key_name);
+            CHECK(user_api_key.id == api_key.id);
+        });
 
         client.fetch_api_keys(logged_in_user, [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
             CHECK(api_keys.size() == 1);
@@ -426,35 +420,32 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             REQUIRE_FALSE(error);
         });
 
-        client.fetch_api_key(api_key.id, logged_in_user,
-                             [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                 REQUIRE_FALSE(error);
-                                 CHECK(user_api_key.disabled == false);
-                                 CHECK(user_api_key.name == api_key_name);
-                                 CHECK(user_api_key.id == api_key.id);
-                             });
+        client.fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.name == api_key_name);
+            CHECK(user_api_key.id == api_key.id);
+        });
 
         client.disable_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        client.fetch_api_key(api_key.id, logged_in_user,
-                             [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                 REQUIRE_FALSE(error);
-                                 CHECK(user_api_key.disabled == true);
-                                 CHECK(user_api_key.name == api_key_name);
-                             });
+        client.fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.disabled == true);
+            CHECK(user_api_key.name == api_key_name);
+        });
 
         client.delete_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        client.fetch_api_key(api_key.id, logged_in_user,
-                             [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                 CHECK(user_api_key.name == "");
-                                 CHECK(error);
-                                 processed = true;
-                             });
+        client.fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            CHECK(user_api_key.name == "");
+            CHECK(error);
+            processed = true;
+        });
 
         CHECK(processed);
     }
@@ -462,15 +453,14 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     SECTION("api-key without a user") {
         std::shared_ptr<SyncUser> no_user = nullptr;
         auto api_key_name = util::format("%1", random_string(15));
-        client.create_api_key(api_key_name, no_user,
-                              [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                  REQUIRE(error);
-                                  CHECK(error->is_service_error());
-                                  CHECK(error->message == "must authenticate first");
-                                  CHECK(user_api_key.name == "");
-                              });
+        client.create_api_key(api_key_name, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->is_service_error());
+            CHECK(error->message == "must authenticate first");
+            CHECK(user_api_key.name == "");
+        });
 
-        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
             CHECK(error->message == "must authenticate first");
@@ -490,7 +480,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             CHECK(error->message == "must authenticate first");
         });
 
-        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
             CHECK(error->message == "must authenticate first");
@@ -503,7 +493,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             CHECK(error->message == "must authenticate first");
         });
 
-        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->is_service_error());
             CHECK(error->message == "must authenticate first");
@@ -516,7 +506,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             CHECK(error->message == "must authenticate first");
         });
 
-        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+        client.fetch_api_key(api_key.id, no_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(user_api_key.name == "");
             REQUIRE(error);
             CHECK(error->is_service_error());
@@ -537,27 +527,25 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         App::UserAPIKeyProviderClient provider = app->provider_client<App::UserAPIKeyProviderClient>();
 
         provider.create_api_key(api_key_name, first_user,
-                                [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                                [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
                                     REQUIRE_FALSE(error);
                                     CHECK(user_api_key.name == api_key_name);
                                     api_key = user_api_key;
                                 });
 
-        provider.fetch_api_key(api_key.id, first_user,
-                               [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                   REQUIRE_FALSE(error);
-                                   CHECK(user_api_key.name == api_key_name);
-                                   CHECK(user_api_key.id.to_string() == user_api_key.id.to_string());
-                               });
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.name == api_key_name);
+            CHECK(user_api_key.id.to_string() == user_api_key.id.to_string());
+        });
 
-        provider.fetch_api_key(
-            api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                REQUIRE(error);
-                CHECK(error->message == "API key not found");
-                CHECK(error->is_service_error());
-                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
-                CHECK(user_api_key.name == "");
-            });
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            CHECK(user_api_key.name == "");
+        });
 
         provider.fetch_api_keys(first_user, [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
             CHECK(api_keys.size() == 1);
@@ -580,24 +568,22 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
         });
 
-        provider.fetch_api_key(api_key.id, first_user,
-                               [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                   REQUIRE_FALSE(error);
-                                   CHECK(user_api_key.disabled == false);
-                                   CHECK(user_api_key.name == api_key_name);
-                               });
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.name == api_key_name);
+        });
 
-        provider.fetch_api_key(
-            api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                REQUIRE(error);
-                CHECK(user_api_key.name == "");
-                CHECK(error->message == "API key not found");
-                CHECK(error->is_service_error());
-                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
-            });
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(user_api_key.name == "");
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+        });
 
         provider.disable_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
@@ -607,55 +593,51 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
         });
 
-        provider.fetch_api_key(api_key.id, first_user,
-                               [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                                   REQUIRE_FALSE(error);
-                                   CHECK(user_api_key.disabled == true);
-                                   CHECK(user_api_key.name == api_key_name);
-                               });
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.disabled == true);
+            CHECK(user_api_key.name == api_key_name);
+        });
 
-        provider.fetch_api_key(
-            api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                REQUIRE(error);
-                CHECK(user_api_key.name == "");
-                CHECK(error->message == "API key not found");
-                CHECK(error->is_service_error());
-                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
-            });
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(user_api_key.name == "");
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+        });
 
         provider.delete_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             CHECK(error->message == "API key not found");
             CHECK(error->is_service_error());
-            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
         });
 
         provider.delete_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        provider.fetch_api_key(
-            api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                CHECK(user_api_key.name == "");
-                REQUIRE(error);
-                CHECK(error->message == "API key not found");
-                CHECK(error->is_service_error());
-                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
-                processed = true;
-            });
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            CHECK(user_api_key.name == "");
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            processed = true;
+        });
 
-        provider.fetch_api_key(
-            api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
-                CHECK(user_api_key.name == "");
-                REQUIRE(error);
-                CHECK(error->message == "API key not found");
-                CHECK(error->is_service_error());
-                CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
-                processed = true;
-            });
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            CHECK(user_api_key.name == "");
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(ServiceErrorCode(error->error_code.value()) == ServiceErrorCode::api_key_not_found);
+            processed = true;
+        });
 
         CHECK(processed);
     }
@@ -669,7 +651,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
 
     SECTION("auth providers function integration") {
         bson::BsonDocument function_params{{"realmCustomAuthFuncUserId", "123456"}};
-        auto credentials = app::AppCredentials::function(function_params);
+        auto credentials = AppCredentials::function(function_params);
         auto user = log_in(app, credentials);
         REQUIRE(user->provider_type() == IdentityProviderFunction);
     }
@@ -687,7 +669,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
         std::shared_ptr<SyncUser> sync_user;
 
         app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            creds.email, creds.password, [&](Optional<app::AppError> error) {
+            creds.email, creds.password, [&](Optional<AppError> error) {
                 CAPTURE(creds.email);
                 CAPTURE(creds.password);
                 REQUIRE_FALSE(error); // first registration success
@@ -696,7 +678,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
         sync_user = log_in(app);
         CHECK(sync_user->provider_type() == IdentityProviderAnonymous);
 
-        app->link_user(sync_user, creds, [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+        app->link_user(sync_user, creds, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             REQUIRE(user);
             CHECK(user->identity() == sync_user->identity());
@@ -705,6 +687,88 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
         });
 
         CHECK(processed);
+    }
+}
+
+// MARK: - Delete User Tests
+
+TEST_CASE("app: delete anonymous user integration", "[sync][app]") {
+    TestSyncManager tsm(get_integration_config(), {});
+    auto app = tsm.app();
+
+    SECTION("delete user expect success") {
+        CHECK(app->sync_manager()->all_users().size() == 0);
+
+        // Log in user 1
+        auto user_a = log_in(app);
+        CHECK(user_a->state() == SyncUser::State::LoggedIn);
+        app->delete_user(user_a, [&](Optional<app::AppError> error) {
+            REQUIRE_FALSE(error);
+            // a logged out anon user will be marked as Removed, not LoggedOut
+            CHECK(user_a->state() == SyncUser::State::Removed);
+        });
+        CHECK(app->sync_manager()->all_users().empty());
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        app->delete_user(user_a, [&](Optional<app::AppError> error) {
+            CHECK(error->message == "User must be logged in to be deleted.");
+            CHECK(app->sync_manager()->all_users().size() == 0);
+        });
+
+        // Log in user 2
+        auto user_b = log_in(app);
+        CHECK(app->sync_manager()->get_current_user() == user_b);
+        CHECK(user_b->state() == SyncUser::State::LoggedIn);
+        CHECK(app->sync_manager()->all_users().size() == 1);
+
+        app->delete_user(user_b, [&](Optional<app::AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(app->sync_manager()->all_users().size() == 0);
+        });
+
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        // check both handles are no longer valid
+        CHECK(user_a->state() == SyncUser::State::Removed);
+        CHECK(user_b->state() == SyncUser::State::Removed);
+    }
+}
+
+TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
+    TestSyncManager tsm(get_integration_config(), {});
+    auto app = tsm.app();
+
+    SECTION("log in and delete") {
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        auto credentials = create_user_and_log_in(app);
+        auto user = app->current_user();
+
+        CHECK(app->sync_manager()->get_current_user() == user);
+        CHECK(user->state() == SyncUser::State::LoggedIn);
+        app->delete_user(user, [&](Optional<app::AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(app->sync_manager()->all_users().size() == 0);
+        });
+        CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        app->log_in_with_credentials(credentials, [](std::shared_ptr<SyncUser> user, util::Optional<AppError> error) {
+            CHECK(!user);
+            REQUIRE(error);
+            REQUIRE(error->error_code.value() == int(ServiceErrorCode::invalid_email_password));
+        });
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        app->delete_user(user, [](Optional<app::AppError> err) {
+            CHECK(err->error_code.value() > 0);
+        });
+
+        CHECK(app->sync_manager()->get_current_user() == nullptr);
+        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(user->state() == SyncUser::State::Removed);
     }
 }
 
@@ -718,7 +782,7 @@ TEST_CASE("app: call function", "[sync][app]") {
 
     bson::BsonArray toSum(5);
     std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
-    const auto checkFn = [](Optional<app::AppError> error, Optional<int64_t> sum) {
+    const auto checkFn = [](Optional<int64_t>&& sum, Optional<AppError>&& error) {
         REQUIRE(!error);
         CHECK(*sum == 15);
     };
@@ -764,23 +828,23 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 
     bson::BsonDocument bad_document{{"bad", "value"}};
 
-    dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many(dog_document, [&](uint64_t, Optional<AppError> error) {
         REQUIRE_FALSE(error);
     });
 
-    dog_collection.delete_many(dog_document2, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many(dog_document2, [&](uint64_t, Optional<AppError> error) {
         REQUIRE_FALSE(error);
     });
 
-    dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
         REQUIRE_FALSE(error);
     });
 
-    dog_collection.delete_many(person_document, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many(person_document, [&](uint64_t, Optional<AppError> error) {
         REQUIRE_FALSE(error);
     });
 
-    dog_collection.delete_many(person_document2, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many(person_document2, [&](uint64_t, Optional<AppError> error) {
         REQUIRE_FALSE(error);
     });
 
@@ -789,52 +853,51 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         ObjectId dog_object_id;
         ObjectId dog2_object_id;
 
-        dog_collection.insert_one_bson(bad_document, [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+        dog_collection.insert_one_bson(bad_document, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
             CHECK(error);
             CHECK(!bson);
         });
 
-        dog_collection.insert_one_bson(dog_document3, [&](Optional<app::AppError> error, Optional<bson::Bson> value) {
+        dog_collection.insert_one_bson(dog_document3, [&](Optional<bson::Bson> value, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             auto bson = static_cast<bson::BsonDocument>(*value);
             CHECK(static_cast<ObjectId>(bson["insertedId"]) == dog3_object_id);
         });
 
-        dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
+        dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        dog_collection.insert_one(bad_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(bad_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             CHECK(error);
             CHECK(!object_id);
         });
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        dog_collection.insert_one(dog_document2, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document2, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        dog_collection.insert_one(dog_document3, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document3, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(object_id->type() == bson::Bson::Type::ObjectId);
             CHECK(static_cast<ObjectId>(*object_id) == dog3_object_id);
         });
 
         person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id, dog3_object_id});
-        person_collection.insert_one(person_document,
-                                     [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
-                                         REQUIRE_FALSE(error);
-                                         CHECK((*object_id).to_string() != "");
-                                     });
+        person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK((*object_id).to_string() != "");
+        });
 
-        dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
+        dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -844,26 +907,25 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             dog_document3,
         };
 
-        dog_collection.insert_many_bson(documents, [&](Optional<app::AppError> error, Optional<bson::Bson> value) {
+        dog_collection.insert_many_bson(documents, [&](Optional<bson::Bson> value, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             auto bson = static_cast<bson::BsonDocument>(*value);
             auto insertedIds = static_cast<bson::BsonArray>(bson["insertedIds"]);
         });
 
-        dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
+        dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        dog_collection.insert_many(documents,
-                                   [&](std::vector<bson::Bson> inserted_docs, Optional<app::AppError> error) {
-                                       REQUIRE_FALSE(error);
-                                       CHECK(inserted_docs.size() == 3);
-                                       CHECK(inserted_docs[0].type() == bson::Bson::Type::ObjectId);
-                                       CHECK(inserted_docs[1].type() == bson::Bson::Type::ObjectId);
-                                       CHECK(inserted_docs[2].type() == bson::Bson::Type::ObjectId);
-                                       CHECK(static_cast<ObjectId>(inserted_docs[2]) == dog3_object_id);
-                                       processed = true;
-                                   });
+        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(inserted_docs.size() == 3);
+            CHECK(inserted_docs[0].type() == bson::Bson::Type::ObjectId);
+            CHECK(inserted_docs[1].type() == bson::Bson::Type::ObjectId);
+            CHECK(inserted_docs[2].type() == bson::Bson::Type::ObjectId);
+            CHECK(static_cast<ObjectId>(inserted_docs[2]) == dog3_object_id);
+            processed = true;
+        });
 
         CHECK(processed);
     }
@@ -871,24 +933,22 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("find") {
         bool processed = false;
 
-        dog_collection.find(dog_document,
-                            [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
-                                REQUIRE_FALSE(error);
-                                CHECK((*document_array).size() == 0);
-                            });
+        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> document_array, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK((*document_array).size() == 0);
+        });
 
-        dog_collection.find_bson(dog_document, {}, [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+        dog_collection.find_bson(dog_document, {}, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(static_cast<bson::BsonArray>(*bson).size() == 0);
         });
 
-        dog_collection.find_one(dog_document,
-                                [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                                    REQUIRE_FALSE(error);
-                                    CHECK(!document);
-                                });
+        dog_collection.find_one(dog_document, [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(!document);
+        });
 
-        dog_collection.find_one_bson(dog_document, {}, [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+        dog_collection.find_one_bson(dog_document, {}, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((!bson || bson::holds_alternative<util::None>(*bson)));
         });
@@ -896,112 +956,108 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         ObjectId dog_object_id;
         ObjectId dog2_object_id;
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        dog_collection.insert_one(dog_document2, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document2, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
         person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
-        person_collection.insert_one(person_document,
-                                     [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
-                                         REQUIRE_FALSE(error);
-                                         CHECK((*object_id).to_string() != "");
-                                     });
+        person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK((*object_id).to_string() != "");
+        });
 
-        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> documents, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*documents).size() == 1);
         });
 
-        dog_collection.find_bson(dog_document, {}, [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+        dog_collection.find_bson(dog_document, {}, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(static_cast<bson::BsonArray>(*bson).size() == 1);
         });
 
-        person_collection.find(person_document,
-                               [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
-                                   REQUIRE_FALSE(error);
-                                   CHECK((*documents).size() == 1);
-                               });
+        person_collection.find(person_document, [&](Optional<bson::BsonArray> documents, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK((*documents).size() == 1);
+        });
 
-        app::MongoCollection::FindOptions options{
-            2,                                                               // document limit
-            util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), // project
-            util::Optional<bson::BsonDocument>({{"breed", 1}})               // sort
+        MongoCollection::FindOptions options{
+            2,                                                         // document limit
+            Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), // project
+            Optional<bson::BsonDocument>({{"breed", 1}})               // sort
         };
 
         dog_collection.find(dog_document, options,
-                            [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
+                            [&](Optional<bson::BsonArray> document_array, Optional<AppError> error) {
                                 REQUIRE_FALSE(error);
                                 CHECK((*document_array).size() == 1);
                             });
 
         dog_collection.find({{"name", "fido"}}, options,
-                            [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
+                            [&](Optional<bson::BsonArray> document_array, Optional<AppError> error) {
                                 REQUIRE_FALSE(error);
                                 CHECK((*document_array).size() == 1);
                                 auto king_charles = static_cast<bson::BsonDocument>((*document_array)[0]);
                                 CHECK(king_charles["breed"] == "king charles");
                             });
 
-        dog_collection.find_one(dog_document,
-                                [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                                    REQUIRE_FALSE(error);
-                                    auto name = (*document)["name"];
-                                    CHECK(name == "fido");
-                                });
+        dog_collection.find_one(dog_document, [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            auto name = (*document)["name"];
+            CHECK(name == "fido");
+        });
 
         dog_collection.find_one(dog_document, options,
-                                [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                     REQUIRE_FALSE(error);
                                     auto name = (*document)["name"];
                                     CHECK(name == "fido");
                                 });
 
-        dog_collection.find_one_bson(dog_document, options,
-                                     [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
-                                         REQUIRE_FALSE(error);
-                                         auto name = (static_cast<bson::BsonDocument>(*bson))["name"];
-                                         CHECK(name == "fido");
-                                     });
+        dog_collection.find_one_bson(dog_document, options, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            auto name = (static_cast<bson::BsonDocument>(*bson))["name"];
+            CHECK(name == "fido");
+        });
 
-        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> documents, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*documents).size() == 1);
         });
 
         dog_collection.find_one_and_delete(dog_document,
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                REQUIRE(document);
                                            });
 
         dog_collection.find_one_and_delete({{}},
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                REQUIRE(document);
                                            });
 
         dog_collection.find_one_and_delete({{"invalid", "key"}},
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                CHECK(!document);
                                            });
 
         dog_collection.find_one_and_delete_bson({{"invalid", "key"}}, {},
-                                                [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+                                                [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                                     REQUIRE_FALSE(error);
                                                     CHECK((!bson || bson::holds_alternative<util::None>(*bson)));
                                                 });
 
-        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+        dog_collection.find(dog_document, [&](Optional<bson::BsonArray> documents, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*documents).size() == 0);
             processed = true;
@@ -1016,29 +1072,28 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         ObjectId dog_object_id;
         ObjectId dog2_object_id;
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
         });
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        dog_collection.insert_one(dog_document2, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document2, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog2_object_id = static_cast<ObjectId>(*object_id);
         });
 
         person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
-        person_collection.insert_one(person_document,
-                                     [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
-                                         REQUIRE_FALSE(error);
-                                         CHECK((*object_id).to_string() != "");
-                                     });
+        person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK((*object_id).to_string() != "");
+        });
 
         bson::BsonDocument match{{"$match", bson::BsonDocument({{"name", "fido"}})}};
 
@@ -1046,40 +1101,40 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 
         bson::BsonArray pipeline{match, group};
 
-        dog_collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+        dog_collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*documents).size() == 1);
         });
 
-        dog_collection.aggregate_bson(pipeline, [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+        dog_collection.aggregate_bson(pipeline, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(static_cast<bson::BsonArray>(*bson).size() == 1);
         });
 
-        dog_collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<app::AppError> error) {
+        dog_collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(count == 2);
         });
 
         dog_collection.count_bson({{"breed", "king charles"}}, 0,
-                                  [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+                                  [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                       REQUIRE_FALSE(error);
                                       CHECK(static_cast<int64_t>(*bson) == 2);
                                   });
 
-        dog_collection.count({{"breed", "french bulldog"}}, [&](uint64_t count, Optional<app::AppError> error) {
+        dog_collection.count({{"breed", "french bulldog"}}, [&](uint64_t count, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(count == 1);
         });
 
-        dog_collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<app::AppError> error) {
+        dog_collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(count == 1);
         });
 
         person_collection.count(
             {{"firstName", "John"}, {"lastName", "Johnson"}, {"age", bson::BsonDocument({{"$gt", 25}})}}, 1,
-            [&](uint64_t count, Optional<app::AppError> error) {
+            [&](uint64_t count, Optional<AppError> error) {
                 REQUIRE_FALSE(error);
                 CHECK(count == 1);
                 processed = true;
@@ -1091,40 +1146,40 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("find and update") {
         bool processed = false;
 
-        app::MongoCollection::FindOneAndModifyOptions find_and_modify_options{
-            util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), // project
-            util::Optional<bson::BsonDocument>({{"name", 1}}),               // sort,
-            true,                                                            // upsert
-            true                                                             // return new doc
+        MongoCollection::FindOneAndModifyOptions find_and_modify_options{
+            Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), // project
+            Optional<bson::BsonDocument>({{"name", 1}}),               // sort,
+            true,                                                      // upsert
+            true                                                       // return new doc
         };
 
         dog_collection.find_one_and_update(dog_document, dog_document2,
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                CHECK(!document);
                                            });
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
         });
 
         dog_collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options,
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                auto breed = static_cast<std::string>((*document)["breed"]);
                                                CHECK(breed == "french bulldog");
                                            });
 
         dog_collection.find_one_and_update(dog_document2, dog_document, find_and_modify_options,
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                auto breed = static_cast<std::string>((*document)["breed"]);
                                                CHECK(breed == "king charles");
                                            });
 
         dog_collection.find_one_and_update_bson(dog_document, dog_document2, find_and_modify_options,
-                                                [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+                                                [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                                     REQUIRE_FALSE(error);
                                                     auto breed = static_cast<std::string>(
                                                         static_cast<bson::BsonDocument>(*bson)["breed"]);
@@ -1132,7 +1187,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                                 });
 
         dog_collection.find_one_and_update_bson(dog_document2, dog_document, find_and_modify_options,
-                                                [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+                                                [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                                     REQUIRE_FALSE(error);
                                                     auto breed = static_cast<std::string>(
                                                         static_cast<bson::BsonDocument>(*bson)["breed"]);
@@ -1140,7 +1195,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                                 });
 
         dog_collection.find_one_and_update({{"name", "invalid name"}}, {{"name", "some name"}},
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE_FALSE(error);
                                                CHECK(!document);
                                                processed = true;
@@ -1149,7 +1204,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         processed = false;
 
         dog_collection.find_one_and_update({{"name", "invalid name"}}, {{}}, find_and_modify_options,
-                                           [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+                                           [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
                                                REQUIRE(error);
                                                CHECK(error->message == "insert not permitted");
                                                CHECK(!document);
@@ -1163,23 +1218,23 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         ObjectId dog_object_id;
 
         dog_collection.update_one(dog_document, dog_document2, true,
-                                  [&](app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
+                                  [&](MongoCollection::UpdateResult result, Optional<AppError> error) {
                                       REQUIRE_FALSE(error);
                                       CHECK((*result.upserted_id).to_string() != "");
                                   });
 
         dog_collection.update_one(dog_document2, dog_document,
-                                  [&](app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
+                                  [&](MongoCollection::UpdateResult result, Optional<AppError> error) {
                                       REQUIRE_FALSE(error);
                                       CHECK(!result.upserted_id);
                                   });
 
-        dog_collection.delete_many({}, [&](uint64_t, Optional<app::AppError> error) {
+        dog_collection.delete_many({}, [&](uint64_t, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
         dog_collection.update_one_bson(dog_document, dog_document2, true,
-                                       [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+                                       [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                            REQUIRE_FALSE(error);
                                            auto upserted_id = static_cast<bson::BsonDocument>(*bson)["upsertedId"];
 
@@ -1187,7 +1242,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                        });
 
         dog_collection.update_one_bson(dog_document2, dog_document, true,
-                                       [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
+                                       [&](Optional<bson::Bson> bson, Optional<AppError> error) {
                                            REQUIRE_FALSE(error);
                                            auto document = static_cast<bson::BsonDocument>(*bson);
                                            auto foundUpsertedId = document.find("upsertedId") != document.end();
@@ -1198,7 +1253,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
         person_document_copy["dogs"] = bson::BsonArray({dog_object_id});
         person_collection.update_one(person_document, person_document, true,
-                                     [&](app::MongoCollection::UpdateResult, Optional<app::AppError> error) {
+                                     [&](MongoCollection::UpdateResult, Optional<AppError> error) {
                                          REQUIRE_FALSE(error);
                                          processed = true;
                                      });
@@ -1209,19 +1264,19 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("update many") {
         bool processed = false;
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
         });
 
         dog_collection.update_many(dog_document2, dog_document, true,
-                                   [&](app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
+                                   [&](MongoCollection::UpdateResult result, Optional<AppError> error) {
                                        REQUIRE_FALSE(error);
                                        CHECK((*result.upserted_id).to_string() != "");
                                    });
 
         dog_collection.update_many(dog_document2, dog_document,
-                                   [&](app::MongoCollection::UpdateResult result, Optional<app::AppError> error) {
+                                   [&](MongoCollection::UpdateResult result, Optional<AppError> error) {
                                        REQUIRE_FALSE(error);
                                        CHECK(!result.upserted_id);
                                        processed = true;
@@ -1235,90 +1290,85 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         ObjectId dog_object_id;
         ObjectId person_object_id;
 
-        app::MongoCollection::FindOneAndModifyOptions find_and_modify_options{
-            util::Optional<bson::BsonDocument>({{"name", "fido"}}), // project
-            util::Optional<bson::BsonDocument>({{"name", 1}}),      // sort,
-            true,                                                   // upsert
-            true                                                    // return new doc
+        MongoCollection::FindOneAndModifyOptions find_and_modify_options{
+            Optional<bson::BsonDocument>({{"name", "fido"}}), // project
+            Optional<bson::BsonDocument>({{"name", 1}}),      // sort,
+            true,                                             // upsert
+            true                                              // return new doc
         };
 
-        dog_collection.find_one_and_replace(
-            dog_document, dog_document2, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-                CHECK(!document);
-            });
+        dog_collection.find_one_and_replace(dog_document, dog_document2,
+                                            [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                REQUIRE_FALSE(error);
+                                                CHECK(!document);
+                                            });
 
-        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
+        dog_collection.insert_one(dog_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = static_cast<ObjectId>(*object_id);
         });
 
-        dog_collection.find_one_and_replace(
-            dog_document, dog_document2, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-                auto name = static_cast<std::string>((*document)["name"]);
-                CHECK(name == "fido");
-            });
+        dog_collection.find_one_and_replace(dog_document, dog_document2,
+                                            [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                REQUIRE_FALSE(error);
+                                                auto name = static_cast<std::string>((*document)["name"]);
+                                                CHECK(name == "fido");
+                                            });
 
-        dog_collection.find_one_and_replace(
-            dog_document2, dog_document, find_and_modify_options,
-            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-                auto name = static_cast<std::string>((*document)["name"]);
-                CHECK(static_cast<std::string>(name) == "fido");
-            });
+        dog_collection.find_one_and_replace(dog_document2, dog_document, find_and_modify_options,
+                                            [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                REQUIRE_FALSE(error);
+                                                auto name = static_cast<std::string>((*document)["name"]);
+                                                CHECK(static_cast<std::string>(name) == "fido");
+                                            });
 
         person_document["dogs"] = bson::BsonArray({dog_object_id});
         person_document2["dogs"] = bson::BsonArray({dog_object_id});
-        person_collection.insert_one(person_document,
-                                     [&](Optional<bson::Bson> object_id, Optional<app::AppError> error) {
-                                         REQUIRE_FALSE(error);
-                                         CHECK((*object_id).to_string() != "");
-                                         person_object_id = static_cast<ObjectId>(*object_id);
-                                     });
+        person_collection.insert_one(person_document, [&](Optional<bson::Bson> object_id, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK((*object_id).to_string() != "");
+            person_object_id = static_cast<ObjectId>(*object_id);
+        });
 
-        app::MongoCollection::FindOneAndModifyOptions person_find_and_modify_options{
-            util::Optional<bson::BsonDocument>({{"firstName", 1}}), // project
-            util::Optional<bson::BsonDocument>({{"firstName", 1}}), // sort,
-            false,                                                  // upsert
-            true                                                    // return new doc
+        MongoCollection::FindOneAndModifyOptions person_find_and_modify_options{
+            Optional<bson::BsonDocument>({{"firstName", 1}}), // project
+            Optional<bson::BsonDocument>({{"firstName", 1}}), // sort,
+            false,                                            // upsert
+            true                                              // return new doc
         };
 
-        person_collection.find_one_and_replace(
-            person_document, person_document2,
-            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-                auto name = static_cast<std::string>((*document)["firstName"]);
-                // Should return the old document
-                CHECK(name == "John");
-                processed = true;
-            });
+        person_collection.find_one_and_replace(person_document, person_document2,
+                                               [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                   REQUIRE_FALSE(error);
+                                                   auto name = static_cast<std::string>((*document)["firstName"]);
+                                                   // Should return the old document
+                                                   CHECK(name == "John");
+                                                   processed = true;
+                                               });
 
-        person_collection.find_one_and_replace(
-            person_document2, person_document, person_find_and_modify_options,
-            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-                auto name = static_cast<std::string>((*document)["firstName"]);
-                // Should return new document, Bob -> John
-                CHECK(name == "John");
-            });
+        person_collection.find_one_and_replace(person_document2, person_document, person_find_and_modify_options,
+                                               [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                   REQUIRE_FALSE(error);
+                                                   auto name = static_cast<std::string>((*document)["firstName"]);
+                                                   // Should return new document, Bob -> John
+                                                   CHECK(name == "John");
+                                               });
 
-        person_collection.find_one_and_replace(
-            {{"invalid", "item"}}, {{}}, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                // If a document is not found then null will be returned for the document and no error will be
-                // returned
-                REQUIRE_FALSE(error);
-                CHECK(!document);
-            });
+        person_collection.find_one_and_replace({{"invalid", "item"}}, {{}},
+                                               [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                   // If a document is not found then null will be returned for the
+                                                   // document and no error will be returned
+                                                   REQUIRE_FALSE(error);
+                                                   CHECK(!document);
+                                               });
 
-        person_collection.find_one_and_replace(
-            {{"invalid", "item"}}, {{}}, person_find_and_modify_options,
-            [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-                CHECK(!document);
-                processed = true;
-            });
+        person_collection.find_one_and_replace({{"invalid", "item"}}, {{}}, person_find_and_modify_options,
+                                               [&](Optional<bson::BsonDocument> document, Optional<AppError> error) {
+                                                   REQUIRE_FALSE(error);
+                                                   CHECK(!document);
+                                                   processed = true;
+                                               });
 
         CHECK(processed);
     }
@@ -1330,36 +1380,34 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bson::BsonArray documents;
         documents.assign(3, dog_document);
 
-        dog_collection.insert_many(documents,
-                                   [&](std::vector<bson::Bson> inserted_docs, Optional<app::AppError> error) {
-                                       REQUIRE_FALSE(error);
-                                       CHECK(inserted_docs.size() == 3);
-                                   });
+        dog_collection.insert_many(documents, [&](std::vector<bson::Bson> inserted_docs, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(inserted_docs.size() == 3);
+        });
 
-        app::MongoCollection::FindOneAndModifyOptions find_and_modify_options{
-            util::Optional<bson::BsonDocument>({{"name", "fido"}}), // project
-            util::Optional<bson::BsonDocument>({{"name", 1}}),      // sort,
-            true,                                                   // upsert
-            true                                                    // return new doc
+        MongoCollection::FindOneAndModifyOptions find_and_modify_options{
+            Optional<bson::BsonDocument>({{"name", "fido"}}), // project
+            Optional<bson::BsonDocument>({{"name", 1}}),      // sort,
+            true,                                             // upsert
+            true                                              // return new doc
         };
 
-        dog_collection.delete_one(dog_document, [&](uint64_t deleted_count, Optional<app::AppError> error) {
+        dog_collection.delete_one(dog_document, [&](uint64_t deleted_count, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(deleted_count >= 1);
         });
 
-        dog_collection.delete_many(dog_document, [&](uint64_t deleted_count, Optional<app::AppError> error) {
+        dog_collection.delete_many(dog_document, [&](uint64_t deleted_count, Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(deleted_count >= 1);
             processed = true;
         });
 
-        person_collection.delete_many_bson(
-            person_document, [&](Optional<app::AppError> error, Optional<bson::Bson> bson) {
-                REQUIRE_FALSE(error);
-                CHECK(static_cast<int32_t>(static_cast<bson::BsonDocument>(*bson)["deletedCount"]) >= 1);
-                processed = true;
-            });
+        person_collection.delete_many_bson(person_document, [&](Optional<bson::Bson> bson, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(static_cast<int32_t>(static_cast<bson::BsonDocument>(*bson)["deletedCount"]) >= 1);
+            processed = true;
+        });
 
         CHECK(processed);
     }
@@ -1377,7 +1425,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     SECTION("register") {
         bool processed;
 
-        app->push_notification_client("gcm").register_device("hello", sync_user, [&](Optional<app::AppError> error) {
+        app->push_notification_client("gcm").register_device("hello", sync_user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
             processed = true;
         });
@@ -1393,13 +1441,13 @@ TEST_CASE("app: push notifications", "[sync][app]") {
 
             app->push_notification_client("gcm").register_device("hello",
                                                                  sync_user,
-                                                                 [&](Optional<app::AppError> error) {
+                                                                 [&](Optional<AppError> error) {
                 REQUIRE_FALSE(error);
             });
 
             app->push_notification_client("gcm").register_device("hello",
                                                                  sync_user,
-                                                                 [&](Optional<app::AppError> error) {
+                                                                 [&](Optional<AppError> error) {
                 REQUIRE_FALSE(error);
                 processed = true;
             });
@@ -1410,7 +1458,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     SECTION("deregister") {
         bool processed;
 
-        app->push_notification_client("gcm").deregister_device(sync_user, [&](Optional<app::AppError> error) {
+        app->push_notification_client("gcm").deregister_device(sync_user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
             processed = true;
         });
@@ -1420,28 +1468,27 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     SECTION("register with unavailable service") {
         bool processed;
 
-        app->push_notification_client("gcm_blah")
-            .register_device("hello", sync_user, [&](Optional<app::AppError> error) {
-                REQUIRE(error);
-                CHECK(error->message == "service not found: 'gcm_blah'");
-                processed = true;
-            });
+        app->push_notification_client("gcm_blah").register_device("hello", sync_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "service not found: 'gcm_blah'");
+            processed = true;
+        });
         CHECK(processed);
     }
 
     SECTION("register with logged out user") {
         bool processed;
 
-        app->log_out([=](util::Optional<AppError> error) {
+        app->log_out([=](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
-        app->push_notification_client("gcm").register_device("hello", sync_user, [&](Optional<app::AppError> error) {
+        app->push_notification_client("gcm").register_device("hello", sync_user, [&](Optional<AppError> error) {
             REQUIRE(error);
             processed = true;
         });
 
-        app->push_notification_client("gcm").register_device("hello", nullptr, [&](Optional<app::AppError> error) {
+        app->push_notification_client("gcm").register_device("hello", nullptr, [&](Optional<AppError> error) {
             REQUIRE(error);
             processed = true;
         });
@@ -1478,7 +1525,7 @@ TEST_CASE("app: token refresh", "[sync][app][token]") {
          - If the token refresh was successful, the original request will retry and we should expect no error in the
          callback of `find_one`
          */
-        dog_collection.find_one(dog_document, [&](Optional<bson::BsonDocument>, Optional<app::AppError> error) {
+        dog_collection.find_one(dog_document, [&](Optional<bson::BsonDocument>, Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
     }
@@ -1511,7 +1558,7 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
     auto email = std::string("realm_tests_do_autoverify-test@example.com");
     auto password = std::string{"password"};
-    auto creds = app::AppCredentials::username_password(email, password);
+    auto creds = AppCredentials::username_password(email, password);
     auto obj_id = ObjectId::gen();
     auto target_id = ObjectId::gen();
     auto mixed_list_values = AnyVector{
@@ -1522,10 +1569,10 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
     {
         TestSyncManager sync_manager(app_config, {});
         auto app = sync_manager.app();
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email, password, [&](Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-            });
+        app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
+                                                                                   [&](Optional<AppError> error) {
+                                                                                       REQUIRE_FALSE(error);
+                                                                                   });
         log_in(app, creds);
         SyncTestFile config(app, partition, schema);
         auto realm = Realm::get_shared_realm(config);
@@ -1564,6 +1611,108 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
             CHECK(mixed == any_cast<Mixed>(mixed_list_values[idx]));
         }
     }
+}
+
+TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
+    std::string base_url = get_base_url();
+    const std::string valid_pk_name = "_id";
+    REQUIRE(!base_url.empty());
+
+    Schema schema{
+        {"origin",
+         {{valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
+          {"link", PropertyType::Object | PropertyType::Nullable, "target"}}},
+        {"target",
+         {{valid_pk_name, PropertyType::String, Property::IsPrimary{true}},
+          {"value", PropertyType::Int},
+          {"name", PropertyType::String}}},
+        {"other_origin",
+         {{valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
+          {"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
+        {"other_target",
+         {{valid_pk_name, PropertyType::UUID, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
+    };
+
+    /*             Create local realm             */
+    TestFile local_config;
+    local_config.cache = true;
+    local_config.schema_version = 1;
+    local_config.schema = schema;
+    auto local_realm = Realm::get_shared_realm(local_config);
+    {
+        auto origin = local_realm->read_group().get_table("class_origin");
+        auto target = local_realm->read_group().get_table("class_target");
+        auto other_origin = local_realm->read_group().get_table("class_other_origin");
+        auto other_target = local_realm->read_group().get_table("class_other_target");
+
+        local_realm->begin_transaction();
+        auto o = target->create_object_with_primary_key("Foo").set("name", "Egon");
+        origin->create_object_with_primary_key(47).set("link", o.get_key());
+        other_target->create_object_with_primary_key(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
+        other_origin->create_object_with_primary_key(ObjectId::gen());
+        local_realm->commit_transaction();
+    }
+
+    /* Create a synced realm and upload some data */
+    auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
+    auto app_session = create_app(server_app_config);
+    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    auto partition = random_string(100);
+    TestSyncManager sync_manager(app_config, {});
+    auto app = sync_manager.app();
+
+    create_user_and_log_in(app);
+    auto user1 = app->current_user();
+    SyncTestFile config1(user1, partition, schema);
+
+    auto r1 = Realm::get_shared_realm(config1);
+
+    auto origin = r1->read_group().get_table("class_origin");
+    auto target = r1->read_group().get_table("class_target");
+    auto other_origin = r1->read_group().get_table("class_other_origin");
+    auto other_target = r1->read_group().get_table("class_other_target");
+
+    r1->begin_transaction();
+    auto o = target->create_object_with_primary_key("Baa").set("name", "Børge");
+    origin->create_object_with_primary_key(47).set("link", o.get_key());
+    other_target->create_object_with_primary_key(UUID("01234567-89ab-cdef-edcb-a98765432101"));
+    other_origin->create_object_with_primary_key(ObjectId::gen());
+    r1->commit_transaction();
+    CHECK(!wait_for_upload(*r1));
+
+    /* Copy local realm data over in a synced one*/
+    create_user_and_log_in(app);
+    auto user2 = app->current_user();
+    REQUIRE(user1 != user2);
+
+    SyncTestFile config2(user1, partition, schema);
+
+    SharedRealm r2;
+    SECTION("Copy before connecting to server") {
+        local_realm->export_to(config2);
+        r2 = Realm::get_shared_realm(config2);
+    }
+
+    SECTION("Open synced realm first") {
+        r2 = Realm::get_shared_realm(config2);
+        CHECK(!wait_for_download(*r2));
+        local_realm->export_to(config2);
+        CHECK(!wait_for_upload(*r2));
+    }
+
+    CHECK(!wait_for_download(*r2));
+    advance_and_notify(*r2);
+    Group& g = r2->read_group();
+    // g.to_json(std::cout);
+    REQUIRE(g.get_table("class_origin")->size() == 1);
+    REQUIRE(g.get_table("class_target")->size() == 2);
+    REQUIRE(g.get_table("class_other_origin")->size() == 2);
+    REQUIRE(g.get_table("class_other_target")->size() == 2);
+
+    CHECK(!wait_for_upload(*r2));
+    CHECK(!wait_for_download(*r1));
+    advance_and_notify(*r1);
+    // r1->read_group().to_json(std::cout);
 }
 
 TEST_CASE("app: set new embedded object", "[sync][app]") {
@@ -1607,17 +1756,17 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     auto dict_obj_id = ObjectId::gen();
     auto email = std::string("realm_tests_do_autoverify-test@example.com");
     auto password = std::string{"password"};
-    auto creds = app::AppCredentials::username_password(email, password);
+    auto creds = AppCredentials::username_password(email, password);
 
     {
         TestSyncManager sync_manager(app_config, {});
         auto app = sync_manager.app();
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(
-            email, password, [&](Optional<app::AppError> error) {
-                REQUIRE_FALSE(error);
-            });
-        app->log_in_with_credentials(app::AppCredentials::username_password(email, password),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+        app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
+                                                                                   [&](Optional<AppError> error) {
+                                                                                       REQUIRE_FALSE(error);
+                                                                                   });
+        app->log_in_with_credentials(AppCredentials::username_password(email, password),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
                                          REQUIRE(user);
                                          REQUIRE_FALSE(error);
                                      });
@@ -1736,7 +1885,7 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         TestSyncManager sync_manager(TestSyncManager::Config(config), {});
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
                                          REQUIRE(!error);
                                          REQUIRE(user);
                                      });
@@ -1790,7 +1939,7 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         TestSyncManager sync_manager(TestSyncManager::Config(config), {});
         auto app = sync_manager.app();
         app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
                                          REQUIRE(!error);
                                          REQUIRE(user);
                                      });
@@ -1932,20 +2081,21 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     class HookedTransport : public SynchronousTestTransport {
     public:
-        void send_request_to_server(const Request request, std::function<void(Response)> completion_block) override
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
         {
             if (request_hook) {
                 request_hook(request);
             }
-            SynchronousTestTransport::send_request_to_server(request, [&](Response response) {
+            SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
                 if (response_hook) {
-                    response_hook(request, response);
+                    response_hook(request, const_cast<Response&>(response));
                 }
                 completion_block(response);
             });
         }
-        std::function<void(const Request&, Response&)> response_hook;
-        std::function<void(const Request&)> request_hook;
+        util::UniqueFunction<void(Request&, Response&)> response_hook;
+        util::UniqueFunction<void(Request&)> request_hook;
     };
 
     SECTION("Fast clock on client") {
@@ -1979,10 +2129,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         // This assumes that we make an http request for the new token while
         // already in the WaitingForAccessToken state.
         bool seen_waiting_for_access_token = false;
-        transport->request_hook = [&](const Request) {
+        transport->request_hook = [&](Request&) {
             auto user = app->current_user();
             REQUIRE(user);
-            for (auto session : user->all_sessions()) {
+            for (auto& session : user->all_sessions()) {
                 // Prior to the fix for #4941, this callback would be called from an infinite loop, always in the
                 // WaitingForAccessToken state.
                 if (session->state() == SyncSession::State::WaitingForAccessToken) {
@@ -2043,10 +2193,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // This assumes that we make an http request for the new token while
             // already in the WaitingForAccessToken state.
             bool seen_waiting_for_access_token = false;
-            transport->request_hook = [&](const Request) {
+            transport->request_hook = [&](Request&) {
                 auto user = app->current_user();
                 REQUIRE(user);
-                for (auto session : user->all_sessions()) {
+                for (auto& session : user->all_sessions()) {
                     if (session->state() == SyncSession::State::WaitingForAccessToken) {
                         REQUIRE(!seen_waiting_for_access_token);
                         seen_waiting_for_access_token = true;
@@ -2064,7 +2214,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         SECTION("User is logged out if the refresh request is denied") {
             REQUIRE(user->is_logged_in());
-            transport->response_hook = [&](const Request request, Response& response) {
+            transport->response_hook = [&](Request& request, Response& response) {
                 auto user = app->current_user();
                 REQUIRE(user);
                 // simulate the server denying the refresh
@@ -2094,7 +2244,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::atomic<bool> did_receive_valid_token{false};
             constexpr size_t num_error_responses = 6;
 
-            transport->response_hook = [&](const Request& request, Response& response) {
+            transport->response_hook = [&](Request& request, Response& response) {
                 // simulate the server experiencing an internal server error
                 if (request.url.find("/session") != std::string::npos) {
                     if (response_times.size() >= num_error_responses) {
@@ -2146,10 +2296,10 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
 
             // requesting a new access token fails because the refresh token used for this request is revoked
-            user->refresh_custom_data([&](util::Optional<AppError> error) {
+            user->refresh_custom_data([&](Optional<AppError> error) {
                 REQUIRE(error);
                 REQUIRE(error->http_status_code == 401);
-                REQUIRE(error->error_code == app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+                REQUIRE(error->error_code == make_error_code(ServiceErrorCode::invalid_session));
             });
 
             // Set a bad access token. This will force a request for a new access token when the sync session opens
@@ -2168,6 +2318,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 REQUIRE(error.message == "Unable to refresh the user access token.");
             };
 
+            auto transport = static_cast<SynchronousTestTransport*>(app_config.transport.get());
+            transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(config.path);
             REQUIRE(user->is_logged_in());
@@ -2177,8 +2329,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 session->wait_for_upload_completion([&](std::error_code err) {
                     std::lock_guard<std::mutex> lock(mtx);
                     called.store(true);
-                    REQUIRE(err == app::make_error_code(realm::app::ServiceErrorCode::invalid_session));
+                    REQUIRE(err == make_error_code(ServiceErrorCode::invalid_session));
                 });
+                transport->unblock();
                 timed_wait_for([&] {
                     return called.load();
                 });
@@ -2208,7 +2361,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             // logging in again doesn't fix things while the account is disabled
             auto error = failed_log_in(app, creds);
-            REQUIRE(error.error_code == app::make_error_code(realm::app::ServiceErrorCode::user_disabled));
+            REQUIRE(error.error_code == make_error_code(ServiceErrorCode::user_disabled));
 
             // admin enables user sessions again which should allow the session to continue
             app_session.admin_api.enable_user_sessions(user->identity(), app_session.server_app_id);
@@ -2249,7 +2402,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(user->is_logged_in());
 
             // new requests for an access token succeed again
-            user->refresh_custom_data([&](util::Optional<AppError> error) {
+            user->refresh_custom_data([&](Optional<AppError> error) {
                 REQUIRE_FALSE(error);
             });
 
@@ -2281,7 +2434,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(anon_user->state() == SyncUser::State::Removed);
 
             // new requests for an access token do not work for anon users
-            anon_user->refresh_custom_data([&](util::Optional<AppError> error) {
+            anon_user->refresh_custom_data([&](Optional<AppError> error) {
                 REQUIRE(error);
                 REQUIRE(error->message ==
                         util::format("Cannot initiate a refresh on user '%1' because the user has been removed",
@@ -2448,7 +2601,7 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
 
         std::shared_ptr<SyncUser> user = log_in(app);
         app->call_function(user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
-                           [&](auto error, auto response) {
+                           [&](auto response, auto error) {
                                CHECK(error == none);
                                CHECK(response);
                                CHECK(*response == true);
@@ -2475,10 +2628,10 @@ TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
 
         bool processed = false;
 
-        std::shared_ptr<SyncUser> user = log_in(app, app::AppCredentials::custom(jwt));
+        std::shared_ptr<SyncUser> user = log_in(app, AppCredentials::custom(jwt));
 
         app->call_function(user, "updateUserData", {bson::BsonDocument({{"name", "Not Foo Bar"}})},
-                           [&](auto error, auto response) {
+                           [&](auto response, auto error) {
                                CHECK(error == none);
                                CHECK(response);
                                CHECK(*response == true);
@@ -2753,7 +2906,8 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         {
         }
 
-        void send_request_to_server(const Request, std::function<void(const Response)> completion_block) override
+        void send_request_to_server(Request&&,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
         {
             completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
         }
@@ -2836,7 +2990,7 @@ public:
     }
 
 private:
-    void handle_profile(const Request request, std::function<void(Response)> completion_block)
+    void handle_profile(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2855,7 +3009,7 @@ private:
         completion_block(Response{200, 0, {}, response});
     }
 
-    void handle_login(const Request request, std::function<void(Response)> completion_block)
+    void handle_login(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2878,7 +3032,7 @@ private:
         completion_block(Response{200, 0, {}, response});
     }
 
-    void handle_location(const Request request, std::function<void(Response)> completion_block)
+    void handle_location(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.timeout_ms == 60000);
@@ -2892,7 +3046,7 @@ private:
         completion_block(Response{200, 0, {}, response});
     }
 
-    void handle_create_api_key(const Request request, std::function<void(Response)> completion_block)
+    void handle_create_api_key(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2906,7 +3060,7 @@ private:
         completion_block(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_key(const Request request, std::function<void(Response)> completion_block)
+    void handle_fetch_api_key(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2920,7 +3074,7 @@ private:
         completion_block(Response{200, 0, {}, response});
     }
 
-    void handle_fetch_api_keys(const Request request, std::function<void(Response)> completion_block)
+    void handle_fetch_api_keys(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2936,7 +3090,7 @@ private:
         completion_block(Response{200, 0, {}, nlohmann::json(elements).dump()});
     }
 
-    void handle_token_refresh(const Request request, std::function<void(Response)> completion_block)
+    void handle_token_refresh(Request& request, util::UniqueFunction<void(const Response&)>& completion_block)
     {
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
@@ -2951,7 +3105,8 @@ private:
     }
 
 public:
-    void send_request_to_server(const Request request, std::function<void(const Response)> completion_block) override
+    void send_request_to_server(Request&& request,
+                                util::UniqueFunction<void(const Response&)>&& completion_block) override
     {
         if (request.url.find("/login") != std::string::npos) {
             handle_login(request, completion_block);
@@ -3141,13 +3296,14 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 
     SECTION("login_anonymous bad") {
         struct transport : UnitTestTransport {
-            void send_request_to_server(const Request request, std::function<void(const Response)> completion_block)
+            void send_request_to_server(Request&& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
             {
                 if (request.url.find("/login") != std::string::npos) {
                     completion_block({200, 0, {}, user_json(bad_access_token).dump()});
                 }
                 else {
-                    UnitTestTransport::send_request_to_server(request, completion_block);
+                    UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
                 }
             }
         };
@@ -3158,9 +3314,9 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         auto error = failed_log_in(app);
         CHECK(error.message == std::string("jwt missing parts"));
         CHECK(error.error_code.message() == "bad token");
-        CHECK(error.error_code.category() == app::json_error_category());
+        CHECK(error.error_code.category() == json_error_category());
         CHECK(error.is_json_error());
-        CHECK(app::JSONErrorCode(error.error_code.value()) == app::JSONErrorCode::bad_token);
+        CHECK(JSONErrorCode(error.error_code.value()) == JSONErrorCode::bad_token);
     }
 }
 
@@ -3176,7 +3332,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
 
     SECTION("create api key") {
         client.create_api_key(UnitTestTransport::api_key_name, logged_in_user,
-                              [&](App::UserAPIKey user_api_key, util::Optional<AppError> error) {
+                              [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
                                   REQUIRE_FALSE(error);
                                   CHECK(user_api_key.disabled == false);
                                   CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
@@ -3186,18 +3342,17 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     }
 
     SECTION("fetch api key") {
-        client.fetch_api_key(obj_id, logged_in_user,
-                             [&](App::UserAPIKey user_api_key, util::Optional<AppError> error) {
-                                 REQUIRE_FALSE(error);
-                                 CHECK(user_api_key.disabled == false);
-                                 CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
-                                 CHECK(user_api_key.name == UnitTestTransport::api_key_name);
-                             });
+        client.fetch_api_key(obj_id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key.name == UnitTestTransport::api_key_name);
+        });
     }
 
     SECTION("fetch api keys") {
         client.fetch_api_keys(logged_in_user,
-                              [&](std::vector<App::UserAPIKey> user_api_keys, util::Optional<AppError> error) {
+                              [&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
                                   REQUIRE_FALSE(error);
                                   CHECK(user_api_keys.size() == 2);
                                   for (auto user_api_key : user_api_keys) {
@@ -3217,10 +3372,10 @@ TEST_CASE("app: user_semantics", "[app]") {
     auto app = tsm.app();
 
     const auto login_user_email_pass = [=] {
-        return log_in(app, app::AppCredentials::username_password("bob", "thompson"));
+        return log_in(app, AppCredentials::username_password("bob", "thompson"));
     };
     const auto login_user_anonymous = [=] {
-        return log_in(app, app::AppCredentials::anonymous());
+        return log_in(app, AppCredentials::anonymous());
     };
 
     CHECK(!app->current_user());
@@ -3265,7 +3420,7 @@ TEST_CASE("app: user_semantics", "[app]") {
             user_events_processed++;
         });
 
-        app->log_out([&](auto) {});
+        app->log_out([](auto) {});
         CHECK(user_events_processed == 1);
 
         CHECK(app->current_user()->identity() == user2->identity());
@@ -3287,7 +3442,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app->current_user()->identity() == user2->identity());
         CHECK(user1->identity() == user2->identity());
 
-        app->log_out([&](auto) {});
+        app->log_out([](auto) {});
         CHECK(app->all_users().size() == 0);
 
         CHECK(event_processed == 3);
@@ -3336,7 +3491,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app->current_user()->identity() == user2->identity());
         CHECK(user1->identity() == user2->identity());
 
-        app->log_out([&](auto) {});
+        app->log_out([](auto) {});
         CHECK(app->all_users().size() == 0);
 
         CHECK(event_processed == 0);
@@ -3348,9 +3503,9 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
         : m_response(r)
     {
     }
-    void send_request_to_server(const Request, std::function<void(const Response)> completion_block) override
+    void send_request_to_server(Request&&, util::UniqueFunction<void(const Response&)>&& completion_block) override
     {
-        completion_block(*m_response);
+        completion_block(Response(*m_response));
     }
 
 private:
@@ -3422,7 +3577,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(!error.is_json_error());
         CHECK(!error.is_custom_error());
         CHECK(error.is_service_error());
-        CHECK(app::ServiceErrorCode(error.error_code.value()) == app::ServiceErrorCode::mongodb_error);
+        CHECK(ServiceErrorCode(error.error_code.value()) == ServiceErrorCode::mongodb_error);
         CHECK(error.message == std::string("a fake MongoDB error message!"));
         CHECK(error.error_code.message() == "MongoDBError");
         CHECK(error.link_to_server_logs == std::string("http://...whatever the server passes us"));
@@ -3435,7 +3590,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(error.is_json_error());
         CHECK(!error.is_custom_error());
         CHECK(!error.is_service_error());
-        CHECK(app::JSONErrorCode(error.error_code.value()) == app::JSONErrorCode::malformed_json);
+        CHECK(JSONErrorCode(error.error_code.value()) == JSONErrorCode::malformed_json);
         CHECK(error.message ==
               std::string("[json.exception.parse_error.101] parse error at line 1, column 2: syntax error "
                           "while parsing value - invalid literal; last read: 'th'"));
@@ -3453,11 +3608,11 @@ TEST_CASE("app: switch user", "[sync][app]") {
         CHECK(app->sync_manager()->all_users().size() == 0);
 
         // Log in user 1
-        auto user_a = log_in(app, app::AppCredentials::username_password("test@10gen.com", "password"));
+        auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
         CHECK(app->sync_manager()->get_current_user() == user_a);
 
         // Log in user 2
-        auto user_b = log_in(app, app::AppCredentials::username_password("test2@10gen.com", "password"));
+        auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
         CHECK(app->sync_manager()->get_current_user() == user_b);
 
         CHECK(app->sync_manager()->all_users().size() == 2);
@@ -3479,10 +3634,10 @@ TEST_CASE("app: switch user", "[sync][app]") {
         CHECK(app->sync_manager()->all_users().size() == 0);
 
         // Log in user 1
-        auto user_a = log_in(app, app::AppCredentials::username_password("test@10gen.com", "password"));
+        auto user_a = log_in(app, AppCredentials::username_password("test@10gen.com", "password"));
         CHECK(app->sync_manager()->get_current_user() == user_a);
 
-        app->log_out([&](Optional<app::AppError> error) {
+        app->log_out([&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
@@ -3490,7 +3645,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         CHECK(user_a->state() == SyncUser::State::LoggedOut);
 
         // Log in user 2
-        auto user_b = log_in(app, app::AppCredentials::username_password("test2@10gen.com", "password"));
+        auto user_b = log_in(app, AppCredentials::username_password("test2@10gen.com", "password"));
         CHECK(app->sync_manager()->get_current_user() == user_b);
         CHECK(app->sync_manager()->all_users().size() == 2);
 
@@ -3510,14 +3665,14 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         auto user_a = log_in(app);
         CHECK(user_a->state() == SyncUser::State::LoggedIn);
 
-        app->log_out(user_a, [&](Optional<app::AppError> error) {
+        app->log_out(user_a, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
             // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
         CHECK(app->sync_manager()->all_users().empty());
 
-        app->remove_user(user_a, [&](Optional<app::AppError> error) {
+        app->remove_user(user_a, [&](Optional<AppError> error) {
             CHECK(error->message == "User has already been removed");
             CHECK(app->sync_manager()->all_users().size() == 0);
         });
@@ -3528,7 +3683,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
         CHECK(app->sync_manager()->all_users().size() == 1);
 
-        app->remove_user(user_b, [&](Optional<app::AppError> error) {
+        app->remove_user(user_b, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
             CHECK(app->sync_manager()->all_users().size() == 0);
         });
@@ -3549,23 +3704,23 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         CHECK(app->sync_manager()->all_users().size() == 0);
         CHECK(app->sync_manager()->get_current_user() == nullptr);
 
-        auto user = log_in(app, app::AppCredentials::username_password("email", "pass"));
+        auto user = log_in(app, AppCredentials::username_password("email", "pass"));
 
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
-        app->log_out(user, [&](Optional<app::AppError> error) {
+        app->log_out(user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
         CHECK(user->state() == SyncUser::State::LoggedOut);
 
-        app->remove_user(user, [&](Optional<app::AppError> error) {
+        app->remove_user(user, [&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
         CHECK(app->sync_manager()->all_users().size() == 0);
 
-        util::Optional<app::AppError> error;
-        app->remove_user(user, [&](Optional<app::AppError> err) {
+        Optional<AppError> error;
+        app->remove_user(user, [&](Optional<AppError> err) {
             error = err;
         });
         CHECK(error->error_code.value() > 0);
@@ -3581,111 +3736,114 @@ TEST_CASE("app: link_user", "[sync][app]") {
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
 
-    auto custom_credentials = app::AppCredentials::facebook("a_token");
-    auto email_pass_credentials = app::AppCredentials::username_password(email, password);
+    auto custom_credentials = AppCredentials::facebook("a_token");
+    auto email_pass_credentials = AppCredentials::username_password(email, password);
 
     auto sync_user = log_in(app, email_pass_credentials);
     CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
 
     SECTION("successful link") {
         bool processed = false;
-        app->link_user(sync_user, custom_credentials,
-                       [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-                           REQUIRE_FALSE(error);
-                           REQUIRE(user);
-                           CHECK(user->identity() == sync_user->identity());
-                           processed = true;
-                       });
+        app->link_user(sync_user, custom_credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+            REQUIRE_FALSE(error);
+            REQUIRE(user);
+            CHECK(user->identity() == sync_user->identity());
+            processed = true;
+        });
         CHECK(processed);
     }
 
     SECTION("link_user should fail when logged out") {
-        app->log_out([&](Optional<app::AppError> error) {
+        app->log_out([&](Optional<AppError> error) {
             REQUIRE_FALSE(error);
         });
 
         bool processed = false;
-        app->link_user(sync_user, custom_credentials,
-                       [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-                           CHECK(error->message == "The specified user is not logged in");
-                           CHECK(!user);
-                           processed = true;
-                       });
+        app->link_user(sync_user, custom_credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+            CHECK(error->message == "The specified user is not logged in");
+            CHECK(!user);
+            processed = true;
+        });
         CHECK(processed);
     }
 }
 
 TEST_CASE("app: auth providers", "[sync][app]") {
     SECTION("auth providers facebook") {
-        auto credentials = app::AppCredentials::facebook("a_token");
+        auto credentials = AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
         CHECK(credentials.provider_as_string() == IdentityProviderFacebook);
-        CHECK(credentials.serialize_as_json() == "{\"accessToken\":\"a_token\",\"provider\":\"oauth2-facebook\"}");
+        CHECK(credentials.serialize_as_bson() ==
+              bson::BsonDocument{{"provider", "oauth2-facebook"}, {"accessToken", "a_token"}});
     }
 
     SECTION("auth providers anonymous") {
-        auto credentials = app::AppCredentials::anonymous();
+        auto credentials = AppCredentials::anonymous();
         CHECK(credentials.provider() == AuthProvider::ANONYMOUS);
         CHECK(credentials.provider_as_string() == IdentityProviderAnonymous);
-        CHECK(credentials.serialize_as_json() == "{\"provider\":\"anon-user\"}");
+        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "anon-user"}});
     }
 
     SECTION("auth providers google authCode") {
-        auto credentials = app::AppCredentials::google(AuthCode("a_token"));
+        auto credentials = AppCredentials::google(AuthCode("a_token"));
         CHECK(credentials.provider() == AuthProvider::GOOGLE);
         CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
-        CHECK(credentials.serialize_as_json() == "{\"authCode\":\"a_token\",\"provider\":\"oauth2-google\"}");
+        CHECK(credentials.serialize_as_bson() ==
+              bson::BsonDocument{{"provider", "oauth2-google"}, {"authCode", "a_token"}});
     }
 
     SECTION("auth providers google idToken") {
-        auto credentials = app::AppCredentials::google(IdToken("a_token"));
+        auto credentials = AppCredentials::google(IdToken("a_token"));
         CHECK(credentials.provider() == AuthProvider::GOOGLE);
         CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
-        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-google\"}");
+        CHECK(credentials.serialize_as_bson() ==
+              bson::BsonDocument{{"provider", "oauth2-google"}, {"id_token", "a_token"}});
     }
 
     SECTION("auth providers apple") {
-        auto credentials = app::AppCredentials::apple("a_token");
+        auto credentials = AppCredentials::apple("a_token");
         CHECK(credentials.provider() == AuthProvider::APPLE);
         CHECK(credentials.provider_as_string() == IdentityProviderApple);
-        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-apple\"}");
+        CHECK(credentials.serialize_as_bson() ==
+              bson::BsonDocument{{"provider", "oauth2-apple"}, {"id_token", "a_token"}});
     }
 
     SECTION("auth providers custom") {
-        auto credentials = app::AppCredentials::custom("a_token");
+        auto credentials = AppCredentials::custom("a_token");
         CHECK(credentials.provider() == AuthProvider::CUSTOM);
         CHECK(credentials.provider_as_string() == IdentityProviderCustom);
-        CHECK(credentials.serialize_as_json() == "{\"provider\":\"custom-token\",\"token\":\"a_token\"}");
+        CHECK(credentials.serialize_as_bson() ==
+              bson::BsonDocument{{"provider", "custom-token"}, {"token", "a_token"}});
     }
 
     SECTION("auth providers username password") {
-        auto credentials = app::AppCredentials::username_password("user", "pass");
+        auto credentials = AppCredentials::username_password("user", "pass");
         CHECK(credentials.provider() == AuthProvider::USERNAME_PASSWORD);
         CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
-        CHECK(credentials.serialize_as_json() ==
-              "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
+        CHECK(credentials.serialize_as_bson() ==
+              bson::BsonDocument{{"provider", "local-userpass"}, {"username", "user"}, {"password", "pass"}});
     }
 
     SECTION("auth providers function") {
         bson::BsonDocument function_params{{"name", "mongo"}};
-        auto credentials = app::AppCredentials::function(function_params);
+        auto credentials = AppCredentials::function(function_params);
         CHECK(credentials.provider() == AuthProvider::FUNCTION);
         CHECK(credentials.provider_as_string() == IdentityProviderFunction);
-        CHECK(credentials.serialize_as_json() == "{\"name\":\"mongo\"}");
+        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"name", "mongo"}});
     }
 
     SECTION("auth providers user api key") {
-        auto credentials = app::AppCredentials::user_api_key("a key");
+        auto credentials = AppCredentials::user_api_key("a key");
         CHECK(credentials.provider() == AuthProvider::USER_API_KEY);
         CHECK(credentials.provider_as_string() == IdentityProviderUserAPIKey);
-        CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
+        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "api-key"}, {"key", "a key"}});
     }
 
     SECTION("auth providers server api key") {
-        auto credentials = app::AppCredentials::server_api_key("a key");
+        auto credentials = AppCredentials::server_api_key("a key");
         CHECK(credentials.provider() == AuthProvider::SERVER_API_KEY);
         CHECK(credentials.provider_as_string() == IdentityProviderServerAPIKey);
-        CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
+        CHECK(credentials.serialize_as_bson() == bson::BsonDocument{{"provider", "api-key"}, {"key", "a key"}});
     }
 }
 
@@ -3702,7 +3860,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(const Request request, std::function<void(const Response)> completion_block)
+            void send_request_to_server(Request&& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
@@ -3710,7 +3869,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     completion_block({200, 0, {}, json.dump()});
                 }
                 else {
-                    UnitTestTransport::send_request_to_server(request, completion_block);
+                    UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
                 }
             }
         };
@@ -3732,7 +3891,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         static bool session_route_hit = false;
 
         struct transport : UnitTestTransport {
-            void send_request_to_server(const Request request, std::function<void(const Response)> completion_block)
+            void send_request_to_server(Request&& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
             {
                 if (request.url.find("/session") != std::string::npos) {
                     session_route_hit = true;
@@ -3740,7 +3900,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                     completion_block({200, 0, {}, json.dump()});
                 }
                 else {
-                    UnitTestTransport::send_request_to_server(request, completion_block);
+                    UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
                 }
             }
         };
@@ -3774,8 +3934,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                 bool get_profile_2_hit = false;
                 bool refresh_hit = false;
 
-                void send_request_to_server(const Request request,
-                                            std::function<void(const Response)> completion_block)
+                void send_request_to_server(Request&& request,
+                                            util::UniqueFunction<void(const Response&)>&& completion_block) override
                 {
                     if (request.url.find("/login") != std::string::npos) {
                         login_hit = true;
@@ -3838,14 +3998,14 @@ public:
     {
     }
 
-    void add_work_item(Response response, std::function<void(const Response)> completion_block)
+    void add_work_item(Response response, util::UniqueFunction<void(const Response&)> completion_block)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
         transport_work.push_front(ResponseWorkItem{std::move(response), std::move(completion_block)});
         transport_work_cond.notify_one();
     }
 
-    void add_work_item(std::function<void()> cb)
+    void add_work_item(util::UniqueFunction<void()> cb)
     {
         std::lock_guard<std::mutex> lk(transport_work_mutex);
         transport_work.push_front(std::move(cb));
@@ -3864,7 +4024,7 @@ public:
 private:
     struct ResponseWorkItem {
         Response response;
-        std::function<void(const Response)> completion_block;
+        util::UniqueFunction<void(const Response&)> completion_block;
     };
 
     void worker_routine()
@@ -3883,7 +4043,7 @@ private:
                 mpark::visit(util::overload{[](ResponseWorkItem& work_item) {
                                                 work_item.completion_block(std::move(work_item.response));
                                             },
-                                            [](std::function<void()>& cb) {
+                                            [](util::UniqueFunction<void()>& cb) {
                                                 cb();
                                             }},
                              work_item);
@@ -3901,7 +4061,7 @@ private:
     std::mutex transport_work_mutex;
     std::condition_variable transport_work_cond;
     bool test_complete = false;
-    std::list<mpark::variant<ResponseWorkItem, std::function<void()>>> transport_work;
+    std::list<mpark::variant<ResponseWorkItem, util::UniqueFunction<void()>>> transport_work;
     JoiningThread transport_thread;
 };
 
@@ -3944,8 +4104,8 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         {
         }
 
-        void send_request_to_server(const Request request,
-                                    std::function<void(const Response)> completion_block) override
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
 
         {
             std::cerr << request.url << std::endl;
@@ -4014,7 +4174,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         std::mutex mutex;
         std::shared_ptr<SyncUser> cur_user;
         app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
                                          std::lock_guard lock(mutex);
                                          CHECK(user);
                                          REQUIRE_FALSE(error);
@@ -4060,8 +4220,8 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
     static const auto test_ws_hostname = "wsproto://host:1234";
 
     struct transport : UnitTestTransport {
-        void send_request_to_server(const Request request,
-                                    std::function<void(const Response)> completion_block) override
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
         {
             if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
@@ -4078,7 +4238,7 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
                 REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
             }
             else {
-                UnitTestTransport::send_request_to_server(request, completion_block);
+                UnitTestTransport::send_request_to_server(std::move(request), std::move(completion_block));
             }
         }
     };

@@ -461,35 +461,6 @@ abrupt disconnections.
 All ALLOC messages must be sent after the [IDENT](#ident) message has been sent.
 
 
-### REFRESH
-
-    head  =  'refresh'  <session ident>  <signed user token size>
-    body  =  <signed user token>
-
-The client sends a REFRESH message when it has procured a new user token for
-authorization purposes. When the server receives a REFRESH message, and the new
-user token passes verification, the server will consider the session
-authenticated with the new token. If the new token grants fewer access rights in
-the current session or is expired, the server will still install it for this
-session and behave accordingly (i.e., terminate the session with an error code
-indicating lack of privileges).
-
-The client will be interested in sending this message when it is able to
-ascertain that its token is about to expire, so as to avoid receiving any
-"Access token expired" (202) error codes, causing the session to be terminated
-and requiring reestablishment of the session with a fresh token.
-
-Param: `<signed user token>` is the new user token. See the [BIND](#bind) message
-for a description of the contents of the user token.
-
-The client is allowed to send the REFRESH message any number of times during a
-session.
-
-The client is not allowed to send a REFRESH message whose token specifies a
-different user identity than the token in the [BIND](#bind) message that initiated
-the session.
-
-
 ### STATE_REQUEST
 
     head  =  'state_request'  <session ident>  <partial transfer server version>
@@ -1044,17 +1015,17 @@ The list of errors passed in [ERROR](#error) messages.
 | 200  | Session closed (no error)
 | 201  | Other session level error
 | 202  | Access token expired
-| 203  | Bad user authentication (BIND, REFRESH)
+| 203  | Bad user authentication (BIND)
 | 204  | Illegal Realm path (BIND)
 | 205  | No such Realm (BIND)
-| 206  | Permission denied (BIND, REFRESH)
+| 206  | Permission denied (BIND)
 | 207  | Bad server file identifier (IDENT) (obsolete)
 | 208  | Bad client file identifier (IDENT)
 | 209  | Bad server version (IDENT, UPLOAD)
 | 210  | Bad client version (IDENT, UPLOAD)
 | 211  | Diverging histories (IDENT)
 | 212  | Bad changeset (UPLOAD)
-| 213  | Disabled session (BIND, REFRESH, IDENT, UPLOAD, MARK)
+| 213  | Disabled session (BIND, IDENT, UPLOAD, MARK)
 | 214  | Partial sync disabled (BIND)
 | 215  | Unsupported session-level feature
 | 216  | Bad origin file identifier (UPLOAD)

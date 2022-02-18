@@ -277,12 +277,6 @@ struct ClientConfig {
     /// consumption.
     bool disable_upload_compaction = false;
 
-    /// Set the `TCP_NODELAY` option on all TCP/IP sockets. This disables
-    /// the Nagle algorithm. Disabling it, can in some cases be used to
-    /// decrease latencies, but possibly at the expense of scalability. Be
-    /// sure to research the subject before you enable this option.
-    bool tcp_no_delay = false;
-
     /// The specified function will be called whenever a PONG message is
     /// received on any connection. The round-trip time in milliseconds will
     /// be pased to the function. The specified function will always be

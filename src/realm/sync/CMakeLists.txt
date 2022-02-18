@@ -49,6 +49,8 @@ set(SYNC_INSTALL_HEADERS
 )
 
 set(NOINST_HEADERS
+    ../util/http.hpp
+    ../util/websocket.hpp
     noinst/changeset_index.hpp
     noinst/client_history_impl.hpp
     noinst/client_impl_base.hpp

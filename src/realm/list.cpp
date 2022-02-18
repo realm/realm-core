@@ -110,32 +110,40 @@ LstBasePtr Obj::get_listbase_ptr(ColKey col_key) const
 
 /****************************** Lst aggregates *******************************/
 
-template <class T>
-void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
+namespace {
+void do_sort(std::vector<size_t>& indices, size_t size, util::FunctionRef<bool(size_t, size_t)> comp)
 {
-    auto sz = size();
-    auto sz2 = indices.size();
-
-    indices.reserve(sz);
-    if (sz < sz2) {
+    auto old_size = indices.size();
+    indices.reserve(size);
+    if (size < old_size) {
         // If list size has decreased, we have to start all over
         indices.clear();
-        sz2 = 0;
+        old_size = 0;
     }
-    for (size_t i = sz2; i < sz; i++) {
+    for (size_t i = old_size; i < size; i++) {
         // If list size has increased, just add the missing indices
         indices.push_back(i);
     }
+
     auto b = indices.begin();
     auto e = indices.end();
+    std::sort(b, e, comp);
+}
+} // anonymous namespace
+
+template <class T>
+void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
+{
+    update_if_needed();
+    auto tree = m_tree.get();
     if (ascending) {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return m_tree->get(i1) < m_tree->get(i2);
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) noexcept {
+            return tree->get(i1) < tree->get(i2);
         });
     }
     else {
-        std::sort(b, e, [this](size_t i1, size_t i2) {
-            return m_tree->get(i1) > m_tree->get(i2);
+        do_sort(indices, size(), [tree](size_t i1, size_t i2) noexcept {
+            return tree->get(i1) > tree->get(i2);
         });
     }
 }
@@ -144,9 +152,10 @@ template <class T>
 void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order) const
 {
     indices.clear();
-    sort(indices, sort_order ? *sort_order : true);
-    auto duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) {
-        return m_tree->get(i1) == m_tree->get(i2);
+    sort(indices, sort_order.value_or(true));
+    auto tree = m_tree.get();
+    auto duplicates = std::unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
+        return tree->get(i1) == tree->get(i2);
     });
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
@@ -378,7 +387,7 @@ Obj LnkLst::create_and_set_linked_object(size_t ndx)
 
 TableView LnkLst::get_sorted_view(SortDescriptor order) const
 {
-    TableView tv(get_target_table(), clone_linklist());
+    TableView tv(clone_linklist());
     tv.do_sync();
     tv.sort(std::move(order));
     return tv;

@@ -64,7 +64,6 @@ public:
     using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
-    using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
     /// Per-server endpoint information used to determine reconnect delays.
     class ReconnectInfo {
@@ -122,17 +121,14 @@ public:
     static constexpr int get_oldest_supported_protocol_version() noexcept;
 
     // @{
-    /// These call stop(), run(), and report_event_loop_metrics() on the service
-    /// object (get_service()) respectively.
+    /// These call stop() and run() on the service object (get_service()) respectively.
     void stop() noexcept;
     void run();
-    void report_event_loop_metrics(std::function<EventLoopMetricsHandler>);
     // @}
 
     const std::string& get_user_agent_string() const noexcept;
     ReconnectMode get_reconnect_mode() const noexcept;
     bool is_dry_run() const noexcept;
-    bool get_tcp_no_delay() const noexcept;
     util::network::Service& get_service() noexcept;
     std::mt19937_64& get_random() noexcept;
 
@@ -154,7 +150,6 @@ private:
     const milliseconds_type m_fast_reconnect_limit;
     const bool m_disable_upload_activation_delay;
     const bool m_dry_run; // For testing purposes only
-    const bool m_tcp_no_delay;
     const bool m_enable_default_port_hack;
     const bool m_disable_upload_compaction;
     const std::function<RoundtripTimeHandler> m_roundtrip_time_handler;
@@ -279,12 +274,9 @@ static_assert(ClientImpl::get_oldest_supported_protocol_version() <= get_current
 /// terminated. This is used to determinte the delay until the next connection
 /// initiation attempt.
 enum class ClientImpl::ConnectionTerminationReason {
-    resolve_operation_failed,          ///< Failure during resolve operation (DNS)
-    connect_operation_failed,          ///< Failure during TCP connect operation
+    connect_operation_failed,          ///< Failure during connect operation
     closed_voluntarily,                ///< Voluntarily closed or connection operation canceled
-    premature_end_of_input,            ///< Premature end of input (before ERROR message was received)
     read_or_write_error,               ///< Read/write error after successful TCP connect operation
-    http_tunnel_failed,                ///< Failure to establish HTTP tunnel with proxy
     ssl_certificate_rejected,          ///< Client rejected the SSL certificate of the server
     ssl_protocol_violation,            ///< A violation of the SSL protocol
     websocket_protocol_violation,      ///< A violation of the WebSocket protocol
@@ -378,15 +370,11 @@ public:
     int get_negotiated_protocol_version() noexcept;
 
     // Overriding methods in util::websocket::EZObserver
-    void websocket_handshake_completion_handler(const util::HTTPHeaders&) override;
-    void websocket_tcp_connect_error_handler(std::error_code) override;
-    void websocket_resolve_error_handler(std::error_code) override;
-    void websocket_http_tunnel_error_handler(std::error_code) override;
+    void websocket_handshake_completion_handler(const std::string& protocol) override;
+    void websocket_connect_error_handler(std::error_code) override;
     void websocket_ssl_handshake_error_handler(std::error_code) override;
-    void websocket_read_error_handler(std::error_code) override;
-    void websocket_write_error_handler(std::error_code) override;
-    void websocket_handshake_error_handler(std::error_code, const util::HTTPHeaders*,
-                                           const std::string_view*) override;
+    void websocket_read_or_write_error_handler(std::error_code) override;
+    void websocket_handshake_error_handler(std::error_code, const std::string_view*) override;
     void websocket_protocol_error_handler(std::error_code) override;
     bool websocket_close_message_received(std::error_code error_code, StringData message) override;
     bool websocket_binary_message_received(const char*, std::size_t) override;
@@ -397,8 +385,7 @@ public:
     SyncServerMode get_sync_server_mode() const noexcept;
     bool is_flx_sync_connection() const noexcept;
 
-    void update_connect_info(const std::string& http_request_path_prefix, const std::string& realm_virt_path,
-                             const std::string& signed_access_token);
+    void update_connect_info(const std::string& http_request_path_prefix, const std::string& signed_access_token);
 
     void resume_active_sessions();
 
@@ -458,8 +445,7 @@ private:
     void handle_message_received(const char* data, std::size_t size);
     void initiate_disconnect_wait();
     void handle_disconnect_wait(std::error_code);
-    void read_error(std::error_code);
-    void write_error(std::error_code);
+    void read_or_write_error(std::error_code);
     void close_due_to_protocol_error(std::error_code);
     void close_due_to_missing_protocol_feature();
     void close_due_to_client_side_error(std::error_code, bool is_fatal);
@@ -487,7 +473,6 @@ private:
     void one_less_active_unsuspended_session();
 
     OutputBuffer& get_output_buffer() noexcept;
-    ConnectionTerminationReason determine_connection_termination_reason(std::error_code) noexcept;
     Session* get_session(session_ident_type) const noexcept;
     static bool was_voluntary(ConnectionTerminationReason) noexcept;
 
@@ -503,7 +488,6 @@ private:
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
-    const std::string m_http_host; // Contents of `Host:` request header
     const bool m_verify_servers_ssl_certificate;
     const util::Optional<std::string> m_ssl_trust_certificate_path;
     const std::function<SSLVerifyCallback> m_ssl_verify_callback;
@@ -600,7 +584,6 @@ private:
     const std::map<std::string, std::string> m_custom_http_headers;
 
     std::string m_http_request_path_prefix;
-    std::string m_realm_virt_path;
     std::string m_signed_access_token;
 };
 
@@ -612,7 +595,6 @@ private:
 class ClientImpl::Session {
 public:
     using ReceivedChangesets = ClientProtocol::ReceivedChangesets;
-    using IntegrationError = ClientHistory::IntegrationError;
 
     util::PrefixLogger logger;
 
@@ -718,48 +700,10 @@ public:
     void request_download_completion_notification();
 
     /// \brief Gets or creates the subscription store associated with this Session.
-    SubscriptionStore* get_or_create_flx_subscription_store();
+    SubscriptionStore* get_flx_subscription_store();
 
     /// \brief Callback for when a new subscription set has been created for FLX sync.
     void on_new_flx_subscription_set(int64_t new_version);
-
-    /// \brief Announce that a new access token is available.
-    ///
-    /// By calling this function, the application announces to the session
-    /// object that a new access token has been made available, and that it can
-    /// be fetched by calling get_signed_access_token().
-    ///
-    /// This function will not resume a session that has already been suspended
-    /// by an error (e.g., `ProtocolError::token_expired`). If the application
-    /// wishes to resume such a session, it should follow up with a call to
-    /// cancel_resumption_delay().
-    ///
-    /// Even if the session is not suspended when this function is called, it
-    /// may end up becoming suspended before the new access token is delivered
-    /// to the server. For example, the prior access token may expire before the
-    /// new access token is received by the server, but the ERROR message may
-    /// not arrive on the client until after the new token is made available by
-    /// the application. This means that the application must be prepared to
-    /// receive `ProtocolError::token_expired` after making a new access token
-    /// available, even when the new token has not expired. Fortunately, this
-    /// should be a rare event, so the application can choose to handle this by
-    /// "blindly" renewing the token again, even though such a renewal is
-    /// technically redundant.
-    ///
-    /// FIXME: Improve the implementation of new_access_token_available() such
-    /// that there is no risk of getting the session suspended by
-    /// `ProtocolError::token_expired` after a new access token has been made
-    /// available. Doing this right, requires protocol changes: Add sequence
-    /// number to REFRESH messages sent by client, and introduce a REFRESH
-    /// response message telling the client that a particular token has been
-    /// received by the server.
-    ///
-    /// IMPORTANT: get_signed_access_token() may get called before
-    /// new_access_token_available() returns (reentrant callback).
-    ///
-    /// It is an error to call this function before activation of the session,
-    /// or after initiation of deactivation.
-    void new_access_token_available();
 
     /// If this session is currently suspended, resume it immediately.
     ///
@@ -773,9 +717,8 @@ public:
     /// This function is thread-safe, but if called from a thread other than the
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
-    bool integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, IntegrationError&,
-                              DownloadBatchState last_in_batch);
+    void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
+                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -787,8 +730,10 @@ public:
     /// It is an error to call this function before activation of the session
     /// (Connection::activate_session()), or after initiation of deactivation
     /// (Connection::initiate_session_deactivation()).
-    void on_changesets_integrated(bool success, version_type client_version, DownloadCursor download_progress,
-                                  IntegrationError error, DownloadBatchState batch_state);
+    void on_changesets_integrated(version_type client_version, DownloadCursor download_progress,
+                                  DownloadBatchState batch_state);
+
+    void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
 
     void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
 
@@ -815,18 +760,6 @@ private:
     /// This function is guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
     const std::string& get_virt_path() const noexcept;
-
-    /// Fetch a reference to the signed access token.
-    ///
-    /// This function is always called by the event loop thread of the
-    /// associated client object.
-    ///
-    /// This function is guaranteed to not be called before activation, and also
-    /// not after initiation of deactivation.
-    ///
-    /// FIXME: For the upstream client of a 2nd tier server it is not ideal that
-    /// the admin token needs to be uploaded for every session.
-    const std::string& get_signed_access_token() const noexcept;
 
     const std::string& get_realm_path() const noexcept;
     DB& get_db() const noexcept;
@@ -926,7 +859,7 @@ private:
     //@}
 
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
-    void on_flx_sync_progress(int64_t verison, DownloadBatchState batch_state);
+    void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
     void begin_resumption_delay();
     void clear_resumption_delay_state();
@@ -947,11 +880,6 @@ private:
 
     util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
     std::chrono::milliseconds m_try_again_activation_delay{1000};
-
-    // Set to false when a new access token is available and needs to be
-    // uploaded to the server. Set to true when uploading of the token has been
-    // initiated via a BIND or a REFRESH message.
-    bool m_access_token_sent = false;
 
     DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
 
@@ -975,7 +903,8 @@ private:
     bool m_unbound_message_received;            // UNBOUND message received
 
     // True when there is a new FLX sync query we need to send to the server.
-    bool m_pending_query_message = false;
+    util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
+    int64_t m_last_sent_flx_query_version = 0;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1110,7 +1039,6 @@ private:
     void send_upload_message();
     void send_mark_message();
     void send_alloc_message();
-    void send_refresh_message();
     void send_unbind_message();
     void send_query_change_message();
     std::error_code receive_ident_message(SaltedFileIdent);
@@ -1137,11 +1065,6 @@ private:
 
 // Implementation
 
-inline void ClientImpl::report_event_loop_metrics(std::function<EventLoopMetricsHandler> handler)
-{
-    m_service.report_event_loop_metrics(std::move(handler)); // Throws
-}
-
 inline const std::string& ClientImpl::get_user_agent_string() const noexcept
 {
     return m_user_agent_string;
@@ -1155,11 +1078,6 @@ inline auto ClientImpl::get_reconnect_mode() const noexcept -> ReconnectMode
 inline bool ClientImpl::is_dry_run() const noexcept
 {
     return m_dry_run;
-}
-
-inline bool ClientImpl::get_tcp_no_delay() const noexcept
-{
-    return m_tcp_no_delay;
 }
 
 inline util::network::Service& ClientImpl::get_service() noexcept
@@ -1296,9 +1214,7 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
     switch (reason) {
         case ConnectionTerminationReason::closed_voluntarily:
             return true;
-        case ConnectionTerminationReason::resolve_operation_failed:
         case ConnectionTerminationReason::connect_operation_failed:
-        case ConnectionTerminationReason::premature_end_of_input:
         case ConnectionTerminationReason::read_or_write_error:
         case ConnectionTerminationReason::ssl_certificate_rejected:
         case ConnectionTerminationReason::ssl_protocol_violation:
@@ -1312,7 +1228,6 @@ inline bool ClientImpl::Connection::was_voluntary(ConnectionTerminationReason re
         case ConnectionTerminationReason::server_said_do_not_reconnect:
         case ConnectionTerminationReason::pong_timeout:
         case ConnectionTerminationReason::missing_protocol_feature:
-        case ConnectionTerminationReason::http_tunnel_failed:
             break;
     }
     return false;
@@ -1365,19 +1280,6 @@ inline void ClientImpl::Session::request_download_completion_notification()
     // cannot have been sent unless an ERROR message was received.
     REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
     if (m_ident_message_sent && !m_error_message_received)
-        ensure_enlisted_to_send(); // Throws
-}
-
-inline void ClientImpl::Session::new_access_token_available()
-{
-    REALM_ASSERT(m_state == Active);
-
-    m_access_token_sent = false;
-
-    // Since the deactivation process has not been initiated, the UNBIND message
-    // cannot have been sent unless an ERROR message was received.
-    REALM_ASSERT(m_error_message_received || !m_unbind_message_sent);
-    if (m_bind_message_sent && !m_error_message_received)
         ensure_enlisted_to_send(); // Throws
 }
 

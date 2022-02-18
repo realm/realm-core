@@ -219,7 +219,7 @@ void set_random_seed()
 
 class AggressiveGovernor : public util::PageReclaimGovernor {
 public:
-    std::function<int64_t()> current_target_getter(size_t) override
+    util::UniqueFunction<int64_t()> current_target_getter(size_t) override
     {
         return []() { return 4096; };
     }
@@ -230,11 +230,16 @@ AggressiveGovernor aggressive_governor;
 
 void set_always_encrypt()
 {
-    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
-    if (str && strlen(str) != 0) {
-        enable_always_encrypt();
-        // ask for a very aggressive page reclaimer to maximize chance of triggering a bug.
-        realm::util::set_page_reclaim_governor(&aggressive_governor);
+    if (const char* env = getenv("UNITTEST_ENCRYPT_ALL")) {
+        std::string str(env);
+        for (auto& c : str) {
+            c = tolower(c);
+        }
+        if (str == "1" || str == "on" || str == "yes") {
+            enable_always_encrypt();
+            // ask for a very aggressive page reclaimer to maximize chance of triggering a bug.
+            realm::util::set_page_reclaim_governor(&aggressive_governor);
+        }
     }
 }
 

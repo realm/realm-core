@@ -21,8 +21,7 @@
 
 #include <realm/object-store/shared_realm.hpp>
 
-#include <realm/object-store/util/checked_mutex.hpp>
-
+#include <realm/util/checked_mutex.hpp>
 #include <realm/version_id.hpp>
 
 #include <condition_variable>
@@ -92,8 +91,9 @@ public:
     // be managed by this coordinator.
     void bind_to_context(Realm& realm) REQUIRES(!m_realm_mutex);
 
-    Realm::Config get_config() const
+    Realm::Config get_config() const REQUIRES(!m_realm_mutex)
     {
+        util::CheckedLockGuard lock(m_realm_mutex);
         return m_config;
     }
 
@@ -202,10 +202,7 @@ public:
     template <typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-    void async_request_write_mutex(TransactionRef& tr, util::UniqueFunction<void()> when_acquired = nullptr)
-    {
-        m_db->async_request_write_mutex(tr, when_acquired);
-    }
+    void async_request_write_mutex(Realm& realm);
 
     AuditInterface* audit_context() const noexcept
     {

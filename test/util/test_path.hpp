@@ -26,7 +26,7 @@
 #define TEST_PATH_HELPER(class_name, var_name, suffix)                                                               \
     class_name var_name(realm::test_util::get_test_path(test_context.get_test_name(), "." #var_name "." suffix))
 
-#ifdef REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
 // Apple doesn't support file names with "�"
 #define TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 #else

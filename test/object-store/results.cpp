@@ -1927,8 +1927,8 @@ TEST_CASE("notifications: results") {
             size_t after_calls = 0;
             CollectionChangeSet before_change;
             CollectionChangeSet after_change;
-            std::function<void(void)> on_before = [] {};
-            std::function<void(void)> on_after = [] {};
+            util::UniqueFunction<void(void)> on_before = [] {};
+            util::UniqueFunction<void(void)> on_after = [] {};
 
             void before(CollectionChangeSet c)
             {

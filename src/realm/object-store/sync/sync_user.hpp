@@ -21,9 +21,9 @@
 
 #include <realm/object-store/util/atomic_shared_ptr.hpp>
 #include <realm/object-store/util/bson/bson.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/sync/subscribable.hpp>
 
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
 
@@ -48,7 +48,7 @@ public:
     virtual ~SyncUserContext() = default;
 };
 
-using SyncUserContextFactory = std::function<std::shared_ptr<SyncUserContext>()>;
+using SyncUserContextFactory = util::UniqueFunction<std::shared_ptr<SyncUserContext>()>;
 
 // A struct that decodes a given JWT.
 struct RealmJWT {
@@ -285,7 +285,8 @@ public:
     void register_session(std::shared_ptr<SyncSession>) REQUIRES(!m_mutex);
 
     /// Refreshes the custom data for this user
-    void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block) REQUIRES(!m_mutex);
+    void refresh_custom_data(util::UniqueFunction<void(util::Optional<app::AppError>)> completion_block)
+        REQUIRES(!m_mutex);
 
     /// Checks the expiry on the access token against the local time and if it is invalid or expires soon, returns
     /// true.

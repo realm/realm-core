@@ -162,7 +162,7 @@ public:
         return target;
     }
 
-    static int64_t get_target_from_system(std::string cfg_file_name)
+    static int64_t get_target_from_system(const std::string& cfg_file_name)
     {
         int64_t target;
         auto local_spec = fetch_value_in_file(cfg_file_name, "target ([[:digit:]]+)");
@@ -181,16 +181,20 @@ public:
         return target;
     }
 
-    std::function<int64_t()> current_target_getter(size_t load) override
+    util::UniqueFunction<int64_t()> current_target_getter(size_t load) override
     {
         static_cast<void>(load);
         if (m_refresh_count > 0) {
             --m_refresh_count;
-            return std::bind([](int64_t target_copy) { return target_copy; }, m_target);
+            return [target = m_target] {
+                return target;
+            };
         }
         m_refresh_count = 10;
-     
-        return std::bind(get_target_from_system, m_cfg_file_name);
+
+        return [file_name = m_cfg_file_name] {
+            return get_target_from_system(file_name);
+        };
     }
 
     void report_target_result(int64_t target) override
@@ -418,7 +422,7 @@ void reclaim_pages_for_file(SharedFileInfo& info, size_t& work_limit)
 void reclaim_pages()
 {
     size_t load;
-    std::function<int64_t()> runnable;
+    util::UniqueFunction<int64_t()> runnable;
     {
         UniqueLock lock(mapping_mutex);
         load = collect_total_workload();

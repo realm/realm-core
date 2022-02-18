@@ -15,35 +15,53 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
+///
+#include <realm/object-store/util/scheduler.hpp>
+#include <realm/util/assert.hpp>
 
 #include <atomic>
 #include <thread>
 #include <uv.h>
-#include <realm/object-store/util/scheduler.hpp>
-#include <realm/util/assert.hpp>
 
 namespace realm::util {
 
-class UvMainLoopScheduler : public util::Scheduler {
+class UvMainLoopScheduler final : public util::Scheduler {
 public:
-    UvMainLoopScheduler() = default;
-    void remove_handle(uv_async_t*& handle)
+    UvMainLoopScheduler()
+        : m_handle(std::make_unique<uv_async_t>())
     {
-        if (handle && handle->data) {
-            static_cast<Data*>(handle->data)->close_requested = true;
-            uv_async_send(handle);
-            // Don't delete anything here as we need to delete it from within the event loop instead
+        // This only supports running on the default loop, i.e. the main thread.
+        // This suffices for node and for our tests, but in the future we may
+        // need a way to pass in a target loop.
+        int err = uv_async_init(uv_default_loop(), m_handle.get(), [](uv_async_t* handle) {
+            if (!handle->data) {
+                return;
+            }
+            auto& data = *static_cast<Data*>(handle->data);
+            if (data.close_requested) {
+                uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
+                    delete reinterpret_cast<Data*>(handle->data);
+                    delete reinterpret_cast<uv_async_t*>(handle);
+                });
+            }
+            else {
+                data.queue.invoke_all();
+            }
+        });
+        if (err < 0) {
+            throw std::runtime_error(util::format("uv_async_init failed: %1", uv_strerror(err)));
         }
-        else {
-            delete handle;
-        }
-        handle = nullptr;
+        m_handle->data = new Data;
     }
+
     ~UvMainLoopScheduler()
     {
-        remove_handle(m_notification_handle);
-        remove_handle(m_write_handle);
-        remove_handle(m_completion_handle);
+        if (m_handle && m_handle->data) {
+            static_cast<Data*>(m_handle->data)->close_requested = true;
+            uv_async_send(m_handle.get());
+            // Don't delete anything here as we need to delete it from within the event loop instead
+            m_handle.release();
+        }
     }
 
     bool is_on_thread() const noexcept override
@@ -55,108 +73,24 @@ public:
         auto o = dynamic_cast<const UvMainLoopScheduler*>(other);
         return (o && (o->m_id == m_id));
     }
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return true;
     }
 
-    uv_async_t* add_callback(std::function<void()> fn)
+    void invoke(util::UniqueFunction<void()>&& fn) override
     {
-        auto the_handle = new uv_async_t;
-        the_handle->data = new Data{std::move(fn), {false}};
-
-        // This assumes that only one thread matters: the main thread (default loop).
-        uv_async_init(uv_default_loop(), the_handle, [](uv_async_t* handle) {
-            auto& data = *static_cast<Data*>(handle->data);
-            if (data.close_requested) {
-                uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
-                    delete reinterpret_cast<Data*>(handle->data);
-                    delete reinterpret_cast<uv_async_t*>(handle);
-                });
-            }
-            else {
-                data.callback();
-            }
-        });
-        return the_handle;
-    }
-    void set_notify_callback(std::function<void()> fn) override
-    {
-        if (m_notification_handle && m_notification_handle->data) {
-            return; // danger!
-            // We would like to, but cant do this check:
-            // REALM_ASSERT((reinterpret_cast<Data*>(m_notification_handle->data)->callback) == fn);
-        }
-        m_notification_handle = add_callback(std::move(fn));
-    }
-
-    void notify() override
-    {
-        uv_async_send(m_notification_handle);
-    }
-    void schedule_writes() override
-    {
-        uv_async_send(m_write_handle);
-    }
-    void schedule_completions() override
-    {
-        uv_async_send(m_completion_handle);
-    }
-    bool can_schedule_writes() const noexcept override
-    {
-        return true;
-    }
-    bool can_schedule_completions() const noexcept override
-    {
-        return true;
-    }
-    void set_schedule_writes_callback(std::function<void()> fn) override
-    {
-        if (m_write_handle && m_write_handle->data) {
-            return; // danger!
-            // We would like to, but cant do this check:
-            // REALM_ASSERT((reinterpret_cast<Data*>(m_notification_handle->data)->callback) == fn);
-        }
-        m_write_handle = add_callback(std::move(fn));
-    }
-    void set_schedule_completions_callback(std::function<void()> fn) override
-    {
-        if (m_completion_handle && m_completion_handle->data) {
-            return; // danger!
-            // We would like to, but cant do this check:
-            // REALM_ASSERT((reinterpret_cast<Data*>(m_notification_handle->data)->callback) == fn);
-        }
-        m_completion_handle = add_callback(std::move(fn));
-    }
-
-    bool set_timeout_callback(uint64_t timeout, std::function<void()> fn) override
-    {
-        if (!m_timer || !m_timer->data) {
-            auto m_timer = new uv_timer_t;
-            m_timer->data = new Data{std::move(fn), {false}};
-
-            uv_timer_init(uv_default_loop(), m_timer);
-            uv_timer_start(
-                m_timer,
-                [](uv_timer_t* handle) {
-                    auto& data = *static_cast<Data*>(handle->data);
-                    data.callback();
-                },
-                timeout, 0);
-        }
-
-        return true;
+        auto& data = *static_cast<Data*>(m_handle->data);
+        data.queue.push(std::move(fn));
+        uv_async_send(m_handle.get());
     }
 
 private:
     struct Data {
-        std::function<void()> callback;
-        std::atomic<bool> close_requested;
+        InvocationQueue queue;
+        std::atomic<bool> close_requested = {false};
     };
-    uv_async_t* m_notification_handle = nullptr;
-    uv_async_t* m_write_handle = nullptr;
-    uv_async_t* m_completion_handle = nullptr;
-    uv_timer_t* m_timer = nullptr;
+    std::unique_ptr<uv_async_t> m_handle;
     std::thread::id m_id = std::this_thread::get_id();
 };
 

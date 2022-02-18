@@ -2,18 +2,88 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
-* Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
+* Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
+* 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
+* Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
+* `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* The release package was missing several headers (since 11.7.0).
+* If a list of objects contains links to objects not included in the synchronized partition, the indices contained in CollectionChangeSet for that list may be wrong ([#5164](https://github.com/realm/realm-core/issues/5164), since v10.0.0)
+* Sending a QUERY message may fail with `Assertion failed: !m_unbind_message_sent` ([#5149](https://github.com/realm/realm-core/pull/5149), since v11.8.0)
+* Subscription names correctly distinguish an empty string from a nullptr ([#5160](https://github.com/realm/realm-core/pull/5160), since v11.8.0)
+* Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
+* Fix some warnings when building with Xcode 13.3.
+* Using accented characters in class and field names may end the session ([#5196](https://github.com/realm/realm-core/pull/5196), since v10.2.0)
+* Calling `Realm::invalidate()` from inside `BindingContext::did_change()` could result in write transactions not being persisted to disk (since v11.8.0).
+* Calling `Realm::close()` or `Realm::invalidate()` from the async write callbacks could result in crashes (since v11.8.0).
+* Asynchronous writes did not work with queue-confined Realms (since v11.8.0).
+* Releasing all references to a Realm while an asynchronous write was in progress would sometimes result in use-after-frees (since v11.8.0).
+* Fixed a fatal sync error "Automatic recovery failed" during DiscardLocal client reset if the reset notifier callbacks were not set to something. ([#5223](https://github.com/realm/realm-core/issues/5223), since v11.5.0)
+* Fixed running file action BackUpThenDeleteRealm which could silently fail to delete the Realm as long as the copy succeeded. If this happens now, the action is changed to DeleteRealm. ([#5180](https://github.com/realm/realm-core/issues/5180), since the beginning)
+* Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state (since v11.8.0).
+* Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
+* Check, when opening a realm, that in-memory realms are not encrypted ([#5195](https://github.com/realm/realm-core/issues/5195))
+* Using asynchronous writes from multiple threads had several race conditions and would often crash (since v11.8.0).
+* Fixed an issue where having several modules using Realm as a dependency will not link correctly the Security framework. ([#7526](https://github.com/realm/realm-cocoa/issues/7526))
+ 
+### Breaking changes
+* Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
+* Renamed SubscriptionSet::SupercededTag -> SupersededTag to correct typo.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* SubscriptionStore's should be initialized with an implict empty SubscriptionSet so users can wait for query version zero to finish synchronizing. ((#5166)[https://github.com/realm/realm-core/pull/5166])
+* Fixed `Future::on_completion()` and added missing testing for it ((#5181)[https://github.com/realm/realm-core/pull/5181])
+* GenericNetworkTransport::send_request_to_server()'s signature has been changed to `void(Request&& request, util::UniqueFunction<void(const Response&)>&& completion)`. Subclasses implementing it will need to be updated.
+* `MongoClient` had a mixture of functions which took `void(Optional<T>, Optional<AppError>)` callbacks and functions which took `void(Optional<AppError>, Optional<T>)` callbacks. They now all have the error parameter last. Most of the error-first functions other than `call_function()` appear to have been unused.
+* Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
+* realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
+* Updated apply_to_state_command tool to support query based sync download messages. ([#5226](https://github.com/realm/realm-core/pull/5226))
+
+----------------------------------------------
+
+# 11.9.0 Release notes
+
+### Enhancements
+* Support exporting data from a local realm to a synchonized realm. ([#5018](https://github.com/realm/realm-core/issues/5018))
+* Add ability to delete a sync user from a MongoDB Realm app. (PR [#5153](https://github.com/realm/realm-core/pull/5153))
+
+### Fixed
+* UserIdentity metadata table grows indefinitely. ([#5152](https://github.com/realm/realm-core/issues/5152), since v10.0.0)
+* Improved error messaging when opening a Realm with `IncompatibleHistories` when translating file exceptions ([#5161](https://github.com/realm/realm-core/pull/5161), since v6.0.0).
+ 
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+----------------------------------------------
+
+# 11.8.0 Release notes
+
+### Enhancements
+* Support arithmetric operations (+, -, *, /) in query parser. Operands can be properties and/or constants of numeric types (integer, float, double or Decimal128). You can now say something like "(age + 5) * 2 > child.age".
+* Support for asynchronous transactions added. (PR [#5035](https://github.com/realm/realm-core/pull/5035))
+* FLX sync now properly handles write_not_allowed client reset errors ([#5147](https://github.com/realm/realm-core/pull/5147))
+* `realm_delete_files` added to the C API, equivalent to `Realm::delete_files`. ([#5127](https://github.com/realm/realm-core/pull/5127))
+
+### Fixed
+* The release package was missing several headers (since v11.7.0).
 * The sync client will now drain the receive queue when send fails with ECONNRESET - ensuring that any error message from the server gets received and processed. ([#5078](https://github.com/realm/realm-core/pull/5078))
 * Schema validation was missing for embedded objects in sets, resulting in an unhelpful error being thrown if the user attempted to define one.
-* Fixed an issue where having several modules using Realm as a dependency will not link correctly the Security framework. ([#7526](https://github.com/realm/realm-cocoa/issues/7526))
+* Opening a Realm with a schema that has an orphaned embedded object type performed an extra empty write transaction (since v11.0.0).
+* Freezing a Realm with a schema that has orphaned embeeded object types threw a "Wrong transactional state" exception (since v11.5.0).
+* SyncManager::path_for_realm now returns a default path when FLX sync is enabled ([#5088](https://github.com/realm/realm-core/pull/5088))
+* Having links in a property of Mixed type would lead to ill-formed JSON output when serializing the database. ([#5125](https://github.com/realm/realm-core/issues/5125), since v11.0.0)
+* FLX sync QUERY messages are now ordered with UPLOAD messages ([#5135](https://github.com/realm/realm-core/pull/5135))
+* Fixed race condition when waiting for state change notifications on FLX subscription sets that may have caused a hang ([#5146](https://github.com/realm/realm-core/pull/5146))
+* SubscriptionSet::to_ext_json() now handles empty subscription sets correctly ([#5134](https://github.com/realm/realm-core/pull/5134))
 
 ### Breaking changes
-* None.
+* FLX SubscriptionSet type split into SubscriptionSet and MutableSubscriptionSet to add type safety ([#5092](https://github.com/realm/realm-core/pull/5092))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -24,6 +94,12 @@
 * 'Obj TableView::get(size_t)' removed. Use 'TableView::get_object' instead.
 * Fix issue compiling in debug mode for iOS.
 * FLX sync now sends the query version in IDENT messages along with the query body ([#5093](https://github.com/realm/realm-core/pull/5093))
+* Errors in C API no longer store or expose a std::exception_ptr. The comparison of realm_async_error_t now compares error code vs object identity. ([#5064](https://github.com/realm/realm-core/pull/5064))
+* The JSON output is slightly changed in the event of link cycles. Nobody is expected to rely on that.
+* Future::get_async() no longer requires its callback to be marked noexcept. ([#5130](https://github.com/realm/realm-core/pull/5130))
+* SubscriptionSet no longer holds any database resources. ([#5150](https://github.com/realm/realm-core/pull/5150))
+* ClientHistoryImpl::integrate_server_changesets now throws instead of returning a boolean to indicate success ([#5118](https://github.com/realm/realm-core/pull/5118))
+* Send empty access token in bind messages. Remove refresh message from sync protocol. ([#5151](https://github.com/realm/realm-core/pull/5151))
 
 ----------------------------------------------
 

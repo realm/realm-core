@@ -121,13 +121,11 @@ public:
         auto o = dynamic_cast<const DummyScheduler*>(other);
         return (o != nullptr);
     }
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return false;
     }
-
-    void set_notify_callback(std::function<void()>) override {}
-    void notify() override {}
+    void invoke(realm::util::UniqueFunction<void()>&&) override {}
 };
 
 } // anonymous namespace
@@ -578,14 +576,23 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     m_realm->begin_transaction();
 
     auto link_list = m_obj.get_linklist(m_schema.identities_col);
-
+    auto identities_table = link_list.get_target_table();
+    auto col_user_id = identities_table->get_column_key(c_sync_user_id);
+    auto col_provider_type = identities_table->get_column_key(c_sync_provider_type);
     link_list.clear();
 
-    for (size_t i = 0; i < identities.size(); i++) {
-        auto obj = link_list.get_target_table()->create_object();
-        obj.set<String>(c_sync_user_id, identities[i].id);
-        obj.set<String>(c_sync_provider_type, identities[i].provider_type);
-        link_list.add(obj.get_key());
+    for (auto& ident : identities) {
+        ObjKey obj_key = identities_table->where()
+                             .equal(col_user_id, StringData(ident.id))
+                             .equal(col_provider_type, StringData(ident.provider_type))
+                             .find();
+        if (!obj_key) {
+            auto obj = link_list.get_target_table()->create_object();
+            obj.set<String>(c_sync_user_id, ident.id);
+            obj.set<String>(c_sync_provider_type, ident.provider_type);
+            obj_key = obj.get_key();
+        }
+        link_list.add(obj_key);
     }
 
     m_realm->commit_transaction();
@@ -744,6 +751,15 @@ void SyncFileActionMetadata::remove()
     m_obj.remove();
     m_realm->commit_transaction();
     m_realm = nullptr;
+}
+
+void SyncFileActionMetadata::set_action(Action new_action)
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_obj.set<Int>(m_schema.idx_action, static_cast<Int>(new_action));
+    m_realm->commit_transaction();
 }
 
 } // namespace realm

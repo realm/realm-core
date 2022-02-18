@@ -97,7 +97,7 @@ public:
     Optional<T>& operator=(Optional<T>&& other) noexcept(std::is_nothrow_move_assignable<T>::value);
     Optional<T>& operator=(const Optional<T>& other) noexcept(std::is_nothrow_copy_assignable<T>::value);
 
-    template <class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
+    template <class U, class = typename std::enable_if<realm::_impl::TypeIsAssignableToOptional<T, U>::value>::type>
     Optional<T>& operator=(U&& value);
 
     explicit constexpr operator bool() const;

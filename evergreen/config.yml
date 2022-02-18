@@ -112,10 +112,6 @@ functions:
               set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
           fi
 
-          if [ -n "${enable_flx_sync|}" ]; then
-              set_cmake_var realm_vars REALM_ENABLE_FLX_SYNC BOOL On
-          fi
-
           echo "Running cmake with these vars:"
           cat cmake_vars/*.txt | tee cmake_vars.txt
           echo
@@ -186,6 +182,74 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
+
+  "run hang analyzer":
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [[ ! -d realm-core ]]; then
+          echo "No source directory exists. Not running hang analyzer"
+        fi
+
+        TOP_DIR=$(pwd)/realm-core
+        mkdir realm-core/hang_analyzer_workdir; cd realm-core/hang_analyzer_workdir
+        ${python3|python3} -m venv venv
+
+        # venv creates its Scripts/activate file with CLRF endings, which
+        # cygwin bash does not like. dos2unix it
+        # (See https://bugs.python.org/issue32451)
+        if [ "Windows_NT" = "$OS" ]; then
+          dos2unix "venv/Scripts/activate"
+        fi
+
+        export VIRTUAL_ENV_DISABLE_PROMPT=yes
+
+        if [ "Windows_NT" = "$OS" ]; then
+          # Need to quote the path on Windows to preserve the separator.
+          . "venv/Scripts/activate" 2> /tmp/activate_error.log
+        else
+          . venv/bin/activate 2> /tmp/activate_error.log
+        fi
+        if [ $? -ne 0 ]; then
+          echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+          exit 1
+        fi
+        python=python
+
+        echo "python set to $(which $python)"
+
+        echo "Upgrading pip to 21.0.1"
+
+        # ref: https://github.com/grpc/grpc/issues/25082#issuecomment-778392661
+        if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" == "Darwin" ]; then
+          export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+          export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+        fi
+
+        python -m pip --disable-pip-version-check install "pip==21.0.1" "wheel==0.37.0" || exit 1
+
+        REQUIREMENTS_PATH=$TOP_DIR/evergreen/hang_analyzer/requirements.txt
+        if [ "Windows_NT" = "$OS" ]; then
+          REQUIREMENTS_PATH=$(cygpath -w $REQUIREMENTS_PATH)
+        fi
+
+        python -m pip install -r $REQUIREMENTS_PATH || exit 1
+
+        echo "Going to run hang analyzer"
+
+        HANG_ANALYZER_PATH=$TOP_DIR/evergreen/hang_analyzer
+        if [ "Windows_NT" = "$OS" ]; then
+          HANG_ANALYZER_PATH=$(cygpath -w $HANG_ANALYZER_PATH)
+        fi
+
+        python $HANG_ANALYZER_PATH
+
+timeout:
+  - func: "run hang analyzer"
 
 tasks:
 - name: compile
@@ -421,11 +485,7 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            if [ -n "${enable_flx_sync}" ]; then
-                BAAS_BRANCH="-b master"
-            fi
-
-            ./evergreen/install_baas.sh -w ./baas-work-dir $BAAS_BRANCH
+            ./evergreen/install_baas.sh -w ./baas-work-dir
         fi
 
   - command: shell.exec
@@ -499,6 +559,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - .test_suite
@@ -514,6 +576,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - "!.disabled_on_windows .test_suite"
@@ -527,6 +591,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - "!.disabled_on_windows .test_suite"
@@ -539,6 +605,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - .test_suite
@@ -551,6 +619,8 @@ task_groups:
   - func: "fetch binaries"
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - compile
   - object-store-tests
@@ -564,6 +634,8 @@ task_groups:
     vars:
       cmake_build_type: "Release"
       target_to_build: "benchmarks"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - .benchmark
 
@@ -578,6 +650,8 @@ task_groups:
       target_to_build: CoreTests
   teardown_task:
   - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
   tasks:
   - long-running-core-tests
 
@@ -598,21 +672,6 @@ buildvariants:
   - name: compile_test
     distros:
     - ubuntu2004-large
-
-- name: ubuntu2004-flx-sync
-  display_name: "Ubuntu 20.04 x86_64 (FLX Sync Enabled)"
-  run_on: ubuntu2004-large
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    run_tests_against_baas: On
-    enable_flx_sync: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-  tasks:
-  - name: compile_test_flx
 
 - name: ubuntu2004-release
   display_name: "Ubuntu 20.04 x86_64 (Clang 11 Release build)"
@@ -684,6 +743,7 @@ buildvariants:
     fetch_missing_dependencies: On
     curl: "/opt/mongodbtoolchain/v3/bin/curl"
     run_tests_against_baas: On
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
   tasks:
   - name: compile_test_and_package
     distros:
@@ -695,6 +755,7 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-aarch64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
+    python3: "/opt/mongodbtoolchain/v3/bin/python3"
     use_system_openssl: On
     fetch_missing_dependencies: On
   tasks:
@@ -718,20 +779,6 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
-
-- name: macos-1015-flx
-  display_name: "MacOS 10.15 x86_64 (FLX sync)"
-  run_on: macos-1015
-  expansions:
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
-    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
-    max_jobs: $(sysctl -n hw.logicalcpu)
-    run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
-    enable_flx_sync: On
-  tasks:
-  - name: compile_test_flx
 
 - name: macos-1015-release
   display_name: "MacOS 10.15 x86_64 (Release build)"
@@ -796,6 +843,7 @@ buildvariants:
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     build_zlib: On
+    python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_and_package_windows
     distros:
@@ -816,6 +864,7 @@ buildvariants:
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     build_zlib: On
+    python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_windows
     distros:

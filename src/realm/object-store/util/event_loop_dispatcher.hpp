@@ -21,10 +21,7 @@
 
 #include <realm/object-store/util/scheduler.hpp>
 
-#include <mutex>
-#include <queue>
 #include <tuple>
-#include <thread>
 
 namespace realm {
 
@@ -37,56 +34,29 @@ class EventLoopDispatcher<void(Args...)> {
     using Tuple = std::tuple<typename std::remove_reference<Args>::type...>;
 
 private:
-    struct State {
-        State(std::function<void(Args...)> func)
-            : func(std::move(func))
-        {
-        }
-
-        const std::function<void(Args...)> func;
-        std::queue<Tuple> invocations;
-        std::mutex mutex;
-        std::shared_ptr<util::Scheduler> scheduler;
-    };
-    const std::shared_ptr<State> m_state;
+    const std::shared_ptr<util::UniqueFunction<void(Args...)>> m_func;
     const std::shared_ptr<util::Scheduler> m_scheduler = util::Scheduler::make_default();
 
 public:
-    EventLoopDispatcher(std::function<void(Args...)> func)
-        : m_state(std::make_shared<State>(std::move(func)))
+    EventLoopDispatcher(util::UniqueFunction<void(Args...)> func)
+        : m_func(std::make_shared<util::UniqueFunction<void(Args...)>>(std::move(func)))
     {
-        m_scheduler->set_notify_callback([state = m_state] {
-            std::unique_lock<std::mutex> lock(state->mutex);
-            while (!state->invocations.empty()) {
-                auto& tuple = state->invocations.front();
-                std::apply(state->func, std::move(tuple));
-                state->invocations.pop();
-            }
-
-            // scheduler retains state, so state needs to only retain scheduler
-            // while it has pending work or neither will ever be destroyed
-            state->scheduler.reset();
-        });
     }
 
-    const std::function<void(Args...)>& func() const
+    const util::UniqueFunction<void(Args...)>& func() const
     {
-        return m_state->func;
+        return *m_func;
     }
 
     void operator()(Args... args)
     {
         if (m_scheduler->is_on_thread()) {
-            m_state->func(std::forward<Args>(args)...);
+            (*m_func)(std::forward<Args>(args)...);
             return;
         }
-
-        {
-            std::unique_lock<std::mutex> lock(m_state->mutex);
-            m_state->scheduler = m_scheduler;
-            m_state->invocations.push(std::make_tuple(std::forward<Args>(args)...));
-        }
-        m_scheduler->notify();
+        m_scheduler->invoke([func = m_func, args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+            std::apply(*func, std::move(args));
+        });
     }
 };
 
@@ -126,8 +96,8 @@ template <typename T, typename... Args>
 struct ExtractSignatureImpl<void (T::*)(Args...) const& noexcept> {
     using signature = void(Args...);
 };
-// Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
-// from something with that anyway.
+// Note: no && specializations since util::UniqueFunction doesn't support them, so you can't construct an
+// EventLoopDispatcher from something with that anyway.
 
 template <typename T>
 using ExtractSignature = typename ExtractSignatureImpl<T>::signature;

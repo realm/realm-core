@@ -2,13 +2,16 @@ set(REALM_FFI_SOURCES
     ../../../realm.h
 
     config.cpp
+    dictionary.cpp
     error.cpp
     notifications.cpp
     object.cpp
+    list.cpp
     query.cpp
     realm.cpp
     scheduler.cpp
     schema.cpp
+    set.cpp
     util.cpp
 
     conversion.hpp

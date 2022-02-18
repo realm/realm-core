@@ -30,6 +30,11 @@ namespace realm {
 
 class Decimal128 {
 public:
+    // Indicates if constructing a Decimal128 from a double should round the double to 15 digits
+    // or 7 digits. This will make 'string -> (float/double) -> Decimal128 -> string' give the
+    // expected result.
+    enum class RoundTo { Digits7 = 0, Digits15 = 1 };
+
     struct Bid64 {
         Bid64(uint64_t x)
             : w(x)
@@ -44,7 +49,11 @@ public:
     explicit Decimal128(int64_t);
     explicit Decimal128(uint64_t);
     explicit Decimal128(int);
-    explicit Decimal128(double);
+    explicit Decimal128(double, RoundTo = RoundTo::Digits15);
+    explicit Decimal128(float val)
+        : Decimal128(double(val), RoundTo::Digits7)
+    {
+    }
     Decimal128(Bid128 coefficient, int exponent, bool sign);
     explicit Decimal128(Bid64);
     explicit Decimal128(StringData);
@@ -117,6 +126,14 @@ private:
     Bid128 m_value;
 
     void from_int64_t(int64_t val);
+    uint64_t get_coefficient_high() const noexcept
+    {
+        return m_value.w[1] & 0x00003fffffffffffull;
+    }
+    uint64_t get_coefficient_low() const noexcept
+    {
+        return m_value.w[0];
+    }
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const Decimal128& id)

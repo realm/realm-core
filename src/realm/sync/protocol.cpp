@@ -74,13 +74,13 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::token_expired:
             return "Access token expired";
         case ProtocolError::bad_authentication:
-            return "Bad user authentication (BIND, REFRESH)";
+            return "Bad user authentication (BIND)";
         case ProtocolError::illegal_realm_path:
             return "Illegal Realm path (BIND)";
         case ProtocolError::no_such_realm:
             return "No such Realm (BIND)";
         case ProtocolError::permission_denied:
-            return "Permission denied (BIND, REFRESH)";
+            return "Permission denied (BIND)";
         case ProtocolError::bad_server_file_ident:
             return "The server sent an obsolete error code (Bad server file identifier (IDENT))";
         case ProtocolError::bad_client_file_ident:
@@ -136,6 +136,9 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "Server permissions for this file ident have changed since the last time it was used (IDENT)";
         case ProtocolError::initial_sync_not_completed:
             return "Client tried to open a session before initial sync is complete (BIND)";
+        case ProtocolError::write_not_allowed:
+            return "Client attempted a write that is disallowed by permissions, or modifies an object outside the "
+                   "current query - requires client reset";
     }
     return nullptr;
 }

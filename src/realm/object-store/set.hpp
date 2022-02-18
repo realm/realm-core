@@ -24,7 +24,7 @@
 
 #include <realm/object-store/object.hpp>
 #include <realm/object-store/property.hpp>
-#include <realm/object-store/results.hpp>
+#include <realm/object-store/collection.hpp>
 
 #include <realm/set.hpp>
 

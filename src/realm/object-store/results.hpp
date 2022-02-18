@@ -28,10 +28,10 @@
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/set.hpp>
 #include <realm/object-store/shared_realm.hpp>
-#include <realm/object-store/util/checked_mutex.hpp>
 #include <realm/object-store/util/copyable_atomic.hpp>
 
 #include <realm/table_view.hpp>
+#include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
 
 namespace realm {
@@ -267,6 +267,7 @@ public:
         PropertyType property_type;
 
         UnsupportedColumnTypeException(ColKey column, Table const& table, const char* operation);
+        UnsupportedColumnTypeException(ColKey column, ConstTableRef table, const char* operation);
         UnsupportedColumnTypeException(ColKey column, TableView const& tv, const char* operation);
     };
 

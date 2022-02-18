@@ -19,9 +19,9 @@
 #ifndef ASYNC_OPEN_TASK_HPP
 #define ASYNC_OPEN_TASK_HPP
 
-#include <realm/object-store/util/checked_mutex.hpp>
+#include <realm/util/checked_mutex.hpp>
+#include <realm/util/functional.hpp>
 
-#include <functional>
 #include <memory>
 #include <vector>
 
@@ -43,13 +43,13 @@ public:
     //
     // If multiple AsyncOpenTasks all attempt to download the same Realm and one of them is canceled,
     // the other tasks will receive a "Cancelled" exception.
-    void start(std::function<void(ThreadSafeReference, std::exception_ptr)> callback) REQUIRES(!m_mutex);
+    void start(util::UniqueFunction<void(ThreadSafeReference, std::exception_ptr)> callback) REQUIRES(!m_mutex);
 
     // Cancels the download and stops the session. No further functions should be called on this class.
     void cancel() REQUIRES(!m_mutex);
 
     uint64_t register_download_progress_notifier(
-        std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)> callback) REQUIRES(!m_mutex);
+        std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)>&& callback) REQUIRES(!m_mutex);
     void unregister_download_progress_notifier(uint64_t token) REQUIRES(!m_mutex);
 
 private:

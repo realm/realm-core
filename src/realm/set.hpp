@@ -24,7 +24,6 @@
 #include <realm/array_key.hpp>
 
 #include <numeric> // std::iota
-#include <set>
 
 namespace realm {
 
@@ -43,6 +42,7 @@ protected:
     void insert_repl(Replication* repl, size_t index, Mixed value) const;
     void erase_repl(Replication* repl, size_t index, Mixed value) const;
     void clear_repl(Replication* repl) const;
+    static std::vector<Mixed> convert_to_mixed_set(const CollectionBase& rhs);
 };
 
 template <class T>
@@ -269,6 +269,8 @@ private:
 
     template <class It1, class It2>
     void assign_symmetric_difference(It1, It2);
+
+    static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
 };
 
 class LnkSet final : public ObjCollectionBase<SetBase> {
@@ -795,28 +797,34 @@ inline void Set<T>::do_clear()
     m_tree->clear();
 }
 
-namespace {
 template <class T>
-auto convert_to_set(const CollectionBase& rhs, bool nullable)
+std::vector<T> Set<T>::convert_to_set(const CollectionBase& rhs, bool nullable)
 {
-    std::set<T, SetElementLessThan<T>> ret;
-    for (size_t i = 0; i < rhs.size(); i++) {
-        auto val = rhs.get_any(i);
-        if constexpr (std::is_same_v<T, Mixed>) {
-            ret.emplace(val);
+    if constexpr (std::is_same_v<T, Mixed>) {
+        return SetBase::convert_to_mixed_set(rhs);
+    }
+
+    std::vector<Mixed> mixed = SetBase::convert_to_mixed_set(rhs);
+    std::vector<T> ret;
+    ret.reserve(mixed.size());
+    for (auto&& val : mixed) {
+        if constexpr (std::is_same_v<T, ObjKey>) {
+            static_cast<void>(nullable);
+            if (val.is_type(type_Link, type_TypedLink)) {
+                ret.push_back(val.get<ObjKey>());
+            }
         }
         else {
             if (val.is_type(ColumnTypeTraits<T>::id)) {
-                ret.emplace(val.get<T>());
+                ret.push_back(val.get<T>());
             }
             else if (val.is_null() && nullable) {
-                ret.emplace(BPlusTree<T>::default_value(true));
+                ret.push_back(BPlusTree<T>::default_value(true));
             }
         }
     }
     return ret;
 }
-} // namespace
 
 template <class T>
 bool Set<T>::is_subset_of(const CollectionBase& rhs) const
@@ -824,7 +832,7 @@ bool Set<T>::is_subset_of(const CollectionBase& rhs) const
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return is_subset_of(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return is_subset_of(other_set.begin(), other_set.end());
 }
 
@@ -841,7 +849,7 @@ bool Set<T>::is_strict_subset_of(const CollectionBase& rhs) const
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return size() != rhs.size() && is_subset_of(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return size() != other_set.size() && is_subset_of(other_set.begin(), other_set.end());
 }
 
@@ -851,7 +859,7 @@ bool Set<T>::is_superset_of(const CollectionBase& rhs) const
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return is_superset_of(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return is_superset_of(other_set.begin(), other_set.end());
 }
 
@@ -868,7 +876,7 @@ bool Set<T>::is_strict_superset_of(const CollectionBase& rhs) const
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return size() != rhs.size() && is_superset_of(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return size() != other_set.size() && is_superset_of(other_set.begin(), other_set.end());
 }
 
@@ -878,7 +886,7 @@ bool Set<T>::intersects(const CollectionBase& rhs) const
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return intersects(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return intersects(other_set.begin(), other_set.end());
 }
 
@@ -908,7 +916,7 @@ bool Set<T>::set_equals(const CollectionBase& rhs) const
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return size() == rhs.size() && is_subset_of(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return size() == other_set.size() && is_subset_of(other_set.begin(), other_set.end());
 }
 
@@ -918,7 +926,7 @@ inline void Set<T>::assign_union(const CollectionBase& rhs)
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return assign_union(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return assign_union(other_set.begin(), other_set.end());
 }
 
@@ -930,7 +938,7 @@ void Set<T>::assign_union(It1 first, It2 last)
     std::set_difference(first, last, begin(), end(), std::back_inserter(the_diff), SetElementLessThan<T>{});
     // 'the_diff' now contains all the elements that are in foreign set, but not in 'this'
     // Now insert those elements
-    for (auto value : the_diff) {
+    for (auto&& value : the_diff) {
         insert(value);
     }
 }
@@ -941,7 +949,7 @@ inline void Set<T>::assign_intersection(const CollectionBase& rhs)
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return assign_intersection(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return assign_intersection(other_set.begin(), other_set.end());
 }
 
@@ -953,7 +961,7 @@ void Set<T>::assign_intersection(It1 first, It2 last)
     std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
     clear();
     // Elements in intersection comes from foreign set, so ok to use here
-    for (auto value : intersection) {
+    for (auto&& value : intersection) {
         insert(value);
     }
 }
@@ -964,7 +972,7 @@ inline void Set<T>::assign_difference(const CollectionBase& rhs)
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return assign_difference(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return assign_difference(other_set.begin(), other_set.end());
 }
 
@@ -976,7 +984,7 @@ void Set<T>::assign_difference(It1 first, It2 last)
     std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
     // 'intersection' now contains all the elements that are in both foreign set and 'this'.
     // Remove those elements. The elements comes from the foreign set, so ok to refer to.
-    for (auto value : intersection) {
+    for (auto&& value : intersection) {
         erase(value);
     }
 }
@@ -987,7 +995,7 @@ inline void Set<T>::assign_symmetric_difference(const CollectionBase& rhs)
     if (auto other_set = dynamic_cast<const Set<T>*>(&rhs)) {
         return assign_symmetric_difference(other_set->begin(), other_set->end());
     }
-    auto other_set = convert_to_set<T>(rhs, m_nullable);
+    auto other_set = convert_to_set(rhs, m_nullable);
     return assign_symmetric_difference(other_set.begin(), other_set.end());
 }
 
@@ -1000,10 +1008,10 @@ void Set<T>::assign_symmetric_difference(It1 first, It2 last)
     std::vector<T> intersection;
     std::set_intersection(first, last, begin(), end(), std::back_inserter(intersection), SetElementLessThan<T>{});
     // Now remove the common elements and add the differences
-    for (auto value : intersection) {
+    for (auto&& value : intersection) {
         erase(value);
     }
-    for (auto value : difference) {
+    for (auto&& value : difference) {
         insert(value);
     }
 }
@@ -1087,7 +1095,8 @@ inline bool LnkSet::is_null(size_t ndx) const
 inline Mixed LnkSet::get_any(size_t ndx) const
 {
     update_if_needed();
-    return m_set.get_any(virtual2real(ndx));
+    auto obj_key = m_set.get(virtual2real(ndx));
+    return ObjLink{get_target_table()->get_key(), obj_key};
 }
 
 inline std::pair<size_t, bool> LnkSet::insert_null()

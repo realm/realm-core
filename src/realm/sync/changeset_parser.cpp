@@ -4,8 +4,6 @@
 #include <realm/table.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
-#include <set>
-
 using namespace realm;
 using namespace realm::sync;
 
@@ -32,6 +30,9 @@ struct ChangesetParser::State {
 
     StringBuffer m_buffer;
     util::metered::set<uint32_t> m_valid_interned_strings;
+    // Cannot use StringData as key type since m_input_begin may start pointing
+    // to a new chunk of memory.
+    util::metered::set<std::string> m_intern_strings;
 
 
     void parse_one(); // Throws
@@ -292,9 +293,16 @@ void ChangesetParser::State::parse_one()
     if (t == InstrTypeInternString) {
         uint32_t index = read_int<uint32_t>();
         StringData str = read_string();
+        if (auto it = m_intern_strings.find(static_cast<std::string_view>(str)); it != m_intern_strings.end()) {
+            parser_error("Unexpected intern string");
+        }
+        if (auto it = m_valid_interned_strings.find(index); it != m_valid_interned_strings.end()) {
+            parser_error("Unexpected intern index");
+        }
         StringBufferRange range = m_handler.add_string_range(str);
         m_handler.set_intern_string(index, range);
         m_valid_interned_strings.emplace(index);
+        m_intern_strings.emplace(std::string{str});
         return;
     }
 

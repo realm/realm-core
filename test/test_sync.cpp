@@ -24,6 +24,7 @@
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
+#include <realm/history.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/transform.hpp>
 #include <realm/sync/history.hpp>
@@ -535,35 +536,6 @@ TEST(Sync_WaitForSessionTerminations)
 }
 
 
-TEST(Sync_AuthFailure)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::bad_authentication, ec);
-            did_fail = true;
-            fixture.stop();
-        };
-        fixture.set_client_side_error_handler(std::move(error_handler));
-        fixture.start();
-
-        Session session = fixture.make_session(db);
-        std::string wrong_signed_user_token{g_signed_test_user_token};
-        wrong_signed_user_token[0] = 'a';
-        fixture.bind_session(session, "/test", wrong_signed_user_token);
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
 TEST(Sync_TokenWithoutExpirationAllowed)
 {
     bool did_fail = false;
@@ -607,8 +579,8 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         TEST_CLIENT_DB(db);
         ClientServerFixture fixture(dir, test_context);
         auto error_handler = [&](std::error_code, bool, const std::string&) {
-            fixture.stop();
             did_fail = true;
+            fixture.stop();
         };
         fixture.set_client_side_error_handler(error_handler);
         fixture.start();
@@ -624,181 +596,6 @@ TEST(Sync_TokenWithNullExpirationAllowed)
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK_NOT(did_fail);
-}
-
-
-TEST(Sync_UnexpiredTokenValidAndExpires)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-
-        fixture.set_fake_token_expiration_time(2999999999); // One second before the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
-TEST(Sync_RefreshExpiredToken)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-
-        fixture.set_fake_token_expiration_time(2999999999); // One second before the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-        session.refresh(g_signed_test_user_token_expiration_unspecified);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK_NOT(did_fail);
-}
-
-
-TEST(Sync_RefreshChangeUserNotAllowed)
-{
-    TEST_DIR(dir);
-    TEST_CLIENT_DB(db);
-    ClientServerFixture fixture(dir, test_context);
-
-    BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::bad_authentication, ec);
-        fixture.stop();
-        bowl.add_stone();
-    };
-    fixture.set_client_side_error_handler(error_handler);
-    fixture.start();
-
-    Session session = fixture.make_session(db);
-    fixture.bind_session(session, "/test", g_user_0_path_test_token);
-    session.wait_for_download_complete_or_client_stopped();
-
-    // Change user
-    session.refresh(g_user_1_path_test_token);
-    bowl.get_stone();
-}
-
-
-TEST(Sync_CannotBindWithExpiredToken)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
-TEST(Sync_CannotRefreshWithExpiredToken)
-{
-    bool did_fail = false;
-    {
-        TEST_DIR(dir);
-        TEST_CLIENT_DB(db);
-        ClientServerFixture fixture(dir, test_context);
-        auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-            CHECK_EQUAL(ProtocolError::token_expired, ec);
-            fixture.stop();
-            did_fail = true;
-        };
-        fixture.set_client_side_error_handler(error_handler);
-        fixture.start();
-        fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-
-        Session session = fixture.make_session(db);
-        fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_unspecified);
-        write_transaction_notifying_session(db, session, [](WriteTransaction& wt) {
-            wt.add_table("class_foo");
-        });
-        session.wait_for_upload_complete_or_client_stopped();
-        session.wait_for_download_complete_or_client_stopped();
-        session.refresh(g_signed_test_user_token_expiration_specified);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
-
-TEST(Sync_CanRefreshTokenAfterExpirationError)
-{
-    // Note: A failure in this test is expected to cause an indefinite hang in
-    // the final call to
-    // Session::wait_for_download_complete_or_client_stopped().
-
-    TEST_DIR(dir);
-    TEST_CLIENT_DB(db);
-    ClientServerFixture fixture(dir, test_context);
-
-    BowlOfStonesSemaphore bowl;
-    auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::token_expired, ec);
-        bowl.add_stone();
-    };
-
-    fixture.set_client_side_error_handler(error_handler);
-    fixture.start();
-
-    fixture.set_fake_token_expiration_time(3000000001); // One second after the token expiration
-
-    Session session = fixture.make_session(db);
-    fixture.bind_session(session, "/test", g_signed_test_user_token_expiration_specified);
-    bowl.get_stone();
-    session.refresh(g_signed_test_user_token_expiration_unspecified);
-    session.wait_for_download_complete_or_client_stopped();
 }
 
 
@@ -1804,8 +1601,8 @@ TEST(Sync_ReadFailureSimulation)
             auto error_handler = [&](std::error_code ec, bool is_fatal, const std::string&) {
                 CHECK_EQUAL(_impl::SimulatedFailure::sync_client__read_head, ec);
                 CHECK_NOT(is_fatal);
-                fixture.stop();
                 client_side_read_did_fail = true;
+                fixture.stop();
             };
             fixture.set_client_side_error_handler(error_handler);
             Session session = fixture.make_bound_session(db, "/test");
@@ -2461,7 +2258,7 @@ void test_realm_deletion(unit_test::TestContext& test_context, bool disable_stat
     }
 
     ClientServerFixture::Config config;
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
 
     std::string server_path = "/test";
     std::string server_realm_file = fixture.map_virtual_to_real_path(server_path);
@@ -3453,31 +3250,19 @@ TEST(Sync_RefreshRightAfterBind)
 TEST(Sync_Permissions)
 {
     TEST_CLIENT_DB(db_valid);
-    TEST_CLIENT_DB(db_invalid);
 
     bool did_see_error_for_valid = false;
-    bool did_see_error_for_invalid = false;
 
     TEST_DIR(server_dir);
 
-    // FIXME: This could use a single client, but the fixture doesn't really
-    // make it easier to deal with session-level errors without disrupting other
-    // sessions.
-    MultiClientServerFixture fixture{2, 1, server_dir, test_context};
-    fixture.set_client_side_error_handler(0, [&](std::error_code, bool, const std::string& message) {
+    ClientServerFixture fixture{server_dir, test_context};
+    fixture.set_client_side_error_handler([&](std::error_code, bool, const std::string& message) {
         CHECK_EQUAL("", message);
         did_see_error_for_valid = true;
     });
-    fixture.set_client_side_error_handler(1, [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ProtocolError::permission_denied, ec);
-        did_see_error_for_invalid = true;
-        fixture.get_client(1).stop();
-    });
     fixture.start();
 
-    Session session_valid = fixture.make_bound_session(0, db_valid, 0, "/valid", g_signed_test_user_token_for_path);
-    Session session_invalid =
-        fixture.make_bound_session(1, db_invalid, 0, "/invalid", g_signed_test_user_token_for_path);
+    Session session_valid = fixture.make_bound_session(db_valid, "/valid", g_signed_test_user_token_for_path);
 
     // Insert some dummy data
     WriteTransaction wt_valid{db_valid};
@@ -3485,13 +3270,7 @@ TEST(Sync_Permissions)
     session_valid.nonsync_transact_notify(wt_valid.commit());
     session_valid.wait_for_upload_complete_or_client_stopped();
 
-    WriteTransaction wt_invalid{db_invalid};
-    wt_invalid.add_table("class_b");
-    session_invalid.nonsync_transact_notify(wt_invalid.commit());
-    session_invalid.wait_for_upload_complete_or_client_stopped();
-
     CHECK_NOT(did_see_error_for_valid);
-    CHECK(did_see_error_for_invalid);
 }
 
 
@@ -3509,7 +3288,7 @@ TEST(Sync_SSL_Certificate_1)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3539,7 +3318,7 @@ TEST(Sync_SSL_Certificate_2)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3577,7 +3356,7 @@ TEST(Sync_SSL_Certificate_3)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3604,7 +3383,7 @@ TEST(Sync_SSL_Certificate_DER)
     config.server_ssl_certificate_path = ca_dir + "/certs/localhost-chain.crt.pem";
     config.server_ssl_certificate_key_path = ca_dir + "/certs/localhost-server.key.pem";
 
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
 
     Session::Config session_config;
     session_config.protocol_envelope = ProtocolEnvelope::realms;
@@ -3784,7 +3563,6 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     Client::Config config;
     config.logger = &client_logger;
     config.reconnect_mode = ReconnectMode::testing;
-    config.tcp_no_delay = true;
     Client client(config);
 
     ThreadWrapper client_thread;
@@ -3811,7 +3589,7 @@ TEST_IF(Sync_SSL_Certificate_Verify_Callback_External, false)
     session_config.ssl_trust_certificate_path = util::none;
     session_config.ssl_verify_callback = ssl_verify_callback;
 
-    Session session(client, db, std::move(session_config));
+    Session session(client, db, nullptr, std::move(session_config));
     session.bind();
     session.wait_for_download_complete_or_client_stopped();
 
@@ -3942,7 +3720,6 @@ TEST(Sync_UploadDownloadProgress_1)
         Client::Config config;
         config.logger = &client_logger;
         config.reconnect_mode = ReconnectMode::testing;
-        config.tcp_no_delay = true;
         Client client(config);
 
         ThreadWrapper client_thread;
@@ -3950,7 +3727,7 @@ TEST(Sync_UploadDownloadProgress_1)
             client.run();
         });
 
-        Session session(client, db);
+        Session session(client, db, nullptr);
 
         int number_of_handler_calls = 0;
 
@@ -4218,7 +3995,6 @@ TEST(Sync_UploadDownloadProgress_3)
     Client::Config client_config;
     client_config.logger = &client_logger;
     client_config.reconnect_mode = ReconnectMode::testing;
-    client_config.tcp_no_delay = true;
     Client client(client_config);
 
     ThreadWrapper client_thread;
@@ -4230,7 +4006,7 @@ TEST(Sync_UploadDownloadProgress_3)
     Session::Config config;
     config.service_identifier = "/realm-sync";
 
-    Session session(client, db, std::move(config));
+    Session session(client, db, nullptr, std::move(config));
 
     // entry is used to count the number of calls to
     // progress_handler. At the first call, the server is
@@ -4370,7 +4146,7 @@ TEST(Sync_UploadDownloadProgress_4)
 
     ClientServerFixture::Config config;
     config.max_download_size = size_t(1e5);
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     Session session_1 = fixture.make_session(db_1);
@@ -4524,7 +4300,6 @@ TEST(Sync_UploadDownloadProgress_6)
     client_config.logger = &client_logger;
     client_config.reconnect_mode = ReconnectMode::testing;
     client_config.one_connection_per_session = false;
-    client_config.tcp_no_delay = true;
     Client client(client_config);
 
     ThreadWrapper client_thread;
@@ -4538,7 +4313,7 @@ TEST(Sync_UploadDownloadProgress_6)
     session_config.realm_identifier = "/test";
     session_config.signed_user_token = g_signed_test_user_token;
 
-    std::unique_ptr<Session> session{new Session{client, db, std::move(session_config)}};
+    std::unique_ptr<Session> session{new Session{client, db, nullptr, std::move(session_config)}};
 
     util::Mutex mutex;
 
@@ -4584,10 +4359,9 @@ TEST(Sync_MultipleSyncAgentsNotAllowed)
     Client::Config config;
     config.logger = &test_context.logger;
     config.reconnect_mode = ReconnectMode::testing;
-    config.tcp_no_delay = true;
     Client client{config};
-    Session session_1{client, db};
-    Session session_2{client, db};
+    Session session_1{client, db, nullptr};
+    Session session_2{client, db, nullptr};
     session_1.bind("realm://foo/bar", "blablabla");
     session_2.bind("realm://foo/bar", "blablabla");
     CHECK_THROW(client.run(), MultipleSyncAgents);
@@ -4605,7 +4379,7 @@ TEST(Sync_CancelReconnectDelay)
 
     // After connection-level error, and at session-level.
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
@@ -4627,7 +4401,7 @@ TEST(Sync_CancelReconnectDelay)
     // After connection-level error, and at client-level while connection
     // object exists (ConnectionImpl in clinet.cpp).
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
@@ -4649,7 +4423,7 @@ TEST(Sync_CancelReconnectDelay)
     // After connection-level error, and at client-level while connection object
     // does not exist (ConnectionImpl in clinet.cpp).
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         {
@@ -4682,7 +4456,7 @@ TEST(Sync_CancelReconnectDelay)
 
     // After session-level error, and at session-level.
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         // Add a session for the purpose of keeping the connection open
@@ -4705,7 +4479,7 @@ TEST(Sync_CancelReconnectDelay)
 
     // After session-level error, and at client-level.
     {
-        ClientServerFixture fixture{server_dir, test_context, fixture_config};
+        ClientServerFixture fixture{server_dir, test_context, std::move(fixture_config)};
         fixture.start();
 
         // Add a session for the purpose of keeping the connection open
@@ -5131,7 +4905,7 @@ TEST(Sync_PingTimesOut)
         ClientServerFixture::Config config;
         config.client_ping_period = 0;  // send ping immediately
         config.client_pong_timeout = 0; // time out immediately
-        ClientServerFixture fixture(dir, test_context, config);
+        ClientServerFixture fixture(dir, test_context, std::move(config));
 
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(Client::Error::pong_timeout, ec);
@@ -5158,7 +4932,7 @@ TEST(Sync_ReconnectAfterPingTimeout)
     config.client_ping_period = 0;  // send ping immediately
     config.client_pong_timeout = 0; // time out immediately
 
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
@@ -5183,7 +4957,7 @@ TEST(Sync_UrgentPingIsSent)
         ClientServerFixture::Config config;
         config.client_pong_timeout = 0; // urgent pings time out immediately
 
-        ClientServerFixture fixture(dir, test_context, config);
+        ClientServerFixture fixture(dir, test_context, std::move(config));
 
         auto error_handler = [&](std::error_code ec, bool, const std::string&) {
             CHECK_EQUAL(Client::Error::pong_timeout, ec);
@@ -5211,7 +4985,7 @@ TEST(Sync_ServerDiscardDeadConnections)
     ClientServerFixture::Config config;
     config.server_connection_reaper_interval = 1; // discard dead connections quickly, FIXME: 0 will not work here :(
 
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
 
     BowlOfStonesSemaphore bowl;
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
@@ -5336,7 +5110,7 @@ TEST(Sync_UploadLogCompactionEnabled)
 
     ClientServerFixture::Config config;
     config.disable_upload_compaction = false;
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     Session session_1 = fixture.make_session(db_1);
@@ -5398,7 +5172,7 @@ TEST(Sync_UploadLogCompactionDisabled)
     ClientServerFixture::Config config;
     config.disable_upload_compaction = true;
     config.disable_history_compaction = true;
-    ClientServerFixture fixture{server_dir, test_context, config};
+    ClientServerFixture fixture{server_dir, test_context, std::move(config)};
     fixture.start();
 
     // Create a changeset with lots of overwrites of the
@@ -5855,7 +5629,7 @@ TEST_IF(Sync_SSL_Certificates, false)
         // Invalid token for the cloud.
         session_config.signed_user_token = g_signed_test_user_token;
 
-        Session session{client, db, std::move(session_config)};
+        Session session{client, db, nullptr, std::move(session_config)};
 
         auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
             if (state == ConnectionState::disconnected) {
@@ -5888,13 +5662,14 @@ TEST(Sync_AuthorizationHeaderName)
     TEST_DIR(dir);
     TEST_CLIENT_DB(db);
 
+    const char* authorization_header_name = "X-Alternative-Name";
     ClientServerFixture::Config config;
-    config.authorization_header_name = "X-Alternative-Name";
-    ClientServerFixture fixture(dir, test_context, config);
+    config.authorization_header_name = authorization_header_name;
+    ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
 
     Session::Config session_config;
-    session_config.authorization_header_name = config.authorization_header_name;
+    session_config.authorization_header_name = authorization_header_name;
 
     std::map<std::string, std::string> custom_http_headers;
     custom_http_headers["Header-Name-1"] = "Header-Value-1";
@@ -5916,7 +5691,7 @@ TEST(Sync_BadChangeset)
     {
         ClientServerFixture::Config config;
         config.disable_upload_compaction = true;
-        ClientServerFixture fixture(dir, test_context, config);
+        ClientServerFixture fixture(dir, test_context, std::move(config));
         fixture.start();
 
         {
@@ -5943,8 +5718,8 @@ TEST(Sync_BadChangeset)
             bool is_fatal = error_info->is_fatal;
             CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
             CHECK(is_fatal);
-            fixture.stop();
             did_fail = true;
+            fixture.stop();
         };
 
         Session session = fixture.make_session(db);
@@ -5955,6 +5730,49 @@ TEST(Sync_BadChangeset)
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK(did_fail);
+}
+
+
+TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
+{
+    TEST_DIR(dir);
+    TEST_CLIENT_DB(db);
+
+    bool did_fail = false;
+    {
+        ClientServerFixture::Config config;
+        config.disable_upload_compaction = true;
+        ClientServerFixture fixture(dir, test_context, std::move(config));
+        fixture.start();
+
+        {
+            Session session = fixture.make_bound_session(db);
+        }
+
+        {
+            WriteTransaction wt(db);
+            TableRef table = wt.add_table("class_table");
+            table->add_column(type_Int, "prógram");
+            table->add_column(type_Int, "program");
+            auto obj = table->create_object();
+            obj.add_int("program", 42);
+            wt.commit();
+        }
+
+        auto listener = [&](ConnectionState state, const Session::ErrorInfo*) {
+            if (state != ConnectionState::disconnected)
+                return;
+            did_fail = true;
+            fixture.stop();
+        };
+
+        Session session = fixture.make_session(db);
+        session.set_connection_state_change_listener(listener);
+        fixture.bind_session(session, "/test");
+
+        session.wait_for_upload_complete_or_client_stopped();
+    }
+    CHECK_NOT(did_fail);
 }
 
 
@@ -6212,7 +6030,7 @@ TEST(Sync_ConcurrentHttpDeleteAndHttpCompact)
 {
     TEST_DIR(server_dir);
     ClientServerFixture::Config config;
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     for (int i = 0; i < 64; ++i) {
@@ -6246,7 +6064,7 @@ TEST(Sync_RunServerWithoutPublicKey)
     TEST_DIR(server_dir);
     ClientServerFixture::Config config;
     config.server_public_key_path = {};
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     // Server must accept an unsigned token when a public key is not passed to
@@ -6280,7 +6098,7 @@ TEST(Sync_ServerSideEncryption)
     {
         ClientServerFixture::Config config;
         config.server_encryption_key = crypt_key_2(always_encrypt);
-        ClientServerFixture fixture(server_dir, test_context, config);
+        ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
 
         Session session = fixture.make_bound_session(db, "/test");
@@ -6310,7 +6128,7 @@ TEST(Sync_ServerSideEncryptionPlusCompact)
     ClientServerFixture::Config config;
     bool always_encrypt = true;
     config.server_encryption_key = crypt_key_2(always_encrypt);
-    ClientServerFixture fixture(server_dir, test_context, config);
+    ClientServerFixture fixture(server_dir, test_context, std::move(config));
     fixture.start();
 
     {
@@ -6386,7 +6204,7 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
     config.disable_upload_compaction = false;
     config.disable_download_compaction = false;
 
-    ClientServerFixture fixture(dir, test_context, config);
+    ClientServerFixture fixture(dir, test_context, std::move(config));
     fixture.start();
 
     {
@@ -6498,7 +6316,7 @@ TEST(Sync_ClientFileBlacklisting)
         ClientServerFixture::Config config;
         config.server_metrics = &metrics;
         config.client_file_blacklists["/test"].push_back(client_file_ident);
-        ClientServerFixture fixture(server_dir, test_context, config);
+        ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
         using ConnectionState = ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
@@ -6510,8 +6328,8 @@ TEST(Sync_ClientFileBlacklisting)
             bool is_fatal = error_info->is_fatal;
             CHECK_EQUAL(sync::ProtocolError::client_file_blacklisted, ec);
             CHECK(is_fatal);
-            fixture.stop();
             did_fail = true;
+            fixture.stop();
         };
         Session session = fixture.make_session(db);
         session.set_connection_state_change_listener(listener);
@@ -7319,6 +7137,101 @@ TEST(Sync_BundledRealmFile)
 
     // Now we can
     db->write_copy(path.c_str());
+}
+
+TEST(Sync_UpgradeToClientHistory)
+{
+    SHARED_GROUP_TEST_PATH(db1_path);
+    SHARED_GROUP_TEST_PATH(db2_path);
+    auto db_1 = DB::create(make_in_realm_history(), db1_path);
+    auto db_2 = DB::create(make_in_realm_history(), db2_path);
+    {
+        auto tr = db_1->start_write();
+
+        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto col_float = embedded->add_column(type_Float, "float");
+        auto col_additional = embedded->add_column_dictionary(*embedded, "additional");
+
+        auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto col_list = baas->add_column_list(type_Int, "list");
+        auto col_set = baas->add_column_set(type_Int, "set");
+        auto col_dict = baas->add_column_dictionary(type_Int, "dictionary");
+        auto col_child = baas->add_column(*embedded, "child");
+
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+        auto col_str = foos->add_column(type_String, "str");
+        auto col_children = foos->add_column_list(*embedded, "children");
+
+        auto foobaas = tr->add_table_with_primary_key("class_FooBaa", type_ObjectId, "_id");
+        auto col_time = foobaas->add_column(type_Timestamp, "time");
+
+        auto col_link = baas->add_column(*foos, "link");
+
+        auto foo = foos->create_object_with_primary_key("123").set(col_str, "Hello");
+        auto children = foo.get_linklist(col_children);
+        children.create_and_insert_linked_object(0);
+        auto baa = baas->create_object_with_primary_key(999).set(col_link, foo.get_key());
+        auto obj = baa.create_and_set_linked_object(col_child);
+        obj.set(col_float, 42.f);
+        auto additional = obj.get_dictionary(col_additional);
+        additional.create_and_insert_linked_object("One").set(col_float, 1.f);
+        additional.create_and_insert_linked_object("Two").set(col_float, 2.f);
+        additional.create_and_insert_linked_object("Three").set(col_float, 3.f);
+
+        auto list = baa.get_list<Int>(col_list);
+        list.add(1);
+        list.add(2);
+        list.add(3);
+        auto set = baa.get_set<Int>(col_set);
+        set.insert(4);
+        set.insert(5);
+        set.insert(6);
+        auto dict = baa.get_dictionary(col_dict);
+        dict.insert("key7", 7);
+        dict.insert("key8", 8);
+        dict.insert("key9", 9);
+
+        for (int i = 0; i < 100; i++) {
+            foobaas->create_object_with_primary_key(ObjectId::gen()).set(col_time, Timestamp(::time(nullptr), i));
+        }
+
+        tr->commit();
+    }
+    {
+        auto tr = db_2->start_write();
+        auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
+        auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
+        auto col_str = foos->add_column(type_String, "str");
+        auto col_link = baas->add_column(*foos, "link");
+
+        auto foo = foos->create_object_with_primary_key("123").set(col_str, "Goodbye");
+        auto baa = baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
+
+        tr->commit();
+    }
+
+    db_1->create_new_history(make_client_replication());
+    db_2->create_new_history(make_client_replication());
+
+    TEST_DIR(dir);
+    fixtures::ClientServerFixture fixture{dir, test_context};
+    fixture.start();
+
+    Session session_1 = fixture.make_session(db_1);
+    Session session_2 = fixture.make_session(db_2);
+    fixture.bind_session(session_1, "/test");
+    fixture.bind_session(session_2, "/test");
+
+    write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
+        auto foos = tr.get_group().get_table("class_Foo");
+        auto foo = foos->create_object_with_primary_key("456");
+    });
+    session_1.wait_for_upload_complete_or_client_stopped();
+    session_2.wait_for_upload_complete_or_client_stopped();
+    session_1.wait_for_download_complete_or_client_stopped();
+    session_2.wait_for_download_complete_or_client_stopped();
+
+    // db_2->start_read()->to_json(std::cout);
 }
 
 // This test is extracted from ClientReset_ThreeClients

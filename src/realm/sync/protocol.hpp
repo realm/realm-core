@@ -218,10 +218,10 @@ enum class ProtocolError {
     session_closed               = 200, // Session closed (no error)
     other_session_error          = 201, // Other session level error
     token_expired                = 202, // Access token expired
-    bad_authentication           = 203, // Bad user authentication (BIND, REFRESH)
+    bad_authentication           = 203, // Bad user authentication (BIND)
     illegal_realm_path           = 204, // Illegal Realm path (BIND)
     no_such_realm                = 205, // No such Realm (BIND)
-    permission_denied            = 206, // Permission denied (BIND, REFRESH)
+    permission_denied            = 206, // Permission denied (BIND)
     bad_server_file_ident        = 207, // Bad server file identifier (IDENT) (obsolete!)
     bad_client_file_ident        = 208, // Bad client file identifier (IDENT)
     bad_server_version           = 209, // Bad server version (IDENT, UPLOAD, TRANSACT)
@@ -248,6 +248,8 @@ enum class ProtocolError {
     server_permissions_changed   = 228, // Server permissions for this file ident have changed since the last time it
                                         // was used (IDENT)
     initial_sync_not_completed   = 229, // Client tried to open a session before initial sync is complete (BIND)
+    write_not_allowed            = 230, // Client attempted a write that is disallowed by permissions, or modifies an
+                                        // object outside the current query - requires client reset (UPLOAD)
 
     // clang-format on
 };

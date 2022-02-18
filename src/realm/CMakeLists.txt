@@ -36,6 +36,7 @@ set(REALM_SOURCES
     db.cpp
     group_writer.cpp
     history.cpp
+    impl/copy_replication.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
     impl/transact_log.cpp
@@ -217,6 +218,7 @@ set(REALM_INSTALL_HEADERS
     util/buffer_stream.hpp
     util/call_with_tuple.hpp
     util/cf_ptr.hpp
+    util/checked_mutex.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
     util/features.h

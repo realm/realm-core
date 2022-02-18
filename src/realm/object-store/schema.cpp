@@ -153,12 +153,10 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
     }
 }
 
-} // end anonymous namespace
-
-std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
+std::unordered_set<std::string> get_embedded_object_orphans(const Schema& schema)
 {
     std::queue<const ObjectSchema*> to_check;
-    for (auto& object : *this) {
+    for (auto& object : schema) {
         if (!object.is_embedded) {
             to_check.push(&object);
         }
@@ -171,8 +169,8 @@ std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
         reachable.insert(object);
         for (auto& prop : object->persisted_properties) {
             if (prop.type == PropertyType::Object) {
-                auto it = find(prop.object_type);
-                REALM_ASSERT(it != this->end());
+                auto it = schema.find(prop.object_type);
+                REALM_ASSERT(it != schema.end());
                 if (it->is_embedded && reachable.insert(&*it).second) {
                     to_check.push(&*it);
                 }
@@ -182,7 +180,7 @@ std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
     }
     // Any object types which weren't found above are orphans
     std::unordered_set<std::string> orphans;
-    for (auto& object : *this) {
+    for (auto& object : schema) {
         if (object.is_embedded && !reachable.count(&object)) {
             orphans.insert(object.name);
         }
@@ -190,6 +188,7 @@ std::unordered_set<std::string> Schema::get_embedded_object_orphans() const
     return orphans;
 }
 
+} // end anonymous namespace
 
 void Schema::validate(uint64_t validation_mode) const
 {
@@ -220,7 +219,7 @@ void Schema::validate(uint64_t validation_mode) const
         check_for_embedded_objects_loop(*this, exceptions);
 
         if (validation_mode & SchemaValidationMode::RejectEmbeddedOrphans) {
-            auto orphans = this->get_embedded_object_orphans();
+            auto orphans = get_embedded_object_orphans(*this);
             for (auto& name : orphans) {
                 exceptions.push_back(util::format(
                     "Embedded object '%1' is unreachable by any link path from top level objects.", name));
@@ -309,13 +308,18 @@ void Schema::zip_matching(T&& a, U&& b, Func&& func) noexcept
         func(nullptr, &b[j]);
 }
 
-std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool include_table_removals) const
+std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMode mode,
+                                          bool include_table_removals) const
 {
+    std::unordered_set<std::string> orphans;
+    if (mode == SchemaMode::AdditiveDiscovered) {
+        orphans = get_embedded_object_orphans(target_schema);
+    }
     std::vector<SchemaChange> changes;
 
     // Add missing tables
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-        if (target && !existing) {
+        if (target && !existing && !orphans.count(target->name)) {
             changes.emplace_back(schema_change::AddTable{target});
         }
         else if (existing && !target) {
@@ -328,7 +332,7 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, bool incl
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
         if (target && existing)
             ::compare(*existing, *target, changes);
-        else if (target) {
+        else if (target && !orphans.count(target->name)) {
             // Target is a new table -- add all properties
             changes.emplace_back(schema_change::AddInitialProperties{target});
         }

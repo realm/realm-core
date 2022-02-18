@@ -32,7 +32,7 @@ bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);
 std::vector<char> make_test_encryption_key(const char start = 0);
 void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string section_name,
-                                          std::function<void()> func);
+                                          util::FunctionRef<void()> func);
 
 std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp = {},
                             util::Optional<int64_t> iat = {});
@@ -55,6 +55,11 @@ static inline int64_t random_int()
     thread_local std::mt19937_64 rng(std::random_device{}());
     return rng();
 }
+
+bool chmod_supported(const std::string& path);
+int get_permissions(const std::string& path);
+void chmod(const std::string& path, int permissions);
+std::string get_parent_directory(const std::string& path);
 
 } // namespace realm
 

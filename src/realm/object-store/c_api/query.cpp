@@ -283,6 +283,44 @@ RLM_API bool realm_results_count(realm_results_t* results, size_t* out_count)
     });
 }
 
+RLM_API realm_results_t* realm_results_filter(realm_results_t* results, realm_query_t* query)
+{
+    return wrap_err([&]() {
+        return new realm_results{results->filter(std::move(query->query))};
+    });
+}
+
+namespace {
+realm_results_t* realm_results_ordering(realm_results_t* results, const char* op, const char* ordering)
+{
+    return wrap_err([&]() -> realm_results_t* {
+        std::string str = "TRUEPREDICATE " + std::string(op) + "(" + std::string(ordering) + ")";
+        auto q = results->get_table()->query(str);
+        auto ordering{q.get_ordering()};
+        return new realm_results{results->apply_ordering(std::move(*ordering))};
+        return nullptr;
+    });
+}
+} // namespace
+
+RLM_API realm_results_t* realm_results_sort(realm_results_t* results, const char* sort_string)
+{
+    return realm_results_ordering(results, "SORT", sort_string);
+}
+
+RLM_API realm_results_t* realm_results_distinct(realm_results_t* results, const char* distinct_string)
+{
+    return realm_results_ordering(results, "DISTINCT", distinct_string);
+}
+
+RLM_API realm_results_t* realm_results_limit(realm_results_t* results, size_t max_count)
+{
+    return wrap_err([&]() {
+        return new realm_results{results->limit(max_count)};
+    });
+}
+
+
 RLM_API bool realm_results_get(realm_results_t* results, size_t index, realm_value_t* out_value)
 {
     return wrap_err([&]() {
@@ -318,12 +356,19 @@ RLM_API bool realm_results_delete_all(realm_results_t* results)
     });
 }
 
+RLM_API realm_results_t* realm_results_snapshot(const realm_results_t* results)
+{
+    return wrap_err([&]() {
+        return new realm_results{results->snapshot()};
+    });
+}
+
 RLM_API bool realm_results_min(realm_results_t* results, realm_property_key_t col, realm_value_t* out_value,
                                bool* out_found)
 {
     return wrap_err([&]() {
         // FIXME: This should be part of Results.
-        results->get_table()->report_invalid_key(ColKey(col));
+        results->get_table()->check_column(ColKey(col));
 
         if (auto x = results->min(ColKey(col))) {
             if (out_found) {
@@ -350,7 +395,7 @@ RLM_API bool realm_results_max(realm_results_t* results, realm_property_key_t co
 {
     return wrap_err([&]() {
         // FIXME: This should be part of Results.
-        results->get_table()->report_invalid_key(ColKey(col));
+        results->get_table()->check_column(ColKey(col));
 
         if (auto x = results->max(ColKey(col))) {
             if (out_found) {
@@ -377,7 +422,7 @@ RLM_API bool realm_results_sum(realm_results_t* results, realm_property_key_t co
 {
     return wrap_err([&]() {
         // FIXME: This should be part of Results.
-        results->get_table()->report_invalid_key(ColKey(col));
+        results->get_table()->check_column(ColKey(col));
 
         if (out_found) {
             *out_found = results->size() != 0;
@@ -408,7 +453,7 @@ RLM_API bool realm_results_average(realm_results_t* results, realm_property_key_
 {
     return wrap_err([&]() {
         // FIXME: This should be part of Results.
-        results->get_table()->report_invalid_key(ColKey(col));
+        results->get_table()->check_column(ColKey(col));
 
         if (auto x = results->average(ColKey(col))) {
             if (out_found) {

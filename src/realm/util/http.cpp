@@ -482,16 +482,5 @@ std::error_code make_error_code(HTTPParserError error)
     return std::error_code(static_cast<int>(error), g_http_parser_error_category);
 }
 
-
-std::string make_http_host(bool is_ssl, std::string_view address, std::uint_fast16_t port)
-{
-    std::ostringstream out;
-    out << address; // Throws
-    std::uint_fast16_t default_port = (is_ssl ? 443 : 80);
-    if (port != default_port)
-        out << ":" << port; // Throws
-    return std::move(out).str();
-}
-
 } // namespace util
 } // namespace realm

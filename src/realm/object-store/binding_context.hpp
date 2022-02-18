@@ -41,12 +41,13 @@ namespace realm {
 // public:
 //     // A token returned from add_notification that can be used to remove the
 //     // notification later
-//     struct token : private std::list<std::function<void ()>>::iterator {
-//         token(std::list<std::function<void ()>>::iterator it) : std::list<std::function<void ()>>::iterator(it) { }
+//     struct token : private std::list<util::UniqueFunction<void ()>>::iterator {
+//         token(std::list<util::UniqueFunction<void ()>>::iterator it)
+//         : std::list<util::UniqueFunction<void ()>>::iterator(it) { }
 //         friend class DelegateImplementation;
 //     };
 //
-//     token add_notification(std::function<void ()> func)
+//     token add_notification(util::UniqueFunction<void ()> func)
 //     {
 //         m_registered_notifications.push_back(std::move(func));
 //         return token(std::prev(m_registered_notifications.end()));
@@ -68,7 +69,7 @@ namespace realm {
 //     }
 //
 // private:
-//     std::list<std::function<void ()>> m_registered_notifications;
+//     std::list<util::UniqueFunction<void ()>> m_registered_notifications;
 // };
 class Realm;
 class Schema;

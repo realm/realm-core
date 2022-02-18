@@ -16,6 +16,8 @@
  *
  **************************************************************************/
 
+#pragma once
+
 #include <condition_variable>
 #include <mutex>
 #include <type_traits>
@@ -666,11 +668,14 @@ public:
     /**
      * This ends the Future continuation chain by calling a callback on completion. Use this to
      * escape back into a callback-based API.
+     *
+     * The callback must not throw since it is called from a noexcept context. The callback must take a
+     * StatusOrStatusWith as its argument and have a return type of void.
      */
     template <typename Func> // StatusOrStatusWith<T> -> void
     void get_async(Func&& func) && noexcept
     {
-        static_assert(std::is_nothrow_invocable_r_v<void, Func, StatusOrStatusWith<FakeVoidToVoid<T>>>);
+        static_assert(std::is_void_v<std::invoke_result_t<Func, StatusOrStatusWith<FakeVoidToVoid<T>>>>);
 
         return general_impl(
             // on ready success:
@@ -790,7 +795,7 @@ public:
         using Wrapper = StatusOrStatusWith<T>;
         using Result = NormalizedCallResult<Func, StatusOrStatusWith<T>>;
         if constexpr (!is_future<Result>) {
-            return generalImpl(
+            return general_impl(
                 // on ready success:
                 [&](T&& val) {
                     return Future<Result>::make_ready(
@@ -798,7 +803,7 @@ public:
                 },
                 // on ready failure:
                 [&](Status&& status) {
-                    return Future<Result>::make_Ready(
+                    return Future<Result>::make_ready(
                         no_throw_call(std::forward<Func>(func), Wrapper(std::move(status))));
                 },
                 // on not ready yet:
@@ -806,16 +811,16 @@ public:
                     return make_continuation<Result>(
                         [func = std::forward<Func>(func)](SharedState<T>* input,
                                                           SharedState<Result>* output) mutable noexcept {
-                            if (!input->status.is_ok())
-                                return output->set_from(no_throw_call(func, Wrapper(std::move(input->status))));
+                            if (!input->m_status.is_ok())
+                                return output->set_from(no_throw_call(func, Wrapper(std::move(input->m_status))));
 
-                            output->set_from(no_throw_call(func, Wrapper(std::move(*input->data))));
+                            output->set_from(no_throw_call(func, Wrapper(std::move(*input->m_data))));
                         });
                 });
         }
         else {
             using UnwrappedResult = typename Result::value_type;
-            return generalImpl(
+            return general_impl(
                 // on ready success:
                 [&](T&& val) {
                     try {
@@ -841,23 +846,23 @@ public:
                     return make_continuation<UnwrappedResult>(
                         [func = std::forward<Func>(func)](SharedState<T>* input,
                                                           SharedState<UnwrappedResult>* output) mutable noexcept {
-                            if (!input->status.isOK()) {
+                            if (!input->m_status.is_ok()) {
                                 try {
                                     throwing_call(func, Wrapper(std::move(input->m_status)))
                                         .propagate_result_to(output);
                                 }
                                 catch (...) {
-                                    output->set_error(exception_to_status());
+                                    output->set_status(exception_to_status());
                                 }
 
                                 return;
                             }
 
                             try {
-                                throwing_call(func, Wrapper(std::move(*input->data))).propagate_result_to(output);
+                                throwing_call(func, Wrapper(std::move(*input->m_data))).propagate_result_to(output);
                             }
                             catch (...) {
-                                output->set_error(exception_to_status());
+                                output->set_status(exception_to_status());
                             }
                         });
                 });
@@ -933,6 +938,8 @@ public:
                 });
         }
     }
+
+    Future<void> ignore_value() && noexcept;
 
 private:
     template <typename T2>
@@ -1112,7 +1119,13 @@ public:
         return std::move(inner).on_error(std::forward<Func>(func));
     }
 
-    Future<void> ignoreValue() && noexcept
+    template <typename Func>
+    auto on_completion(Func&& func) && noexcept
+    {
+        return std::move(inner).on_completion(std::forward<Func>(func));
+    }
+
+    Future<void> ignore_value() && noexcept
     {
         return std::move(*this);
     }
@@ -1202,6 +1215,12 @@ inline void Promise<T>::set_from(Future<T>&& future) noexcept
     set_impl([&] {
         std::move(future).propagate_result_to(m_shared_state.get());
     });
+}
+
+template <typename T>
+inline Future<void> Future<T>::ignore_value() && noexcept
+{
+    return std::move(*this).then([](auto&&) {});
 }
 
 } // namespace realm::util

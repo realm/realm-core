@@ -376,7 +376,7 @@ public:
     ///
     /// CAUTION: The completion handler may be called before
     /// stop_sync_and_wait_for_backup_completion() returns.
-    void stop_sync_and_wait_for_backup_completion(std::function<void(bool did_complete)> completion_handler,
+    void stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_complete)> completion_handler,
                                                   milliseconds_type timeout);
 
     /// See Config::connection_reaper_timeout..

@@ -34,11 +34,10 @@
 
 #include <realm/object-store/util/generic/scheduler.hpp>
 
-namespace realm {
-namespace util {
+namespace realm::util {
 namespace {
 
-std::function<std::shared_ptr<Scheduler>()> s_factory = &Scheduler::make_platform_default;
+util::UniqueFunction<std::shared_ptr<Scheduler>()> s_factory = &Scheduler::make_platform_default;
 
 class FrozenScheduler : public util::Scheduler {
 public:
@@ -47,8 +46,7 @@ public:
     {
     }
 
-    void notify() override {}
-    void set_notify_callback(std::function<void()>) override {}
+    void invoke(UniqueFunction<void()>&&) override {}
     bool is_on_thread() const noexcept override
     {
         return true;
@@ -58,38 +56,39 @@ public:
         auto o = dynamic_cast<const FrozenScheduler*>(other);
         return (o && (o->m_version == m_version));
     }
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return false;
     }
-    void schedule_writes() override {}
-    void schedule_completions() override {}
-    bool can_schedule_writes() const noexcept override
-    {
-        return false;
-    }
-    bool can_schedule_completions() const noexcept override
-    {
-        return false;
-    }
-    void set_schedule_writes_callback(std::function<void()>) override {}
-    void set_schedule_completions_callback(std::function<void()>) override {}
 
 private:
     VersionID m_version;
 };
 } // anonymous namespace
 
-Scheduler::~Scheduler() = default;
-
-void Scheduler::set_default_factory(std::function<std::shared_ptr<Scheduler>()> factory)
+void InvocationQueue::push(util::UniqueFunction<void()>&& fn)
 {
-    s_factory = std::move(factory);
+    std::lock_guard lock(m_mutex);
+    m_functions.push_back(std::move(fn));
 }
 
-std::shared_ptr<Scheduler> Scheduler::get_frozen(VersionID version)
+void InvocationQueue::invoke_all()
 {
-    return make_frozen(version);
+    std::vector<util::UniqueFunction<void()>> functions;
+    {
+        std::lock_guard lock(m_mutex);
+        functions.swap(m_functions);
+    }
+    for (auto&& fn : functions) {
+        fn();
+    }
+}
+
+Scheduler::~Scheduler() = default;
+
+void Scheduler::set_default_factory(util::UniqueFunction<std::shared_ptr<Scheduler>()> factory)
+{
+    s_factory = std::move(factory);
 }
 
 std::shared_ptr<Scheduler> Scheduler::make_default()
@@ -149,5 +148,4 @@ std::shared_ptr<Scheduler> Scheduler::make_uv()
 }
 #endif // REALM_HAVE_UV
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util

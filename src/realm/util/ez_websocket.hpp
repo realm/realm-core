@@ -12,7 +12,6 @@ namespace realm::util::network {
 class Service;
 }
 
-
 namespace realm::util::websocket {
 using port_type = sync::port_type;
 
@@ -22,17 +21,19 @@ struct EZConfig {
     std::mt19937_64& random;
     util::network::Service& service;
     std::string user_agent;
-    bool tcp_no_delay;
 };
 
 struct EZEndpoint {
     std::string address;
     port_type port;
-    std::string http_host; // Contents of `Host:` request header
-    std::string path;
+    std::string path;      // Includes auth token in query.
     std::string protocols; // separated with ", "
     bool is_ssl;
-    util::HTTPHeaders headers; // Includes both auth and "custom" headers
+
+    // The remaining fields are just passing through values from the SyncConfig. They can be ignored if SDK chooses
+    // not to support the related config options. This may be necessary when using websocket libraries without
+    // low-level control.
+    std::map<std::string, std::string> headers; // Only includes "custom" headers.
     bool verify_servers_ssl_certificate;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SyncConfig::SSLVerifyCallback> ssl_verify_callback;
@@ -44,7 +45,7 @@ public:
     /// websocket_handshake_completion_handler() is called when the websocket is connected, .i.e.
     /// after the handshake is done. It is not allowed to send messages on the socket before the
     /// handshake is done. No message_received callbacks will be called before the handshake is done.
-    virtual void websocket_handshake_completion_handler(const HTTPHeaders&) = 0;
+    virtual void websocket_handshake_completion_handler(const std::string& protocol) = 0;
 
     //@{
     /// websocket_read_error_handler() and websocket_write_error_handler() are called when an
@@ -61,14 +62,10 @@ public:
     /// no more messages should be sent, or will be received.
     /// It is safe to destroy the WebSocket object in these handlers.
     /// TODO there are too many error handlers. Try to get down to just one.
-    virtual void websocket_tcp_connect_error_handler(std::error_code) = 0;
-    virtual void websocket_resolve_error_handler(std::error_code) = 0;
-    virtual void websocket_http_tunnel_error_handler(std::error_code) = 0;
+    virtual void websocket_connect_error_handler(std::error_code) = 0;
     virtual void websocket_ssl_handshake_error_handler(std::error_code) = 0;
-    virtual void websocket_read_error_handler(std::error_code) = 0;
-    virtual void websocket_write_error_handler(std::error_code) = 0;
-    virtual void websocket_handshake_error_handler(std::error_code, const HTTPHeaders*,
-                                                   const std::string_view* body) = 0;
+    virtual void websocket_read_or_write_error_handler(std::error_code) = 0;
+    virtual void websocket_handshake_error_handler(std::error_code, const std::string_view* body) = 0;
     virtual void websocket_protocol_error_handler(std::error_code) = 0;
     //@}
 
@@ -92,7 +89,7 @@ class EZSocket {
 public:
     virtual ~EZSocket();
 
-    virtual void async_write_binary(const char* data, size_t size, std::function<void()>&& handler) = 0;
+    virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
 };
 
 class EZSocketFactory {

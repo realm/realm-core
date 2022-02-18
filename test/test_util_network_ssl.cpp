@@ -148,7 +148,7 @@ public:
     }
 
     // Must be called by thread associated with `client_service`
-    void delay_client(std::function<void()> handler, int n = 512)
+    void delay_client(realm::util::UniqueFunction<void()> handler, int n = 512)
     {
         m_handler = std::move(handler);
         m_num = n;
@@ -159,7 +159,7 @@ private:
     network::Socket m_server_socket, m_client_socket;
     char m_server_char = 0, m_client_char = 0;
     int m_num;
-    std::function<void()> m_handler;
+    realm::util::UniqueFunction<void()> m_handler;
 
     void initiate_server_read()
     {
@@ -196,8 +196,8 @@ private:
     void initiate_client_write()
     {
         if (m_num <= 0) {
-            std::function<void()> handler = std::move(m_handler);
-            m_handler = std::function<void()>();
+            realm::util::UniqueFunction<void()> handler = std::move(m_handler);
+            m_handler = nullptr;
             handler();
             return;
         }
@@ -448,7 +448,17 @@ TEST(Util_Network_SSL_BrokenPipeOnHandshakeWrite)
     do {
         socket_2.write_some(buffer.get(), size, ec);
     } while (!ec);
+#if REALM_PLATFORM_APPLE
+    // Which error we get from writing to a closed socket seems to depend on
+    // some asynchronous kernel state. If it notices that the socket is closed
+    // before sending any data we get EPIPE, and if it's after trying to send
+    // data it's ECONNRESET. EHOSTDOWN is not documented as an error code from
+    // send() and may be worth investigating once the macOS 12 XNU source is
+    // released.
+    REALM_ASSERT(ec == error::broken_pipe || ec == error::connection_reset || ec.value() == EHOSTDOWN);
+#else
     REALM_ASSERT(ec == error::broken_pipe);
+#endif
 
     CHECK_SYSTEM_ERROR(ssl_stream_2.handshake(), error::broken_pipe);
 }
@@ -517,7 +527,11 @@ TEST(Util_Network_SSL_BrokenPipeOnWrite)
     do {
         socket_2.write_some(buffer.get(), size, ec);
     } while (!ec);
+#if REALM_PLATFORM_APPLE
+    REALM_ASSERT(ec == error::broken_pipe || ec == error::connection_reset || ec.value() == EHOSTDOWN);
+#else
     REALM_ASSERT(ec == error::broken_pipe);
+#endif
 
     char ch = 0;
     CHECK_SYSTEM_ERROR(ssl_stream_2.write(&ch, 1), error::broken_pipe);
@@ -547,7 +561,11 @@ TEST(Util_Network_SSL_BrokenPipeOnShutdown)
     do {
         socket_2.write_some(buffer.get(), size, ec);
     } while (!ec);
+#if REALM_PLATFORM_APPLE
+    REALM_ASSERT(ec == error::broken_pipe || ec == error::connection_reset || ec.value() == EHOSTDOWN);
+#else
     REALM_ASSERT(ec == error::broken_pipe);
+#endif
 
     CHECK_SYSTEM_ERROR(ssl_stream_2.shutdown(), error::broken_pipe);
 }
@@ -711,7 +729,7 @@ TEST(Util_Network_SSL_StressTest)
         network::DeadlineTimer read_timer{service};
         network::DeadlineTimer write_timer{service};
         bool read_done = false, write_done = false;
-        std::function<void()> shedule_cancellation = [&] {
+        realm::util::UniqueFunction<void()> shedule_cancellation = [&] {
             auto handler = [&](std::error_code ec) {
                 REALM_ASSERT(!ec || ec == error::operation_aborted);
                 if (ec == error::operation_aborted)
@@ -728,7 +746,7 @@ TEST(Util_Network_SSL_StressTest)
         char* read_begin = read_buffer.get();
         char* read_end = read_buffer.get() + original_size;
         int num_read_cycles = 0;
-        std::function<void()> read = [&] {
+        realm::util::UniqueFunction<void()> read = [&] {
             if (read_begin == read_end) {
                 log("<R%1>", id);
                 CHECK(std::equal(read_original, read_original + original_size, read_buffer.get()));
@@ -774,7 +792,7 @@ TEST(Util_Network_SSL_StressTest)
         const char* write_begin = write_original;
         const char* write_end = write_original + original_size;
         int num_write_cycles = 0;
-        std::function<void()> write = [&] {
+        realm::util::UniqueFunction<void()> write = [&] {
             if (write_begin == write_end) {
                 log("<W%1>", id);
                 ++num_write_cycles;

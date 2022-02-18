@@ -106,19 +106,15 @@ jobWrapper {
             buildType : 'Debug',
             maxBpNodeSize: 1000,
             enableEncryption: true,
+            useEncryption: false,
             enableSync: false,
             runTests: true,
-        ]
-        def linuxOptionsNoEncrypt = [
-            buildType : 'Debug',
-            maxBpNodeSize: 4,
-            enableEncryption: false,
-            enableSync: false,
         ]
 
         parallelExecutors = [
             buildLinuxRelease       : doBuildLinux('Release'),
             checkLinuxDebug         : doCheckInDocker(buildOptions),
+            checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
             checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
             checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
             checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
@@ -264,6 +260,9 @@ def doCheckInDocker(Map options = [:]) {
             def buildEnv = docker.build 'realm-core-linux:18.04'
             def environment = environment()
             environment << 'UNITTEST_PROGRESS=1'
+            if (options.useEncryption) {
+                environment << 'UNITTEST_ENCRYPT_ALL=1'
+            }
 
             def buildSteps = { String dockerArgs = "" ->
                 withEnv(environment) {

@@ -292,7 +292,7 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
 
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
-            table->report_invalid_key(col_key);
+            table->check_column(col_key);
 
             if (col_key.is_collection()) {
                 auto& schema = schema_for_table(obj->get_realm(), table->get_key());
@@ -308,7 +308,6 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         for (size_t i = 0; i < num_values; ++i) {
             auto col_key = ColKey(properties[i]);
             auto val = from_capi(values[i]);
-            val = typed_link_to_objkey(val, col_key);
             o.set_any(col_key, val, is_default);
         }
 
@@ -325,164 +324,51 @@ RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_
         auto table = obj.get_table();
 
         auto col_key = ColKey(key);
-        table->report_invalid_key(col_key);
+        table->check_column(col_key);
 
         if (!col_key.is_list()) {
-            auto table = obj.get_table();
-            auto& schema = schema_for_table(object->get_realm(), table->get_key());
-            throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
+            report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
         return new realm_list_t{List{object->get_realm(), std::move(obj), col_key}};
     });
 }
 
-RLM_API bool realm_list_size(const realm_list_t* list, size_t* out_size)
+RLM_API realm_set_t* realm_get_set(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {
-        size_t size = list->size();
-        if (out_size)
-            *out_size = size;
-        return true;
-    });
-}
+        object->verify_attached();
 
-RLM_API bool realm_list_get_property(const realm_list_t* list, realm_property_info_t* out_property_info)
-{
-    static_cast<void>(list);
-    static_cast<void>(out_property_info);
-    REALM_TERMINATE("Not implemented yet.");
-}
+        auto obj = object->obj();
+        auto table = obj.get_table();
 
-RLM_API bool realm_list_get(const realm_list_t* list, size_t index, realm_value_t* out_value)
-{
-    return wrap_err([&]() {
-        list->verify_attached();
-        realm_value_t result{};
+        auto col_key = ColKey(key);
+        table->check_column(col_key);
 
-        auto getter = util::overload{
-            [&](Obj*) {
-                Obj o = list->get<Obj>(index);
-                result.type = RLM_TYPE_LINK;
-                result.link.target_table = o.get_table()->get_key().value;
-                result.link.target = o.get_key().value;
-            },
-            [&](util::Optional<Obj>*) {
-                REALM_TERMINATE("Nullable link lists not supported");
-            },
-            [&](auto p) {
-                using T = std::remove_cv_t<std::remove_pointer_t<decltype(p)>>;
-                Mixed mixed{list->get<T>(index)};
-                result = to_capi(mixed);
-            },
-        };
-
-        switch_on_type(list->get_type(), getter);
-
-        if (out_value)
-            *out_value = result;
-        return true;
-    });
-}
-
-RLM_API bool realm_list_insert(realm_list_t* list, size_t index, realm_value_t value)
-{
-    return wrap_err([&]() {
-        auto val = from_capi(value);
-        check_value_assignable(*list, val);
-
-        auto col_key = list->get_parent_column_key();
-        val = typed_link_to_objkey(val, col_key);
-
-        list->insert_any(index, val);
-        return true;
-    });
-}
-
-RLM_API bool realm_list_set(realm_list_t* list, size_t index, realm_value_t value)
-{
-    return wrap_err([&]() {
-        auto val = from_capi(value);
-        check_value_assignable(*list, val);
-
-        auto col_key = list->get_parent_column_key();
-        val = typed_link_to_objkey(val, col_key);
-
-        list->set_any(index, val);
-        return true;
-    });
-}
-
-RLM_API bool realm_list_erase(realm_list_t* list, size_t index)
-{
-    return wrap_err([&]() {
-        list->remove(index);
-        return true;
-    });
-}
-
-RLM_API bool realm_list_clear(realm_list_t* list)
-{
-    return wrap_err([&]() {
-        // Note: Confusing naming.
-        list->remove_all();
-        return true;
-    });
-}
-
-RLM_API bool realm_list_remove_all(realm_list_t* list)
-{
-    return wrap_err([&]() {
-        // Note: Confusing naming.
-        list->delete_all();
-        return true;
-    });
-}
-
-RLM_API realm_list_t* realm_list_from_thread_safe_reference(const realm_t* realm, realm_thread_safe_reference_t* tsr)
-{
-    return wrap_err([&]() {
-        auto ltsr = dynamic_cast<realm_list::thread_safe_reference*>(tsr);
-        if (!ltsr) {
-            throw std::logic_error{"Thread safe reference type mismatch"};
+        if (!col_key.is_set()) {
+            report_type_mismatch(object->get_realm(), *table, col_key);
         }
 
-        auto list = ltsr->resolve<List>(*realm);
-        return new realm_list_t{std::move(list)};
+        return new realm_set_t{object_store::Set{object->get_realm(), std::move(obj), col_key}};
     });
 }
 
-RLM_API bool realm_list_resolve_in(const realm_list_t* from_list, const realm_t* target_realm,
-                                   realm_list_t** resolved)
+RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {
-        try {
-            const auto& realm = *target_realm;
-            auto frozen_list = from_list->freeze(realm);
-            if (frozen_list.is_valid()) {
-                *resolved = new realm_list_t{std::move(frozen_list)};
-            }
-            else {
-                *resolved = nullptr;
-            }
-            return true;
-        }
-        catch (NoSuchTable&) {
-            *resolved = nullptr;
-            return true;
-        }
-        catch (KeyNotFound&) {
-            *resolved = nullptr;
-            return true;
-        }
-    });
-}
+        object->verify_attached();
 
-RLM_API bool realm_list_is_valid(const realm_list_t* list)
-{
-    if (!list)
-        return false;
-    return list->is_valid();
+        auto obj = object->obj();
+        auto table = obj.get_table();
+        auto col_key = ColKey(key);
+        table->check_column(col_key);
+
+        if (!col_key.is_dictionary()) {
+            report_type_mismatch(object->get_realm(), *table, col_key);
+        }
+
+        return new realm_dictionary_t{object_store::Dictionary{object->get_realm(), std::move(obj), col_key}};
+    });
 }
 
 } // namespace realm::c_api

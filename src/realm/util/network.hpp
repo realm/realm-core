@@ -366,7 +366,7 @@ public:
     /// `REALM_UTIL_NETWORK_EVENT_LOOP_METRICS` was defined during
     /// compilation. When the feature is not available, the specified handler
     /// will never be called.
-    void report_event_loop_metrics(std::function<EventLoopMetricsHandler>);
+    void report_event_loop_metrics(util::UniqueFunction<EventLoopMetricsHandler>);
 
 private:
     enum class Want { nothing = 0, read, write };
@@ -581,7 +581,7 @@ public:
     /// execute. This means that a new resolve operation can be started from the
     /// completion handler.
     template <class H>
-    void async_resolve(Query, H handler);
+    void async_resolve(Query, H&& handler);
 
     /// \brief Cancel all asynchronous operations.
     ///
@@ -984,7 +984,7 @@ public:
     ///
     /// \param ep The remote endpoint of the connection to be established.
     template <class H>
-    void async_connect(const Endpoint& ep, H handler);
+    void async_connect(const Endpoint& ep, H&& handler);
 
     /// @{ \brief Perform an asynchronous read operation.
     ///
@@ -1049,11 +1049,11 @@ public:
     /// operation can be started from the completion handler of another
     /// asynchronous buffered read operation.
     template <class H>
-    void async_read(char* buffer, std::size_t size, H handler);
+    void async_read(char* buffer, std::size_t size, H&& handler);
     template <class H>
-    void async_read(char* buffer, std::size_t size, ReadAheadBuffer&, H handler);
+    void async_read(char* buffer, std::size_t size, ReadAheadBuffer&, H&& handler);
     template <class H>
-    void async_read_until(char* buffer, std::size_t size, char delim, ReadAheadBuffer&, H handler);
+    void async_read_until(char* buffer, std::size_t size, char delim, ReadAheadBuffer&, H&& handler);
     /// @}
 
     /// \brief Perform an asynchronous write operation.
@@ -1099,12 +1099,12 @@ public:
     /// operation can be started from the completion handler of another
     /// asynchronous write operation.
     template <class H>
-    void async_write(const char* data, std::size_t size, H handler);
+    void async_write(const char* data, std::size_t size, H&& handler);
 
     template <class H>
-    void async_read_some(char* buffer, std::size_t size, H handler);
+    void async_read_some(char* buffer, std::size_t size, H&& handler);
     template <class H>
-    void async_write_some(const char* data, std::size_t size, H handler);
+    void async_write_some(const char* data, std::size_t size, H&& handler);
 
     enum shutdown_type {
 #ifdef _WIN32
@@ -1251,11 +1251,11 @@ public:
     /// closed state (Socket::is_open()) when async_accept() is called.
     ///
     template <class H>
-    void async_accept(Socket& sock, H handler);
+    void async_accept(Socket& sock, H&& handler);
     /// \param ep Upon completion, the remote peer endpoint will have been
     /// assigned to this variable.
     template <class H>
-    void async_accept(Socket& sock, Endpoint& ep, H handler);
+    void async_accept(Socket& sock, Endpoint& ep, H&& handler);
     /// @}
 
 private:
@@ -1271,7 +1271,7 @@ private:
     Want do_accept_async(Socket&, Endpoint*, std::error_code&) noexcept;
 
     template <class H>
-    void async_accept(Socket&, Endpoint*, H);
+    void async_accept(Socket&, Endpoint*, H&&);
 };
 
 
@@ -1323,7 +1323,7 @@ public:
     /// another one is in progress. An asynchronous wait operation is in
     /// progress until its completion handler starts executing.
     template <class R, class P, class H>
-    void async_wait(std::chrono::duration<R, P> delay, H handler);
+    void async_wait(std::chrono::duration<R, P> delay, H&& handler);
 
     /// \brief Cancel an asynchronous wait operation.
     ///
@@ -1377,7 +1377,7 @@ private:
 class Trigger {
 public:
     template <class F>
-    Trigger(Service&, F func);
+    Trigger(Service&, F&& func);
     ~Trigger() noexcept;
 
     Trigger() noexcept = default;
@@ -2076,7 +2076,7 @@ protected:
 template <class H>
 class Service::PostOper : public PostOperBase {
 public:
-    PostOper(std::size_t size, Impl& service, H handler)
+    PostOper(std::size_t size, Impl& service, H&& handler)
         : PostOperBase{size, service}
         , m_handler{std::move(handler)}
     {
@@ -2331,7 +2331,7 @@ public:
     }
 
     template <class H>
-    static void async_read(S& stream, char* buffer, std::size_t size, bool is_read_some, H handler)
+    static void async_read(S& stream, char* buffer, std::size_t size, bool is_read_some, H&& handler)
     {
         char* begin = buffer;
         char* end = buffer + size;
@@ -2341,7 +2341,7 @@ public:
     }
 
     template <class H>
-    static void async_write(S& stream, const char* data, std::size_t size, bool is_write_some, H handler)
+    static void async_write(S& stream, const char* data, std::size_t size, bool is_write_some, H&& handler)
     {
         const char* begin = data;
         const char* end = data + size;
@@ -2352,7 +2352,7 @@ public:
 
     template <class H>
     static void async_buffered_read(S& stream, char* buffer, std::size_t size, int delim, ReadAheadBuffer& rab,
-                                    H handler)
+                                    H&& handler)
     {
         char* begin = buffer;
         char* end = buffer + size;
@@ -2631,7 +2631,7 @@ template <class S>
 template <class H>
 class Service::BasicStreamOps<S>::ReadOper : public ReadOperBase {
 public:
-    ReadOper(std::size_t size, S& stream, bool is_read_some, char* begin, char* end, H handler)
+    ReadOper(std::size_t size, S& stream, bool is_read_some, char* begin, char* end, H&& handler)
         : ReadOperBase{size, stream, is_read_some, begin, end}
         , m_handler{std::move(handler)}
     {
@@ -2661,7 +2661,7 @@ template <class S>
 template <class H>
 class Service::BasicStreamOps<S>::WriteOper : public WriteOperBase {
 public:
-    WriteOper(std::size_t size, S& stream, bool is_write_some, const char* begin, const char* end, H handler)
+    WriteOper(std::size_t size, S& stream, bool is_write_some, const char* begin, const char* end, H&& handler)
         : WriteOperBase{size, stream, is_write_some, begin, end}
         , m_handler{std::move(handler)}
     {
@@ -2691,7 +2691,8 @@ template <class S>
 template <class H>
 class Service::BasicStreamOps<S>::BufferedReadOper : public BufferedReadOperBase {
 public:
-    BufferedReadOper(std::size_t size, S& stream, char* begin, char* end, int delim, ReadAheadBuffer& rab, H handler)
+    BufferedReadOper(std::size_t size, S& stream, char* begin, char* end, int delim, ReadAheadBuffer& rab,
+                     H&& handler)
         : BufferedReadOperBase{size, stream, begin, end, delim, rab}
         , m_handler{std::move(handler)}
     {
@@ -2878,7 +2879,7 @@ inline void Service::AsyncOper::do_recycle(bool orphaned) noexcept
 template <class H>
 class Resolver::ResolveOper : public Service::ResolveOperBase {
 public:
-    ResolveOper(std::size_t size, Resolver& r, Query q, H handler)
+    ResolveOper(std::size_t size, Resolver& r, Query q, H&& handler)
         : ResolveOperBase{size, r, std::move(q)}
         , m_handler{std::move(handler)}
     {
@@ -2919,7 +2920,7 @@ inline Endpoint::List Resolver::resolve(const Query& q)
 }
 
 template <class H>
-void Resolver::async_resolve(Query query, H handler)
+void Resolver::async_resolve(Query query, H&& handler)
 {
     Service::LendersResolveOperPtr op = Service::alloc<ResolveOper<H>>(m_resolve_oper, *this, std::move(query),
                                                                        std::move(handler)); // Throws
@@ -3159,7 +3160,7 @@ protected:
 template <class H>
 class Socket::ConnectOper : public ConnectOperBase {
 public:
-    ConnectOper(std::size_t size, Socket& sock, H handler)
+    ConnectOper(std::size_t size, Socket& sock, H&& handler)
         : ConnectOperBase{size, sock}
         , m_handler{std::move(handler)}
     {
@@ -3287,49 +3288,49 @@ inline std::size_t Socket::write_some(const char* data, std::size_t size, std::e
 }
 
 template <class H>
-inline void Socket::async_connect(const Endpoint& ep, H handler)
+inline void Socket::async_connect(const Endpoint& ep, H&& handler)
 {
     LendersConnectOperPtr op = Service::alloc<ConnectOper<H>>(m_write_oper, *this, std::move(handler)); // Throws
     m_desc.initiate_oper(std::move(op), ep);                                                            // Throws
 }
 
 template <class H>
-inline void Socket::async_read(char* buffer, std::size_t size, H handler)
+inline void Socket::async_read(char* buffer, std::size_t size, H&& handler)
 {
     bool is_read_some = false;
     StreamOps::async_read(*this, buffer, size, is_read_some, std::move(handler)); // Throws
 }
 
 template <class H>
-inline void Socket::async_read(char* buffer, std::size_t size, ReadAheadBuffer& rab, H handler)
+inline void Socket::async_read(char* buffer, std::size_t size, ReadAheadBuffer& rab, H&& handler)
 {
     int delim = std::char_traits<char>::eof();
     StreamOps::async_buffered_read(*this, buffer, size, delim, rab, std::move(handler)); // Throws
 }
 
 template <class H>
-inline void Socket::async_read_until(char* buffer, std::size_t size, char delim, ReadAheadBuffer& rab, H handler)
+inline void Socket::async_read_until(char* buffer, std::size_t size, char delim, ReadAheadBuffer& rab, H&& handler)
 {
     int delim_2 = std::char_traits<char>::to_int_type(delim);
     StreamOps::async_buffered_read(*this, buffer, size, delim_2, rab, std::move(handler)); // Throws
 }
 
 template <class H>
-inline void Socket::async_write(const char* data, std::size_t size, H handler)
+inline void Socket::async_write(const char* data, std::size_t size, H&& handler)
 {
     bool is_write_some = false;
     StreamOps::async_write(*this, data, size, is_write_some, std::move(handler)); // Throws
 }
 
 template <class H>
-inline void Socket::async_read_some(char* buffer, std::size_t size, H handler)
+inline void Socket::async_read_some(char* buffer, std::size_t size, H&& handler)
 {
     bool is_read_some = true;
     StreamOps::async_read(*this, buffer, size, is_read_some, std::move(handler)); // Throws
 }
 
 template <class H>
-inline void Socket::async_write_some(const char* data, std::size_t size, H handler)
+inline void Socket::async_write_some(const char* data, std::size_t size, H&& handler)
 {
     bool is_write_some = true;
     StreamOps::async_write(*this, data, size, is_write_some, std::move(handler)); // Throws
@@ -3467,7 +3468,7 @@ protected:
 template <class H>
 class Acceptor::AcceptOper : public AcceptOperBase {
 public:
-    AcceptOper(std::size_t size, Acceptor& a, Socket& s, Endpoint* e, H handler)
+    AcceptOper(std::size_t size, Acceptor& a, Socket& s, Endpoint* e, H&& handler)
         : AcceptOperBase{size, a, s, e}
         , m_handler{std::move(handler)}
     {
@@ -3528,14 +3529,14 @@ inline std::error_code Acceptor::accept(Socket& sock, Endpoint& ep, std::error_c
 }
 
 template <class H>
-inline void Acceptor::async_accept(Socket& sock, H handler)
+inline void Acceptor::async_accept(Socket& sock, H&& handler)
 {
     Endpoint* ep = nullptr;
     async_accept(sock, ep, std::move(handler)); // Throws
 }
 
 template <class H>
-inline void Acceptor::async_accept(Socket& sock, Endpoint& ep, H handler)
+inline void Acceptor::async_accept(Socket& sock, Endpoint& ep, H&& handler)
 {
     async_accept(sock, &ep, std::move(handler)); // Throws
 }
@@ -3561,7 +3562,7 @@ inline Acceptor::Want Acceptor::do_accept_async(Socket& socket, Endpoint* ep, st
 }
 
 template <class H>
-inline void Acceptor::async_accept(Socket& sock, Endpoint* ep, H handler)
+inline void Acceptor::async_accept(Socket& sock, Endpoint* ep, H&& handler)
 {
     if (REALM_UNLIKELY(sock.is_open()))
         throw util::runtime_error("Socket is already open");
@@ -3575,7 +3576,7 @@ inline void Acceptor::async_accept(Socket& sock, Endpoint* ep, H handler)
 template <class H>
 class DeadlineTimer::WaitOper : public Service::WaitOperBase {
 public:
-    WaitOper(std::size_t size, DeadlineTimer& timer, clock::time_point expiration_time, H handler)
+    WaitOper(std::size_t size, DeadlineTimer& timer, clock::time_point expiration_time, H&& handler)
         : Service::WaitOperBase{size, timer, expiration_time}
         , m_handler{std::move(handler)}
     {
@@ -3605,7 +3606,7 @@ inline DeadlineTimer::~DeadlineTimer() noexcept
 }
 
 template <class R, class P, class H>
-inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H handler)
+inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H&& handler)
 {
     clock::time_point now = clock::now();
     // FIXME: This method of detecting overflow does not work. Comparison
@@ -3616,9 +3617,8 @@ inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H handl
     if (delay > max_add)
         throw util::overflow_error("Expiration time overflow");
     clock::time_point expiration_time = now + delay;
-    Service::LendersWaitOperPtr op = Service::alloc<WaitOper<H>>(m_wait_oper, *this, expiration_time,
-                                                                 std::move(handler)); // Throws
-    initiate_oper(std::move(op));                                                     // Throws
+    initiate_oper(Service::alloc<WaitOper<H>>(m_wait_oper, *this, expiration_time,
+                                              std::move(handler))); // Throws
 }
 
 // ---------------- Trigger ----------------
@@ -3626,7 +3626,7 @@ inline void DeadlineTimer::async_wait(std::chrono::duration<R, P> delay, H handl
 template <class H>
 class Trigger::ExecOper : public Service::TriggerExecOperBase {
 public:
-    ExecOper(Service::Impl& service_impl, H handler)
+    ExecOper(Service::Impl& service_impl, H&& handler)
         : Service::TriggerExecOperBase{service_impl}
         , m_handler{std::move(handler)}
     {
@@ -3647,7 +3647,7 @@ private:
 };
 
 template <class H>
-inline Trigger::Trigger(Service& service, H handler)
+inline Trigger::Trigger(Service& service, H&& handler)
     : m_exec_oper{new ExecOper<H>{*service.m_impl, std::move(handler)}} // Throws
 {
 }

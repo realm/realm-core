@@ -28,11 +28,11 @@
 
 #include <realm/object_id.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/util/functional.hpp>
 
 #include <mutex>
 
 namespace realm {
-
 class SyncUser;
 class SyncSession;
 class SyncManager;
@@ -88,7 +88,7 @@ public:
     /// Get all users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
 
-    std::shared_ptr<SyncManager> sync_manager() const
+    std::shared_ptr<SyncManager> const& sync_manager() const
     {
         return m_sync_manager;
     }
@@ -116,41 +116,42 @@ public:
     public:
         /// Creates a user API key that can be used to authenticate as the current user.
         /// @param name The name of the API key to be created.
-        /// @param completion_block A callback to be invoked once the call is complete.
-        void create_api_key(const std::string& name, std::shared_ptr<SyncUser> user,
-                            std::function<void(UserAPIKey, util::Optional<AppError>)> completion_block);
+        /// @param completion A callback to be invoked once the call is complete.
+        void create_api_key(const std::string& name, const std::shared_ptr<SyncUser>& user,
+                            util::UniqueFunction<void(UserAPIKey&&, util::Optional<AppError>)>&& completion);
 
         /// Fetches a user API key associated with the current user.
         /// @param id The id of the API key to fetch.
-        /// @param completion_block A callback to be invoked once the call is complete.
-        void fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                           std::function<void(UserAPIKey, util::Optional<AppError>)> completion_block);
+        /// @param completion A callback to be invoked once the call is complete.
+        void fetch_api_key(const realm::ObjectId& id, const std::shared_ptr<SyncUser>& user,
+                           util::UniqueFunction<void(UserAPIKey&&, util::Optional<AppError>)>&& completion);
 
         /// Fetches the user API keys associated with the current user.
-        /// @param completion_block A callback to be invoked once the call is complete.
-        void fetch_api_keys(std::shared_ptr<SyncUser> user,
-                            std::function<void(std::vector<UserAPIKey>, util::Optional<AppError>)> completion_block);
+        /// @param completion A callback to be invoked once the call is complete.
+        void
+        fetch_api_keys(const std::shared_ptr<SyncUser>& user,
+                       util::UniqueFunction<void(std::vector<UserAPIKey>&&, util::Optional<AppError>)>&& completion);
 
         /// Deletes a user API key associated with the current user.
         /// @param id The id of the API key to delete.
         /// @param user The user to perform this operation.
-        /// @param completion_block A callback to be invoked once the call is complete.
-        void delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                            std::function<void(util::Optional<AppError>)> completion_block);
+        /// @param completion A callback to be invoked once the call is complete.
+        void delete_api_key(const realm::ObjectId& id, const std::shared_ptr<SyncUser>& user,
+                            util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Enables a user API key associated with the current user.
         /// @param id The id of the API key to enable.
         /// @param user The user to perform this operation.
-        /// @param completion_block A callback to be invoked once the call is complete.
-        void enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                            std::function<void(util::Optional<AppError>)> completion_block);
+        /// @param completion A callback to be invoked once the call is complete.
+        void enable_api_key(const realm::ObjectId& id, const std::shared_ptr<SyncUser>& user,
+                            util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Disables a user API key associated with the current user.
         /// @param id The id of the API key to disable.
         /// @param user The user to perform this operation.
-        /// @param completion_block A callback to be invoked once the call is complete.
-        void disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                             std::function<void(util::Optional<AppError>)> completion_block);
+        /// @param completion A callback to be invoked once the call is complete.
+        void disable_api_key(const realm::ObjectId& id, const std::shared_ptr<SyncUser>& user,
+                             util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     private:
         friend class App;
@@ -173,51 +174,51 @@ public:
         /// and sends a confirmation email to the provided address.
         /// @param email The email address of the user to register.
         /// @param password The password that the user created for the new username/password identity.
-        /// @param completion_block A callback to be invoked once the call is complete.
+        /// @param completion A callback to be invoked once the call is complete.
         void register_email(const std::string& email, const std::string& password,
-                            std::function<void(util::Optional<AppError>)> completion_block);
+                            util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Confirms an email identity with the username/password provider.
         /// @param token The confirmation token that was emailed to the user.
         /// @param token_id The confirmation token id that was emailed to the user.
-        /// @param completion_block A callback to be invoked once the call is complete.
+        /// @param completion A callback to be invoked once the call is complete.
         void confirm_user(const std::string& token, const std::string& token_id,
-                          std::function<void(util::Optional<AppError>)> completion_block);
+                          util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Re-sends a confirmation email to a user that has registered but
         /// not yet confirmed their email address.
         /// @param email The email address of the user to re-send a confirmation for.
-        /// @param completion_block A callback to be invoked once the call is complete.
+        /// @param completion A callback to be invoked once the call is complete.
         void resend_confirmation_email(const std::string& email,
-                                       std::function<void(util::Optional<AppError>)> completion_block);
+                                       util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         void send_reset_password_email(const std::string& email,
-                                       std::function<void(util::Optional<AppError>)> completion_block);
+                                       util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Retries the custom confirmation function on a user for a given email.
         /// @param email The email address of the user to retry the custom confirmation for.
-        /// @param completion_block A callback to be invoked once the retry is complete.
+        /// @param completion A callback to be invoked once the retry is complete.
         void retry_custom_confirmation(const std::string& email,
-                                       std::function<void(util::Optional<AppError>)> completion_block);
+                                       util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Resets the password of an email identity using the
         /// password reset token emailed to a user.
         /// @param password The desired new password.
         /// @param token The password reset token that was emailed to the user.
         /// @param token_id The password reset token id that was emailed to the user.
-        /// @param completion_block A callback to be invoked once the call is complete.
+        /// @param completion A callback to be invoked once the call is complete.
         void reset_password(const std::string& password, const std::string& token, const std::string& token_id,
-                            std::function<void(util::Optional<AppError>)> completion_block);
+                            util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
         /// Resets the password of an email identity using the
         /// password reset function set up in the application.
         /// @param email The email address of the user.
         /// @param password The desired new password.
         /// @param args A bson array of arguments.
-        /// @param completion_block A callback to be invoked once the call is complete.
+        /// @param completion A callback to be invoked once the call is complete.
         void call_reset_password_function(const std::string& email, const std::string& password,
                                           const bson::BsonArray& args,
-                                          std::function<void(util::Optional<AppError>)> completion_block);
+                                          util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     private:
         friend class App;
@@ -239,20 +240,22 @@ public:
     /// completion block will be called with an error.
     ///
     /// @param credentials A `SyncCredentials` object representing the user to log in.
-    /// @param completion_block A callback block to be invoked once the log in completes.
+    /// @param completion A callback block to be invoked once the log in completes.
     void log_in_with_credentials(
         const AppCredentials& credentials,
-        std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+        util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
 
     /// Logout the current user.
-    void log_out(std::function<void(util::Optional<AppError>)>);
+    void log_out(util::UniqueFunction<void(util::Optional<AppError>)>&&);
 
     /// Refreshes the custom data for a specified user
-    /// @param sync_user The user you want to refresh
-    void refresh_custom_data(std::shared_ptr<SyncUser> sync_user, std::function<void(util::Optional<AppError>)>);
+    /// @param user The user you want to refresh
+    void refresh_custom_data(const std::shared_ptr<SyncUser>& user,
+                             util::UniqueFunction<void(util::Optional<AppError>)>&&);
 
     /// Log out the given user if they are not already logged out.
-    void log_out(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
+    void log_out(const std::shared_ptr<SyncUser>& user,
+                 util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
     /// specified as a parameter. This will only be successful if this `SyncUser` is the currently authenticated
@@ -260,11 +263,12 @@ public:
     ///
     /// @param user The user which will have the credentials linked to, the user must be logged in
     /// @param credentials The `AppCredentials` used to link the user to a new identity.
-    /// @param completion_block The completion handler to call when the linking is complete.
+    /// @param completion The completion handler to call when the linking is complete.
     ///                         If the operation is  successful, the result will contain the original
     ///                         `SyncUser` object representing the user.
-    void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
-                   std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+    void
+    link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
+              util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
 
     /// Switches the active user with the specified one. The user must
     /// exist in the list of all users who have logged into this application, and
@@ -273,13 +277,20 @@ public:
     ///
     /// @param user The user to switch to
     /// @returns A shared pointer to the new current user
-    std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
+    std::shared_ptr<SyncUser> switch_user(const std::shared_ptr<SyncUser>& user) const;
 
     /// Logs out and removes the provided user.
     /// This invokes logout on the server.
     /// @param user the user to remove
-    /// @param completion_block Will return an error if the user is not found or the http request failed.
-    void remove_user(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
+    /// @param completion Will return an error if the user is not found or the http request failed.
+    void remove_user(const std::shared_ptr<SyncUser>& user,
+                     util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+
+    /// Deletes a user and all its data from the server.
+    /// @param user The user to delete
+    /// @param completion Will return an error if the user is not found or the http request failed.
+    void delete_user(const std::shared_ptr<SyncUser>& user,
+                     util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     // Get a provider client for the given class type.
     template <class T>
@@ -289,46 +300,48 @@ public:
     }
 
     void call_function(
-        std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
+        const std::shared_ptr<SyncUser>& user, const std::string& name, const bson::BsonArray& args_bson,
         const util::Optional<std::string>& service_name,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
 
     void call_function(
-        std::shared_ptr<SyncUser> user, const std::string&, const bson::BsonArray& args_bson,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+        const std::shared_ptr<SyncUser>& user, const std::string&, const bson::BsonArray& args_bson,
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
 
     void call_function(
         const std::string& name, const bson::BsonArray& args_bson, const util::Optional<std::string>& service_name,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
 
     void call_function(
         const std::string&, const bson::BsonArray& args_bson,
-        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+        util::UniqueFunction<void(util::Optional<bson::Bson>&&, util::Optional<AppError>)>&& completion) override;
 
     template <typename T>
-    void call_function(std::shared_ptr<SyncUser> user, const std::string& name, const bson::BsonArray& args_bson,
-                       std::function<void(util::Optional<AppError>, util::Optional<T>)> completion_block)
+    void call_function(const std::shared_ptr<SyncUser>& user, const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       util::UniqueFunction<void(util::Optional<T>&&, util::Optional<AppError>)>&& completion)
     {
-        call_function(user, name, args_bson, util::none,
-                      [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-                          if (value) {
-                              return completion_block(error, util::some<T>(static_cast<T>(*value)));
-                          }
+        call_function(
+            user, name, args_bson, util::none,
+            [completion = std::move(completion)](util::Optional<bson::Bson>&& value, util::Optional<AppError> error) {
+                if (value) {
+                    return completion(util::some<T>(static_cast<T>(*value)), std::move(error));
+                }
 
-                          return completion_block(error, util::none);
-                      });
+                return completion(util::none, std::move(error));
+            });
     }
 
     template <typename T>
     void call_function(const std::string& name, const bson::BsonArray& args_bson,
-                       std::function<void(util::Optional<AppError>, util::Optional<T>)> completion_block)
+                       util::UniqueFunction<void(util::Optional<T>&&, util::Optional<AppError>)>&& completion)
     {
-        call_function(current_user(), name, args_bson, completion_block);
+        call_function(current_user(), name, args_bson, std::move(completion));
     }
 
     // NOTE: only sets "Accept: text/event-stream" header. If you use an API that sets that but doesn't support
     // setting other headers (eg. EventSource() in JS), you can ignore the headers field on the request.
-    Request make_streaming_request(std::shared_ptr<SyncUser> user, const std::string& name,
+    Request make_streaming_request(const std::shared_ptr<SyncUser>& user, const std::string& name,
                                    const bson::BsonArray& args_bson,
                                    const util::Optional<std::string>& service_name) const;
 
@@ -351,41 +364,47 @@ private:
     std::shared_ptr<SyncManager> m_sync_manager;
 
     /// Refreshes the access token for a specified `SyncUser`
-    /// @param completion_block Passes an error should one occur.
-    void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
-                              std::function<void(util::Optional<AppError>)> completion_block);
-
+    /// @param completion Passes an error should one occur.
+    void refresh_access_token(const std::shared_ptr<SyncUser>& user,
+                              util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token
     /// @param error The error to check for auth failures
     /// @param response The original response to pass back should this not be an auth error
     /// @param request The request to perform
-    /// @param completion_block returns the original response in the case it is not an auth error, or if a failure
+    /// @param completion returns the original response in the case it is not an auth error, or if a failure
     /// occurs, if the refresh was a success the newly attempted response will be passed back
-    void handle_auth_failure(const AppError& error, const Response& response, Request request,
-                             std::shared_ptr<SyncUser> sync_user, std::function<void(Response)> completion_block);
+    void handle_auth_failure(const AppError& error, const Response& response, Request&& request,
+                             const std::shared_ptr<SyncUser>& user,
+                             util::UniqueFunction<void(const Response&)>&& completion);
 
     std::string url_for_path(const std::string& path) const override;
 
-    void init_app_metadata(std::function<void(util::Optional<AppError>, util::Optional<Response>)> completion_block);
+    void init_app_metadata(util::UniqueFunction<void(const util::Optional<Response>&)>&& completion);
+
+    void basic_request(std::string&& route, std::string&& body,
+                       util::UniqueFunction<void(util::Optional<AppError>)>&& completion);
+    void post(std::string&& route, util::UniqueFunction<void(util::Optional<AppError>)>&& completion,
+              const bson::BsonDocument& body);
 
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
-    /// @param completion_block Returns the response from the server
-    void do_request(Request request, std::function<void(Response)> completion_block);
+    /// @param completion Returns the response from the server
+    void do_request(Request&& request, util::UniqueFunction<void(const Response&)>&& completion);
 
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
-    /// @param completion_block Returns the response from the server
-    void do_authenticated_request(Request request, std::shared_ptr<SyncUser> sync_user,
-                                  std::function<void(Response)> completion_block) override;
+    /// @param completion Returns the response from the server
+    void do_authenticated_request(Request&& request, const std::shared_ptr<SyncUser>& user,
+                                  util::UniqueFunction<void(const Response&)>&& completion) override;
 
 
     /// Gets the social profile for a `SyncUser`
-    /// @param completion_block Callback will pass the `SyncUser` with the social profile details
-    void get_profile(std::shared_ptr<SyncUser> sync_user,
-                     std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+    /// @param completion Callback will pass the `SyncUser` with the social profile details
+    void
+    get_profile(const std::shared_ptr<SyncUser>& user,
+                util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -395,10 +414,10 @@ private:
     ///
     /// @param credentials A `SyncCredentials` object representing the user to log in.
     /// @param linking_user A `SyncUser` you want to link these credentials too
-    /// @param completion_block A callback block to be invoked once the log in completes.
+    /// @param completion A callback block to be invoked once the log in completes.
     void log_in_with_credentials(
-        const AppCredentials& credentials, const std::shared_ptr<SyncUser> linking_user,
-        std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+        const AppCredentials& credentials, const std::shared_ptr<SyncUser>& linking_user,
+        util::UniqueFunction<void(const std::shared_ptr<SyncUser>&, util::Optional<AppError>)>&& completion);
 
     /// Provides MongoDB Realm Cloud with metadata related to the users session
     void attach_auth_options(bson::BsonDocument& body);
@@ -406,6 +425,8 @@ private:
     std::string function_call_url_path() const;
 
     void configure(const SyncClientConfig& sync_client_config);
+
+    bool verify_user_present(const std::shared_ptr<SyncUser>& user) const;
 };
 
 // MARK: Provider client templates

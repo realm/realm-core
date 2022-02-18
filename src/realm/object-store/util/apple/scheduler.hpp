@@ -16,13 +16,20 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/util/to_string.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/util/to_string.hpp>
 
 #include <atomic>
 #include <dispatch/dispatch.h>
 #include <objc/runtime.h>
 #include <pthread.h>
+
+namespace {
+struct RefCountedInvocationQueue {
+    realm::util::InvocationQueue queue;
+    std::atomic<size_t> ref_count = {0};
+};
+} // namespace
 
 namespace realm::util {
 
@@ -31,132 +38,60 @@ public:
     RunLoopScheduler(CFRunLoopRef run_loop = nullptr);
     ~RunLoopScheduler();
 
-    void notify() override;
-    void schedule_writes() override;
-    void schedule_completions() override;
-
-    void set_notify_callback(std::function<void()> fn) override
-    {
-        set_callback(m_notify_signal, fn);
-    }
-    void set_schedule_writes_callback(std::function<void()> fn) override
-    {
-        if (m_write_signal)
-            return; // danger!
-        set_callback(m_write_signal, fn);
-    }
-    void set_schedule_completions_callback(std::function<void()> fn) override
-    {
-        if (m_completion_signal)
-            return; // danger!
-        set_callback(m_completion_signal, fn);
-    }
+    void invoke(util::UniqueFunction<void()>&&) override;
 
     bool is_on_thread() const noexcept override;
     bool is_same_as(const Scheduler* other) const noexcept override;
-    bool can_deliver_notifications() const noexcept override;
-    bool can_schedule_writes() const noexcept override
-    {
-        return true;
-    }
-    bool can_schedule_completions() const noexcept override
-    {
-        return true;
-    }
+    bool can_invoke() const noexcept override;
 
 private:
     CFRunLoopRef m_runloop;
     CFRunLoopSourceRef m_notify_signal = nullptr;
-    CFRunLoopSourceRef m_write_signal = nullptr;
-    CFRunLoopSourceRef m_completion_signal = nullptr;
+    RefCountedInvocationQueue& m_queue;
 
     void release(CFRunLoopSourceRef&);
-    void set_callback(CFRunLoopSourceRef&, std::function<void()>);
+    void set_callback(CFRunLoopSourceRef&, util::UniqueFunction<void()>);
 };
 
 RunLoopScheduler::RunLoopScheduler(CFRunLoopRef run_loop)
     : m_runloop(run_loop ?: CFRunLoopGetCurrent())
+    , m_queue(*new RefCountedInvocationQueue)
 {
     CFRetain(m_runloop);
-}
-
-RunLoopScheduler::~RunLoopScheduler()
-{
-    release(m_notify_signal);
-    release(m_write_signal);
-    release(m_completion_signal);
-    CFRelease(m_runloop);
-}
-
-void RunLoopScheduler::release(CFRunLoopSourceRef& source)
-{
-    if (source) {
-        CFRunLoopSourceInvalidate(source);
-        CFRelease(source);
-        source = nullptr;
-    }
-}
-
-void RunLoopScheduler::set_callback(CFRunLoopSourceRef& source, std::function<void()> callback)
-{
-    release(source);
-
-    struct RefCountedRunloopCallback {
-        std::function<void()> callback;
-        std::atomic<size_t> ref_count;
-    };
 
     CFRunLoopSourceContext ctx{};
-    ctx.info = new RefCountedRunloopCallback{std::move(callback), {0}};
+    ctx.info = &m_queue;
     ctx.perform = [](void* info) {
-        static_cast<RefCountedRunloopCallback*>(info)->callback();
+        static_cast<RefCountedInvocationQueue*>(info)->queue.invoke_all();
     };
     ctx.retain = [](const void* info) {
-        static_cast<RefCountedRunloopCallback*>(const_cast<void*>(info))
+        static_cast<RefCountedInvocationQueue*>(const_cast<void*>(info))
             ->ref_count.fetch_add(1, std::memory_order_relaxed);
         return info;
     };
     ctx.release = [](const void* info) {
-        auto ptr = static_cast<RefCountedRunloopCallback*>(const_cast<void*>(info));
+        auto ptr = static_cast<RefCountedInvocationQueue*>(const_cast<void*>(info));
         if (ptr->ref_count.fetch_add(-1, std::memory_order_acq_rel) == 1) {
             delete ptr;
         }
     };
 
-    source = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &ctx);
-    CFRunLoopAddSource(m_runloop, source, kCFRunLoopDefaultMode);
+    m_notify_signal = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &ctx);
+    CFRunLoopAddSource(m_runloop, m_notify_signal, kCFRunLoopDefaultMode);
 }
 
-void RunLoopScheduler::notify()
+RunLoopScheduler::~RunLoopScheduler()
 {
-    if (!m_notify_signal)
-        return;
+    CFRunLoopSourceInvalidate(m_notify_signal);
+    CFRelease(m_notify_signal);
+    CFRelease(m_runloop);
+}
+
+void RunLoopScheduler::invoke(util::UniqueFunction<void()>&& fn)
+{
+    m_queue.queue.push(std::move(fn));
 
     CFRunLoopSourceSignal(m_notify_signal);
-    // Signalling the source makes it run the next time the runloop gets
-    // to it, but doesn't make the runloop start if it's currently idle
-    // waiting for events
-    CFRunLoopWakeUp(m_runloop);
-}
-
-void RunLoopScheduler::schedule_writes()
-{
-    if (!m_write_signal)
-        return;
-
-    CFRunLoopSourceSignal(m_write_signal);
-    // Signalling the source makes it run the next time the runloop gets
-    // to it, but doesn't make the runloop start if it's currently idle
-    // waiting for events
-    CFRunLoopWakeUp(m_runloop);
-}
-
-void RunLoopScheduler::schedule_completions()
-{
-    if (!m_completion_signal)
-        return;
-
-    CFRunLoopSourceSignal(m_completion_signal);
     // Signalling the source makes it run the next time the runloop gets
     // to it, but doesn't make the runloop start if it's currently idle
     // waiting for events
@@ -174,7 +109,7 @@ bool RunLoopScheduler::is_same_as(const Scheduler* other) const noexcept
     return (o && (o->m_runloop == m_runloop));
 }
 
-bool RunLoopScheduler::can_deliver_notifications() const noexcept
+bool RunLoopScheduler::can_invoke() const noexcept
 {
     // The main thread may not be in a run loop yet if we're called from
     // something like `applicationDidFinishLaunching:`, but it presumably will
@@ -196,12 +131,11 @@ public:
     DispatchQueueScheduler(dispatch_queue_t queue);
     ~DispatchQueueScheduler();
 
-    void notify() override;
-    void set_notify_callback(std::function<void()>) override;
+    void invoke(util::UniqueFunction<void()>&&) override;
 
     bool is_on_thread() const noexcept override;
     bool is_same_as(const Scheduler* other) const noexcept override;
-    bool can_deliver_notifications() const noexcept override
+    bool can_invoke() const noexcept override
     {
         return true;
     }
@@ -240,15 +174,11 @@ DispatchQueueScheduler::~DispatchQueueScheduler()
         Block_release(m_callback);
 }
 
-void DispatchQueueScheduler::notify()
+void DispatchQueueScheduler::invoke(util::UniqueFunction<void()>&& fn)
 {
-    dispatch_async(m_queue, m_callback);
-}
-
-void DispatchQueueScheduler::set_notify_callback(std::function<void()> callback)
-{
-    m_callback = Block_copy(^{
-      callback();
+    auto ptr = fn.release();
+    dispatch_async(m_queue, ^{
+        util::UniqueFunction<void()>{ptr}();
     });
 }
 

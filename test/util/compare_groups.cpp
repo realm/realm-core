@@ -1054,7 +1054,7 @@ bool compare_groups(const Transaction& group_1, const Transaction& group_2)
 
 
 bool compare_groups(const Transaction& group_1, const Transaction& group_2,
-                    std::function<bool(StringData)> filter_func, util::Logger& logger)
+                    util::FunctionRef<bool(StringData)> filter_func, util::Logger& logger)
 {
     auto filter = [&](const Group& group, std::vector<StringData>& tables) {
         auto table_keys = group.get_table_keys();

@@ -36,7 +36,7 @@
 using namespace realm;
 using namespace realm::_impl;
 
-using SessionWaiterPointer = void (sync::Session::*)(std::function<void(std::error_code)>);
+using SessionWaiterPointer = void (sync::Session::*)(util::UniqueFunction<void(std::error_code)>);
 
 constexpr const char SyncError::c_original_file_path_key[];
 constexpr const char SyncError::c_recovery_file_path_key[];
@@ -178,7 +178,8 @@ void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::er
     }
 }
 
-std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session)
+util::UniqueFunction<void(util::Optional<app::AppError>)>
+SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
 {
     return [session](util::Optional<app::AppError> error) {
         auto session_user = session->user();
@@ -231,6 +232,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
 SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig config, SyncManager* sync_manager)
     : m_config(std::move(config))
     , m_db(std::move(db))
+    , m_flx_subscription_store(make_flx_subscription_store())
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
@@ -241,6 +243,21 @@ std::shared_ptr<SyncManager> SyncSession::sync_manager() const
     std::lock_guard<std::mutex> lk(m_state_mutex);
     REALM_ASSERT(m_sync_manager);
     return m_sync_manager->shared_from_this();
+}
+
+std::shared_ptr<sync::SubscriptionStore> SyncSession::make_flx_subscription_store()
+{
+    if (!m_config.flx_sync_requested) {
+        return nullptr;
+    }
+
+    return std::make_shared<sync::SubscriptionStore>(m_db, [this](int64_t new_version) {
+        std::lock_guard<std::mutex> lk(m_state_mutex);
+        if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
+            return;
+        }
+        m_session->on_new_flx_sync_subscription(new_version);
+    });
 }
 
 void SyncSession::detach_from_sync_manager()
@@ -512,6 +529,46 @@ void SyncSession::create_sync_session()
     do_create_sync_session();
 }
 
+sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy)
+{
+    sync::Session::Config::ClientReset config;
+    config.discard_local = (session_config.client_resync_mode == ClientResyncMode::DiscardLocal);
+    config.notify_after_client_reset = [&session_config](std::string local_path, VersionID previous_version) {
+        REALM_ASSERT(!local_path.empty());
+        SharedRealm frozen_before, active_after;
+        if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            auto local_config = local_coordinator->get_config();
+            active_after = local_coordinator->get_realm(local_config, util::none);
+            local_config.scheduler = nullptr;
+            frozen_before = local_coordinator->get_realm(local_config, previous_version);
+            REALM_ASSERT(active_after);
+            REALM_ASSERT(!active_after->is_frozen());
+            REALM_ASSERT(frozen_before);
+            REALM_ASSERT(frozen_before->is_frozen());
+        }
+        if (session_config.notify_after_client_reset) {
+            session_config.notify_after_client_reset(frozen_before, active_after);
+        }
+    };
+    config.notify_before_client_reset = [&session_config](std::string local_path) {
+        REALM_ASSERT(!local_path.empty());
+        SharedRealm frozen_local;
+        Realm::Config local_config;
+        if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            local_config = local_coordinator->get_config();
+            local_config.scheduler = nullptr;
+            frozen_local = local_coordinator->get_realm(local_config, VersionID());
+            REALM_ASSERT(frozen_local);
+            REALM_ASSERT(frozen_local->is_frozen());
+        }
+        if (session_config.notify_before_client_reset) {
+            session_config.notify_before_client_reset(frozen_local);
+        }
+    };
+    config.fresh_copy = std::move(fresh_copy);
+    return config;
+}
+
 void SyncSession::do_create_sync_session()
 {
     sync::Session::Config session_config;
@@ -521,7 +578,7 @@ void SyncSession::do_create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
-    session_config.flx_sync_requested = m_config.flx_sync_requested;
+
     {
         std::string sync_route = m_sync_manager->sync_route();
 
@@ -541,42 +598,11 @@ void SyncSession::do_create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        sync::Session::Config::ClientReset config;
-        config.discard_local = (m_config.client_resync_mode == ClientResyncMode::DiscardLocal);
-        config.notify_after_client_reset = [this](std::string local_path, VersionID previous_version) {
-            REALM_ASSERT(!local_path.empty());
-            SharedRealm frozen_before, active_after;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                auto local_config = local_coordinator->get_config();
-                active_after = local_coordinator->get_realm(local_config, util::none);
-                local_config.scheduler = nullptr;
-                frozen_before = local_coordinator->get_realm(local_config, previous_version);
-                REALM_ASSERT(active_after);
-                REALM_ASSERT(!active_after->is_frozen());
-                REALM_ASSERT(frozen_before);
-                REALM_ASSERT(frozen_before->is_frozen());
-            }
-            m_config.notify_after_client_reset(frozen_before, active_after);
-        };
-        config.notify_before_client_reset = [this](std::string local_path) {
-            REALM_ASSERT(!local_path.empty());
-            SharedRealm frozen_local;
-            Realm::Config local_config;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                local_config = local_coordinator->get_config();
-                local_config.scheduler = nullptr;
-                frozen_local = local_coordinator->get_realm(local_config, VersionID());
-                REALM_ASSERT(frozen_local);
-                REALM_ASSERT(frozen_local->is_frozen());
-            }
-            m_config.notify_before_client_reset(frozen_local);
-        };
-        config.fresh_copy = std::move(m_client_reset_fresh_copy);
-        session_config.client_reset_config = std::move(config);
+        session_config.client_reset_config = make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy));
         m_force_client_reset = false;
     }
 
-    m_session = m_client.make_session(m_db, std::move(session_config));
+    m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
 
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
@@ -634,7 +660,7 @@ void SyncSession::do_create_sync_session()
     });
 }
 
-void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
+void SyncSession::set_sync_transact_callback(util::UniqueFunction<sync::Session::SyncTransactCallback> callback)
 {
     std::lock_guard l(m_state_mutex);
     m_sync_transact_callback = std::move(callback);
@@ -792,7 +818,7 @@ void SyncSession::initiate_access_token_refresh()
 }
 
 void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
-                                          std::function<void(std::error_code)> callback,
+                                          util::UniqueFunction<void(std::error_code)> callback,
                                           _impl::SyncProgressNotifier::NotifierType direction)
 {
     bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
@@ -821,19 +847,19 @@ void SyncSession::add_completion_callback(const std::unique_lock<std::mutex>&,
     });
 }
 
-void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
+void SyncSession::wait_for_upload_completion(util::UniqueFunction<void(std::error_code)>&& callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     add_completion_callback(lock, std::move(callback), ProgressDirection::upload);
 }
 
-void SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
+void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     add_completion_callback(lock, std::move(callback), ProgressDirection::download);
 }
 
-uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback> notifier,
+uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,
                                                  ProgressDirection direction, bool is_streaming)
 {
     return m_progress_notifier.register_callback(std::move(notifier), direction, is_streaming);
@@ -844,9 +870,9 @@ void SyncSession::unregister_progress_notifier(uint64_t token)
     m_progress_notifier.unregister_callback(token);
 }
 
-uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateChangeCallback> callback)
+uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateChangeCallback>&& callback)
 {
-    return m_connection_change_notifier.add_callback(callback);
+    return m_connection_change_notifier.add_callback(std::move(callback));
 }
 
 void SyncSession::unregister_connection_change_callback(uint64_t token)
@@ -875,12 +901,12 @@ std::string const& SyncSession::path() const
 
 sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
 {
-    return m_session->get_flx_subscription_store();
+    return m_flx_subscription_store.get();
 }
 
 bool SyncSession::has_flx_subscription_store() const
 {
-    return m_session->has_flx_subscription_store();
+    return static_cast<bool>(m_flx_subscription_store);
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)
@@ -963,7 +989,7 @@ void SyncSession::did_drop_external_reference()
 uint64_t SyncProgressNotifier::register_callback(std::function<ProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
-    std::function<void()> invocation;
+    util::UniqueFunction<void()> invocation;
     uint64_t token_value = 0;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -1001,7 +1027,7 @@ void SyncProgressNotifier::update(uint64_t downloaded, uint64_t downloadable, ui
     if (download_version == 0)
         return;
 
-    std::vector<std::function<void()>> invocations;
+    std::vector<util::UniqueFunction<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded, snapshot_version};
@@ -1023,8 +1049,8 @@ void SyncProgressNotifier::set_local_version(uint64_t snapshot_version)
     m_local_transaction_version = snapshot_version;
 }
 
-std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress,
-                                                                               bool& is_expired)
+util::UniqueFunction<void()>
+SyncProgressNotifier::NotifierPackage::create_invocation(Progress const& current_progress, bool& is_expired)
 {
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;

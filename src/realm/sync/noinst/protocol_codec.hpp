@@ -167,8 +167,6 @@ public:
                            const std::string& server_path, const std::string& signed_user_token,
                            bool need_client_file_ident, bool is_subserver);
 
-    void make_refresh_message(OutputBuffer&, session_ident_type session_ident, const std::string& signed_user_token);
-
     void make_pbs_ident_message(OutputBuffer&, session_ident_type session_ident, SaltedFileIdent client_file_ident,
                                 const SyncProgress& progress);
 
@@ -647,16 +645,6 @@ public:
 
                 connection.receive_bind_message(session_ident, std::move(path), std::move(signed_user_token),
                                                 need_client_file_ident, is_subserver); // Throws
-            }
-            else if (message_type == "refresh") {
-                auto session_ident = msg.read_next<session_ident_type>();
-                auto signed_user_token_size = msg.read_next<size_t>('\n');
-                if (signed_user_token_size > s_max_signed_user_token_size)
-                    return report_error(Error::limits_exceeded, "Signed user token in REFRESH message is too large");
-
-                auto signed_user_token = msg.read_sized_data<std::string>(signed_user_token_size);
-
-                connection.receive_refresh_message(session_ident, std::move(signed_user_token)); // Throws
             }
             else if (message_type == "ident") {
                 auto session_ident = msg.read_next<session_ident_type>();

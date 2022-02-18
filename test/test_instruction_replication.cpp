@@ -340,20 +340,20 @@ TEST(InstructionReplication_InvalidateObject)
 {
     Fixture fixture{test_context};
     {
-        WriteTransaction wt{fixture.sg_1};
-        TableRef foo = wt.get_or_add_table("class_foo");
+        auto wt = fixture.sg_1->start_write();
+        TableRef foo = wt->add_table_with_primary_key("class_foo", type_Int, "_id");
         ColKey col_ndx = foo->add_column(type_Int, "i");
-        TableRef bar = wt.get_or_add_table("class_bar");
+        TableRef bar = wt->get_or_add_table("class_bar");
         ColKey col_link = bar->add_column(*foo, "link");
         ColKey col_linklist = bar->add_column_list(*foo, "linklist");
 
-        Obj obj = foo->create_object().set(col_ndx, 123);
+        Obj obj = foo->create_object_with_primary_key(1).set(col_ndx, 123);
         // Create link to object soon to be deleted
         bar->create_object().set(col_link, obj.get_key()).get_linklist(col_linklist).add(obj.get_key());
 
-        foo->create_object().set(col_ndx, 456);
+        foo->create_object_with_primary_key(2).set(col_ndx, 456);
         obj.invalidate();
-        wt.commit();
+        wt->commit();
     }
     fixture.replay_transactions();
     fixture.check_equal();
@@ -633,5 +633,41 @@ TEST(InstructionReplication_NullablePrimaryKeys)
         CHECK_EQUAL(first.get<int64_t>(col_ndx), 123);
         CHECK_EQUAL(second.get<int64_t>(col_ndx), 456);
         CHECK_EQUAL(third.get<int64_t>(col_ndx), 789);
+    }
+}
+
+TEST(InstructionReplication_Dictionary)
+{
+    Fixture fixture{test_context};
+    {
+        WriteTransaction wt{fixture.sg_1};
+        TableRef foo = wt.add_table("class_foo");
+        ColKey col_ndx = foo->add_column_dictionary(type_Mixed, "dict");
+        Obj obj = foo->create_object();
+        auto dict = obj.get_dictionary(col_ndx);
+        dict.insert("a", 123);
+        dict.insert("b", 45.0);
+        dict.insert("c", "Hello");
+        dict.insert("d", true);
+        dict.insert("erase_me", "erase_me");
+        dict.erase("erase_me");
+        wt.commit();
+    }
+    fixture.replay_transactions();
+    fixture.check_equal();
+    {
+        ReadTransaction rt{fixture.sg_2};
+        auto foo = rt.get_table("class_foo");
+        CHECK(foo);
+        CHECK_EQUAL(foo->size(), 1);
+        auto obj = *foo->begin();
+        ColKey col_ndx = foo->get_column_key("dict");
+        CHECK(col_ndx.is_dictionary());
+        auto dict = obj.get_dictionary(col_ndx);
+        CHECK_EQUAL(dict.size(), 4);
+        CHECK_EQUAL(dict.get("a"), 123);
+        CHECK_EQUAL(dict.get("b"), 45.0);
+        CHECK_EQUAL(dict.get("c"), "Hello");
+        CHECK_EQUAL(dict.get("d"), true);
     }
 }

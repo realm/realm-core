@@ -318,7 +318,7 @@ struct HTTPParser : protected HTTPParserBase {
         }
     }
 
-    void write_buffer(std::function<void(std::error_code, size_t)> handler)
+    void write_buffer(util::UniqueFunction<void(std::error_code, size_t)> handler)
     {
         m_socket.async_write(m_write_buffer.data(), m_write_buffer.size(), std::move(handler));
     }
@@ -352,7 +352,7 @@ struct HTTPClient : protected HTTPParser<Socket> {
     /// If a request is already in progress, an exception will be thrown.
     ///
     /// This method is *NOT* thread-safe.
-    void async_request(const HTTPRequest& request, std::function<Handler> handler)
+    void async_request(const HTTPRequest& request, util::UniqueFunction<Handler> handler)
     {
         if (REALM_UNLIKELY(m_handler)) {
             throw util::runtime_error("Request already in progress.");
@@ -373,7 +373,7 @@ struct HTTPClient : protected HTTPParser<Socket> {
     }
 
 private:
-    std::function<Handler> m_handler;
+    util::UniqueFunction<Handler> m_handler;
     HTTPResponse m_response;
 
     std::error_code on_first_line(StringData line) override final
@@ -436,7 +436,7 @@ struct HTTPServer : protected HTTPParser<Socket> {
     /// receive the next request.
     ///
     /// This function is *NOT* thread-safe.
-    void async_receive_request(std::function<RequestHandler> handler)
+    void async_receive_request(util::UniqueFunction<RequestHandler> handler)
     {
         if (REALM_UNLIKELY(m_request_handler)) {
             throw util::runtime_error("Response already in progress.");
@@ -456,7 +456,7 @@ struct HTTPServer : protected HTTPParser<Socket> {
     /// before the \a handler of a previous invocation has been invoked.
     ///
     /// This function is *NOT* thread-safe.
-    void async_send_response(const HTTPResponse& response, std::function<RespondHandler> handler)
+    void async_send_response(const HTTPResponse& response, util::UniqueFunction<RespondHandler> handler)
     {
         if (REALM_UNLIKELY(!m_request_handler)) {
             throw util::runtime_error("No request in progress.");
@@ -479,8 +479,8 @@ struct HTTPServer : protected HTTPParser<Socket> {
     }
 
 private:
-    std::function<RequestHandler> m_request_handler;
-    std::function<RespondHandler> m_respond_handler;
+    util::UniqueFunction<RequestHandler> m_request_handler;
+    util::UniqueFunction<RespondHandler> m_respond_handler;
     HTTPRequest m_request;
 
     std::error_code on_first_line(StringData line) override final
@@ -514,9 +514,6 @@ private:
         m_request_handler(std::move(m_request), ec);
     }
 };
-
-
-std::string make_http_host(bool is_ssl, std::string_view address, std::uint_fast16_t port);
 
 } // namespace util
 } // namespace realm

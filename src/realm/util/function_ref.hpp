@@ -22,8 +22,10 @@
 #include <functional>
 #include <utility>
 
-namespace realm {
-namespace util {
+namespace realm::util {
+
+template <typename Signature>
+class UniqueFunction;
 
 #ifdef _WIN32
 // VC++ warns about multiple copy constructors, but we want both const and
@@ -117,6 +119,20 @@ public:
         return m_callback(m_obj, std::forward<Args>(args)...);
     }
 
+    // Converting FunctionRef to std::function technically can work, but is
+    // almost guaranteed to be a bug
+    template <typename Signature>
+    operator std::function<Signature>() const = delete;
+    template <typename Signature>
+    operator std::function<Signature>() = delete;
+    template <typename Signature>
+    operator UniqueFunction<Signature>() const = delete;
+    template <typename Signature>
+    operator UniqueFunction<Signature>() = delete;
+
+    // FunctionRef cannot be null
+    constexpr FunctionRef(std::nullptr_t) noexcept = delete;
+
 private:
     void* m_obj;
     Return (*m_callback)(void*, Args...);
@@ -128,8 +144,7 @@ constexpr void swap(FunctionRef<R(Args...)>& lhs, FunctionRef<R(Args...)>& rhs) 
     lhs.swap(rhs);
 }
 
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #ifdef _WIN32
 #pragma warning(pop)
