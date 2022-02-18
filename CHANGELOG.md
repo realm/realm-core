@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* The Swift package set the linker flags on the wrong target, resulting in linker errors when SPM decides to build the core library as a dynamic library ([Swift #7266](https://github.com/realm/realm-swift/issues/7266)).
  
 ### Breaking changes
 * None.
