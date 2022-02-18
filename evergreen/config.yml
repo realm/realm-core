@@ -781,15 +781,9 @@ buildvariants:
   - name: compile_test
   - name: swift-build-and-test
 
-<<<<<<< HEAD
-- name: macos-1100-release
-  display_name: "MacOS 11 x86_64 (Release build)"
-  run_on: macos-1100
-=======
 - name: macos-1015-release
   display_name: "MacOS 10.15 x86_64 (Release build)"
   run_on: macos-1015
->>>>>>> 298c35523 (Revert "fix run_on macos version for evergreen")
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
