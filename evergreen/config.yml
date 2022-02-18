@@ -68,6 +68,27 @@ functions:
                       -j ${max_jobs|$(grep -c proc /proc/cpuinfo)}
           fi
 
+          if [ -n "${vcpkg_triplet}" ]; then
+              set_cmake_var vcpkg_vars CMAKE_TOOLCHAIN_FILE FILEPATH $(./evergreen/abspath.sh "tools/vcpkg/ports/scripts/buildsystems/vcpkg.cmake")
+              set_cmake_var vcpkg_vars VCPKG_MANIFEST_DIR PATH $(./evergreen/abspath.sh "tools/vcpkg")
+              set_cmake_var vcpkg_vars VCPKG_OVERLAY_TRIPLETS STRING $(./evergreen/abspath.sh "tools/vcpkg/triplets")
+              set_cmake_var vcpkg_vars VCPKG_TARGET_TRIPLET STRING ${vcpkg_triplet}
+              set_cmake_var vcpkg_vars VCPKG_MANIFEST_FEATURES STRING "tests"
+
+              # Disable the default vcpkg binary cache because it's under $HOME
+              export VCPKG_BINARY_SOURCES=clear
+
+              if [ -n "${vcpkg_cache_aws_access_key|}" ] && [ -n "${vcpkg_cache_aws_secret_key|}" ]; then
+                    export AWS_ACCESS_KEY_ID="${vcpkg_cache_aws_access_key}"
+                    export AWS_SECRET_ACCESS_KEY="${vcpkg_cache_aws_secret_key}"
+                    export AWS_DEFAULT_REGION=eu-west-1
+
+                    # Configure vcpkg to disable other cache sources and use the following S3 bucket
+                    #disable until the windows hosts get the aws cli
+                    #export VCPKG_BINARY_SOURCES="clear;x-aws,s3://vcpkg-binary-caches,readwrite"
+              fi
+          fi
+
           if [ -n "${run_tests_against_baas|}" ]; then
               set_cmake_var baas_vars REALM_ENABLE_AUTH_TESTS BOOL On
               set_cmake_var baas_vars REALM_MONGODB_ENDPOINT STRING "http://localhost:9090"
@@ -842,7 +863,7 @@ buildvariants:
     package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
-    build_zlib: On
+    vcpkg_triplet: "x64-windows-static"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_and_package_windows
@@ -863,7 +884,27 @@ buildvariants:
     package_flags: "-C Release"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
-    build_zlib: On
+    vcpkg_triplet: "x64-windows-static"
+    python3: "/cygdrive/c/python/python37/python.exe"
+  tasks:
+  - name: compile_test_windows
+    distros:
+    - windows-64-vs2019-large
+
+- name: windows-32-vs2019-release
+  display_name: "Windows x86 (VS 2019 Release build)"
+  run_on: windows-64-vs2019-test
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-windows-x86_64.zip"
+    cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
+    cmake_generator: "Visual Studio 16 2019"
+    extra_flags: "-A Win32"
+    cmake_build_type: "Release"
+    test_flags: "-C Release"
+    package_flags: "-C Release"
+    max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
+    fetch_missing_dependencies: On
+    vcpkg_triplet: "x86-windows-static"
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
   - name: compile_test_windows
