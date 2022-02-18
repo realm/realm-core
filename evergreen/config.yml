@@ -294,7 +294,7 @@ tasks:
   - func: "fetch binaries"
   - command: shell.exec
     params:
-      working_dir: realm-core
+      working_dir: realm-core/test
       shell: /bin/bash
       script: |-
         #!/bin/bash

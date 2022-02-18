@@ -7,7 +7,7 @@
 #include <locale>
 #include <sstream>
 
-#include <realm/sync/noinst/server/metrics.hpp>
+#include "metrics.hpp"
 
 using namespace realm;
 

@@ -13,8 +13,8 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/time.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
-#include <realm/sync/noinst/server/metrics.hpp>
-#include <realm/sync/noinst/server/crypto_server.hpp>
+#include "metrics.hpp"
+#include "crypto_server.hpp"
 #include <realm/sync/client.hpp>
 
 namespace realm {

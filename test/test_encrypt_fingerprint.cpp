@@ -1,6 +1,6 @@
 #include "test.hpp"
 
-#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
+#include "util/sync-server/encrypt_fingerprint.hpp"
 
 using namespace realm;
 using namespace realm::util;

@@ -742,15 +742,6 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
-                runAndCollectWarnings(
-                    parser: 'clang',
-                    script: 'xcrun swift build',
-                    name: "osx-clang-xcrun-swift-${buildType}",
-                    filters: warningFilters,
-                )
-                sh 'xcrun swift run ObjectStoreTests'
-            }
 
             archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
 
@@ -777,6 +768,18 @@ def doBuildMacOs(Map options = [:]) {
                     """
                     recordTests("macosx_${buildType}")
                 }
+
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
+                    dir('test') {
+                        runAndCollectWarnings(
+                            parser: 'clang',
+                            script: "xcrun swift build -c ${buildType.toLowerCase()}",
+                            name: "osx-clang-xcrun-swift-${buildType}",
+                            filters: warningFilters,
+                        )
+                        sh "xcrun swift run ObjectStoreTests -c ${buildType.toLowerCase()}"
+                    }
+            }
             }
         }
     }

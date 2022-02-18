@@ -28,5 +28,5 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-
+add_subdirectory(sync-server)
 

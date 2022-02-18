@@ -3,10 +3,10 @@
 #include <condition_variable>
 
 #include <realm/binary_data.hpp>
-#include <realm/sync/noinst/server/crypto_server.hpp>
+#include "util/sync-server/crypto_server.hpp"
 #include <realm/sync/client.hpp>
-#include <realm/sync/noinst/server/access_token.hpp>
-#include <realm/sync/noinst/server/access_control.hpp>
+#include "util/sync-server/access_token.hpp"
+#include "util/sync-server/access_control.hpp"
 
 #include "test.hpp"
 

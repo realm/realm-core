@@ -1,4 +1,4 @@
-#include <realm/sync/noinst/server/server.hpp>
+#include "server.hpp"
 
 #include <realm/binary_data.hpp>
 #include <realm/impl/simulated_failure.hpp>
@@ -9,12 +9,12 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server/access_control.hpp>
-#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
-#include <realm/sync/noinst/server/server_file_access_cache.hpp>
-#include <realm/sync/noinst/server/server_impl_base.hpp>
-#include <realm/sync/noinst/server/vacuum.hpp>
+#include "access_control.hpp"
+#include "encrypt_fingerprint.hpp"
+#include "server_dir.hpp"
+#include "server_file_access_cache.hpp"
+#include "server_impl_base.hpp"
+#include "vacuum.hpp"
 #include <realm/sync/transform.hpp>
 #include <realm/util/base64.hpp>
 #include <realm/util/bind_ptr.hpp>
@@ -5077,7 +5077,7 @@ void ServerImpl::initiate_accept()
             handle_accept(ec);
     };
     bool is_ssl = bool(m_ssl_context);
-    m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                 // Throws
+    m_next_http_conn.reset(new HTTPConnection(*this, ++m_next_conn_id, is_ssl));                            // Throws
     m_acceptor.async_accept(m_next_http_conn->get_socket(), m_next_http_conn_endpoint, std::move(handler)); // Throws
 }
 

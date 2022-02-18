@@ -17,19 +17,19 @@ set(SERVER_SOURCES
 set(SERVER_HEADERS
     access_control.hpp
     access_token.hpp
-    clock.hpp
+    ${RealmCore_SOURCE_DIR}/src/realm/sync/noinst/server/clock.hpp
     command_line_util.hpp
     crypto_server.hpp
     encrypt_fingerprint.hpp
     encryption_transformer.hpp
     metrics.hpp
-    permissions.hpp
+    ${RealmCore_SOURCE_DIR}/src/realm/sync/noinst/server/permissions.hpp
     reopening_file_logger.hpp
     server.hpp
     server_configuration.hpp
     server_dir.hpp
     server_file_access_cache.hpp
-    server_history.hpp
+    ${RealmCore_SOURCE_DIR}/src/realm/sync/noinst/server/server_history.hpp
     server_impl_base.hpp
     server_legacy_migration.hpp
     vacuum.hpp

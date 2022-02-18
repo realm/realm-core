@@ -1,4 +1,4 @@
-#include <realm/sync/noinst/server/access_control.hpp>
+#include "access_control.hpp"
 
 using namespace realm;
 using namespace realm::sync;

@@ -1,4 +1,4 @@
-#include <realm/sync/noinst/server/vacuum.hpp>
+#include "vacuum.hpp"
 
 #include <realm/group.hpp>
 #include <realm/sync/history.hpp>

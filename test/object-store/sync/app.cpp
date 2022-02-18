@@ -39,7 +39,7 @@
 
 #include <external/json/json.hpp>
 #include <external/mpark/variant.hpp>
-#include <realm/sync/noinst/server/access_token.hpp>
+#include "../../util/sync-server/access_token.hpp"
 #include <realm/util/base64.hpp>
 #include <realm/util/overload.hpp>
 #include <realm/util/uri.hpp>

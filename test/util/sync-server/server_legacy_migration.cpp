@@ -5,7 +5,7 @@
 #include <realm/db.hpp>
 #include <realm/util/file.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
-#include <realm/sync/noinst/server/server_legacy_migration.hpp>
+#include "server_legacy_migration.hpp"
 
 using namespace realm;
 

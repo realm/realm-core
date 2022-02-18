@@ -21,7 +21,7 @@
 #include <realm/chunked_binary.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
+#include "util/sync-server/server_dir.hpp"
 #include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
 #include <realm/history.hpp>
@@ -30,7 +30,7 @@
 #include <realm/sync/history.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/client.hpp>
-#include <realm/sync/noinst/server/server.hpp>
+#include "util/sync-server/server.hpp"
 #include <realm/list.hpp>
 
 #include "sync_fixtures.hpp"

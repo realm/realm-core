@@ -38,3 +38,7 @@
 
 # Jenkins unit test reports
 /unit-test-report.xml
+
+# SwiftPM
+.build
+.swiftpm

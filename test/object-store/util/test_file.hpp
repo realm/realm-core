@@ -34,7 +34,7 @@
 #include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
-#include <realm/sync/noinst/server/server.hpp>
+#include "../../util/sync-server/server.hpp"
 
 #endif // REALM_ENABLE_SYNC
 

@@ -9,12 +9,12 @@
 #include <realm/util/file.hpp>
 #include <realm/util/network.hpp>
 #include <realm/string_data.hpp>
-#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
-#include <realm/sync/noinst/server/server_legacy_migration.hpp>
-#include <realm/sync/noinst/server/server_configuration.hpp>
+#include "encrypt_fingerprint.hpp"
+#include "server_legacy_migration.hpp"
+#include "server_configuration.hpp"
 
 #if !REALM_MOBILE
-#include <realm/sync/noinst/server/command_line_util.hpp>
+#include "command_line_util.hpp"
 using realm::config::show_help;
 #endif
 

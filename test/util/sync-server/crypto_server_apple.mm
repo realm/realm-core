@@ -1,4 +1,4 @@
-#include <realm/sync/noinst/server/crypto_server.hpp>
+#include "crypto_server.hpp"
 
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/scope_exit.hpp>

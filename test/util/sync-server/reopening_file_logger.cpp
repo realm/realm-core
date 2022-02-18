@@ -1,6 +1,6 @@
 #include <utility>
 
-#include <realm/sync/noinst/server/reopening_file_logger.hpp>
+#include "reopening_file_logger.hpp"
 
 using namespace realm;
 using _impl::ReopeningFileLogger;

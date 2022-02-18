@@ -13,7 +13,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 
-#include <realm/sync/noinst/server/metrics.hpp>
+#include "metrics.hpp"
 
 namespace realm {
 namespace _impl {
