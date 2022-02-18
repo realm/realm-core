@@ -1,4 +1,11 @@
-FROM ubuntu:18.04
+FROM ubuntu:21.04
+
+ARG CMAKE_VERSION=3.22.2
+
+# This forces dpkg not to call sync() after package extraction and speeds up install
+RUN echo "force-unsafe-io" > /etc/dpkg/dpkg.cfg.d/02apt-speedup
+# No need for the apt cache in a container
+RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache
 
 # One dependency per line in alphabetical order.
 # This should help avoiding duplicates and make the file easier to update.
@@ -8,34 +15,34 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     gcovr \
     gdb \
     git \
-    gcc-8 \
-    g++-8 \
+    gcc-11 \
+    g++-11 \
     lcov \
     libcurl4-openssl-dev \
     libuv1-dev \
     libprocps-dev \
     ninja-build \
     pkg-config \
-    python-matplotlib \
+    python3-matplotlib \
     s3cmd \
     tar \
     unzip \
     valgrind \
-    wget \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p ~/.ssh \
  && ssh-keyscan -H github.com >> ~/.ssh/known_hosts
 
-# Ensure a new enough version of CMake is available.
+# Install CMake
 RUN cd /opt \
-    && wget -nv https://cmake.org/files/v3.15/cmake-3.15.2-Linux-x86_64.tar.gz \
-    && tar zxf cmake-3.15.2-Linux-x86_64.tar.gz
+    && curl -LO https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-linux-x86_64.tar.gz \
+    && tar zxvf cmake-$CMAKE_VERSION-linux-x86_64.tar.gz \
+    && rm -f cmake-$CMAKE_VERSION-linux-x86_64.tar.gz
+ENV PATH "/opt/cmake-$CMAKE_VERSION-linux-x86_64/bin:$PATH"
 
-ENV PATH "/opt/cmake-3.15.2-Linux-x86_64/bin:$PATH"
-ENV CC gcc-8
-ENV CXX g++-8
+ENV CC gcc-11
+ENV CXX g++-11
 
 VOLUME /source
 VOLUME /out
