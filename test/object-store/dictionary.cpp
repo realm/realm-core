@@ -1347,14 +1347,6 @@ TEST_CASE("dictionary sort by keyPath value", "[dictionary]") {
     auto col_s1 = table->get_column_key("s1");
     auto col_dict = table->get_column_key("intDictionary");
 
-    /*SECTION("sort by dict field '0'") {
-        // FIXME: Implement sorting by dict field keyPath
-        auto sorted = all_values.sort({{"intDictionary['0']", false}});
-        REQUIRE(sorted.size() == 2);
-        REQUIRE(sorted.get(0).get<Int>(col_id) == 0);
-        REQUIRE(sorted.get(1).get<Int>(col_id) == 1);
-    }*/
-
     SECTION("sort by dict field 'a' using ColKey ascending") {
         Object::create(
             ctx, r, *r->schema().find("DictionaryObject"),
