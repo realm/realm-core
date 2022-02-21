@@ -918,6 +918,16 @@ def setBuildName(newBuildName) {
 def getArchive() {
     deleteDir()
     unstash 'core-source'
+
+    // If the current node's clock is behind the clock of the node that stashed the sources originally
+    // the CMake generated files will always be out-of-date compared to the source files,
+    // which can lead Ninja into a loop.
+    // Touching all source files to reset their timestamp relative to the current node works around that.
+    if (isUnix()) {
+        sh 'find . -type f -exec touch {} +'
+    } else {
+        powershell 'Get-ChildItem . * -recurse | ForEach-Object{$_.LastWriteTime = get-date}'
+    }
 }
 
 def getSourceArchive() {
