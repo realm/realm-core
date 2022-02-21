@@ -35,7 +35,6 @@ using File = realm::util::File;
 
 static const std::string base_path =
     fs::path{util::make_temp_dir() + "/realm_objectstore_sync_file"}.make_preferred().string();
-;
 
 static void prepare_sync_manager_test()
 {
