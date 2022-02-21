@@ -13,7 +13,6 @@ LIBRARY/src/bid128_quantize.c
 LIBRARY/src/bid_convert_data.c
 LIBRARY/src/bid_decimal_data.c
 LIBRARY/src/bid_decimal_globals.c
-LIBRARY/src/bid_binarydecimal.c
 LIBRARY/src/bid_from_int.c
 LIBRARY/src/bid_round.c
 )
