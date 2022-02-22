@@ -19,6 +19,7 @@
 #ifndef REALM_UTIL_COMPRESSION_HPP
 #define REALM_UTIL_COMPRESSION_HPP
 
+#include <realm/util/features.h>
 #include <realm/util/span.hpp>
 
 #include <array>
@@ -28,6 +29,12 @@
 #include <stddef.h>
 #include <string>
 #include <vector>
+
+// Use libcompression by default on Apple platforms, but it can be disabled to
+// test the zlib codepaths
+#ifndef REALM_USE_LIBCOMPRESSION
+#define REALM_USE_LIBCOMPRESSION REALM_PLATFORM_APPLE
+#endif
 
 namespace realm::util::compression {
 

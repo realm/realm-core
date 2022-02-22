@@ -720,6 +720,7 @@ let package = Package(
             publicHeadersPath: ".",
             cxxSettings: cxxSettings,
             linkerSettings: [
+                .linkedLibrary("compression"),
                 .linkedLibrary("z"),
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
                 .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),

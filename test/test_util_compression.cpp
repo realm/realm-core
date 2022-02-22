@@ -55,7 +55,7 @@ void compress_decompress_compare(test_util::unit_test::TestContext& test_context
 
     Buffer<char> compressed_buf(compressed_buf_size);
     size_t compressed_size;
-    int compression_level = 1;
+    int compression_level = 5;
 
     auto ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size, compression_level);
     CHECK_NOT(ec);
@@ -121,11 +121,14 @@ TEST(Compression_Decompress_Incorrect_Size)
     std::error_code ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size, compression_level);
     CHECK_NOT(ec);
 
+    // Libcompression always says it used the entire output buffer
+#if !REALM_USE_LIBCOMPRESSION
     size_t decompressed_size = 5000; // incorrect
     Buffer<char> decompressed_buf(decompressed_buf_size);
 
     ec = compression::decompress(compressed_buf, decompressed_buf);
     CHECK_EQUAL(ec, compression::error::incorrect_decompressed_size);
+#endif
 }
 
 // This unit test compresses and decompresses data that is highly compressible.

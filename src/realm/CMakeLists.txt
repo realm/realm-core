@@ -342,6 +342,10 @@ else()
     message(FATAL_ERROR "No zlib dependency defined")
 endif()
 
+if(APPLE)
+    target_link_libraries(Storage PUBLIC "-lcompression")
+endif()
+
 install(TARGETS Storage EXPORT realm
         ARCHIVE DESTINATION lib
         COMPONENT devel)

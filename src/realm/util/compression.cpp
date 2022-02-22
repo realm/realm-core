@@ -23,6 +23,10 @@
 #include <zlib.h>
 #include <zconf.h> // for zlib
 
+#if REALM_USE_LIBCOMPRESSION
+#include <compression.h>
+#endif
+
 namespace {
 
 constexpr std::size_t g_max_stream_avail =
@@ -193,6 +197,29 @@ std::error_code compression::decompress(Span<const char> compressed_buf, Span<ch
     auto decompressed_ptr = reinterpret_cast<unsigned char*>(decompressed_buf.data());
     auto decompressed_buf_size = decompressed_buf.size();
 
+#if REALM_USE_LIBCOMPRESSION
+    // All of our non-macOS deployment targets are high enough to have libcompression,
+    // but we support some older macOS versions
+    if (__builtin_available(macOS 10.11, *)) {
+        // libcompression doesn't handle the zlib header, so we have to do it ourselves.
+        // The first byte is the compression algorithm and the second is the
+        // window size (which zlib uses as an optimization to allocate the correct
+        // buffer size, but is optional).
+        if (compressed_size < 2 || *compressed_ptr != 0x78)
+            return error::corrupt_input;
+        compressed_size -= 2;
+        compressed_ptr += 2;
+        size_t bytes_written = compression_decode_buffer(
+            reinterpret_cast<uint8_t*>(decompressed_ptr), decompressed_buf_size,
+            reinterpret_cast<const uint8_t*>(compressed_ptr), compressed_size, nullptr, COMPRESSION_ZLIB);
+        if (bytes_written == decompressed_buf_size)
+            return std::error_code{};
+        if (bytes_written == 0)
+            return error::corrupt_input;
+        return error::incorrect_decompressed_size;
+    }
+#endif
+
     z_stream strm;
 
     strm.zalloc = Z_NULL;
@@ -266,12 +293,11 @@ void compression::allocate_and_compress(CompressMemoryArena& compress_memory_are
     const int compression_level = 1;
     std::size_t compressed_size = 0;
 
-    compress_memory_arena.reset();
-
     if (compressed_buf.size() < 256)
         compressed_buf.resize(256); // Throws
 
     for (;;) {
+        compress_memory_arena.reset();
         std::error_code ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size,
                                                    compression_level, &compress_memory_arena);
 
