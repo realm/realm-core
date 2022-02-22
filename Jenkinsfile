@@ -596,16 +596,8 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 }
             }
             if (runTests && !isUWP) {
-                def prefix = "Windows-${platform}-${buildType}";
-                def environment = environment() << [
-                    "TMP=${env.WORKSPACE}\\temp",
-                    'UNITTEST_PROGRESS=1'
-                ]
-                if (platform == 'Win32') {
-                  // On 32-bit Windows we run out of address space when running
-                  // the sync tests in parallel
-                  environment << 'UNITTEST_THREADS=1'
-                }
+                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
+                environment << 'UNITTEST_PROGRESS=1'
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
@@ -615,6 +607,13 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                           rmdir /Q /S %TMP%
                         '''
                     }
+                }
+                if (arch == 'x86') {
+                  // On 32-bit Windows we run out of address space when running
+                  // the sync tests in parallel
+                  environment << 'UNITTEST_THREADS=1'
+                }
+                withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
@@ -623,17 +622,10 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                           rmdir /Q /S %TMP%
                         '''
                     }
-                    dir("build-dir/test/object-store/${buildType}") {
-                        bat """
-                          mkdir %TMP%
-                          realm-object-store-tests.exe 
-                          rmdir /Q /S %TMP%
-                        """
-                    }
                 }
-
-                recordTests("${prefix}-core", 'core-results.xml')
-                recordTests("${prefix}-sync", 'sync-results.xml')
+                def prefix = "Windows-${platform}-${buildType}";
+                recordTests("${prefix}-core", "core-results.xml")
+                recordTests("${prefix}-sync", "sync-results.xml")
             }
         }
     }
