@@ -1486,6 +1486,12 @@ TEST_CASE("C API") {
             auto q =
                 cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0 SORT(int ASCENDING)", 1, &arg));
 
+            SECTION("realm_query_description()") {
+                const char* descr = realm_query_get_description(q.get());
+                std::string expected = "string == \"Hello, World!\" SORT(int ASC)";
+                CHECK(descr == expected);
+            }
+
             SECTION("realm_query_count()") {
                 size_t count;
                 CHECK(checked(realm_query_count(q.get(), &count)));

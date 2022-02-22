@@ -114,6 +114,12 @@ public:
     {
     }
 
+    // Move from std::unique_ptr
+    bind_ptr(std::unique_ptr<T>&& p) noexcept
+    {
+        bind(p.release());
+    }
+
     // Move assign
     bind_ptr& operator=(bind_ptr&& p) noexcept
     {
@@ -254,6 +260,12 @@ private:
     friend class bind_ptr;
 };
 
+template <class T, typename... Args>
+bind_ptr<T> make_bind(Args&&... __args)
+{
+    return bind_ptr<T>(new T(std::forward<Args>(__args)...));
+}
+
 
 template <class C, class T, class U>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const bind_ptr<U>& p)
@@ -297,11 +309,11 @@ public:
         REALM_ASSERT(m_ref_count == 0);
     }
 
-    RefCountBase(const RefCountBase&) = delete;
-    RefCountBase(RefCountBase&&) = delete;
-
-    void operator=(const RefCountBase&) = delete;
-    void operator=(RefCountBase&&) = delete;
+    RefCountBase(const RefCountBase&)
+        : m_ref_count(0)
+    {
+    }
+    void operator=(const RefCountBase&) {}
 
 protected:
     void bind_ptr() const noexcept
@@ -338,11 +350,11 @@ public:
         REALM_ASSERT(m_ref_count == 0);
     }
 
-    AtomicRefCountBase(const AtomicRefCountBase&) = delete;
-    AtomicRefCountBase(AtomicRefCountBase&&) = delete;
-
-    void operator=(const AtomicRefCountBase&) = delete;
-    void operator=(AtomicRefCountBase&&) = delete;
+    AtomicRefCountBase(const AtomicRefCountBase&)
+        : m_ref_count(0)
+    {
+    }
+    void operator=(const AtomicRefCountBase&) {}
 
 protected:
     // FIXME: Operators ++ and -- as used below use

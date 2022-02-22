@@ -5,6 +5,7 @@
 * Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
 * 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
 * Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
+* realm_query_get_description added to the C-API. ([#5106](https://github.com/realm/realm-core/issues/5106))
 * `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
 
 ### Fixed

@@ -2010,6 +2010,14 @@ RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_class_key_t targe
 
 
 /**
+ * Get textual representation of query
+ *
+ * @return a string containing the description. The string memory is managed by the query object.
+ */
+RLM_API const char* realm_query_get_description(realm_query_t*);
+
+
+/**
  * Parse a query string and append it to an existing query via logical &&.
  * The query string applies to the same table and Realm as the existing query.
  *

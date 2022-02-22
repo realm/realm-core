@@ -1842,13 +1842,13 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     return description;
 }
 
-Query& Query::set_ordering(std::unique_ptr<DescriptorOrdering> ordering)
+Query& Query::set_ordering(util::bind_ptr<DescriptorOrdering> ordering)
 {
     m_ordering = std::move(ordering);
     return *this;
 }
 
-std::shared_ptr<DescriptorOrdering> Query::get_ordering()
+util::bind_ptr<DescriptorOrdering> Query::get_ordering()
 {
     return std::move(m_ordering);
 }
