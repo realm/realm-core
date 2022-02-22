@@ -7,6 +7,7 @@
 * Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
 * realm_query_get_description added to the C-API. ([#5106](https://github.com/realm/realm-core/issues/5106))
 * `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
+* Added `realm_get_schema_version` to the C-API. ([#5236](https://github.com/realm/realm-core/issues/5236))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

@@ -49,6 +49,12 @@ RLM_API realm_schema_t* realm_get_schema(const realm_t* realm)
     });
 }
 
+RLM_API uint64_t realm_get_schema_version(const realm_t* realm)
+{
+    auto& rlm = *realm;
+    return rlm->schema_version();
+}
+
 RLM_API bool realm_schema_validate(const realm_schema_t* schema, uint64_t validation_mode)
 {
     return wrap_err([&]() {

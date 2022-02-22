@@ -228,7 +228,7 @@ public:
     {
         return m_schema;
     }
-    uint64_t schema_version() const
+    uint64_t schema_version() const noexcept
     {
         return m_schema_version;
     }
