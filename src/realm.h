@@ -3056,9 +3056,7 @@ RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, rea
                                                        void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_cancel_waits_on_nonfatal_error(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_authorization_header_name(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, const char* name,
-                                                      const char* value) RLM_API_NOEXCEPT;
-
+RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, const char* name,const char* value) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
                                                realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
