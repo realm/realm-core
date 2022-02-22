@@ -468,6 +468,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
 
         sync_session->revive_if_needed();
         wait_for_upload(*realm);
+        wait_for_download(*realm);
 
         realm->refresh();
         CHECK(results.size() == 2);
