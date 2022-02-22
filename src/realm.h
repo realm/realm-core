@@ -741,6 +741,26 @@ RLM_API uint64_t realm_config_get_max_number_of_active_versions(const realm_conf
 RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, uint64_t);
 
 /**
+ * Configure realm to be in memory
+ */
+RLM_API void realm_config_set_in_memory(realm_config_t*, bool) RLM_API_NOEXCEPT;
+
+/**
+ * Check if realm is configured in memory
+ */
+RLM_API bool realm_config_get_in_memory(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Set FIFO path
+ */
+RLM_API void realm_config_set_fifo_path(realm_config_t*, const char*);
+
+/**
+ Check realm FIFO path
+ */
+RLM_API const char* realm_config_get_fifo_path(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
  * Create a custom scheduler object from callback functions.
  *
  * @param userdata Pointer passed to all callbacks.
@@ -2546,8 +2566,6 @@ RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, u
 RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_in_memory(realm_config_t*, uint8_t) RLM_API_NOEXCEPT;
-RLM_API void realm_app_config_set_fifo_path(realm_config_t*, const char*) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_t* instance with the same app id, or create it with the
@@ -3059,7 +3077,6 @@ RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
     realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t*,
                                                                          uint64_t token) RLM_API_NOEXCEPT;
-
 /**
  * Get the sync session for a specific realm.
  *

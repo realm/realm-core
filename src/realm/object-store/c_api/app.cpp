@@ -334,16 +334,6 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const 
     config->sdk_version = std::string(sdk_version);
 }
 
-RLM_API void realm_app_config_set_in_memory(realm_config_t* realm_config, uint8_t value) noexcept
-{
-    realm_config->in_memory = (value == 0 ? false : true);
-}
-
-RLM_API void realm_app_config_set_fifo_path(realm_config_t* realm_config, const char* fifo_path) noexcept
-{
-    realm_config->fifo_files_fallback_path = std::string(fifo_path);
-}
-
 RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
                                    const realm_sync_client_config_t* sync_client_config)
 {
