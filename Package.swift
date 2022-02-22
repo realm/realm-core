@@ -799,6 +799,7 @@ let package = Package(
             cxxSettings: ([
                 .headerSearchPath(".."),
                 .headerSearchPath("../../../external/catch/single_include"),
+                .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
@@ -824,6 +825,7 @@ let package = Package(
             cxxSettings: ([
                 .headerSearchPath("."),
                 .headerSearchPath("../../external/catch/single_include"),
+                .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting],
             linkerSettings: [
                 .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),

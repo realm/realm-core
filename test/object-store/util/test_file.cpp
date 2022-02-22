@@ -67,7 +67,7 @@ TestFile::TestFile()
     if (m_temp_dir.size() == 0 || m_temp_dir[m_temp_dir.size() - 1] != '/') {
         m_temp_dir = m_temp_dir + "/";
     }
-    path = util::format("%1realm.XXXXXX", m_temp_dir);
+    path = fs::path(util::format("%1realm.XXXXXX", m_temp_dir)).string();
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;
@@ -324,8 +324,13 @@ TestSyncManager::~TestSyncManager()
 {
     if (m_should_teardown_test_directory) {
         if (!m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
-            m_app->sync_manager()->reset_for_testing();
-            util::try_remove_dir_recursive(m_base_file_path);
+            try {
+                m_app->sync_manager()->reset_for_testing();
+                util::try_remove_dir_recursive(m_base_file_path);
+            }
+            catch (const std::exception& ex) {
+                std::cerr << ex.what() << "\n";
+            }
             app::App::clear_cached_apps();
         }
 #if REALM_ENABLE_AUTH_TESTS
