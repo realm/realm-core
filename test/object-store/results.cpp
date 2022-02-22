@@ -65,7 +65,7 @@ template <>
 struct StringMaker<realm::util::Optional<realm::util::Any>> {
     static std::string convert(realm::util::Optional<realm::util::Any> any)
     {
-        return any ? realm::util::format("some(Any<%1>)", any->type().name()) : "none";
+        return any ? "none" : realm::util::format("some(Any<%1>)", any->type().name());
     }
 };
 } // namespace Catch

@@ -43,10 +43,6 @@ template <>
 struct StringMaker<object_store::Dictionary> {
     static std::string convert(const object_store::Dictionary& dict)
     {
-        if (dict.size() == 0) {
-            return "{}";
-        }
-
         std::stringstream ss;
         ss << "{";
         for (auto [key, value] : dict) {
