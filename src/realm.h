@@ -2546,6 +2546,8 @@ RLM_API void realm_app_config_set_default_request_timeout(realm_app_config_t*, u
 RLM_API void realm_app_config_set_platform(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_in_memory(realm_config_t*, uint8_t) RLM_API_NOEXCEPT;
+RLM_API void realm_app_config_set_fifo_path(realm_config_t*, const char*) RLM_API_NOEXCEPT;
 
 /**
  * Get an existing @a realm_app_t* instance with the same app id, or create it with the
