@@ -564,8 +564,8 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age = 1 || age == 3", 2);
     verify_query(test_context, t, "fees = 1.2 || fees = 2.23", 1);
     verify_query(test_context, t, "fees = 2 || fees = 3", 1);
-    verify_query(test_context, t, "fees BETWEEN {2, 3}", 3);
-    verify_query(test_context, t, "fees BETWEEN {2.20, 2.25}", 2);
+    verify_query(test_context, t, "fees BETWEEN {2, 3}", 4);
+    verify_query(test_context, t, "fees BETWEEN {2.20, 2.25}", 3);
     verify_query(test_context, t, "fees = 2 || fees = 3 || fees = 4", 1);
     verify_query(test_context, t, "fees = 0 || fees = 1", 0);
 
@@ -3871,7 +3871,20 @@ TEST(Parser_Between)
     verify_query(test_context, table, "between > 0", 2);
     verify_query(test_context, table, "between <= 3", 3);
 
-    verify_query(test_context, table, "age between {20, 25}", 1);
+    verify_query(test_context, table, "age between {24, 26}", 3);
+
+    verify_query(test_context, table, "age between {20, 23}", 0);
+    verify_query(test_context, table, "age between {20, 24}", 1);
+    verify_query(test_context, table, "age between {20, 25}", 2);
+    verify_query(test_context, table, "age between {20, 26}", 3);
+    verify_query(test_context, table, "age between {20, 27}", 3);
+
+    verify_query(test_context, table, "age between {23, 30}", 3);
+    verify_query(test_context, table, "age between {24, 30}", 3);
+    verify_query(test_context, table, "age between {25, 30}", 2);
+    verify_query(test_context, table, "age between {26, 30}", 1);
+    verify_query(test_context, table, "age between {27, 30}", 0);
+
     CHECK_THROW_ANY(verify_query(test_context, table, "age between {20}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "age between {20, 25, 34}", 1));
 }
