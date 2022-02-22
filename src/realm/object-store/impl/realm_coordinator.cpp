@@ -455,8 +455,10 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
                                  util::format("File at path '%1' already exists.", ex.get_path()), ex.what());
     }
     catch (util::File::NotFound const& ex) {
-        throw RealmFileException(RealmFileException::Kind::NotFound, ex.get_path(),
-                                 util::format("Directory at path '%1' does not exist.", ex.get_path()), ex.what());
+        throw RealmFileException(
+            RealmFileException::Kind::NotFound, ex.get_path(),
+            util::format("'%1' at path '%2' does not exist.", immutable ? "File" : "Directory", ex.get_path()),
+            ex.what());
     }
     catch (FileFormatUpgradeRequired const& ex) {
         throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
