@@ -7,8 +7,8 @@
 #include "realm/sync/protocol.hpp"
 #include "realm/sync/transform.hpp"
 #include "realm/sync/changeset_parser.hpp"
-#include "realm/sync/noinst/compression.hpp"
 #include "realm/util/cli_args.hpp"
+#include "realm/util/compression.hpp"
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
 
@@ -114,8 +114,8 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     if (is_body_compressed) {
         uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
-        std::error_code ec = _impl::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                            uncompressed_body_buffer.get(), uncompressed_body_size);
+        std::error_code ec = util::compression::decompress(compressed_body.data(), compressed_body.size(),
+                                                           uncompressed_body_buffer.get(), uncompressed_body_size);
 
         if (ec) {
             throw ProtocolCodecException("error decompressing download message");
@@ -169,8 +169,8 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
 
-        std::error_code ec = _impl::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                            uncompressed_body_buffer.get(), uncompressed_body_size);
+        std::error_code ec = util::compression::decompress(compressed_body.data(), compressed_body.size(),
+                                                           uncompressed_body_buffer.get(), uncompressed_body_size);
 
         if (ec) {
             throw ProtocolCodecException("error decompressing upload message");

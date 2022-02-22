@@ -1,6 +1,25 @@
+/*************************************************************************
+ *
+ * Copyright 2022 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
-#ifndef REALM_NOINST_COMPRESSION_HPP
-#define REALM_NOINST_COMPRESSION_HPP
+#ifndef REALM_UTIL_COMPRESSION_HPP
+#define REALM_UTIL_COMPRESSION_HPP
+
+#include <realm/binary_data.hpp>
 
 #include <array>
 #include <memory>
@@ -10,9 +29,7 @@
 #include <string>
 #include <vector>
 
-#include <realm/binary_data.hpp>
-
-namespace realm::_impl::compression {
+namespace realm::util::compression {
 
 enum class error {
     out_of_memory = 1,
@@ -27,18 +44,18 @@ const std::error_category& error_category() noexcept;
 
 std::error_code make_error_code(error) noexcept;
 
-} // namespace realm::_impl::compression
+} // namespace realm::util::compression
 
 namespace std {
 
 template <>
-struct is_error_code_enum<realm::_impl::compression::error> {
+struct is_error_code_enum<realm::util::compression::error> {
     static const bool value = true;
 };
 
 } // namespace std
 
-namespace realm::_impl::compression {
+namespace realm::util::compression {
 
 class Alloc {
 public:
@@ -127,6 +144,6 @@ std::error_code decompress(const char* compressed_buf, size_t compressed_size, c
 size_t allocate_and_compress(CompressMemoryArena& compress_memory_arena, BinaryData uncompressed_buf,
                              std::vector<char>& compressed_buf);
 
-} // namespace realm::_impl::compression
+} // namespace realm::util::compression
 
-#endif // REALM_NOINST_COMPRESSION_HPP
+#endif // REALM_UTIL_COMPRESSION_HPP

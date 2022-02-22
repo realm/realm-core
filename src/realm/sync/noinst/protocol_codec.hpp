@@ -7,20 +7,20 @@
 #include <vector>
 #include <string>
 
-#include <realm/util/optional.hpp>
-#include <realm/util/memory_stream.hpp>
 #include <realm/util/buffer_stream.hpp>
+#include <realm/util/compression.hpp>
 #include <realm/util/from_chars.hpp>
 #include <realm/util/logger.hpp>
+#include <realm/util/memory_stream.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/chunked_binary.hpp>
+#include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/history.hpp>
 #include <realm/sync/impl/clamped_hex_dump.hpp>
-#include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/transform.hpp>
-#include <realm/sync/changeset_parser.hpp>
-#include <realm/sync/history.hpp>
 
 namespace realm::_impl {
 struct ProtocolCodecException : public std::runtime_error {
@@ -180,7 +180,7 @@ public:
         util::Logger& logger;
 
         UploadMessageBuilder(util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
-                             _impl::compression::CompressMemoryArena& compress_memory_arena);
+                             util::compression::CompressMemoryArena& compress_memory_arena);
 
         void add_changeset(version_type client_version, version_type server_version, timestamp_type origin_timestamp,
                            file_ident_type origin_file_ident, ChunkedBinaryData changeset);
@@ -193,7 +193,7 @@ public:
         std::size_t m_num_changesets = 0;
         OutputBuffer& m_body_buffer;
         std::vector<char>& m_compression_buffer;
-        _impl::compression::CompressMemoryArena& m_compress_memory_arena;
+        util::compression::CompressMemoryArena& m_compress_memory_arena;
     };
 
     UploadMessageBuilder make_upload_message_builder(util::Logger& logger);
@@ -329,7 +329,7 @@ private:
         // if is_body_compressed == true, we must decompress the received body.
         if (is_body_compressed) {
             uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
-            std::error_code ec = _impl::compression::decompress(
+            std::error_code ec = util::compression::decompress(
                 msg.remaining().data(), compressed_body_size, uncompressed_body_buffer.get(), uncompressed_body_size);
 
             if (ec) {
@@ -408,7 +408,7 @@ private:
     // Permanent buffers to use for internal purposes such as compression.
     std::vector<char> m_buffer;
 
-    _impl::compression::CompressMemoryArena m_compress_memory_arena;
+    util::compression::CompressMemoryArena m_compress_memory_arena;
 };
 
 
@@ -551,8 +551,8 @@ public:
                     auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
 
                     std::error_code ec =
-                        _impl::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                       uncompressed_body_buffer.get(), uncompressed_body_size);
+                        util::compression::decompress(compressed_body.data(), compressed_body.size(),
+                                                      uncompressed_body_buffer.get(), uncompressed_body_size);
 
                     if (ec) {
                         return report_error(Error::bad_decompression, "compression::inflate: %1", ec.message());

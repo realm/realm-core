@@ -3,17 +3,13 @@
 #include "util/compare_groups.hpp"
 #include "util/crypt_key.hpp"
 
-#include <realm/sync/noinst/compression.hpp>
-#include <realm/sync/history.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
+#include <realm/util/compression.hpp>
 
 #include <algorithm>
 #include <cstring>
 
 using namespace realm;
 using namespace realm::util;
-using namespace realm::sync;
-using namespace realm::_impl;
 using namespace realm::test_util;
 
 namespace {

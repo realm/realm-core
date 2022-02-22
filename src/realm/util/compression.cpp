@@ -1,4 +1,22 @@
-#include <realm/sync/noinst/compression.hpp>
+/*************************************************************************
+ *
+ * Copyright 2022 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
+#include <realm/util/compression.hpp>
 
 #include <realm/util/assert.hpp>
 
@@ -15,11 +33,11 @@ class ErrorCategoryImpl : public std::error_category {
 public:
     const char* name() const noexcept override final
     {
-        return "realm::_impl::compression::error";
+        return "realm::util::compression::error";
     }
     std::string message(int err) const override final
     {
-        using error = realm::_impl::compression::error;
+        using error = realm::util::compression::error;
         error e = error(err);
         switch (e) {
             case error::out_of_memory:
@@ -43,7 +61,7 @@ ErrorCategoryImpl g_error_category;
 
 void* custom_alloc(void* opaque, unsigned int cnt, unsigned int size)
 {
-    using Alloc = realm::_impl::compression::Alloc;
+    using Alloc = realm::util::compression::Alloc;
     Alloc& alloc = *static_cast<Alloc*>(opaque);
     std::size_t accum_size = cnt * std::size_t(size);
     return alloc.alloc(accum_size);
@@ -51,7 +69,7 @@ void* custom_alloc(void* opaque, unsigned int cnt, unsigned int size)
 
 void custom_free(void* opaque, void* addr)
 {
-    using Alloc = realm::_impl::compression::Alloc;
+    using Alloc = realm::util::compression::Alloc;
     Alloc& alloc = *static_cast<Alloc*>(opaque);
     return alloc.free(addr);
 }
@@ -60,7 +78,7 @@ void custom_free(void* opaque, void* addr)
 
 
 using namespace realm;
-using namespace _impl;
+using namespace util;
 
 const std::error_category& compression::error_category() noexcept
 {

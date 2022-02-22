@@ -73,6 +73,7 @@ set(UTIL_SOURCES
     util/base64.cpp
     util/basic_system_errors.cpp
     util/cli_args.cpp
+    util/compression.cpp
     util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
     util/file.cpp
@@ -219,6 +220,7 @@ set(REALM_INSTALL_HEADERS
     util/call_with_tuple.hpp
     util/cf_ptr.hpp
     util/checked_mutex.hpp
+    util/compression.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
     util/features.h
@@ -328,6 +330,15 @@ target_link_libraries(Storage INTERFACE Threads::Threads)
 
 if(UNIX AND NOT APPLE)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
+endif()
+
+# Use Zlib if the imported target is defined, otherise use -lz on Apple platforms
+if(TARGET ZLIB::ZLIB)
+    target_link_libraries(Storage PUBLIC ZLIB::ZLIB)
+elseif(APPLE)
+    target_link_options(Storage PUBLIC "-lz")
+else()
+    message(FATAL_ERROR "No zlib dependency defined")
 endif()
 
 install(TARGETS Storage EXPORT realm

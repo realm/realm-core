@@ -54,7 +54,7 @@ void ClientProtocol::make_query_change_message(OutputBuffer& out, session_ident_
 
 ClientProtocol::UploadMessageBuilder::UploadMessageBuilder(
     util::Logger& logger, OutputBuffer& body_buffer, std::vector<char>& compression_buffer,
-    _impl::compression::CompressMemoryArena& compress_memory_arena)
+    util::compression::CompressMemoryArena& compress_memory_arena)
     : logger{logger}
     , m_body_buffer{body_buffer}
     , m_compression_buffer{compression_buffer}
@@ -89,8 +89,8 @@ void ClientProtocol::UploadMessageBuilder::make_upload_message(int protocol_vers
     constexpr std::size_t g_max_uncompressed = 1024;
 
     if (body.size() > g_max_uncompressed) {
-        compressed_body_size = _impl::compression::allocate_and_compress(m_compress_memory_arena, body,
-                                                                         m_compression_buffer); // Throws
+        compressed_body_size = util::compression::allocate_and_compress(m_compress_memory_arena, body,
+                                                                        m_compression_buffer); // Throws
     }
 
     // The compressed body is only sent if it is smaller than the uncompressed body.
@@ -140,8 +140,8 @@ void ClientProtocol::make_ping(OutputBuffer& out, milliseconds_type timestamp, m
 std::string ClientProtocol::compressed_hex_dump(BinaryData blob)
 {
     std::vector<char> buf;
-    size_t sz = _impl::compression::allocate_and_compress(m_compress_memory_arena, blob,
-                                                          buf); // Throws
+    size_t sz = util::compression::allocate_and_compress(m_compress_memory_arena, blob,
+                                                         buf); // Throws
 
     util::StringBuffer encode_buffer;
     auto encoded_size = util::base64_encoded_size(sz);

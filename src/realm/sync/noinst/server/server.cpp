@@ -7,7 +7,6 @@
 #include <realm/sync/impl/clamped_hex_dump.hpp>
 #include <realm/sync/impl/clock.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/sync/noinst/compression.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
 #include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
@@ -20,6 +19,7 @@
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/circular_buffer.hpp>
+#include <realm/util/compression.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/http.hpp>
 #include <realm/util/json_parser.hpp>
@@ -988,7 +988,7 @@ public:
         return m_server_protocol;
     }
 
-    _impl::compression::CompressMemoryArena& get_compress_memory_arena() noexcept
+    compression::CompressMemoryArena& get_compress_memory_arena() noexcept
     {
         return m_compress_memory_arena;
     }
@@ -1222,7 +1222,7 @@ private:
     std::map<std::int_fast64_t, std::unique_ptr<HTTPConnection>> m_http_connections;
     std::map<std::int_fast64_t, std::unique_ptr<SyncConnection>> m_sync_connections;
     ServerProtocol m_server_protocol;
-    _impl::compression::CompressMemoryArena m_compress_memory_arena;
+    compression::CompressMemoryArena m_compress_memory_arena;
     MiscBuffers m_misc_buffers;
     std::unique_ptr<Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
@@ -3423,10 +3423,10 @@ private:
                     body = uncompressed.data();
                     std::size_t max_uncompressed = 1024;
                     if (uncompressed.size() > max_uncompressed) {
-                        _impl::compression::CompressMemoryArena& arena = server.get_compress_memory_arena();
+                        compression::CompressMemoryArena& arena = server.get_compress_memory_arena();
                         std::vector<char>& buffer = server.get_misc_buffers().compress;
-                        std::size_t size = _impl::compression::allocate_and_compress(arena, uncompressed,
-                                                                                     buffer); // Throws
+                        std::size_t size = compression::allocate_and_compress(arena, uncompressed,
+                                                                              buffer); // Throws
                         if (size < uncompressed.size()) {
                             body = buffer.data();
                             compressed_body_size = size;
