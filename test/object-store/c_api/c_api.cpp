@@ -423,6 +423,16 @@ TEST_CASE("C API (non-database)") {
             realm_config_set_max_number_of_active_versions(config.get(), 999);
             CHECK(realm_config_get_max_number_of_active_versions(config.get()) == 999);
         }
+
+        SECTION("realm_config_set_in_memory()") {
+            realm_config_set_in_memory(config.get(), true);
+            CHECK(realm_config_get_in_memory(config.get()) == true);
+        }
+
+        SECTION("realm_config_set_fifo_path()") {
+            realm_config_set_fifo_path(config.get(), "test_path.FIFO");
+            CHECK(std::string{realm_config_get_fifo_path(config.get())} == "test_path.FIFO");
+        }
     }
 }
 
