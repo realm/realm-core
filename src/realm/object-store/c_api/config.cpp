@@ -176,3 +176,23 @@ RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t* conf
 {
     config->max_number_of_active_versions = uint_fast64_t(n);
 }
+
+RLM_API void realm_config_set_in_memory(realm_config_t* realm_config, bool value) noexcept
+{
+    realm_config->in_memory = value;
+}
+
+RLM_API bool realm_config_get_in_memory(realm_config_t* realm_config) noexcept
+{
+    return realm_config->in_memory;
+}
+
+RLM_API void realm_config_set_fifo_path(realm_config_t* realm_config, const char* fifo_path)
+{
+    realm_config->fifo_files_fallback_path = fifo_path;
+}
+
+RLM_API const char* realm_config_get_fifo_path(realm_config_t* realm_config) noexcept
+{
+    return realm_config->fifo_files_fallback_path.c_str();
+}

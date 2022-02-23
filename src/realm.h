@@ -741,6 +741,26 @@ RLM_API uint64_t realm_config_get_max_number_of_active_versions(const realm_conf
 RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, uint64_t);
 
 /**
+ * Configure realm to be in memory
+ */
+RLM_API void realm_config_set_in_memory(realm_config_t*, bool) RLM_API_NOEXCEPT;
+
+/**
+ * Check if realm is configured in memory
+ */
+RLM_API bool realm_config_get_in_memory(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Set FIFO path
+ */
+RLM_API void realm_config_set_fifo_path(realm_config_t*, const char*);
+
+/**
+ Check realm FIFO path
+ */
+RLM_API const char* realm_config_get_fifo_path(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
  * Create a custom scheduler object from callback functions.
  *
  * @param userdata Pointer passed to all callbacks.
