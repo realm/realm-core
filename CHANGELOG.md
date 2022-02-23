@@ -7,6 +7,8 @@
 * realm_query_get_description added to the C-API. ([#5106](https://github.com/realm/realm-core/issues/5106))
 * `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
 * Added `realm_get_schema_version` to the C-API. ([#5236](https://github.com/realm/realm-core/issues/5236))
+* Added support for configuring 'in_memory' option in C-API. ([#5249](https://github.com/realm/realm-core/issues/5249))
+* Added support for configuring 'custom FIFO file paths' in C-API. ([#5250](https://github.com/realm/realm-core/issues/5250))
 
 ### Fixed
 * If a list of objects contains links to objects not included in the synchronized partition, the indices contained in CollectionChangeSet for that list may be wrong ([#5164](https://github.com/realm/realm-core/issues/5164), since v10.0.0)
