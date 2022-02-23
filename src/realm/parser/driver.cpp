@@ -507,8 +507,8 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     ValueNode min(limits->elements.at(0));
     ValueNode max(limits->elements.at(1));
-    RelationalNode cmp1(prop, CompareNode::GREATER, &min);
-    RelationalNode cmp2(prop, CompareNode::LESS, &max);
+    RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, &min);
+    RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, &max);
     AndNode and_node(&cmp1, &cmp2);
 
     return and_node.visit(drv);
