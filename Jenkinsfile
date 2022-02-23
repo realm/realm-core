@@ -123,6 +123,7 @@ jobWrapper {
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+            buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
             buildiosDebug           : doBuildAppleDevice('iphoneos', 'Debug'),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
@@ -184,7 +185,7 @@ jobWrapper {
             }
 
             windowsBuildTypes = ['Debug', 'Release']
-            windowsPlatforms = ['Win32', 'x64']
+            windowsPlatforms = ['Win32', 'x64', 'ARM64']
 
             for (buildType in windowsBuildTypes) {
                 for (platform in windowsPlatforms) {
@@ -553,6 +554,8 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       CMAKE_TOOLCHAIN_FILE: '%WORKSPACE%/tools/vcpkg/ports/scripts/buildsystems/vcpkg.cmake',
       VCPKG_MANIFEST_DIR: '%WORKSPACE%/tools/vcpkg',
       VCPKG_OVERLAY_TRIPLETS: '%WORKSPACE%/tools/vcpkg/triplets',
+      // set a custom buildtrees path because the default one is too long and msbuild tasks fail
+      VCPKG_INSTALL_OPTIONS: '--x-buildtrees-root=%WORKSPACE%/vcpkg-buildtrees',
       VCPKG_TARGET_TRIPLET: triplet,
     ]
 
