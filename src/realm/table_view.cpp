@@ -402,7 +402,8 @@ size_t TableView::count_mixed(ColKey column_key, Mixed target) const
 }
 
 
-void TableView::to_json(std::ostream& out, size_t link_depth) const
+void TableView::to_json(std::ostream& out, size_t link_depth, const std::map<std::string, std::string>& renames,
+                        JSONOutputMode mode) const
 {
     // Represent table as list of objects
     out << "[";
@@ -417,7 +418,7 @@ void TableView::to_json(std::ostream& out, size_t link_depth) const
             else {
                 out << ",";
             }
-            m_table->get_object(key).to_json(out, link_depth, {}, output_mode_json);
+            m_table->get_object(key).to_json(out, link_depth, renames, mode);
         }
     }
 
