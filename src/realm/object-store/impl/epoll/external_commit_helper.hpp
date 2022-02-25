@@ -70,6 +70,7 @@ private:
     // Read-write file descriptor for the named pipe which is waited on for
     // changes and written to when a commit is made
     FdHolder m_notify_fd;
+    FdHolder m_notify_fd_write;
 };
 
 } // namespace _impl

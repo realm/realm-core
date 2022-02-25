@@ -295,7 +295,8 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
-    if (!try_create_fifo(m_resource_path)) {
+    bool fifo_created = try_create_fifo(m_resource_path);
+    if (!fifo_created) {
         // Filesystem doesn't support named pipes, so try putting it in tmp_dir instead
         // Hash collisions are okay here because they just result in doing
         // extra work, as opposed to correctness problems.
@@ -303,13 +304,26 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         ss << normalize_dir(tmp_path);
         ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
         m_resource_path = ss.str();
-        create_fifo(m_resource_path);
+        fifo_created = try_create_fifo(m_resource_path);
     }
-    m_fd_read = open(m_resource_path.c_str(), O_RDWR);
-    if (m_fd_read == -1) {
-        throw std::system_error(errno, std::system_category());
+    if (fifo_created) {
+        m_fd_read = open(m_resource_path.c_str(), O_RDWR);
+        if (m_fd_read == -1) {
+            throw std::system_error(errno, std::system_category());
+        }
+        m_fd_write = -1;
     }
-    m_fd_write = -1;
+    else {
+        // named pipe could not be created, fallback to anonymous pipe
+        int notification_pipe[2];
+        int ret = pipe(notification_pipe);
+        if (ret == -1) {
+            throw std::system_error(errno, std::system_category());
+        }
+
+        m_fd_read = notification_pipe[0];
+        m_fd_write = notification_pipe[1];
+    }
 
 #else // !REALM_TVOS
 

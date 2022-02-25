@@ -64,13 +64,13 @@ void make_non_blocking(int fd)
 // But first consume all bytes in the pipe, since linux may only notify on transition from not ready to ready.
 // If a process dies after reading but before writing, it can consume a pending notification, and possibly prevent
 // other processes from observing it. This is a transient issue and the next notification will work correctly.
-void notify_fd(int fd, bool read_first = true)
+void notify_fd(int fd, int read_fd, bool read_first = true)
 {
     while (true) {
         if (read_first) {
             while (true) {
                 uint8_t buff[1024];
-                ssize_t actual = read(fd, buff, sizeof(buff));
+                ssize_t actual = read(read_fd, buff, sizeof(buff));
                 if (actual == 0) {
                     break; // Not sure why we would see EOF here, but defer error handling to the writer.
                 }
@@ -170,12 +170,21 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
         path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(parent.get_path()));
-        util::create_fifo(path);
+        fifo_created = util::try_create_fifo(path);
     }
+    if (fifo_created) {
+        m_notify_fd = open(path.c_str(), O_RDWR);
+    }
+    else {
+        // named pipe could not be created, fallback to anonymous pipe
+        int notification_pipe[2];
+        int ret = pipe(notification_pipe);
+        if (ret == -1) {
+            throw std::system_error(errno, std::system_category());
+        }
 
-    m_notify_fd = open(path.c_str(), O_RDWR);
-    if (m_notify_fd == -1) {
-        throw std::system_error(errno, std::system_category());
+        m_notify_fd = notification_pipe[0];
+        m_notify_fd_write = notification_pipe[1];
     }
 
     make_non_blocking(m_notify_fd);
@@ -238,7 +247,7 @@ ExternalCommitHelper::DaemonThread::~DaemonThread()
 {
     // Not reading first since we know we have never written, and it is illegal to read from the write-side of the
     // pipe. Unlike a fifo, where in and out sides share an fd, with an anonymous pipe, they each have a dedicated fd.
-    notify_fd(m_shutdown_write_fd, /*read_first=*/false);
+    notify_fd(m_shutdown_write_fd, m_shutdown_write_fd, /*read_first=*/false);
     m_thread.join(); // Wait for the thread to exit
 }
 
@@ -323,5 +332,10 @@ void ExternalCommitHelper::DaemonThread::listen()
 
 void ExternalCommitHelper::notify_others()
 {
-    notify_fd(m_notify_fd);
+    if (m_notify_fd_write != -1) {
+        notify_fd(m_notify_fd_write, m_notify_fd);
+    }
+    else {
+        notify_fd(m_notify_fd, m_notify_fd);
+    }
 }
