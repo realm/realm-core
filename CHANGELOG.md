@@ -8,6 +8,7 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * The Swift package set the linker flags on the wrong target, resulting in linker errors when SPM decides to build the core library as a dynamic library ([Swift #7266](https://github.com/realm/realm-swift/issues/7266)).
 * Wrong error code returned from C-API on MacOS ([#5233](https://github.com/realm/realm-core/issues/5233), since v10.0.0)
+* Mixed::compare() used inconsistent rounding for comparing a Decimal128 to a float, giving different results from comparing those values directly ([#5270](https://github.com/realm/realm-core/pull/5270)).
  
 ### Breaking changes
 * None.
