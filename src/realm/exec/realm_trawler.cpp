@@ -28,6 +28,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstring>
 
 constexpr const int signature = 0x41414141;
 uint64_t current_logical_file_size;
@@ -469,7 +470,7 @@ void Table::print_columns(const Group& group) const
             type_str = "->";
             if (col_key) {
                 // core6
-                realm::TableKey opposite_table_key(m_opposite_table.get_val(col_key.get_index().val));
+                realm::TableKey opposite_table_key(uint32_t(m_opposite_table.get_val(col_key.get_index().val)));
                 target_table_ndx = opposite_table_key.value & 0xFFFF;
             }
             else {
