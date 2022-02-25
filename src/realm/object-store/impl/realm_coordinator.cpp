@@ -457,7 +457,7 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
     catch (util::File::NotFound const& ex) {
         throw RealmFileException(
             RealmFileException::Kind::NotFound, ex.get_path(),
-            util::format("'%1' at path '%2' does not exist.", immutable ? "File" : "Directory", ex.get_path()),
+            util::format("%1 at path '%2' does not exist.", immutable ? "File" : "Directory", ex.get_path()),
             ex.what());
     }
     catch (FileFormatUpgradeRequired const& ex) {
