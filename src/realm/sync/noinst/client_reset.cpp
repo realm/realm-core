@@ -28,6 +28,7 @@
 
 #include <realm/util/flat_map.hpp>
 
+#include <algorithm>
 #include <vector>
 
 using namespace realm;
@@ -508,17 +509,21 @@ void EmbeddedObjectConverter::process_pending()
 }
 
 struct ListTracker {
-    bool insert(uint32_t local_index, size_t remote_list_size, uint32_t& remote_index_out)
+
+    struct CrossListIndex {
+        uint32_t local;
+        uint32_t remote;
+        size_t stable_id;
+    };
+
+    util::Optional<CrossListIndex> insert(uint32_t local_index, size_t remote_list_size)
     {
         if (m_requires_manual_copy) {
-            return false;
+            return util::none;
         }
-        remote_index_out = local_index;
-        if (m_did_clear) {
-            return true;
-        }
-        if (remote_index_out > remote_list_size) {
-            remote_index_out = static_cast<uint32_t>(remote_list_size);
+        uint32_t remote_index = local_index;
+        if (remote_index > remote_list_size) {
+            remote_index = static_cast<uint32_t>(remote_list_size);
         }
         for (auto& ndx : m_indices_allowed) {
             if (ndx.local >= local_index) {
@@ -526,34 +531,43 @@ struct ListTracker {
                 ++ndx.remote;
             }
         }
-        m_indices_allowed.push_back(IndexPair{local_index, remote_index_out});
-        return true;
+        CrossListIndex inserted{local_index, remote_index, ++m_stable_id_counter};
+        m_indices_allowed.push_back(inserted);
+        return inserted;
     }
 
-    bool update(uint32_t index, uint32_t& remote_index_out, bool is_embedded = false)
+    util::Optional<CrossListIndex> find_stable_id(size_t id)
     {
         if (m_requires_manual_copy) {
-            return false;
+            return util::none;
         }
-        remote_index_out = index;
-        if (m_did_clear) {
-            return true;
+        for (auto& ndx : m_indices_allowed) {
+            if (ndx.stable_id == id) {
+                return ndx;
+            }
+        }
+        return util::none;
+    }
+
+    util::Optional<CrossListIndex> update(uint32_t index, bool is_embedded = false)
+    {
+        if (m_requires_manual_copy) {
+            return util::none;
         }
         for (auto& ndx : m_indices_allowed) {
             if (ndx.local == index) {
-                remote_index_out = ndx.remote;
-                return true;
+                return ndx;
             }
         }
         if (!is_embedded) {
             m_requires_manual_copy = true;
-            m_indices_allowed.clear();
         }
-        return false;
+        return util::none;
     }
 
     void clear()
     {
+        // FIXME: check for optimizations here
         // any local operations to a list after a clear are
         // strictly on locally added elements so no need to continue tracking
         m_requires_manual_copy = false;
@@ -568,64 +582,60 @@ struct ListTracker {
         }
         remote_from_out = from;
         remote_to_out = to;
-        if (m_did_clear) {
-            return true;
+
+        // Only allow move operations that operate on known indices.
+        // This requires that both local elements 'from' and 'to' are known.
+        auto target_from = m_indices_allowed.end();
+        auto target_to = m_indices_allowed.end();
+        for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
+            if (it->local == from) {
+                REALM_ASSERT(target_from == m_indices_allowed.end());
+                target_from = it;
+            }
+            else if (it->local == to) {
+                REALM_ASSERT(target_to == m_indices_allowed.end());
+                target_to = it;
+            }
         }
-        //        if (from >= lst_size || to >= lst_size) {
-        //            m_requires_manual_copy = true;
-        //            m_indices_allowed.clear();
-        //            return false;
-        //        }
+        if (target_from == m_indices_allowed.end() || target_to == m_indices_allowed.end()) {
+            m_requires_manual_copy = true;
+            m_indices_allowed.clear();
+            return false;
+        }
+        REALM_ASSERT_EX(target_from->remote <= lst_size, from, to, target_from->remote, target_to->remote, lst_size);
+        REALM_ASSERT_EX(target_to->remote <= lst_size, from, to, target_from->remote, target_to->remote, lst_size);
+
         if (from == to) {
-            // not sure if this is possible, but it is a no-op
-            return true;
+            // we shouldn't be generating an instruction for this case, but it is a no-op
+            return true; // LCOV_EXCL_LINE
         }
         else if (from < to) {
-            auto target = m_indices_allowed.end();
             for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
-                if (it->local == from) {
-                    REALM_ASSERT(target == m_indices_allowed.end());
-                    target = it;
-                }
-                else if (it->local > from && it->local <= to) {
+                if (it->local > from && it->local <= to) {
                     REALM_ASSERT(it->local != 0);
                     REALM_ASSERT(it->remote != 0);
                     --it->local;
                     --it->remote;
                 }
             }
-            if (target == m_indices_allowed.end() || target->remote + (to - from) >= lst_size) {
-                m_requires_manual_copy = true;
-                m_indices_allowed.clear();
-                return false;
-            }
-            remote_from_out = target->remote;
-            remote_to_out = target->remote + (to - from);
-            target->local = to;
-            target->remote = target->remote + (to - from);
+            remote_from_out = target_from->remote;
+            remote_to_out = target_to->remote + 1;
+            target_from->local = target_to->local + 1;
+            target_from->remote = target_to->remote + 1;
             return true;
         }
         else { // from > to
-            auto target = m_indices_allowed.end();
             for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
-                if (it->local == from) {
-                    REALM_ASSERT(target == m_indices_allowed.end());
-                    target = it;
-                }
-                else if (it->local < from && it->local >= to) {
+                if (it->local < from && it->local >= to) {
+                    REALM_ASSERT_EX(it->remote + 1 < lst_size, it->remote, lst_size);
                     ++it->local;
                     ++it->remote;
                 }
             }
-            if (target == m_indices_allowed.end() || target->remote < (from - to)) {
-                m_requires_manual_copy = true;
-                m_indices_allowed.clear();
-                return false;
-            }
-            remote_from_out = target->remote;
-            remote_to_out = target->remote - (from - to);
-            target->local = to;
-            target->remote = target->remote - (from - to);
+            remote_from_out = target_from->remote;
+            remote_to_out = target_to->remote - 1;
+            target_from->local = target_to->local - 1;
+            target_from->remote = target_to->remote - 1;
             return true;
         }
         REALM_UNREACHABLE();
@@ -638,9 +648,6 @@ struct ListTracker {
             return false;
         }
         remote_index_out = index;
-        if (m_did_clear) {
-            return true;
-        }
         bool found = false;
         for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end();) {
             if (it->local == index) {
@@ -669,76 +676,218 @@ struct ListTracker {
     }
 
 private:
-    struct IndexPair {
-        uint32_t local;
-        uint32_t remote;
-    };
-    std::vector<IndexPair> m_indices_allowed;
+    std::vector<CrossListIndex> m_indices_allowed;
     bool m_requires_manual_copy = false;
     bool m_did_clear = false;
+    size_t m_stable_id_counter = 0;
 };
 
-// Allow access to resolve a list object via a PathInstruction.
-// The changeset is also needed in order to translate InternStrings along the path.
-struct PathResolver : protected InstructionApplier {
-    PathResolver(Transaction& state, const Changeset& changeset, util::Logger* logger)
-        : InstructionApplier(state)
-    {
-        InstructionApplier::begin_apply(changeset, logger);
+std::unique_ptr<LstBase> get_list_from_path(Obj& obj, ColKey col)
+{
+    // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
+    // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
+    // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
+    // links.
+    REALM_ASSERT(col.is_list());
+    std::unique_ptr<LstBase> list;
+    if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
+        auto table = obj.get_table();
+        if (!table->get_link_target(col)->is_embedded()) {
+            list = obj.get_list_ptr<ObjKey>(col);
+        }
+        else {
+            list = obj.get_listbase_ptr(col);
+        }
     }
-    void resolve_if_list(const instr::PathInstruction& instr, const char* instr_name,
-                         util::UniqueFunction<void(LstBase&)> callback)
-    {
-        InstructionApplier::resolve_if_list(instr, instr_name, std::move(callback));
+    else {
+        list = obj.get_listbase_ptr(col);
     }
-    std::string print(const instr::PathInstruction& instr) const
+    return list;
+}
+
+struct InternDictKey {
+    size_t pos = realm::npos;
+    size_t size = realm::npos;
+    bool is_null() const
     {
-        return InstructionApplier::print(instr);
+        return pos == realm::npos && size == realm::npos;
     }
+    constexpr bool operator==(const InternDictKey& other) const noexcept
+    {
+        return pos == other.pos && size == other.size;
+    }
+    constexpr bool operator!=(const InternDictKey& other) const noexcept
+    {
+        return !operator==(other);
+    }
+    constexpr bool operator<(const InternDictKey& other) const noexcept
+    {
+        if (pos < other.pos) {
+            return true;
+        }
+        else if (pos == other.pos) {
+            return size < other.size;
+        }
+        return false;
+    }
+};
+
+struct InterningBuffer {
+    StringData get_key(const InternDictKey& key) const
+    {
+        if (key.is_null()) {
+            return {};
+        }
+        if (key.size == 0) {
+            return "";
+        }
+        REALM_ASSERT(key.pos < m_dict_keys_buffer.size());
+        REALM_ASSERT(key.pos + key.size <= m_dict_keys_buffer.size());
+        return StringData{m_dict_keys_buffer.data() + key.pos, key.size};
+    }
+
+    InternDictKey get_or_add(const StringData& str)
+    {
+        for (auto& key : m_dict_keys) {
+            StringData existing = get_key(key);
+            if (existing == str) {
+                return key;
+            }
+        }
+        InternDictKey new_key{};
+        if (str.is_null()) {
+            m_dict_keys.push_back(new_key);
+        }
+        else {
+            size_t next_pos = m_dict_keys_buffer.size();
+            new_key.pos = next_pos;
+            new_key.size = str.size();
+            m_dict_keys_buffer.append(str);
+            m_dict_keys.push_back(new_key);
+        }
+        return new_key;
+    }
+    InternDictKey get_interned_key(const StringData& str) const
+    {
+        if (str.is_null()) {
+            return {};
+        }
+        for (auto& key : m_dict_keys) {
+            StringData existing = get_key(key);
+            if (existing == str) {
+                return key;
+            }
+        }
+        REALM_UNREACHABLE();
+        return {};
+    }
+    std::string print() const
+    {
+        return util::format("InterningBuffer of size=%1:'%2'", m_dict_keys.size(), m_dict_keys_buffer);
+    }
+
+private:
+    std::string m_dict_keys_buffer;
+    std::vector<InternDictKey> m_dict_keys;
 };
 
 // A wrapper around a PathInstruction which enables storing this path in a
-// FlatMap or other container as a unique item while also providing the
-// local path as an incidental.
+// FlatMap or other container. The advantage of using this instead of a PathInstruction
+// is the use of ColKey instead of column names and that because it is not possible to use
+// the InternStrings of a PathInstruction because they are tied to a specific Changeset, and
+// while the ListPath can be used across multiple Changesets.
 struct ListPath {
-    ListPath(const instr::PathInstruction& r, const instr::PathInstruction& l)
-        : remote(r)
-        , local(l)
+    ListPath(TableKey table_key, ObjKey obj_key)
+        : m_table_key(table_key)
+        , m_obj_key(obj_key)
     {
-        // remove the index at the end if present, we only want the path to the list itself
-        if (remote.path.size() > 0 && remote.path.is_array_index()) {
-            remote.path.m_path.erase(remote.path.m_path.end() - 1);
-        }
-        if (local.path.size() > 0 && local.path.is_array_index()) {
-            local.path.m_path.erase(local.path.m_path.end() - 1);
-        }
     }
-    instr::PathInstruction remote;
-    instr::PathInstruction local;
-    // the following operators are required for storing in a FlatMap
-    // and we only care about checking the remote path for uniqueness
-    bool operator<(const ListPath& other) const
-    {
-        if (remote.table < other.remote.table || remote.object < other.remote.object ||
-            remote.field < other.remote.field || remote.path.size() < other.remote.path.size()) {
-            return true;
+
+    struct Element {
+        Element(size_t stable_ndx)
+            : index(stable_ndx)
+            , type(Type::ListIndex)
+        {
         }
-        if (remote.path.size() == other.remote.path.size()) {
-            for (size_t i = 0; i < remote.path.size(); ++i) {
-                if (remote.path[i] < other.remote.path[i]) {
-                    return true;
+        Element(const InternDictKey& str)
+            : intern_key(str)
+            , type(Type::InternKey)
+        {
+        }
+        Element(ColKey key)
+            : col_key(key)
+            , type(Type::ColumnKey)
+        {
+        }
+        union {
+            InternDictKey intern_key;
+            size_t index;
+            ColKey col_key;
+        };
+        enum class Type {
+            InternKey,
+            ListIndex,
+            ColumnKey,
+        } type;
+        bool operator==(const Element& other) const
+        {
+            if (type == other.type) {
+                switch (type) {
+                    case Type::InternKey:
+                        return intern_key == other.intern_key;
+                    case Type::ListIndex:
+                        return index == other.index;
+                    case Type::ColumnKey:
+                        return col_key == other.col_key;
                 }
             }
+            return false;
         }
-        return false;
+        bool operator!=(const Element& other) const
+        {
+            return !(operator==(other));
+        }
+        bool operator<(const Element& other) const
+        {
+            if (type < other.type) {
+                return true;
+            }
+            if (type == other.type) {
+                switch (type) {
+                    case Type::InternKey:
+                        return intern_key < other.intern_key;
+                    case Type::ListIndex:
+                        return index < other.index;
+                    case Type::ColumnKey:
+                        return col_key < other.col_key;
+                }
+            }
+            return false;
+        }
+    };
+    std::vector<Element> m_path;
+    TableKey m_table_key;
+    ObjKey m_obj_key;
+
+    void append(const Element& item)
+    {
+        m_path.push_back(item);
+    }
+
+    bool operator<(const ListPath& other) const
+    {
+        if (m_table_key < other.m_table_key || m_obj_key < other.m_obj_key || m_path.size() < other.m_path.size()) {
+            return true;
+        }
+        return std::lexicographical_compare(m_path.begin(), m_path.end(), other.m_path.begin(), other.m_path.end());
     }
 
     bool operator==(const ListPath& other) const
     {
-        if (remote.table == other.remote.table && remote.object == other.remote.object &&
-            remote.field == other.remote.field && remote.path.size() == other.remote.path.size()) {
-            for (size_t i = 0; i < remote.path.size(); ++i) {
-                if (remote.path[i] != other.remote.path[i]) {
+        if (m_table_key == other.m_table_key && m_obj_key == other.m_obj_key &&
+            m_path.size() == other.m_path.size()) {
+            for (size_t i = 0; i < m_path.size(); ++i) {
+                if (m_path[i] != other.m_path[i]) {
                     return false;
                 }
             }
@@ -752,18 +901,36 @@ struct ListPath {
         return !(operator==(other));
     }
 
-#if REALM_DEBUG
-    std::string remote_path;
-    std::string local_path;
-#endif
+    std::string path_to_string(Transaction& remote, const InterningBuffer& buffer)
+    {
+        TableRef remote_table = remote.get_table(m_table_key);
+        Obj base_obj = remote_table->get_object(m_obj_key);
+        std::string path = util::format("%1.pk=%2", remote_table->get_name(), base_obj.get_primary_key());
+        for (auto& e : m_path) {
+            switch (e.type) {
+                case Element::Type::ColumnKey:
+                    path += util::format(".%1", remote_table->get_column_name(e.col_key));
+                    remote_table = remote_table->get_link_target(e.col_key);
+                    break;
+                case Element::Type::ListIndex:
+                    path += util::format("[%1]", e.index);
+                    break;
+                case Element::Type::InternKey:
+                    path += util::format("[key='%1']", buffer.get_key(e.intern_key));
+                    break;
+            }
+        }
+        return path;
+    }
 };
 
 struct RecoverLocalChangesetsHandler : public InstructionApplier {
     using Instruction = sync::Instruction;
-
+    using ListPathCallback = util::UniqueFunction<bool(LstBase&, uint32_t, const ListPath&)>;
     Transaction& remote;
     Transaction& local;
     util::Logger& logger;
+    InterningBuffer m_intern_keys;
 
     // Track any recovered operations on lists to make sure that they are allowed.
     // If not, the lists here will be copied verbatim from the local state to the remote.
@@ -793,29 +960,30 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         throw realm::_impl::client_reset::ClientResetFailed(full_message);
     }
 
-    void process_changeset(const ChunkedBinaryData& chunked_changeset)
+    void process_changesets(const std::vector<ChunkedBinaryData>& changesets)
     {
-        if (chunked_changeset.size() == 0)
-            return;
-
-        ChunkedBinaryInputStream in{chunked_changeset};
-        sync::Changeset parsed_changeset;
-        sync::parse_changeset(in, parsed_changeset); // Throws
-        // parsed_changeset.print(); // view the changes to be recovered in stdout for debugging
-
-        InstructionApplier::begin_apply(parsed_changeset, &logger);
-        for (auto instr : parsed_changeset) {
-            if (!instr)
+        for (const ChunkedBinaryData& chunked_changeset : changesets) {
+            if (chunked_changeset.size() == 0)
                 continue;
-            instr->visit(*this); // Throws
+
+            ChunkedBinaryInputStream in{chunked_changeset};
+            sync::Changeset parsed_changeset;
+            sync::parse_changeset(in, parsed_changeset); // Throws
+            // parsed_changeset.print(); // view the changes to be recovered in stdout for debugging
+
+            InstructionApplier::begin_apply(parsed_changeset, &logger);
+            for (auto instr : parsed_changeset) {
+                if (!instr)
+                    continue;
+                instr->visit(*this); // Throws
+            }
+            InstructionApplier::end_apply();
         }
 
-        copy_lists_with_unrecoverable_changes(
-            parsed_changeset); // FIXME: should this happen after all changesets have been applied?
-        InstructionApplier::end_apply();
+        copy_lists_with_unrecoverable_changes();
     }
 
-    void copy_lists_with_unrecoverable_changes(const sync::Changeset& changeset)
+    void copy_lists_with_unrecoverable_changes()
     {
         // Any modifications, moves or deletes to list elements which were not also created in the recovery
         // cannot be reliably applied because there is no way to know if the indices on the server have
@@ -831,54 +999,129 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
         // we would know where list elements ended up or if they were deleted by the server.
         EmbeddedObjectConverter embedded_object_tracker;
-        PathResolver local_resolver(local, changeset, &logger);
-        const char* instr_name_remote = "RecoverListRemote";
-        const char* instr_name_local = "RecoverListLocal";
         for (auto& it : m_lists) {
-#if REALM_DEBUG
-            it.first.local_path = local_resolver.print(it.first.local);
-            it.first.remote_path = print(it.first.remote);
-#endif
             if (it.second.requires_manual_copy()) {
-                bool did_translate_remote = false;
-                bool did_translate_local = false;
-                resolve_if_list(it.first.remote, instr_name_remote, [&](LstBase& remote_list) {
-                    did_translate_remote = true;
-                    local_resolver.resolve_if_list(it.first.local, instr_name_local, [&](LstBase& local_list) {
-                        did_translate_local = true;
-                        ConstTableRef local_table = local_list.get_table();
-                        ConstTableRef remote_table = remote_list.get_table();
-                        ColKey local_col_key = local_list.get_col_key();
-                        ColKey remote_col_key = remote_list.get_col_key();
-                        Obj local_obj = local_list.get_obj();
-                        Obj remote_obj = remote_list.get_obj();
-                        InterRealmValueConverter value_converter(local_table, local_col_key, remote_table,
-                                                                 remote_col_key, embedded_object_tracker);
-                        logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", print(it.first.remote),
-                                     remote_list.size(), local_list.size());
-                        copy_list(local_obj, remote_obj, value_converter, nullptr);
-                        embedded_object_tracker.process_pending();
-                    });
+                std::string path_str = it.first.path_to_string(remote, m_intern_keys);
+                bool did_translate = resolve(it.first, [&](LstBase& remote_list, LstBase& local_list) {
+                    ConstTableRef local_table = local_list.get_table();
+                    ConstTableRef remote_table = remote_list.get_table();
+                    ColKey local_col_key = local_list.get_col_key();
+                    ColKey remote_col_key = remote_list.get_col_key();
+                    Obj local_obj = local_list.get_obj();
+                    Obj remote_obj = remote_list.get_obj();
+                    InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
+                                                             embedded_object_tracker);
+                    logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
+                                 local_list.size());
+                    copy_list(local_obj, remote_obj, value_converter, nullptr);
+                    embedded_object_tracker.process_pending();
                 });
-                if (!did_translate_local || !did_translate_remote) {
+                if (!did_translate) {
                     // object no longer exists in the local state, ignore and continue
-                    logger.warn("Discarding a list recovery made to an object which could not be resolved. Resolved "
-                                "local = %1, Resolved remote = %2, local_path='%3', remote_path='%4'",
-                                did_translate_local, did_translate_remote, local_resolver.print(it.first.local),
-                                print(it.first.remote));
+                    logger.warn("Discarding a list recovery made to an object which could not be resolved. "
+                                "remote_path='%3'",
+                                path_str);
                 }
             }
         }
         embedded_object_tracker.process_pending();
     }
 
+    bool resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
+                      util::UniqueFunction<void(LstBase&, LstBase&)> callback)
+    {
+        for (auto it = path.m_path.begin(); it != path.m_path.end();) {
+            if (!remote_obj || !local_obj) {
+                return false;
+            }
+            REALM_ASSERT(it->type == ListPath::Element::Type::ColumnKey);
+            ColKey col = it->col_key;
+            REALM_ASSERT(col);
+            if (col.is_list()) {
+                std::unique_ptr<LstBase> remote_list = get_list_from_path(remote_obj, col);
+                ColKey local_col =
+                    local_obj.get_table()->get_column_key(remote_obj.get_table()->get_column_name(col));
+                REALM_ASSERT(local_col);
+                std::unique_ptr<LstBase> local_list = get_list_from_path(local_obj, local_col);
+                ++it;
+                if (it == path.m_path.end()) {
+                    callback(*remote_list, *local_list);
+                    return true;
+                }
+                else {
+                    REALM_ASSERT(it->type == ListPath::Element::Type::ListIndex);
+                    REALM_ASSERT(it != path.m_path.end());
+                    size_t stable_index_id = it->index;
+                    REALM_ASSERT(stable_index_id != realm::npos);
+                    // create a path just to this point
+                    ListPath current_path = path;
+                    current_path.m_path.erase(current_path.m_path.begin() +
+                                                  (current_path.m_path.size() - (path.m_path.end() - it)),
+                                              current_path.m_path.end());
+                    if (m_lists.count(current_path) == 0) {
+                        return false;
+                    }
+                    auto cross_index = m_lists[current_path].find_stable_id(stable_index_id);
+                    if (!cross_index) {
+                        return false;
+                    }
+                    REALM_ASSERT(cross_index->remote < remote_list->size());
+                    REALM_ASSERT(cross_index->local < local_list->size());
+                    REALM_ASSERT(dynamic_cast<LnkLst*>(remote_list.get()));
+                    auto remote_link_list = static_cast<LnkLst*>(remote_list.get());
+                    REALM_ASSERT(dynamic_cast<LnkLst*>(local_list.get()));
+                    auto local_link_list = static_cast<LnkLst*>(local_list.get());
+                    remote_obj = remote_link_list->get_object(cross_index->remote);
+                    local_obj = local_link_list->get_object(cross_index->local);
+                    ++it;
+                }
+            }
+            else {
+                REALM_ASSERT(col.is_dictionary());
+                ++it;
+                REALM_ASSERT(it != path.m_path.end());
+                REALM_ASSERT(it->type == ListPath::Element::Type::InternKey);
+                Dictionary remote_dict = remote_obj.get_dictionary(col);
+                Dictionary local_dict = local_obj.get_dictionary(remote_obj.get_table()->get_column_name(col));
+                StringData dict_key = m_intern_keys.get_key(it->intern_key);
+                if (remote_dict.contains(dict_key) && local_dict.contains(dict_key)) {
+                    remote_obj = remote_dict.get_object(dict_key);
+                    local_obj = local_dict.get_object(dict_key);
+                    ++it;
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback)
+    {
+        auto remote_table = remote.get_table(path.m_table_key);
+        if (remote_table) {
+            auto local_table = local.get_table(remote_table->get_name());
+            if (local_table) {
+                auto remote_obj = remote_table->get_object(path.m_obj_key);
+                if (remote_obj) {
+                    auto local_obj_key = local_table->find_primary_key(remote_obj.get_primary_key());
+                    if (local_obj_key) {
+                        return resolve_path(path, remote_obj, local_table->get_object(local_obj_key),
+                                            std::move(callback));
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     bool translate_list_element(LstBase& list, uint32_t index, Instruction::Path::iterator begin,
                                 Instruction::Path::const_iterator end, const char* instr_name,
-                                util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback,
-                                bool ignore_missing_dict_keys, instr::PathInstruction& instr)
+                                ListPathCallback list_callback, bool ignore_missing_dict_keys, ListPath& path)
     {
         if (begin == end) {
-            return list_callback(list, index);
+            return list_callback(list, index, path);
         }
 
         auto col = list.get_col_key();
@@ -894,29 +1137,22 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
             auto& link_list = static_cast<LnkLst&>(list);
             auto obj = link_list.get_obj();
-            instr::PathInstruction embedded_list_path = instr;
-            embedded_list_path.path.m_path.erase(embedded_list_path.path.m_path.begin() +
-                                                     (embedded_list_path.path.m_path.size() - (end - begin)),
-                                                 embedded_list_path.path.m_path.end());
-            // the local path, in the second parameter below is ignored as we do not insert anything
-            // here, only checking
-            ListPath to_check(embedded_list_path, embedded_list_path /*ignored*/);
-            if (m_lists.count(to_check) != 0) {
-                auto& list_tracker = m_lists[to_check];
-                uint32_t translated_ndx = uint32_t(-1);
+            if (m_lists.count(path) != 0) {
+                auto& list_tracker = m_lists[path];
                 constexpr bool is_embedded = true;
-                if (!list_tracker.update(index, translated_ndx, is_embedded)) {
+                auto cross_ndx = list_tracker.update(index, is_embedded);
+                if (!cross_ndx) {
                     return false; // not allowed to modify this list item
                 }
-                REALM_ASSERT(translated_ndx != uint32_t(-1));
-                REALM_ASSERT_EX(translated_ndx < link_list.size(), translated_ndx, link_list.size());
-                *(begin - 1) = translated_ndx;
-
-                auto embedded_object = link_list.get_object(translated_ndx);
+                REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
+                REALM_ASSERT_EX(cross_ndx->remote < link_list.size(), cross_ndx->remote, link_list.size());
+                *(begin - 1) = cross_ndx->remote;
+                path.append(cross_ndx->stable_id);
+                auto embedded_object = link_list.get_object(cross_ndx->remote);
                 if (auto pfield = mpark::get_if<InternString>(&*begin)) {
                     ++begin;
                     return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
-                                           ignore_missing_dict_keys, instr);
+                                           ignore_missing_dict_keys, path);
                 }
                 else {
                     handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
@@ -937,10 +1173,10 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     bool translate_dictionary_element(Dictionary& dict, InternString key, Instruction::Path::iterator begin,
                                       Instruction::Path::const_iterator end, const char* instr_name,
-                                      util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback,
-                                      bool ignore_missing_dict_keys, instr::PathInstruction& instr)
+                                      ListPathCallback list_callback, bool ignore_missing_dict_keys, ListPath& path)
     {
         StringData string_key = get_string(key);
+        InternDictKey translated_key = m_intern_keys.get_or_add(string_key);
         if (begin == end) {
             if (ignore_missing_dict_keys && dict.find(Mixed{string_key}) == dict.end()) {
                 return false;
@@ -948,6 +1184,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             return true;
         }
 
+        path.append(translated_key);
         auto col = dict.get_col_key();
         auto table = dict.get_table();
         auto field_name = table->get_column_name(col);
@@ -970,7 +1207,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             if (auto pfield = mpark::get_if<InternString>(&*begin)) {
                 ++begin;
                 return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
-                                       ignore_missing_dict_keys, instr);
+                                       ignore_missing_dict_keys, path);
             }
             else {
                 handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
@@ -985,8 +1222,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     bool translate_field(Obj& obj, InternString field, Instruction::Path::iterator begin,
                          Instruction::Path::const_iterator end, const char* instr_name,
-                         util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback, bool ignore_missing_dict_keys,
-                         instr::PathInstruction& instr)
+                         ListPathCallback list_callback, bool ignore_missing_dict_keys, ListPath& path)
     {
         auto field_name = get_string(field);
         ColKey col = obj.get_table()->get_column_key(field_name);
@@ -994,37 +1230,21 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             handle_error(util::format("%1 instruction for path '%2.%3' could not be found", instr_name,
                                       obj.get_table()->get_name(), field_name));
         }
-
+        path.append(col);
         if (begin == end) {
             if (col.is_list()) {
                 auto list = obj.get_listbase_ptr(col);
-                return list_callback(*list, uint32_t(-1)); // Array Clear does not have an index
+                return list_callback(*list, uint32_t(-1), path); // Array Clear does not have an index
             }
             return true;
         }
 
         if (col.is_list()) {
             if (auto pindex = mpark::get_if<uint32_t>(&*begin)) {
-                // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
-                // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
-                // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
-                // links.
-                std::unique_ptr<LstBase> list;
-                if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
-                    auto table = obj.get_table();
-                    if (!table->get_link_target(col)->is_embedded()) {
-                        list = obj.get_list_ptr<ObjKey>(col);
-                    }
-                    else {
-                        list = obj.get_listbase_ptr(col);
-                    }
-                }
-                else {
-                    list = obj.get_listbase_ptr(col);
-                }
+                std::unique_ptr<LstBase> list = get_list_from_path(obj, col);
                 ++begin;
                 return translate_list_element(*list, *pindex, begin, end, instr_name, std::move(list_callback),
-                                              ignore_missing_dict_keys, instr);
+                                              ignore_missing_dict_keys, path);
             }
             else {
                 handle_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", instr_name,
@@ -1036,7 +1256,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 auto dict = obj.get_dictionary(col);
                 ++begin;
                 return translate_dictionary_element(dict, *pkey, begin, end, instr_name, std::move(list_callback),
-                                                    ignore_missing_dict_keys, instr);
+                                                    ignore_missing_dict_keys, path);
             }
             else {
                 handle_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'",
@@ -1060,7 +1280,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             if (auto pfield = mpark::get_if<InternString>(&*begin)) {
                 ++begin;
                 return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
-                                       ignore_missing_dict_keys, instr);
+                                       ignore_missing_dict_keys, path);
             }
             else {
                 handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
@@ -1073,8 +1293,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         REALM_UNREACHABLE();
     }
 
-    bool translate_path(instr::PathInstruction& instr, const char* instr_name,
-                        util::UniqueFunction<bool(LstBase&, uint32_t)> list_callback,
+    bool translate_path(instr::PathInstruction& instr, const char* instr_name, ListPathCallback list_callback,
                         bool ignore_missing_dict_keys = false)
     {
         Obj obj;
@@ -1085,9 +1304,9 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             logger.warn("Cannot recover '%1' which operates on a deleted object", instr_name);
             return false;
         }
-
+        ListPath path(obj.get_table()->get_key(), obj.get_key());
         return translate_field(obj, instr.field, instr.path.begin(), instr.path.end(), instr_name,
-                               std::move(list_callback), ignore_missing_dict_keys, instr);
+                               std::move(list_callback), ignore_missing_dict_keys, path);
     }
 
     void operator()(const Instruction::AddTable& instr)
@@ -1114,7 +1333,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
 
     void operator()(const Instruction::CreateObject& instr)
     {
-        // This should always succeed.
+        // This should always succeed, and no path translation is needed because Create operates on top level objects.
         InstructionApplier::operator()(instr);
     }
 
@@ -1137,14 +1356,13 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         const bool dictionary_erase = instr.value.type == instr::Payload::Type::Erased;
         if (translate_path(
                 instr_copy, instr_name,
-                [&](LstBase& list, uint32_t index) {
-                    auto obj = list.get_obj();
-                    auto& list_tracker = m_lists[{instr_copy, instr}];
-                    uint32_t translated_ndx;
-                    bool allowed_to_update = list_tracker.update(instr.index(), index);
-                    instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                    instr_copy.path.back() = translated_ndx;
-                    return allowed_to_update;
+                [&](LstBase& list, uint32_t index, const ListPath& path) {
+                    auto cross_index = m_lists[path].update(index);
+                    if (cross_index) {
+                        instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                        instr_copy.path.back() = cross_index->remote;
+                    }
+                    return bool(cross_index);
                 },
                 dictionary_erase)) {
             if (!check_links_exist(instr_copy.value)) {
@@ -1162,7 +1380,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         const char* instr_name = "AddInteger";
         Instruction::AddInteger instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
                 REALM_UNREACHABLE();
                 return true;
             })) {
@@ -1174,11 +1392,9 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         const char* instr_name = "Clear";
         Instruction::Clear instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t ndx) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t ndx, const ListPath& path) {
                 REALM_ASSERT(ndx == uint32_t(-1));
-                auto obj = list.get_obj();
-                auto& list_tracker = m_lists[{instr_copy, instr}];
-                list_tracker.clear();
+                m_lists[path].clear();
                 // Clear.prior_size is ignored and always zero
                 return true;
             })) {
@@ -1216,19 +1432,15 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             return;
         }
         Instruction::ArrayInsert instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
                 REALM_ASSERT(index != uint32_t(-1));
                 size_t list_size = list.size();
-                auto obj = list.get_obj();
-                auto& list_tracker = m_lists[{instr_copy, instr}];
-                uint32_t translated_index;
-                bool allowed_to_insert =
-                    list_tracker.insert(static_cast<uint32_t>(index), list_size, translated_index);
-                if (allowed_to_insert) {
-                    instr_copy.path.back() = translated_index;
+                auto cross_index = m_lists[path].insert(index, list_size);
+                if (cross_index) {
+                    instr_copy.path.back() = cross_index->remote;
                     instr_copy.prior_size = static_cast<uint32_t>(list_size);
                 }
-                return allowed_to_insert;
+                return bool(cross_index);
             })) {
             InstructionApplier::operator()(instr_copy);
         }
@@ -1238,14 +1450,12 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         const char* instr_name = "ArrayMove";
         Instruction::ArrayMove instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
                 REALM_ASSERT(index != uint32_t(-1));
                 size_t lst_size = list.size();
-                auto obj = list.get_obj();
-                auto& list_tracker = m_lists[{instr_copy, instr}];
                 uint32_t translated_from, translated_to;
-                bool allowed_to_move = list_tracker.move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
-                                                         translated_from, translated_to);
+                bool allowed_to_move = m_lists[path].move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
+                                                          translated_from, translated_to);
                 if (allowed_to_move) {
                     instr_copy.prior_size = static_cast<uint32_t>(lst_size);
                     instr_copy.path.back() = translated_from;
@@ -1261,11 +1471,10 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         const char* instr_name = "ArrayErase";
         Instruction::ArrayErase instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
                 auto obj = list.get_obj();
-                auto& list_tracker = m_lists[{instr_copy, instr}];
                 uint32_t translated_index;
-                bool allowed_to_delete = list_tracker.remove(static_cast<uint32_t>(index), translated_index);
+                bool allowed_to_delete = m_lists[path].remove(static_cast<uint32_t>(index), translated_index);
                 if (allowed_to_delete) {
                     instr_copy.prior_size = static_cast<uint32_t>(list.size());
                     instr_copy.path.back() = translated_index;
@@ -1284,7 +1493,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             return;
         }
         Instruction::SetInsert instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
                 REALM_UNREACHABLE(); // there is validation before this point
                 return false;
             })) {
@@ -1296,7 +1505,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     {
         const char* instr_name = "SetErase";
         Instruction::SetErase instr_copy = instr;
-        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t) {
+        if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
                 REALM_UNREACHABLE(); // there is validation before this point
                 return false;
             })) {
@@ -1629,11 +1838,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     std::vector<ChunkedBinaryData> local_changes;
 
     if (recover_local_changes) {
-        // FIXME: make sure that there are no silly copies made of the changesets into
-        // memory along the way the history entries here should just be pointers into the
-        // history compartment.
         local_changes = history_local->get_local_changes(current_version_local);
-        logger.debug("Local changesets to recover: %1", local_changes.size());
+        logger.info("Local changesets to recover: %1", local_changes.size());
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
@@ -1653,13 +1859,8 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
         fresh_server_version = remote_progress.latest_server_version;
 
         if (recover_local_changes) {
-            // FIXME: keep track of current version, and apply the recovered changes, then erase the history before
-            // the recovered changes
             RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
-            // FIXME: it may be desirable to make these separate transactions
-            for (const auto& change : local_changes) {
-                handler.process_changeset(change); // throws on error
-            }
+            handler.process_changesets(local_changes); // throws on error
             ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
             REALM_ASSERT_RELEASE(client_repl);
             ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
@@ -1676,11 +1877,11 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
     wt_local->commit_and_continue_as_read();
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
-    logger.debug("perform_client_reset_diff is done, old_version.version = %1, "
-                 "old_version.index = %2, new_version.version = %3, "
-                 "new_version.index = %4",
-                 old_version_local.version, old_version_local.index, new_version_local.version,
-                 new_version_local.index);
+    logger.info("perform_client_reset_diff is done, old_version.version = %1, "
+                "old_version.index = %2, new_version.version = %3, "
+                "new_version.index = %4",
+                old_version_local.version, old_version_local.index, new_version_local.version,
+                new_version_local.index);
 
     return LocalVersionIDs{old_version_local, new_version_local};
 }
