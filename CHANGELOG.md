@@ -40,6 +40,7 @@
 * Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
 * realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
 * Updated apply_to_state_command tool to support query based sync download messages. ([#5226](https://github.com/realm/realm-core/pull/5226))
+* Fixed an issue that made it necessary to always compile with the Windows 8.1 SDK to produce binaries able to run on Windows 8.1. ([#5247](https://github.com/realm/realm-core/pull/5247))
 
 ----------------------------------------------
 
