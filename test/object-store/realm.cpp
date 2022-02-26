@@ -1684,6 +1684,65 @@ TEST_CASE("SharedRealm: async writes") {
         });
     }
 
+    SECTION("async writes scheduled inside sync write") {
+        realm->begin_transaction();
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 1);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 2);
+            table->create_object();
+            realm->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+        REQUIRE(table->size() == 0);
+        table->create_object();
+        realm->commit_transaction();
+        wait_for_done();
+        REQUIRE(table->size() == 3);
+    }
+
+    SECTION("async writes scheduled inside multiple sync write") {
+        realm->begin_transaction();
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 2);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 3);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        REQUIRE(table->size() == 0);
+        table->create_object();
+        realm->commit_transaction();
+
+        realm->begin_transaction();
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 4);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 5);
+            table->create_object();
+            realm->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+        REQUIRE(table->size() == 1);
+        table->create_object();
+        realm->commit_transaction();
+
+
+        wait_for_done();
+        REQUIRE(table->size() == 6);
+    }
+
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });
