@@ -249,6 +249,7 @@ set(REALM_INSTALL_HEADERS
     util/scope_exit.hpp
     util/serializer.hpp
     util/sha_crypto.hpp
+    util/span.hpp
     util/string_buffer.hpp
     util/terminate.hpp
     util/thread.hpp
