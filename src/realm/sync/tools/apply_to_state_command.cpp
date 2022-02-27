@@ -114,8 +114,8 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     if (is_body_compressed) {
         uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
-        std::error_code ec = util::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                           uncompressed_body_buffer.get(), uncompressed_body_size);
+        std::error_code ec =
+            util::compression::decompress(compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
 
         if (ec) {
             throw ProtocolCodecException("error decompressing download message");
@@ -169,8 +169,8 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
 
-        std::error_code ec = util::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                           uncompressed_body_buffer.get(), uncompressed_body_size);
+        std::error_code ec =
+            util::compression::decompress(compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
 
         if (ec) {
             throw ProtocolCodecException("error decompressing upload message");

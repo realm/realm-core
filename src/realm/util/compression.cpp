@@ -17,8 +17,7 @@
  **************************************************************************/
 
 #include <realm/util/compression.hpp>
-
-#include <realm/util/assert.hpp>
+#include <realm/util/safe_int_ops.hpp>
 
 #include <limits>
 #include <zlib.h>
@@ -94,40 +93,26 @@ std::error_code compression::make_error_code(error error_code) noexcept
 // zlib compression level: 1-9, 1 fastest.
 
 // zlib deflateBound()
-std::error_code compression::compress_bound(const char* uncompressed_buf, std::size_t uncompressed_size,
-                                            std::size_t& bound, int compression_level)
+std::size_t compression::compress_bound(std::size_t size) noexcept
 {
-    z_stream strm;
-
-    strm.zalloc = Z_NULL;
-    strm.zfree = Z_NULL;
-    strm.next_in = reinterpret_cast<unsigned char*>(const_cast<char*>(uncompressed_buf));
-    strm.avail_in = uInt(uncompressed_size);
-
-    int rc = deflateInit(&strm, compression_level);
-    if (rc == Z_MEM_ERROR)
-        return error::out_of_memory;
-
-    if (rc != Z_OK)
-        return error::compress_error;
-
-    unsigned long zlib_bound = deflateBound(&strm, uLong(uncompressed_size));
-
-    rc = deflateEnd(&strm);
-    if (rc != Z_OK)
-        return error::compress_error;
-
-    bound = zlib_bound;
-
-    return std::error_code{};
+    // DEFLATE's worst-case size is a 6 byte zlib header, plus the uncompressed
+    // data, plus a 5 byte header for every 16383 byte block.
+    size_t overhead = 6 + 5 * (size / 16383 + 1);
+    if (std::numeric_limits<size_t>::max() - overhead < size)
+        return 0;
+    return size + overhead;
 }
 
 
 // zlib deflate()
-std::error_code compression::compress(const char* uncompressed_buf, std::size_t uncompressed_size,
-                                      char* compressed_buf, std::size_t compressed_buf_size,
+std::error_code compression::compress(Span<const char> uncompressed_buf, Span<char> compressed_buf,
                                       std::size_t& compressed_size, int compression_level, Alloc* custom_allocator)
 {
+    auto uncompressed_ptr = reinterpret_cast<unsigned char*>(const_cast<char*>(uncompressed_buf.data()));
+    auto uncompressed_size = uncompressed_buf.size();
+    auto compressed_ptr = reinterpret_cast<unsigned char*>(compressed_buf.data());
+    auto compressed_buf_size = compressed_buf.size();
+
     z_stream strm;
     strm.opaque = Z_NULL;
     strm.zalloc = Z_NULL;
@@ -146,20 +131,17 @@ std::error_code compression::compress(const char* uncompressed_buf, std::size_t 
     if (rc != Z_OK)
         return error::compress_error;
 
-    strm.next_in = reinterpret_cast<unsigned char*>(const_cast<char*>(uncompressed_buf));
+    strm.next_in = uncompressed_ptr;
     strm.avail_in = 0;
-    strm.next_out = reinterpret_cast<unsigned char*>(compressed_buf);
+    strm.next_out = compressed_ptr;
     strm.avail_out = 0;
 
     std::size_t next_in_ndx = 0;
     std::size_t next_out_ndx = 0;
     REALM_ASSERT(rc == Z_OK);
     while (rc == Z_OK || rc == Z_BUF_ERROR) {
-
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_in + strm.avail_in)) ==
-                     uncompressed_buf + next_in_ndx);
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_out + strm.avail_out)) ==
-                     compressed_buf + next_out_ndx);
+        REALM_ASSERT(strm.next_in + strm.avail_in == uncompressed_ptr + next_in_ndx);
+        REALM_ASSERT(strm.next_out + strm.avail_out == compressed_ptr + next_out_ndx);
 
         bool stream_updated = false;
 
@@ -204,9 +186,13 @@ std::error_code compression::compress(const char* uncompressed_buf, std::size_t 
 
 
 // zlib inflate
-std::error_code compression::decompress(const char* compressed_buf, std::size_t compressed_size,
-                                        char* decompressed_buf, std::size_t decompressed_size)
+std::error_code compression::decompress(Span<const char> compressed_buf, Span<char> decompressed_buf)
 {
+    auto compressed_ptr = reinterpret_cast<unsigned char*>(const_cast<char*>(compressed_buf.data()));
+    auto compressed_size = compressed_buf.size();
+    auto decompressed_ptr = reinterpret_cast<unsigned char*>(decompressed_buf.data());
+    auto decompressed_buf_size = decompressed_buf.size();
+
     z_stream strm;
 
     strm.zalloc = Z_NULL;
@@ -215,10 +201,10 @@ std::error_code compression::decompress(const char* compressed_buf, std::size_t 
     std::size_t next_in_ndx = 0;
     std::size_t next_out_ndx = 0;
 
-    strm.next_in = reinterpret_cast<unsigned char*>(const_cast<char*>(compressed_buf));
+    strm.next_in = compressed_ptr;
     next_in_ndx = std::min(compressed_size - next_in_ndx, g_max_stream_avail);
     strm.avail_in = uInt(next_in_ndx);
-    strm.next_out = reinterpret_cast<unsigned char*>(const_cast<char*>(decompressed_buf));
+    strm.next_out = decompressed_ptr;
     strm.avail_out = 0;
 
     int rc = inflateInit(&strm);
@@ -229,26 +215,22 @@ std::error_code compression::decompress(const char* compressed_buf, std::size_t 
     REALM_ASSERT(rc == Z_OK);
     while (rc == Z_OK || rc == Z_BUF_ERROR) {
 
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_in + strm.avail_in)) ==
-                     compressed_buf + next_in_ndx);
-        REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_out + strm.avail_out)) ==
-                     decompressed_buf + next_out_ndx);
+        REALM_ASSERT(strm.next_in + strm.avail_in == compressed_ptr + next_in_ndx);
+        REALM_ASSERT(strm.next_out + strm.avail_out == decompressed_ptr + next_out_ndx);
 
         bool stream_updated = false;
 
         if (strm.avail_in == 0 && next_in_ndx < compressed_size) {
-            REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_in)) ==
-                         compressed_buf + next_in_ndx);
+            REALM_ASSERT(strm.next_in == compressed_ptr + next_in_ndx);
             std::size_t in_size = std::min(compressed_size - next_in_ndx, g_max_stream_avail);
             next_in_ndx += in_size;
             strm.avail_in = uInt(in_size);
             stream_updated = true;
         }
 
-        if (strm.avail_out == 0 && next_out_ndx < decompressed_size) {
-            REALM_ASSERT(const_cast<const char*>(reinterpret_cast<char*>(strm.next_out)) ==
-                         decompressed_buf + next_out_ndx);
-            std::size_t out_size = std::min(decompressed_size - next_out_ndx, g_max_stream_avail);
+        if (strm.avail_out == 0 && next_out_ndx < decompressed_buf_size) {
+            REALM_ASSERT(strm.next_out == decompressed_ptr + next_out_ndx);
+            std::size_t out_size = std::min(decompressed_buf_size - next_out_ndx, g_max_stream_avail);
             next_out_ndx += out_size;
             strm.avail_out = uInt(out_size);
             stream_updated = true;
@@ -278,8 +260,8 @@ std::error_code compression::decompress(const char* compressed_buf, std::size_t 
 }
 
 
-std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_memory_arena,
-                                               BinaryData uncompressed_buf, std::vector<char>& compressed_buf)
+void compression::allocate_and_compress(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
+                                        std::vector<char>& compressed_buf)
 {
     const int compression_level = 1;
     std::size_t compressed_size = 0;
@@ -290,9 +272,8 @@ std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_mem
         compressed_buf.resize(256); // Throws
 
     for (;;) {
-        std::error_code ec =
-            compression::compress(uncompressed_buf.data(), uncompressed_buf.size(), compressed_buf.data(),
-                                  compressed_buf.size(), compressed_size, compression_level, &compress_memory_arena);
+        std::error_code ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size,
+                                                   compression_level, &compress_memory_arena);
 
         if (REALM_UNLIKELY(ec)) {
             if (ec == compression::error::compress_buffer_too_small) {
@@ -322,6 +303,5 @@ std::size_t compression::allocate_and_compress(CompressMemoryArena& compress_mem
         }
         break;
     }
-
-    return compressed_size;
+    compressed_buf.resize(compressed_size);
 }

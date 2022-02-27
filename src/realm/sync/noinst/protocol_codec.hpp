@@ -329,8 +329,9 @@ private:
         // if is_body_compressed == true, we must decompress the received body.
         if (is_body_compressed) {
             uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
-            std::error_code ec = util::compression::decompress(
-                msg.remaining().data(), compressed_body_size, uncompressed_body_buffer.get(), uncompressed_body_size);
+            std::error_code ec =
+                util::compression::decompress({msg.remaining().data(), compressed_body_size},
+                                              {uncompressed_body_buffer.get(), uncompressed_body_size});
 
             if (ec) {
                 return report_error(Error::bad_decompression, "compression::inflate: %1", ec.message());
@@ -550,9 +551,8 @@ public:
                     uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
                     auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
 
-                    std::error_code ec =
-                        util::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                      uncompressed_body_buffer.get(), uncompressed_body_size);
+                    std::error_code ec = util::compression::decompress(
+                        compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
 
                     if (ec) {
                         return report_error(Error::bad_decompression, "compression::inflate: %1", ec.message());

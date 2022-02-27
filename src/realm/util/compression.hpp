@@ -19,7 +19,7 @@
 #ifndef REALM_UTIL_COMPRESSION_HPP
 #define REALM_UTIL_COMPRESSION_HPP
 
-#include <realm/binary_data.hpp>
+#include <realm/util/span.hpp>
 
 #include <array>
 #include <memory>
@@ -60,14 +60,14 @@ namespace realm::util::compression {
 class Alloc {
 public:
     // Returns null on "out of memory"
-    virtual void* alloc(size_t size) = 0;
+    virtual void* alloc(size_t size) noexcept = 0;
     virtual void free(void* addr) noexcept = 0;
     virtual ~Alloc() {}
 };
 
 class CompressMemoryArena : public Alloc {
 public:
-    void* alloc(size_t size) override final
+    void* alloc(size_t size) noexcept override final
     {
         size_t offset = m_offset;
         size_t misalignment = offset % alignof(std::max_align_t);
@@ -113,36 +113,27 @@ private:
 
 /// compress_bound() calculates an upper bound on the size of the compressed
 /// data. The caller can use this function to allocate memory buffer calling
-/// compress(). \a uncompressed_buf is the buffer with uncompressed data. The
-/// size of the uncompressed data is \a uncompressed_size. \a compression_level
-/// is described under compress(). \a bound is set to the upper bound at
-/// return. The returned error code is of category compression::error_category.
-std::error_code compress_bound(const char* uncompressed_buf, size_t uncompressed_size, size_t& bound,
-                               int compression_level = 1);
+/// compress(). Returns 0 if the bound would overflow size_t.
+size_t compress_bound(size_t uncompressed_size) noexcept;
 
-/// compress() compresses the data in the \a uncompressed_buf of size \a
-/// uncompressed_size into \a compressed_buf. compress() resizes \a
-/// compressed_buf. At return, \a compressed_buf has the size of the compressed
-/// data. \a compression_level is [1-9] with 1 the fastest for the current zlib
-/// implementation. The returned error code is of category
-/// compression::error_category.
-std::error_code compress(const char* uncompressed_buf, size_t uncompressed_size, char* compressed_buf,
-                         size_t compressed_buf_size, size_t& compressed_size, int compression_level = 1,
-                         Alloc* custom_allocator = nullptr);
+/// compress() compresses the data in the \a uncompressed_buf and stores it in
+/// \a compressed_buf. If compression is successful, the compressed size is
+/// stored in \a compressed_size. \a compression_level is [1-9] with 1 the
+/// fastest for the current zlib implementation. The returned error code is of
+/// category compression::error_category. If \a Alloc is non-null, it is used
+/// for all memory allocations inside compress() and compress() will not throw
+/// any exceptions.
+std::error_code compress(Span<const char> uncompressed_buf, Span<char> compressed_buf, size_t& compressed_size,
+                         int compression_level = 1, Alloc* custom_allocator = nullptr);
 
-/// decompress() decompresses the data in \param compressed_buf of size \a
-/// compresed_size into \a decompressed_buf. \a decompressed_size is the
-/// expected size of the decompressed data. \a decompressed_buf must have size
-/// at least \a decompressed_size. decompress() throws on errors, including the
-/// error where the size of the decompressed data is unequal to
-/// decompressed_size.  The returned error code is of category
-/// compression::error_category.
-std::error_code decompress(const char* compressed_buf, size_t compressed_size, char* decompressed_buf,
-                           size_t decompressed_size);
+/// decompress() decompresses the data in \a compressed_buf into \a decompressed_buf.
+/// decompress may throw std::bad_alloc, but all other errors (including the
+/// target buffer being too small) are reported by returning an error code of
+/// category compression::error_code.
+std::error_code decompress(Span<const char> compressed_buf, Span<char> decompressed_buf);
 
-
-size_t allocate_and_compress(CompressMemoryArena& compress_memory_arena, BinaryData uncompressed_buf,
-                             std::vector<char>& compressed_buf);
+void allocate_and_compress(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
+                           std::vector<char>& compressed_buf);
 
 } // namespace realm::util::compression
 

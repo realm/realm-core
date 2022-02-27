@@ -58,8 +58,8 @@ std::string changeset_compressed_to_binary(const std::string& changeset_compress
 
     // Decompress
     std::unique_ptr<char[]> uncompressed_body_buffer(new char[decompressed_size]);
-    std::error_code ec = util::compression::decompress(decode_buffer.data(), *decoded_size,
-                                                       uncompressed_body_buffer.get(), decompressed_size);
+    std::error_code ec = util::compression::decompress({decode_buffer.data(), *decoded_size},
+                                                       {uncompressed_body_buffer.get(), decompressed_size});
 
     if (ec) {
         throw std::runtime_error(util::format("compression::inflate: %1", ec.message()));

@@ -84,19 +84,18 @@ void ClientProtocol::UploadMessageBuilder::make_upload_message(int protocol_vers
 {
     static_cast<void>(protocol_version);
     BinaryData body = {m_body_buffer.data(), std::size_t(m_body_buffer.size())};
-    std::size_t compressed_body_size = body.size();
 
     constexpr std::size_t g_max_uncompressed = 1024;
 
+    bool is_body_compressed = false;
     if (body.size() > g_max_uncompressed) {
-        compressed_body_size = util::compression::allocate_and_compress(m_compress_memory_arena, body,
-                                                                        m_compression_buffer); // Throws
+        util::compression::allocate_and_compress(m_compress_memory_arena, body,
+                                                 m_compression_buffer); // Throws
+        is_body_compressed = m_compression_buffer.size() < body.size();
     }
 
     // The compressed body is only sent if it is smaller than the uncompressed body.
-    bool is_body_compressed = (compressed_body_size < body.size());
-    if (!is_body_compressed)
-        compressed_body_size = 0;
+    std::size_t compressed_body_size = is_body_compressed ? m_compression_buffer.size() : 0;
 
     // The header of the upload message.
     out << "upload " << session_ident << " " << int(is_body_compressed) << " " << body.size() << " "
@@ -140,13 +139,12 @@ void ClientProtocol::make_ping(OutputBuffer& out, milliseconds_type timestamp, m
 std::string ClientProtocol::compressed_hex_dump(BinaryData blob)
 {
     std::vector<char> buf;
-    size_t sz = util::compression::allocate_and_compress(m_compress_memory_arena, blob,
-                                                         buf); // Throws
+    util::compression::allocate_and_compress(m_compress_memory_arena, blob, buf); // Throws
 
     util::StringBuffer encode_buffer;
-    auto encoded_size = util::base64_encoded_size(sz);
+    auto encoded_size = util::base64_encoded_size(buf.size());
     encode_buffer.resize(encoded_size);
-    util::base64_encode(buf.data(), sz, encode_buffer.data(), encode_buffer.size());
+    util::base64_encode(buf.data(), buf.size(), encode_buffer.data(), encode_buffer.size());
 
     return encode_buffer.str();
 }

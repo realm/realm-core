@@ -3425,11 +3425,10 @@ private:
                     if (uncompressed.size() > max_uncompressed) {
                         compression::CompressMemoryArena& arena = server.get_compress_memory_arena();
                         std::vector<char>& buffer = server.get_misc_buffers().compress;
-                        std::size_t size = compression::allocate_and_compress(arena, uncompressed,
-                                                                              buffer); // Throws
-                        if (size < uncompressed.size()) {
+                        compression::allocate_and_compress(arena, uncompressed, buffer); // Throws
+                        if (buffer.size() < uncompressed.size()) {
                             body = buffer.data();
-                            compressed_body_size = size;
+                            compressed_body_size = buffer.size();
                             body_is_compressed = true;
                         }
                     }

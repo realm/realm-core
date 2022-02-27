@@ -40,6 +40,8 @@ namespace util {
 template <class T, class Allocator = DefaultAllocator>
 class Buffer {
 public:
+    using value_type = T;
+
     Buffer(Allocator& alloc = Allocator::get_default()) noexcept
         : m_data(nullptr, STLDeleter<T[], Allocator>{alloc})
         , m_size(0)
