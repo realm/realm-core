@@ -16,52 +16,12 @@
  *
  **************************************************************************/
 
-#include <stdexcept>
-#include <utility>
-#include <iomanip>
-
-#include <realm/group.hpp>
-#include <realm/table.hpp>
-#include <realm/list.hpp>
-#include <realm/db.hpp>
 #include <realm/replication.hpp>
-#include <realm/util/logger.hpp>
-#include <realm/array_bool.hpp>
-#include <realm/array_string.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_timestamp.hpp>
+
+#include <realm/list.hpp>
 
 using namespace realm;
 using namespace realm::util;
-
-
-namespace {
-
-class InputStreamImpl : public _impl::NoCopyInputStream {
-public:
-    InputStreamImpl(const char* data, size_t size) noexcept
-        : m_begin(data)
-        , m_end(data + size)
-    {
-    }
-
-    ~InputStreamImpl() noexcept {}
-
-    bool next_block(const char*& begin, const char*& end) override
-    {
-        if (m_begin != 0) {
-            begin = m_begin;
-            end = m_end;
-            m_begin = nullptr;
-            return (end > begin);
-        }
-        return false;
-    }
-    const char* m_begin;
-    const char* const m_end;
-};
-
-} // anonymous namespace
 
 void Replication::initialize(DB&)
 {

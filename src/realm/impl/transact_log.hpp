@@ -19,18 +19,16 @@
 #ifndef REALM_IMPL_TRANSACT_LOG_HPP
 #define REALM_IMPL_TRANSACT_LOG_HPP
 
-#include <stdexcept>
-
-#include <realm/string_data.hpp>
-#include <realm/data_type.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/util/buffer.hpp>
-#include <realm/util/string_buffer.hpp>
-#include <realm/impl/input_stream.hpp>
-
-#include <realm/group.hpp>
 #include <realm/collection.hpp>
+#include <realm/data_type.hpp>
+#include <realm/group.hpp>
+#include <realm/string_data.hpp>
+#include <realm/util/buffer.hpp>
+#include <realm/util/input_stream.hpp>
+#include <realm/util/string_buffer.hpp>
 
+#include <stdexcept>
 #include <tuple>
 
 namespace realm {
@@ -379,17 +377,17 @@ public:
 
     /// See `TransactLogEncoder` for a list of methods that the `InstructionHandler` must define.
     template <class InstructionHandler>
-    void parse(InputStream&, InstructionHandler&);
+    void parse(util::InputStream&, InstructionHandler&);
 
     template <class InstructionHandler>
-    void parse(NoCopyInputStream&, InstructionHandler&);
+    void parse(util::NoCopyInputStream&, InstructionHandler&);
 
 private:
     util::Buffer<char> m_input_buffer;
 
     // The input stream is assumed to consist of chunks of memory organised such that
     // every instruction resides in a single chunk only.
-    NoCopyInputStream* m_input;
+    util::NoCopyInputStream* m_input;
     // pointer into transaction log, each instruction is parsed from m_input_begin and onwards.
     // Each instruction are assumed to be contiguous in memory.
     const char* m_input_begin;
@@ -756,7 +754,7 @@ inline TransactLogParser::~TransactLogParser() noexcept {}
 
 
 template <class InstructionHandler>
-void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler)
+void TransactLogParser::parse(util::NoCopyInputStream& in, InstructionHandler& handler)
 {
     m_input = &in;
     m_input_begin = m_input_end = nullptr;
@@ -766,9 +764,9 @@ void TransactLogParser::parse(NoCopyInputStream& in, InstructionHandler& handler
 }
 
 template <class InstructionHandler>
-void TransactLogParser::parse(InputStream& in, InstructionHandler& handler)
+void TransactLogParser::parse(util::InputStream& in, InstructionHandler& handler)
 {
-    NoCopyInputStreamAdaptor in_2(in, m_input_buffer.data(), m_input_buffer.size());
+    util::NoCopyInputStreamAdaptor in_2(in, m_input_buffer.data(), m_input_buffer.size());
     parse(in_2, handler); // Throws
 }
 
@@ -1281,7 +1279,7 @@ private:
 };
 
 
-class ReversedNoCopyInputStream : public NoCopyInputStream {
+class ReversedNoCopyInputStream : public util::NoCopyInputStream {
 public:
     ReversedNoCopyInputStream(TransactReverser& reverser)
         : m_instr_order(reverser.m_instructions)

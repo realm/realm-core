@@ -24,7 +24,7 @@
 #include <realm/table.hpp>
 
 #include <realm/util/buffer_stream.hpp>
-#include <realm/impl/input_stream.hpp>
+#include <realm/util/input_stream.hpp>
 
 
 namespace realm {
@@ -83,7 +83,7 @@ private:
     BinaryIterator m_begin;
 };
 
-class ChunkedBinaryInputStream : public _impl::NoCopyInputStream {
+class ChunkedBinaryInputStream : public util::NoCopyInputStream {
 public:
     explicit ChunkedBinaryInputStream(const ChunkedBinaryData& chunks)
         : m_it(chunks.iterator())

@@ -1601,7 +1601,7 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
         if (REALM_UNLIKELY(expression)) {
             buffer.clear();
             cursor.get_changeset(buffer); // Throws
-            _impl::SimpleInputStream in{buffer.data(), buffer.size()};
+            util::SimpleInputStream in{buffer.data(), buffer.size()};
             sync::Changeset changeset;
             sync::parse_changeset(in, changeset); // Throws
             expression->reset(changeset);
@@ -1645,7 +1645,7 @@ void inspect_history(SyncHistoryCursor& cursor, util::Optional<file_ident_type> 
                     out << "# Version " << version << "\n"; // Throws
                 buffer.clear();
                 cursor.get_changeset(buffer); // Throws
-                _impl::SimpleInputStream in{buffer.data(), buffer.size()};
+                util::SimpleInputStream in{buffer.data(), buffer.size()};
                 sync::Changeset changeset;
                 sync::parse_changeset(in, changeset); // Throws
 #if REALM_DEBUG

@@ -1,6 +1,6 @@
 /*************************************************************************
  *
- * Copyright 2016 Realm Inc.
+ * Copyright 2022 Realm Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,12 @@
  *
  **************************************************************************/
 
-#ifndef REALM_IMPL_INPUT_STREAM_HPP
-#define REALM_IMPL_INPUT_STREAM_HPP
+#ifndef REALM_UTIL_INPUT_STREAM_HPP
+#define REALM_UTIL_INPUT_STREAM_HPP
 
-#include <algorithm>
+#include <realm/utilities.hpp>
 
-#include <realm/binary_data.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/impl/cont_transact_hist.hpp>
-#include <realm/util/buffer.hpp>
-
-
-namespace realm {
-namespace _impl {
-
-
+namespace realm::util {
 class InputStream {
 public:
     /// Read bytes from this input stream and place them in the specified
@@ -47,6 +38,18 @@ public:
     virtual size_t read(char* buffer, size_t size) = 0;
 
     virtual ~InputStream() noexcept = default;
+};
+
+class NoCopyInputStream {
+public:
+    /// \return if any bytes was read.
+    /// A value of false indicates end-of-input.
+    /// If return value is true, \a begin and \a end are
+    /// updated to reflect the start and limit of a
+    /// contiguous memory chunk.
+    virtual bool next_block(const char*& begin, const char*& end) = 0;
+
+    virtual ~NoCopyInputStream() noexcept = default;
 };
 
 
@@ -71,20 +74,6 @@ private:
     const char* const m_end;
 };
 
-
-class NoCopyInputStream {
-public:
-    /// \return if any bytes was read.
-    /// A value of false indicates end-of-input.
-    /// If return value is true, \a begin and \a end are
-    /// updated to reflect the start and limit of a
-    /// contiguous memory chunk.
-    virtual bool next_block(const char*& begin, const char*& end) = 0;
-
-    virtual ~NoCopyInputStream() noexcept = default;
-};
-
-
 class NoCopyInputStreamAdaptor : public NoCopyInputStream {
 public:
     NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept
@@ -102,11 +91,10 @@ public:
     }
 
 private:
-    InputStream& m_in;
+    util::InputStream& m_in;
     char* m_buffer;
     size_t m_buffer_size;
 };
-
 
 class SimpleNoCopyInputStream : public NoCopyInputStream {
 public:
@@ -132,64 +120,6 @@ private:
     size_t m_size;
 };
 
-class ChangesetInputStream : public NoCopyInputStream {
-public:
-    using version_type = History::version_type;
-    static constexpr unsigned NB_BUFFERS = 8;
+} // namespace realm::util
 
-    ChangesetInputStream(History& hist, version_type begin_version, version_type end_version)
-        : m_history(hist)
-        , m_begin_version(begin_version)
-        , m_end_version(end_version)
-    {
-        get_changeset();
-    }
-
-    bool next_block(const char*& begin, const char*& end) override
-    {
-        while (m_valid) {
-            BinaryData actual = m_changesets_begin->get_next();
-
-            if (actual.size() > 0) {
-                begin = actual.data();
-                end = actual.data() + actual.size();
-                return true;
-            }
-
-            m_changesets_begin++;
-
-            if (REALM_UNLIKELY(m_changesets_begin == m_changesets_end)) {
-                get_changeset();
-            }
-        }
-        return false; // End of input
-    }
-
-private:
-    History& m_history;
-    version_type m_begin_version, m_end_version;
-    BinaryIterator m_changesets[NB_BUFFERS]; // Buffer
-    BinaryIterator* m_changesets_begin = nullptr;
-    BinaryIterator* m_changesets_end = nullptr;
-    bool m_valid;
-
-    void get_changeset()
-    {
-        auto versions_to_get = m_end_version - m_begin_version;
-        m_valid = versions_to_get > 0;
-        if (m_valid) {
-            if (versions_to_get > NB_BUFFERS)
-                versions_to_get = NB_BUFFERS;
-            version_type end_version = m_begin_version + versions_to_get;
-            m_history.get_changesets(m_begin_version, end_version, m_changesets);
-            m_begin_version = end_version;
-            m_changesets_begin = m_changesets;
-            m_changesets_end = m_changesets_begin + versions_to_get;
-        }
-    }
-};
-
-} // namespace _impl
-} // namespace realm
-
-#endif // REALM_IMPL_INPUT_STREAM_HPP
+#endif // REALM_UTIL_INPUT_STREAM_HPP

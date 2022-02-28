@@ -1,18 +1,18 @@
 #include <algorithm>
-#include <stack>
 #include <cstring>
+#include <stack>
 
-#include <realm/util/value_reset_guard.hpp>
-#include <realm/util/hex_dump.hpp>
-#include <realm/table_view.hpp>
-#include <realm/impl/input_stream.hpp>
-#include <realm/sync/impl/clamped_hex_dump.hpp>
-#include <realm/sync/noinst/server/server_history.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/instruction_applier.hpp>
-#include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/changeset_encoder.hpp>
+#include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/impl/clamped_hex_dump.hpp>
+#include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/hex_dump.hpp>
+#include <realm/util/input_stream.hpp>
+#include <realm/util/value_reset_guard.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 using namespace realm::sync;

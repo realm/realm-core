@@ -20,20 +20,20 @@
 #define REALM_GROUP_HPP
 
 #include <functional>
+#include <map>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include <map>
-#include <stdexcept>
-#include <optional>
 
-#include <realm/util/features.h>
+#include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
-#include <realm/impl/input_stream.hpp>
-#include <realm/impl/output_stream.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
+#include <realm/impl/output_stream.hpp>
 #include <realm/metrics/metrics.hpp>
 #include <realm/table.hpp>
-#include <realm/alloc_slab.hpp>
+#include <realm/util/features.h>
+#include <realm/util/input_stream.hpp>
 
 namespace realm {
 
@@ -761,7 +761,7 @@ private:
     class TransactAdvancer;
     /// Memory mappings must have been updated to reflect any growth in filesize before
     /// calling advance_transact()
-    void advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream&, bool writable);
+    void advance_transact(ref_type new_top_ref, util::NoCopyInputStream&, bool writable);
     void refresh_dirty_accessors();
     void flush_accessors_for_commit();
 

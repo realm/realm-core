@@ -3,7 +3,7 @@
 #define REALM_SYNC_CHANGESET_PARSER_HPP
 
 #include <realm/sync/changeset.hpp>
-#include <realm/impl/input_stream.hpp>
+#include <realm/util/input_stream.hpp>
 
 namespace realm {
 namespace sync {
@@ -13,14 +13,14 @@ struct ChangesetParser {
     ///
     /// FIXME: Consider using std::error_code instead of throwing exceptions on
     /// parse errors.
-    void parse(_impl::NoCopyInputStream&, InstructionHandler&);
+    void parse(util::NoCopyInputStream&, InstructionHandler&);
 
 private:
     struct State;
 };
 
-void parse_changeset(_impl::NoCopyInputStream&, Changeset& out_log);
-void parse_changeset(_impl::InputStream&, Changeset& out_log);
+void parse_changeset(util::NoCopyInputStream&, Changeset& out_log);
+void parse_changeset(util::InputStream&, Changeset& out_log);
 
 
 } // namespace sync

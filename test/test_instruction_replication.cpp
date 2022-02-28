@@ -40,7 +40,7 @@ struct Fixture {
     {
         Changeset result;
         const auto& buffer = history_1->get_instruction_encoder().buffer();
-        _impl::SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+        util::SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
         sync::parse_changeset(stream, result);
 
         WriteTransaction wt{sg_2};

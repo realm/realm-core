@@ -199,9 +199,9 @@ set(REALM_INSTALL_HEADERS
     backup_restore.hpp
 
     impl/array_writer.hpp
+    impl/changeset_input_stream.hpp
     impl/cont_transact_hist.hpp
     impl/destroy_guard.hpp
-    impl/input_stream.hpp
     impl/output_stream.hpp
     impl/simulated_failure.hpp
     impl/transact_log.hpp
@@ -233,6 +233,7 @@ set(REALM_INSTALL_HEADERS
     util/functional.hpp
     util/future.hpp
     util/hex_dump.hpp
+    util/input_stream.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
     util/interprocess_mutex.hpp

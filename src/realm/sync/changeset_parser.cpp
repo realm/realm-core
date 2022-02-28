@@ -10,10 +10,10 @@ using namespace realm::sync;
 struct ChangesetParser::State {
     using StringBuffer = util::BasicStringBuffer<util::MeteredAllocator>;
 
-    _impl::NoCopyInputStream& m_input;
+    util::NoCopyInputStream& m_input;
     InstructionHandler& m_handler;
 
-    explicit State(_impl::NoCopyInputStream& input, InstructionHandler& handler)
+    explicit State(util::NoCopyInputStream& input, InstructionHandler& handler)
         : m_input(input)
         , m_handler(handler)
     {
@@ -85,7 +85,7 @@ struct ChangesetParser::State {
 };
 
 
-void ChangesetParser::parse(_impl::NoCopyInputStream& input, InstructionHandler& handler)
+void ChangesetParser::parse(util::NoCopyInputStream& input, InstructionHandler& handler)
 {
     State state{input, handler};
 
@@ -651,14 +651,14 @@ struct InstructionBuilder : InstructionHandler {
 namespace realm {
 namespace sync {
 
-void parse_changeset(_impl::InputStream& input, Changeset& out_log)
+void parse_changeset(util::InputStream& input, Changeset& out_log)
 {
     util::Buffer<char> input_buffer{1024};
-    _impl::NoCopyInputStreamAdaptor in_2{input, input_buffer.data(), input_buffer.size()};
+    util::NoCopyInputStreamAdaptor in_2{input, input_buffer.data(), input_buffer.size()};
     return parse_changeset(in_2, out_log);
 }
 
-void parse_changeset(_impl::NoCopyInputStream& input, Changeset& out_log)
+void parse_changeset(util::NoCopyInputStream& input, Changeset& out_log)
 {
     ChangesetParser parser;
     InstructionBuilder builder{out_log};
