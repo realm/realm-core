@@ -137,9 +137,6 @@ public:
             return schema_mode == SchemaMode::ReadOnly;
         }
 
-        // The following are intended for internal/testing purposes and
-        // should not be publicly exposed in binding APIs
-
         // If false, always return a new Realm instance, and don't return
         // that Realm instance for other requests for a cached Realm. Useful
         // for dynamic Realms and for tests that need multiple instances on
@@ -150,6 +147,7 @@ public:
         // format. Used by the browser to warn the user that it'll modify
         // the file.
         bool disable_format_upgrade = false;
+
         // Disable the background worker thread for producing change
         // notifications. Useful for tests for those notifications so that
         // everything can be done deterministically on one thread, and
