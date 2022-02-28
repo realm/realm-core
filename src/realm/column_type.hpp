@@ -46,7 +46,7 @@ struct ColumnType {
         UUID = 17
     };
 
-    constexpr explicit ColumnType(int t) noexcept
+    constexpr explicit ColumnType(int64_t t) noexcept
         : m_type(Type(t))
     {
     }

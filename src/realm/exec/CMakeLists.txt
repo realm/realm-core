@@ -22,6 +22,13 @@ set_target_properties(RealmTrawler PROPERTIES
 )
 target_link_libraries(RealmTrawler Storage)
 
+add_executable(RealmDecrypt EXCLUDE_FROM_ALL realm_decrypt.cpp )
+set_target_properties(RealmDecrypt PROPERTIES
+    OUTPUT_NAME "realm-decrypt"
+    DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX}
+)
+target_link_libraries(RealmDecrypt Storage)
+
 add_executable(RealmBrowser EXCLUDE_FROM_ALL realm_browser.cpp )
 set_target_properties(RealmBrowser PROPERTIES
     OUTPUT_NAME "realm-browser-10"
