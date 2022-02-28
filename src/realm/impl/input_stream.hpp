@@ -46,9 +46,7 @@ public:
     /// availble.
     virtual size_t read(char* buffer, size_t size) = 0;
 
-    virtual ~InputStream() noexcept
-    {
-    }
+    virtual ~InputStream() noexcept = default;
 };
 
 
@@ -83,9 +81,7 @@ public:
     /// contiguous memory chunk.
     virtual bool next_block(const char*& begin, const char*& end) = 0;
 
-    virtual ~NoCopyInputStream() noexcept
-    {
-    }
+    virtual ~NoCopyInputStream() noexcept = default;
 };
 
 
@@ -135,63 +131,6 @@ private:
     const char* m_data;
     size_t m_size;
 };
-
-class MultiLogNoCopyInputStream : public NoCopyInputStream {
-public:
-    MultiLogNoCopyInputStream(const BinaryData* logs_begin, const BinaryData* logs_end)
-        : m_logs_begin(logs_begin)
-        , m_logs_end(logs_end)
-    {
-        if (m_logs_begin != m_logs_end)
-            m_curr_buf_remaining_size = m_logs_begin->size();
-    }
-
-    size_t read(char* buffer, size_t size)
-    {
-        if (m_logs_begin == m_logs_end)
-            return 0;
-        for (;;) {
-            if (m_curr_buf_remaining_size > 0) {
-                size_t offset = m_logs_begin->size() - m_curr_buf_remaining_size;
-                const char* data = m_logs_begin->data() + offset;
-                size_t size_2 = std::min(m_curr_buf_remaining_size, size);
-                m_curr_buf_remaining_size -= size_2;
-                // FIXME: Eliminate the need for copying by changing the API of
-                // Replication::InputStream such that blocks can be handed over
-                // without copying. This is a straight forward change, but the
-                // result is going to be more complicated and less conventional.
-                realm::safe_copy_n(data, size_2, buffer);
-                return size_2;
-            }
-
-            ++m_logs_begin;
-            if (m_logs_begin == m_logs_end)
-                return 0;
-            m_curr_buf_remaining_size = m_logs_begin->size();
-        }
-    }
-
-    bool next_block(const char*& begin, const char*& end) override
-    {
-        while (m_logs_begin < m_logs_end) {
-            size_t result = m_logs_begin->size();
-            const char* data = m_logs_begin->data();
-            m_logs_begin++;
-            if (result == 0)
-                continue; // skip empty blocks
-            begin = data;
-            end = data + result;
-            return result;
-        }
-        return 0;
-    }
-
-private:
-    const BinaryData* m_logs_begin;
-    const BinaryData* m_logs_end;
-    size_t m_curr_buf_remaining_size;
-};
-
 
 class ChangesetInputStream : public NoCopyInputStream {
 public:

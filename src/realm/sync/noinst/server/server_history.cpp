@@ -1079,7 +1079,7 @@ util::metered::vector<sync::Changeset> ServerHistory::get_parsed_changesets(vers
         std::size_t ndx = std::size_t(version - m_history_base_version - 1);
         Changeset changeset;
 
-        auto binary = BinaryIterator{&m_acc->sh_changesets, ndx};
+        auto binary = ChunkedBinaryData{m_acc->sh_changesets, ndx};
         ChunkedBinaryInputStream stream{binary};
         parse_changeset(stream, changeset); // Throws
 

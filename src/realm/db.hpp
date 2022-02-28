@@ -39,10 +39,6 @@
 
 namespace realm {
 
-namespace _impl {
-class WriteLogCollector;
-}
-
 class Transaction;
 using TransactionRef = std::shared_ptr<Transaction>;
 

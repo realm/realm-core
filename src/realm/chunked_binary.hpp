@@ -40,11 +40,6 @@ public:
     {
     }
 
-    ChunkedBinaryData(const BinaryIterator& bd)
-        : m_begin{bd}
-    {
-    }
-
     ChunkedBinaryData(const BinaryColumn& col, size_t index)
         : m_begin{&col, index}
     {
@@ -82,15 +77,16 @@ public:
     /// has been constructed from BinaryData.
     BinaryData get_first_chunk() const;
 
+    BinaryIterator iterator() const noexcept;
+
 private:
     BinaryIterator m_begin;
-    friend class ChunkedBinaryInputStream;
 };
 
 class ChunkedBinaryInputStream : public _impl::NoCopyInputStream {
 public:
     explicit ChunkedBinaryInputStream(const ChunkedBinaryData& chunks)
-        : m_it(chunks.m_begin)
+        : m_it(chunks.iterator())
     {
     }
 

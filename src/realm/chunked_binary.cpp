@@ -21,6 +21,11 @@
 
 using namespace realm;
 
+BinaryIterator ChunkedBinaryData::iterator() const noexcept
+{
+    return m_begin;
+}
+
 size_t ChunkedBinaryData::size() const noexcept
 {
     BinaryIterator copy = m_begin;
@@ -118,7 +123,5 @@ size_t ChunkedBinaryData::copy_to(std::unique_ptr<char[]>& dest) const
 // has been constructed from BinaryData.
 BinaryData ChunkedBinaryData::get_first_chunk() const
 {
-    BinaryIterator copy = m_begin;
-    BinaryData chunk = copy.get_next();
-    return chunk;
+    return m_begin.get_only();
 }
