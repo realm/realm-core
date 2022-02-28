@@ -13,7 +13,7 @@ using namespace realm;
 
 sync::Changeset changeset_binary_to_sync_changeset(const std::string& changeset_binary)
 {
-    util::SimpleInputStream input_stream{changeset_binary.data(), changeset_binary.size()};
+    util::SimpleInputStream input_stream{changeset_binary};
     sync::Changeset changeset;
     sync::parse_changeset(input_stream, changeset);
 

@@ -67,7 +67,7 @@ TEST_TYPES(InstructionReplication_CreateIdColumnInNewTables, MakeClientHistory, 
     // Check that only the AddTable instruction is emitted
     Changeset result;
     auto buffer = history->get_instruction_encoder().release();
-    util::SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+    util::SimpleNoCopyInputStream stream{buffer};
     sync::parse_changeset(stream, result);
     CHECK_EQUAL(result.size(), 1);
     CHECK_EQUAL(result.begin()->type(), Instruction::Type::AddTable);

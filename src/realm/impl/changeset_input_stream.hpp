@@ -38,15 +38,11 @@ public:
         get_changeset();
     }
 
-    bool next_block(const char*& begin, const char*& end) override
+    util::Span<const char> next_block() override
     {
         while (m_valid) {
-            BinaryData actual = m_changesets_begin->get_next();
-
-            if (actual.size() > 0) {
-                begin = actual.data();
-                end = actual.data() + actual.size();
-                return true;
+            if (BinaryData actual = m_changesets_begin->get_next(); actual.size() > 0) {
+                return actual;
             }
 
             m_changesets_begin++;
@@ -55,7 +51,7 @@ public:
                 get_changeset();
             }
         }
-        return false; // End of input
+        return {nullptr, nullptr}; // End of input
     }
 
 private:
@@ -70,15 +66,17 @@ private:
     {
         auto versions_to_get = m_end_version - m_begin_version;
         m_valid = versions_to_get > 0;
-        if (m_valid) {
-            if (versions_to_get > NB_BUFFERS)
-                versions_to_get = NB_BUFFERS;
-            version_type end_version = m_begin_version + versions_to_get;
-            m_history.get_changesets(m_begin_version, end_version, m_changesets);
-            m_begin_version = end_version;
-            m_changesets_begin = m_changesets;
-            m_changesets_end = m_changesets_begin + versions_to_get;
+        if (!m_valid) {
+            return;
         }
+
+        if (versions_to_get > NB_BUFFERS)
+            versions_to_get = NB_BUFFERS;
+        version_type end_version = m_begin_version + versions_to_get;
+        m_history.get_changesets(m_begin_version, end_version, m_changesets);
+        m_begin_version = end_version;
+        m_changesets_begin = m_changesets;
+        m_changesets_end = m_changesets_begin + versions_to_get;
     }
 };
 

@@ -766,7 +766,7 @@ void TransactLogParser::parse(util::NoCopyInputStream& in, InstructionHandler& h
 template <class InstructionHandler>
 void TransactLogParser::parse(util::InputStream& in, InstructionHandler& handler)
 {
-    util::NoCopyInputStreamAdaptor in_2(in, m_input_buffer.data(), m_input_buffer.size());
+    util::NoCopyInputStreamAdaptor in_2(in, m_input_buffer);
     parse(in_2, handler); // Throws
 }
 
@@ -1031,7 +1031,10 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 
 inline bool TransactLogParser::next_input_buffer()
 {
-    return m_input->next_block(m_input_begin, m_input_end);
+    auto buffer = m_input->next_block();
+    m_input_begin = buffer.begin();
+    m_input_end = buffer.end();
+    return m_input_begin != m_input_end;
 }
 
 
@@ -1291,15 +1294,13 @@ public:
         m_current = m_instr_order.size();
     }
 
-    bool next_block(const char*& begin, const char*& end) override
+    util::Span<const char> next_block() override
     {
         if (m_current != 0) {
             m_current--;
-            begin = m_buffer + m_instr_order[m_current].begin;
-            end = m_buffer + m_instr_order[m_current].end;
-            return (end > begin);
+            return {m_buffer + m_instr_order[m_current].begin, m_buffer + m_instr_order[m_current].end};
         }
-        return false;
+        return {m_buffer, m_buffer};
     }
 
 private:

@@ -90,12 +90,9 @@ public:
     {
     }
 
-    bool next_block(const char*& begin, const char*& end) override
+    util::Span<const char> next_block() override
     {
-        BinaryData block = m_it.get_next();
-        begin = block.data();
-        end = begin + block.size();
-        return begin != end;
+        return m_it.get_next();
     }
 
 private:

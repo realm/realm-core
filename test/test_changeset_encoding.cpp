@@ -15,7 +15,7 @@ Changeset encode_then_parse(const Changeset& changeset)
 
     sync::ChangesetEncoder::Buffer buffer;
     encode_changeset(changeset, buffer);
-    SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+    SimpleNoCopyInputStream stream{buffer};
     Changeset parsed;
     parse_changeset(stream, parsed);
     return parsed;
@@ -272,7 +272,7 @@ TEST(ChangesetEncoding_AccentWords)
     auto& buffer = encoder.buffer();
 
     using realm::util::SimpleNoCopyInputStream;
-    SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+    SimpleNoCopyInputStream stream{buffer};
     Changeset parsed;
     // This will throw if a string is interned twice.
     CHECK_NOTHROW(parse_changeset(stream, parsed));

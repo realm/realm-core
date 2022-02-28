@@ -463,7 +463,10 @@ bool ChangesetParser::State::has_next() noexcept
 
 bool ChangesetParser::State::next_input_buffer() noexcept
 {
-    return m_input.next_block(m_input_begin, m_input_end);
+    auto next = m_input.next_block();
+    m_input_begin = next.begin();
+    m_input_end = next.end();
+    return m_input_begin != m_input_end;
 }
 
 template <class T>
@@ -654,7 +657,7 @@ namespace sync {
 void parse_changeset(util::InputStream& input, Changeset& out_log)
 {
     util::Buffer<char> input_buffer{1024};
-    util::NoCopyInputStreamAdaptor in_2{input, input_buffer.data(), input_buffer.size()};
+    util::NoCopyInputStreamAdaptor in_2{input, input_buffer};
     return parse_changeset(in_2, out_log);
 }
 

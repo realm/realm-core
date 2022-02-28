@@ -1042,7 +1042,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     // Possible optimization: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
     // expensive.
-    util::SimpleInputStream in(uncommitted_changes.data(), uncommitted_changes.size());
+    util::SimpleInputStream in(uncommitted_changes);
     _impl::TransactLogParser parser; // Throws
     _impl::TransactReverser reverser;
     parser.parse(in, reverser); // Throws

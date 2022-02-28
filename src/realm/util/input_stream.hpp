@@ -20,6 +20,7 @@
 #define REALM_UTIL_INPUT_STREAM_HPP
 
 #include <realm/utilities.hpp>
+#include <realm/util/span.hpp>
 
 namespace realm::util {
 class InputStream {
@@ -35,19 +36,16 @@ public:
     /// Implementations are only allowed to block (put the calling thread to
     /// sleep) up until the point in time where the first byte can be made
     /// availble.
-    virtual size_t read(char* buffer, size_t size) = 0;
+    virtual size_t read(Span<char> buffer) = 0;
 
     virtual ~InputStream() noexcept = default;
 };
 
 class NoCopyInputStream {
 public:
-    /// \return if any bytes was read.
-    /// A value of false indicates end-of-input.
-    /// If return value is true, \a begin and \a end are
-    /// updated to reflect the start and limit of a
-    /// contiguous memory chunk.
-    virtual bool next_block(const char*& begin, const char*& end) = 0;
+    /// Returns a span containing the next block.
+    /// A zero-length span indicates end-of-input.
+    virtual Span<const char> next_block() = 0;
 
     virtual ~NoCopyInputStream() noexcept = default;
 };
@@ -55,69 +53,56 @@ public:
 
 class SimpleInputStream : public InputStream {
 public:
-    SimpleInputStream(const char* data, size_t size) noexcept
-        : m_ptr(data)
-        , m_end(data + size)
+    SimpleInputStream(Span<const char> data) noexcept
+        : m_data(data)
     {
     }
-    size_t read(char* buffer, size_t size) override
+    size_t read(Span<char> buffer) override
     {
-        size_t n = std::min(size, size_t(m_end - m_ptr));
-        const char* begin = m_ptr;
-        m_ptr += n;
-        realm::safe_copy_n(begin, n, buffer);
+        size_t n = std::min(buffer.size(), m_data.size());
+        realm::safe_copy_n(m_data.begin(), n, buffer.begin());
+        m_data = m_data.sub_span(n);
         return n;
     }
 
 private:
-    const char* m_ptr;
-    const char* const m_end;
+    Span<const char> m_data;
 };
 
 class NoCopyInputStreamAdaptor : public NoCopyInputStream {
 public:
-    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept
+    NoCopyInputStreamAdaptor(InputStream& in, Span<char> buffer) noexcept
         : m_in(in)
         , m_buffer(buffer)
-        , m_buffer_size(buffer_size)
     {
     }
-    bool next_block(const char*& begin, const char*& end) override
+    Span<const char> next_block() override
     {
-        size_t n = m_in.read(m_buffer, m_buffer_size);
-        begin = m_buffer;
-        end = m_buffer + n;
-        return n;
+        size_t n = m_in.read(m_buffer);
+        return m_buffer.first(n);
     }
 
 private:
     util::InputStream& m_in;
-    char* m_buffer;
-    size_t m_buffer_size;
+    Span<char> m_buffer;
 };
 
 class SimpleNoCopyInputStream : public NoCopyInputStream {
 public:
-    SimpleNoCopyInputStream(const char* data, size_t size)
+    SimpleNoCopyInputStream(Span<const char> data)
         : m_data(data)
-        , m_size(size)
     {
     }
 
-    bool next_block(const char*& begin, const char*& end) override
+    Span<const char> next_block() override
     {
-        if (m_size == 0)
-            return 0;
-        size_t size = m_size;
-        begin = m_data;
-        end = m_data + size;
-        m_size = 0;
-        return size;
+        auto ret = m_data;
+        m_data = m_data.last(0);
+        return ret;
     }
 
 private:
-    const char* m_data;
-    size_t m_size;
+    Span<const char> m_data;
 };
 
 } // namespace realm::util
