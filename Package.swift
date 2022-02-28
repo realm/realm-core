@@ -721,6 +721,8 @@ let package = Package(
             cxxSettings: cxxSettings,
             linkerSettings: [
                 .linkedLibrary("z"),
+                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ]),
         .target(
             name: "RealmQueryParser",
@@ -826,11 +828,7 @@ let package = Package(
                 .headerSearchPath("."),
                 .headerSearchPath("../../external/catch/single_include"),
                 .define("_LIBCPP_DISABLE_AVAILABILITY")
-            ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
+            ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "CapiTests",
             dependencies: ["Capi", "ObjectStoreTestUtils"],
@@ -838,11 +836,7 @@ let package = Package(
             cxxSettings: ([
                 .headerSearchPath("../"),
                 .headerSearchPath("../../../external/catch/single_include")
-            ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
+            ] + cxxSettings) as [CXXSetting]),
     ],
     cxxLanguageStandard: .cxx1z
 )
