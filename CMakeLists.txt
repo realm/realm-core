@@ -354,13 +354,22 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
-if(${CMAKE_GENERATOR} IN_LIST "Ninja;Unix Makefiles")
+set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+
+# Generators that don't support build-time configuration selection.
+# Others like Xcode and Visual Studio can determine the package name
+# based on the build configuration at build-time.
+set(_single_config_generators
+    Ninja
+    "Unix Makefiles"
+)
+if(CMAKE_GENERATOR IN_LIST _single_config_generators)
     set(CPACK_PACKAGE_NAME "realm-${CMAKE_BUILD_TYPE}")
 else()
     set(CPACK_PACKAGE_NAME "realm-\${CPACK_BUILD_CONFIG}")
 endif()
-set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
-set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)
 cpack_add_component(devel DEPENDS devel)
