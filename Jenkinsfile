@@ -772,7 +772,7 @@ def doBuildMacOs(Map options = [:]) {
                     // recordTests expects the test results xml file in a build-dir/test/ folder
                     sh """
                         mkdir -p build-dir/test
-                        cp build-macosx/test/unit-test-report.xml build-dir/test/
+                        cp build-macosx/test/${buildType}/unit-test-report.xml build-dir/test/
                     """
                     recordTests("macosx_${buildType}")
                 }
