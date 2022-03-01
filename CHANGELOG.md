@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Sync changesets waiting to be uploaded to the server are now compressed, reducing the disk space needed when large write transactions are performed while offline or limited in bandwidth. This bumps the sync history schema version, meaning that synchronized Realms written by this version cannot be opened by older versions. Older Realms are seamlessly upgraded and local Realms are uneffected. ([PR 5260](https://github.com/realm/realm-core/pull/5260)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

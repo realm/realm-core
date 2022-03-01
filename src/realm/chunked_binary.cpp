@@ -81,40 +81,18 @@ void ChunkedBinaryData::write_to(util::ResettableExpandableBufferOutputStream& o
     }
 }
 
-// copy_to() copies the ChunkedBinaryData to \a buffer of size
-// \a buffer_size starting at \a offset in the ChunkedBinaryData.
-// copy_to() copies until the end of \a buffer or the end of
-// the ChunkedBinaryData whichever comes first.
-// copy_to() returns the number of copied bytes.
-size_t ChunkedBinaryData::copy_to(char* buffer, size_t buffer_size, size_t offset) const
+void ChunkedBinaryData::copy_to(util::AppendBuffer<char>& dest) const
 {
     size_t sz = size();
-    REALM_ASSERT(offset <= sz);
-    size_t n = std::min(buffer_size, sz - offset);
-    size_t chunk_offset = 0;
-    size_t buffer_pos = 0;
+    dest.resize(sz);
+    util::Span out(dest);
+
     BinaryIterator copy = m_begin;
     BinaryData chunk;
     while (!(chunk = copy.get_next()).is_null()) {
-        if (buffer_pos == n)
-            break;
-        if (chunk_offset + chunk.size() > offset) {
-            size_t begin = offset + buffer_pos - chunk_offset;
-            size_t end = std::min(chunk.size(), begin + n - buffer_pos);
-            std::copy(chunk.data() + begin, chunk.data() + end, buffer + buffer_pos);
-            buffer_pos += end - begin;
-        }
-        chunk_offset += chunk.size();
+        std::copy(chunk.data(), chunk.data() + chunk.size(), out.data());
+        out = out.sub_span(chunk.size());
     }
-    return n;
-}
-
-size_t ChunkedBinaryData::copy_to(std::unique_ptr<char[]>& dest) const
-{
-    size_t sz = size();
-    dest.reset(new char[sz]);
-    copy_to(dest.get(), sz, 0);
-    return size();
 }
 
 // get_first_chunk() is used in situations

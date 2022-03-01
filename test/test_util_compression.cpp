@@ -32,6 +32,11 @@ Buffer<char> generate_compressible_data(size_t size)
 // Generate data that is not compressible.
 Buffer<char> generate_non_compressible_data(size_t size)
 {
+    Buffer<char> result(size);
+#if REALM_PLATFORM_APPLE
+    // arc4random is orders of magnitude faster than Random, so use that when we can
+    arc4random_buf(result.data(), result.size());
+#else
     // Generating random data using the RNG's native size is dramatically faster
     // than generating individual bytes.
     using uint = std::mt19937::result_type;
@@ -39,37 +44,48 @@ Buffer<char> generate_non_compressible_data(size_t size)
     Buffer<uint> content(rounded_size);
     test_util::Random random(test_util::produce_nondeterministic_random_seed());
     random.draw_ints<uint>(content.data(), rounded_size);
-
-    Buffer<char> result(size);
     memcpy(result.data(), content.data(), size);
+#endif
     return result;
+}
+
+AppendBuffer<char> compress_buffer(test_util::unit_test::TestContext& test_context, Span<const char> uncompressed_buf)
+{
+    AppendBuffer<char> compressed_buf;
+    size_t compressed_buf_size = compression::compress_bound(uncompressed_buf.size());
+    CHECK(compressed_buf_size);
+    if (!compressed_buf_size)
+        return compressed_buf;
+    compressed_buf.resize(compressed_buf_size);
+
+    size_t compressed_size;
+    int compression_level = 5;
+    auto ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size, compression_level);
+    CHECK_NOT(ec);
+    if (ec)
+        return AppendBuffer<char>();
+    compressed_buf.resize(compressed_size);
+    return compressed_buf;
+}
+
+void compare(test_util::unit_test::TestContext& test_context, Span<const char> uncompressed,
+             Span<const char> decompressed)
+{
+    CHECK(std::equal(uncompressed.begin(), uncompressed.end(), decompressed.begin(), decompressed.end()));
 }
 
 // Compress, decompress and verify equality.
 void compress_decompress_compare(test_util::unit_test::TestContext& test_context, Span<const char> uncompressed_buf)
 {
-    size_t compressed_buf_size = compression::compress_bound(uncompressed_buf.size());
-    CHECK(compressed_buf_size);
-    if (!compressed_buf_size)
-        return;
-
-    Buffer<char> compressed_buf(compressed_buf_size);
-    size_t compressed_size;
-    int compression_level = 5;
-
-    auto ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size, compression_level);
-    CHECK_NOT(ec);
-    if (ec)
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+    if (!compressed_buf.size())
         return;
 
     Buffer<char> decompressed_buf(uncompressed_buf.size());
-    ec = compression::decompress(Span(compressed_buf).first(compressed_size), decompressed_buf);
+    auto ec = compression::decompress(compressed_buf, decompressed_buf);
     CHECK_NOT(ec);
-    if (ec)
-        return;
-
-    CHECK(std::equal(uncompressed_buf.begin(), uncompressed_buf.end(), decompressed_buf.data(),
-                     decompressed_buf.data() + decompressed_buf.size()));
+    if (!ec)
+        compare(test_context, uncompressed_buf, decompressed_buf);
 }
 
 void allocate_and_compress_decompress_compare(test_util::unit_test::TestContext& test_context,
@@ -78,15 +94,13 @@ void allocate_and_compress_decompress_compare(test_util::unit_test::TestContext&
     std::vector<char> compressed_buf;
 
     compression::CompressMemoryArena compress_memory_arena;
-
     compression::allocate_and_compress(compress_memory_arena, uncompressed_buf, compressed_buf);
 
     Buffer<char> decompressed_buf(uncompressed_buf.size());
     std::error_code ec = compression::decompress(compressed_buf, decompressed_buf);
     CHECK_NOT(ec);
-
-    CHECK(std::equal(uncompressed_buf.begin(), uncompressed_buf.end(), decompressed_buf.data(),
-                     decompressed_buf.data() + decompressed_buf.size()));
+    if (!ec)
+        compare(test_context, uncompressed_buf, decompressed_buf);
 }
 
 } // anonymous namespace
@@ -107,28 +121,72 @@ TEST(Compression_Compress_Buffer_Too_Small)
     CHECK_EQUAL(ec, compression::error::compress_buffer_too_small);
 }
 
-TEST(Compression_Decompress_Incorrect_Size)
+TEST(Compression_Decompress_Too_Small_Buffer)
 {
     size_t uncompressed_size = 10000;
     auto uncompressed_buf = generate_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
 
-    size_t compressed_buf_size = 10000;
-    Buffer<char> compressed_buf(compressed_buf_size);
+    size_t decompressed_size = uncompressed_size / 2; // incorrect
+    Buffer<char> decompressed_buf(decompressed_size);
 
-    size_t compressed_size;
-    int compression_level = 5;
-
-    std::error_code ec = compression::compress(uncompressed_buf, compressed_buf, compressed_size, compression_level);
-    CHECK_NOT(ec);
-
-    // Libcompression always says it used the entire output buffer
-#if !REALM_USE_LIBCOMPRESSION
-    size_t decompressed_size = 5000; // incorrect
-    Buffer<char> decompressed_buf(decompressed_buf_size);
-
-    ec = compression::decompress(compressed_buf, decompressed_buf);
+    auto ec = compression::decompress(compressed_buf, decompressed_buf);
+#if REALM_USE_LIBCOMPRESSION
+    // There doesn't appear to be a good way to distinguish this with libcompression
+    CHECK_EQUAL(ec, compression::error::corrupt_input);
+#else
     CHECK_EQUAL(ec, compression::error::incorrect_decompressed_size);
 #endif
+}
+
+TEST(Compression_Decompress_Too_Large_Buffer)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed_buf = generate_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+
+    size_t decompressed_size = uncompressed_size * 2; // incorrect
+    Buffer<char> decompressed_buf(decompressed_size);
+
+    auto ec = compression::decompress(compressed_buf, decompressed_buf);
+    CHECK_EQUAL(ec, compression::error::incorrect_decompressed_size);
+}
+
+TEST(Compression_Decompress_Truncated_Input)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed_buf = generate_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+
+    Buffer<char> decompressed_buf(uncompressed_size);
+    auto ec = compression::decompress(Span(compressed_buf.data(), compressed_buf.size() - 10), decompressed_buf);
+    CHECK_EQUAL(ec, compression::error::corrupt_input);
+}
+
+TEST(Compression_Decompress_Too_Long_Input)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed_buf = generate_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+    compressed_buf.resize(compressed_buf.size() + 100);
+
+    Buffer<char> decompressed_buf(uncompressed_size);
+    auto ec = compression::decompress(compressed_buf, decompressed_buf);
+    CHECK_EQUAL(ec, compression::error::corrupt_input);
+}
+
+TEST(Compression_Decompress_Corrupt_Input)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed_buf = generate_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+
+    // Flip a bit in the compressed data so that decompression fails
+    compressed_buf.data()[compressed_buf.size() / 2] ^= 1;
+
+    Buffer<char> decompressed_buf(uncompressed_size);
+    auto ec = compression::decompress(compressed_buf, decompressed_buf);
+    CHECK_EQUAL(ec, compression::error::corrupt_input);
 }
 
 // This unit test compresses and decompresses data that is highly compressible.
@@ -188,4 +246,164 @@ TEST_IF(Compression_Allocate_And_Compress_Large, false)
 {
     uint64_t uncompressed_size = (uint64_t(1) << 32) + 100;
     allocate_and_compress_decompress_compare(test_context, generate_compressible_data(size_t(uncompressed_size)));
+}
+
+namespace {
+struct ChunkingStream : NoCopyInputStream {
+    Span<const char> input;
+    size_t block_size;
+    Span<const char> next_block() override
+    {
+        size_t n = std::min(block_size, input.size());
+        auto ret = input.sub_span(0, n);
+        input = input.sub_span(n);
+        return ret;
+    }
+};
+
+// Check a fibonacci sequence of block sizes to validate everything works
+// with weirdly sized blocks. Note that the loop conditional is misleading
+// and it actually does one call with block_size > uncompressed_size.
+void for_each_fib_block_size(size_t size, Span<const char> input, FunctionRef<void(NoCopyInputStream&)> fn)
+{
+    ChunkingStream stream;
+    size_t f1 = 0, f2 = 1;
+    stream.block_size = 0;
+    while (stream.block_size < size) {
+        stream.input = input;
+        stream.block_size = f1 + f2;
+        f1 = f2;
+        f2 = stream.block_size;
+        fn(stream);
+    }
+}
+} // anonymous namespace
+
+TEST(Compression_Decompress_Stream_SmallBlocks)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed_buf = generate_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+    Buffer<char> decompressed_buf(uncompressed_size);
+
+    for_each_fib_block_size(uncompressed_size, compressed_buf, [&](NoCopyInputStream& stream) {
+        auto ec = compression::decompress(stream, decompressed_buf);
+        CHECK_NOT(ec);
+        compare(test_context, uncompressed_buf, decompressed_buf);
+    });
+}
+
+// Verify that things work with > 4 GB blocks
+TEST_IF(Compression_Decompress_Stream_LargeBlocks, false)
+{
+    size_t uncompressed_size = (uint64_t(1) << 33) + (uint64_t(1) << 32); // 12 GB
+    auto uncompressed_buf = generate_non_compressible_data(uncompressed_size);
+    auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
+    Buffer<char> decompressed_buf(uncompressed_size);
+
+    ChunkingStream stream;
+
+    // Everything in one > 4 GB block
+    stream.block_size = uint64_t(1) << 34;
+    stream.input = compressed_buf;
+    auto ec = compression::decompress(stream, decompressed_buf);
+    CHECK_NOT(ec);
+    compare(test_context, uncompressed_buf, decompressed_buf);
+
+    // Multiple > 4 GB blocks
+    stream.block_size = (uint64_t(1) << 32) + 100;
+    stream.input = compressed_buf;
+    ec = compression::decompress(stream, decompressed_buf);
+    CHECK_NOT(ec);
+    compare(test_context, uncompressed_buf, decompressed_buf);
+}
+
+TEST(Compression_AllocateAndCompressWithHeader_Compressible)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    CHECK_LESS(compressed.size(), uncompressed.size());
+
+    util::AppendBuffer<char> decompressed;
+    util::SimpleNoCopyInputStream compressed_stream(compressed);
+    auto ec = compression::decompress_with_header(compressed_stream, decompressed);
+    CHECK_NOT(ec);
+    compare(test_context, uncompressed, decompressed);
+}
+
+TEST(Compression_AllocateAndCompressWithHeader_Noncompressible)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_non_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+
+    // Should have stored uncompressed with a header added
+    CHECK_EQUAL(compressed.size(), uncompressed.size() + 10);
+    compare(test_context, uncompressed, Span(compressed).sub_span(10));
+
+    util::AppendBuffer<char> decompressed;
+    util::SimpleNoCopyInputStream compressed_stream(compressed);
+    auto ec = compression::decompress_with_header(compressed_stream, decompressed);
+    CHECK_NOT(ec);
+    compare(test_context, uncompressed, decompressed);
+}
+
+static void copy_stream(Span<char> dest, NoCopyInputStream& stream)
+{
+    Span out = dest;
+    Span<const char> block;
+    while ((block = stream.next_block()), block.size()) {
+        std::memcpy(out.data(), block.data(), block.size());
+        out = out.sub_span(block.size());
+    }
+}
+
+static void test_decompress_stream(test_util::unit_test::TestContext& test_context, Span<const char> uncompressed,
+                                   Span<const char> compressed)
+{
+    Buffer<char> decompressed(uncompressed.size());
+
+    for_each_fib_block_size(uncompressed.size(), compressed, [&](NoCopyInputStream& stream) {
+        size_t total_size = 0;
+        auto decompress_stream = compression::decompress_input_stream(stream, total_size);
+        CHECK(decompress_stream);
+        CHECK_EQUAL(total_size, uncompressed.size());
+        if (decompress_stream) {
+            copy_stream(decompressed, *decompress_stream);
+            compare(test_context, uncompressed, decompressed);
+        }
+    });
+}
+
+TEST(Compression_DecompressInputStream_Compressible_Small)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    test_decompress_stream(test_context, uncompressed, compressed);
+}
+
+TEST_IF(Compression_DecompressInputStream_Compressible_Large, false)
+{
+    size_t uncompressed_size = (uint64_t(1) << 32) + 100;
+    auto uncompressed = generate_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    test_decompress_stream(test_context, uncompressed, compressed);
+}
+
+TEST(Compression_DecompressInputStream_NonCompressible_Small)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_non_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    test_decompress_stream(test_context, uncompressed, compressed);
+}
+
+TEST_IF(Compression_DecompressInputStream_NonCompressible_Large, false)
+{
+    size_t uncompressed_size = (uint64_t(1) << 32) + 100;
+    auto uncompressed = generate_non_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    test_decompress_stream(test_context, uncompressed, compressed);
 }

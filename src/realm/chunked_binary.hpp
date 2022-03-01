@@ -23,6 +23,7 @@
 #include <realm/column_binary.hpp>
 #include <realm/table.hpp>
 
+#include <realm/util/buffer.hpp>
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/input_stream.hpp>
 
@@ -60,16 +61,9 @@ public:
 
     void write_to(util::ResettableExpandableBufferOutputStream& out) const;
 
-    /// copy_to() copies the chunked binary data to \a buffer of size
-    /// \a buffer_size starting at \a offset in the ChunkedBinary.
-    /// copy_to() copies until the end of \a buffer or the end of
-    /// the ChunkedBinary whichever comes first.
-    /// copy_to() returns the number of copied bytes.
-    size_t copy_to(char* buffer, size_t buffer_size, size_t offset) const;
-
-    /// copy_to() allocates a buffer of size() in \a dest and
-    /// copies the chunked binary data to \a dest.
-    size_t copy_to(std::unique_ptr<char[]>& dest) const;
+    /// copy_to() clears the target buffer and then copies the chunked binary
+    /// data to it.
+    void copy_to(util::AppendBuffer<char>& dest) const;
 
     /// get_first_chunk() is used in situations
     /// where it is known that there is exactly one

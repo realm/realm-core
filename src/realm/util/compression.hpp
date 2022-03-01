@@ -19,7 +19,9 @@
 #ifndef REALM_UTIL_COMPRESSION_HPP
 #define REALM_UTIL_COMPRESSION_HPP
 
+#include <realm/util/buffer.hpp>
 #include <realm/util/features.h>
+#include <realm/util/input_stream.hpp>
 #include <realm/util/span.hpp>
 
 #include <array>
@@ -63,6 +65,11 @@ struct is_error_code_enum<realm::util::compression::error> {
 } // namespace std
 
 namespace realm::util::compression {
+
+enum class Algorithm {
+    None = 0,
+    Deflate = 0x78,
+};
 
 class Alloc {
 public:
@@ -139,8 +146,18 @@ std::error_code compress(Span<const char> uncompressed_buf, Span<char> compresse
 /// category compression::error_code.
 std::error_code decompress(Span<const char> compressed_buf, Span<char> decompressed_buf);
 
-void allocate_and_compress(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
-                           std::vector<char>& compressed_buf);
+std::error_code decompress(NoCopyInputStream& compressed, Span<char> decompressed_buf);
+std::error_code decompress_with_header(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed);
+
+std::error_code allocate_and_compress(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
+                                      std::vector<char>& compressed_buf);
+void allocate_and_compress_with_header(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
+                                       util::AppendBuffer<char>& compressed_buf);
+util::AppendBuffer<char> allocate_and_compress_with_header(Span<const char> uncompressed_buf);
+
+std::unique_ptr<NoCopyInputStream> decompress_input_stream(NoCopyInputStream& source, size_t& total_size);
+
+size_t get_uncompressed_size_from_header(NoCopyInputStream& source);
 
 } // namespace realm::util::compression
 

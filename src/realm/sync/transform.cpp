@@ -2614,10 +2614,19 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
     auto i = p.first;
     if (p.second) {
         i->second = std::make_unique<Changeset>(); // Throws
-        ChunkedBinaryData data = history.get_reciprocal_transform(version);
+        bool is_compressed = false;
+        ChunkedBinaryData data = history.get_reciprocal_transform(version, is_compressed);
         ChunkedBinaryInputStream in{data};
         Changeset& changeset = *i->second;
-        sync::parse_changeset(in, changeset); // Throws
+        if (is_compressed) {
+            size_t total_size;
+            auto decompressed = util::compression::decompress_input_stream(in, total_size);
+            REALM_ASSERT(decompressed);
+            sync::parse_changeset(*decompressed, changeset); // Throws
+        }
+        else {
+            sync::parse_changeset(in, changeset); // Throws
+        }
 
         changeset.version = version;
         changeset.last_integrated_remote_version = history_entry.remote_version;

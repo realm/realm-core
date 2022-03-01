@@ -113,12 +113,17 @@ private:
 template <class T>
 class AppendBuffer {
 public:
+    using value_type = T;
+
     AppendBuffer() noexcept = default;
     AppendBuffer(AppendBuffer&&) noexcept = default;
     AppendBuffer& operator=(AppendBuffer&&) noexcept = default;
 
     /// Returns the current size of the buffer.
     size_t size() const noexcept;
+
+    /// Returns the current capcity of the buffer.
+    size_t capacity() const noexcept;
 
     /// Gives read and write access to the elements.
     T* data() noexcept;
@@ -238,6 +243,12 @@ template <class T>
 inline size_t AppendBuffer<T>::size() const noexcept
 {
     return m_size;
+}
+
+template <class T>
+inline size_t AppendBuffer<T>::capacity() const noexcept
+{
+    return m_buffer.size();
 }
 
 template <class T>

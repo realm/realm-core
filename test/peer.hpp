@@ -340,8 +340,9 @@ public:
         return m_history.find_history_entry(begin_version, end_version, m_remote_file_ident, only_nonempty, entry);
     }
 
-    ChunkedBinaryData get_reciprocal_transform(version_type version) const override final
+    ChunkedBinaryData get_reciprocal_transform(version_type version, bool& is_compressed) const override final
     {
+        is_compressed = false;
         return m_history.get_reciprocal_transform(m_remote_file_ident, version); // Throws
     }
 

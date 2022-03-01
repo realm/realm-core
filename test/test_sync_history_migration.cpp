@@ -67,7 +67,7 @@ TEST(Sync_HistoryMigration)
     // version, and for which corresponding files exist in
     // `resources/history_migration/`. See the `produce_new_files` above for an
     // easy way to generate new files.
-    std::vector<int> client_schema_versions = {11};
+    std::vector<int> client_schema_versions = {11, 12};
     std::vector<int> server_schema_versions = {20};
 
     // Before bootstrapping, there can be no client or server files. After
@@ -439,5 +439,46 @@ TEST(Sync_HistoryMigration)
     }
 
     CHECK_NOT(produce_new_files); // Should not be enabled under normal circumstances
+}
+
+TEST(Sync_HistoryCompression)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBRef db = DB::create(sync::make_client_replication(), path);
+
+    {
+        WriteTransaction wt(db);
+        auto table = wt.add_table("class_table");
+        table->add_column(type_Binary, "data");
+        wt.commit();
+    }
+
+    { // Create a changeset which should be highly compressible
+        WriteTransaction wt(db);
+        auto table = wt.get_table("class_table");
+        auto data = std::make_unique<char[]>(100'000);
+        table->create_object().set("data", BinaryData{data.get(), 100'000});
+        wt.commit();
+    }
+
+    // Inspect the history compartment directly to verify that compression happened
+    ReadTransaction rt(db);
+    using gf = _impl::GroupFriend;
+    Allocator& alloc = gf::get_alloc(rt.get_group());
+    auto ref = gf::get_history_ref(rt.get_group());
+
+    Array history_root(alloc);
+    history_root.init_from_ref(ref);
+
+    BinaryColumn changesets(alloc);
+    changesets.set_parent(&history_root, 13); // s_changesets_iip
+    changesets.init_from_parent();
+
+    // Both changesets should be small: the first because it's just creating the
+    // schema, and the second because the 100k binary data is all zeroes and
+    // can be compressed to <1% of its source size.
+    CHECK_EQUAL(changesets.size(), 2);
+    CHECK_LESS(changesets.get(0).size(), 256);
+    CHECK_LESS(changesets.get(1).size(), 256);
 }
 } // unnamed namespace

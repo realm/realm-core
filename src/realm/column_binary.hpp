@@ -47,6 +47,7 @@ public:
         : m_binary_col(col)
         , m_ndx(ndx)
     {
+        REALM_ASSERT(col);
     }
 
     BinaryData get_next() noexcept

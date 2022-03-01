@@ -50,8 +50,7 @@ public:
     virtual ~NoCopyInputStream() noexcept = default;
 };
 
-
-class SimpleInputStream : public InputStream {
+class SimpleInputStream final : public InputStream {
 public:
     SimpleInputStream(Span<const char> data) noexcept
         : m_data(data)
@@ -69,7 +68,7 @@ private:
     Span<const char> m_data;
 };
 
-class NoCopyInputStreamAdaptor : public NoCopyInputStream {
+class NoCopyInputStreamAdaptor final : public NoCopyInputStream {
 public:
     NoCopyInputStreamAdaptor(InputStream& in, Span<char> buffer) noexcept
         : m_in(in)
@@ -87,7 +86,7 @@ private:
     Span<char> m_buffer;
 };
 
-class SimpleNoCopyInputStream : public NoCopyInputStream {
+class SimpleNoCopyInputStream final : public NoCopyInputStream {
 public:
     SimpleNoCopyInputStream(Span<const char> data)
         : m_data(data)
