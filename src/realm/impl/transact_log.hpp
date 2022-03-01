@@ -26,7 +26,6 @@
 #include <realm/string_data.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/input_stream.hpp>
-#include <realm/util/string_buffer.hpp>
 
 #include <stdexcept>
 #include <tuple>
@@ -396,7 +395,7 @@ private:
     // memory. Setting m_input_end to 0 disables this check, and is used if it is already known
     // that all of the instructions are in memory.
     const char* m_input_end;
-    util::StringBuffer m_string_buffer;
+    std::string m_string_buffer;
 
     REALM_NORETURN void parser_error() const;
 
@@ -408,9 +407,9 @@ private:
     T read_int();
 
     void read_bytes(char* data, size_t size);
-    BinaryData read_buffer(util::StringBuffer&, size_t size);
+    BinaryData read_buffer(std::string&, size_t size);
 
-    StringData read_string(util::StringBuffer&);
+    StringData read_string(std::string&);
 
     // Advance m_input_begin and m_input_end to reflect the next block of instructions
     // Returns false if no more input was available
@@ -1004,7 +1003,7 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
     m_input_begin = to;
 }
 
-inline BinaryData TransactLogParser::read_buffer(util::StringBuffer& buf, size_t size)
+inline BinaryData TransactLogParser::read_buffer(std::string& buf, size_t size)
 {
     const size_t avail = m_input_end - m_input_begin;
     if (avail >= size) {
@@ -1018,7 +1017,7 @@ inline BinaryData TransactLogParser::read_buffer(util::StringBuffer& buf, size_t
     return BinaryData(buf.data(), size);
 }
 
-inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
+inline StringData TransactLogParser::read_string(std::string& buf)
 {
     size_t size = read_int<size_t>(); // Throws
 

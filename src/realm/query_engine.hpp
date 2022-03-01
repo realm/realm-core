@@ -110,7 +110,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/unicode.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/serializer.hpp>
-#include <realm/util/string_buffer.hpp>
 #include <realm/utilities.hpp>
 #include <realm/index_string.hpp>
 

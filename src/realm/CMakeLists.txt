@@ -251,7 +251,6 @@ set(REALM_INSTALL_HEADERS
     util/serializer.hpp
     util/sha_crypto.hpp
     util/span.hpp
-    util/string_buffer.hpp
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp

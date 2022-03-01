@@ -8,8 +8,6 @@ using namespace realm;
 using namespace realm::sync;
 
 struct ChangesetParser::State {
-    using StringBuffer = util::BasicStringBuffer<util::MeteredAllocator>;
-
     util::NoCopyInputStream& m_input;
     InstructionHandler& m_handler;
 
@@ -28,7 +26,7 @@ struct ChangesetParser::State {
     // that all of the instructions are in memory.
     const char* m_input_end = nullptr;
 
-    StringBuffer m_buffer;
+    std::string m_buffer;
     util::metered::set<uint32_t> m_valid_interned_strings;
     // Cannot use StringData as key type since m_input_begin may start pointing
     // to a new chunk of memory.

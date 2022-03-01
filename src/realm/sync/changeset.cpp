@@ -13,7 +13,7 @@ using namespace realm::util;
 Changeset::Changeset()
 {
     m_strings = std::make_shared<InternStrings>();
-    m_string_buffer = std::make_shared<StringBuffer>();
+    m_string_buffer = std::make_shared<std::string>();
 }
 
 Changeset::Changeset(const Changeset& other, share_buffers_tag)

@@ -129,37 +129,33 @@ std::string create_jwt(const std::string appId)
     std::string headerStr = header.dump();
     std::string payloadStr = payload.dump();
 
-    util::StringBuffer header_buffer;
-    header_buffer.resize(util::base64_encoded_size(headerStr.length()));
-    util::base64_encode(headerStr.data(), headerStr.length(), header_buffer.data(), header_buffer.size());
+    std::string encoded_header;
+    encoded_header.resize(util::base64_encoded_size(headerStr.length()));
+    util::base64_encode(headerStr.data(), headerStr.length(), encoded_header.data(), encoded_header.size());
 
-    util::StringBuffer payload_buffer;
-    payload_buffer.resize(util::base64_encoded_size(payloadStr.length()));
-    util::base64_encode(payloadStr.data(), payloadStr.length(), payload_buffer.data(), payload_buffer.size());
+    std::string encoded_payload;
+    encoded_payload.resize(util::base64_encoded_size(payloadStr.length()));
+    util::base64_encode(payloadStr.data(), payloadStr.length(), encoded_payload.data(), encoded_payload.size());
 
     // Remove padding characters.
+    while (encoded_header.back() == '=')
+        encoded_header.pop_back();
+    while (encoded_payload.back() == '=')
+        encoded_payload.pop_back();
 
-    std::string encodedHeaderStr = header_buffer.str();
-    encodedHeaderStr.erase(remove(encodedHeaderStr.begin(), encodedHeaderStr.end(), '='), encodedHeaderStr.end());
-
-    std::string encodedPayloadStr = payload_buffer.str();
-    encodedPayloadStr.erase(remove(encodedPayloadStr.begin(), encodedPayloadStr.end(), '='), encodedPayloadStr.end());
-
-    std::string jwtPayload = encodedHeaderStr + "." + encodedPayloadStr;
+    std::string jwtPayload = encoded_header + "." + encoded_payload;
 
     auto mac = HMAC_SHA256("My_very_confidential_secretttttt", jwtPayload);
 
-    util::StringBuffer signature_buffer;
-    signature_buffer.resize(util::base64_encoded_size(mac.length()));
-    util::base64_encode(mac.data(), mac.length(), signature_buffer.data(), signature_buffer.size());
+    std::string signature;
+    signature.resize(util::base64_encoded_size(mac.length()));
+    util::base64_encode(mac.data(), mac.length(), signature.data(), signature.size());
+    while (signature.back() == '=')
+        signature.pop_back();
+    std::replace(signature.begin(), signature.end(), '+', '-');
+    std::replace(signature.begin(), signature.end(), '/', '_');
 
-    std::string encodedSignatureStr = signature_buffer.str();
-    encodedSignatureStr.erase(remove(encodedSignatureStr.begin(), encodedSignatureStr.end(), '='),
-                              encodedSignatureStr.end());
-    std::replace(encodedSignatureStr.begin(), encodedSignatureStr.end(), '+', '-');
-    std::replace(encodedSignatureStr.begin(), encodedSignatureStr.end(), '/', '_');
-
-    return jwtPayload + "." + encodedSignatureStr;
+    return jwtPayload + "." + signature;
 }
 
 // MARK: - Login with Credentials Tests

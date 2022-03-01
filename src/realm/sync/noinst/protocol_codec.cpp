@@ -141,12 +141,12 @@ std::string ClientProtocol::compressed_hex_dump(BinaryData blob)
     std::vector<char> buf;
     util::compression::allocate_and_compress(m_compress_memory_arena, blob, buf); // Throws
 
-    util::StringBuffer encode_buffer;
+    std::string encode_buffer;
     auto encoded_size = util::base64_encoded_size(buf.size());
     encode_buffer.resize(encoded_size);
     util::base64_encode(buf.data(), buf.size(), encode_buffer.data(), encode_buffer.size());
 
-    return encode_buffer.str();
+    return encode_buffer;
 }
 
 // Server protocol

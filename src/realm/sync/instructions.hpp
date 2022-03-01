@@ -17,7 +17,6 @@
 #include <realm/timestamp.hpp>
 #include <realm/util/input_stream.hpp>
 #include <realm/util/overload.hpp>
-#include <realm/util/string_buffer.hpp>
 
 namespace realm {
 

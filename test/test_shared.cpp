@@ -143,7 +143,7 @@ DWORD winfork(std::string unit_test_name)
 
     GetModuleFileName(nullptr, filename, MAX_PATH);
 
-    StringBuffer environment;
+    std::string environment;
     environment.append("REALM_FORKED=1");
     environment.append("\0", 1);
     environment.append("UNITTEST_FILTER=" + unit_test_name);

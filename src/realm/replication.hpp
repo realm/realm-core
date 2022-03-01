@@ -28,7 +28,6 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
-#include <realm/util/string_buffer.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/transact_log.hpp>
 
