@@ -774,6 +774,8 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
+    test_flags: "-C Debug"
+    package_flags: "-C Debug"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
@@ -790,6 +792,8 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
+    test_flags: "-C Release"
+    package_flags: "-C Release"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
@@ -809,6 +813,8 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
+    test_flags: "-C Debug"
+    package_flags: "-C Debug"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
@@ -827,6 +833,8 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
+    test_flags: "-C Release"
+    package_flags: "-C Release"
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
     run_tests_against_baas: On
