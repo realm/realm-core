@@ -34,9 +34,9 @@ TEST(Sync_SubscriptionStoreBasic)
     SHARED_GROUP_TEST_PATH(sub_store_path);
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        SubscriptionStore store(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
         // Because there are no subscription sets yet, get_latest should point to an empty object
-        auto latest = store.get_latest();
+        auto latest = store->get_latest();
         CHECK(latest.begin() == latest.end());
         CHECK_EQUAL(latest.size(), 0);
         CHECK(latest.find("a sub") == latest.end());
@@ -77,13 +77,13 @@ TEST(Sync_SubscriptionStoreBasic)
     // Destroy the DB and reload it and make sure we can get the subscriptions we set in the previous block.
     {
         SubscriptionStoreFixture fixture(sub_store_path);
-        SubscriptionStore store(fixture.db, [](int64_t) {});
+        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
         auto read_tr = fixture.db->start_read();
         Query query_a(read_tr->get_table(fixture.a_table_key));
         query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
 
-        auto set = store.get_latest();
+        auto set = store->get_latest();
         CHECK_EQUAL(set.version(), 1);
         CHECK_EQUAL(set.size(), 2);
         auto it = set.find(query_a);
@@ -108,7 +108,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -118,7 +118,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 
     // Create a new subscription set, insert a subscription into it, and mark it as complete.
     {
-        auto out = store.get_latest().make_mutable_copy();
+        auto out = store->get_latest().make_mutable_copy();
         auto&& [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         CHECK_NOT(it == out.end());
@@ -129,7 +129,7 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 
     // Clone the completed set and update it to have a new query.
     {
-        auto new_set = store.get_latest().make_mutable_copy();
+        auto new_set = store->get_latest().make_mutable_copy();
         CHECK_EQUAL(new_set.version(), 2);
         new_set.clear();
         new_set.insert_or_assign("b sub", query_b);
@@ -139,8 +139,8 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     // There should now be two subscription sets, version 1 is complete with query a and version 2 is pending with
     // query b.
     {
-        auto active = store.get_active();
-        auto latest = store.get_latest();
+        auto active = store->get_active();
+        auto latest = store->get_latest();
         CHECK_NOT_EQUAL(active.version(), latest.version());
         CHECK_EQUAL(active.state(), SubscriptionSet::State::Complete);
         CHECK_EQUAL(latest.state(), SubscriptionSet::State::Pending);
@@ -155,24 +155,24 @@ TEST(Sync_SubscriptionStoreStateUpdates)
 
     // Mark the version 2 set as complete.
     {
-        auto latest_mutable = store.get_mutable_by_version(2);
+        auto latest_mutable = store->get_mutable_by_version(2);
         latest_mutable.update_state(SubscriptionSet::State::Complete);
         std::move(latest_mutable).commit();
     }
 
     // There should now only be one set, version 2, that is complete. Trying to get version 1 should throw an error.
     {
-        auto active = store.get_active();
-        auto latest = store.get_latest();
+        auto active = store->get_active();
+        auto latest = store->get_latest();
         CHECK(active.version() == latest.version());
         CHECK(active.state() == SubscriptionSet::State::Complete);
 
         // By marking version 2 as complete version 1 will get superceded and removed.
-        CHECK_THROW(store.get_mutable_by_version(1), KeyNotFound);
+        CHECK_THROW(store->get_mutable_by_version(1), KeyNotFound);
     }
 
     {
-        auto set = store.get_latest().make_mutable_copy();
+        auto set = store->get_latest().make_mutable_copy();
         CHECK_EQUAL(set.size(), 1);
         // This is just to create a unique name for this sub so we can verify that the iterator returned by
         // insert_or_assign is pointing to the subscription that was just created.
@@ -197,7 +197,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -207,7 +207,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
     ObjectId id_of_inserted;
     auto sub_name = ObjectId::gen().to_string();
     {
-        auto out = store.get_latest().make_mutable_copy();
+        auto out = store->get_latest().make_mutable_copy();
         auto [it, inserted] = out.insert_or_assign(sub_name, query_a);
         CHECK(inserted);
         CHECK_NOT(it == out.end());
@@ -223,7 +223,7 @@ TEST(Sync_SubscriptionStoreUpdateExisting)
         std::move(out).commit();
     }
     {
-        auto set = store.get_latest().make_mutable_copy();
+        auto set = store->get_latest().make_mutable_copy();
         CHECK_EQUAL(set.size(), 1);
         auto it = std::find_if(set.begin(), set.end(), [&](const Subscription& sub) {
             return sub.id() == id_of_inserted;
@@ -237,7 +237,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
     auto read_tr = fixture.db->start_read();
     Query query_a(read_tr->get_table("class_a"));
@@ -246,7 +246,7 @@ TEST(Sync_SubscriptionStoreAssignAnonAndNamed)
     query_b.equal(fixture.foo_col, "Realm");
 
     {
-        auto out = store.get_latest().make_mutable_copy();
+        auto out = store->get_latest().make_mutable_copy();
         auto [it, inserted] = out.insert_or_assign("a sub", query_a);
         CHECK(inserted);
         auto named_id = it->id();
@@ -273,10 +273,10 @@ TEST(Sync_SubscriptionStoreNotifications)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
-    SubscriptionStore store(fixture.db, [](int64_t) {});
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
 
     std::vector<util::Future<SubscriptionSet::State>> notification_futures;
-    auto sub_set = store.get_latest().make_mutable_copy();
+    auto sub_set = store->get_latest().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Pending));
     sub_set = std::move(sub_set).commit().make_mutable_copy();
     notification_futures.push_back(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping));
@@ -294,13 +294,13 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(notification_futures[0].get(), SubscriptionSet::State::Pending);
 
     // This should also return immediately with a ready future because the subset is in the correct state.
-    CHECK_EQUAL(store.get_mutable_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
+    CHECK_EQUAL(store->get_mutable_by_version(1).get_state_change_notification(SubscriptionSet::State::Pending).get(),
                 SubscriptionSet::State::Pending);
 
     // This should not be ready yet because we haven't updated its state.
     CHECK_NOT(notification_futures[1].is_ready());
 
-    sub_set = store.get_mutable_by_version(2);
+    sub_set = store->get_mutable_by_version(2);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     std::move(sub_set).commit();
 
@@ -311,7 +311,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_NOT(notification_futures[2].is_ready());
 
     // Update the state to complete - skipping the bootstrapping phase entirely.
-    sub_set = store.get_mutable_by_version(3);
+    sub_set = store->get_mutable_by_version(3);
     sub_set.update_state(SubscriptionSet::State::Complete);
     std::move(sub_set).commit();
 
@@ -322,8 +322,8 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Update one of the subscription sets to have an error state along with an error message.
     std::string error_msg = "foo bar bizz buzz. i'm an error string for this test!";
     CHECK_NOT(notification_futures[3].is_ready());
-    auto old_sub_set = store.get_by_version(4);
-    sub_set = store.get_mutable_by_version(4);
+    auto old_sub_set = store->get_by_version(4);
+    sub_set = store->get_mutable_by_version(4);
     sub_set.update_state(SubscriptionSet::State::Bootstrapping);
     sub_set.update_state(SubscriptionSet::State::Error, std::string_view(error_msg));
     std::move(sub_set).commit();
@@ -341,7 +341,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(err_res.get_status().reason(), error_msg);
 
     // Getting a ready future on a set that's already in the error state should also return immediately with an error.
-    err_res = store.get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
+    err_res = store->get_by_version(4).get_state_change_notification(SubscriptionSet::State::Complete).get_no_throw();
     CHECK_NOT(err_res.is_ok());
     CHECK_EQUAL(err_res.get_status().code(), ErrorCodes::RuntimeError);
     CHECK_EQUAL(err_res.get_status().reason(), error_msg);
@@ -352,9 +352,9 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_NOT(notification_futures[4].is_ready());
     CHECK_NOT(notification_futures[5].is_ready());
 
-    old_sub_set = store.get_by_version(5);
+    old_sub_set = store->get_by_version(5);
 
-    sub_set = store.get_mutable_by_version(6);
+    sub_set = store->get_mutable_by_version(6);
     sub_set.update_state(SubscriptionSet::State::Complete);
     std::move(sub_set).commit();
 
@@ -375,11 +375,11 @@ TEST(Sync_SubscriptionStoreNotifications)
     // Check that if a subscription set gets updated to a new state and the SubscriptionSet returned by commit() is
     // not explicitly refreshed (i.e. is reading from a snapshot from before the state change), that it can still
     // return a ready future.
-    auto mut_set = store.get_latest().make_mutable_copy();
+    auto mut_set = store->get_latest().make_mutable_copy();
     auto waitable_set = std::move(mut_set).commit();
 
     {
-        mut_set = store.get_mutable_by_version(waitable_set.version());
+        mut_set = store->get_mutable_by_version(waitable_set.version());
         mut_set.update_state(SubscriptionSet::State::Complete);
         std::move(mut_set).commit();
     }
@@ -387,6 +387,21 @@ TEST(Sync_SubscriptionStoreNotifications)
     auto fut = waitable_set.get_state_change_notification(SubscriptionSet::State::Complete);
     CHECK(fut.is_ready());
     CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
+}
+
+TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    // Because there are no subscription sets yet, get_latest should point to an empty object
+    auto latest = std::make_unique<SubscriptionSet>(store->get_latest());
+    CHECK(latest->begin() == latest->end());
+    // The SubscriptionStore gets destroyed.
+    store.reset();
+
+    // Throws since the SubscriptionStore is gone.
+    CHECK_THROW(latest->refresh(), std::logic_error);
 }
 
 } // namespace realm::sync
