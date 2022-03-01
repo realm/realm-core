@@ -373,6 +373,7 @@ void BaseDescriptor::Sorter::cache_first_column(IndexPairs& v)
 }
 
 DescriptorOrdering::DescriptorOrdering(const DescriptorOrdering& other)
+    : AtomicRefCountBase()
 {
     for (const auto& d : other.m_descriptors) {
         m_descriptors.emplace_back(d->clone());

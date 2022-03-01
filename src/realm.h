@@ -741,6 +741,26 @@ RLM_API uint64_t realm_config_get_max_number_of_active_versions(const realm_conf
 RLM_API void realm_config_set_max_number_of_active_versions(realm_config_t*, uint64_t);
 
 /**
+ * Configure realm to be in memory
+ */
+RLM_API void realm_config_set_in_memory(realm_config_t*, bool) RLM_API_NOEXCEPT;
+
+/**
+ * Check if realm is configured in memory
+ */
+RLM_API bool realm_config_get_in_memory(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Set FIFO path
+ */
+RLM_API void realm_config_set_fifo_path(realm_config_t*, const char*);
+
+/**
+ Check realm FIFO path
+ */
+RLM_API const char* realm_config_get_fifo_path(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
  * Create a custom scheduler object from callback functions.
  *
  * @param userdata Pointer passed to all callbacks.
@@ -999,6 +1019,13 @@ RLM_API realm_schema_t* realm_schema_new(const realm_class_info_t* classes, size
  *       must be called on it.
  */
 RLM_API realm_schema_t* realm_get_schema(const realm_t*);
+
+/**
+ * Get the schema version for this realm.
+ *
+ * This function cannot fail.
+ */
+RLM_API uint64_t realm_get_schema_version(const realm_t* realm);
 
 /**
  * Update the schema of an open realm.
@@ -2007,6 +2034,14 @@ RLM_API realm_dictionary_t* realm_dictionary_from_thread_safe_reference(const re
  */
 RLM_API realm_query_t* realm_query_parse(const realm_t*, realm_class_key_t target_table, const char* query_string,
                                          size_t num_args, const realm_value_t* args);
+
+
+/**
+ * Get textual representation of query
+ *
+ * @return a string containing the description. The string memory is managed by the query object.
+ */
+RLM_API const char* realm_query_get_description(realm_query_t*);
 
 
 /**

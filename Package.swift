@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.9.0"
+let versionStr = "11.10.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -721,6 +721,8 @@ let package = Package(
             cxxSettings: cxxSettings,
             linkerSettings: [
                 .linkedLibrary("z"),
+                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
+                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
             ]),
         .target(
             name: "RealmQueryParser",
@@ -799,6 +801,7 @@ let package = Package(
             cxxSettings: ([
                 .headerSearchPath(".."),
                 .headerSearchPath("../../../external/catch/single_include"),
+                .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "ObjectStoreTests",
@@ -824,11 +827,8 @@ let package = Package(
             cxxSettings: ([
                 .headerSearchPath("."),
                 .headerSearchPath("../../external/catch/single_include"),
-            ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
+                .define("_LIBCPP_DISABLE_AVAILABILITY")
+            ] + cxxSettings) as [CXXSetting]),
         .target(
             name: "CapiTests",
             dependencies: ["Capi", "ObjectStoreTestUtils"],
@@ -836,11 +836,7 @@ let package = Package(
             cxxSettings: ([
                 .headerSearchPath("../"),
                 .headerSearchPath("../../../external/catch/single_include")
-            ] + cxxSettings) as [CXXSetting],
-            linkerSettings: [
-                .linkedFramework("Foundation", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-                .linkedFramework("Security", .when(platforms: [.macOS, .iOS, .tvOS, .watchOS])),
-            ]),
+            ] + cxxSettings) as [CXXSetting]),
     ],
     cxxLanguageStandard: .cxx1z
 )

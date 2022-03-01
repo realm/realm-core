@@ -24,6 +24,8 @@
 #include <realm/util/optional.hpp>
 
 #include <functional>
+#include <filesystem>
+namespace fs = std::filesystem;
 
 namespace realm {
 

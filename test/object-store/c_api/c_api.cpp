@@ -423,6 +423,16 @@ TEST_CASE("C API (non-database)") {
             realm_config_set_max_number_of_active_versions(config.get(), 999);
             CHECK(realm_config_get_max_number_of_active_versions(config.get()) == 999);
         }
+
+        SECTION("realm_config_set_in_memory()") {
+            realm_config_set_in_memory(config.get(), true);
+            CHECK(realm_config_get_in_memory(config.get()) == true);
+        }
+
+        SECTION("realm_config_set_fifo_path()") {
+            realm_config_set_fifo_path(config.get(), "test_path.FIFO");
+            CHECK(std::string{realm_config_get_fifo_path(config.get())} == "test_path.FIFO");
+        }
     }
 }
 
@@ -1485,6 +1495,12 @@ TEST_CASE("C API") {
             auto arg = rlm_str_val("Hello, World!");
             auto q =
                 cptr_checked(realm_query_parse(realm, class_foo.key, "string == $0 SORT(int ASCENDING)", 1, &arg));
+
+            SECTION("realm_query_description()") {
+                const char* descr = realm_query_get_description(q.get());
+                std::string expected = "string == \"Hello, World!\" SORT(int ASC)";
+                CHECK(descr == expected);
+            }
 
             SECTION("realm_query_count()") {
                 size_t count;

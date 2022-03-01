@@ -2,29 +2,57 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
-* 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
-* Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
-* `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* The Swift package set the linker flags on the wrong target, resulting in linker errors when SPM decides to build the core library as a dynamic library ([Swift #7266](https://github.com/realm/realm-swift/issues/7266)).
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 11.10.0 Release notes
+
+### Enhancements
+* Add `util::UniqueFunction::target()`, which does the same thing as `std::function::target()`.
+* 'filter', 'sort', 'distinct', and 'limit' functions on Results added to the C-API. ([#5099](https://github.com/realm/realm-core/issues/5099))
+* Set and Dictionary supported in the C-API. ([#5031](https://github.com/realm/realm-core/issues/5031))
+* realm_query_get_description added to the C-API. ([#5106](https://github.com/realm/realm-core/issues/5106))
+* `Realm::begin_transaction()` no longer spawns a worker thread or asynchronously acquires the write lock on Apple platforms.
+* Added `realm_get_schema_version` to the C-API. ([#5236](https://github.com/realm/realm-core/issues/5236))
+* Added support for configuring 'in_memory' option in C-API. ([#5249](https://github.com/realm/realm-core/issues/5249))
+* Added support for configuring 'custom FIFO file paths' in C-API. ([#5250](https://github.com/realm/realm-core/issues/5250))
+
+### Fixed
 * If a list of objects contains links to objects not included in the synchronized partition, the indices contained in CollectionChangeSet for that list may be wrong ([#5164](https://github.com/realm/realm-core/issues/5164), since v10.0.0)
 * Sending a QUERY message may fail with `Assertion failed: !m_unbind_message_sent` ([#5149](https://github.com/realm/realm-core/pull/5149), since v11.8.0)
 * Subscription names correctly distinguish an empty string from a nullptr ([#5160](https://github.com/realm/realm-core/pull/5160), since v11.8.0)
 * Converting floats/doubles into Decimal128 would yield imprecise results ([#5184](https://github.com/realm/realm-core/pull/5184), since v6.1.0)
 * Fix some warnings when building with Xcode 13.3.
 * Using accented characters in class and field names may end the session ([#5196](https://github.com/realm/realm-core/pull/5196), since v10.2.0)
-* Calling `Realm::invalidate()` from inside `BindingContext::did_change()` could result in write transactions not being persisted to disk (since v11.8.0).
-* Calling `Realm::close()` or `Realm::invalidate()` from the async write callbacks could result in crashes (since v11.8.0).
-* Asynchronous writes did not work with queue-confined Realms (since v11.8.0).
-* Releasing all references to a Realm while an asynchronous write was in progress would sometimes result in use-after-frees (since v11.8.0).
+* Several issues related to async write fixed ([#5183](https://github.com/realm/realm-core/pull/5183), since v11.8.0)
+  - Calling `Realm::invalidate()` from inside `BindingContext::did_change()` could result in write transactions not being persisted to disk
+  - Calling `Realm::close()` or `Realm::invalidate()` from the async write callbacks could result in crashes
+  - Asynchronous writes did not work with queue-confined Realms.
+  - Releasing all references to a Realm while an asynchronous write was in progress would sometimes result in use-after-frees.
+  - Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state.
+  - Using asynchronous writes from multiple threads had several race conditions and would often crash (since v11.8.0).
 * Fixed a fatal sync error "Automatic recovery failed" during DiscardLocal client reset if the reset notifier callbacks were not set to something. ([#5223](https://github.com/realm/realm-core/issues/5223), since v11.5.0)
 * Fixed running file action BackUpThenDeleteRealm which could silently fail to delete the Realm as long as the copy succeeded. If this happens now, the action is changed to DeleteRealm. ([#5180](https://github.com/realm/realm-core/issues/5180), since the beginning)
-* Throwing exceptions from asynchronous write callbacks would result in crashes or the Realm being in an invalid state (since v11.8.0).
 * Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
 * Check, when opening a realm, that in-memory realms are not encrypted ([#5195](https://github.com/realm/realm-core/issues/5195))
-* Using asynchronous writes from multiple threads had several race conditions and would often crash (since v11.8.0).
+* Changed parsed queries using the `between` operator to be inclusive of the limits, a closed interval instead of an open interval. This is to conform to the published documentation and for parity with NSPredicate's definition. ([#5262](https://github.com/realm/realm-core/issues/5262), since the introduction of this operator in v11.3.0)
+* Using a SubscriptionSet after closing the realm could result in a use-after-free violation ([#5208](https://github.com/realm/realm-core/issues/5208), since v11.6.1)
  
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
@@ -43,6 +71,7 @@
 * Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
 * realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
 * Updated apply_to_state_command tool to support query based sync download messages. ([#5226](https://github.com/realm/realm-core/pull/5226))
+* Fixed an issue that made it necessary to always compile with the Windows 8.1 SDK to produce binaries able to run on Windows 8.1. ([#5247](https://github.com/realm/realm-core/pull/5247))
 
 ----------------------------------------------
 

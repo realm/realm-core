@@ -1,6 +1,7 @@
 #ifndef REALM_OBJECT_STORE_C_API_TYPES_HPP
 #define REALM_OBJECT_STORE_C_API_TYPES_HPP
 
+#include <memory>
 #include <realm.h>
 #include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/c_api/error.hpp>
@@ -445,13 +446,13 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
 
 struct realm_query : realm::c_api::WrapC {
     realm::Query query;
-    realm::DescriptorOrdering ordering;
     std::weak_ptr<realm::Realm> weak_realm;
 
-    explicit realm_query(realm::Query query, realm::DescriptorOrdering ordering, std::weak_ptr<realm::Realm> realm)
+    explicit realm_query(realm::Query query, realm::util::bind_ptr<realm::DescriptorOrdering> ordering,
+                         std::weak_ptr<realm::Realm> realm)
         : query(std::move(query))
-        , ordering(std::move(ordering))
         , weak_realm(realm)
+        , m_ordering(std::move(ordering))
     {
     }
 
@@ -460,7 +461,29 @@ struct realm_query : realm::c_api::WrapC {
         return new realm_query{*this};
     }
 
+    realm::Query& get_query()
+    {
+        return query;
+    }
+
+    const realm::DescriptorOrdering& get_ordering() const
+    {
+        static const realm::DescriptorOrdering null_ordering;
+        return m_ordering ? *m_ordering : null_ordering;
+    }
+
+    const char* get_description()
+    {
+        m_description = query.get_description();
+        if (m_ordering)
+            m_description += " " + m_ordering->get_description(query.get_table());
+        return m_description.c_str();
+    }
+
 private:
+    realm::util::bind_ptr<realm::DescriptorOrdering> m_ordering;
+    std::string m_description;
+
     realm_query(const realm_query&) = default;
 };
 

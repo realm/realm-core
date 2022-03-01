@@ -73,6 +73,12 @@ endif()
 
 target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
 
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+        target_link_libraries(ObjectStoreTests stdc++fs)
+    endif()
+endif()
+
 create_coverage_target(generate-coverage ObjectStoreTests)
 
 add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
@@ -145,6 +151,10 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
     get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
     target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
+endif()
+
+if(APPLE)
+    target_compile_definitions(ObjectStoreTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
 endif()
 
 add_subdirectory(notifications-fuzzer)

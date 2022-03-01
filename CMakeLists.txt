@@ -126,11 +126,20 @@ set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_definitions(
-        /DWIN32_LEAN_AND_MEAN
-        /DUNICODE
-        /D_UNICODE
+    add_compile_definitions(
+        WIN32_LEAN_AND_MEAN # include minimal Windows.h for faster builds
+        UNICODE # prefer Unicode variants of Windows APIs over ANSI variants
+        _UNICODE # prefer Unicode variants of C runtime APIs over ANSI variants
     )
+    if(NOT WINDOWS_STORE)
+        # for regular Windows target Windows 8.1 as the minimum version
+        # see https://docs.microsoft.com/en-us/windows/win32/WinProg/using-the-windows-headers
+        add_compile_definitions(
+            _WIN32_WINNT=0x0603
+            WINVER=0x603
+            NTDDI_VERSION=0x06030000
+    )
+    endif()
 endif()
 
 if(MSVC)
@@ -202,6 +211,7 @@ find_package(FLEX 2.6.4 EXACT)
 
 option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
 if(NOT APPLE OR REALM_FORCE_OPENSSL)
+    set(OPENSSL_USE_STATIC_LIBS ON)
     if(VCPKG_TOOLCHAIN)
         # If we're building with vcpkg, prefer to find OpenSSL there first
         find_package(OpenSSL)
