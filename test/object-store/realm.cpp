@@ -679,6 +679,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
         wait_for_download(*realm);
+        wait_for_upload(*realm);
+
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
         REQUIRE(realm->read_group().get_table("class_object")->size() == 3);

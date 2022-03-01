@@ -1989,6 +1989,7 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
         repl.get_history().set_client_file_ident(client_file_ident, fix_up_object_ids); // Throws
         this->m_progress.download.last_integrated_client_version = 0;
         this->m_progress.upload.client_version = 0;
+        this->m_last_version_selected_for_upload = 0;
     }
 
     // Ready to send the IDENT message
