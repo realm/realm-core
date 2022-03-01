@@ -123,6 +123,7 @@ jobWrapper {
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+            buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
             buildiosDebug           : doBuildApplePlatform('iphoneos', 'Debug'),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
@@ -184,7 +185,7 @@ jobWrapper {
             }
 
             windowsBuildTypes = ['Debug', 'Release']
-            windowsPlatforms = ['Win32', 'x64']
+            windowsPlatforms = ['Win32', 'x64', 'ARM64']
 
             for (buildType in windowsBuildTypes) {
                 for (platform in windowsPlatforms) {
@@ -548,7 +549,11 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       CMAKE_BUILD_TYPE: buildType,
       REALM_ENABLE_SYNC: "ON",
       CPACK_SYSTEM_NAME: cpackSystemName,
-      CMAKE_TOOLCHAIN_FILE: "c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+      CMAKE_TOOLCHAIN_FILE: '%WORKSPACE%/tools/vcpkg/ports/scripts/buildsystems/vcpkg.cmake',
+      VCPKG_MANIFEST_DIR: '%WORKSPACE%/tools/vcpkg',
+      VCPKG_OVERLAY_TRIPLETS: '%WORKSPACE%/tools/vcpkg/triplets',
+      // set a custom buildtrees path because the default one is too long and msbuild tasks fail
+      VCPKG_INSTALL_OPTIONS: '--x-buildtrees-root=%WORKSPACE%/vcpkg-buildtrees',
       VCPKG_TARGET_TRIPLET: triplet,
     ]
 
@@ -566,6 +571,10 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       cmakeOptions << [
         REALM_NO_TESTS: '1',
       ]
+    } else {
+        cmakeOptions << [
+            VCPKG_MANIFEST_FEATURES: 'tests'
+        ]
     }
 
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
@@ -575,7 +584,11 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
+                withAWS(credentials: 'aws-credentials', region: 'eu-west-1') {
+                    withEnv(["VCPKG_BINARY_SOURCES=clear;x-aws,s3://vcpkg-binary-caches,readwrite"]) {
+                        bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
+                    }
+                }
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(
                         parser: 'msbuild',
@@ -890,6 +903,16 @@ def setBuildName(newBuildName) {
 def getArchive() {
     deleteDir()
     unstash 'core-source'
+
+    // If the current node's clock is behind the clock of the node that stashed the sources originally
+    // the CMake generated files will always be out-of-date compared to the source files,
+    // which can lead Ninja into a loop.
+    // Touching all source files to reset their timestamp relative to the current node works around that.
+    if (isUnix()) {
+        sh 'find . -type f -exec touch {} +'
+    } else {
+        powershell 'Get-ChildItem . * -recurse | ForEach-Object{$_.LastWriteTime = get-date}'
+    }
 }
 
 def getSourceArchive() {
