@@ -157,17 +157,15 @@ TEST_CASE("test_object_nico") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     TestFile config;
-    // realm::Realm::Config config;
     config.cache = false;
-    config.automatic_change_notifications = true;
-    config.schema = Schema{{"test",
+    config.schema = Schema{{"test_1",
                             {//{"val1",PropertyType::Int},
                              {"val2", PropertyType::Set}}}};
 
     config.schema_version = 0;
     auto realm = Realm::get_shared_realm(config);
     REQUIRE(realm != nullptr);
-    auto table = realm->read_group().get_table("class_test");
+    auto table = realm->read_group().get_table("class_test_1");
     REQUIRE(table != nullptr);
     auto col_key_set = table->get_column_key("val2");
 
@@ -180,28 +178,25 @@ TEST_CASE("test_object_nico") {
     realm->commit_transaction();
 
     // register listener to table changes
-    Object obj{realm, *table->begin()};
+    Object object{realm, *table->begin()};
     CollectionChangeSet c;
-    obj.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr ex) {
+    bool callback_called = false;
+    auto token = object.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr ex) {
         static_cast<void>(ex);
-        auto c = change;
+        auto c = std::move(change);
+        callback_called = true;
     });
-    //
+    advance_and_notify(*realm);
+
     // write into the set
     realm->begin_transaction();
-    // interesting this kills compilation
-    // auto elem =  table->begin()->get_set<int>(col_key_set).size();
-    table->begin()->get_set<int64_t>(col_key_set).insert(6);
-    // objAccessor.get_set<int>(col_key_set).insert(3);
+    objAccessor.get_set<int64_t>(col_key_set).insert(67);
     realm->commit_transaction();
-    //
-    //
+
+
     advance_and_notify(*realm);
-    //
-    //
-    //    //end close file
-    REQUIRE(!c.empty());
-    //    realm->close();
+    REQUIRE(callback_called);
+    // REQUIRE(!c.empty());
 }
 
 TEST_CASE("object") {
