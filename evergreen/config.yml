@@ -485,7 +485,9 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir
+            #TODO RCORE-911 we are pinning the version we're testing against because the API on the cloud side
+            # has changed and we cannot set schema info in our sync tests right now.
+            ./evergreen/install_baas.sh -w ./baas-work-dir -b 7fbacab7df7215ead072684639949235c1aa8217
         fi
 
   - command: shell.exec
