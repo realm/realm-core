@@ -401,7 +401,7 @@ TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
     store.reset();
 
     // Throws since the SubscriptionStore is gone.
-    CHECK_THROW_ANY(latest->refresh());
+    CHECK_THROW(latest->refresh(), std::logic_error);
 }
 
 } // namespace realm::sync
