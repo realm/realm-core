@@ -138,7 +138,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
             _WIN32_WINNT=0x0603
             WINVER=0x603
             NTDDI_VERSION=0x06030000
-    )
+        )
     endif()
 endif()
 
