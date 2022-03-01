@@ -152,6 +152,60 @@ public:
     mutable CreatePolicy last_create_policy;
 };
 
+TEST_CASE("test_object_nico")
+{
+    using namespace std::string_literals;
+    _impl::RealmCoordinator::assert_no_open_realms();
+
+    TestFile config;
+    //realm::Realm::Config config;
+    config.cache = false;
+    config.automatic_change_notifications = true;
+    config.schema = Schema{{"test",{
+        //{"val1",PropertyType::Int},
+        {"val2",PropertyType::Set}
+    }}};
+    
+    config.schema_version = 0;
+    auto realm = Realm::get_shared_realm(config);
+    REQUIRE(realm!=nullptr);
+    auto table = realm->read_group().get_table("class_test");
+    REQUIRE(table!=nullptr);
+    auto col_key_set  = table->get_column_key("val2");
+    
+    realm->begin_transaction();
+    Obj objAccessor = table->create_object();
+    object_store::Set set(realm, objAccessor, col_key_set);
+    set.insert(10);
+    set.insert(5);
+    set.insert(2);
+    realm->commit_transaction();
+    
+    //register listener to table changes
+    Object obj{realm, *table->begin()};
+    CollectionChangeSet c;
+    obj.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr ex){
+        static_cast<void>(ex);
+        auto c = change;
+    });
+//
+    //write into the set
+    realm->begin_transaction();
+    //interesting this kills compilation
+    //auto elem =  table->begin()->get_set<int>(col_key_set).size();
+    table->begin()->get_set<int64_t>(col_key_set).insert(6);
+    //objAccessor.get_set<int>(col_key_set).insert(3);
+    realm->commit_transaction();
+//
+//
+    advance_and_notify(*realm);
+//
+//
+//    //end close file
+    REQUIRE(!c.empty());
+//    realm->close();
+}
+
 TEST_CASE("object") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -324,7 +378,6 @@ TEST_CASE("object") {
 
             advance_and_notify(*r);
         };
-
         auto require_change = [&](Object& object, KeyPathArray key_path_array = {}) {
             auto token = object.add_notification_callback(
                 [&](CollectionChangeSet c, std::exception_ptr) {
