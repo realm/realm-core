@@ -549,7 +549,7 @@ struct ListTracker {
         return util::none;
     }
 
-    util::Optional<CrossListIndex> update(uint32_t index, bool is_embedded = false)
+    util::Optional<CrossListIndex> update(uint32_t index)
     {
         if (m_requires_manual_copy) {
             return util::none;
@@ -559,9 +559,7 @@ struct ListTracker {
                 return ndx;
             }
         }
-        if (!is_embedded) {
-            m_requires_manual_copy = true;
-        }
+        queue_for_manual_copy();
         return util::none;
     }
 
@@ -598,8 +596,7 @@ struct ListTracker {
             }
         }
         if (target_from == m_indices_allowed.end() || target_to == m_indices_allowed.end()) {
-            m_requires_manual_copy = true;
-            m_indices_allowed.clear();
+            queue_for_manual_copy();
             return false;
         }
         REALM_ASSERT_EX(target_from->remote <= lst_size, from, to, target_from->remote, target_to->remote, lst_size);
@@ -663,8 +660,7 @@ struct ListTracker {
             ++it;
         }
         if (!found) {
-            m_requires_manual_copy = true;
-            m_indices_allowed.clear();
+            queue_for_manual_copy();
             return false;
         }
         return true;
@@ -673,6 +669,12 @@ struct ListTracker {
     bool requires_manual_copy() const
     {
         return m_requires_manual_copy;
+    }
+
+    void queue_for_manual_copy()
+    {
+        m_requires_manual_copy = true;
+        m_indices_allowed.clear();
     }
 
 private:
@@ -1139,8 +1141,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             auto obj = link_list.get_obj();
             if (m_lists.count(path) != 0) {
                 auto& list_tracker = m_lists[path];
-                constexpr bool is_embedded = true;
-                auto cross_ndx = list_tracker.update(index, is_embedded);
+                auto cross_ndx = list_tracker.update(index);
                 if (!cross_ndx) {
                     return false; // not allowed to modify this list item
                 }
@@ -1159,7 +1160,9 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 }
             }
             else {
-                return false; // no record of this list, so ignore this instruction
+                // no record of this base list so far, track it for verbatim copy
+                m_lists[path].queue_for_manual_copy();
+                return false;
             }
         }
         else {
