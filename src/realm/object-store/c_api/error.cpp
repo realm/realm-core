@@ -172,7 +172,10 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     catch (const NotNullableException& ex) {
         populate_error(ex, RLM_ERR_PROPERTY_NOT_NULLABLE);
     }
-    catch (const List::OutOfBoundsIndexException& ex) {
+    catch (const object_store::Collection::OutOfBoundsIndexException& ex) {
+        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+    }
+    catch (const Results::OutOfBoundsIndexException& ex) {
         populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
     }
     catch (const query_parser::InvalidQueryError& ex) {
