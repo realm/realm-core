@@ -2885,14 +2885,76 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
             TopLevelContent expected_recovered = local;
             reset_embedded_object({local}, {remote}, expected_recovered);
         }
-        SECTION("inserting an embedded object into a list which has indices modified by the remote") {
-            EmbeddedContent new_element{};
-            local.array_values.insert(local.array_values.end(), new_element);
+        SECTION("moving preexisting list items triggers a list copy") {
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    REQUIRE(list.size() == 3);
+                    list.move(0, 1);
+                    list.move(1, 2);
+                    list.move(1, 0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // any change here is lost
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        TopLevelContent expected_recovered = local;
+                        std::iter_swap(expected_recovered.array_values.begin(),
+                                       expected_recovered.array_values.begin() + 1);
+                        std::iter_swap(expected_recovered.array_values.begin() + 1,
+                                       expected_recovered.array_values.begin() + 2);
+                        std::iter_swap(expected_recovered.array_values.begin() + 1,
+                                       expected_recovered.array_values.begin());
+                        actual.test(expected_recovered);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("inserting new embedded objects into a list which has indices modified by the remote are recovered") {
+            EmbeddedContent new_element1, new_element2;
+            local.array_values.insert(local.array_values.end(), new_element1);
+            local.array_values.insert(local.array_values.begin(), new_element2);
             remote.array_values.erase(remote.array_values.begin());
             remote.array_values.erase(remote.array_values.begin());
-            TopLevelContent expected_recovered = remote;
-            expected_recovered.array_values.insert(expected_recovered.array_values.end(), new_element);
-            reset_embedded_object({local}, {remote}, expected_recovered);
+            test_reset
+                ->make_local_changes([&](SharedRealm local) {
+                    Obj obj = get_top_object(local);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(3);
+                    new_element1.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(0);
+                    new_element2.assign_to(embedded);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size() - 1);
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        TopLevelContent expected_recovered = remote;
+                        expected_recovered.array_values.insert(expected_recovered.array_values.end(), new_element1);
+                        expected_recovered.array_values.insert(expected_recovered.array_values.begin(), new_element2);
+                        actual.test(expected_recovered);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
         }
         SECTION("local list clear removes remotely inserted objects") {
             EmbeddedContent new_element_local, new_element_remote;
@@ -3051,13 +3113,15 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                 ->run();
         }
         SECTION("removing an added list item does not trigger a list copy") {
-            EmbeddedContent local_added_at_begin;
+            EmbeddedContent local_added_and_removed, local_added;
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     Obj obj = get_top_object(local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     auto embedded = list.create_and_insert_linked_object(0);
-                    local_added_at_begin.assign_to(embedded);
+                    local_added_and_removed.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(1);
+                    local_added.assign_to(embedded);
                     local_realm->commit_transaction();
                     local_realm->begin_transaction();
                     list.remove(0);
@@ -3071,17 +3135,27 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                 ->on_post_reset([&](SharedRealm local_realm) {
                     Obj obj = get_top_object(local_realm);
                     TopLevelContent actual = TopLevelContent::get_from(obj);
-                    actual.test(remote);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        TopLevelContent expected_recovered = remote;
+                        expected_recovered.array_values.insert(expected_recovered.array_values.begin(), local_added);
+                        actual.test(expected_recovered);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
                 })
                 ->run();
         }
         SECTION("removing a preexisting list item triggers a list copy") {
-            EmbeddedContent remote_updated_item_0;
+            EmbeddedContent remote_updated_item_0, local_added;
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     Obj obj = get_top_object(local_realm);
                     auto list = obj.get_linklist("array_of_objs");
                     list.remove(0);
+                    list.remove(0);
+                    auto embedded = list.create_and_insert_linked_object(1);
+                    local_added.assign_to(embedded);
                     local = TopLevelContent::get_from(obj);
                 })
                 ->make_remote_changes([&](SharedRealm remote_realm) {
