@@ -152,7 +152,7 @@ public:
     mutable CreatePolicy last_create_policy;
 };
 
-TEST_CASE("test_object_nico") {
+TEST_CASE("simple_test_object_race_condition") {
     using namespace std::string_literals;
     _impl::RealmCoordinator::assert_no_open_realms();
 
@@ -171,32 +171,38 @@ TEST_CASE("test_object_nico") {
 
     realm->begin_transaction();
     Obj objAccessor = table->create_object();
-    object_store::Set set(realm, objAccessor, col_key_set);
+    realm->commit_transaction();
+    
+    Object object{realm, *table->begin()};
+    CollectionChangeSet c;
+    bool callback_called = false;
+    std::atomic<int> n_callbacks = 0;
+    
+    auto token =  object.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr ex) {
+        try
+        {
+            if(ex)
+                std::rethrow_exception(ex);
+            callback_called = true;
+            n_callbacks.fetch_add(1);
+            c = std::move(change);
+        }
+        catch(const std::exception& ) {
+            
+        }
+    });
+    advance_and_notify(*realm);
+    //advance_and_notify(*realm);
+    realm->begin_transaction();
+    object_store::Set set(realm, *table->begin(), col_key_set);
     set.insert(10);
     set.insert(5);
     set.insert(2);
     realm->commit_transaction();
-
-    // register listener to table changes
-    Object object{realm, *table->begin()};
-    CollectionChangeSet c;
-    bool callback_called = false;
-    auto token = object.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr ex) {
-        static_cast<void>(ex);
-        auto c = std::move(change);
-        callback_called = true;
-    });
     advance_and_notify(*realm);
-
-    // write into the set
-    realm->begin_transaction();
-    objAccessor.get_set<int64_t>(col_key_set).insert(67);
-    realm->commit_transaction();
-
-
-    advance_and_notify(*realm);
+        
     REQUIRE(callback_called);
-    // REQUIRE(!c.empty());
+    REQUIRE(n_callbacks.load() == 2);
 }
 
 TEST_CASE("object") {
