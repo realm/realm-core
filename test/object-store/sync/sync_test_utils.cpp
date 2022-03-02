@@ -377,17 +377,20 @@ struct TestServerClientReset : public TestClientReset {
             auto realm2 = Realm::get_shared_realm(m_remote_config);
             auto session2 = sync_manager->get_existing_session(realm2->config().path);
 
-            wait_for_download(*realm2);
-            realm2->begin_transaction();
-            auto table = get_table(*realm2, "object");
-            auto col = table->get_column_key("value");
-            table->begin()->set(col, 6);
-            if (m_make_remote_changes) {
-                m_make_remote_changes(realm2);
+            for (int i = 0; i < 2; ++i) {
+                wait_for_download(*realm2);
+                realm2->begin_transaction();
+                auto table = get_table(*realm2, "object");
+                auto col = table->get_column_key("value");
+                table->begin()->set(col, i + 5);
+                if (i == 1 && m_make_remote_changes) {
+                    m_make_remote_changes(realm2);
+                }
+                realm2->commit_transaction();
+                wait_for_upload(*realm2);
+                server.advance_clock(10s);
             }
-            realm2->commit_transaction();
-            wait_for_upload(*realm2);
-            server.advance_clock(60s);
+            server.advance_clock(10s);
             realm2->close();
         }
 
