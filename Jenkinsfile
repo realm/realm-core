@@ -124,7 +124,7 @@ jobWrapper {
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
             buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
-            buildiosDebug           : doBuildApplePlatform('iphoneos', 'Debug'),
+            checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
@@ -258,7 +258,6 @@ def doCheckInDocker(Map options = [:]) {
             def sourcesDir = pwd()
             def buildEnv = docker.build 'realm-core-linux:21.04'
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
@@ -348,7 +347,6 @@ def doCheckSanity(Map options = [:]) {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
@@ -430,7 +428,7 @@ def doCheckValgrind() {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:21.04'
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
+            environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
             withEnv(environment) {
                 buildEnv.inside {
                     def workspace = pwd()
@@ -448,7 +446,7 @@ def doCheckValgrind() {
                         sh """
                             cd build-dir/test
                             valgrind --version
-                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests --no-error-exitcode
+                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests
                         """
                     } finally {
                         recordTests("Linux-ValgrindDebug")
@@ -467,7 +465,6 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             def buildDir = "build-${stashName}".replaceAll('___', '-')
             def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
             if (test == TestAction.None) {
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
@@ -607,13 +604,12 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 }
             }
             if (runTests && !isUWP) {
-                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
-                environment << 'UNITTEST_PROGRESS=1'
+                def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1' ]
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
-                          realm-tests.exe --no-error-exit-code
+                          realm-tests.exe
                           copy unit-test-report.xml ..\\core-results.xml
                           rmdir /Q /S %TMP%
                         '''
@@ -628,7 +624,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
-                          realm-sync-tests.exe --no-error-exit-code
+                          realm-sync-tests.exe
                           copy unit-test-report.xml ..\\sync-results.xml
                           rmdir /Q /S %TMP%
                         '''
@@ -774,7 +770,6 @@ def doBuildMacOs(Map options = [:]) {
             if (options.runTests) {
                 try {
                     def environment = environment()
-                    environment << 'UNITTEST_PROGRESS=1'
                     environment << 'CTEST_OUTPUT_ON_FAILURE=1'
                     dir('build-macosx') {
                         withEnv(environment) {
@@ -794,10 +789,10 @@ def doBuildMacOs(Map options = [:]) {
     }
 }
 
-def doBuildApplePlatform(String platform, String buildType) {
+def doBuildApplePlatform(String platform, String buildType, boolean test = false) {
     def cmakeOptions = [
         CMAKE_TOOLCHAIN_FILE: '$WORKSPACE/tools/cmake/xcode.toolchain.cmake',
-        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',,
+        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',
         REALM_VERSION: gitDescribeVersion,
         REALM_BUILD_LIB_ONLY: 'ON'
     ]
@@ -824,8 +819,22 @@ def doBuildApplePlatform(String platform, String buildType) {
                         filters: warningFilters,
                     )
                     sh "PLATFORM_NAME=${platform} EFFECTIVE_PLATFORM_NAME=-${platform} cpack -C ${buildType}"
+
+                    if (test) {
+                        if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
+                        sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
+                        def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
+                        withEnv(env) {
+                            runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.core.CoreTests', '$WORKSPACE/')
+                        }
+                        sh '''
+                            mkdir -p $WORKSPACE/build-dir/test
+                            cp $WORKSPACE/unit-test-report.xml $WORKSPACE/build-dir/test
+                        '''
+                    }
                 }
             }
+            if (test) recordTests("${platform}_${buildType}")
 
             String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
             archiveArtifacts tarball
@@ -883,8 +892,9 @@ def recordTests(tag, String reportName = "unit-test-report.xml") {
 def environment() {
     return [
         "UNITTEST_SHUFFLE=1",
-        "UNITTEST_XML=1"
-        ]
+        "UNITTEST_XML=1",
+        "UNITTEST_PROGRESS=1"
+    ]
 }
 
 def readGitTag() {

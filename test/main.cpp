@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#include <realm/util/features.h>
 #include "test_all.hpp"
 #include "util/test_path.hpp"
 #ifdef _WIN32
@@ -24,6 +25,20 @@
 // PathCchRemoveFileSpec()
 #include <pathcch.h>
 #pragma comment(lib, "Pathcch.lib")
+#elif REALM_PLATFORM_APPLE && (REALM_APPLE_DEVICE || TARGET_OS_SIMULATOR)
+#include <CoreFoundation/CoreFoundation.h>
+#include <realm/util/cf_ptr.hpp>
+using namespace realm::util;
+
+static std::string url_to_path(CFURLRef url)
+{
+    auto path = adoptCF(CFURLCopyPath(url));
+    size_t len = CFStringGetLength(path.get()) + 1;
+    char buffer[len];
+    bool result = CFStringGetCString(path.get(), buffer, len, kCFStringEncodingUTF8);
+    REALM_ASSERT(result);
+    return std::string(buffer, len - 1);
+}
 #else
 #include <unistd.h>
 #include <libgen.h>
@@ -39,6 +54,12 @@ int main(int argc, char* argv[])
     }
     PathCchRemoveFileSpec(path, MAX_PATH);
     SetCurrentDirectory(path);
+#elif REALM_PLATFORM_APPLE && (REALM_APPLE_DEVICE || TARGET_OS_SIMULATOR)
+    auto home = adoptCF(CFCopyHomeDirectoryURL());
+    realm::test_util::set_test_path_prefix(url_to_path(home.get()) + "Documents/");
+
+    auto resources_url = adoptCF(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
+    realm::test_util::set_test_resource_path(url_to_path(resources_url.get()));
 #else
     char executable[PATH_MAX];
     if (realpath(argv[0], executable) == nullptr) {
@@ -50,10 +71,11 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Failed to change directory.\n");
         return 1;
     }
+#endif
+
     if (argc > 1) {
         realm::test_util::set_test_path_prefix(argv[1]);
     }
-#endif
 
     return test_all(argc, argv);
 }

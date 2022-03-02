@@ -317,12 +317,13 @@ if (REALM_BUILD_DOGLESS)
 endif()
 
 # Enable CTest and include unit tests
-if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
-    enable_testing()
-    add_subdirectory(test)
-    if (REALM_BUILD_TEST_CLIENT)
-        add_subdirectory(test/client)
-    endif()
+if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+    set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
+endif()
+enable_testing()
+add_subdirectory(test ${REALM_EXCLUDE_TESTS})
+if (REALM_BUILD_TEST_CLIENT)
+    add_subdirectory(test/client)
 endif()
 
 # Install the licence and changelog files

@@ -295,6 +295,8 @@ void display_build_config()
               << "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
               << "\n"
               << "UNITTEST_RANDOM_SEED:                       " << unit_test_random_seed << "\n"
+              << "Test path prefix:                           " << test_util::get_test_path_prefix() << "\n"
+              << "Test resource path:                         " << test_util::get_test_resource_path() << "\n"
               << std::endl;
 }
 
@@ -565,7 +567,8 @@ int test_all(int argc, char* argv[], util::Logger* logger, bool disable_all_sync
         disable_sync_to_disk();
 #endif
 
-    bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
+    char* no_error_exitcode_str = getenv("UNITTEST_NO_ERROR_EXITCODE");
+    bool no_error_exit_status = no_error_exitcode_str && strlen(no_error_exitcode_str) != 0;
 
 #ifdef WIN32
 #if REALM_UWP
@@ -608,5 +611,5 @@ int test_all(int argc, char* argv[], util::Logger* logger, bool disable_all_sync
         getchar(); // wait for key
 #endif
 
-    return success || no_error_exit_staus ? EXIT_SUCCESS : EXIT_FAILURE;
+    return success || no_error_exit_status ? EXIT_SUCCESS : EXIT_FAILURE;
 }
