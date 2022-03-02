@@ -761,6 +761,16 @@ RLM_API void realm_config_set_fifo_path(realm_config_t*, const char*);
 RLM_API const char* realm_config_get_fifo_path(realm_config_t*) RLM_API_NOEXCEPT;
 
 /**
+ * If 'cached' is false, always return a new Realm instance.
+ */
+RLM_API void realm_config_set_cached(realm_config_t*, bool cached) RLM_API_NOEXCEPT;
+
+/**
+ * Check if realms are cached
+ */
+RLM_API bool realm_config_get_cached(realm_config_t*) RLM_API_NOEXCEPT;
+
+/**
  * Create a custom scheduler object from callback functions.
  *
  * @param userdata Pointer passed to all callbacks.

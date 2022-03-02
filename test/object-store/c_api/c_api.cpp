@@ -815,6 +815,16 @@ TEST_CASE("C API") {
 
     CHECK(realm_get_num_classes(realm) == 2);
 
+    SECTION("cached realm") {
+        auto config2 = make_config(test_file.path.c_str(), false);
+        realm_config_set_cached(config2.get(), true);
+        REQUIRE(realm_config_get_cached(config2.get()));
+        auto realm2 = cptr(realm_open(config2.get()));
+        CHECK(!realm_equals(realm, realm2.get()));
+        auto realm3 = cptr(realm_open(config2.get()));
+        REQUIRE(realm_equals(realm3.get(), realm2.get()));
+    }
+
     SECTION("native ptr conversion") {
         realm::SharedRealm native;
         _realm_get_native_ptr(realm, &native, sizeof(native));
