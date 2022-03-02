@@ -1642,6 +1642,18 @@ TEST_CASE("C API") {
                     }
                 }
 
+                SECTION("empty result") {
+                    auto q2 =
+                        cptr_checked(realm_query_parse(realm, class_foo.key, "string == 'boogeyman'", 0, nullptr));
+                    auto r2 = cptr_checked(realm_query_find_all(q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 0);
+                    realm_value_t value = rlm_null();
+                    CHECK(!realm_results_get(r2.get(), 0, &value));
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                }
+
                 SECTION("realm_results_get()") {
                     realm_value_t value = rlm_null();
                     CHECK(checked(realm_results_get(r.get(), 0, &value)));
