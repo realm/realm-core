@@ -406,7 +406,7 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
         },
         default_schema.schema);
 }
-
+#if 0
 TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_offline_writes");
 
@@ -467,7 +467,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         realm->commit_transaction();
 
         sync_session->revive_if_needed();
-        wait_for_upload(*realm);
+        wait_for_download(*realm);
 
         realm->refresh();
         CHECK(results.size() == 2);
@@ -533,7 +533,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
         foo_obj.set<int64_t>(queryable_int_field, 0);
         realm->commit_transaction();
 
-        wait_for_upload(*realm);
+        wait_for_download(*realm);
 
         realm->refresh();
         CHECK(results.size() == 2);
@@ -541,7 +541,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
-
+#endif
 
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
