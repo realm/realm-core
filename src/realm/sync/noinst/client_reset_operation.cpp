@@ -49,14 +49,13 @@ std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
 
 bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
 {
-    REALM_ASSERT(m_db_fresh);
-
     m_salted_file_ident = salted_file_ident;
     // only do the reset if there is data to reset
     // if there is nothing in this Realm, then there is nothing to reset and
     // sync should be able to continue as normal
     bool local_realm_exists = m_db.get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
+        REALM_ASSERT_EX(m_db_fresh, m_db.get_path(), m_discard_local);
         m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, discard_local = %3",
                        m_db.get_path(), local_realm_exists, m_discard_local);
 

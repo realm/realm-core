@@ -76,8 +76,6 @@ protected:
 
     using ListCallback = util::UniqueFunction<void(LstBase&, size_t)>;
     void resolve_list(const Instruction::PathInstruction& instr, const char* instr_name, ListCallback&& callback);
-    void resolve_if_list(const Instruction::PathInstruction& instr, const char* instr_name,
-                         util::UniqueFunction<void(LstBase&)>);
     bool check_links_exist(const Instruction::Payload& payload);
     bool allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name);
     std::string print(const Instruction::PathInstruction& instr) const;
