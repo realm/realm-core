@@ -551,7 +551,6 @@ struct ListTracker {
 
     void clear()
     {
-        // FIXME: check for optimizations here
         // any local operations to a list after a clear are
         // strictly on locally added elements so no need to continue tracking
         m_requires_manual_copy = false;

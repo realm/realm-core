@@ -99,8 +99,9 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
     FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
-/*
+
 #if REALM_ENABLE_AUTH_TESTS
+namespace cf = realm::collection_fixtures;
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
         return;
@@ -1273,7 +1274,6 @@ TEST_CASE("sync: client reset", "[client reset]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-/*
 namespace cf = realm::collection_fixtures;
 TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
@@ -1781,7 +1781,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
         }
     }
 }
-*/
+
 namespace test_instructions {
 
 struct Add {

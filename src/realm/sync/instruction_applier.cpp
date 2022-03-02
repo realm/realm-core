@@ -849,22 +849,6 @@ void InstructionApplier::resolve_list(const Instruction::PathInstruction& instr,
     resolve_path(instr, instr_name, std::move(callback));
 }
 
-void InstructionApplier::resolve_if_list(const Instruction::PathInstruction& instr, const char* instr_name,
-                                         util::UniqueFunction<void(LstBase&)> list_callback)
-{
-    auto callback = util::overload{[&](LstBase& list, size_t) {
-                                       list_callback(list);
-                                   },
-                                   [&](LstBase& list) {
-                                       list_callback(list);
-                                   },
-                                   [&](SetBase&) {},
-                                   [&](Dictionary&) {},
-                                   [&](Dictionary&, Mixed) {},
-                                   [&](Obj&, ColKey) {}};
-    resolve_path(instr, instr_name, std::move(callback));
-}
-
 bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name)
 {
     bool allows_nulls = false;
