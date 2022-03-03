@@ -131,9 +131,7 @@ protected:
 };
 
 #if REALM_ENABLE_SYNC
-std::unique_ptr<TestClientReset> make_test_server_client_reset(const Realm::Config& local_config,
-                                                               const Realm::Config& remote_config,
-                                                               TestSyncManager& test_sync_manager);
+
 #if REALM_ENABLE_AUTH_TESTS
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
