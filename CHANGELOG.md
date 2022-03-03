@@ -10,6 +10,7 @@
 * Wrong error code returned from C-API on MacOS ([#5233](https://github.com/realm/realm-core/issues/5233), since v10.0.0)
 * Mixed::compare() used inconsistent rounding for comparing a Decimal128 to a float, giving different results from comparing those values directly ([#5270](https://github.com/realm/realm-core/pull/5270)).
 * Calling Realm::async_begin_transaction() from within a write transaction while the async state was idle would hit an assertion failure (since v11.10.0).
+* Fix issue with scheduler being deleted on wrong thread. This caused async open to hang in eg. realm-js. ([#5287](https://github.com/realm/realm-core/pull/5287), Since v11.10.0)
  
 ### Breaking changes
 * None.
