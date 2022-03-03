@@ -33,6 +33,7 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/util/event_loop_dispatcher.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/async_open_task.hpp>
@@ -616,16 +617,15 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
         ThreadSafeReference realm_ref;
-        std::atomic<bool> called{false};
+        bool called = false;
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
+        task->start(realm::util::EventLoopDispatcher([&](ThreadSafeReference&& ref, std::exception_ptr error) {
             REQUIRE(!error);
             called = true;
             realm_ref = std::move(ref);
-        });
+        }));
         util::EventLoop::main().run_until([&] {
-            return called.load();
+            return called;
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
