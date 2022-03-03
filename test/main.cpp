@@ -77,5 +77,5 @@ int main(int argc, char* argv[])
         realm::test_util::set_test_path_prefix(argv[1]);
     }
 
-    return test_all(argc, argv);
+    return test_all();
 }

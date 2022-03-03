@@ -545,7 +545,7 @@ bool run_tests(util::Logger* logger)
 } // anonymous namespace
 
 
-int test_all(int argc, char* argv[], util::Logger* logger, bool disable_all_sync_to_disk)
+int test_all(util::Logger* logger, bool disable_all_sync_to_disk)
 {
     // General note: Some Github clients on Windows will interfere with the .realm files created by unit tests (the
     // git client will attempt to access the files when it sees that new files have been created). This may cause
