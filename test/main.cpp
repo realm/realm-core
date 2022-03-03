@@ -33,11 +33,15 @@ using namespace realm::util;
 static std::string url_to_path(CFURLRef url)
 {
     auto path = adoptCF(CFURLCopyPath(url));
-    size_t len = CFStringGetLength(path.get()) + 1;
-    char buffer[len];
-    bool result = CFStringGetCString(path.get(), buffer, len, kCFStringEncodingUTF8);
-    REALM_ASSERT(result);
-    return std::string(buffer, len - 1);
+    auto length = CFStringGetLength(path.get());
+    std::string ret;
+    ret.resize(CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8));
+    CFIndex bytes_written;
+    CFStringGetBytes(path.get(), {0, length}, kCFStringEncodingUTF8, 0, false, reinterpret_cast<uint8_t*>(ret.data()),
+                     ret.size(), &bytes_written);
+    REALM_ASSERT(bytes_written);
+    ret.resize(bytes_written);
+    return ret;
 }
 #else
 #include <unistd.h>
