@@ -107,14 +107,12 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::bad_client_version:
         case ProtocolError::illegal_realm_path:
         case ProtocolError::no_such_realm:
-        case ProtocolError::bad_changeset:
         case ProtocolError::bad_changeset_header_syntax:
         case ProtocolError::bad_changeset_size:
         case ProtocolError::bad_decompression:
         case ProtocolError::unsupported_session_feature:
         case ProtocolError::transact_before_upload:
         case ProtocolError::partial_sync_disabled:
-        case ProtocolError::user_mismatch:
         case ProtocolError::too_many_sessions:
         case ProtocolError::bad_query:
         case ProtocolError::switch_to_pbs:
@@ -149,6 +147,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::object_already_exists:
         case ProtocolError::server_permissions_changed:
         case ProtocolError::write_not_allowed:
+        case ProtocolError::bad_changeset:
+        case ProtocolError::user_mismatch:
             return SimplifiedProtocolError::ClientResetRequested;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
