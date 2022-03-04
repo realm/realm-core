@@ -3092,14 +3092,24 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
-    auto waitpid_checked = [](int pid, int* status, int options) {
+    auto waitpid_checked = [](int pid, int* status, int options, const std::string& info) {
         int ret;
         do {
             ret = waitpid(pid, status, options);
         } while (ret == -1 && errno == EINTR);
-        REALM_ASSERT_EX(ret != -1, errno);
-        REALM_ASSERT(WIFEXITED(*status));
-        REALM_ASSERT(WEXITSTATUS(*status) == 0);
+        REALM_ASSERT_EX(ret != -1, errno, pid, info);
+
+        bool signaled_to_stop = WIFSIGNALED(*status);
+        REALM_ASSERT_EX(!signaled_to_stop, WTERMSIG(*status), WCOREDUMP(*status), pid, info);
+
+        bool stopped = WIFSTOPPED(*status);
+        REALM_ASSERT_EX(!stopped, WSTOPSIG(*status), pid, info);
+
+        bool exited_normally = WIFEXITED(*status);
+        REALM_ASSERT_EX(exited_normally, pid, info);
+
+        auto exit_status = WEXITSTATUS(*status);
+        REALM_ASSERT_EX(exit_status == 0, pid, info);
     };
 
     int readpids[read_process_count];
@@ -3129,7 +3139,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     }
     else {
         int status;
-        waitpid_checked(pid, &status, 0);
+        waitpid_checked(pid, &status, 0, "populate");
     }
 
     // intialization complete. Start writers:
@@ -3159,7 +3169,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all writer threads to complete
     for (int i = 0; i < write_process_count; ++i) {
         int status = 0;
-        waitpid_checked(writepids[i], &status, 0);
+        waitpid_checked(writepids[i], &status, 0, util::format("writer[%1]", i));
     }
 
     // Allow readers time to catch up
@@ -3179,7 +3189,7 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     // Wait for all reader threads to complete
     for (int i = 0; i < read_process_count; ++i) {
         int status;
-        waitpid_checked(readpids[i], &status, 0);
+        waitpid_checked(readpids[i], &status, 0, util::format("reader[%1]", i));
     }
 }
 
