@@ -2,14 +2,14 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Support for new SchemaMode::HardResetFile added. ([#4782](https://github.com/realm/realm-core/issues/4782))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
  
 ### Breaking changes
-* None.
+* SchemaMode::ResetFile renamed to SchemaMode::SoftResetFile.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

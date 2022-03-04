@@ -287,11 +287,13 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             return false;
 
-        case SchemaMode::ResetFile:
+        case SchemaMode::SoftResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
                 return true;
             if (m_schema_version == version && !ObjectStore::needs_migration(changes))
                 return true;
+            REALM_FALLTHROUGH;
+        case SchemaMode::HardResetFile:
             reset_file(schema, changes);
             return true;
 
@@ -347,7 +349,8 @@ void Realm::set_schema_subset(Schema schema)
     std::vector<SchemaChange> changes = m_schema.compare(schema, m_config.schema_mode);
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
-        case SchemaMode::ResetFile:
+        case SchemaMode::SoftResetFile:
+        case SchemaMode::HardResetFile:
             ObjectStore::verify_no_migration_required(changes);
             break;
 

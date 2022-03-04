@@ -79,7 +79,11 @@ enum class SchemaMode : uint8_t {
     // This mode allows using schemata with different subsets of tables
     // on different threads, but the tables which are shared must be
     // identical.
-    ResetFile,
+    SoftResetFile,
+
+    // Delete the file and recreate it from scratch.
+    // The migration function is not used.
+    HardResetFile,
 
     // The only changes allowed are to add new tables, add columns to
     // existing tables, and to add or remove indexes from existing

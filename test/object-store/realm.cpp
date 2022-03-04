@@ -3039,10 +3039,20 @@ struct ModeManual {
         return false;
     }
 };
-struct ModeResetFile {
+struct ModeSoftResetFile {
     static SchemaMode mode()
     {
-        return SchemaMode::ResetFile;
+        return SchemaMode::SoftResetFile;
+    }
+    static bool should_call_init_on_version_bump()
+    {
+        return true;
+    }
+};
+struct ModeHardResetFile {
+    static SchemaMode mode()
+    {
+        return SchemaMode::HardResetFile;
     }
     static bool should_call_init_on_version_bump()
     {
@@ -3051,7 +3061,7 @@ struct ModeResetFile {
 };
 
 TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]", ModeAutomatic,
-                   ModeAdditive, ModeManual, ModeResetFile)
+                   ModeAdditive, ModeManual, ModeSoftResetFile, ModeHardResetFile)
 {
     TestFile config;
     config.schema_mode = TestType::mode();
