@@ -935,7 +935,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 }
 #endif
 
+#ifndef _WIN32
 TEST_CASE("SharedRealm: async writes") {
+
     _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
@@ -1280,9 +1282,9 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 0);
 
         // Should be able to perform another write afterwards
-        realm->async_begin_transaction([&] {
+        realm->async_begin_transaction([&done, table, realm_copy = realm] {
             table->create_object();
-            realm->commit_transaction();
+            realm_copy->commit_transaction();
             done = true;
         });
         wait_for_done();
@@ -1749,7 +1751,7 @@ TEST_CASE("SharedRealm: async writes") {
         return !realm || !realm->has_pending_async_work();
     });
 }
-
+#endif
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms
 #if REALM_PLATFORM_APPLE
@@ -1935,10 +1937,9 @@ private:
     };
     std::vector<Task> m_tasks;
 };
-
+#ifndef _WIN32
 TEST_CASE("SharedRealm: async_writes_2") {
     _impl::RealmCoordinator::assert_no_open_realms();
-
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -2002,6 +2003,7 @@ TEST_CASE("SharedRealm: async_writes_2") {
     });
     REQUIRE(done);
 }
+#endif
 
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())
@@ -2051,7 +2053,7 @@ TEST_CASE("SharedRealm: notifications") {
         realm->commit_transaction();
         REQUIRE(change_count == 1);
     }
-
+#ifndef _WIN32
     SECTION("remote notifications are sent asynchronously") {
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();
@@ -2078,7 +2080,7 @@ TEST_CASE("SharedRealm: notifications") {
             return !realm->has_pending_async_work();
         });
     }
-
+#endif
     SECTION("refresh() from within changes_available() refreshes") {
         context->changes_available_fn = [&] {
             REQUIRE(realm->refresh());
@@ -2309,7 +2311,9 @@ TEST_CASE("Realm::delete_files()") {
         REQUIRE(util::File::exists(path + ".lock"));
         REQUIRE(util::File::exists(path));
         REQUIRE(util::File::exists(path + ".management"));
+#ifndef _WIN32
         REQUIRE(util::File::exists(path + ".note"));
+#endif
         REQUIRE(util::File::exists(path + ".log"));
     }
 
@@ -3108,8 +3112,9 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[
 }
 
 TEST_CASE("BindingContext is notified about delivery of change notifications") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -3306,8 +3311,9 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
 }
 
 TEST_CASE("Statistics on Realms") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     // config.cache = false;
     config.automatic_change_notifications = false;
@@ -3411,7 +3417,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
             REQUIRE_THROWS(realm->verify_thread());
         }).join();
     }
-
+#ifndef _WIN32
     SECTION("delivers notifications to the thread it is resolved on") {
         if (!util::EventLoop::has_implementation())
             return;
@@ -3425,6 +3431,7 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
             return called;
         });
     }
+#endif
 
     SECTION("resolves to existing cached Realm for the thread if caching is enabled") {
         auto r1 = Realm::get_shared_realm(config);
