@@ -84,9 +84,13 @@ public:
         return m_first_page;
     }
 
+    void set_patch_file(const FileDesc& patch) 
+    {
+        m_patch_fd = patch;
+    }
 private:
     SharedFileInfo& m_file;
-
+    FileDesc m_patch_fd;
     size_t m_page_shift;
     size_t m_blocks_per_page;
 
