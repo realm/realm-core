@@ -19,6 +19,7 @@
 #ifndef FLX_SYNC_HARNESS_H
 #define FLX_SYNC_HARNESS_H
 
+#include "util/test_file.hpp"
 #ifdef REALM_ENABLE_AUTH_TESTS
 
 #include "sync/sync_test_utils.hpp"
@@ -113,6 +114,11 @@ public:
     std::shared_ptr<App> app() const noexcept
     {
         return m_test_session.app();
+    }
+
+    const TestAppSession& app_session() const noexcept
+    {
+        return m_test_session;
     }
 
 private:

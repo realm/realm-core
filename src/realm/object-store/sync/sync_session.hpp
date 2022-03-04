@@ -19,6 +19,7 @@
 #ifndef REALM_OS_SYNC_SESSION_HPP
 #define REALM_OS_SYNC_SESSION_HPP
 
+#include "realm/sync/client_base.hpp"
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/sync/config.hpp>
