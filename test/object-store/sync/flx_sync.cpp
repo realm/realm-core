@@ -437,6 +437,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         realm->commit_transaction();
 
         wait_for_upload(*realm);
+        wait_for_download(*realm);
         sync_session->close();
 
         // Make it so the subscriptions only match the "foo" object
