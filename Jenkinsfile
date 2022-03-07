@@ -633,6 +633,16 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         '''
                     }
                 }
+
+                withEnv(environment) {
+                    dir("build-dir/test/object-store/${buildType}") {
+                        bat '''
+                          mkdir %TMP%
+                          realm-object-store-tests.exe
+                          rmdir /Q /S %TMP%
+                        '''
+                    }
+                }
                 def prefix = "Windows-${platform}-${buildType}";
                 recordTests("${prefix}-core", "core-results.xml")
                 recordTests("${prefix}-sync", "sync-results.xml")
