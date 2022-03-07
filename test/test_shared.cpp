@@ -3957,6 +3957,37 @@ TEST(Shared_EncryptionBug)
     }
 }
 
+TEST(Shared_EncryptedFileGen)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    DBOptions options;
+    options.encryption_key = crypt_key(true);
+    {
+        std::unique_ptr<Replication> hist_w(make_in_realm_history());
+        DBRef db = DB::create(*hist_w, path, options);
+        {
+            auto tr = db->start_write();
+            auto foo = tr->add_table("foo");
+            auto col_str = foo->add_column(type_String, "str");
+            auto obj = foo->create_object();
+            tr->commit_and_continue_as_read();
+            for (int i = 0; i < 1024; i++) {
+                auto size = rand() % 10000;
+                std::string s(size, 'A');
+                tr->promote_to_write();
+                obj.set(col_str, s);
+                tr->commit_and_continue_as_read();
+            }
+        }
+    }
+
+    {
+        std::unique_ptr<Replication> hist_w(make_in_realm_history());
+        DBRef db = DB::create(*hist_w, path, options);
+        db->start_read()->verify();
+    }
+}
+
 TEST(Shared_ManyColumns)
 {
     // We had a bug where cluster array has to expand, but the new ref

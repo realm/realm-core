@@ -123,12 +123,41 @@ off_t iv_table_pos(off_t pos)
     return off_t(metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size);
 }
 
+void direct_copy(FileDesc origin_file, FileDesc target_file)
+{
+    size_t buffer_size = 4096;
+    size_t total = 0;
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(buffer_size); // Throws
+    size_t pos = File::get_file_pos(origin_file);
+    File::seek_static(origin_file, 0);
+    for (;;) {
+        size_t n = File::read_static(origin_file, buffer.get(), buffer_size); // Throws
+        File::write_static(target_file, buffer.get(), n);                     // Throws
+        total += n;
+        if (n < buffer_size) {
+            std::cout << "Done with total = " << total << "    and n = " << n << std::endl;
+            break;
+        }
+    }
+    File::seek_static(origin_file, pos);
+}
+
+static int write_cnt = 0;
 void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
 {
     uint64_t orig = File::get_file_pos(fd);
     File::seek_static(fd, pos);
     File::write_static(fd, static_cast<const char*>(data), len);
     File::seek_static(fd, orig);
+
+    ++write_cnt;
+    auto size = File::get_size_static(fd);
+    if ((write_cnt) && (size)) {
+        std::string name = "potential_failure.realm_" + to_string(write_cnt);
+        File f_out(name, File::mode_Write);
+        direct_copy(fd, f_out.get_descriptor());
+        std::cout << "Wrote: " << name << "   with size " << size << std::endl;
+    }
 }
 
 size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
@@ -143,16 +172,16 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
-    : m_rw_buffer(new char[block_size]),
-      m_dst_buffer(new char[block_size])
+    : m_rw_buffer(new char[block_size])
+    , m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
     // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
-    // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to 
+    // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to
     // suppress a false encryption security warning from the IBM Bluemix Security Analyzer (PR[#2911])
     unsigned char u_iv[kCCKeySizeAES256];
     arc4random_buf(u_iv, kCCKeySizeAES256);
-    void *iv = u_iv;
+    void* iv = u_iv;
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
 #elif defined(_WIN32)
@@ -489,8 +518,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (is(m->m_page_state[shadow_mapping_local_ndx], UpToDate)) {
-            memcpy(page_addr(local_page_ndx),
-                   m->page_addr(shadow_mapping_local_ndx),
+            memcpy(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
             return true;
         }
@@ -506,8 +534,8 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 
     if (!copy_up_to_date_page(local_page_ndx)) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
-                            addr, static_cast<size_t>(1ULL << m_page_shift));
+        m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr,
+                            static_cast<size_t>(1ULL << m_page_shift));
     }
     if (is_not(m_page_state[local_page_ndx], UpToDate | PartiallyUpToDate))
         m_num_decrypted++;
@@ -533,7 +561,8 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
         m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
-void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept
+void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset,
+                                                size_t end_offset) noexcept
 {
     // Go through all other mappings of this file and copy changes into those mappings
     size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -542,8 +571,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         if (m != this && m->contains_page(page_ndx_in_file)) {
             size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
             if (is(m->m_page_state[shadow_local_page_ndx], UpToDate)) { // only keep up to data pages up to date
-                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset,
-                       page_addr(local_page_ndx) + begin_offset,
+                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset, page_addr(local_page_ndx) + begin_offset,
                        end_offset - begin_offset);
             }
             else {
@@ -566,8 +594,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
         return;
 
     const size_t page_ndx_in_file = local_page_ndx + m_first_page;
-    if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
-                             m_validate_buffer.get(),
+    if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), m_validate_buffer.get(),
                              static_cast<size_t>(1ULL << m_page_shift)))
         return;
 
@@ -575,8 +602,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (m != this && m->contains_page(page_ndx_in_file) && is(m->m_page_state[shadow_mapping_local_ndx], Dirty)) {
-            memcpy(m_validate_buffer.get(),
-                   m->page_addr(shadow_mapping_local_ndx),
+            memcpy(m_validate_buffer.get(), m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
             break;
         }

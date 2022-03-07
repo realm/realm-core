@@ -28,6 +28,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstring>
 
 constexpr const int signature = 0x41414141;
 uint64_t current_logical_file_size;
@@ -53,7 +54,9 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
     list.insert(list.end(), list2.begin(), list2.end());
     list2.clear();
     if (list.size() > 1) {
-        std::sort(begin(list), end(list), [](T& a, T& b) { return a.start < b.start; });
+        std::sort(begin(list), end(list), [](T& a, T& b) {
+            return a.start < b.start;
+        });
 
         auto prev = list.begin();
         for (auto it = list.begin() + 1; it != list.end(); ++it) {
@@ -76,7 +79,11 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
         }
 
         // Remove all of the now zero-size chunks from the free list
-        list.erase(std::remove_if(begin(list), end(list), [](T& chunk) { return chunk.length == 0; }), end(list));
+        list.erase(std::remove_if(begin(list), end(list),
+                                  [](T& chunk) {
+                                      return chunk.length == 0;
+                                  }),
+                   end(list));
     }
 }
 
@@ -392,6 +399,10 @@ public:
     void schema_info();
     void memory_leaks();
     void free_list_info() const;
+    bool valid()
+    {
+        return m_top_ref != 0;
+    }
 
 private:
     uint64_t m_top_ref;
@@ -423,7 +434,9 @@ std::string human_readable(uint64_t val)
 uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
-    std::for_each(list.begin(), list.end(), [&](const Entry& e) { sz += e.length; });
+    std::for_each(list.begin(), list.end(), [&](const Entry& e) {
+        sz += e.length;
+    });
     return sz;
 }
 
@@ -625,16 +638,20 @@ RealmFile::RealmFile(const std::string& file_path, const char* encryption_key, u
     else {
         std::cout << "Current top ref: 0x" << std::hex << m_top_ref << std::dec << std::endl;
     }
-    m_start_pos = 24;
-    m_group = std::make_unique<Group>(m_alloc, m_top_ref);
-    m_file_format_version = m_alloc.get_committed_file_format_version();
-    std::cout << "File format version: " << m_file_format_version << std::endl;
-    std::cout << "File size: " << m_alloc.get_baseline() << std::endl;
-    std::cout << *m_group;
+    if (m_top_ref) {
+        m_start_pos = 24;
+        m_group = std::make_unique<Group>(m_alloc, m_top_ref);
+        m_file_format_version = m_alloc.get_committed_file_format_version();
+        std::cout << "File format version: " << m_file_format_version << std::endl;
+        std::cout << "File size: " << m_alloc.get_baseline() << std::endl;
+        std::cout << *m_group;
+    }
 }
 
 void RealmFile::node_scan()
 {
+    if (!m_group->valid())
+        return;
     std::map<uint64_t, unsigned> sizes;
     uint64_t ref = m_start_pos;
     auto free_list = m_group->get_free_list();
@@ -692,6 +709,8 @@ void RealmFile::node_scan()
 
 void RealmFile::schema_info()
 {
+    if (!m_group->valid())
+        return;
     m_group->print_schema();
 }
 
@@ -726,6 +745,8 @@ void RealmFile::memory_leaks()
 
 void RealmFile::free_list_info() const
 {
+    if (!m_group->valid())
+        return;
     std::map<uint64_t, unsigned> free_sizes;
     std::map<uint64_t, unsigned> pinned_sizes;
     std::cout << "Free space:" << std::endl;
@@ -808,19 +829,21 @@ int main(int argc, const char* argv[])
                 else {
                     std::cout << "File name: " << argv[curr_arg] << std::endl;
                     RealmFile rf(argv[curr_arg], key_ptr, alternate_top);
-                    if (free_list_info) {
-                        rf.free_list_info();
+                    if (rf.valid()) {
+                        if (free_list_info) {
+                            rf.free_list_info();
+                        }
+                        if (memory_leaks) {
+                            rf.memory_leaks();
+                        }
+                        if (schema_info) {
+                            rf.schema_info();
+                        }
+                        if (node_scan) {
+                            rf.node_scan();
+                        }
+                        std::cout << std::endl;
                     }
-                    if (memory_leaks) {
-                        rf.memory_leaks();
-                    }
-                    if (schema_info) {
-                        rf.schema_info();
-                    }
-                    if (node_scan) {
-                        rf.node_scan();
-                    }
-                    std::cout << std::endl;
                 }
             }
         }
