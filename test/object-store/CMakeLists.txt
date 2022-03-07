@@ -110,11 +110,8 @@ endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
-if(VSCODE_TEST_RUNNER)
-    # Increase the Catch2 virtual console width so that the Visual Studio Code
-    # Test Explorer extension can parse long test names
-    target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
-endif()
+# Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
