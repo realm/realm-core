@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* The previous release broke the `REALM_ENABLE_SYNC` CMake option on Windows in that OpenSSL was always a required dependency, regardless of whether Sync was enabled or not. This has been fixed.
 
 ----------------------------------------------
 
