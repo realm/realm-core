@@ -639,7 +639,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         bat '''
                           mkdir %TMP%
                           realm-object-store-tests.exe
-                          copy unit-test-report.xml ..\\..\\object-store-results.xml
                           rmdir /Q /S %TMP%
                         '''
                     }
@@ -647,7 +646,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 def prefix = "Windows-${platform}-${buildType}";
                 recordTests("${prefix}-core", "core-results.xml")
                 recordTests("${prefix}-sync", "sync-results.xml")
-                recordTests("${prefix}-object-store", "object-store-results.xml")
             }
         }
     }
