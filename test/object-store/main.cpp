@@ -59,19 +59,22 @@ int main(int argc, char** argv)
         return 1;
     }
 #endif
-    int result = -1;
+
+    Catch::ConfigData config;
+
     if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
-        Catch::ConfigData config;
         config.reporterName = "evergreen";
         config.outputFilename = str;
-        Catch::Session session;
-        session.useConfigData(config);
-        result = session.run();
     }
-    else {
-        result = Catch::Session().run(argc, argv);
+    else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
+        config.reporterName = "junit";
+        config.outputFilename = "unit-test-report.xml";
     }
+
+    Catch::Session session;
+    session.useConfigData(config);
+    int result = session.run(argc, argv);
     return result < 0xff ? result : 0xff;
 }
 
