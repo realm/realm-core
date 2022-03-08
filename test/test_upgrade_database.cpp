@@ -1484,12 +1484,12 @@ TEST_IF(Upgrade_Database_9_10, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SI
     if (REALM_MAX_BPNODE_SIZE == 1000) {
         auto sg = DB::create(*hist, temp_copy);
         if (generate_json) {
-            std::ofstream expect("expect_test_upgrade_database_9_to_10.json");
+            std::ofstream expect(test_util::get_test_path_prefix() + "expect_test_upgrade_database_9_to_10.json");
             sg->start_read()->to_json(expect, 0);
         }
         nlohmann::json expected;
         nlohmann::json actual;
-        std::ifstream expect("expect_test_upgrade_database_9_to_10.json");
+        std::ifstream expect(test_util::get_test_resource_path() + "expect_test_upgrade_database_9_to_10.json");
         expect >> expected;
 
         std::stringstream out;

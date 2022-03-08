@@ -124,7 +124,7 @@ jobWrapper {
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
             buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
             buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
-            buildiosDebug           : doBuildAppleDevice('iphoneos', 'Debug'),
+            checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
@@ -156,7 +156,7 @@ jobWrapper {
 
             parallelExecutors = [
                 buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
-                buildCatalystRelease: doBuildMacOsCatalyst('Release'),
+                buildCatalystRelease: doBuildApplePlatform('maccatalyst', 'Release'),
 
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
@@ -176,7 +176,7 @@ jobWrapper {
                          'watchos', 'watchsimulator']
 
             for (sdk in appleSdks) {
-                parallelExecutors[sdk] = doBuildAppleDevice(sdk, 'Release')
+                parallelExecutors[sdk] = doBuildApplePlatform(sdk, 'Release')
             }
 
             linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
@@ -204,11 +204,9 @@ jobWrapper {
                     unstash name: cocoaStash
                 }
                 sh 'tools/build-cocoa.sh -x'
-                archiveArtifacts('realm-*.tar.*')
-                stash includes: 'realm-*.tar.xz', name: "cocoa-xz"
-                stash includes: 'realm-*.tar.gz', name: "cocoa-gz"
-                publishingStashes << "cocoa-xz"
-                publishingStashes << "cocoa-gz"
+                archiveArtifacts('realm-*.tar.xz')
+                stash includes: 'realm-*.tar.xz', name: "cocoa"
+                publishingStashes << "cocoa"
             }
         }
         stage('Publish to S3') {
@@ -260,7 +258,6 @@ def doCheckInDocker(Map options = [:]) {
             def sourcesDir = pwd()
             def buildEnv = docker.build 'realm-core-linux:21.04'
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
@@ -350,7 +347,6 @@ def doCheckSanity(Map options = [:]) {
             getArchive()
             def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             withEnv(environment) {
                 buildEnv.inside(privileged) {
                     try {
@@ -432,7 +428,7 @@ def doCheckValgrind() {
             getArchive()
             def buildEnv = docker.build 'realm-core-linux:21.04'
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
+            environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
             withEnv(environment) {
                 buildEnv.inside {
                     def workspace = pwd()
@@ -450,7 +446,7 @@ def doCheckValgrind() {
                         sh """
                             cd build-dir/test
                             valgrind --version
-                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests --no-error-exitcode
+                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests
                         """
                     } finally {
                         recordTests("Linux-ValgrindDebug")
@@ -469,7 +465,6 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             def buildDir = "build-${stashName}".replaceAll('___', '-')
             def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
             if (test == TestAction.None) {
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
@@ -606,13 +601,12 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 }
             }
             if (runTests && !isUWP) {
-                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
-                environment << 'UNITTEST_PROGRESS=1'
+                def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1' ]
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
-                          realm-tests.exe --no-error-exit-code
+                          realm-tests.exe
                           copy unit-test-report.xml ..\\core-results.xml
                           rmdir /Q /S %TMP%
                         '''
@@ -627,7 +621,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
-                          realm-sync-tests.exe --no-error-exit-code
+                          realm-sync-tests.exe
                           copy unit-test-report.xml ..\\sync-results.xml
                           rmdir /Q /S %TMP%
                         '''
@@ -718,48 +712,48 @@ def buildPerformance() {
 
 def doBuildMacOs(Map options = [:]) {
     def buildType = options.buildType;
-    def sdk = 'macosx'
 
     def cmakeOptions = [
-        CMAKE_BUILD_TYPE: options.buildType,
-        CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
+        CMAKE_TOOLCHAIN_FILE: '$WORKSPACE/tools/cmake/xcode.toolchain.cmake',
+        CMAKE_SYSTEM_NAME: 'Darwin',
+        CPACK_SYSTEM_NAME: 'macosx',
+        CMAKE_OSX_ARCHITECTURES: 'x86_64;arm64',
+        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',
         REALM_ENABLE_SYNC: options.enableSync,
+        REALM_VERSION: gitDescribeVersion
     ]
     if (!options.runTests) {
         cmakeOptions << [
-            REALM_NO_TESTS: "ON",
+            REALM_NO_TESTS: 'ON',
         ]
     }
     if (longRunningTests) {
         cmakeOptions << [
-            CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
+            CMAKE_CXX_FLAGS: '-DTEST_DURATION=1',
         ]
     }
 
-    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=\"$v\"" }.join(' ')
 
     return {
         rlmNode('osx') {
             getArchive()
 
-            dir("build-macosx-${buildType}") {
+            dir('build-macosx') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
                     retry(3) {
                         timeout(time: 2, unit: 'MINUTES') {
-                            sh """
-                                rm -rf *
-                                cmake ${cmakeDefinitions} -D REALM_VERSION=${gitDescribeVersion} -G Ninja ..
-                            """
+                            sh "cmake ${cmakeDefinitions} -G Xcode .."
                         }
                     }
 
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: 'ninja package',
-                        name: "osx-clang-${buildType}",
+                        script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO",
+                        name: "xcode-macosx-${buildType}",
                         filters: warningFilters,
                     )
                 }
@@ -768,34 +762,34 @@ def doBuildMacOs(Map options = [:]) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
-                    name: "osx-clang-xcrun-swift-${buildType}",
+                    name: "swift-build-macosx-${buildType}",
                     filters: warningFilters,
                 )
                 sh 'xcrun swift run ObjectStoreTests'
             }
 
-            archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
+            String tarball = "realm-${buildType}-${gitDescribeVersion}-macosx-*.tar.gz"
+            archiveArtifacts tarball
 
             def stashName = "macosx___${buildType}"
-            stash includes:"build-macosx-${buildType}/*.tar.gz", name:stashName
+            stash includes: tarball, name: stashName
             cocoaStashes << stashName
             publishingStashes << stashName
 
             if (options.runTests) {
                 try {
                     def environment = environment()
-                    environment << 'UNITTEST_PROGRESS=1'
                     environment << 'CTEST_OUTPUT_ON_FAILURE=1'
-                    dir("build-macosx-${buildType}") {
+                    dir('build-macosx') {
                         withEnv(environment) {
-                            sh "${ctest_cmd}"
+                            sh "${ctest_cmd} -C ${buildType}"
                         }
                     }
                 } finally {
                     // recordTests expects the test results xml file in a build-dir/test/ folder
                     sh """
                         mkdir -p build-dir/test
-                        cp build-macosx-${buildType}/test/unit-test-report.xml build-dir/test/
+                        cp build-macosx/test/${buildType}/unit-test-report.xml build-dir/test/
                     """
                     recordTests("macosx_${buildType}")
                 }
@@ -804,63 +798,60 @@ def doBuildMacOs(Map options = [:]) {
     }
 }
 
-def doBuildMacOsCatalyst(String buildType) {
+def doBuildApplePlatform(String platform, String buildType, boolean test = false) {
+    def cmakeOptions = [
+        CMAKE_TOOLCHAIN_FILE: '$WORKSPACE/tools/cmake/xcode.toolchain.cmake',
+        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',
+        REALM_VERSION: gitDescribeVersion,
+        REALM_BUILD_LIB_ONLY: 'ON'
+    ]
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=\"$v\"" }.join(' ')
+
+    String buildDestination = "generic/platform=${platform}"
+    if (platform == 'maccatalyst') {
+        buildDestination = 'generic/platform=macOS,variant=Mac Catalyst'
+    }
+
     return {
         rlmNode('osx') {
             getArchive()
 
-            dir("build-maccatalyst-${buildType}") {
+            dir('build-xcode-platforms') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
-                    sh """
-                            rm -rf *
-                            cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
-                                  -D CMAKE_BUILD_TYPE=${buildType} \\
-                                  -D REALM_VERSION=${gitDescribeVersion} \\
-                                  -D REALM_SKIP_SHARED_LIB=ON \\
-                                  -D REALM_BUILD_LIB_ONLY=ON \\
-                                  -G Ninja ..
-                        """
+                    sh "cmake ${cmakeDefinitions} -G Xcode .."
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: 'ninja package',
-                        name: "osx-maccatalyst-${buildType}",
+                        script: """
+                            xcodebuild -scheme ALL_BUILD -configuration ${buildType} -destination "${buildDestination}"
+                        """,
+                        name: "xcode-${platform}-${buildType}",
                         filters: warningFilters,
                     )
-                }
-            }
+                    sh "PLATFORM_NAME=${platform} EFFECTIVE_PLATFORM_NAME=-${platform} cpack -C ${buildType}"
 
-            archiveArtifacts("build-maccatalyst-${buildType}/*.tar.gz")
-
-            def stashName = "maccatalyst__${buildType}"
-            stash includes:"build-maccatalyst-${buildType}/*.tar.gz", name:stashName
-            cocoaStashes << stashName
-            publishingStashes << stashName
-        }
-    }
-}
-
-def doBuildAppleDevice(String sdk, String buildType) {
-    return {
-        rlmNode('osx') {
-            getArchive()
-
-            withEnv(["DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/"]) {
-                retry(3) {
-                    timeout(time: 45, unit: 'MINUTES') {
-                        sh """
-                            rm -rf build-*
-                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                        """
+                    if (test) {
+                        if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
+                        sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
+                        def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
+                        withEnv(env) {
+                            runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.core.CoreTests', '$WORKSPACE/')
+                        }
+                        sh '''
+                            mkdir -p $WORKSPACE/build-dir/test
+                            cp $WORKSPACE/unit-test-report.xml $WORKSPACE/build-dir/test
+                        '''
                     }
                 }
             }
-            archiveArtifacts("build-${sdk}-${buildType}/*.tar.gz")
-            def stashName = "${sdk}___${buildType}"
-            stash includes:"build-${sdk}-${buildType}/*.tar.gz", name:stashName
+            if (test) recordTests("${platform}_${buildType}")
+
+            String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
+            archiveArtifacts tarball
+
+            def stashName = "${platform}__${buildType}"
+            stash includes: tarball, name: stashName
             cocoaStashes << stashName
-            if(gitTag) {
-                publishingStashes << stashName
-            }
+            publishingStashes << stashName
         }
     }
 }
@@ -910,8 +901,9 @@ def recordTests(tag, String reportName = "unit-test-report.xml") {
 def environment() {
     return [
         "UNITTEST_SHUFFLE=1",
-        "UNITTEST_XML=1"
-        ]
+        "UNITTEST_XML=1",
+        "UNITTEST_PROGRESS=1"
+    ]
 }
 
 def readGitTag() {

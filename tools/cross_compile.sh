@@ -80,27 +80,16 @@ if [ "${OS}" == "android" ]; then
     ninja -v
     ninja package
 else
-    case "${OS}" in
-        iphone*) toolchain="ios";;
-        watch*) toolchain="watchos";;
-        appletv*) toolchain="tvos";;
-    esac
-    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
+    mkdir -p build-xcode-platforms
+    cd build-xcode-platforms || exit 1
 
-    mkdir -p "build-${OS}-${BUILD_TYPE}"
-    cd "build-${OS}-${BUILD_TYPE}" || exit 1
-
-    cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${toolchain}.toolchain.cmake" \
-          -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
+    cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
           -D REALM_BUILD_LIB_ONLY=1 \
           -D REALM_VERSION="${VERSION}" \
           ${CMAKE_FLAGS} \
           -G Xcode ..
-    xcodebuild -sdk "${OS}" \
-               -configuration "${BUILD_TYPE}" \
-               -target install \
-               ONLY_ACTIVE_ARCH=NO
-    tar -cvzf "realm-${BUILD_TYPE}-${VERSION}-${OS}-devel.tar.gz" -C install lib include
+    xcodebuild -scheme ALL_BUILD -configuration "${BUILD_TYPE}" -destination "generic/platform=${OS}"
+    PLATFORM_NAME="${OS}" EFFECTIVE_PLATFORM_NAME="-${OS}" cpack -C "${BUILD_TYPE}"
 fi

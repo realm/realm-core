@@ -743,10 +743,14 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    test_flags: "-C Debug"
+    package_flags: "-C Debug"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
   - name: compile_test
   - name: swift-build-and-test
@@ -757,11 +761,15 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    test_flags: "-C Release"
+    package_flags: "-C Release"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
   - name: compile_test_and_package
   - name: benchmarks
@@ -774,10 +782,14 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    test_flags: "-C Debug"
+    package_flags: "-C Debug"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test
     distros:
@@ -790,11 +802,15 @@ buildvariants:
   expansions:
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
-    cmake_toolchain_file: "./tools/cmake/macosx.toolchain.cmake"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    test_flags: "-C Release"
+    package_flags: "-C Release"
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test_and_package
   - name: benchmarks

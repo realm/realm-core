@@ -25,3 +25,6 @@ RUN cd /opt \
     && tar zxvf cmake-$CMAKE_VERSION-linux-x86_64.tar.gz \
     && rm -f cmake-$CMAKE_VERSION-linux-x86_64.tar.gz
 ENV PATH "/opt/cmake-$CMAKE_VERSION-linux-x86_64/bin:$PATH"
+
+ENV GIT_COMMITTER_NAME realm-ci
+ENV GIT_COMMITTER_EMAIL ci@realm.io

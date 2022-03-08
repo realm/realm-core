@@ -40,45 +40,56 @@ shift $((OPTIND-1))
 
 readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator )
 
-function build_macos {
-    local platform="$1"
-    local bt="$2"
-    local folder_name="build-${platform}-${bt}"
-    mkdir -p "${folder_name}"
-    (
-        cd "${folder_name}" || exit 1
-        rm -f realm-*-devel.tar.gz
-        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/$platform.toolchain.cmake" \
-              -D CMAKE_BUILD_TYPE="${bt}" \
-              -D REALM_VERSION="${VERSION}" \
-              -D REALM_SKIP_SHARED_LIB=ON \
-              -D REALM_BUILD_LIB_ONLY=ON \
-              ${CMAKE_FLAGS} \
-              -G Ninja ..
-        cmake --build . --config "${bt}" --target package
-    )
-}
-
 if [[ -n $BUILD ]]; then
-    for bt in "${BUILD_TYPES[@]}"; do
-        build_macos macosx "$bt"
-    done
-    if [[ -z $MACOS_ONLY ]]; then
+    mkdir -p build-macosx
+    (
+        cd build-macosx
+        cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
+        -D CMAKE_SYSTEM_NAME=Darwin \
+        -D REALM_VERSION="${VERSION}" \
+        -D REALM_BUILD_LIB_ONLY=ON \
+        -D CPACK_SYSTEM_NAME=macosx \
+        -D CPACK_PACKAGE_DIRECTORY=.. \
+        ${CMAKE_FLAGS} \
+        -G Xcode ..
+
         for bt in "${BUILD_TYPES[@]}"; do
-            build_macos maccatalyst "$bt"
+            xcodebuild -sdk macosx -configuration "${bt}" ONLY_ACTIVE_ARCH=NO
+            cpack -C "${bt}"
         done
-        for os in "${device_platforms[@]}"; do
-            for bt in "${BUILD_TYPES[@]}"; do
-                tools/cross_compile.sh -o "$os" -t "$bt" -v "$(git describe)" -f "${CMAKE_FLAGS}"
+    )
+    if [[ -z $MACOS_ONLY ]]; then
+        mkdir -p build-xcode-platforms
+        (
+            cd build-xcode-platforms
+            cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
+            -D REALM_VERSION="${VERSION}" \
+            -D REALM_BUILD_LIB_ONLY=ON \
+            -D CPACK_PACKAGE_DIRECTORY=.. \
+            ${CMAKE_FLAGS} \
+            -G Xcode ..
+
+            destinations=(-destination "generic/platform=macOS,variant=Mac Catalyst")
+            for os in "${device_platforms[@]}"; do
+                destinations+=(-destination "generic/platform=${os}")
             done
-        done
+
+            for bt in "${BUILD_TYPES[@]}"; do
+                xcodebuild -scheme ALL_BUILD -configuration "${bt}" "${destinations[@]}"
+
+                PLATFORM_NAME="maccatalyst" EFFECTIVE_PLATFORM_NAME="-maccatalyst" cpack -C "${bt}"
+                for os in "${device_platforms[@]}"; do
+                    PLATFORM_NAME="${os}" EFFECTIVE_PLATFORM_NAME="-${os}" cpack -C "${bt}"
+                done
+            done
+        )
     fi
 fi
 
 rm -rf core
 mkdir core
 
-filename="build-macosx-Release/realm-Release-${VERSION}-macosx-devel.tar.gz"
+filename="realm-Release-${VERSION}-macosx-devel.tar.gz"
 tar -C core -zxvf "${filename}" include doc
 
 # Overwrite version.txt
@@ -90,7 +101,7 @@ for bt in "${BUILD_TYPES[@]}"; do
 
     for p in "${PLATFORMS[@]}"; do
         # Extract all of the source libraries we need
-        filename="build-${p}-${bt}/realm-${bt}-${VERSION}-${p}-devel.tar.gz"
+        filename="realm-${bt}-${VERSION}-${p}-devel.tar.gz"
         # core binary
         tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${p}${suffix}.a"
@@ -117,39 +128,6 @@ for bt in "${BUILD_TYPES[@]}"; do
               core/librealm-object-store-${p}${suffix}.a
     done
 done
-
-# Create the legacy fat library for realm-js, which includes simulator and
-# device slices in a single library. We only need to do this for iOS because
-# realm-js does not support tvOS or watchOS.
-function create_fat_library {
-    local device_suffix="$1"
-    local simulator_suffix="$2"
-    local output_suffix="$3"
-
-    # Remove the arm64 slice from the simulator library if it exists as we
-    # can't have two arm64 slices in the universal library
-    local simulator_input_file="core/librealm-${simulator_suffix}.a"
-    local simulator_file="core/librealm-noarm-${simulator_suffix}.a"
-    local device_file="core/librealm-${device_suffix}.a"
-    lipo "$simulator_input_file" -remove arm64 -output "$simulator_file" \
-        || cp -c "$simulator_input_file" "$simulator_file"
-
-    # Combine the simulator and device libraries
-    lipo "$simulator_file" "$device_file" \
-         -create -output "core/librealm-${output_suffix}.a"
-
-    # Remove the temporary file
-    rm "$simulator_file"
-}
-
-if [[ -z $MACOS_ONLY ]]; then
-    for bt in "${BUILD_TYPES[@]}"; do
-        [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
-
-        create_fat_library "monorepo-iphoneos${suffix}" "monorepo-iphonesimulator${suffix}" "monorepo-ios${suffix}"
-        create_fat_library "parser-iphoneos${suffix}" "parser-iphonesimulator${suffix}" "parser-ios${suffix}"
-    done
-fi
 
 function add_to_xcframework() {
     local xcf="$1"
@@ -255,18 +233,6 @@ if [[ -n $COPY ]]; then
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
 else
-    rm -f "realm-monorepo-cocoa-${VERSION}.tar.xz"
-    tar -czvf "realm-monorepo-cocoa-${VERSION}.tar.gz" \
-        core/doc \
-        core/include \
-        core/version.txt \
-        core/librealm-monorepo-ios.a \
-        core/librealm-monorepo-macosx.a \
-        core/librealm-monorepo-maccatalyst.a \
-        core/librealm-parser-ios.a \
-        core/librealm-parser-macosx.a \
-        core/librealm-parser-maccatalyst.a
-
     if [[ -n $BUILD_XCFRAMEWORK ]]; then
         rm -f "realm-parser-cocoa-${VERSION}.tar.xz"
         tar -cJvf "realm-parser-cocoa-${VERSION}.tar.xz" core/realm-parser*.xcframework
