@@ -33,6 +33,7 @@
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
+#include <realm/object-store/util/event_loop_dispatcher.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/async_open_task.hpp>
@@ -616,16 +617,15 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
         ThreadSafeReference realm_ref;
-        std::atomic<bool> called{false};
+        bool called = false;
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
+        task->start(realm::util::EventLoopDispatcher([&](ThreadSafeReference&& ref, std::exception_ptr error) {
             REQUIRE(!error);
             called = true;
             realm_ref = std::move(ref);
-        });
+        }));
         util::EventLoop::main().run_until([&] {
-            return called.load();
+            return called;
         });
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
@@ -679,6 +679,8 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Now open a realm based on the realm file created above
         auto realm = Realm::get_shared_realm(config3);
         wait_for_download(*realm);
+        wait_for_upload(*realm);
+
         // Make sure we have got a new client file id
         REQUIRE(realm->read_group().get_sync_file_id() != client_file_id);
         REQUIRE(realm->read_group().get_table("class_object")->size() == 3);
@@ -1682,6 +1684,65 @@ TEST_CASE("SharedRealm: async writes") {
         util::EventLoop::main().run_until([&] {
             return completion_calls == 41;
         });
+    }
+
+    SECTION("async writes scheduled inside sync write") {
+        realm->begin_transaction();
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 1);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 2);
+            table->create_object();
+            realm->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+        REQUIRE(table->size() == 0);
+        table->create_object();
+        realm->commit_transaction();
+        wait_for_done();
+        REQUIRE(table->size() == 3);
+    }
+
+    SECTION("async writes scheduled inside multiple sync write") {
+        realm->begin_transaction();
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 2);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 3);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        REQUIRE(table->size() == 0);
+        table->create_object();
+        realm->commit_transaction();
+
+        realm->begin_transaction();
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 4);
+            table->create_object();
+            realm->async_commit_transaction();
+        });
+        realm->async_begin_transaction([&] {
+            REQUIRE(table->size() == 5);
+            table->create_object();
+            realm->async_commit_transaction([&](std::exception_ptr) {
+                done = true;
+            });
+        });
+        REQUIRE(table->size() == 1);
+        table->create_object();
+        realm->commit_transaction();
+
+
+        wait_for_done();
+        REQUIRE(table->size() == 6);
     }
 
     util::EventLoop::main().run_until([&] {

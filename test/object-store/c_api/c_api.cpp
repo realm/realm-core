@@ -815,6 +815,16 @@ TEST_CASE("C API") {
 
     CHECK(realm_get_num_classes(realm) == 2);
 
+    SECTION("cached realm") {
+        auto config2 = make_config(test_file.path.c_str(), false);
+        realm_config_set_cached(config2.get(), true);
+        REQUIRE(realm_config_get_cached(config2.get()));
+        auto realm2 = cptr(realm_open(config2.get()));
+        CHECK(!realm_equals(realm, realm2.get()));
+        auto realm3 = cptr(realm_open(config2.get()));
+        REQUIRE(realm_equals(realm3.get(), realm2.get()));
+    }
+
     SECTION("native ptr conversion") {
         realm::SharedRealm native;
         _realm_get_native_ptr(realm, &native, sizeof(native));
@@ -1640,6 +1650,18 @@ TEST_CASE("C API") {
                         CHECK(checked(realm_results_count(r2.get(), &count2)));
                         CHECK(count == count2);
                     }
+                }
+
+                SECTION("empty result") {
+                    auto q2 =
+                        cptr_checked(realm_query_parse(realm, class_foo.key, "string == 'boogeyman'", 0, nullptr));
+                    auto r2 = cptr_checked(realm_query_find_all(q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 0);
+                    realm_value_t value = rlm_null();
+                    CHECK(!realm_results_get(r2.get(), 0, &value));
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
                 }
 
                 SECTION("realm_results_get()") {

@@ -1666,7 +1666,7 @@ return yy::parser::make_EQUAL  ();
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-return yy::parser::make_IN  ();
+return yy::parser::make_IN  (yytext);
 	YY_BREAK
 case 6:
 YY_RULE_SETUP

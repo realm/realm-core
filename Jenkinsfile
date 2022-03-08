@@ -122,7 +122,7 @@ jobWrapper {
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
+            buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
             buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
             checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
@@ -559,11 +559,8 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
         CMAKE_SYSTEM_NAME: 'WindowsStore',
         CMAKE_SYSTEM_VERSION: '10.0',
       ]
-    } else {
-      cmakeOptions << [
-        CMAKE_SYSTEM_VERSION: '8.1',
-      ]
     }
+
     if (!runTests) {
       cmakeOptions << [
         REALM_NO_TESTS: '1',

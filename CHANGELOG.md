@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* The Swift package set the linker flags on the wrong target, resulting in linker errors when SPM decides to build the core library as a dynamic library ([Swift #7266](https://github.com/realm/realm-swift/issues/7266)).
+* Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
  
 ### Breaking changes
 * None.
@@ -17,7 +17,25 @@
 -----------
 
 ### Internals
-* None.
+* The previous release broke the `REALM_ENABLE_SYNC` CMake option on Windows in that OpenSSL was always a required dependency, regardless of whether Sync was enabled or not. This has been fixed.
+
+----------------------------------------------
+
+# 11.11.0 Release notes
+
+### Enhancements
+* Added support for configuring caching of Realms in C-API. ([#5275](https://github.com/realm/realm-core/issues/5275))
+
+### Fixed
+* The Swift package set the linker flags on the wrong target, resulting in linker errors when SPM decides to build the core library as a dynamic library ([Swift #7266](https://github.com/realm/realm-swift/issues/7266)).
+* Wrong error code returned from C-API on MacOS ([#5233](https://github.com/realm/realm-core/issues/5233), since v10.0.0)
+* Mixed::compare() used inconsistent rounding for comparing a Decimal128 to a float, giving different results from comparing those values directly ([#5270](https://github.com/realm/realm-core/pull/5270)).
+* Calling Realm::async_begin_transaction() from within a write transaction while the async state was idle would hit an assertion failure (since v11.10.0).
+* Fix issue with scheduler being deleted on wrong thread. This caused async open to hang in eg. realm-js. ([#5287](https://github.com/realm/realm-core/pull/5287), Since v11.10.0)
+* Waiting for upload after opening a bundled realm file could hang. ([#5277](https://github.com/realm/realm-core/issues/5277), since v11.5.0)
+ 
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 

@@ -67,7 +67,6 @@ using namespace realm::query_parser;
   NULL_VAL "null"
   EQUAL   "=="
   NOT_EQUAL   "!="
-  IN      "IN"
   LESS    "<"
   GREATER ">"
   GREATER_EQUAL ">="
@@ -105,6 +104,7 @@ using namespace realm::query_parser;
 %token <std::string> CONTAINS "contains"
 %token <std::string> LIKE    "like"
 %token <std::string> BETWEEN "between"
+%token <std::string> IN "in"
 %token <std::string> SORT "sort"
 %token <std::string> DISTINCT "distinct"
 %token <std::string> LIMIT "limit"
@@ -304,6 +304,7 @@ id
     | SORT                      { $$ = $1; }
     | DISTINCT                  { $$ = $1; }
     | LIMIT                     { $$ = $1; }
+    | IN                        { $$ = $1; }
 %%
 
 void
