@@ -84,13 +84,14 @@ public:
         return m_first_page;
     }
 
-    void set_patch_file(const FileDesc& patch) 
+    void set_patch_file(const FileDesc& patch)
     {
         m_patch_fd = patch;
     }
+
 private:
     SharedFileInfo& m_file;
-    FileDesc m_patch_fd;
+    FileDesc m_patch_fd = 0;
     size_t m_page_shift;
     size_t m_blocks_per_page;
 
@@ -100,10 +101,10 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
-        Touched = 1,           // a ref->ptr translation has taken place
-        UpToDate = 2,          // the page is fully up to date
-        PartiallyUpToDate = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8              // the page has been modified with respect to what's on file.
+        Touched = 1,    // a ref->ptr translation has taken place
+        UpToDate = 2,   // the page is fully up to date
+        GrowingOld = 4, // the page is valid for old translations, but requires re-decryption for new
+        Dirty = 8       // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
@@ -150,7 +151,8 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
 {
     REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
 
-    size_t local_ndx = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
+    size_t local_ndx =
+        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
     REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
     return local_ndx;
 }
@@ -163,8 +165,8 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 }
 
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_ENABLE_ENCRYPTION
 
@@ -179,7 +181,7 @@ struct DecryptionFailed : util::File::AccessError {
     {
     }
 };
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP

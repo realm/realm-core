@@ -52,6 +52,7 @@ public:
 
     bool read(FileDesc fd, off_t pos, char* dst, size_t size);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
+    void write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
 
 private:
@@ -108,7 +109,13 @@ struct SharedFileInfo {
 
     SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
 };
+
+inline void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
+{
+    write(fd, 0, pos, src, size);
 }
-}
+
+} // namespace util
+} // namespace realm
 
 #endif // REALM_ENABLE_ENCRYPTION
