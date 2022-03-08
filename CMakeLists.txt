@@ -316,22 +316,24 @@ if (REALM_BUILD_DOGLESS)
     add_subdirectory(src/dogless)
 endif()
 
-# Enable CTest and include unit tests
-if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
-    set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
-endif()
-enable_testing()
-add_subdirectory(test ${REALM_EXCLUDE_TESTS})
-if (REALM_BUILD_TEST_CLIENT)
-    add_subdirectory(test/client)
-endif()
-
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
-# Only prepare install/package targets if we're not a submodule
+# Only prepare test/install/package targets if we're not a submodule
 if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     return()
+endif()
+
+# Enable CTest and include unit tests
+enable_testing()
+
+if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+    set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
+endif()
+add_subdirectory(test ${REALM_EXCLUDE_TESTS})
+
+if (REALM_BUILD_TEST_CLIENT)
+    add_subdirectory(test/client)
 endif()
 
 # Make the project importable from the build directory
