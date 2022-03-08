@@ -100,10 +100,6 @@ functions:
               set_cmake_var realm_vars REALM_FETCH_MISSING_DEPENDENCIES BOOL On
           fi
 
-          if [[ -n "${cmake_build_type|}" ]]; then
-              set_cmake_var realm_vars CMAKE_BUILD_TYPE STRING "${cmake_build_type}"
-          fi
-
           if [[ -n "${cmake_toolchain_file|}" ]]; then
               set_cmake_var realm_vars CMAKE_TOOLCHAIN_FILE PATH "${cmake_toolchain_file}"
           fi
@@ -119,7 +115,7 @@ functions:
           $CMAKE \
             -B build \
             -C cmake_vars.txt ${extra_flags} \
-            -G "${cmake_generator|Unix Makefiles}"
+            -G "${cmake_generator|Ninja Multi-Config}"
 
           if [[ -n "${target_to_build|}" ]]; then
               target="--target ${target_to_build|}"
@@ -139,12 +135,12 @@ functions:
         script: |-
           set -o errexit
 
-          if [[ -z "${path_to_benchmark}" ]]; then
-              echo "No path to benchmark specified."
+          if [[ -z "${benchmark_name}" ]]; then
+              echo "No benchmark specified."
               exit 1
           fi
 
-          BENCHMARK=$(./evergreen/abspath.sh ${path_to_benchmark})
+          BENCHMARK=$(./evergreen/abspath.sh ./build/test/benchmark-${benchmark_name}/${cmake_build_type|Debug}/realm-benchmark-${benchmark_name})
           echo "Going to run benchmark $BENCHMARK"
 
           [[ -d benchmark_results ]] && rm -rf benchmark_results
@@ -176,7 +172,7 @@ functions:
               export UNITTEST_PROGRESS=${report_test_progress|}
           fi
           cd build
-          $CTEST -V $TEST_FLAGS
+          $CTEST -C ${cmake_build_type|Debug} -V $TEST_FLAGS
 
   "upload test results":
   - command: attach.results
@@ -268,7 +264,7 @@ tasks:
         cpack=$(pwd)/${cmake_bindir}/cpack
 
         cd build
-        $cpack -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
+        $cpack -C ${cmake_build_type|Debug} -G TGZ -D "CPACK_PACKAGE_FILE_NAME=realm-core-artifacts" ${package_flags|}
   - command: s3.put
     params:
       aws_key: '${artifacts_aws_access_key}'
@@ -435,7 +431,7 @@ tasks:
   commands:
   - func: "run benchmark"
     vars:
-      path_to_benchmark: ./build/test/benchmark-common-tasks/realm-benchmark-common-tasks
+      benchmark_name: common-tasks
 
 - name: benchmark-crud
   exec_timeout_secs: 1800
@@ -443,7 +439,7 @@ tasks:
   commands:
   - func: "run benchmark"
     vars:
-      path_to_benchmark: ./build/test/benchmark-crud/realm-benchmark-crud
+      benchmark_name: crud
 
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]
@@ -745,8 +741,6 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
-    test_flags: "-C Debug"
-    package_flags: "-C Debug"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
@@ -763,8 +757,6 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
-    test_flags: "-C Release"
-    package_flags: "-C Release"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
@@ -784,8 +776,6 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
-    test_flags: "-C Debug"
-    package_flags: "-C Debug"
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
@@ -804,8 +794,6 @@ buildvariants:
     cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
     cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
     cmake_generator: Xcode
-    test_flags: "-C Release"
-    package_flags: "-C Release"
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
     run_tests_against_baas: On
@@ -825,8 +813,6 @@ buildvariants:
     cmake_bindir: "./cmake-3.20.3-windows-x86_64/bin"
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
-    test_flags: "-C Debug"
-    package_flags: "-C Debug"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     build_zlib: On
@@ -846,8 +832,6 @@ buildvariants:
     cmake_generator: "Visual Studio 16 2019"
     extra_flags: "-A x64"
     cmake_build_type: "Release"
-    test_flags: "-C Release"
-    package_flags: "-C Release"
     max_jobs: $(($(grep -c proc /proc/cpuinfo) / 2))
     fetch_missing_dependencies: On
     build_zlib: On
