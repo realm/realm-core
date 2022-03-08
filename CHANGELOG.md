@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
  
 ### Breaking changes
 * None.
