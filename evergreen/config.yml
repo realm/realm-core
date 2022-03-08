@@ -455,7 +455,7 @@ tasks:
       test_filter: SyncTests
 
 - name: object-store-tests
-  tags: [ "disabled_on_windows", "test_suite", "for_pull_requests" ]
+  tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
   commands:
   - func: "compile"
@@ -567,37 +567,6 @@ task_groups:
   - compile
   - .test_suite
   - package
-
-# The object-store tests currently fail to start on Windows. There's a separate evergreen config to
-# disable them until that's fixed.
-- name: compile_test_and_package_windows
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - "!.disabled_on_windows .test_suite"
-  - package
-
-- name: compile_test_windows
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - "!.disabled_on_windows .test_suite"
 
 - name: compile_test
   max_hosts: 1
@@ -863,7 +832,7 @@ buildvariants:
     build_zlib: On
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
-  - name: compile_test_and_package_windows
+  - name: compile_test_and_package
     distros:
     - windows-64-vs2019-large
   - name: long-running-tests
@@ -884,6 +853,6 @@ buildvariants:
     build_zlib: On
     python3: "/cygdrive/c/python/python37/python.exe"
   tasks:
-  - name: compile_test_windows
+  - name: compile_test
     distros:
     - windows-64-vs2019-large
