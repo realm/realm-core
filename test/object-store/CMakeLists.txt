@@ -110,11 +110,8 @@ endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
-if(VSCODE_TEST_RUNNER)
-    # Increase the Catch2 virtual console width so that the Visual Studio Code
-    # Test Explorer extension can parse long test names
-    target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
-endif()
+# Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
@@ -137,10 +134,14 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     elseif(REALM_FETCH_MISSING_DEPENDENCIES)
         message(STATUS "LibUV not found, building from source with FetchContent")
         include(FetchContent)
+        set(libUV_Git_TAG "v1.35.0")
+        if(MSVC)
+            set(liUV_Git_TAG "v1.43.0")
+        endif()
         FetchContent_Declare(
             libuv
             GIT_REPOSITORY https://github.com/libuv/libuv.git
-            GIT_TAG        v1.35.0
+            GIT_TAG ${libUV_Git_TAG}
         )
         FetchContent_Populate(libuv)
         add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR} EXCLUDE_FROM_ALL)
