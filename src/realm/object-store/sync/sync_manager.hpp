@@ -86,6 +86,7 @@ struct SyncClientConfig {
     std::string user_agent_application_info;
 
     SyncClientTimeouts timeouts;
+    std::function<std::unique_ptr<util::websocket::EZSocketFactory>(util::websocket::EZConfig&&)> socket_factory;
 };
 
 class SyncManager : public std::enable_shared_from_this<SyncManager> {

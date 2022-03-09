@@ -74,6 +74,7 @@ set(UTIL_SOURCES
     util/basic_system_errors.cpp
     util/cli_args.cpp
     util/encrypted_file_mapping.cpp
+    util/ez_websocket.cpp
     util/fifo_helper.cpp
     util/file.cpp
     util/file_mapper.cpp
@@ -221,6 +222,7 @@ set(REALM_INSTALL_HEADERS
     util/checked_mutex.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
+    util/ez_websocket.hpp
     util/features.h
     util/fifo_helper.hpp
     util/file.hpp
