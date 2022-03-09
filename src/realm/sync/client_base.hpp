@@ -291,6 +291,8 @@ struct ClientConfig {
     ///
     /// Testing/debugging feature. Should never be enabled in production.
     bool disable_sync_to_disk = false;
+
+    std::function<std::unique_ptr<util::websocket::EZSocketFactory>(util::websocket::EZConfig&&)> socket_factory;
 };
 
 /// \brief Information about an error causing a session to be temporarily

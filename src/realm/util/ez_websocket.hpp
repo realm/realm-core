@@ -99,7 +99,7 @@ public:
     {
     }
 
-    EZSocketFactory(EZSocketFactory&&) = delete;
+//    EZSocketFactory(EZSocketFactory&&) = delete;
 
     std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint);
 

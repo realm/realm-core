@@ -54,6 +54,11 @@ using port_type = std::uint_fast16_t;
 enum class ProtocolError;
 }
 
+namespace util::websocket {
+class EZSocketFactory;
+struct EZConfig;
+}
+
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError {
@@ -171,6 +176,7 @@ struct SyncConfig {
     util::Optional<std::string> authorization_header_name;
     std::map<std::string, std::string> custom_http_headers;
 
+    std::function<std::unique_ptr<realm::util::websocket::EZSocketFactory>(util::websocket::EZConfig&&)> socket_factory;
     // The name of the directory which Realms should be backed up to following
     // a client reset in ClientResyncMode::Manual mode
     util::Optional<std::string> recovery_directory;
