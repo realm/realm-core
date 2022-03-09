@@ -47,8 +47,7 @@ using namespace realm::test_util;
 
 namespace {
 
-// FIXME: Disabled because of a migration bug in Core re: embedded objects support.
-TEST_IF(Sync_HistoryMigration, false)
+TEST(Sync_HistoryMigration)
 {
     // Set to true to produce new versions of client and server-side files in
     // `resources/history_migration/` as needed. This should be done whenever
@@ -68,8 +67,8 @@ TEST_IF(Sync_HistoryMigration, false)
     // version, and for which corresponding files exist in
     // `resources/history_migration/`. See the `produce_new_files` above for an
     // easy way to generate new files.
-    std::vector<int> client_schema_versions = {1, 2, 10};
-    std::vector<int> server_schema_versions = {7, 8, 9, 10, 20};
+    std::vector<int> client_schema_versions = {11};
+    std::vector<int> server_schema_versions = {20};
 
     // Before bootstrapping, there can be no client or server files. After
     // bootstrapping, there must be at least one client, and one server file.
