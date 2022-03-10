@@ -65,6 +65,8 @@ public:
                 return "Compression buffer too small";
             case error::compress_error:
                 return "Compression error";
+            case error::compress_input_too_long:
+                return "Compression input too long";
             case error::corrupt_input:
                 return "Corrupt input data";
             case error::incorrect_decompressed_size:
@@ -128,13 +130,35 @@ void grow_arena(compression::CompressMemoryArena& compress_memory_arena)
     compress_memory_arena.resize(n); // Throws
 }
 
+uint8_t read_byte(NoCopyInputStream& is, Span<const char>& buf)
+{
+    if (!buf.size())
+        buf = is.next_block();
+    if (buf.size()) {
+        char c = buf.front();
+        buf = buf.sub_span(1);
+        return c;
+    }
+    return 0;
+}
+
+char peek_byte(NoCopyInputStream& is, Span<const char>& buf)
+{
+    if (!buf.size())
+        buf = is.next_block();
+    if (buf.size())
+        return buf.front();
+    return 0;
+}
+
 struct DecompressInputStreamNone final : public NoCopyInputStream {
     DecompressInputStreamNone(NoCopyInputStream& s, Span<const char> b)
         : source(s)
         , current_block(b)
     {
-        if (!current_block.size())
-            current_block = source.next_block();
+        read_byte(s, current_block); // Algorithm
+        read_byte(s, current_block); // Flags
+        peek_byte(s, current_block);
     }
     NoCopyInputStream& source;
     Span<const char> current_block;
@@ -224,10 +248,23 @@ public:
     DecompressInputStreamLibCompression(NoCopyInputStream& s, Span<const char> b, size_t total_size)
         : m_source(s)
     {
+        compression_algorithm algorithm;
+        switch (compression::Algorithm(read_byte(s, b))) {
+            case compression::Algorithm::Deflate:
+                algorithm = COMPRESSION_ZLIB;
+                break;
+            case compression::Algorithm::LZFSE:
+                algorithm = COMPRESSION_LZFSE;
+                break;
+            default:
+                REALM_UNREACHABLE();
+        }
+        read_byte(s, b); // Flags
+
         // Arbitrary upper limit to reduce peak memory usage
         constexpr const size_t max_out_buffer_size = 1024 * 1024;
         m_buffer.reserve(std::min(total_size, max_out_buffer_size));
-        auto rc = compression_stream_init(&m_strm, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB);
+        auto rc = compression_stream_init(&m_strm, COMPRESSION_STREAM_DECODE, algorithm);
         if (rc != COMPRESSION_STATUS_OK)
             throw std::system_error(compression::error::decompress_error);
         m_strm.src_size = b.size();
@@ -397,27 +434,6 @@ std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> 
     return error::corrupt_input;
 }
 
-uint8_t read_byte(NoCopyInputStream& is, Span<const char>& buf)
-{
-    if (!buf.size())
-        buf = is.next_block();
-    if (buf.size()) {
-        char c = buf.front();
-        buf = buf.sub_span(1);
-        return c;
-    }
-    return 0;
-}
-
-char peek_byte(NoCopyInputStream& is, Span<const char>& buf)
-{
-    if (!buf.size())
-        buf = is.next_block();
-    if (buf.size())
-        return buf.front();
-    return 0;
-}
-
 #if REALM_USE_LIBCOMPRESSION
 std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<const char> compressed_buf,
                                           Span<char> decompressed_buf)
@@ -428,16 +444,25 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
     // The first nibble is compression algorithm (where 8 is DEFLATE), and second
     // nibble is window size. RFC 1950 only allows window size 7, so the first
     // byte must be 0x78.
-    if (read_byte(compressed, compressed_buf) != (uint8_t)Algorithm::Deflate)
-        return error::corrupt_input;
+    compression_algorithm algo;
+    switch (Algorithm(read_byte(compressed, compressed_buf))) {
+        case Algorithm::Deflate:
+            algo = COMPRESSION_ZLIB;
+            break;
+        case Algorithm::LZFSE:
+            algo = COMPRESSION_LZFSE;
+            break;
+        default:
+            return error::corrupt_input;
+    }
     // The second byte has flags. Bit 5 is the only interesting one, which
     // indicates if a custom dictionary was used. We don't support that.
     uint8_t flags = read_byte(compressed, compressed_buf);
-    if (flags & 0b10000)
+    if (flags & 0b100000)
         return error::corrupt_input;
 
     compression_stream strm;
-    auto rc = compression_stream_init(&strm, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB);
+    auto rc = compression_stream_init(&strm, COMPRESSION_STREAM_DECODE, algo);
     if (rc != COMPRESSION_STATUS_OK)
         return error::decompress_error;
 
@@ -522,6 +547,13 @@ std::error_code decompress(NoCopyInputStream& compressed, Span<const char> compr
             }
 #endif
             return decompress_zlib(compressed, compressed_buf, decompressed_buf);
+        case Algorithm::LZFSE:
+#if REALM_USE_LIBCOMPRESSION
+            if (__builtin_available(macOS 10.11, *)) {
+                return decompress_libcompression(compressed, compressed_buf, decompressed_buf);
+            }
+#endif
+            return error::corrupt_input;
         default:
             return error::corrupt_input;
     }
@@ -555,6 +587,67 @@ void record_compression_result(size_t uncompressed, size_t compressed)
 #else
 void record_compression_result(size_t, size_t) {}
 #endif
+
+#if REALM_USE_LIBCOMPRESSION
+std::error_code compress_lzfse(Span<const char> uncompressed_buf, Span<char> compressed_buf,
+                               std::size_t& compressed_size, compression::Alloc* custom_allocator)
+{
+    using namespace compression;
+    if (compressed_buf.size() < 6)
+        return error::compress_buffer_too_small;
+    // compression_encode_buffer() takes a size_t, but crashes if the value is
+    // larger than 2^31. Using the stream API works, but it's slower for
+    // normal-sized input, and we can just fall back to zlib for this edge case.
+    if (uncompressed_buf.size() > std::numeric_limits<int32_t>::max())
+        return error::compress_input_too_long;
+
+    // Write the header
+    compressed_buf[0] = (uint8_t)Algorithm::LZFSE;
+    compressed_buf[1] = 0;
+    compressed_buf = compressed_buf.sub_span(2);
+
+    auto uncompressed_ptr = to_bytef(uncompressed_buf.data());
+    auto uncompressed_size = uncompressed_buf.size();
+    auto compressed_ptr = to_bytef(compressed_buf.data());
+    auto compressed_buf_size = compressed_buf.size() - 4;
+
+    void* scratch_buffer = nullptr;
+    if (custom_allocator) {
+        scratch_buffer = custom_allocator->alloc(compression_encode_scratch_buffer_size(COMPRESSION_LZFSE));
+        if (!scratch_buffer)
+            return error::out_of_memory;
+    }
+
+    size_t bytes = compression_encode_buffer(compressed_ptr, compressed_buf_size, uncompressed_ptr, uncompressed_size,
+                                             scratch_buffer, COMPRESSION_LZFSE);
+    if (bytes == 0)
+        return error::compress_buffer_too_small;
+
+    // Calculate the checksum and append it to the end of the stream
+    uLong checksum = htonl(adler32(1, uncompressed_ptr, static_cast<uInt>(uncompressed_size)));
+    for (int i = 0; i < 4; ++i) {
+        compressed_buf[bytes + i] = checksum & 0xFF;
+        checksum >>= 8;
+    }
+    compressed_size = bytes + 6;
+    return std::error_code{};
+}
+#endif
+
+std::error_code compress_lzfse_or_zlib(Span<const char> uncompressed_buf, Span<char> compressed_buf,
+                                       std::size_t& compressed_size, int compression_level,
+                                       compression::Alloc* custom_allocator)
+{
+    using namespace compression;
+#if REALM_USE_LIBCOMPRESSION
+    if (__builtin_available(macOS 10.10, *)) {
+        auto ec = compress_lzfse(uncompressed_buf, compressed_buf, compressed_size, custom_allocator);
+        if (ec != error::compress_input_too_long)
+            return ec;
+    }
+#endif
+    return compress(uncompressed_buf, compressed_buf, compressed_size, compression_level, custom_allocator);
+}
 } // unnamed namespace
 
 
@@ -733,7 +826,8 @@ void compression::allocate_and_compress_with_header(CompressMemoryArena& arena, 
     while (uncompressed.size() > 256) {
         init_arena(arena);
         const int compression_level = 1;
-        auto ec = compress(uncompressed, Span(compressed).sub_span(8), compressed_size, compression_level, &arena);
+        auto ec = compress_lzfse_or_zlib(uncompressed, Span(compressed).sub_span(8), compressed_size,
+                                         compression_level, &arena);
         if (ec == error::compress_buffer_too_small) {
             // Compressed result was larger than uncompressed, so just store the
             // uncompressed
@@ -783,16 +877,11 @@ std::unique_ptr<NoCopyInputStream> compression::decompress_input_stream(NoCopyIn
     total_size = static_cast<size_t>(size);
 
     auto algo = static_cast<Algorithm>(peek_byte(source, first_block));
-    if (algo == Algorithm::None) {
-        read_byte(source, first_block); // Algorithm
-        read_byte(source, first_block); // Flags
+    if (algo == Algorithm::None)
         return std::make_unique<DecompressInputStreamNone>(source, first_block);
-    }
 #if REALM_USE_LIBCOMPRESSION
     if (__builtin_available(macOS 10.10, *)) {
-        if (algo == Algorithm::Deflate) {
-            read_byte(source, first_block); // Algorithm
-            read_byte(source, first_block); // Flags
+        if (algo == Algorithm::Deflate || algo == Algorithm::LZFSE) {
             return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, total_size);
         }
     }

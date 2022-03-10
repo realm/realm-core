@@ -44,9 +44,10 @@ enum class error {
     out_of_memory = 1,
     compress_buffer_too_small = 2,
     compress_error = 3,
-    corrupt_input = 4,
-    incorrect_decompressed_size = 5,
-    decompress_error = 6,
+    compress_input_too_long = 4,
+    corrupt_input = 5,
+    incorrect_decompressed_size = 6,
+    decompress_error = 7,
 };
 
 const std::error_category& error_category() noexcept;
@@ -69,6 +70,7 @@ namespace realm::util::compression {
 enum class Algorithm {
     None = 0,
     Deflate = 0x78,
+    LZFSE = 0x09,
 };
 
 class Alloc {

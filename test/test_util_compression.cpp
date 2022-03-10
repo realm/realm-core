@@ -367,9 +367,8 @@ static void test_decompress_stream(test_util::unit_test::TestContext& test_conte
     for_each_fib_block_size(uncompressed.size(), compressed, [&](NoCopyInputStream& stream) {
         size_t total_size = 0;
         auto decompress_stream = compression::decompress_input_stream(stream, total_size);
-        CHECK(decompress_stream);
         CHECK_EQUAL(total_size, uncompressed.size());
-        if (decompress_stream) {
+        if (CHECK(decompress_stream)) {
             copy_stream(decompressed, *decompress_stream);
             compare(test_context, uncompressed, decompressed);
         }
