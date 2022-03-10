@@ -168,6 +168,18 @@ typedef struct realm_value {
     } RLM_ANON_UNION_MEMBER(values);
     realm_value_type_e type;
 } realm_value_t;
+typedef struct realm_key_path_elem {
+    realm_class_key_t object;
+    realm_property_key_t property;
+} realm_key_path_elem_t;
+typedef struct realm_key_path {
+    size_t nb_elements;
+    realm_key_path_elem_t* path_elements;
+} realm_key_path_t;
+typedef struct realm_key_path_array {
+    size_t nb_elements;
+    realm_key_path_t* paths;
+} realm_key_path_array_t;
 
 typedef struct realm_version_id {
     uint64_t version;
@@ -1373,11 +1385,10 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t*, void* userdata,
-                                                                           realm_free_userdata_func_t free,
-                                                                           realm_on_object_change_func_t on_change,
-                                                                           realm_callback_error_func_t on_error,
-                                                                           realm_scheduler_t*);
+RLM_API realm_notification_token_t*
+realm_object_add_notification_callback(realm_object_t*, void* userdata, realm_free_userdata_func_t free,
+                                       realm_key_path_array_t*, realm_on_object_change_func_t on_change,
+                                       realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
  * Get an object from a thread-safe reference, potentially originating in a
@@ -1584,11 +1595,10 @@ RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_list_t*, void* userdata,
-                                                                         realm_free_userdata_func_t free,
-                                                                         realm_on_collection_change_func_t on_change,
-                                                                         realm_callback_error_func_t on_error,
-                                                                         realm_scheduler_t*);
+RLM_API realm_notification_token_t*
+realm_list_add_notification_callback(realm_list_t*, void* userdata, realm_free_userdata_func_t free,
+                                     realm_key_path_array_t*, realm_on_collection_change_func_t on_change,
+                                     realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
  * Get an list from a thread-safe reference, potentially originating in a
@@ -1861,11 +1871,10 @@ RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t 
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, void* userdata,
-                                                                        realm_free_userdata_func_t free,
-                                                                        realm_on_collection_change_func_t on_change,
-                                                                        realm_callback_error_func_t on_error,
-                                                                        realm_scheduler_t*);
+RLM_API realm_notification_token_t*
+realm_set_add_notification_callback(realm_set_t*, void* userdata, realm_free_userdata_func_t free,
+                                    realm_key_path_array_t*, realm_on_collection_change_func_t on_change,
+                                    realm_callback_error_func_t on_error, realm_scheduler_t*);
 /**
  * Get an set from a thread-safe reference, potentially originating in a
  * different `realm_t` instance
@@ -2018,7 +2027,7 @@ RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, cons
  */
 RLM_API realm_notification_token_t*
 realm_dictionary_add_notification_callback(realm_dictionary_t*, void* userdata, realm_free_userdata_func_t free,
-                                           realm_on_collection_change_func_t on_change,
+                                           realm_key_path_array_t*, realm_on_collection_change_func_t on_change,
                                            realm_callback_error_func_t on_error, realm_scheduler_t*);
 
 /**
@@ -2288,11 +2297,10 @@ RLM_API bool realm_results_sum(realm_results_t*, realm_property_key_t, realm_val
 RLM_API bool realm_results_average(realm_results_t*, realm_property_key_t, realm_value_t* out_average,
                                    bool* out_found);
 
-RLM_API realm_notification_token_t* realm_results_add_notification_callback(realm_results_t*, void* userdata,
-                                                                            realm_free_userdata_func_t,
-                                                                            realm_on_collection_change_func_t,
-                                                                            realm_callback_error_func_t,
-                                                                            realm_scheduler_t*);
+RLM_API realm_notification_token_t*
+realm_results_add_notification_callback(realm_results_t*, void* userdata, realm_free_userdata_func_t,
+                                        realm_key_path_array_t*, realm_on_collection_change_func_t,
+                                        realm_callback_error_func_t, realm_scheduler_t*);
 
 /**
  * Get an results object from a thread-safe reference, potentially originating
