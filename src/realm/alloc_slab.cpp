@@ -692,7 +692,7 @@ util::File& SlabAlloc::get_patch_file()
 
 void SlabAlloc::apply_pending_patch()
 {
-
+    EncryptedFileMapping::static_apply_pending_patch(m_file, m_encryption_patch_file);
 }
 
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)

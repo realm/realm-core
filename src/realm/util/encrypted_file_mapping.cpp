@@ -244,7 +244,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
         ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
         if (bytes_read == 0) {
-            memset(dst, 'X', size);
+            // memset(dst, 0, size);
             return false;
         }
         iv_table& iv = get_iv_table(fd, pos);
@@ -252,7 +252,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             // This block has never been written to, so we've just read pre-allocated
             // space. No memset() since the code using this doesn't rely on
             // pre-allocated space being zeroed.
-            memset(dst, 'Y', size);
+            // memset(dst, 0, size);
             return false;
         }
 
@@ -261,7 +261,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
             // new IV and writing the data
             if (iv.iv2 == 0) {
                 // Very first write was interrupted
-                memset(dst, 'Z', size);
+                // memset(dst, 0, size);
                 return false;
             }
 
@@ -279,7 +279,7 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                     if (m_rw_buffer[i] != 0)
                         throw DecryptionFailed();
                 }
-                memset(dst, 'W', size);
+                // memset(dst, 0, size);
                 return false;
             }
         }
@@ -396,6 +396,16 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
     }
 }
 
+void AESCryptor::static_apply_pending_patch(FileDesc f, FileDesc patch_f)
+{
+    Patch patch;
+    int read = File::read_static(patch_f, &patch, sizeof(patch));
+    if (read != sizeof(patch)) {
+        std::cerr << "Patch incorrect, size wrong" << std::endl;
+        return;
+    }
+            calc_hmac(&patch.payload, sizeof(patch.payload), patch.payload.iv.hmac1, patch.hmac);
+}
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept
 {
     uint8_t iv[aes_block_size] = {0};
@@ -505,6 +515,11 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
     REALM_ASSERT(m_blocks_per_page * block_size == static_cast<size_t>(1ULL << m_page_shift));
     set(addr, size, file_offset); // throws
     file.mappings.push_back(this);
+}
+
+static void static_apply_pending_patch(const File& f, const File& patch_f)
+{
+    AESCryptor::static_apply_pending_patch(f.get_descriptor(), patch_f.get_descriptor());
 }
 
 EncryptedFileMapping::~EncryptedFileMapping()

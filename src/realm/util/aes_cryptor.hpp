@@ -54,7 +54,7 @@ public:
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
     void write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
-
+    static void static_apply_pending_patch(FileDesc f, FileDesc f_patch);
 private:
     enum EncryptionMode {
 #if REALM_PLATFORM_APPLE
