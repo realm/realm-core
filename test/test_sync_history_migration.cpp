@@ -479,6 +479,6 @@ TEST(Sync_HistoryCompression)
     // can be compressed to <1% of its source size.
     CHECK_EQUAL(changesets.size(), 2);
     CHECK_LESS(changesets.get(0).size(), 256);
-    CHECK_LESS(changesets.get(1).size(), 256);
+    CHECK_LESS(changesets.get(1).size(), 1024);
 }
 } // unnamed namespace

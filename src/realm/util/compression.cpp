@@ -35,6 +35,12 @@ using namespace util;
 
 namespace {
 
+enum class Algorithm {
+    None = 0,
+    Deflate = 1,
+    Lzfse = 2,
+};
+
 using stream_avail_size_t = std::conditional_t<sizeof(uInt) < sizeof(size_t), uInt, size_t>;
 constexpr stream_avail_size_t g_max_stream_avail = std::numeric_limits<stream_avail_size_t>::max();
 
@@ -95,19 +101,6 @@ void custom_free(void* opaque, void* addr)
     return alloc.free(addr);
 }
 
-std::error_code read_size(Span<const char> block, size_t& out_size)
-{
-    if (block.size() < 10)
-        return compression::error::corrupt_input;
-    uint64_t size;
-    std::memcpy(&size, block.data(), sizeof(size));
-    if (size > std::numeric_limits<size_t>::max()) {
-        return compression::error::out_of_memory;
-    }
-    out_size = static_cast<size_t>(size);
-    return std::error_code{};
-}
-
 void init_arena(compression::CompressMemoryArena& compress_memory_arena)
 {
     if (compress_memory_arena.size() == 0) {
@@ -142,7 +135,7 @@ uint8_t read_byte(NoCopyInputStream& is, Span<const char>& buf)
     return 0;
 }
 
-char peek_byte(NoCopyInputStream& is, Span<const char>& buf)
+uint8_t peek_byte(NoCopyInputStream& is, Span<const char>& buf)
 {
     if (!buf.size())
         buf = is.next_block();
@@ -151,14 +144,68 @@ char peek_byte(NoCopyInputStream& is, Span<const char>& buf)
     return 0;
 }
 
+struct Header {
+    Algorithm algorithm;
+    size_t size;
+};
+
+Header read_header(NoCopyInputStream& is, Span<const char>& buf)
+{
+    Header ret = {};
+    auto first_byte = read_byte(is, buf);
+    ret.algorithm = Algorithm(first_byte >> 4);
+    size_t size_width = first_byte & 0b1111;
+    if (size_width > sizeof(size_t))
+        ret.size = -1;
+    else {
+        for (size_t i = 0; i < size_width; ++i) {
+            ret.size += size_t(read_byte(is, buf)) << (i * 8);
+        }
+    }
+    return ret;
+}
+
+uint8_t header_width(size_t size)
+{
+    uint8_t width = 0;
+    while (size) {
+        ++width;
+        size >>= 8;
+    }
+    return width + 1;
+}
+
+size_t write_header(Header h, Span<char> target)
+{
+    uint8_t width = 0;
+    target[0] = uint8_t(h.algorithm) << 4;
+    for (size_t sz = h.size; sz; sz >>= 8, ++width) {
+        target[width + 1] = uint8_t(sz & 0xFF);
+        ++target[0];
+    }
+    return width + 1;
+}
+
+// Feed in a zlib header to inflate() for the places we don't store it
+void inflate_zlib_header(z_stream& strm)
+{
+    Bytef out;
+    strm.avail_in = 2;
+    strm.next_in = to_bytef("\x78\x5e");
+    strm.avail_out = sizeof(out);
+    strm.next_out = &out;
+
+    int rc = inflate(&strm, Z_SYNC_FLUSH);
+    REALM_ASSERT(rc == Z_OK);
+    REALM_ASSERT(strm.avail_in == 0);
+}
+
 struct DecompressInputStreamNone final : public NoCopyInputStream {
     DecompressInputStreamNone(NoCopyInputStream& s, Span<const char> b)
         : source(s)
         , current_block(b)
     {
-        read_byte(s, current_block); // Algorithm
-        read_byte(s, current_block); // Flags
-        peek_byte(s, current_block);
+        peek_byte(s, current_block); // ensure current_block isn't empty
     }
     NoCopyInputStream& source;
     Span<const char> current_block;
@@ -180,11 +227,14 @@ public:
         // Arbitrary upper limit to reduce peak memory usage
         constexpr const size_t max_out_buffer_size = 1024 * 1024;
         m_buffer.reserve(std::min(total_size, max_out_buffer_size));
-        m_strm.avail_in = bounded_avail(b.size());
-        m_strm.next_in = to_bytef(b.data());
+
         int rc = inflateInit(&m_strm);
         if (rc != Z_OK)
             throw std::system_error(make_error_code(compression::error::decompress_error), m_strm.msg);
+        inflate_zlib_header(m_strm);
+
+        m_strm.avail_in = bounded_avail(b.size());
+        m_strm.next_in = to_bytef(b.data());
         m_current_block = b.sub_span(m_strm.avail_in);
     }
 
@@ -243,28 +293,29 @@ private:
 };
 
 #if REALM_USE_LIBCOMPRESSION
+
+compression_algorithm algorithm_to_compression_algorithm(Algorithm a)
+{
+    switch (Algorithm(a)) {
+        case Algorithm::Deflate:
+            return COMPRESSION_ZLIB;
+        case Algorithm::Lzfse:
+            return COMPRESSION_LZFSE;
+        default:
+            REALM_UNREACHABLE();
+    }
+}
+
 class DecompressInputStreamLibCompression final : public NoCopyInputStream {
 public:
-    DecompressInputStreamLibCompression(NoCopyInputStream& s, Span<const char> b, size_t total_size)
+    DecompressInputStreamLibCompression(NoCopyInputStream& s, Span<const char> b, Header h)
         : m_source(s)
     {
-        compression_algorithm algorithm;
-        switch (compression::Algorithm(read_byte(s, b))) {
-            case compression::Algorithm::Deflate:
-                algorithm = COMPRESSION_ZLIB;
-                break;
-            case compression::Algorithm::LZFSE:
-                algorithm = COMPRESSION_LZFSE;
-                break;
-            default:
-                REALM_UNREACHABLE();
-        }
-        read_byte(s, b); // Flags
-
         // Arbitrary upper limit to reduce peak memory usage
         constexpr const size_t max_out_buffer_size = 1024 * 1024;
-        m_buffer.reserve(std::min(total_size, max_out_buffer_size));
-        auto rc = compression_stream_init(&m_strm, COMPRESSION_STREAM_DECODE, algorithm);
+        m_buffer.reserve(std::min(h.size, max_out_buffer_size));
+        auto rc = compression_stream_init(&m_strm, COMPRESSION_STREAM_DECODE,
+                                          algorithm_to_compression_algorithm(h.algorithm));
         if (rc != COMPRESSION_STATUS_OK)
             throw std::system_error(compression::error::decompress_error);
         m_strm.src_size = b.size();
@@ -334,8 +385,6 @@ private:
 std::error_code decompress_none(NoCopyInputStream& compressed, Span<const char> compressed_buf,
                                 Span<char> decompressed_buf)
 {
-    // Skip the header
-    compressed_buf = compressed_buf.sub_span(2);
     do {
         auto count = std::min(decompressed_buf.size(), compressed_buf.size());
         std::memcpy(decompressed_buf.data(), compressed_buf.data(), count);
@@ -350,7 +399,7 @@ std::error_code decompress_none(NoCopyInputStream& compressed, Span<const char> 
 }
 
 std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> compressed_buf,
-                                Span<char> decompressed_buf)
+                                Span<char> decompressed_buf, bool has_header)
 {
     using namespace compression;
 
@@ -364,6 +413,9 @@ std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> 
         REALM_ASSERT(rc == Z_OK);
         static_cast<void>(rc);
     });
+
+    if (!has_header)
+        inflate_zlib_header(strm);
 
     do {
         size_t in_offset = 0;
@@ -436,33 +488,29 @@ std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> 
 
 #if REALM_USE_LIBCOMPRESSION
 std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<const char> compressed_buf,
-                                          Span<char> decompressed_buf)
+                                          Span<char> decompressed_buf, Algorithm algorithm, bool has_header)
 {
     using namespace compression;
 
-    // libcompression doesn't handle the zlib header, so we have to do it ourselves.
-    // The first nibble is compression algorithm (where 8 is DEFLATE), and second
-    // nibble is window size. RFC 1950 only allows window size 7, so the first
-    // byte must be 0x78.
-    compression_algorithm algo;
-    switch (Algorithm(read_byte(compressed, compressed_buf))) {
-        case Algorithm::Deflate:
-            algo = COMPRESSION_ZLIB;
-            break;
-        case Algorithm::LZFSE:
-            algo = COMPRESSION_LZFSE;
-            break;
-        default:
+    // If we're given a buffer with a zlib header we have to parse it outselves,
+    // as libcompression doesn't handle it.
+    if (has_header) {
+        // The first nibble is compression algorithm (where 8 is DEFLATE), and second
+        // nibble is window size. RFC 1950 only allows window size 7, so the first
+        // byte must be 0x78.
+        if (read_byte(compressed, compressed_buf) != 0x78)
             return error::corrupt_input;
+        // The second byte has flags. Bit 5 is the only interesting one, which
+        // indicates if a custom dictionary was used. We don't support that.
+        uint8_t flags = read_byte(compressed, compressed_buf);
+        if (flags & 0b100000)
+            return error::corrupt_input;
+        algorithm = Algorithm::Deflate;
     }
-    // The second byte has flags. Bit 5 is the only interesting one, which
-    // indicates if a custom dictionary was used. We don't support that.
-    uint8_t flags = read_byte(compressed, compressed_buf);
-    if (flags & 0b100000)
-        return error::corrupt_input;
 
     compression_stream strm;
-    auto rc = compression_stream_init(&strm, COMPRESSION_STREAM_DECODE, algo);
+    auto rc =
+        compression_stream_init(&strm, COMPRESSION_STREAM_DECODE, algorithm_to_compression_algorithm(algorithm));
     if (rc != COMPRESSION_STATUS_OK)
         return error::decompress_error;
 
@@ -524,7 +572,7 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
 #endif
 
 std::error_code decompress(NoCopyInputStream& compressed, Span<const char> compressed_buf,
-                           Span<char> decompressed_buf)
+                           Span<char> decompressed_buf, Algorithm algorithm, bool has_header)
 {
     using namespace compression;
 
@@ -535,25 +583,20 @@ std::error_code decompress(NoCopyInputStream& compressed, Span<const char> compr
         return error::incorrect_decompressed_size;
     }
 
-    switch (Algorithm(compressed_buf[0])) {
+#if REALM_USE_LIBCOMPRESSION
+    // All of our non-macOS deployment targets are high enough to have libcompression,
+    // but we support some older macOS versions
+    if (__builtin_available(macOS 10.11, *)) {
+        if (algorithm != Algorithm::None)
+            return decompress_libcompression(compressed, compressed_buf, decompressed_buf, algorithm, has_header);
+    }
+#endif
+
+    switch (algorithm) {
         case Algorithm::None:
             return decompress_none(compressed, compressed_buf, decompressed_buf);
         case Algorithm::Deflate:
-#if REALM_USE_LIBCOMPRESSION
-            // All of our non-macOS deployment targets are high enough to have libcompression,
-            // but we support some older macOS versions
-            if (__builtin_available(macOS 10.11, *)) {
-                return decompress_libcompression(compressed, compressed_buf, decompressed_buf);
-            }
-#endif
-            return decompress_zlib(compressed, compressed_buf, decompressed_buf);
-        case Algorithm::LZFSE:
-#if REALM_USE_LIBCOMPRESSION
-            if (__builtin_available(macOS 10.11, *)) {
-                return decompress_libcompression(compressed, compressed_buf, decompressed_buf);
-            }
-#endif
-            return error::corrupt_input;
+            return decompress_zlib(compressed, compressed_buf, decompressed_buf, has_header);
         default:
             return error::corrupt_input;
     }
@@ -593,18 +636,13 @@ std::error_code compress_lzfse(Span<const char> uncompressed_buf, Span<char> com
                                std::size_t& compressed_size, compression::Alloc* custom_allocator)
 {
     using namespace compression;
-    if (compressed_buf.size() < 6)
+    if (compressed_buf.size() < 4)
         return error::compress_buffer_too_small;
     // compression_encode_buffer() takes a size_t, but crashes if the value is
     // larger than 2^31. Using the stream API works, but it's slower for
     // normal-sized input, and we can just fall back to zlib for this edge case.
     if (uncompressed_buf.size() > std::numeric_limits<int32_t>::max())
         return error::compress_input_too_long;
-
-    // Write the header
-    compressed_buf[0] = (uint8_t)Algorithm::LZFSE;
-    compressed_buf[1] = 0;
-    compressed_buf = compressed_buf.sub_span(2);
 
     auto uncompressed_ptr = to_bytef(uncompressed_buf.data());
     auto uncompressed_size = uncompressed_buf.size();
@@ -629,7 +667,7 @@ std::error_code compress_lzfse(Span<const char> uncompressed_buf, Span<char> com
         compressed_buf[bytes + i] = checksum & 0xFF;
         checksum >>= 8;
     }
-    compressed_size = bytes + 6;
+    compressed_size = bytes + 4;
     return std::error_code{};
 }
 #endif
@@ -641,12 +679,22 @@ std::error_code compress_lzfse_or_zlib(Span<const char> uncompressed_buf, Span<c
     using namespace compression;
 #if REALM_USE_LIBCOMPRESSION
     if (__builtin_available(macOS 10.10, *)) {
-        auto ec = compress_lzfse(uncompressed_buf, compressed_buf, compressed_size, custom_allocator);
+        size_t len = write_header({Algorithm::Lzfse, uncompressed_buf.size()}, compressed_buf);
+        auto ec = compress_lzfse(uncompressed_buf, compressed_buf.sub_span(len), compressed_size, custom_allocator);
         if (ec != error::compress_input_too_long)
             return ec;
     }
 #endif
-    return compress(uncompressed_buf, compressed_buf, compressed_size, compression_level, custom_allocator);
+    size_t len = header_width(uncompressed_buf.size());
+    REALM_ASSERT(len >= 2);
+    auto ec = compress(uncompressed_buf, compressed_buf.sub_span(len - 2), compressed_size, compression_level,
+                       custom_allocator);
+    if (!ec) {
+        // Note: overwrites zlib header
+        write_header({Algorithm::Deflate, uncompressed_buf.size()}, compressed_buf);
+        compressed_size -= 2;
+    }
+    return ec;
 }
 } // unnamed namespace
 
@@ -754,26 +802,25 @@ std::error_code compression::compress(Span<const char> uncompressed_buf, Span<ch
 
 std::error_code compression::decompress(NoCopyInputStream& compressed, Span<char> decompressed_buf)
 {
-    return ::decompress(compressed, compressed.next_block(), decompressed_buf);
+    return ::decompress(compressed, compressed.next_block(), decompressed_buf, Algorithm::Deflate, true);
 }
 
 std::error_code compression::decompress(Span<const char> compressed_buf, Span<char> decompressed_buf)
 {
     SimpleNoCopyInputStream adapter(compressed_buf);
-    return ::decompress(adapter, adapter.next_block(), decompressed_buf);
+    return ::decompress(adapter, adapter.next_block(), decompressed_buf, Algorithm::Deflate, true);
 }
 
-std::error_code compression::decompress_with_header(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed)
+std::error_code compression::decompress_nonportable(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed)
 {
     auto compressed_buf = compressed.next_block();
-    size_t size;
-    if (auto ec = read_size(compressed_buf, size))
-        return ec;
-    decompressed.resize(size);
-    if (size == 0) {
+    auto header = read_header(compressed, compressed_buf);
+    if (header.size == std::numeric_limits<size_t>::max())
+        return error::out_of_memory;
+    decompressed.resize(header.size);
+    if (header.size == 0)
         return std::error_code{};
-    }
-    return ::decompress(compressed, compressed_buf.sub_span(sizeof(size)), decompressed);
+    return ::decompress(compressed, compressed_buf, decompressed, header.algorithm, false);
 }
 
 std::error_code compression::allocate_and_compress(CompressMemoryArena& compress_memory_arena,
@@ -812,13 +859,16 @@ std::error_code compression::allocate_and_compress(CompressMemoryArena& compress
     return std::error_code{};
 }
 
-void compression::allocate_and_compress_with_header(CompressMemoryArena& arena, Span<const char> uncompressed,
+void compression::allocate_and_compress_nonportable(CompressMemoryArena& arena, Span<const char> uncompressed,
                                                     util::AppendBuffer<char>& compressed)
 {
-    compressed.resize(uncompressed.size() + 10);
-    uint64_t size = uncompressed.size();
-    std::memcpy(compressed.data(), &size, sizeof(size));
+    if (uncompressed.size() == 0) {
+        compressed.resize(0);
+        return;
+    }
 
+    size_t header_size = header_width(uncompressed.size());
+    compressed.resize(uncompressed.size() + header_size);
     size_t compressed_size = 0;
     // zlib is ineffective for very small sizes. Measured results indicate that
     // it only manages to compress at all past 100 bytes and the compression
@@ -826,8 +876,7 @@ void compression::allocate_and_compress_with_header(CompressMemoryArena& arena, 
     while (uncompressed.size() > 256) {
         init_arena(arena);
         const int compression_level = 1;
-        auto ec = compress_lzfse_or_zlib(uncompressed, Span(compressed).sub_span(8), compressed_size,
-                                         compression_level, &arena);
+        auto ec = compress_lzfse_or_zlib(uncompressed, compressed, compressed_size, compression_level, &arena);
         if (ec == error::compress_buffer_too_small) {
             // Compressed result was larger than uncompressed, so just store the
             // uncompressed
@@ -841,58 +890,53 @@ void compression::allocate_and_compress_with_header(CompressMemoryArena& arena, 
         if (ec) {
             throw std::system_error(ec);
         }
-        record_compression_result(uncompressed.size(), compressed_size + 8);
         REALM_ASSERT(compressed_size);
-        compressed.resize(compressed_size + 8);
-        break;
+        compressed_size += header_size;
+        record_compression_result(uncompressed.size(), compressed_size);
+        compressed.resize(compressed_size);
+        return;
     }
 
     // If compression made it grow or it was too small to compress then copy
     // the source over uncompressed
     if (!compressed_size) {
-        record_compression_result(uncompressed.size(), uncompressed.size() + 10);
-        compressed.data()[8] = static_cast<char>(Algorithm::None);
-        compressed.data()[9] = 0; // Window size
-        std::memcpy(compressed.data() + 10, uncompressed.data(), uncompressed.size());
+        record_compression_result(uncompressed.size(), uncompressed.size() + header_size);
+        write_header({Algorithm::None, uncompressed.size()}, compressed);
+        std::memcpy(compressed.data() + header_size, uncompressed.data(), uncompressed.size());
     }
 }
 
-util::AppendBuffer<char> compression::allocate_and_compress_with_header(Span<const char> uncompressed_buf)
+util::AppendBuffer<char> compression::allocate_and_compress_nonportable(Span<const char> uncompressed_buf)
 {
     util::compression::CompressMemoryArena arena;
     util::AppendBuffer<char> compressed;
-    allocate_and_compress_with_header(arena, uncompressed_buf, compressed);
+    allocate_and_compress_nonportable(arena, uncompressed_buf, compressed);
     return compressed;
 }
 
-std::unique_ptr<NoCopyInputStream> compression::decompress_input_stream(NoCopyInputStream& source, size_t& total_size)
+std::unique_ptr<NoCopyInputStream> compression::decompress_nonportable_input_stream(NoCopyInputStream& source,
+                                                                                    size_t& total_size)
 {
     auto first_block = source.next_block();
-    uint64_t size = 0;
-    for (int i = 0; i < 8; ++i) {
-        size += uint64_t(read_byte(source, first_block)) << (8 * i);
-    }
-    if (size > std::numeric_limits<size_t>::max())
+    auto header = read_header(source, first_block);
+    if (header.size == std::numeric_limits<size_t>::max())
         return nullptr;
-    total_size = static_cast<size_t>(size);
+    total_size = header.size;
 
-    auto algo = static_cast<Algorithm>(peek_byte(source, first_block));
-    if (algo == Algorithm::None)
+    if (header.algorithm == Algorithm::None)
         return std::make_unique<DecompressInputStreamNone>(source, first_block);
 #if REALM_USE_LIBCOMPRESSION
     if (__builtin_available(macOS 10.10, *)) {
-        if (algo == Algorithm::Deflate || algo == Algorithm::LZFSE) {
-            return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, total_size);
-        }
+        return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, header);
     }
 #endif
-    if (algo == Algorithm::Deflate)
+    if (header.algorithm == Algorithm::Deflate)
         return std::make_unique<DecompressInputStreamZlib>(source, first_block, total_size);
     return nullptr;
 }
 
 size_t compression::get_uncompressed_size_from_header(NoCopyInputStream& source)
 {
-    size_t size;
-    return read_size(source.next_block(), size) ? 0 : size;
+    auto first_block = source.next_block();
+    return read_header(source, first_block).size;
 }

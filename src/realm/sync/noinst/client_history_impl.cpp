@@ -168,7 +168,7 @@ void ClientHistory::compress_stored_changesets()
             if (data.is_null())
                 continue;
             data.copy_to(compressed_buffer);
-            util::compression::allocate_and_compress_with_header(arena, compressed_buffer, decompressed_buffer);
+            util::compression::allocate_and_compress_nonportable(arena, compressed_buffer, decompressed_buffer);
             column->set(i, BinaryData{decompressed_buffer.data(), decompressed_buffer.size()}); // Throws
         }
     }
@@ -313,7 +313,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
         UploadChangeset uc;
         util::AppendBuffer<char> decompressed;
         ChunkedBinaryInputStream is(entry.changeset);
-        auto ec = util::compression::decompress_with_header(is, decompressed);
+        auto ec = util::compression::decompress_nonportable(is, decompressed);
         REALM_ASSERT(ec == std::error_code{});
         uc.origin_timestamp = entry.origin_timestamp;
         uc.origin_file_ident = entry.origin_file_ident;
@@ -530,7 +530,7 @@ void ClientHistory::set_reciprocal_transform(version_type version, BinaryData da
     std::size_t index = size_t(version - m_sync_history_base_version) - 1;
     REALM_ASSERT(index < sync_history_size());
 
-    auto compressed = util::compression::allocate_and_compress_with_header(data);
+    auto compressed = util::compression::allocate_and_compress_nonportable(data);
     m_arrays->reciprocal_transforms.set(index, BinaryData{compressed.data(), compressed.size()}); // Throws
 }
 
@@ -670,7 +670,7 @@ void ClientHistory::add_sync_history_entry(HistoryEntry entry)
 
     if (!entry.changeset.is_null()) {
         auto changeset = entry.changeset.get_first_chunk();
-        auto compressed = util::compression::allocate_and_compress_with_header(changeset);
+        auto compressed = util::compression::allocate_and_compress_nonportable(changeset);
         m_arrays->changesets.add(BinaryData{compressed.data(), compressed.size()}); // Throws
     }
     else {
@@ -936,7 +936,7 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         ChunkedBinaryData changeset{m_arrays->changesets, i};
         ChunkedBinaryInputStream is{changeset};
         size_t decompressed_size;
-        auto decompressed = util::compression::decompress_input_stream(is, decompressed_size);
+        auto decompressed = util::compression::decompress_nonportable_input_stream(is, decompressed_size);
         if (!decompressed)
             continue;
         Changeset log;
@@ -982,7 +982,7 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         if (did_modify) {
             ChangesetEncoder::Buffer modified;
             encode_changeset(log, modified);
-            util::compression::allocate_and_compress_with_header(arena, modified, compressed);
+            util::compression::allocate_and_compress_nonportable(arena, modified, compressed);
             m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
 
             uploadable_bytes += modified.size() - decompressed_size;

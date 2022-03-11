@@ -320,33 +320,67 @@ TEST_IF(Compression_Decompress_Stream_LargeBlocks, false)
 
 TEST(Compression_AllocateAndCompressWithHeader_Compressible)
 {
-    size_t uncompressed_size = 10000;
-    auto uncompressed = generate_compressible_data(uncompressed_size);
-    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
-    CHECK_LESS(compressed.size(), uncompressed.size());
-
     util::AppendBuffer<char> decompressed;
-    util::SimpleNoCopyInputStream compressed_stream(compressed);
-    auto ec = compression::decompress_with_header(compressed_stream, decompressed);
-    CHECK_NOT(ec);
-    compare(test_context, uncompressed, decompressed);
+
+    {
+        // Zero byte input should stay zero bytes
+        auto compressed = compression::allocate_and_compress_nonportable(std::array<char, 0>());
+        CHECK_EQUAL(compressed.size(), 0);
+
+        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
+        CHECK_NOT(ec);
+        CHECK_EQUAL(decompressed.size(), 0);
+    }
+
+    {
+        // Short data should be stored uncompressed even if it is compressible
+        size_t uncompressed_size = 255;
+        auto uncompressed = generate_compressible_data(uncompressed_size);
+        auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+        CHECK_EQUAL(compressed.size(), uncompressed.size() + 2);
+        compare(test_context, uncompressed, Span(compressed).sub_span(2));
+
+        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
+        CHECK_NOT(ec);
+        compare(test_context, uncompressed, decompressed);
+    }
+
+    // Longer data should actually be compressed
+    size_t uncompressed_sizes[] = {(1 << 8) + 10, (1 << 16) + 10, (1 << 24) + 10};
+    for (size_t uncompressed_size : uncompressed_sizes) {
+        auto uncompressed = generate_compressible_data(uncompressed_size);
+        auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+        CHECK_LESS(compressed.size(), uncompressed.size());
+
+        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
+        CHECK_NOT(ec);
+        compare(test_context, uncompressed, decompressed);
+    }
 }
 
 TEST(Compression_AllocateAndCompressWithHeader_Noncompressible)
 {
-    size_t uncompressed_size = 10000;
-    auto uncompressed = generate_non_compressible_data(uncompressed_size);
-    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
-
-    // Should have stored uncompressed with a header added
-    CHECK_EQUAL(compressed.size(), uncompressed.size() + 10);
-    compare(test_context, uncompressed, Span(compressed).sub_span(10));
-
     util::AppendBuffer<char> decompressed;
-    util::SimpleNoCopyInputStream compressed_stream(compressed);
-    auto ec = compression::decompress_with_header(compressed_stream, decompressed);
-    CHECK_NOT(ec);
-    compare(test_context, uncompressed, decompressed);
+    size_t expected_header_width = 2;
+    size_t uncompressed_sizes[] = {(1 << 0) + 10, (1 << 8) + 10, (1 << 16) + 10, (1 << 24) + 10};
+    for (size_t uncompressed_size : uncompressed_sizes) {
+        auto uncompressed = generate_non_compressible_data(uncompressed_size);
+        auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+
+        // Should have stored uncompressed with a header added
+        CHECK_EQUAL(compressed.size(), uncompressed.size() + expected_header_width);
+        compare(test_context, uncompressed, Span(compressed).sub_span(expected_header_width));
+
+        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
+        CHECK_NOT(ec);
+        compare(test_context, uncompressed, decompressed);
+
+        ++expected_header_width;
+    }
 }
 
 static void copy_stream(Span<char> dest, NoCopyInputStream& stream)
@@ -366,7 +400,7 @@ static void test_decompress_stream(test_util::unit_test::TestContext& test_conte
 
     for_each_fib_block_size(uncompressed.size(), compressed, [&](NoCopyInputStream& stream) {
         size_t total_size = 0;
-        auto decompress_stream = compression::decompress_input_stream(stream, total_size);
+        auto decompress_stream = compression::decompress_nonportable_input_stream(stream, total_size);
         CHECK_EQUAL(total_size, uncompressed.size());
         if (CHECK(decompress_stream)) {
             copy_stream(decompressed, *decompress_stream);
@@ -379,7 +413,7 @@ TEST(Compression_DecompressInputStream_Compressible_Small)
 {
     size_t uncompressed_size = 10000;
     auto uncompressed = generate_compressible_data(uncompressed_size);
-    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
     test_decompress_stream(test_context, uncompressed, compressed);
 }
 
@@ -387,7 +421,7 @@ TEST_IF(Compression_DecompressInputStream_Compressible_Large, false)
 {
     size_t uncompressed_size = (uint64_t(1) << 32) + 100;
     auto uncompressed = generate_compressible_data(uncompressed_size);
-    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
     test_decompress_stream(test_context, uncompressed, compressed);
 }
 
@@ -395,7 +429,7 @@ TEST(Compression_DecompressInputStream_NonCompressible_Small)
 {
     size_t uncompressed_size = 10000;
     auto uncompressed = generate_non_compressible_data(uncompressed_size);
-    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
     test_decompress_stream(test_context, uncompressed, compressed);
 }
 
@@ -403,6 +437,6 @@ TEST_IF(Compression_DecompressInputStream_NonCompressible_Large, false)
 {
     size_t uncompressed_size = (uint64_t(1) << 32) + 100;
     auto uncompressed = generate_non_compressible_data(uncompressed_size);
-    auto compressed = compression::allocate_and_compress_with_header(uncompressed);
+    auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
     test_decompress_stream(test_context, uncompressed, compressed);
 }

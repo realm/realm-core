@@ -67,12 +67,6 @@ struct is_error_code_enum<realm::util::compression::error> {
 
 namespace realm::util::compression {
 
-enum class Algorithm {
-    None = 0,
-    Deflate = 0x78,
-    LZFSE = 0x09,
-};
-
 class Alloc {
 public:
     // Returns null on "out of memory"
@@ -132,33 +126,85 @@ private:
 /// compress(). Returns 0 if the bound would overflow size_t.
 size_t compress_bound(size_t uncompressed_size) noexcept;
 
-/// compress() compresses the data in the \a uncompressed_buf and stores it in
-/// \a compressed_buf. If compression is successful, the compressed size is
-/// stored in \a compressed_size. \a compression_level is [1-9] with 1 the
-/// fastest for the current zlib implementation. The returned error code is of
-/// category compression::error_category. If \a Alloc is non-null, it is used
-/// for all memory allocations inside compress() and compress() will not throw
-/// any exceptions.
+/// compress() compresses the data in the \a uncompressed_buf using zlib and
+/// stores it in \a compressed_buf. If compression is successful, the
+/// compressed size is stored in \a compressed_size. \a compression_level is
+/// [1-9] with 1 the fastest for the current zlib implementation. The returned
+/// error code is of category compression::error_category. If \a Alloc is
+/// non-null, it is used for all memory allocations inside compress() and
+/// compress() will not throw any exceptions.
 std::error_code compress(Span<const char> uncompressed_buf, Span<char> compressed_buf, size_t& compressed_size,
                          int compression_level = 1, Alloc* custom_allocator = nullptr);
 
-/// decompress() decompresses the data in \a compressed_buf into \a decompressed_buf.
+/// decompress() decompresses zlib-compressed the data in \a compressed_buf into \a decompressed_buf.
 /// decompress may throw std::bad_alloc, but all other errors (including the
 /// target buffer being too small) are reported by returning an error code of
 /// category compression::error_code.
 std::error_code decompress(Span<const char> compressed_buf, Span<char> decompressed_buf);
 
+/// decompress() decompresses zlib-compressed data in \a compressed into \a
+/// decompressed_buf. decompress may throw std::bad_alloc or any exceptions
+/// thrown by \a compressed, but all other errors (including the target buffer
+/// being too small) are reported by returning an error code of category
+/// compression::error_code.
 std::error_code decompress(NoCopyInputStream& compressed, Span<char> decompressed_buf);
-std::error_code decompress_with_header(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed);
 
+/// allocate_and_compress() compresses the data in \a uncompressed_buf using
+/// zlib, storing the result in \a compressed_buf. \a compressed_buf is resized
+/// to the required size, and on non-error return has size equal to the
+/// compressed size. All errors other than std::bad_alloc are returned as an
+/// error code of categrory compression::error_code.
 std::error_code allocate_and_compress(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
                                       std::vector<char>& compressed_buf);
-void allocate_and_compress_with_header(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
+
+/// decompress() decompresses data produced by
+/// allocate_and_compress_nonportable() in \a compressed into \a decompressed.
+/// \a decompressed is resized to the required size, and on non-error return
+/// has size equal to the compressed size. All errors other than std::bad_alloc
+/// are returned as an error code of categrory compression::error_code.
+std::error_code decompress_nonportable(NoCopyInputStream& compressed, AppendBuffer<char>& decompressed);
+
+/// decompress_nonportable_input_stream() returns an input stream which wraps
+/// the \a source input stream and decompresses data produced by
+/// allocate_and_compress_nonportable(). The returned input stream will be
+/// nullptr if the source data is in an unsupported format. Decompression
+/// errors will be reported by throwing a std::system_error containing an error
+/// code of category compression::error_code. If this returns a non-nullptr
+/// input stream, \a total_size is set to the decompressed size of the data
+/// which will be produced by fully consuming the returned input stream.
+std::unique_ptr<NoCopyInputStream> decompress_nonportable_input_stream(NoCopyInputStream& source, size_t& total_size);
+
+/// allocate_and_compress_nonportable() compresses the data stored in \a
+/// uncompressed_buf, writing it to \a compressed_buf.
+///
+/// The compressed data may use one of several compression algorithms and
+/// contains a nonstandard header, and so it can only be read by
+/// decompress_nonportable() or decompress_nonportable_input_stream(). The set
+/// of compression algorithms available is platform-specific, so data
+/// compressed with this function must only be used locally.
+///
+/// This function reports errors by throwing a std::system_error containing an
+/// error code of category compression::error_code. It may additionally throw
+/// std::bad_alloc.
+void allocate_and_compress_nonportable(CompressMemoryArena& compress_memory_arena, Span<const char> uncompressed_buf,
                                        util::AppendBuffer<char>& compressed_buf);
-util::AppendBuffer<char> allocate_and_compress_with_header(Span<const char> uncompressed_buf);
 
-std::unique_ptr<NoCopyInputStream> decompress_input_stream(NoCopyInputStream& source, size_t& total_size);
+/// allocate_and_compress_nonportable() compresses the data stored in \a
+/// uncompressed_buf, returning a buffer of the appropriate size.
+///
+/// The compressed data may use one of several compression algorithms and
+/// contains a nonstandard header, and so it can only be read by
+/// decompress_nonportable() or decompress_nonportable_input_stream(). The set
+/// of compression algorithms available is platform-specific, so data
+/// compressed with this function must only be used locally.
+///
+/// This function reports errors by throwing a std::system_error containing an
+/// error code of category compression::error_code. It may additionally throw
+/// std::bad_alloc.
+util::AppendBuffer<char> allocate_and_compress_nonportable(Span<const char> uncompressed_buf);
 
+/// Get the decompressed size of the data produced by
+/// allocate_and_compress_nonportable() which is stored in \a source.
 size_t get_uncompressed_size_from_header(NoCopyInputStream& source);
 
 } // namespace realm::util::compression

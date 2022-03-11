@@ -2620,7 +2620,7 @@ Changeset& TransformerImpl::get_reciprocal_transform(TransformHistory& history, 
         Changeset& changeset = *i->second;
         if (is_compressed) {
             size_t total_size;
-            auto decompressed = util::compression::decompress_input_stream(in, total_size);
+            auto decompressed = util::compression::decompress_nonportable_input_stream(in, total_size);
             REALM_ASSERT(decompressed);
             sync::parse_changeset(*decompressed, changeset); // Throws
         }
