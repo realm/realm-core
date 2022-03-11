@@ -525,6 +525,8 @@ void RealmCoordinator::open_db()
 #endif
 
     bool server_synchronization_mode = m_config.sync_config || m_config.force_sync_history;
+    bool schema_mode_reset_file =
+        m_config.schema_mode == SchemaMode::SoftResetFile || m_config.schema_mode == SchemaMode::HardResetFile;
     try {
         if (m_config.immutable() && m_config.realm_data) {
             m_db = DB::create(m_config.realm_data, false);
@@ -551,8 +553,7 @@ void RealmCoordinator::open_db()
             options.temp_dir = util::normalize_dir(m_config.fifo_files_fallback_path);
         }
         options.encryption_key = m_config.encryption_key.data();
-        options.allow_file_format_upgrade =
-            !m_config.disable_format_upgrade && m_config.schema_mode != SchemaMode::ResetFile;
+        options.allow_file_format_upgrade = !m_config.disable_format_upgrade && !schema_mode_reset_file;
         if (history) {
             options.backup_at_file_format_change = m_config.backup_at_file_format_change;
             m_db = DB::create(std::move(history), m_config.path, options);
@@ -562,14 +563,14 @@ void RealmCoordinator::open_db()
         }
     }
     catch (realm::FileFormatUpgradeRequired const&) {
-        if (m_config.schema_mode != SchemaMode::ResetFile) {
+        if (!schema_mode_reset_file) {
             translate_file_exception(m_config.path, m_config.immutable());
         }
         util::File::remove(m_config.path);
         return open_db();
     }
     catch (UnsupportedFileFormatVersion const&) {
-        if (m_config.schema_mode != SchemaMode::ResetFile) {
+        if (!schema_mode_reset_file) {
             translate_file_exception(m_config.path, m_config.immutable());
         }
         util::File::remove(m_config.path);
