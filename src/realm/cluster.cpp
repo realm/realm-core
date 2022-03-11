@@ -39,6 +39,32 @@
 
 namespace realm {
 
+/******************************* FieldValues *********************************/
+
+FieldValues::FieldValues(std::initializer_list<FieldValue> init)
+    : m_values(init)
+{
+    if (m_values.size() > 1) {
+        // Sort according to ColKey index
+        std::sort(m_values.begin(), m_values.end(), [](auto& a, auto& b) {
+            return a.col_key.get_index().val < b.col_key.get_index().val;
+        });
+    }
+}
+
+void FieldValues::insert(ColKey k, Mixed val, bool is_default)
+{
+    if (m_values.empty()) {
+        m_values.emplace_back(k, val, is_default);
+        return;
+    }
+    unsigned int idx = k.get_index().val;
+    auto it = std::lower_bound(m_values.begin(), m_values.end(), idx, [](auto& a, unsigned int i) {
+        return a.col_key.get_index().val < i;
+    });
+    m_values.insert(it, {k, val, is_default});
+}
+
 /******************************* ClusterNode *********************************/
 
 void ClusterNode::IteratorState::clear()

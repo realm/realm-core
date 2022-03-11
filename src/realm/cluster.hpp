@@ -49,7 +49,23 @@ struct FieldValue {
     bool is_default;
 };
 
-using FieldValues = std::vector<FieldValue>;
+class FieldValues {
+public:
+    FieldValues() {}
+    FieldValues(std::initializer_list<FieldValue>);
+    void insert(ColKey k, Mixed val, bool is_default = false);
+    auto begin() const
+    {
+        return m_values.begin();
+    }
+    auto end() const
+    {
+        return m_values.end();
+    }
+
+private:
+    std::vector<FieldValue> m_values;
+};
 
 class ClusterNode : public Array {
 public:

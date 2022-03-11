@@ -1665,10 +1665,10 @@ bool Table::migrate_objects()
             auto col_type = col_key.get_type();
             auto nullable = col_key.get_attrs().test(col_attr_Nullable);
             auto val = get_val_from_column(row_ndx, col_type, nullable, it.second.get());
-            init_values.emplace_back(col_key, val);
+            init_values.insert(col_key, val);
         }
         for (auto& it : ts_accessors) {
-            init_values.emplace_back(it.first, Mixed(it.second->get(row_ndx)));
+            init_values.insert(it.first, Mixed(it.second->get(row_ndx)));
         }
 
         // Create object with the initial values
@@ -3016,7 +3016,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         *did_create = true;
     }
 
-    field_values.emplace_back(primary_key_col, primary_key);
+    field_values.insert(primary_key_col, primary_key);
     Obj ret = m_clusters.insert(key, field_values);
 
     // Check if unresolved exists
