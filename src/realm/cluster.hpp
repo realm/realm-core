@@ -38,13 +38,15 @@ class ColumnAttrMask;
 class CascadeState;
 
 struct FieldValue {
-    FieldValue(ColKey k, Mixed val)
+    FieldValue(ColKey k, Mixed val, bool is_default = false)
         : col_key(k)
         , value(val)
+        , is_default(is_default)
     {
     }
     ColKey col_key;
     Mixed value;
+    bool is_default;
 };
 
 using FieldValues = std::vector<FieldValue>;

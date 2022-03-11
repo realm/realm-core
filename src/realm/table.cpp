@@ -2959,7 +2959,8 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     }
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, bool* did_create)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, UpdateMode mode,
+                                          bool* did_create)
 {
     auto primary_key_col = get_primary_key_column();
     if (m_is_embedded || !primary_key_col)
@@ -2975,7 +2976,18 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     // Check for existing object
     if (ObjKey key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
-        return m_clusters.get(key);
+        if (mode == UpdateMode::never) {
+            throw std::logic_error(
+                util::format("Attempting to create an object in '%1' with an existing primary key value '%2'.",
+                             get_name(), primary_key));
+        }
+        auto obj = m_clusters.get(key);
+        for (auto& val : field_values) {
+            if (mode == UpdateMode::all || obj.get_any(val.col_key) != val.value) {
+                obj.set_any(val.col_key, val.value, val.is_default);
+            }
+        }
+        return obj;
     }
 
     ObjKey unres_key;

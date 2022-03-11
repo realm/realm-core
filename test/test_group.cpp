@@ -1631,7 +1631,10 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK(table->has_search_index(primary_key_column));
 
-    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col2, "first"}});
+    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col2, "last"}});
+    CHECK_THROW_ANY(table->create_object_with_primary_key("Exactly!", {{}}, Table::UpdateMode::never));
+    table->create_object_with_primary_key("Exactly!", {{col2, "first"}}, Table::UpdateMode::changed);
+
     table->create_object_with_primary_key("Paul", {{col2, "John"}});
     table->create_object_with_primary_key("John", {{col2, "Paul"}});
     table->create_object_with_primary_key("George", {{col2, "George"}});
