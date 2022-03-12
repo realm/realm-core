@@ -254,17 +254,15 @@ TEST_CASE("sync: client reset", "[client reset]") {
             auto obj = results.get<Obj>(0);
             REQUIRE(obj.get<Int>("value") == 4);
             object = Object(realm, obj);
-            object_token =
-                object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                    REQUIRE_FALSE(err);
-                    object_changes = std::move(changes);
-                });
-        }
-        results_token =
-            results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
                 REQUIRE_FALSE(err);
-                results_changes = std::move(changes);
+                object_changes = std::move(changes);
             });
+        }
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            results_changes = std::move(changes);
+        });
     };
 
     SECTION("recovery") {
@@ -2088,7 +2086,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                     }
                     CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
                 }
-                const bool sorted_comparison = !test_type_is_array;
+                constexpr bool sorted_comparison = !test_type_is_array;
                 if constexpr (sorted_comparison) {
                     // order should not matter except for lists
                     std::sort(local_pks.begin(), local_pks.end());
