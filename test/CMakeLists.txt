@@ -77,6 +77,8 @@ set(CORE_TEST_SOURCES
     test_util_chunked_binary.cpp
     test_util_error.cpp
     test_util_file.cpp
+    test_util_fixed_size_buffer.cpp
+    test_util_flat_map.cpp
     test_util_functional.cpp
     test_util_future.cpp
     test_util_from_chars.cpp
@@ -88,7 +90,6 @@ set(CORE_TEST_SOURCES
     test_util_stringbuffer.cpp
     test_util_to_string.cpp
     test_util_type_list.cpp
-    test_util_fixed_size_buffer.cpp
     test_uuid.cpp
     test_mixed_null_assertions.cpp)
 
