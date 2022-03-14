@@ -1291,6 +1291,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
     config.cache = false;
     config.automatic_change_notifications = false;
     ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
     config.sync_config->client_resync_mode = test_mode;
     config.schema = Schema{
         {"object",
@@ -1489,7 +1490,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(object.is_valid());
                     std::vector<T>& expected_state = remote_state;
                     if (test_mode == ClientResyncMode::Recover) {
-                        expected_state.insert(expected_state.begin(), local_state.begin(), local_state.end());
+                        expected_state = local_state;
                     }
                     check_list(results.get<Obj>(0), expected_state);
                     check_list(object.obj(), expected_state);
@@ -1717,10 +1718,12 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
                     CHECK(object.is_valid());
                     std::set<Mixed>& expected = remote_state;
                     if (test_mode == ClientResyncMode::Recover) {
+                        bool do_erase_initial = remote_state.find(Mixed{values[0]}) == remote_state.end() ||
+                                                local_state.find(Mixed{values[0]}) == local_state.end();
                         for (auto& e : local_state) {
                             expected.insert(e);
                         }
-                        if (local_state.find(Mixed{values[0]}) == local_state.end()) {
+                        if (do_erase_initial) {
                             expected.erase(Mixed{values[0]}); // explicit erase of initial element occured
                         }
                     }
