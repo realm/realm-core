@@ -73,6 +73,9 @@ protected:
         }
     }
 
+    using ListCallback = util::UniqueFunction<void(LstBase&, size_t)>;
+    void resolve_list(const Instruction::PathInstruction& instr, const char* instr_name, ListCallback&& callback);
+
 private:
     const Changeset* m_log = nullptr;
     util::Logger* m_logger = nullptr;
