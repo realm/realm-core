@@ -43,7 +43,6 @@ namespace realm {
 class TableView;
 class SortDescriptor;
 class Group;
-class LstBase;
 template <class>
 class Lst;
 
