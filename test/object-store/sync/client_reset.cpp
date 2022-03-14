@@ -2089,13 +2089,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                     }
                     CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
                 }
-                constexpr bool sorted_comparison = !test_type_is_array;
-                if constexpr (sorted_comparison) {
+                if (!test_type_is_array) {
                     // order should not matter except for lists
                     std::sort(local_pks.begin(), local_pks.end());
                     std::sort(expected_links.begin(), expected_links.end());
                 }
-                require_links_to_match_ids(linked_objects, expected_links, sorted_comparison);
+                require_links_to_match_ids(linked_objects, expected_links, !test_type_is_array);
                 if (local_pks == expected_links) {
                     REQUIRE_INDICES(results_changes.modifications);
                     REQUIRE_INDICES(object_changes.modifications);
@@ -2135,8 +2134,8 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
         ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
         ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
         ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
-        ObjLink dest4 = create_one_dest_object(realm, dest_pk_4);
-        ObjLink dest5 = create_one_dest_object(realm, dest_pk_5);
+        create_one_dest_object(realm, dest_pk_4);
+        create_one_dest_object(realm, dest_pk_5);
         create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
     });
 
