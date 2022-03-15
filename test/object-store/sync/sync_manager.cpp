@@ -739,36 +739,6 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     }
 }
 
-TEST_CASE("sync_manager: metadata") {
-    TestSyncManager init_sync_manager(
-        TestSyncManager::Config(base_path, realm::SyncManager::MetadataMode::NoEncryption));
-    auto sync_manager = init_sync_manager.app()->sync_manager();
-
-    auto cleanup = util::make_scope_exit([=]() noexcept {
-        sync_manager->reset_for_testing();
-    });
-    reset_test_directory(base_path);
-
-    app::App::Config app_config;
-    app_config.app_id = "foo_app_id";
-    app_config.base_url = base_path;
-    app_config.platform = "OS Test Platform";
-    app_config.platform_version = "OS Test Platform Version";
-    app_config.sdk_version = "SDK Version";
-
-    SECTION("should be reset in case of decryption error") {
-        SyncClientConfig config;
-        config.base_file_path = base_path;
-        config.metadata_mode = SyncManager::MetadataMode::Encryption;
-        config.custom_encryption_key = make_test_encryption_key();
-
-        sync_manager->reset_for_testing();
-
-        config.custom_encryption_key = make_test_encryption_key(1);
-        config.reset_metadata_on_error = true;
-    }
-}
-
 TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
     reset_test_directory(base_path);
 

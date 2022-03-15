@@ -85,19 +85,8 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
             }
 
             bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
-            try {
-                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
-                                                                           m_config.custom_encryption_key);
-            }
-            catch (RealmFileException const&) {
-                if (m_config.reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
-                    m_metadata_manager = std::make_unique<SyncMetadataManager>(
-                        m_file_manager->metadata_path(), encrypt, std::move(m_config.custom_encryption_key));
-                }
-                else {
-                    throw;
-                }
-            }
+            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(), encrypt,
+                                                                       m_config.custom_encryption_key);
 
             REALM_ASSERT(m_metadata_manager);
 

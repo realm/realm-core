@@ -7,6 +7,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed a potential crash if a sync session is stopped in the middle of a `DiscardLocal` client reset. ([#5295](https://github.com/realm/realm-core/issues/5295), since v11.5.0) 
+* Opening an encrypted Realm while the keychain is locked on macOS would crash ([Swift #7438](https://github.com/realm/realm-swift/issues/7438)).
  
 ### Breaking changes
 * None.
