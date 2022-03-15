@@ -452,27 +452,9 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
 
     do_authenticated_request(
         std::move(req), sync_user,
-        [completion = std::move(completion), weak_app = weak_from_this(),
-         sync_user](const Response& profile_response) {
+        [completion = std::move(completion), this, sync_user](const Response& profile_response) {
             if (auto error = AppUtils::check_for_errors(profile_response)) {
                 return completion(nullptr, std::move(error));
-            }
-
-            // No-op if the app has been deallocated or the user has been removed.
-            auto app = weak_app.lock();
-            if (!app) {
-                return completion(
-                    nullptr,
-                    AppError(make_client_error_code(ClientErrorCode::app_deallocated),
-                             util::format("Cannot update profile of user '%1' because the app has been deallocated",
-                                          sync_user->identity())));
-            }
-            if (sync_user->state() == SyncUser::State::Removed) {
-                return completion(
-                    nullptr,
-                    AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                             util::format("Cannot update profile of user '%1' because the user has been removed",
-                                          sync_user->identity())));
             }
 
             try {
@@ -490,8 +472,8 @@ void App::get_profile(const std::shared_ptr<SyncUser>& sync_user,
                 sync_user->update_identities(identities);
                 sync_user->update_user_profile(SyncUserProfile(get<BsonDocument>(profile_json, "data")));
                 sync_user->set_state(SyncUser::State::LoggedIn);
-                app->m_sync_manager->set_current_user(sync_user->identity());
-                app->emit_change_to_subscribers(*app);
+                m_sync_manager->set_current_user(sync_user->identity());
+                emit_change_to_subscribers(*this);
             }
             catch (const AppError& err) {
                 return completion(nullptr, err);
@@ -539,33 +521,33 @@ void App::log_in_with_credentials(
     BsonDocument body = credentials.serialize_as_bson();
     attach_auth_options(body);
 
-    do_request(
-        {HttpMethod::post, route, m_request_timeout_ms,
-         get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
-        [completion = std::move(completion), credentials, linking_user, this](const Response& response) mutable {
-            if (auto error = AppUtils::check_for_errors(response)) {
-                return completion(nullptr, std::move(error));
-            }
+    do_request({HttpMethod::post, route, m_request_timeout_ms,
+                get_request_headers(linking_user, RequestTokenType::AccessToken), Bson(body).to_string()},
+               [completion = std::move(completion), credentials, linking_user,
+                anchor = shared_from_this()](const Response& response) mutable {
+                   if (auto error = AppUtils::check_for_errors(response)) {
+                       return completion(nullptr, std::move(error));
+                   }
 
-            std::shared_ptr<realm::SyncUser> sync_user = linking_user;
-            try {
-                auto json = parse<BsonDocument>(response.body);
-                if (linking_user) {
-                    linking_user->update_access_token(get<std::string>(json, "access_token"));
-                }
-                else {
-                    sync_user = m_sync_manager->get_user(
-                        get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
-                        get<std::string>(json, "access_token"), credentials.provider_as_string(),
-                        get<std::string>(json, "device_id"));
-                }
-            }
-            catch (const AppError& e) {
-                return completion(nullptr, e);
-            }
+                   std::shared_ptr<realm::SyncUser> sync_user = linking_user;
+                   try {
+                       auto json = parse<BsonDocument>(response.body);
+                       if (linking_user) {
+                           linking_user->update_access_token(get<std::string>(json, "access_token"));
+                       }
+                       else {
+                           sync_user = anchor->m_sync_manager->get_user(
+                               get<std::string>(json, "user_id"), get<std::string>(json, "refresh_token"),
+                               get<std::string>(json, "access_token"), credentials.provider_as_string(),
+                               get<std::string>(json, "device_id"));
+                       }
+                   }
+                   catch (const AppError& e) {
+                       return completion(nullptr, e);
+                   }
 
-            App::get_profile(sync_user, std::move(completion));
-        });
+                   anchor->get_profile(sync_user, std::move(completion));
+               });
 }
 
 void App::log_in_with_credentials(
@@ -781,7 +763,7 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
     // if we do not have metadata yet, we need to initialize it and send the
     // request once that's complete
     init_app_metadata([completion = std::move(completion), request = std::move(request),
-                       this](const util::Optional<Response>& error) mutable {
+                       anchor = shared_from_this()](const util::Optional<Response>& error) mutable {
         if (error) {
             return completion(std::move(*error));
         }
@@ -789,13 +771,13 @@ void App::do_request(Request&& request, UniqueFunction<void(const Response&)>&& 
         // if this is the first time we have received app metadata, the
         // original request will not have the correct URL hostname for
         // non global deployments.
-        auto app_metadata = m_sync_manager->app_metadata();
+        auto app_metadata = anchor->m_sync_manager->app_metadata();
         if (app_metadata && app_metadata->deployment_model != "GLOBAL" &&
-            request.url.rfind(m_base_url, 0) != std::string::npos) {
-            request.url.replace(0, m_base_url.size(), app_metadata->hostname);
+            request.url.rfind(anchor->m_base_url, 0) != std::string::npos) {
+            request.url.replace(0, anchor->m_base_url.size(), app_metadata->hostname);
         }
 
-        m_config.transport->send_request_to_server(std::move(request), std::move(completion));
+        anchor->m_config.transport->send_request_to_server(std::move(request), std::move(completion));
     });
 }
 
@@ -806,10 +788,10 @@ void App::do_authenticated_request(Request&& request, const std::shared_ptr<Sync
                                                                                 : RequestTokenType::AccessToken);
 
     auto completion_2 = [completion = std::move(completion), request, sync_user,
-                         this](const Response& response) mutable {
+                         anchor = shared_from_this()](const Response& response) mutable {
         if (auto error = AppUtils::check_for_errors(response)) {
-            App::handle_auth_failure(std::move(*error), std::move(response), std::move(request), sync_user,
-                                     std::move(completion));
+            anchor->handle_auth_failure(std::move(*error), std::move(response), std::move(request), sync_user,
+                                        std::move(completion));
         }
         else {
             completion(std::move(response));
