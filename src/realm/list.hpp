@@ -560,42 +560,10 @@ inline T Lst<T>::remove(const iterator& it)
     return remove(it.index());
 }
 
-//template<typename Tree>
-//inline size_t mixed_links_size(Tree& m_tree)
-//{
-//
-//    size_t null_links = 0;
-//    size_t size_mixed = m_tree->size();
-//
-//    for(size_t ndx = 0; ndx<size_mixed; ++ndx) {
-//
-//        Mixed mixed= m_tree->get(ndx);
-//        if(mixed.is_unresolved_link())
-//        auto link = mixed.get_link();
-//        if(link.is_null() || link.is_unresolved())
-//            null_links += 1;
-//
-//    }
-//    return size_mixed - null_links;
-//}
-
 template <class T>
 inline size_t Lst<T>::size() const
 {
     return update() ? m_tree->size() : 0;
-    
-//    if constexpr (std::is_same<T, Mixed>::value) {
-//        
-//        if(size > 0) {
-//            Mixed mixed = get_any(0);
-//            if(mixed.
-//        } && get_any(0).)
-//        //mixed logic
-//        update();
-//        return mixed_links_size(m_tree);
-//    }
-//    
-//    return ;
 }
 
 template <class T>
