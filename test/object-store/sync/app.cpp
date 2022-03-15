@@ -4379,9 +4379,9 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
+TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, profile, user_removed };
+    enum class TestState { unknown, location, login, profile };
     struct TestStateBundle {
         void advance_to(TestState new_state)
         {
@@ -4422,22 +4422,18 @@ TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
         {
             std::cerr << request.url << std::endl;
             if (request.url.find("/login") != std::string::npos) {
-                CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion_block));
             }
             else if (request.url.find("/profile") != std::string::npos) {
-                CHECK(state.get() == TestState::login);
                 state.advance_to(TestState::profile);
-                state.wait_for(TestState::user_removed);
                 mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
                                                     std::move(completion_block));
             }
             else if (request.url.find("/location") != std::string::npos) {
                 CHECK(request.method == HttpMethod::get);
-                CHECK(state.get() == TestState::unknown);
                 state.advance_to(TestState::location);
                 mock_transport_worker.add_work_item(
                     Response{200,
@@ -4453,29 +4449,30 @@ TEST_CASE("app: user removed during profile refresh", "[sync][app]") {
         TestStateBundle& state;
     };
 
-    TestSyncManager sync_manager(get_config(std::make_shared<transport>(mock_transport_worker, state)));
-    auto app = sync_manager.app();
-
-    Optional<AppError> cur_error;
+    std::shared_ptr<SyncUser> cur_user;
     std::mutex mutex;
-    // Profile will be refreshed only after logging in.
-    app->log_in_with_credentials(AppCredentials::anonymous(),
-                                 [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                     std::lock_guard lock(mutex);
-                                     CHECK(!user);
-                                     REQUIRE(error);
-                                     cur_error = std::move(error);
-                                 });
-    // Remove the user when /profile request is sent to server.
-    state.wait_for(TestState::profile);
-    app->sync_manager()->reset_for_testing();
-    state.advance_to(TestState::user_removed);
+    auto transporter = std::make_shared<transport>(mock_transport_worker, state);
 
+    {
+        TestSyncManager sync_manager(get_config(transporter));
+        auto app = sync_manager.app();
+
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
+                                         std::lock_guard lock(mutex);
+                                         CHECK(user);
+                                         REQUIRE_FALSE(error);
+                                         cur_user = std::move(user);
+                                     });
+    }
+
+    // At this point the test does not hold any reference to `app`.
+    state.wait_for(TestState::login);
     util::EventLoop::main().run_until([&] {
         std::lock_guard lock(mutex);
-        return bool(cur_error);
+        return cur_user != nullptr;
     });
-    CHECK(cur_error);
+    CHECK(cur_user);
 
     mock_transport_worker.mark_complete();
 }
