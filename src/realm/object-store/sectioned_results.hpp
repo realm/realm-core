@@ -29,9 +29,11 @@ class Mixed;
 
 struct SectionRange {
     size_t index;
-    size_t begin;
-    size_t end;
+    std::vector<size_t> indices;
 };
+
+using SectionedResultsNotificatonCallback
+    = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
 
 class ResultsSection {
 public:
@@ -47,6 +49,9 @@ public:
 
     size_t size();
 
+    NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
+                                                KeyPathArray key_path_array = {}) &;
+
 private:
     SectionedResults* m_parent;
     size_t m_index;
@@ -55,43 +60,40 @@ private:
 
 class SectionedResults {
 public:
+    using ComparisonFunc = util::UniqueFunction<bool(Mixed first, Mixed second)>;
+    using ComparisonFunc2 = util::UniqueFunction<Mixed(Mixed value)>;
 
-    SectionedResults(Results results,
-                     util::UniqueFunction<bool(Mixed first, Mixed second)> comparison_func):
-    m_results(results),
-    m_callback(std::move(comparison_func)) {
-        calculate_sections();
-    };
+    SectionedResults(Results results, ComparisonFunc2 comparison_func);
 
     ResultsSection operator[](size_t idx);
 
-    using CBFunc = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
-    NotificationToken add_notification_callback(CBFunc callback,
+    NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
-
-    SectionRange section_for_index(size_t index);
 
     size_t size();
 
 private:
 
-    void calculate_sections();
     friend class SectionedResultsNotificationHandler;
     void calculate_sections_if_required(Results::EvaluateMode mode = Results::EvaluateMode::Count);
+
+    NotificationToken add_notification_callback_for_section(size_t section_index,
+                                                            SectionedResultsNotificatonCallback callback,
+                                                            KeyPathArray key_path_array = {});
 
     friend class realm::ResultsSection;
     Results m_results;
     std::vector<SectionRange> m_offset_ranges;
-    util::UniqueFunction<bool(Mixed first, Mixed second)> m_callback;
+    ComparisonFunc2 m_callback;
 };
 
 struct SectionedResultsChangeSet {
-    // Sections and indices which were removed from the _old_ collection
-    std::map<size_t, std::set<size_t>> deletions;
     // Sections and indices in the _new_ collection which are new insertions
-    std::map<size_t, std::set<size_t>> insertions;
+    std::map<size_t, std::vector<size_t>> insertions;
     // Sections and indices of objects in the _old_ collection which were modified
-    std::map<size_t, std::set<size_t>> modifications;
+    std::map<size_t, std::vector<size_t>> modifications;
+    // Sections and indices which were removed from the _old_ collection
+    std::map<size_t, std::vector<size_t>> deletions;
 };
 
 

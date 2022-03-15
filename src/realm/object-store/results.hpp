@@ -64,10 +64,6 @@ public:
     Results(const Results&);
     Results& operator=(const Results&);
 
-    SectionedResults sectioned_results(const std::string& key_path,
-                                       bool ascending,
-                                       util::UniqueFunction<bool(Mixed first, Mixed second)> comparison_func);
-
     // Get the Realm
     std::shared_ptr<Realm> get_realm() const
     {
@@ -341,6 +337,8 @@ public:
     {
         m_update_policy = policy;
     }
+
+    SectionedResults sectioned_results(util::UniqueFunction<Mixed(Mixed value)> comparison_func) REQUIRES(m_mutex);
 
 private:
     std::shared_ptr<Realm> m_realm;
