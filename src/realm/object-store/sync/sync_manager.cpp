@@ -521,13 +521,19 @@ SyncManager::~SyncManager()
     }
 #endif
 
-    for (auto& user : m_users) {
-        user->detach_from_sync_manager();
+    {
+        util::CheckedLockGuard lk(m_user_mutex);
+        for (auto& user : m_users) {
+            user->detach_from_sync_manager();
+        }
     }
 
-    // Stop the client. This will abort any uploads that inactive sessions are waiting for.
-    if (m_sync_client)
-        m_sync_client->stop();
+    {
+        util::CheckedLockGuard lk(m_mutex);
+        // Stop the client. This will abort any uploads that inactive sessions are waiting for.
+        if (m_sync_client)
+            m_sync_client->stop();
+    }
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
