@@ -72,12 +72,13 @@ public:
         if (ndx >= current_size) {
             throw std::out_of_range("Index out of range");
         }
-        
-        //proxy out the mixed value for links, we need to know if the link is valid or not (not necesseraly must it be null)
-        if constexpr(std::is_same<T, Mixed>::value)
-        {
+
+        // proxy out the mixed value for links, we need to know if the link is valid or not (not necesseraly must it
+        // be null)
+        if constexpr (std::is_same<T, Mixed>::value) {
             Mixed mixed_link_value = m_tree->get(ndx);
-            if(mixed_link_value.is_null()) return Mixed{};
+            if (mixed_link_value.is_null())
+                return Mixed{};
             return mixed_link_value;
         }
         return m_tree->get(ndx);
