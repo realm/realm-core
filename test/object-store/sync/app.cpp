@@ -4400,7 +4400,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         {
             std::unique_lock<std::mutex> lk(mutex);
             cond.wait(lk, [&] {
-                return state == new_state;
+                return state >= new_state;
             });
         }
 
