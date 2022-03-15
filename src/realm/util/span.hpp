@@ -113,10 +113,12 @@ public:
     {
         REALM_ASSERT(extent == std::distance(begin, end));
     }
+#if 0 // VS 16.9 incorrectly rejects this. 16.10+ support it
     constexpr Span(element_type (&arr)[extent]) noexcept
         : m_data{arr}
     {
     }
+#endif
     template <class U, std::enable_if_t<std::is_convertible_v<U (*)[], element_type (*)[]>, int> = 0>
     constexpr Span(std::array<U, extent>& arr) noexcept
         : m_data{arr.data()}
@@ -147,12 +149,14 @@ public:
     {
     }
 
+#if 0 // VS 16.9 incorrectly rejects this. 16.10+ support it
     template <class U, std::enable_if_t<std::is_convertible_v<U (*)[], element_type (*)[]>, int> = 0>
     constexpr explicit Span(const Span<U, dynamic_extent>& other) noexcept
         : m_data{other.data()}
     {
         REALM_ASSERT(extent == other.size());
     }
+#endif
 
     template <size_t count>
     constexpr Span<element_type, count> first() const noexcept
