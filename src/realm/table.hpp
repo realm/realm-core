@@ -48,7 +48,6 @@ namespace realm {
 class BacklinkColumn;
 template <class>
 class BacklinkCount;
-class BinaryColumy;
 class TableView;
 class Group;
 class SortDescriptor;
