@@ -4178,7 +4178,6 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                                          promise.emplace_value(std::move(user));
                                      });
 
-        state.wait_for(TestState::profile_2);
         auto cur_user = std::move(cur_user_future).get();
         CHECK(cur_user);
 
@@ -4459,7 +4458,6 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     }
 
     // At this point the test does not hold any reference to `app`.
-    state.wait_for(TestState::login);
     state.advance_to(TestState::app_deallocated);
     auto cur_user = std::move(cur_user_future).get();
     CHECK(cur_user);
