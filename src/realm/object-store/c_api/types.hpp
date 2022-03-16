@@ -444,6 +444,34 @@ struct realm_notification_token : realm::c_api::WrapC, realm::NotificationToken 
     }
 };
 
+
+struct realm_callback_token : realm::c_api::WrapC {
+protected:
+    realm_callback_token(realm_t* realm, uint64_t token)
+        : m_realm(realm)
+        , m_token(token)
+    {
+    }
+    realm_t* m_realm;
+    uint64_t m_token;
+};
+
+struct realm_callback_token_realm : realm_callback_token {
+    realm_callback_token_realm(realm_t* realm, uint64_t token)
+        : realm_callback_token(realm, token)
+    {
+    }
+    ~realm_callback_token_realm() override;
+};
+
+struct realm_callback_token_schema : realm_callback_token {
+    realm_callback_token_schema(realm_t* realm, uint64_t token)
+        : realm_callback_token(realm, token)
+    {
+    }
+    ~realm_callback_token_schema() override;
+};
+
 struct realm_query : realm::c_api::WrapC {
     realm::Query query;
     std::weak_ptr<realm::Realm> weak_realm;
