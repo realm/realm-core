@@ -100,14 +100,15 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
     m_config.sync_config->get_fresh_realm_for_path =
-        [&](const std::string& path, util::UniqueFunction<void(DBRef, util::Optional<std::string>)> callback) {
+        [m_config_copy = m_config](const std::string& path,
+                                   util::UniqueFunction<void(DBRef, util::Optional<std::string>)> callback) {
             try {
                 // Get a fully downloaded Realm using the current configuration but changing the
                 // on disk path to the one provided. The current sync session is not affected.
                 REALM_ASSERT(!path.empty());
-                REALM_ASSERT(path != m_config.path);
-                REALM_ASSERT(m_config.sync_config);
-                auto copy_config = m_config;
+                REALM_ASSERT(path != m_config_copy.path);
+                REALM_ASSERT(m_config_copy.sync_config);
+                auto copy_config = m_config_copy;
                 copy_config.schema = util::none;
                 copy_config.realm_data = BinaryData{};
                 copy_config.audit_factory = {};
@@ -117,7 +118,7 @@ void RealmCoordinator::create_sync_session()
                 // This prevents a cycle if the fresh copy itself experiences a client reset.
                 // To make this change and not have it affect the actual sync session, an explicit
                 // copy must be made of the sync config because it is a shared pointer.
-                copy_config.sync_config = std::make_shared<SyncConfig>(*m_config.sync_config);
+                copy_config.sync_config = std::make_shared<SyncConfig>(*m_config_copy.sync_config);
                 copy_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
                 std::shared_ptr<RealmCoordinator> rc = get_coordinator(copy_config);
                 REALM_ASSERT(rc);
