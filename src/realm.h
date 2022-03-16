@@ -3085,12 +3085,12 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
 /**
  * Get latest subscription set for realm  flx sync
  */
-RLM_API realm_flx_sync_subscription_set_t* get_latest_subscription_set(realm_t* realm);
+RLM_API realm_flx_sync_subscription_set_t* get_latest_subscription_set(const realm_t* realm);
 
 /**
  * Get active subscription set for realm flx sync
  */
-RLM_API realm_flx_sync_subscription_set_t* get_active_subscription_set(realm_t* realm);
+RLM_API realm_flx_sync_subscription_set_t* get_active_subscription_set(const realm_t* realm);
 
 /**
  * Create a task that will open a realm with the specific configuration

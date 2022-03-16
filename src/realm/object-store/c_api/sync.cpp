@@ -407,23 +407,25 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
     config->client_resync_mode = ClientResyncMode(mode);
 }
 
-RLM_API realm_flx_sync_subscription_set_t* get_latest_subscription_set(realm_t* realm)
+RLM_API realm_flx_sync_subscription_set_t* get_latest_subscription_set(const realm_t* realm)
 {
-    if (auto subscription = (*realm)->get_latest_subscription_set()) {
-        return new realm_flx_sync_subscription_set(std::move(subscription));
-    }
-    return nullptr;
+    if(realm == nullptr)
+        return nullptr;
+    
+    auto subscription = (*realm)->get_latest_subscription_set();
+    return new realm_flx_sync_subscription_set_t(std::make_shared<sync::SubscriptionSet>(subscription));
 }
 
-RLM_API realm_flx_sync_subscription_set_t* get_active_subscription_set(realm_t* realm)
+RLM_API realm_flx_sync_subscription_set_t* get_active_subscription_set(const realm_t* realm)
 {
-    if (auto subscription = (*realm)->get_active_subscription_set()) {
-        return new realm_flx_sync_subscription_set(std::move(subscription));
-    }
-    return nullptr;
+    if(realm == nullptr)
+        return nullptr;
+    
+    auto subscription = (*realm)->get_active_subscription_set();
+    return new realm_flx_sync_subscription_set_t(std::make_shared<sync::SubscriptionSet>(subscription));
 }
 
-RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config)
+RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config) noexcept
 {
     return new realm_async_open_task_t(Realm::get_synchronized_realm(*config));
 }
