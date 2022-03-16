@@ -240,10 +240,10 @@ static void ensure_reclaimer_thread_runs()
 struct ReclaimerThreadStopper {
     ~ReclaimerThreadStopper()
     {
-            if (reclaimer_thread) {
-                reclaimer_shutdown = true;
-                reclaimer_thread->join();
-            }
+        if (reclaimer_thread) {
+            reclaimer_shutdown = true;
+            reclaimer_thread->join();
+        }
     }
 } reclaimer_thread_stopper;
 #else // REALM_PLATFORM_APPLE
@@ -262,7 +262,9 @@ static void ensure_reclaimer_thread_runs()
         }
         reclaimer_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, reclaimer_queue);
         dispatch_source_set_timer(reclaimer_timer, DISPATCH_TIME_NOW, NSEC_PER_SEC, NSEC_PER_SEC);
-        dispatch_source_set_event_handler(reclaimer_timer, ^{ reclaim_pages(); });
+        dispatch_source_set_event_handler(reclaimer_timer, ^{
+            reclaim_pages();
+        });
         dispatch_resume(reclaimer_timer);
     }
 }
@@ -273,7 +275,8 @@ struct ReclaimerThreadStopper {
         if (reclaimer_timer) {
             dispatch_source_cancel(reclaimer_timer);
             // Block until any currently-running timer tasks are done
-            dispatch_sync(reclaimer_queue, ^{});
+            dispatch_sync(reclaimer_queue, ^{
+                          });
             dispatch_release(reclaimer_timer);
             dispatch_release(reclaimer_queue);
         }
@@ -307,8 +310,9 @@ void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
 {
     UniqueLock lock(mapping_mutex);
     ensure_reclaimer_thread_runs();
-    auto j = std::find_if(info.readers.begin(), info.readers.end(),
-                          [=](auto& reader) { return reader.reader_ID == reader_id; });
+    auto j = std::find_if(info.readers.begin(), info.readers.end(), [=](auto& reader) {
+        return reader.reader_ID == reader_id;
+    });
     if (j == info.readers.end()) {
         ReaderInfo i = {reader_id, info.current_version};
         info.readers.push_back(i);
@@ -479,7 +483,7 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 }
 } // anonymous namespace
 
-SharedFileInfo* get_file_info_for_file(File& file)
+SharedFileInfo* get_file_info_for_file(const File& file)
 {
     LockGuard lock(mapping_mutex);
 #ifndef _WIN32
@@ -691,7 +695,7 @@ void* mmap_anon(size_t size)
 
     ULARGE_INTEGER s;
     s.QuadPart = size;
-    
+
     hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, s.HighPart, s.LowPart, nullptr);
     if (hMapFile == NULL) {
         throw std::system_error(GetLastError(), std::system_category(), "CreateFileMapping() failed");
@@ -974,5 +978,5 @@ void msync(FileDesc fd, void* addr, size_t size)
     }
 #endif
 }
-}
-}
+} // namespace util
+} // namespace realm

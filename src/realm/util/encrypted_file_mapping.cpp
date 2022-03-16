@@ -350,6 +350,33 @@ struct Patch {
     uint8_t hmac[32]; // for validation of above
 };
 
+void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
+{
+    Patch patch;
+    int read = File::read_static(patch_f, reinterpret_cast<char*>(&patch), sizeof(patch));
+    if (read == 0) {
+        std::cerr << "Patch empty, trusting real file" << std::endl;
+        return;
+    }
+    if (read != sizeof(patch)) {
+        std::cerr << "Patch incorrect, size wrong" << std::endl;
+        return;
+    }
+    if (!check_hmac(&patch.payload, sizeof(patch.payload), patch.hmac)) {
+        std::cerr << "Patch incorrect, check_hmac fails" << std::endl;
+        return;
+    }
+    std::cerr << "Patch valid - writing IV vector" << std::endl;
+    File::seek_static(f, iv_table_pos(patch.payload.pos));
+    File::write_static(f, reinterpret_cast<char*>(&patch.payload.iv), sizeof(patch.payload.iv));
+    std::cerr << "Patch valid - writing data block" << std::endl;
+    File::seek_static(f, patch.payload.pos);
+    File::write_static(f, reinterpret_cast<char*>(patch.payload.buffer), block_size);
+    std::cerr << "Main file patched - syncing and removing patch file" << std::endl;
+    fsync(f);
+    ftruncate(patch_f, 0);
+}
+
 void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
@@ -374,12 +401,18 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
             Patch patch;
             patch.payload.pos = pos;
             memcpy(&patch.payload.iv, &iv, sizeof(iv));
+            uint8_t hmac_tmp[32], hmac_out[32];
+            memcpy(&hmac_tmp, &patch.payload.iv.hmac1, 32);
             memcpy(&patch.payload.buffer, m_rw_buffer.get(), block_size);
             calc_hmac(&patch.payload, sizeof(patch.payload), patch.payload.iv.hmac1, patch.hmac);
 
             File::seek_static(patch_fd, 0);
             File::write_static(patch_fd, reinterpret_cast<const char*>(&patch), sizeof(patch));
             fsync(patch_fd);
+            memcpy(&patch.payload.iv.hmac1, hmac_tmp, 32);
+            calc_hmac(&patch.payload, sizeof(patch.payload), patch.payload.iv.hmac1, hmac_out);
+
+            REALM_ASSERT(memcmp(hmac_out, patch.hmac, 28) == 0);
         }
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
@@ -396,16 +429,6 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
     }
 }
 
-void AESCryptor::static_apply_pending_patch(FileDesc f, FileDesc patch_f)
-{
-    Patch patch;
-    int read = File::read_static(patch_f, &patch, sizeof(patch));
-    if (read != sizeof(patch)) {
-        std::cerr << "Patch incorrect, size wrong" << std::endl;
-        return;
-    }
-            calc_hmac(&patch.payload, sizeof(patch.payload), patch.payload.iv.hmac1, patch.hmac);
-}
 void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept
 {
     uint8_t iv[aes_block_size] = {0};
@@ -517,9 +540,12 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
     file.mappings.push_back(this);
 }
 
-static void static_apply_pending_patch(const File& f, const File& patch_f)
+void EncryptedFileMapping::static_apply_pending_patch(const File& f, const File& patch_f)
 {
-    AESCryptor::static_apply_pending_patch(f.get_descriptor(), patch_f.get_descriptor());
+    SharedFileInfo* info = util::get_file_info_for_file(f);
+    if (info) {
+        info->cryptor.apply_pending_patch(f.get_descriptor(), patch_f.get_descriptor());
+    }
 }
 
 EncryptedFileMapping::~EncryptedFileMapping()

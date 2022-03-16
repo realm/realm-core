@@ -143,7 +143,8 @@ void SlabAlloc::detach() noexcept
             m_mappings.clear();
             m_youngest_live_version = 0;
             m_file.close();
-            if (m_encryption_patch_file.is_attached()) m_encryption_patch_file.close();
+            if (m_encryption_patch_file.is_attached())
+                m_encryption_patch_file.close();
             break;
         default:
             REALM_UNREACHABLE();
@@ -692,7 +693,9 @@ util::File& SlabAlloc::get_patch_file()
 
 void SlabAlloc::apply_pending_patch()
 {
+#ifdef REALM_ENABLE_ENCRYPTION
     EncryptedFileMapping::static_apply_pending_patch(m_file, m_encryption_patch_file);
+#endif
 }
 
 ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
@@ -887,8 +890,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     REALM_ASSERT(m_mappings.size());
     m_data = m_mappings[0].primary_mapping.get_addr();
     realm::util::encryption_read_barrier(m_mappings[0].primary_mapping, 0, sizeof(Header));
-    dg.release();  // Do not detach
-    fcg.release(); // Do not close
+    dg.release();   // Do not detach
+    fcg.release();  // Do not close
     fcg2.release(); // Do not close
 #if REALM_ENABLE_ENCRYPTION
     m_realm_file_info = util::get_file_info_for_file(m_file);
