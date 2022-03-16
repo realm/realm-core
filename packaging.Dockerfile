@@ -1,2 +1,2 @@
 # https://github.com/realm/ci/tree/master/realm/docker/build-centos
-FROM ghcr.io/realm/ci/build-env-centos:pr-319
+FROM ghcr.io/realm/ci/build-env-centos:master

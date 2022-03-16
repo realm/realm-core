@@ -80,12 +80,7 @@ jobWrapper {
             rlmNode('docker') {
                 getArchive()
 
-                def buildEnv
-                docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-                    buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-                }
-
-                buildEnv.inside {
+                buildDockerEnv('testing.Dockerfile').inside {
                     echo "Checking code formatting"
                     modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
                     try {
@@ -261,11 +256,9 @@ def doCheckInDocker(Map options = [:]) {
     return {
         rlmNode('docker') {
             getArchive()
-            def sourcesDir = pwd()
-            def buildEnv
-            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-            }
+
+            def buildEnv = buildDockerEnv('testing.Dockerfile')
+
             def environment = environment()
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
@@ -355,15 +348,11 @@ def doCheckSanity(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
 
-            def buildEnv
-            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-            }
             def environment = environment() + [
               'CC=clang',
               'CXX=clang++'
             ]
-            buildEnv.inside(privileged) {
+            buildDockerEnv('testing.Dockerfile').inside(privileged) {
                 withEnv(environment) {
                     try {
                         dir('build-dir') {
@@ -391,12 +380,7 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            def buildEnv
-            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-              buildEnv = docker.build('realm-core-packaging', '-f packaging.Dockerfile .')
-            }
-
-            buildEnv.inside {
+            buildDockerEnv('packaging.Dockerfile').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
@@ -422,16 +406,12 @@ def doBuildLinuxClang(String buildType) {
         rlmNode('docker') {
             getArchive()
 
-            def buildEnv
-            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-            }
             def environment = environment() + [
               'CC=clang',
               'CXX=clang++'
             ]
 
-            buildEnv.inside {
+            buildDockerEnv('testing.Dockerfile').inside {
                 withEnv(environment) {
                     dir('build-dir') {
                         sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
@@ -461,16 +441,11 @@ def doCheckValgrind() {
         rlmNode('docker') {
             getArchive()
 
-            def buildEnv
-            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-            }
-
             def environment = environment()
             environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
 
-            withEnv(environment) {
-                buildEnv.inside {
+            buildDockerEnv('testing.Dockerfile').inside {
+                withEnv(environment) {
                     try {
                         sh '''
                            mkdir build-dir
@@ -503,10 +478,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
 
-            def buildEnv
-            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-              buildEnv = docker.build('realm-core-android', '-f android.Dockerfile .')
-            }
+            def buildEnv = buildDockerEnv('android.Dockerfile')
 
             def environment = environment()
             def cmakeArgs = ''
@@ -726,15 +698,10 @@ def buildPerformance() {
     rlmNode('brix && exclusive') {
       getArchive()
 
-      def buildEnv
-      docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-        buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-      }
-
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      buildEnv.inside {
+      buildDockerEnv('testing.Dockerfile').inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -910,12 +877,7 @@ def doBuildCoverage() {
     rlmNode('docker') {
       getArchive()
 
-      def buildEnv
-      docker.withRegistry('https://ghcr.io', 'github-packages-token') {
-        buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
-      }
-
-      buildEnv.inside {
+      buildDockerEnv('testing.Dockerfile').inside {
         sh '''
           mkdir build
           cd build
@@ -998,6 +960,14 @@ def getSourceArchive() {
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )
+}
+
+def buildDockerEnv(String dockerfile = 'Dockerfile', String extraArgs = '') {
+    def buildEnv
+    docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+        buildEnv = docker.build("ci/realm-core:${dockerfile}", ". -f ${dockerfile} ${extraArgs}")
+    }
+    return buildEnv
 }
 
 enum TestAction {
