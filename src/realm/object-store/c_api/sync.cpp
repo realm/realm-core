@@ -409,18 +409,18 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
 
 RLM_API realm_flx_sync_subscription_set_t* get_latest_subscription_set(const realm_t* realm)
 {
-    if(realm == nullptr)
+    if (realm == nullptr)
         return nullptr;
-    
+
     auto subscription = (*realm)->get_latest_subscription_set();
     return new realm_flx_sync_subscription_set_t(std::make_shared<sync::SubscriptionSet>(subscription));
 }
 
 RLM_API realm_flx_sync_subscription_set_t* get_active_subscription_set(const realm_t* realm)
 {
-    if(realm == nullptr)
+    if (realm == nullptr)
         return nullptr;
-    
+
     auto subscription = (*realm)->get_active_subscription_set();
     return new realm_flx_sync_subscription_set_t(std::make_shared<sync::SubscriptionSet>(subscription));
 }
