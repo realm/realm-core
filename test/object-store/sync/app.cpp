@@ -4108,7 +4108,6 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                                     util::UniqueFunction<void(const Response&)>&& completion_block) override
 
         {
-            std::cerr << request.url << std::endl;
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
@@ -4381,7 +4380,7 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
 
 TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     AsyncMockNetworkTransport mock_transport_worker;
-    enum class TestState { unknown, location, login, profile };
+    enum class TestState { unknown, location, login, app_deallocated, profile };
     struct TestStateBundle {
         void advance_to(TestState new_state)
         {
@@ -4400,7 +4399,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         {
             std::unique_lock<std::mutex> lk(mutex);
             cond.wait(lk, [&] {
-                return state >= new_state;
+                return state == new_state;
             });
         }
 
@@ -4420,9 +4419,9 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
                                     util::UniqueFunction<void(const Response&)>&& completion_block) override
 
         {
-            std::cerr << request.url << std::endl;
             if (request.url.find("/login") != std::string::npos) {
                 state.advance_to(TestState::login);
+                state.wait_for(TestState::app_deallocated);
                 mock_transport_worker.add_work_item(
                     Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
                     std::move(completion_block));
@@ -4468,6 +4467,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
 
     // At this point the test does not hold any reference to `app`.
     state.wait_for(TestState::login);
+    state.advance_to(TestState::app_deallocated);
     util::EventLoop::main().run_until([&] {
         std::lock_guard lock(mutex);
         return cur_user != nullptr;
