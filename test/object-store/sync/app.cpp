@@ -4171,20 +4171,16 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
     {
         std::mutex mutex;
-        std::shared_ptr<SyncUser> cur_user;
+        auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
         app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                         std::lock_guard lock(mutex);
-                                         CHECK(user);
+                                     [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                                             util::Optional<AppError> error) mutable {
                                          REQUIRE_FALSE(error);
-                                         cur_user = std::move(user);
+                                         promise.emplace_value(std::move(user));
                                      });
 
         state.wait_for(TestState::profile_2);
-        util::EventLoop::main().run_until([&] {
-            std::lock_guard lock(mutex);
-            return cur_user != nullptr;
-        });
+        auto cur_user = std::move(cur_user_future).get();
         CHECK(cur_user);
 
         Realm::Config realm_config;
@@ -4448,7 +4444,7 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         TestStateBundle& state;
     };
 
-    std::shared_ptr<SyncUser> cur_user;
+    auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
     std::mutex mutex;
     auto transporter = std::make_shared<transport>(mock_transport_worker, state);
 
@@ -4457,21 +4453,17 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
         auto app = sync_manager.app();
 
         app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                         std::lock_guard lock(mutex);
-                                         CHECK(user);
+                                     [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                                             util::Optional<AppError> error) mutable {
                                          REQUIRE_FALSE(error);
-                                         cur_user = std::move(user);
+                                         promise.emplace_value(std::move(user));
                                      });
     }
 
     // At this point the test does not hold any reference to `app`.
     state.wait_for(TestState::login);
     state.advance_to(TestState::app_deallocated);
-    util::EventLoop::main().run_until([&] {
-        std::lock_guard lock(mutex);
-        return cur_user != nullptr;
-    });
+    auto cur_user = std::move(cur_user_future).get();
     CHECK(cur_user);
 
     mock_transport_worker.mark_complete();
