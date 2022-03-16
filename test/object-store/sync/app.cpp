@@ -4170,7 +4170,6 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
     auto app = sync_manager.app();
 
     {
-        std::mutex mutex;
         auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
         app->log_in_with_credentials(AppCredentials::anonymous(),
                                      [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
@@ -4445,7 +4444,6 @@ TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
     };
 
     auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
-    std::mutex mutex;
     auto transporter = std::make_shared<transport>(mock_transport_worker, state);
 
     {
