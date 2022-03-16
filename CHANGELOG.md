@@ -62,7 +62,8 @@
 * Calling Realm::async_begin_transaction() from within a write transaction while the async state was idle would hit an assertion failure (since v11.10.0).
 * Fix issue with scheduler being deleted on wrong thread. This caused async open to hang in eg. realm-js. ([#5287](https://github.com/realm/realm-core/pull/5287), Since v11.10.0)
 * Waiting for upload after opening a bundled realm file could hang. ([#5277](https://github.com/realm/realm-core/issues/5277), since v11.5.0)
- 
+* Supporting flexible sync for C-API. ([#5110](https://github.com/realm/realm-core/issues/5110), Since v11.10.0)
+
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
