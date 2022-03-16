@@ -1632,21 +1632,16 @@ TEST(Unresolved_Mixed_links)
     // difference between list/set of links and lst/set of Mixed, size returns the whole list of links also the
     // null/unresolved ones
     expected_size = 1;
-    CHECK_EQUAL(list_mixed.size(), expected_size); // fails
-    CHECK_EQUAL(set_mixed.size(), expected_size);  // fails
+    CHECK_EQUAL(list_mixed.size(), expected_size);
+    CHECK_EQUAL(set_mixed.size(), expected_size);
 
-    auto check_mixed_link = [&](Mixed link) {
-        auto is_null = link.is_null();
-        auto is_unresolved = link.is_unresolved_link();
-        CHECK(is_null || is_unresolved);
-    };
     if (list_mixed.size()) {
         auto link = list_mixed.get(0);
-        check_mixed_link(link);
+        CHECK(link.is_null());
     }
     if (set_mixed.size()) {
         auto link = set_mixed.get(0);
-        check_mixed_link(link);
+        CHECK(link.is_null());
     }
 }
 
