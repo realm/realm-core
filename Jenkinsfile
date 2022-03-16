@@ -79,7 +79,13 @@ jobWrapper {
         stage('FormatCheck') {
             rlmNode('docker') {
                 getArchive()
-                docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+
+                def buildEnv
+                docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+                    buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+                }
+
+                buildEnv.inside {
                     echo "Checking code formatting"
                     modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
                     try {
@@ -256,15 +262,18 @@ def doCheckInDocker(Map options = [:]) {
         rlmNode('docker') {
             getArchive()
             def sourcesDir = pwd()
-            def buildEnv = docker.build 'realm-core-linux:21.04'
+            def buildEnv
+            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+            }
             def environment = environment()
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
 
             def buildSteps = { String dockerArgs = "" ->
-                withEnv(environment) {
-                    buildEnv.inside(dockerArgs) {
+                buildEnv.inside(dockerArgs) {
+                    withEnv(environment) {
                         try {
                             dir('build-dir') {
                                 sh "cmake ${cmakeDefinitions} -G Ninja .."
@@ -345,10 +354,17 @@ def doCheckSanity(Map options = [:]) {
     return {
         rlmNode('docker') {
             getArchive()
-            def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
-            def environment = environment()
-            withEnv(environment) {
-                buildEnv.inside(privileged) {
+
+            def buildEnv
+            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+            }
+            def environment = environment() + [
+              'CC=clang',
+              'CXX=clang++'
+            ]
+            buildEnv.inside(privileged) {
+                withEnv(environment) {
                     try {
                         dir('build-dir') {
                             sh "cmake ${cmakeDefinitions} -G Ninja .."
@@ -375,12 +391,17 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            docker.build('realm-core-generic:gcc-11', '-f generic.Dockerfile .').inside {
+            def buildEnv
+            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+              buildEnv = docker.build('realm-core-packaging', '-f packaging.Dockerfile .')
+            }
+
+            buildEnv.inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-11 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -400,18 +421,31 @@ def doBuildLinuxClang(String buildType) {
     return {
         rlmNode('docker') {
             getArchive()
-            docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
-                dir('build-dir') {
-                    sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
-                    runAndCollectWarnings(
-                        script: 'ninja',
-                        parser: "clang",
-                        name: "linux-clang-${buildType}",
-                        filters: warningFilters,
-                    )
-                    sh 'cpack -G TGZ'
+
+            def buildEnv
+            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+            }
+            def environment = environment() + [
+              'CC=clang',
+              'CXX=clang++'
+            ]
+
+            buildEnv.inside {
+                withEnv(environment) {
+                    dir('build-dir') {
+                        sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
+                        runAndCollectWarnings(
+                            script: 'ninja',
+                            parser: "clang",
+                            name: "linux-clang-${buildType}",
+                            filters: warningFilters,
+                        )
+                        sh 'cpack -G TGZ'
+                    }
                 }
             }
+
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
                 def stashName = "linux___${buildType}"
@@ -426,30 +460,35 @@ def doCheckValgrind() {
     return {
         rlmNode('docker') {
             getArchive()
-            def buildEnv = docker.build 'realm-core-linux:21.04'
+
+            def buildEnv
+            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+              buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+            }
+
             def environment = environment()
             environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
+
             withEnv(environment) {
                 buildEnv.inside {
-                    def workspace = pwd()
                     try {
-                        sh """
+                        sh '''
                            mkdir build-dir
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
-                        """
+                        '''
                         runAndCollectWarnings(
                             script: 'cd build-dir && ninja',
                             name: "linux-valgrind",
                             filters: warningFilters,
                         )
-                        sh """
+                        sh '''
                             cd build-dir/test
                             valgrind --version
-                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests
-                        """
+                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$WORKSPACE/test/valgrind.suppress --error-exitcode=1 ./realm-tests
+                        '''
                     } finally {
-                        recordTests("Linux-ValgrindDebug")
+                        recordTests('Linux-RelWithDebInfo')
                     }
                 }
             }
@@ -463,7 +502,12 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
+
+            def buildEnv
+            docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+              buildEnv = docker.build('realm-core-android', '-f android.Dockerfile .')
+            }
+
             def environment = environment()
             def cmakeArgs = ''
             if (test == TestAction.None) {
@@ -682,10 +726,15 @@ def buildPerformance() {
     rlmNode('brix && exclusive') {
       getArchive()
 
+      def buildEnv
+      docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+        buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+      }
+
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      docker.build('realm-core-linux:21.04').inside {
+      buildEnv.inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -860,28 +909,31 @@ def doBuildCoverage() {
   return {
     rlmNode('docker') {
       getArchive()
-      docker.build('realm-core-linux:21.04').inside {
-        def workspace = pwd()
-        sh """
+
+      def buildEnv
+      docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+        buildEnv = docker.build('realm-core-testing', '-f testing.Dockerfile .')
+      }
+
+      buildEnv.inside {
+        sh '''
           mkdir build
           cd build
           cmake -G Ninja -D REALM_COVERAGE=ON ..
           ninja
           cd ..
-          lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
+          lcov --no-external --capture --initial --directory . --output-file $WORKSPACE/coverage-base.info
           cd build/test
           ulimit -c unlimited
           UNITTEST_PROGRESS=1 ./realm-tests
           cd ../..
-          lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
-          lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
-          lcov --remove ${workspace}/coverage-total.info '/usr/*' '${workspace}/test/*' --output-file ${workspace}/coverage-filtered.info
+          lcov --no-external --directory . --capture --output-file $WORKSPACE/coverage-test.info
+          lcov --add-tracefile $WORKSPACE/coverage-base.info --add-tracefile coverage-test.info --output-file $WORKSPACE/coverage-total.info
+          lcov --remove $WORKSPACE/coverage-total.info '/usr/*' '$WORKSPACE/test/*' --output-file $WORKSPACE/coverage-filtered.info
           rm coverage-base.info coverage-test.info coverage-total.info
-        """
+        '''
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
-          sh '''
-            curl -s https://codecov.io/bash | bash
-          '''
+          sh 'curl -s https://codecov.io/bash | bash'
         }
       }
     }
