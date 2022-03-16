@@ -77,7 +77,7 @@ public:
         // be null)
         if constexpr (std::is_same<T, Mixed>::value) {
             Mixed mixed_link_value = m_tree->get(ndx);
-            if (mixed_link_value.is_null())
+            if (mixed_link_value.is_unresolved_link())
                 return Mixed{};
             return mixed_link_value;
         }
