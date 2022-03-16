@@ -2776,7 +2776,6 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  */
 RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
                                                                     const char* custom_filename) RLM_API_NOEXCEPT;
-
 RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
@@ -3023,6 +3022,10 @@ typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_sessi
 typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
 
+typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
+typedef struct realm_flx_sync_subscription_set realm_flx_sync_subscription_set_t;
+typedef struct realm_flx_sync_mutable_subscription_set realm_flx_sync_mutable_subscription_set_t;
+
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
  *
@@ -3078,6 +3081,16 @@ RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, cons
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
                                                realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
+
+/**
+ * Get latest subscription set for realm  flx sync
+ */
+RLM_API realm_flx_sync_subscription_set_t* get_latest_subscription_set(realm_t* realm);
+
+/**
+ * Get active subscription set for realm flx sync
+ */
+RLM_API realm_flx_sync_subscription_set_t* get_active_subscription_set(realm_t* realm);
 
 /**
  * Create a task that will open a realm with the specific configuration
