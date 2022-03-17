@@ -463,7 +463,7 @@ def doCheckValgrind() {
                             valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$WORKSPACE/test/valgrind.suppress --error-exitcode=1 ./realm-tests
                         '''
                     } finally {
-                        recordTests('Linux-RelWithDebInfo')
+                        recordTests('Linux-Valgrind')
                     }
                 }
             }
