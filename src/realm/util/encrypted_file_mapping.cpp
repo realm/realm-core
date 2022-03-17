@@ -355,15 +355,15 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     Patch patch;
     int read = File::read_static(patch_f, reinterpret_cast<char*>(&patch), sizeof(patch));
     if (read == 0) {
-        std::cerr << "Patch empty, trusting real file" << std::endl;
+        std::cerr << "Patch ignored, empty" << std::endl;
         return;
     }
     if (read != sizeof(patch)) {
-        std::cerr << "Patch incorrect, size wrong" << std::endl;
+        std::cerr << "Patch ignored, size wrong" << std::endl;
         return;
     }
     if (!check_hmac(&patch.payload, sizeof(patch.payload), patch.hmac)) {
-        std::cerr << "Patch incorrect, check_hmac fails" << std::endl;
+        std::cerr << "Patch ignored, check_hmac fails" << std::endl;
         return;
     }
     std::cerr << "Patch valid - writing IV vector" << std::endl;
@@ -372,7 +372,7 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     std::cerr << "Patch valid - writing data block" << std::endl;
     File::seek_static(f, patch.payload.pos);
     File::write_static(f, reinterpret_cast<char*>(patch.payload.buffer), block_size);
-    std::cerr << "Main file patched - syncing and removing patch file" << std::endl;
+    std::cerr << "Realm file patched - syncing Realm file and truncating patch file" << std::endl;
     fsync(f);
     ftruncate(patch_f, 0);
 }
@@ -397,26 +397,23 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
             // they're different.
         } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
-        if (patch_fd) {
+        if (patch_fd >= 0) {
             Patch patch;
             patch.payload.pos = pos;
             memcpy(&patch.payload.iv, &iv, sizeof(iv));
-            uint8_t hmac_tmp[32], hmac_out[32];
+            uint8_t hmac_tmp[32];
             memcpy(&hmac_tmp, &patch.payload.iv.hmac1, 32);
             memcpy(&patch.payload.buffer, m_rw_buffer.get(), block_size);
-            calc_hmac(&patch.payload, sizeof(patch.payload), patch.payload.iv.hmac1, patch.hmac);
+            calc_hmac(&patch.payload, sizeof(patch.payload), patch.hmac, m_hmacKey);
 
             File::seek_static(patch_fd, 0);
             File::write_static(patch_fd, reinterpret_cast<const char*>(&patch), sizeof(patch));
             fsync(patch_fd);
-            memcpy(&patch.payload.iv.hmac1, hmac_tmp, 32);
-            calc_hmac(&patch.payload, sizeof(patch.payload), patch.payload.iv.hmac1, hmac_out);
-
-            REALM_ASSERT(memcmp(hmac_out, patch.hmac, 28) == 0);
+            //REALM_ASSERT(check_hmac(&patch.payload, sizeof(patch.payload), patch.hmac));
         }
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
-        if (patch_fd) {
+        if (patch_fd >= 0) {
             // if we're maintaining a patch, then we have to fsync the current write now
             fsync(fd); // <---- not good enough for iOS
         }
