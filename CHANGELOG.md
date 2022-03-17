@@ -2,12 +2,35 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* None.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 11.12.0 Release notes
+
+### Enhancements
 * Support for new SchemaMode::HardResetFile added. ([#4782](https://github.com/realm/realm-core/issues/4782))
 * Support for keypaths in change notifications added to C-API ([#5216](https://github.com/realm/realm-core/issues/5216))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
+* Application would sometimes crash with exceptions like 'KeyNotFound' or assertion "has_refs()". Other issues indicating file corruption may also be fixed by this. The one mentioned here is the one that lead to solving the problem. ([#5283](https://github.com/realm/realm-core/issues/5283), since v6.0.0)
+* Refreshing the user profile after the app has been destroyed leads to assertion failure ([#5238](https://github.com/realm/realm-core/issues/5238))
  
 ### Breaking changes
 * SchemaMode::ResetFile renamed to SchemaMode::SoftResetFile.
