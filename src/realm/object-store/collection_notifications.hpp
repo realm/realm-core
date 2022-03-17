@@ -89,6 +89,9 @@ struct CollectionChangeSet {
     // unreported moves which show up only as a delete/insert pair.
     std::vector<Move> moves;
 
+    // This flag indicates if the collection was cleared. 
+    bool collection_was_cleared = false;
+
     // This flag indicates whether the underlying object which is the source of this
     // collection was deleted. This applies to lists, dictionaries and sets.
     // This enables notifiers to report a change on empty collections that have been deleted.
@@ -100,7 +103,7 @@ struct CollectionChangeSet {
     bool empty() const noexcept
     {
         return deletions.empty() && insertions.empty() && modifications.empty() && modifications_new.empty() &&
-               moves.empty() && !collection_root_was_deleted;
+               moves.empty() && !collection_root_was_deleted  && !collection_was_cleared;
     }
 };
 
