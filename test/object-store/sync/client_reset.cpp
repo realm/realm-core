@@ -99,7 +99,7 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
 }
 
 #if REALM_ENABLE_AUTH_TESTS
-
+#if 0
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
         return;
@@ -1007,7 +1007,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
     }
 }
-
+#endif
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
