@@ -1995,7 +1995,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         });
         timed_wait_for([&] {
             return called.load();
-        });
+        }, std::chrono::milliseconds(10000));
         REQUIRE(called);
         called.store(false);
         session->wait_for_download_completion([&](std::error_code err) {
@@ -2004,7 +2004,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         });
         timed_wait_for([&] {
             return called.load();
-        });
+        }, std::chrono::milliseconds(10000));
         return Results(r, r->read_group().get_table("class_Dog"));
     };
 
