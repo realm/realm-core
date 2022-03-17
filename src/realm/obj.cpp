@@ -1774,7 +1774,7 @@ inline void nullify_set(Obj& obj, ColKey origin_col_key, T target)
 
 void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
 {
-    ensure_writeable();
+    // ensure_writeable();
 
     ColKey::Idx origin_col_ndx = origin_col_key.get_index();
     Allocator& alloc = get_alloc();
@@ -2161,6 +2161,8 @@ inline void Obj::do_set_null(ColKey col_key)
     values.set_parent(&fields, col_ndx.val + 1);
     values.init_from_parent();
     values.set_null(m_row_ndx);
+
+    sync(fields);
 }
 
 template <>
@@ -2178,6 +2180,8 @@ inline void Obj::do_set_null<ArrayString>(ColKey col_key)
     values.set_spec(const_cast<Spec*>(&get_spec()), spec_ndx);
     values.init_from_parent();
     values.set_null(m_row_ndx);
+
+    sync(fields);
 }
 
 Obj& Obj::set_null(ColKey col_key, bool is_default)
@@ -2194,7 +2198,6 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
         }
 
         update_if_needed();
-        ensure_writeable();
 
         StringIndex* index = m_table->get_search_index(col_key);
         if (index && !m_key.is_unresolved()) {
