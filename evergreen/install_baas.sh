@@ -25,7 +25,7 @@ case $(uname -s) in
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
     ;;
     Linux)
-        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.8.linux-amd64.tar.gz"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.15.11.linux-amd64.tar.gz"
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
         NODE_URL="https://nodejs.org/dist/v14.17.0/node-v14.17.0-linux-x64.tar.gz"
 
