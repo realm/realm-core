@@ -14,14 +14,7 @@ case $(uname -s) in
         STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
         STITCH_ASSISTED_AGG_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_osx_patch_20e2e4201581e8a98e0f1eb87c62e23e985c7e15_608c2a54c9ec44445262d94b_21_04_30_16_03_33/assisted_agg"
         MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/osx/mongodb-macos-x86_64-enterprise-5.0.3.tgz"
-        case $(uname -m) in
-            x86_64)
-                GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.15.11.darwin-amd64.tar.gz"
-            ;;
-            arm64)
-                GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.16.5.darwin-arm64.tar.gz"
-            ;;
-        esac
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.8.darwin-amd64.tar.gz"
 
         NODE_URL="https://nodejs.org/dist/v14.17.0/node-v14.17.0-darwin-x64.tar.gz"
         # For now, we build everything as x64_64 since we don't have mongo binaries for ARM64
@@ -32,7 +25,7 @@ case $(uname -s) in
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-darwin-amd64"
     ;;
     Linux)
-        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.15.11.linux-amd64.tar.gz"
+        GO_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/go1.17.8.linux-amd64.tar.gz"
         JQ_DOWNLOAD_URL="https://s3.amazonaws.com/static.realm.io/evergreen-assets/jq-1.6-linux-amd64"
         NODE_URL="https://nodejs.org/dist/v14.17.0/node-v14.17.0-linux-x64.tar.gz"
 
