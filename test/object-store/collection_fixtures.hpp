@@ -629,7 +629,8 @@ struct ListOfMixedLinks : public LinkedCollectionBase {
         Lst<Mixed> list = obj.get_list<Mixed>(col);
         size_t num_unresolved = 0;
         for (auto value : list) {
-            if (value.is_unresolved_link()) {
+            // mixed link can never be invalid only null
+            if (value.is_null()) {
                 ++num_unresolved;
             }
         }
@@ -736,7 +737,8 @@ struct SetOfMixedLinks : public LinkedCollectionBase {
         Set<Mixed> set = obj.get_set<Mixed>(col);
         size_t num_unresolved = 0;
         for (auto value : set) {
-            if (value.is_unresolved_link()) {
+            // mixed link can never be invalid only null
+            if (value.is_null()) {
                 ++num_unresolved;
             }
         }
