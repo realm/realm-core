@@ -645,7 +645,6 @@ struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSess
 };
 
 struct realm_flx_sync_subscription : realm::c_api::WrapC, std::shared_ptr<realm::sync::Subscription> {
-
     realm_flx_sync_subscription(std::shared_ptr<realm::sync::Subscription> subscription)
         : std::shared_ptr<realm::sync::Subscription>{std::move(subscription)}
     {
