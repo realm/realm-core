@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
 
 ----------------------------------------------
 
