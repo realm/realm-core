@@ -3082,13 +3082,14 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#if !REALM_ENABLE_ENCRYPTION
-// Interprocess communication does not work with encryption enabled
-
 #if !REALM_ANDROID && !REALM_IOS
 // fork should not be used on android or ios.
-
-TEST(LangBindHelper_ImplicitTransactions_InterProcess)
+// Interprocess communication does not work with encryption turned on.
+// This test must be non-concurrant due to fork. If a child process
+// is created while a static mutex is locked (eg. util::GlobalRandom::m_mutex)
+// then any attempt to use the mutex would hang infinitely and the child would
+// crash upon exit(0) when attempting to destroy a locked mutex.
+NONCONCURRENT_TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
@@ -3194,7 +3195,6 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
 }
 
 #endif // !REALM_ANDROID && !REALM_IOS
-#endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
