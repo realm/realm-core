@@ -411,7 +411,7 @@ private:
     void set_int(ColKey col_key, int64_t value);
     void add_backlink(ColKey backlink_col, ObjKey origin_key);
     bool remove_one_backlink(ColKey backlink_col, ObjKey origin_key);
-    void nullify_link(ColKey origin_col, ObjLink target_key);
+    void nullify_link(ColKey origin_col, ObjLink target_key) &&;
     // Used when inserting a new link. You will not remove existing links in this process
     void set_backlink(ColKey col_key, ObjLink new_link) const;
     // Used when replacing a link, return true if CascadeState contains objects to remove
