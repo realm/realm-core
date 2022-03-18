@@ -203,6 +203,10 @@ public:
             m_root->bp_set_parent(parent, ndx_in_parent);
     }
 
+    virtual Mixed get_any(size_t) = 0;
+    virtual void erase(size_t) = 0;
+    virtual void clear() = 0;
+
     void create();
     void destroy();
     void verify() const
@@ -271,6 +275,7 @@ template <class T>
 class BPlusTree : public BPlusTreeBase {
 public:
     using LeafArray = typename LeafTypeTrait<T>::type;
+    using value_type = T;
 
     /**
      * Actual class for the leaves. Maps the abstract interface defined
@@ -452,7 +457,17 @@ public:
         }
     }
 
-    void erase(size_t n)
+    Mixed get_any(size_t n) override
+    {
+        if constexpr (std::is_same_v<T, uint64_t>) {
+            return Mixed(int64_t(get(n)));
+        }
+        else {
+            return get(n);
+        }
+    }
+
+    void erase(size_t n) override
     {
         auto func = [](BPlusTreeNode* node, size_t ndx) {
             LeafNode* leaf = static_cast<LeafNode*>(node);
@@ -464,7 +479,7 @@ public:
         m_size--;
     }
 
-    void clear()
+    void clear() override
     {
         if (m_root->is_leaf()) {
             LeafNode* leaf = static_cast<LeafNode*>(m_root.get());

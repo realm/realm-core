@@ -2071,12 +2071,9 @@ void Obj::assign_pk_and_backlinks(const Obj& other)
             if (c.is_dictionary()) {
                 auto dict = linking_obj.get_dictionary(c);
                 Mixed val(other.get_link());
-                for (auto it : dict) {
-                    if (it.second == val) {
-                        auto link = get_link();
-                        dict.insert(it.first, link);
-                    }
-                }
+                auto key = dict.find_value(val);
+                REALM_ASSERT(!key.is_null());
+                dict.insert(key, get_link());
             }
             else if (c.is_set()) {
                 if (c.get_type() == col_type_Link) {

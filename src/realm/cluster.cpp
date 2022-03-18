@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include "realm/cluster.hpp"
-#include "realm/dictionary_cluster_tree.hpp"
 #include "realm/array_integer.hpp"
 #include "realm/array_basic.hpp"
 #include "realm/array_bool.hpp"
@@ -1179,11 +1178,9 @@ void Cluster::verify() const
                 sz = arr.size();
             }
             for (size_t n = 0; n < sz; n++) {
-                if (arr.get(n)) {
-                    auto key_type = get_owning_table()->get_dictionary_key_type(col_key);
-                    DictionaryClusterTree cluster(&arr, key_type, get_alloc(), n);
-                    cluster.init_from_parent();
-                    cluster.verify();
+                if (auto ref = arr.get(n)) {
+                    Dictionary dict(get_alloc(), col_key, to_ref(ref));
+                    dict.verify();
                 }
             }
             return false;

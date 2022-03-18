@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include "realm/table_cluster_tree.hpp"
-#include "realm/dictionary_cluster_tree.hpp"
 #include "realm/table.hpp"
 #include "realm/replication.hpp"
 #include "realm/array_key.hpp"
@@ -234,15 +233,20 @@ void TableClusterTree::remove_all_links(CascadeState& state)
                 for (size_t i = 0; i < sz; i++) {
                     if (values.get_as_ref(i)) {
                         std::vector<ObjLink> links;
-                        DictionaryClusterTree dict_cluster(&values, DataType(col_key.get_type()), alloc, i);
-                        dict_cluster.init_from_parent();
-                        ArrayMixed leaf(alloc);
-                        // Iterate through cluster and find all link values
-                        dict_cluster.traverse([&leaf, &links](const Cluster* cluster) {
-                            size_t e = cluster->node_size();
-                            cluster->init_leaf(DictionaryClusterTree::s_values_col, &leaf);
-                            for (size_t i = 0; i < e; i++) {
-                                auto mix = leaf.get(i);
+
+                        Array top(alloc);
+                        top.set_parent(&values, i);
+                        top.init_from_parent();
+                        BPlusTree<Mixed> values(alloc);
+                        values.set_parent(&top, 1);
+                        values.init_from_parent();
+
+                        // Iterate through values and insert all link values
+                        values.traverse([&](BPlusTreeNode* node, size_t) {
+                            auto bplustree_leaf = static_cast<BPlusTree<Mixed>::LeafNode*>(node);
+                            auto sz = bplustree_leaf->size();
+                            for (size_t i = 0; i < sz; i++) {
+                                auto mix = bplustree_leaf->get(i);
                                 if (mix.is_type(type_TypedLink)) {
                                     links.push_back(mix.get<ObjLink>());
                                 }
