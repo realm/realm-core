@@ -92,7 +92,7 @@ public:
 
 private:
     SharedFileInfo& m_file;
-    FileDesc m_patch_fd = 0;
+    FileDesc m_patch_fd = -1;
     size_t m_page_shift;
     size_t m_blocks_per_page;
 

@@ -55,6 +55,7 @@ SharedFileInfo::SharedFileInfo(const uint8_t* key, FileDesc file_descriptor)
     : fd(file_descriptor)
     , cryptor(key)
 {
+    wq = cryptor.make_queue();
 }
 
 // We have the following constraints here:
@@ -349,35 +350,75 @@ struct Patch {
     Payload payload;
     uint8_t hmac[32]; // for validation of above
 };
+class WriteQueueImpl {
+public:
+    std::vector<Patch> the_queue;
+    ~WriteQueueImpl()
+    {
+        REALM_ASSERT(the_queue.empty());
+    }
+};
+
+WriteQueue AESCryptor::make_queue()
+{
+    return std::make_unique<WriteQueueImpl>();
+}
 
 void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
 {
     Patch patch;
-    int read = File::read_static(patch_f, reinterpret_cast<char*>(&patch), sizeof(patch));
-    if (read == 0) {
-        std::cerr << "Patch ignored, empty" << std::endl;
-        return;
+    bool patched = false;
+    while (true) {
+        int read = File::read_static(patch_f, reinterpret_cast<char*>(&patch), sizeof(patch));
+        if (read == 0) {
+            break;
+        }
+        if (read != sizeof(patch)) {
+            std::cerr << "Patch ignored, size wrong" << std::endl;
+            break;
+        }
+        if (!check_hmac(&patch.payload, sizeof(patch.payload), patch.hmac)) {
+            std::cerr << "Patch ignored, check_hmac fails" << std::endl;
+            break;
+        }
+        std::cerr << "Patch valid, patching Realm file at " << patch.payload.pos << std::endl;
+        File::seek_static(f, iv_table_pos(patch.payload.pos));
+        File::write_static(f, reinterpret_cast<char*>(&patch.payload.iv), sizeof(patch.payload.iv));
+        File::seek_static(f, real_offset(patch.payload.pos));
+        File::write_static(f, reinterpret_cast<char*>(patch.payload.buffer), block_size);
+        patched = true;
     }
-    if (read != sizeof(patch)) {
-        std::cerr << "Patch ignored, size wrong" << std::endl;
-        return;
+    if (patched) {
+        std::cerr << "Realm file patched - syncing Realm file and truncating patch file" << std::endl;
+        fsync(f);
+        ftruncate(patch_f, 0);
     }
-    if (!check_hmac(&patch.payload, sizeof(patch.payload), patch.hmac)) {
-        std::cerr << "Patch ignored, check_hmac fails" << std::endl;
-        return;
-    }
-    std::cerr << "Patch valid - writing IV vector" << std::endl;
-    File::seek_static(f, iv_table_pos(patch.payload.pos));
-    File::write_static(f, reinterpret_cast<char*>(&patch.payload.iv), sizeof(patch.payload.iv));
-    std::cerr << "Patch valid - writing data block" << std::endl;
-    File::seek_static(f, patch.payload.pos);
-    File::write_static(f, reinterpret_cast<char*>(patch.payload.buffer), block_size);
-    std::cerr << "Realm file patched - syncing Realm file and truncating patch file" << std::endl;
-    fsync(f);
-    ftruncate(patch_f, 0);
 }
 
-void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size) noexcept
+void AESCryptor::flush_queue(FileDesc fd, FileDesc patch_fd, const WriteQueue& q)
+{
+    // Flush the write buffer into the patch file
+    ftruncate(patch_fd, 0);
+    // File::seek_static(patch_fd, 0);
+    auto data = q->the_queue.data();
+    auto size = sizeof(Patch) * q->the_queue.size();
+    File::write_static(patch_fd, reinterpret_cast<const char*>(data), size);
+    fsync(patch_fd);
+    // Once the patch file has been synced, Write each block to the realm file
+    std::cerr << "Wrote patch file - now updating Realm file: ";
+    for (auto& patch : q->the_queue) {
+        std::cerr << patch.payload.pos << " ";
+        File::seek_static(fd, iv_table_pos(patch.payload.pos));
+        File::write_static(fd, reinterpret_cast<char*>(&patch.payload.iv), sizeof(patch.payload.iv));
+        File::seek_static(fd, real_offset(patch.payload.pos));
+        File::write_static(fd, reinterpret_cast<char*>(patch.payload.buffer), block_size);
+    }
+    std::cerr << "Done." << std::endl;
+    q->the_queue.clear();
+}
+
+void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size,
+                       const WriteQueue& q) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -398,27 +439,20 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
         } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
         if (patch_fd >= 0) {
-            Patch patch;
+            REALM_ASSERT(q);
+            q->the_queue.emplace_back(Patch());
+            Patch& patch = q->the_queue.back();
             patch.payload.pos = pos;
             memcpy(&patch.payload.iv, &iv, sizeof(iv));
             uint8_t hmac_tmp[32];
             memcpy(&hmac_tmp, &patch.payload.iv.hmac1, 32);
             memcpy(&patch.payload.buffer, m_rw_buffer.get(), block_size);
             calc_hmac(&patch.payload, sizeof(patch.payload), patch.hmac, m_hmacKey);
-
-            File::seek_static(patch_fd, 0);
-            File::write_static(patch_fd, reinterpret_cast<const char*>(&patch), sizeof(patch));
-            fsync(patch_fd);
-            //REALM_ASSERT(check_hmac(&patch.payload, sizeof(patch.payload), patch.hmac));
         }
-        check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
-        check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
-        if (patch_fd >= 0) {
-            // if we're maintaining a patch, then we have to fsync the current write now
-            fsync(fd); // <---- not good enough for iOS
+        else {
+            check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
+            check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
         }
-        // From here the patch is not needed anymore, but we don't have to invalidate it,
-        // since any later write will do that.
 
         pos += block_size;
         src += block_size;
@@ -821,10 +855,12 @@ void EncryptedFileMapping::flush() noexcept
 
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
         m_file.cryptor.write(m_file.fd, m_patch_fd, off_t(page_ndx_in_file << m_page_shift),
-                             page_addr(local_page_ndx), static_cast<size_t>(1ULL << m_page_shift));
+                             page_addr(local_page_ndx), static_cast<size_t>(1ULL << m_page_shift), m_file.wq);
         clear(m_page_state[local_page_ndx], Dirty);
     }
-
+    if (m_patch_fd >= 0) {
+        m_file.cryptor.flush_queue(m_file.fd, m_patch_fd, m_file.wq);
+    }
     validate();
 }
 
@@ -833,6 +869,9 @@ void EncryptedFileMapping::flush() noexcept
 #endif
 void EncryptedFileMapping::sync() noexcept
 {
+    if (m_patch_fd >= 0) {
+        REALM_ASSERT(m_file.wq->the_queue.empty());
+    }
 #ifdef _WIN32
     if (FlushFileBuffers(m_file.fd))
         return;

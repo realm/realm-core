@@ -42,6 +42,8 @@ namespace util {
 
 struct iv_table;
 class EncryptedFileMapping;
+class WriteQueueImpl;
+using WriteQueue = std::shared_ptr<WriteQueueImpl>;
 
 class AESCryptor {
 public:
@@ -52,10 +54,11 @@ public:
 
     bool read(FileDesc fd, off_t pos, char* dst, size_t size);
     void try_read_block(FileDesc fd, off_t pos, char* dst) noexcept;
-    void write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size) noexcept;
+    void write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* src, size_t size, const WriteQueue& q) noexcept;
     void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
     void apply_pending_patch(FileDesc f, FileDesc f_patch);
-
+    WriteQueue make_queue();
+    void flush_queue(FileDesc f, FileDesc f_patch, const WriteQueue& q);
 private:
     enum EncryptionMode {
 #if REALM_PLATFORM_APPLE
@@ -107,13 +110,13 @@ struct SharedFileInfo {
     size_t num_reclaimed_pages = 0;
     size_t progress_index = 0;
     std::vector<ReaderInfo> readers;
-
+    WriteQueue wq;
     SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
 };
 
 inline void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
 {
-    write(fd, 0, pos, src, size);
+    write(fd, -1, pos, src, size, nullptr);
 }
 
 } // namespace util
