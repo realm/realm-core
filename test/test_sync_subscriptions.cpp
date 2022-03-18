@@ -1,3 +1,4 @@
+#include "realm/exceptions.hpp"
 #include "realm/sync/subscriptions.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 
@@ -130,10 +131,16 @@ TEST(Sync_SubscriptionStoreStateUpdates)
     // Clone the completed set and update it to have a new query.
     {
         auto new_set = store->get_latest().make_mutable_copy();
+        auto new_set_copy = new_set;
         CHECK_EQUAL(new_set.version(), 2);
         new_set.clear();
         new_set.insert_or_assign("b sub", query_b);
         std::move(new_set).commit();
+
+        // Mutating a MutableSubscriptionSet that's already been committed should throw a LogicError
+        CHECK_THROW(new_set_copy.clear(), LogicError);
+        CHECK_THROW(new_set_copy.erase(new_set_copy.begin()), LogicError);
+        CHECK_THROW(new_set_copy.insert_or_assign(query_b), LogicError);
     }
 
     // There should now be two subscription sets, version 1 is complete with query a and version 2 is pending with
