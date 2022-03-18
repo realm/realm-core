@@ -1,22 +1,22 @@
 // For format details, see https://aka.ms/vscode-remote/devcontainer.json or this file's README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.106.0/containers/docker-existing-dockerfile
 {
-    "name": "Object Store",
+    "name": "Realm Core",
 
     "dockerComposeFile": "docker-compose.yml",
     "service": "tests",
     "workspaceFolder": "/realm-core",
 
+    "forwardPorts": ["baas-proxy:8080"],
+
     // Set *default* container specific settings.json values on container create.
-    "settings": { 
-        "terminal.integrated.shell.linux": null,
+    "settings": {
         "cmake.configureSettings": {
             "REALM_ENABLE_AUTH_TESTS": "ON",
             "REALM_MONGODB_ENDPOINT": "http://mongodb-realm:9090",
-            "REALM_STITCH_CONFIG": "/realm-core/test/object-store/mongodb/config.json",
         },
         "cmake.cmakePath": "cmake",
-        "cmake.generator": "Ninja"
+        "cmake.generator": "Ninja",
     },
 
     // Add the IDs of extensions you want installed when the container is created.
@@ -25,5 +25,12 @@
         "ms-vscode.cmake-tools",
         "twxs.cmake",
         "matepek.vscode-catch2-test-adapter"
-    ]
+    ],
+
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "4gb"
+    },
+
+    "postCreateCommand": "[ ! -z \"$MMS_SCRATCH_AWS_CREDENTIALS\" ] && echo $MMS_SCRATCH_AWS_CREDENTIALS > ~/.aws/mms-scratch-credentials"
 }

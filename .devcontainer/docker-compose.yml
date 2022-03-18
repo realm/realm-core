@@ -1,11 +1,14 @@
 version: "3.4"
 services:
   tests:
-    build: ..
-    env_file: ../dependencies.list
+    build: 
+      context: ..
+      dockerfile: testing.Dockerfile
     command: sleep infinity # indefinetely pause container so it doesn't exit while VS Code is attached
     volumes:
       - ..:/realm-core:cached
+      - build-dir-volume:/realm-core/build
+      - vscode-extensions-volume:/root/.vscode-server/extensions
     depends_on: 
       - mongodb-realm
     # [Optional] Required for ptrace-based debuggers like C++, Go, and Rust
@@ -14,18 +17,29 @@ services:
     security_opt:
       - seccomp:unconfined
   mongodb-realm:
-    image: docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG:-latest}
+    image: ghcr.io/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG:-latest}
     restart: unless-stopped
-    volumes:
-      - ../test/object-store/mongodb:/apps/auth-integration-tests
     hostname: mongodb-realm
     environment: 
       MONGODB_REALM_HOSTNAME: mongodb-realm
-    ports:
-      - 9090:9090
+    secrets:
+      - source: mms-scratch-aws-credentials
+        target: /root/.aws/credentials
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090"]
       interval: 1m30s
       timeout: 10s
       retries: 3
       start_period: 1m
+  baas-proxy:
+    build: baas-proxy
+    depends_on: 
+      - mongodb-realm
+    ports:
+      - "8080"
+volumes:
+  build-dir-volume:
+  vscode-extensions-volume:
+secrets:
+  mms-scratch-aws-credentials:
+    file: ~/.aws/mms-scratch-credentials
