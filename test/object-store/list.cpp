@@ -140,10 +140,10 @@ TEST_CASE("list") {
             });
         }
 
-        SECTION("clearing list set correct flag") {
+        SECTION("clearing list sets correct flag") {
             auto token = require_change();
             write([&] {
-                    lst.remove_all();
+                lst.remove_all();
             });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
             REQUIRE(change.collection_was_cleared);

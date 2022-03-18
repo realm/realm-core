@@ -26,13 +26,14 @@ using namespace realm;
 using namespace realm::_impl;
 
 CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions, IndexSet insertions, IndexSet modifications,
-                                                 std::vector<Move> moves, bool collection_was_cleared, bool root_was_deleted)
+                                                 std::vector<Move> moves, bool collection_was_cleared,
+                                                 bool root_was_deleted)
     : CollectionChangeSet({std::move(deletions),
                            std::move(insertions),
                            std::move(modifications),
                            {},
                            std::move(moves),
-                           collection_was_cleared, 
+                           collection_was_cleared,
                            root_was_deleted})
 {
     for (auto&& move : this->moves) {
@@ -237,7 +238,7 @@ void CollectionChangeBuilder::clear(size_t old_size)
     moves.clear();
     columns.clear();
     deletions.set(old_size);
-    collection_was_cleared = true; 
+    collection_was_cleared = true;
 }
 
 void CollectionChangeBuilder::move(size_t from, size_t to)
@@ -699,7 +700,6 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
     // but we don't want inserts in the final modification set
     modifications.remove(insertions);
 
-    return {std::move(deletions),     std::move(insertions), std::move(modifications_in_old),
-            std::move(modifications), std::move(moves),  collection_was_cleared, collection_root_was_deleted,
-            std::move(columns)};
+    return {std::move(deletions), std::move(insertions),  std::move(modifications_in_old), std::move(modifications),
+            std::move(moves),     collection_was_cleared, collection_root_was_deleted,     std::move(columns)};
 }
