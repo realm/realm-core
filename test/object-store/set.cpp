@@ -749,6 +749,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 link_set.remove_all();
             });
             REQUIRE_INDICES(change.deletions, 0, 1, 2);
+            REQUIRE(change.collection_was_cleared);
 
             // Should not resend delete all notification after another commit
             change = {};
