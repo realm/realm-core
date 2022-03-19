@@ -3089,7 +3089,9 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 // is created while a static mutex is locked (eg. util::GlobalRandom::m_mutex)
 // then any attempt to use the mutex would hang infinitely and the child would
 // crash upon exit(0) when attempting to destroy a locked mutex.
-NONCONCURRENT_TEST(LangBindHelper_ImplicitTransactions_InterProcess)
+// This is not run with ASAN because children intentionally call exit(0) which does not
+// invoke destructors.
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
@@ -3110,7 +3112,7 @@ NONCONCURRENT_TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         REALM_ASSERT_EX(exited_normally, pid, info);
 
         auto exit_status = WEXITSTATUS(*status);
-        REALM_ASSERT_EX(exit_status == 0, pid, info);
+        REALM_ASSERT_EX(exit_status == 0, exit_status, pid, info);
     };
 
     int readpids[read_process_count];
@@ -3120,7 +3122,7 @@ NONCONCURRENT_TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
-        {
+        try {
             std::unique_ptr<Replication> hist(make_in_realm_history());
             DBRef sg = DB::create(*hist, path);
             // initialize table with 200 entries holding 0..200
@@ -3135,6 +3137,9 @@ NONCONCURRENT_TEST(LangBindHelper_ImplicitTransactions_InterProcess)
             table_b->create_object().set_all(99);
             wt.add_table("C");
             wt.commit();
+        }
+        catch (const std::exception& e) {
+            REALM_ASSERT_EX(false, e.what());
         }
         exit(0);
     }
