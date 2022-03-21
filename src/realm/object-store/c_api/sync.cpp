@@ -552,8 +552,9 @@ realm_sync_subscription_update_state_with_error(realm_flx_sync_mutable_subscript
 RLM_API realm_flx_sync_subscription_set_t*
 realm_sync_subscription_commit(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set)
 {
-    if (mutable_subscription_set)
-        std::move(*mutable_subscription_set).commit();
+    if (mutable_subscription_set == nullptr)
+        return nullptr;
+    return new realm_flx_sync_subscription_set_t{std::move(*mutable_subscription_set).commit()};
 }
 
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config) noexcept
