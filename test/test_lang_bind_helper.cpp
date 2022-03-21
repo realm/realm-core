@@ -21,6 +21,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <csignal>
 #include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -3083,6 +3084,15 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 #ifndef _WIN32
 
 #if !REALM_ANDROID && !REALM_IOS
+std::stringstream ss;
+void signal_handler(int signal)
+{
+    std::cout << "signal handler: " << signal << std::endl;
+    util::Backtrace::capture().print(ss);
+    std::cout << "trace: " << ss.str() << std::endl;
+    exit(signal);
+}
+
 // fork should not be used on android or ios.
 // Interprocess communication does not work with encryption turned on.
 // This test must be non-concurrant due to fork. If a child process
@@ -3122,6 +3132,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
+        std::signal(SIGSEGV, signal_handler);
         try {
             std::unique_ptr<Replication> hist(make_in_realm_history());
             DBRef sg = DB::create(*hist, path);
