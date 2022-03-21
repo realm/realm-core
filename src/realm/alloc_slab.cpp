@@ -736,7 +736,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // the call below to set_encryption_key.
     m_file.set_encryption_key(cfg.encryption_key);
     if (cfg.encryption_key && !cfg.read_only) {
-        m_encryption_patch_file.open((path + ".patch").c_str(), access, create, 0);
+        m_encryption_patch_file.open((path + ".patch").c_str(), access, create, File::flag_DSync);
         apply_pending_patch();
     }
     File::CloseGuard fcg(m_file);

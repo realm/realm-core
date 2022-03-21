@@ -434,7 +434,7 @@ void AESCryptor::flush_queue(FileDesc fd, FileDesc patch_fd, const WriteQueue& q
     // Flush the write buffer into the patch file
     File::seek_static(patch_fd, 0);
     File::write_static(patch_fd, reinterpret_cast<const char*>(data), byte_size);
-    fsync(patch_fd);
+    //fsync(patch_fd);
     // Once the patch file has been synced, Write each block to the realm file
     // std::cerr << "Wrote patch file - now updating Realm file: ";
     for (unsigned long i = 1; i < entries; ++i ) {

@@ -197,8 +197,11 @@ public:
     };
 
     enum {
-        flag_Trunc = 1, ///< Truncate the file if it already exists.
-        flag_Append = 2 ///< Move to end of file before each write.
+        flag_Trunc = 1,  ///< Truncate the file if it already exists.
+        flag_Append = 2, ///< Move to end of file before each write.
+        flag_Direct = 4, ///< Bypass buffer cache
+        flag_Sync = 8,   ///< Synchronize data+metadata to device immediately
+        flag_DSync = 16  ///< Synchronize data to device immediately 
     };
 
     /// See open(const std::string&, Mode).
