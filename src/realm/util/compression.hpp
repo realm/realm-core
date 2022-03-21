@@ -48,6 +48,7 @@ enum class error {
     corrupt_input = 5,
     incorrect_decompressed_size = 6,
     decompress_error = 7,
+    decompress_unsupported = 8,
 };
 
 const std::error_category& error_category() noexcept;

@@ -314,7 +314,11 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
         util::AppendBuffer<char> decompressed;
         ChunkedBinaryInputStream is(entry.changeset);
         auto ec = util::compression::decompress_nonportable(is, decompressed);
-        REALM_ASSERT(ec == std::error_code{});
+        if (ec == util::compression::error::decompress_unsupported) {
+            REALM_TERMINATE(
+                "Synchronized Realm files with unuploaded local changes cannot be copied between platforms.");
+        }
+        REALM_ASSERT_3(ec, ==, std::error_code{});
         uc.origin_timestamp = entry.origin_timestamp;
         uc.origin_file_ident = entry.origin_file_ident;
         uc.progress = UploadCursor{version, entry.remote_version};

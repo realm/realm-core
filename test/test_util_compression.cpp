@@ -383,6 +383,41 @@ TEST(Compression_AllocateAndCompressWithHeader_Noncompressible)
     }
 }
 
+static void set_invalid_compression_algorithm(Span<char> buffer)
+{
+    // Set the algorithm part of the header to 255
+    buffer[0] |= 0b11110000;
+}
+
+static void set_invalid_size_width(Span<char> buffer)
+{
+    // Set the size width to 255 bytes
+    buffer[0] |= 0b1111;
+}
+
+TEST(Compression_AllocateAndCompressWithHeader_Invalid)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_compressible_data(uncompressed_size);
+    util::AppendBuffer<char> decompressed;
+
+    {
+        auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+        set_invalid_compression_algorithm(compressed);
+        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
+        CHECK_EQUAL(ec, compression::error::decompress_unsupported);
+    }
+
+    {
+        auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+        set_invalid_size_width(compressed);
+        util::SimpleNoCopyInputStream compressed_stream(compressed);
+        auto ec = compression::decompress_nonportable(compressed_stream, decompressed);
+        CHECK_EQUAL(ec, compression::error::out_of_memory);
+    }
+}
+
 static void copy_stream(Span<char> dest, NoCopyInputStream& stream)
 {
     Span out = dest;
@@ -407,6 +442,32 @@ static void test_decompress_stream(test_util::unit_test::TestContext& test_conte
             compare(test_context, uncompressed, decompressed);
         }
     });
+}
+
+static void test_failed_compress_stream(test_util::unit_test::TestContext& test_context, Span<const char> compressed)
+{
+    size_t total_size;
+    SimpleNoCopyInputStream stream(compressed);
+    auto decompress_stream = compression::decompress_nonportable_input_stream(stream, total_size);
+    CHECK_NOT(decompress_stream);
+}
+
+TEST(Compression_DecompressInputStream_UnsupportedAlgorithm)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+    set_invalid_compression_algorithm(compressed);
+    test_failed_compress_stream(test_context, compressed);
+}
+
+TEST(Compression_DecompressInputStream_InvalidSize)
+{
+    size_t uncompressed_size = 10000;
+    auto uncompressed = generate_compressible_data(uncompressed_size);
+    auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
+    set_invalid_size_width(compressed);
+    test_failed_compress_stream(test_context, compressed);
 }
 
 TEST(Compression_DecompressInputStream_Compressible_Small)

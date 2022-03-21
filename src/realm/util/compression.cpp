@@ -79,6 +79,8 @@ public:
                 return "Decompressed data size not equal to expected size";
             case error::decompress_error:
                 return "Decompression error";
+            case error::decompress_unsupported:
+                return "Decompression failed due to unsupported input compression";
         }
         REALM_UNREACHABLE();
     }
@@ -302,7 +304,7 @@ compression_algorithm algorithm_to_compression_algorithm(Algorithm a)
         case Algorithm::Lzfse:
             return COMPRESSION_LZFSE;
         default:
-            REALM_UNREACHABLE();
+            return (compression_algorithm)0;
     }
 }
 
@@ -452,7 +454,7 @@ std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> 
             }
             if (rc == Z_NEED_DICT) {
                 // We don't support custom dictionaries
-                return error::decompress_error;
+                return error::decompress_unsupported;
             }
             if (rc == Z_DATA_ERROR) {
                 return error::corrupt_input;
@@ -504,13 +506,16 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
         // indicates if a custom dictionary was used. We don't support that.
         uint8_t flags = read_byte(compressed, compressed_buf);
         if (flags & 0b100000)
-            return error::corrupt_input;
+            return error::decompress_unsupported;
         algorithm = Algorithm::Deflate;
     }
 
+    auto compression_algorithm = algorithm_to_compression_algorithm(algorithm);
+    if (!compression_algorithm)
+        return error::decompress_unsupported;
+
     compression_stream strm;
-    auto rc =
-        compression_stream_init(&strm, COMPRESSION_STREAM_DECODE, algorithm_to_compression_algorithm(algorithm));
+    auto rc = compression_stream_init(&strm, COMPRESSION_STREAM_DECODE, compression_algorithm);
     if (rc != COMPRESSION_STATUS_OK)
         return error::decompress_error;
 
@@ -598,7 +603,7 @@ std::error_code decompress(NoCopyInputStream& compressed, Span<const char> compr
         case Algorithm::Deflate:
             return decompress_zlib(compressed, compressed_buf, decompressed_buf, has_header);
         default:
-            return error::corrupt_input;
+            return error::decompress_unsupported;
     }
 }
 
@@ -927,7 +932,8 @@ std::unique_ptr<NoCopyInputStream> compression::decompress_nonportable_input_str
         return std::make_unique<DecompressInputStreamNone>(source, first_block);
 #if REALM_USE_LIBCOMPRESSION
     if (__builtin_available(macOS 10.10, *)) {
-        return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, header);
+        if (header.algorithm == Algorithm::Deflate || header.algorithm == Algorithm::Lzfse)
+            return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, header);
     }
 #endif
     if (header.algorithm == Algorithm::Deflate)
