@@ -666,13 +666,37 @@ struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC, realm::syn
 };
 
 struct realm_flx_sync_subscription_desc : realm::c_api::WrapC {
-    realm_flx_sync_subscription_desc(size_t position, bool success)
-        : m_position(position)
+    realm_flx_sync_subscription_desc(size_t index, bool success)
+        : m_index(index)
         , m_success(success)
     {
     }
-    size_t m_position;
+
+    size_t get_index() const
+    {
+        return m_index;
+    }
+
+    bool success() const
+    {
+        return m_success;
+    }
+
+    size_t m_index;
     bool m_success;
+};
+
+struct realm_flx_sync_subscription_json : realm::c_api::WrapC {
+    realm_flx_sync_subscription_json() = default;
+    realm_flx_sync_subscription_json(const char* json)
+        : m_subscription_json(json)
+    {
+    }
+    const char* get_subscription() const
+    {
+        return m_subscription_json.c_str();
+    }
+    std::string m_subscription_json;
 };
 
 struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {
