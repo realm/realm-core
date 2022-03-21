@@ -644,66 +644,35 @@ struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSess
     }
 };
 
-struct realm_flx_sync_subscription : realm::c_api::WrapC, std::shared_ptr<realm::sync::Subscription> {
-    realm_flx_sync_subscription(std::shared_ptr<realm::sync::Subscription> subscription)
-        : std::shared_ptr<realm::sync::Subscription>{std::move(subscription)}
+struct realm_flx_sync_subscription : realm::c_api::WrapC, realm::sync::Subscription {
+    realm_flx_sync_subscription(realm::sync::Subscription&& subscription)
+        : realm::sync::Subscription(std::move(subscription))
     {
-    }
-
-    realm_flx_sync_subscription* clone() const override
-    {
-        return new realm_flx_sync_subscription{*this};
-    }
-
-    bool equals(const WrapC& other) const noexcept final
-    {
-        if (auto ptr = dynamic_cast<const realm_flx_sync_subscription*>(&other)) {
-            return get() == ptr->get();
-        }
-        return false;
     }
 };
 
-struct realm_flx_sync_subscription_set : realm::c_api::WrapC, std::shared_ptr<realm::sync::SubscriptionSet> {
-    realm_flx_sync_subscription_set(std::shared_ptr<realm::sync::SubscriptionSet> subscription_set)
-        : std::shared_ptr<realm::sync::SubscriptionSet>{std::move(subscription_set)}
+struct realm_flx_sync_subscription_set : realm::c_api::WrapC, realm::sync::SubscriptionSet {
+    realm_flx_sync_subscription_set(realm::sync::SubscriptionSet&& subscription_set)
+        : realm::sync::SubscriptionSet(std::move(subscription_set))
     {
-    }
-
-    realm_flx_sync_subscription_set* clone() const override
-    {
-        return new realm_flx_sync_subscription_set{*this};
-    }
-
-    bool equals(const WrapC& other) const noexcept final
-    {
-        if (auto ptr = dynamic_cast<const realm_flx_sync_subscription_set*>(&other)) {
-            return get() == ptr->get();
-        }
-        return false;
     }
 };
 
-struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC,
-                                                 std::shared_ptr<realm::sync::MutableSubscriptionSet> {
-    realm_flx_sync_mutable_subscription_set(
-        std::shared_ptr<realm::sync::MutableSubscriptionSet> mutable_subscription_set)
-        : std::shared_ptr<realm::sync::MutableSubscriptionSet>{std::move(mutable_subscription_set)}
+struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC, realm::sync::MutableSubscriptionSet {
+    realm_flx_sync_mutable_subscription_set(realm::sync::MutableSubscriptionSet&& mutable_subscription_set)
+        : realm::sync::MutableSubscriptionSet(std::move(mutable_subscription_set))
     {
     }
+};
 
-    realm_flx_sync_mutable_subscription_set* clone() const override
+struct realm_flx_sync_subscription_desc : realm::c_api::WrapC {
+    realm_flx_sync_subscription_desc(size_t position, bool success)
+        : m_position(position)
+        , m_success(success)
     {
-        return new realm_flx_sync_mutable_subscription_set{*this};
     }
-
-    bool equals(const WrapC& other) const noexcept final
-    {
-        if (auto ptr = dynamic_cast<const realm_flx_sync_mutable_subscription_set*>(&other)) {
-            return get() == ptr->get();
-        }
-        return false;
-    }
+    size_t m_position;
+    bool m_success;
 };
 
 struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {
