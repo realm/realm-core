@@ -3117,19 +3117,19 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         do {
             ret = waitpid(pid, status, options);
         } while (ret == -1 && errno == EINTR);
-        REALM_ASSERT_EX(ret != -1, errno, pid, info);
+        REALM_ASSERT_RELEASE_EX(ret != -1, errno, pid, info);
 
         bool signaled_to_stop = WIFSIGNALED(*status);
-        REALM_ASSERT_EX(!signaled_to_stop, WTERMSIG(*status), WCOREDUMP(*status), pid, info);
+        REALM_ASSERT_RELEASE_EX(!signaled_to_stop, WTERMSIG(*status), WCOREDUMP(*status), pid, info);
 
         bool stopped = WIFSTOPPED(*status);
-        REALM_ASSERT_EX(!stopped, WSTOPSIG(*status), pid, info);
+        REALM_ASSERT_RELEASE_EX(!stopped, WSTOPSIG(*status), pid, info);
 
         bool exited_normally = WIFEXITED(*status);
-        REALM_ASSERT_EX(exited_normally, pid, info);
+        REALM_ASSERT_RELEASE_EX(exited_normally, pid, info);
 
         auto exit_status = WEXITSTATUS(*status);
-        REALM_ASSERT_EX(exit_status == 0, exit_status, pid, info);
+        REALM_ASSERT_RELEASE_EX(exit_status == 0, exit_status, pid, info);
     };
 
     int readpids[read_process_count];
