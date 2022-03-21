@@ -355,6 +355,58 @@ TEST_CASE("sync: client reset", "[client reset]") {
             REQUIRE(after_callback_invocations == 0);
         }
 
+        SECTION("notifiers work if the session instance changes") {
+            // run this test with ASAN to check for use after free
+            size_t before_callback_invoctions_2 = 0;
+            size_t after_callback_invocations_2 = 0;
+            std::shared_ptr<SyncSession> session;
+            std::unique_ptr<SyncConfig> config_copy;
+            {
+                SyncTestFile temp_config = get_valid_config();
+                temp_config.persist();
+                temp_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+                config_copy = std::make_unique<SyncConfig>(*temp_config.sync_config);
+                config_copy->notify_before_client_reset = [&](SharedRealm) {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    ++before_callback_invoctions_2;
+                };
+                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm) {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    ++after_callback_invocations_2;
+                };
+
+                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm) {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    ++before_callback_invoctions;
+                    REQUIRE(session);
+                    REQUIRE(config_copy);
+                    session->update_configuration(*config_copy);
+                };
+
+                auto realm = Realm::get_shared_realm(temp_config);
+                wait_for_download(*realm);
+
+                session = sync_manager.app()->sync_manager()->get_existing_session(temp_config.path);
+                REQUIRE(session);
+            }
+            realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
+                                       "A fake client reset error", true);
+            SyncSession::OnlyForTesting::handle_error(*session, synthetic);
+
+            session->revive_if_needed();
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return before_callback_invoctions > 0;
+                },
+                std::chrono::seconds(120));
+            millisleep(500); // just make some space for the after callback to be attempted
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
+            REQUIRE(before_callback_invoctions_2 == 0);
+            REQUIRE(after_callback_invocations_2 == 0);
+        }
+
         SECTION("an interrupted reset can recover on the next session") {
             struct SessionInterruption : public std::runtime_error {
                 using std::runtime_error::runtime_error;
