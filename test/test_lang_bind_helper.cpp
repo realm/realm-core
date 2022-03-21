@@ -21,6 +21,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <csignal>
 #include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -3082,13 +3083,32 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#if !REALM_ENABLE_ENCRYPTION
-// Interprocess communication does not work with encryption enabled
+#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE)
+// Interprocess communication does not work with encryption enabled on Apple.
+// This is because fork() does not play well with Apple primitives such as
+// dispatch_queue_t in ReclaimerThreadStopper. This could possibly be fixed if
+// we need more tests like this.
 
 #if !REALM_ANDROID && !REALM_IOS
-// fork should not be used on android or ios.
 
-TEST(LangBindHelper_ImplicitTransactions_InterProcess)
+std::stringstream ss;
+void signal_handler(int signal)
+{
+    std::cout << "signal handler: " << signal << std::endl;
+    util::Backtrace::capture().print(ss);
+    std::cout << "trace: " << ss.str() << std::endl;
+    exit(signal);
+}
+
+// fork should not be used on android or ios.
+// Interprocess communication does not work with encryption turned on.
+// This test must be non-concurrant due to fork. If a child process
+// is created while a static mutex is locked (eg. util::GlobalRandom::m_mutex)
+// then any attempt to use the mutex would hang infinitely and the child would
+// crash upon exit(0) when attempting to destroy a locked mutex.
+// This is not run with ASAN because children intentionally call exit(0) which does not
+// invoke destructors.
+NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
 {
     const int write_process_count = 7;
     const int read_process_count = 3;
@@ -3097,19 +3117,19 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
         do {
             ret = waitpid(pid, status, options);
         } while (ret == -1 && errno == EINTR);
-        REALM_ASSERT_EX(ret != -1, errno, pid, info);
+        REALM_ASSERT_RELEASE_EX(ret != -1, errno, pid, info);
 
         bool signaled_to_stop = WIFSIGNALED(*status);
-        REALM_ASSERT_EX(!signaled_to_stop, WTERMSIG(*status), WCOREDUMP(*status), pid, info);
+        REALM_ASSERT_RELEASE_EX(!signaled_to_stop, WTERMSIG(*status), WCOREDUMP(*status), pid, info);
 
         bool stopped = WIFSTOPPED(*status);
-        REALM_ASSERT_EX(!stopped, WSTOPSIG(*status), pid, info);
+        REALM_ASSERT_RELEASE_EX(!stopped, WSTOPSIG(*status), pid, info);
 
         bool exited_normally = WIFEXITED(*status);
-        REALM_ASSERT_EX(exited_normally, pid, info);
+        REALM_ASSERT_RELEASE_EX(exited_normally, pid, info);
 
         auto exit_status = WEXITSTATUS(*status);
-        REALM_ASSERT_EX(exit_status == 0, pid, info);
+        REALM_ASSERT_RELEASE_EX(exit_status == 0, exit_status, pid, info);
     };
 
     int readpids[read_process_count];
@@ -3119,7 +3139,8 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
-        {
+        std::signal(SIGSEGV, signal_handler);
+        try {
             std::unique_ptr<Replication> hist(make_in_realm_history());
             DBRef sg = DB::create(*hist, path);
             // initialize table with 200 entries holding 0..200
@@ -3134,6 +3155,9 @@ TEST(LangBindHelper_ImplicitTransactions_InterProcess)
             table_b->create_object().set_all(99);
             wt.add_table("C");
             wt.commit();
+        }
+        catch (const std::exception& e) {
+            REALM_ASSERT_EX(false, e.what());
         }
         exit(0);
     }
