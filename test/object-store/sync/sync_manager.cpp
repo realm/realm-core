@@ -339,7 +339,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     }
 
     struct TestPath {
-        std::string partition;
+        bson::Bson partition;
         std::string expected_path;
         bool pre_create = true;
     };
@@ -359,10 +359,11 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         auto u3 = manager.get_or_make_user_metadata(identity_3, provider_type);
 
         {
-            auto expected_u1_path = [&](std::string partition) {
-                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->identity(), u1->local_uuid(), partition);
+            auto expected_u1_path = [&](const bson::Bson& partition) {
+                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->identity(), u1->local_uuid(),
+                                          partition.to_string());
             };
-            std::string partition = "partition1";
+            bson::Bson partition = "partition1";
             auto expected_paths = expected_u1_path(partition);
             paths_under_test.push_back({partition, expected_paths.current_preferred_path, false});
 
@@ -407,15 +408,15 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
                 }
             }
 
-            paths = {sync_manager->path_for_realm(SyncConfig{user1, "123456789"}),
-                     sync_manager->path_for_realm(SyncConfig{user1, "foo"}),
-                     sync_manager->path_for_realm(SyncConfig{user2, "partition"}, {"123456789"}),
-                     sync_manager->path_for_realm(SyncConfig{user3, "foo"}),
-                     sync_manager->path_for_realm(SyncConfig{user3, "bar"}),
-                     sync_manager->path_for_realm(SyncConfig{user3, "baz"})};
+            paths = {sync_manager->path_for_realm(SyncConfig{user1, bson::Bson("123456789")}),
+                     sync_manager->path_for_realm(SyncConfig{user1, bson::Bson("foo")}),
+                     sync_manager->path_for_realm(SyncConfig{user2, bson::Bson("partition")}, {"123456789"}),
+                     sync_manager->path_for_realm(SyncConfig{user3, bson::Bson("foo")}),
+                     sync_manager->path_for_realm(SyncConfig{user3, bson::Bson("bar")}),
+                     sync_manager->path_for_realm(SyncConfig{user3, bson::Bson("baz")})};
 
             for (auto& test : paths_under_test) {
-                std::string actual = tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, test.partition});
+                std::string actual = sync_manager->path_for_realm(SyncConfig{user1, test.partition});
                 REQUIRE(actual == test.expected_path);
                 paths.push_back(actual);
             }

@@ -131,26 +131,21 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
     }
     std::string clean_name = name ? util::make_percent_encoded_string(*name) : cleaned_partition;
     std::string cleaned_app_id = util::make_percent_encoded_string(app_id);
-    std::string manager_path = fs::path{base_path + "/mongodb-realm/" + cleaned_app_id}.make_preferred().string();
-    std::string preferred_name = fs::path{manager_path + "/" + identity + "/" + clean_name}.make_preferred().string();
-    current_preferred_path = fs::path{preferred_name + ".realm"}.make_preferred().string();
-    fallback_hashed_path =
-        fs::path{manager_path + "/" + do_hash(preferred_name) + ".realm"}.make_preferred().string();
-    legacy_sync_directories_to_make.push_back(
-        fs::path{manager_path + "/" + local_identity}.make_preferred().string());
+    const auto manager_path = fs::path{base_path}.make_preferred() / "mongodb-realm" / cleaned_app_id;
+    const auto preferred_name = manager_path / identity / clean_name;
+    current_preferred_path = preferred_name.string() + ".realm";
+    fallback_hashed_path = (manager_path / do_hash(preferred_name)).string() + ".realm";
+    legacy_sync_directories_to_make.push_back((manager_path / local_identity).string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
-    legacy_local_id_path = fs::path{manager_path + "/" + local_identity + "/" +
-                                    (name ? util::make_percent_encoded_string(*name) : encoded_partition) + ".realm"}
-                               .make_preferred()
-                               .string();
-    auto dir_builder = fs::path{manager_path + "/realm-object-server"}.make_preferred().string();
-    legacy_sync_directories_to_make.push_back(dir_builder);
-    dir_builder = fs::path{dir_builder + "/" + local_identity}.make_preferred().string();
-    legacy_sync_directories_to_make.push_back(dir_builder);
-    legacy_sync_path =
-        fs::path{dir_builder + "/" + (name ? util::make_percent_encoded_string(*name) : cleaned_partition)}
-            .make_preferred()
+    legacy_local_id_path =
+        (manager_path / local_identity / (name ? util::make_percent_encoded_string(*name) : encoded_partition))
+            .concat(".realm")
             .string();
+    auto dir_builder = manager_path / "realm-object-server";
+    legacy_sync_directories_to_make.push_back(dir_builder.string());
+    dir_builder /= local_identity;
+    legacy_sync_directories_to_make.push_back(dir_builder.string());
+    legacy_sync_path = (dir_builder / (name ? util::make_percent_encoded_string(*name) : cleaned_partition)).string();
 }
 
 #if REALM_ENABLE_SYNC

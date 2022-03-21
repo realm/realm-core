@@ -112,14 +112,7 @@ InMemoryTestFile::InMemoryTestFile()
 #if REALM_ENABLE_SYNC
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
 {
-    if (!app)
-        throw std::runtime_error("Must provide `app` for SyncTestFile");
-
-    if (name.empty())
-        name = path.substr(path.rfind('/') + 1);
-
-    if (name[0] != '/')
-        name = "/" + name;
+    REALM_ASSERT(app);
 
     std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
     std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
@@ -127,7 +120,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     sync_config =
         std::make_shared<SyncConfig>(app->sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token,
                                                                    app->base_url(), fake_device_id),
-                                     name);
+                                     bson::Bson(name));
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
@@ -140,9 +133,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
 
 SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson partition, realm::Schema _schema)
 {
-    if (!user)
-        throw std::runtime_error("Must provide `user` for SyncTestFile");
-
+    REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, partition);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
@@ -158,9 +149,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson par
 
 SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema _schema, SyncConfig::FLXSyncEnabled)
 {
-    if (!user)
-        throw std::runtime_error("Must provide `user` for SyncTestFile");
-
+    REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, SyncConfig::FLXSyncEnabled{});
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
