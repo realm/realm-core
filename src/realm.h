@@ -3033,7 +3033,7 @@ typedef enum realm_flx_sync_subscription_set_state {
     BOOTSTRAPPING,
     COMPLETE,
     ERROR,
-    SUPERSEDED
+    SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
 
 /**
