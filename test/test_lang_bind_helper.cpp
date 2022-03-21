@@ -3083,7 +3083,14 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
+#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE)
+// Interprocess communication does not work with encryption enabled on Apple.
+// This is because fork() does not play well with Apple primitives such as
+// dispatch_queue_t in ReclaimerThreadStopper. This could possibly be fixed if
+// we need more tests like this.
+
 #if !REALM_ANDROID && !REALM_IOS
+
 std::stringstream ss;
 void signal_handler(int signal)
 {
@@ -3211,6 +3218,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
 }
 
 #endif // !REALM_ANDROID && !REALM_IOS
+#endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
