@@ -1772,9 +1772,9 @@ inline void nullify_set(Obj& obj, ColKey origin_col_key, T target)
 }
 } // namespace
 
-void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link)
+void Obj::nullify_link(ColKey origin_col_key, ObjLink target_link) &&
 {
-    // ensure_writeable();
+    REALM_ASSERT(get_alloc().get_storage_version() == m_storage_version);
 
     ColKey::Idx origin_col_ndx = origin_col_key.get_index();
     Allocator& alloc = get_alloc();

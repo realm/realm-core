@@ -19,21 +19,32 @@
 #ifndef REALM_OS_KEYCHAIN_HELPER_HPP
 #define REALM_OS_KEYCHAIN_HELPER_HPP
 
-#include <cstdint>
-#include <stdexcept>
+#include <realm/util/features.h>
+
+#if REALM_PLATFORM_APPLE
+
+#include <realm/util/optional.hpp>
 #include <vector>
 
-namespace realm {
-namespace keychain {
+namespace realm::keychain {
 
-std::vector<char> metadata_realm_encryption_key(bool check_legacy_service);
+// Get the stored encryption key for the metadata realm if one exists.
+util::Optional<std::vector<char>> get_existing_metadata_realm_key();
+// Create a new encryption key and store it in the keychain. Returns none if
+// the key could not be stored.
+util::Optional<std::vector<char>> create_new_metadata_realm_key();
 
-class KeychainAccessException : public std::runtime_error {
-public:
-    KeychainAccessException(int32_t error_code);
-};
+// Delete the encryption key for the metadata realm from the keychain.
+void delete_metadata_realm_encryption_key();
 
-} // namespace keychain
-} // namespace realm
+} // namespace realm::keychain
+
+#else // REALM_PLATFORM_APPLE
+
+namespace realm::keychain {
+inline void delete_metadata_realm_encryption_key() {}
+} // namespace realm::keychain
+
+#endif // REALM_PLATFORM_APPLE
 
 #endif // REALM_OS_KEYCHAIN_HELPER_HPP

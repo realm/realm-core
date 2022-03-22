@@ -273,8 +273,10 @@ RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_clas
     });
 }
 
-RLM_API uint64_t realm_add_schema_changed_callback(realm_t* realm, realm_on_schema_change_func_t callback,
-                                                   void* userdata, realm_free_userdata_func_t free_userdata)
+RLM_API realm_callback_token_t* realm_add_schema_changed_callback(realm_t* realm,
+                                                                  realm_on_schema_change_func_t callback,
+                                                                  void* userdata,
+                                                                  realm_free_userdata_func_t free_userdata)
 {
     util::UniqueFunction<void(const Schema&)> func =
         [callback, userdata = UserdataPtr{userdata, free_userdata}](const Schema& schema) {
@@ -282,12 +284,8 @@ RLM_API uint64_t realm_add_schema_changed_callback(realm_t* realm, realm_on_sche
             callback(userdata.get(), c_schema);
             realm_release(c_schema);
         };
-    return CBindingContext::get(*realm).schema_changed_callbacks().add(std::move(func));
-}
-
-RLM_API void realm_remove_schema_changed_callback(realm_t* realm, uint64_t token)
-{
-    CBindingContext::get(*realm).schema_changed_callbacks().remove(token);
+    return new realm_callback_token_schema(
+        realm, CBindingContext::get(*realm).schema_changed_callbacks().add(std::move(func)));
 }
 
 } // namespace realm::c_api

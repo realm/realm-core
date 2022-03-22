@@ -1383,8 +1383,7 @@ public:
     {
         // Nullify immediately if we don't need to send cascade notifications
         if (!notification_handler()) {
-            Obj obj = src_table.get_object(origin_key);
-            obj.nullify_link(src_col_key, target_link);
+            src_table.get_object(origin_key).nullify_link(src_col_key, target_link);
             return;
         }
 

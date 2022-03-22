@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed a potential crash if a sync session is stopped in the middle of a `DiscardLocal` client reset. ([#5295](https://github.com/realm/realm-core/issues/5295), since v11.5.0) 
+* Opening an encrypted Realm while the keychain is locked on macOS would crash ([Swift #7438](https://github.com/realm/realm-swift/issues/7438)).
  
 ### Breaking changes
 * None.
@@ -18,6 +19,8 @@
 
 ### Internals
 * Upgraded OpenSSL from v1.1.1g to v1.1.1n.
+* Catch2 was updated to 2.13.8. ([#5327](https://github.com/realm/realm-core/pull/5327))
+* Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
 
 ----------------------------------------------
 
@@ -26,6 +29,7 @@
 ### Enhancements
 * Support for new SchemaMode::HardResetFile added. ([#4782](https://github.com/realm/realm-core/issues/4782))
 * Support for keypaths in change notifications added to C-API ([#5216](https://github.com/realm/realm-core/issues/5216))
+* Release of callback functions done through realm_release() ([#5217](https://github.com/realm/realm-core/issues/5217))
 
 ### Fixed
 * Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
@@ -34,6 +38,7 @@
  
 ### Breaking changes
 * SchemaMode::ResetFile renamed to SchemaMode::SoftResetFile.
+* Token type changed for registration of callback functions for changes on Realm and Schema. The functions are unregistered be releasing the token through 'realm_release()'.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

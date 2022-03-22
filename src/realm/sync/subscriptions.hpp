@@ -266,6 +266,8 @@ private:
 
     std::pair<iterator, bool> insert_or_assign_impl(iterator it, util::Optional<std::string> name,
                                                     std::string object_class_name, std::string query_str);
+    // Throws is m_tr is in the wrong state.
+    void check_is_mutable() const;
 
     void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                          StringData object_class_name, StringData query_str);

@@ -248,12 +248,6 @@ RLM_API void realm_sync_client_config_set_encryption_key(realm_sync_client_confi
     config->custom_encryption_key = std::vector<char>(key, key + 64);
 }
 
-RLM_API void realm_sync_client_config_set_reset_metadata_on_error(realm_sync_client_config_t* config,
-                                                                  bool reset) noexcept
-{
-    config->reset_metadata_on_error = reset;
-}
-
 RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t* config, realm_log_func_t callback,
                                                        void* userdata,
                                                        realm_free_userdata_func_t userdata_free) noexcept
