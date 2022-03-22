@@ -3050,7 +3050,6 @@ RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config
                                                         realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t*,
                                                                   const uint8_t[64]) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_reset_metadata_on_error(realm_sync_client_config_t*, bool) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t*, realm_log_func_t, void* userdata,
                                                        realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t*, realm_log_level_e) RLM_API_NOEXCEPT;
