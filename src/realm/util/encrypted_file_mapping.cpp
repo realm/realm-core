@@ -342,9 +342,9 @@ void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
 }
 
 union Patch {
-    struct Meta { // first patch entry holds the metadata for all entries
+    struct Meta {         // first patch entry holds the metadata for all entries
         uint8_t hmac[32]; // for validation of the rest
-        int num_blocks;        
+        int num_blocks;
     };
     struct Payload { // each following entry hold a payload
         off_t pos;
@@ -352,7 +352,7 @@ union Patch {
         char buffer[block_size];
     };
 
-    Meta meta; // first entry in write queue
+    Meta meta;       // first entry in write queue
     Payload payload; // subsequent entries
 };
 
@@ -377,10 +377,11 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
 {
     unsigned patch_size = File::get_size_static(patch_f);
     if (patch_size <= sizeof(Patch)) {
+        // nothing to patch (already patched or no patch yet)
         return;
     }
     if (patch_size % sizeof(Patch) != 0) {
-        std::cerr << "Patch ignored, size wrong" << std::endl;
+        // Patch ignored, size wrong (we assume patch wasn't completely written)
         ftruncate(patch_f, 0);
         return;
     }
@@ -389,33 +390,34 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     patches.resize(entries);
     auto data = patches.data();
     int read = File::read_static(patch_f, reinterpret_cast<char*>(data), patch_size);
-    if (read != (signed) patch_size) {
-        std::cerr << "Reading patch file failed, ignoring patch" << std::endl;
+    if (read != (signed)patch_size) {
+        // Reading patch file failed, ignoring patch
         // this is actually fatal, isn't it?
         ftruncate(patch_f, 0);
         return;
     }
     // the actual number of entries may be less than what's in the file:
     entries = data->meta.num_blocks;
-    std::cerr << "Found patch file with " << (entries - 1) << " entries" << std::endl;
-    auto check_start = reinterpret_cast<char*>( &(data->meta.num_blocks));
-    auto check_end = reinterpret_cast<char*>( data + entries );
+    auto check_start = reinterpret_cast<char*>(&(data->meta.num_blocks));
+    auto check_end = reinterpret_cast<char*>(data + entries);
     auto check_size = check_end - check_start;
     if (!check_hmac(check_start, check_size, data->meta.hmac)) {
-        std::cerr << "Patch ignored, check_hmac fails" << std::endl;
+        // Patch ignored, check_hmac fails - we assume patch was only partially written
         ftruncate(patch_f, 0);
         return;
     }
+    // We have a valid patch. now patch the realm file.
+    // In case we are killed before completion, the patch file is still there and the
+    // patching process is restarted next time someone attaches the realm file.
     for (unsigned j = 1; j < entries; ++j) {
-        Patch& patch = patches[j];        
-        std::cerr << "Patch valid, patching Realm file at " << patch.payload.pos << std::endl;
+        Patch& patch = patches[j];
         File::seek_static(f, iv_table_pos(patch.payload.pos));
         File::write_static(f, reinterpret_cast<char*>(&patch.payload.iv), sizeof(patch.payload.iv));
         File::seek_static(f, real_offset(patch.payload.pos));
         File::write_static(f, reinterpret_cast<char*>(patch.payload.buffer), block_size);
     }
-    std::cerr << "Realm file patched - syncing Realm file and truncating patch file" << std::endl;
     fsync(f);
+    // With the realm file patched and sync'ed to stable storage, we invalidate the patch file.
     ftruncate(patch_f, 0);
 }
 
@@ -426,18 +428,18 @@ void AESCryptor::flush_queue(FileDesc fd, FileDesc patch_fd, const WriteQueue& q
     auto entries = q->the_queue.size();
     auto byte_size = sizeof(Patch) * entries;
     data->meta.num_blocks = entries;
-    auto check_start = reinterpret_cast<char*>( &(data->meta.num_blocks));
-    auto check_end = reinterpret_cast<char*>( data + entries );
+    auto check_start = reinterpret_cast<char*>(&(data->meta.num_blocks));
+    auto check_end = reinterpret_cast<char*>(data + entries);
     auto check_size = check_end - check_start;
     calc_hmac(check_start, check_size, data->meta.hmac, m_hmacKey);
 
     // Flush the write buffer into the patch file
     File::seek_static(patch_fd, 0);
     File::write_static(patch_fd, reinterpret_cast<const char*>(data), byte_size);
-    //fsync(patch_fd);
+    // fsync(patch_fd);
     // Once the patch file has been synced, Write each block to the realm file
     // std::cerr << "Wrote patch file - now updating Realm file: ";
-    for (unsigned long i = 1; i < entries; ++i ) {
+    for (unsigned long i = 1; i < entries; ++i) {
         auto& patch = q->the_queue[i];
         // std::cerr << patch.payload.pos << " ";
         File::seek_static(fd, iv_table_pos(patch.payload.pos));
@@ -476,10 +478,10 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
             Patch& patch = q->the_queue.back();
             patch.payload.pos = pos;
             memcpy(&patch.payload.iv, &iv, sizeof(iv));
-            //uint8_t hmac_tmp[32];
-            //memcpy(&hmac_tmp, &patch.payload.iv.hmac1, 32);
+            // uint8_t hmac_tmp[32];
+            // memcpy(&hmac_tmp, &patch.payload.iv.hmac1, 32);
             memcpy(&patch.payload.buffer, m_rw_buffer.get(), block_size);
-            //calc_hmac(&patch.payload, sizeof(patch.payload), patch.hmac, m_hmacKey);
+            // calc_hmac(&patch.payload, sizeof(patch.payload), patch.hmac, m_hmacKey);
         }
         else {
             check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
