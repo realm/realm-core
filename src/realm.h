@@ -331,6 +331,7 @@ typedef enum realm_property_flags {
 
 /* Notification types */
 typedef struct realm_notification_token realm_notification_token_t;
+typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
 typedef void (*realm_on_object_change_func_t)(void* userdata, const realm_object_changes_t*);
@@ -985,13 +986,8 @@ RLM_API bool realm_rollback(realm_t*);
  *
  * @return a registration token used to remove the callback.
  */
-RLM_API uint64_t realm_add_realm_changed_callback(realm_t*, realm_on_realm_change_func_t, void* userdata,
-                                                  realm_free_userdata_func_t);
-
-/**
- * Remove a realm changed callback that was previously registered with the token.
- */
-RLM_API void realm_remove_realm_changed_callback(realm_t*, uint64_t token);
+RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t*, realm_on_realm_change_func_t,
+                                                                 void* userdata, realm_free_userdata_func_t);
 
 /**
  * Refresh the view of the realm file.
@@ -1097,13 +1093,9 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
  *
  * @return a registration token used to remove the callback.
  */
-RLM_API uint64_t realm_add_schema_changed_callback(realm_t*, realm_on_schema_change_func_t, void* userdata,
-                                                   realm_free_userdata_func_t);
+RLM_API realm_callback_token_t* realm_add_schema_changed_callback(realm_t*, realm_on_schema_change_func_t,
+                                                                  void* userdata, realm_free_userdata_func_t);
 
-/**
- * Remove a schema changed callback that was previously registered with the token.
- */
-RLM_API void realm_remove_schema_changed_callback(realm_t*, uint64_t token);
 
 /**
  * Validate the schema.

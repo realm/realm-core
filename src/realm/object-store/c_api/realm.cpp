@@ -1,7 +1,18 @@
 #include <realm/object-store/c_api/types.hpp>
 #include "realm.hpp"
 
+realm_callback_token_realm::~realm_callback_token_realm()
+{
+    realm::c_api::CBindingContext::get(*m_realm).realm_changed_callbacks().remove(m_token);
+}
+
+realm_callback_token_schema::~realm_callback_token_schema()
+{
+    realm::c_api::CBindingContext::get(*m_realm).schema_changed_callbacks().remove(m_token);
+}
+
 namespace realm::c_api {
+
 
 RLM_API bool realm_get_version_id(const realm_t* realm, bool* out_found, realm_version_id_t* out_version)
 {
@@ -129,18 +140,16 @@ RLM_API bool realm_rollback(realm_t* realm)
     });
 }
 
-RLM_API uint64_t realm_add_realm_changed_callback(realm_t* realm, realm_on_realm_change_func_t callback,
-                                                  void* userdata, realm_free_userdata_func_t free_userdata)
+RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t* realm,
+                                                                 realm_on_realm_change_func_t callback,
+                                                                 void* userdata,
+                                                                 realm_free_userdata_func_t free_userdata)
 {
     util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, free_userdata}]() {
         callback(userdata.get());
     };
-    return CBindingContext::get(*realm).realm_changed_callbacks().add(std::move(func));
-}
-
-RLM_API void realm_remove_realm_changed_callback(realm_t* realm, uint64_t token)
-{
-    CBindingContext::get(*realm).realm_changed_callbacks().remove(token);
+    return new realm_callback_token_realm(
+        realm, CBindingContext::get(*realm).realm_changed_callbacks().add(std::move(func)));
 }
 
 RLM_API bool realm_refresh(realm_t* realm)

@@ -848,12 +848,12 @@ TEST_CASE("C API") {
 
     SECTION("realm changed notification") {
         bool realm_changed_callback_called = false;
-        realm_add_realm_changed_callback(
+        auto token = cptr(realm_add_realm_changed_callback(
             realm,
             [](void* userdata) {
                 *reinterpret_cast<bool*>(userdata) = true;
             },
-            &realm_changed_callback_called, [](void*) {});
+            &realm_changed_callback_called, [](void*) {}));
 
         realm_begin_write(realm);
         realm_commit(realm);
@@ -906,7 +906,7 @@ TEST_CASE("C API") {
             realm_schema_t* expected_schema;
             bool result;
         } context = {new_schema, false};
-        realm_add_schema_changed_callback(
+        auto token = realm_add_schema_changed_callback(
             realm,
             [](void* userdata, auto* new_schema) {
                 auto& ctx = *reinterpret_cast<Context*>(userdata);
@@ -934,6 +934,7 @@ TEST_CASE("C API") {
         }
         free(properties);
         realm_release(new_schema);
+        realm_release(token);
     }
 
     SECTION("schema validates") {
