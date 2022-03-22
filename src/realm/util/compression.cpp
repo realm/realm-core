@@ -137,15 +137,6 @@ uint8_t read_byte(NoCopyInputStream& is, Span<const char>& buf)
     return 0;
 }
 
-uint8_t peek_byte(NoCopyInputStream& is, Span<const char>& buf)
-{
-    if (!buf.size())
-        buf = is.next_block();
-    if (buf.size())
-        return buf.front();
-    return 0;
-}
-
 struct Header {
     Algorithm algorithm;
     size_t size;
@@ -207,7 +198,8 @@ struct DecompressInputStreamNone final : public NoCopyInputStream {
         : source(s)
         , current_block(b)
     {
-        peek_byte(s, current_block); // ensure current_block isn't empty
+        if (current_block.empty())
+            current_block = source.next_block();
     }
     NoCopyInputStream& source;
     Span<const char> current_block;
