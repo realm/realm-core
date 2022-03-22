@@ -658,17 +658,10 @@ struct realm_flx_sync_subscription_set : realm::c_api::WrapC, realm::sync::Subsc
     }
 };
 
-struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC, realm::sync::MutableSubscriptionSet {
-    realm_flx_sync_mutable_subscription_set(realm::sync::MutableSubscriptionSet&& mutable_subscription_set)
-        : realm::sync::MutableSubscriptionSet(std::move(mutable_subscription_set))
-    {
-    }
-};
-
 struct realm_flx_sync_subscription_desc : realm::c_api::WrapC {
-    realm_flx_sync_subscription_desc(size_t index, bool success)
+    realm_flx_sync_subscription_desc(size_t index, bool inserted)
         : m_index(index)
-        , m_success(success)
+        , m_inserted(inserted)
     {
     }
 
@@ -677,26 +670,13 @@ struct realm_flx_sync_subscription_desc : realm::c_api::WrapC {
         return m_index;
     }
 
-    bool success() const
+    bool inserted() const
     {
-        return m_success;
+        return m_inserted;
     }
 
     size_t m_index;
-    bool m_success;
-};
-
-struct realm_flx_sync_subscription_json : realm::c_api::WrapC {
-    realm_flx_sync_subscription_json() = default;
-    realm_flx_sync_subscription_json(const char* json)
-        : m_subscription_json(json)
-    {
-    }
-    const char* get_subscription() const
-    {
-        return m_subscription_json.c_str();
-    }
-    std::string m_subscription_json;
+    bool m_inserted;
 };
 
 struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {

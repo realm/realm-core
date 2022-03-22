@@ -407,161 +407,165 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
     config->client_resync_mode = ClientResyncMode(mode);
 }
 
-RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t* realm)
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription(const realm_t* realm) noexcept
 {
     if (realm == nullptr)
         return nullptr;
 
-    return new realm_flx_sync_subscription_set_t((*realm)->get_latest_subscription_set());
+    return wrap_err([&]() {
+        return new realm_flx_sync_subscription_set_t((*realm)->get_latest_subscription_set());
+    });
 }
 
-RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t* realm)
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription(const realm_t* realm) noexcept
 {
     if (realm == nullptr)
         return nullptr;
 
-    return new realm_flx_sync_subscription_set_t((*realm)->get_active_subscription_set());
+    return wrap_err([&]() {
+        return new realm_flx_sync_subscription_set_t((*realm)->get_active_subscription_set());
+    });
 }
 
-RLM_API realm_flx_sync_mutable_subscription_set_t*
-realm_sync_get_mutable_subscription_set(const realm_flx_sync_subscription_set_t* subscription_set)
+RLM_API bool
+realm_sync_get_state_change_notification_async(const realm_flx_sync_subscription_set_t* subscription,
+                                               realm_flx_sync_subscription_set_state_e notify_when,
+                                               realm_sync_on_subscription_state_changed callback) noexcept
 {
-    if (subscription_set == nullptr)
-        return nullptr;
-    return new realm_flx_sync_mutable_subscription_set_t(subscription_set->make_mutable_copy());
+    if (subscription == nullptr || callback == nullptr)
+        return false;
+
+    return wrap_err([&]() {
+        auto future_state =
+            subscription->make_mutable_copy().get_state_change_notification(SubscriptionSet::State{notify_when});
+        std::move(future_state)
+            .get_async([callback, subscription](const StatusWith<SubscriptionSet::State>& state) -> void {
+                if (state.is_ok())
+                    callback(subscription,
+                             realm_flx_sync_subscription_set_state_e(static_cast<int>(state.get_value())));
+                else
+                    callback(subscription, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_ERROR);
+            });
+        return true;
+    });
 }
 
-RLM_API void realm_sync_get_state_change_notification_async(const realm_flx_sync_subscription_set_t* subscription_set,
-                                                            realm_flx_sync_subscription_set_state_e notify_when,
-                                                            realm_sync_on_subscription_state_changed callback)
+RLM_API int64_t realm_sync_subscription_version(const realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (subscription_set) {
-        auto future_state = subscription_set->get_state_change_notification(SubscriptionSet::State{notify_when});
-        using State = StatusWith<SubscriptionSet::State>;
-        auto f = [callback](State state) -> void {
-            if (callback && state.is_ok()) {
-                callback(realm_flx_sync_subscription_set_state_e(static_cast<int>(state.get_value())));
-            }
-        };
-        std::move(future_state).on_completion(f).get();
-    }
-}
-
-RLM_API int64_t realm_sync_subscription_version(const realm_flx_sync_subscription_set_t* subscription_set) noexcept
-{
-    if (subscription_set == nullptr)
+    if (subscription == nullptr)
         return -1;
-    return subscription_set->version();
+
+    return subscription->version();
 }
 
 RLM_API realm_flx_sync_subscription_set_state_e
-realm_sync_subscription_state(const realm_flx_sync_subscription_set_t* subscription_set) noexcept
+realm_sync_subscription_state(const realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (subscription_set == nullptr)
-        return realm_flx_sync_subscription_set_state_e::RLM_SYNC_ERROR;
-    return static_cast<realm_flx_sync_subscription_set_state_e>(subscription_set->state());
+    if (subscription == nullptr)
+        return realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_UNCOMMITTED;
+
+    return static_cast<realm_flx_sync_subscription_set_state_e>(subscription->state());
 }
 
-RLM_API const char*
-realm_sync_subscription_error_str(const realm_flx_sync_subscription_set_t* subscription_set) noexcept
+RLM_API const char* realm_sync_subscription_error_str(const realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (subscription_set == nullptr)
+    if (subscription == nullptr)
         return "";
-    return subscription_set->error_str().data();
+
+    return subscription->error_str().data();
 }
 
-RLM_API size_t realm_sync_subscription_size(const realm_flx_sync_subscription_set_t* subscription_set) noexcept
+RLM_API size_t realm_sync_subscription_size(const realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (subscription_set == nullptr)
+    if (subscription == nullptr)
         return 0;
-    return subscription_set->size();
+
+    return subscription->size();
 }
 
-RLM_API realm_flx_sync_subscription_t* realm_sync_subscription_at(realm_flx_sync_subscription_set_t* subscription_set,
-                                                                  size_t index)
+RLM_API realm_flx_sync_subscription_t*
+realm_sync_subscription_at(const realm_flx_sync_subscription_set_t* subscription, size_t index) noexcept
 {
-    if (subscription_set == nullptr)
+    if (subscription == nullptr)
         return nullptr;
-    return new realm_flx_sync_subscription_t(subscription_set->at(index));
+
+    return wrap_err([&]() {
+        return new realm_flx_sync_subscription_t(subscription->at(index));
+    });
 }
 
-RLM_API realm_flx_sync_subscription_json_t*
-realm_sync_subscription_to_ext_json(const realm_flx_sync_subscription_set_t* subscription_set)
+RLM_API bool realm_sync_subscription_refresh(realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (subscription_set == nullptr)
-        return new realm_flx_sync_subscription_json_t{};
-    return new realm_flx_sync_subscription_json_t{subscription_set->to_ext_json().c_str()};
+    if (subscription == nullptr)
+        return false;
+
+    return wrap_err([&]() {
+        subscription->refresh();
+        return true;
+    });
 }
 
-RLM_API void realm_sync_subscription_refresh(realm_flx_sync_subscription_set_t* subscription_set) noexcept
+RLM_API bool realm_sync_subscription_clear(const realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (subscription_set)
-        subscription_set->refresh();
-}
+    if (subscription == nullptr)
+        return false;
 
-RLM_API void realm_sync_subscription_clear(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set)
-{
-    if (mutable_subscription_set)
-        mutable_subscription_set->clear();
-}
-
-RLM_API realm_flx_sync_subscription_desc_t* realm_sync_subscription_insert_or_assign_with_name(
-    realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set, const char* name, realm_query_t* query)
-{
-    if (mutable_subscription_set != nullptr && query != nullptr) {
-        const auto [it, res] = mutable_subscription_set->insert_or_assign(name, Query(query->query));
-        size_t index = std::distance(mutable_subscription_set->begin(), it);
-        return new realm_flx_sync_subscription_desc_t{index, res};
-    }
-    return nullptr;
+    return wrap_err([&]() {
+        subscription->make_mutable_copy().clear();
+        return true;
+    });
 }
 
 RLM_API realm_flx_sync_subscription_desc_t*
-realm_sync_subscription_insert_or_assign(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set,
-                                         realm_query_t* query)
+realm_sync_subscription_insert_or_assign_with_name(const realm_flx_sync_subscription_set_t* subscription,
+                                                   const char* name, realm_query_t* query) noexcept
 {
-    if (mutable_subscription_set != nullptr && query != nullptr) {
-        const auto [it, res] = mutable_subscription_set->insert_or_assign(Query(query->query));
-        size_t index = std::distance(mutable_subscription_set->begin(), it);
-        return new realm_flx_sync_subscription_desc_t{index, res};
-    }
-    return nullptr;
+    if (subscription == nullptr || query == nullptr)
+        return nullptr;
+
+    return wrap_err([&]() {
+        auto mutable_subscription = subscription->make_mutable_copy();
+        const auto [it, inserted] = mutable_subscription.insert_or_assign(name, Query(query->query));
+        size_t index = std::distance(mutable_subscription.begin(), it);
+        return new realm_flx_sync_subscription_desc_t{index, inserted};
+    });
 }
 
-RLM_API bool realm_sync_subscription_erase(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set,
-                                           size_t ndx)
+RLM_API realm_flx_sync_subscription_desc_t*
+realm_sync_subscription_insert_or_assign(const realm_flx_sync_subscription_set_t* subscription,
+                                         const realm_query_t* query) noexcept
 {
-    if (mutable_subscription_set == nullptr)
+    if (subscription == nullptr || query == nullptr)
+        return nullptr;
+
+    return wrap_err([&]() {
+        auto mutable_subscription = subscription->make_mutable_copy();
+        const auto [it, inserted] = mutable_subscription.insert_or_assign(Query(query->query));
+        size_t index = std::distance(mutable_subscription.begin(), it);
+        return new realm_flx_sync_subscription_desc_t{index, inserted};
+    });
+}
+
+RLM_API bool realm_sync_subscription_erase(const realm_flx_sync_subscription_set_t* subscription, size_t ndx) noexcept
+{
+    if (subscription == nullptr)
         return false;
 
-    const auto it = mutable_subscription_set->erase(mutable_subscription_set->begin() + ndx);
-    return it != mutable_subscription_set->end();
-}
-
-RLM_API void realm_sync_subscription_update_state(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set,
-                                                  realm_flx_sync_subscription_set_state_e state)
-{
-    if (mutable_subscription_set) {
-        mutable_subscription_set->update_state(SubscriptionSet::State{state});
-    }
-}
-
-RLM_API void
-realm_sync_subscription_update_state_with_error(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set,
-                                                realm_flx_sync_subscription_set_state_e state, const char* error_str)
-{
-    if (mutable_subscription_set) {
-        mutable_subscription_set->update_state(SubscriptionSet::State{state},
-                                               util::Optional<std::string_view>{error_str});
-    }
+    return wrap_err([&]() {
+        auto it = subscription->make_mutable_copy().erase(subscription->begin() + ndx);
+        return it != subscription->end();
+    });
 }
 
 RLM_API realm_flx_sync_subscription_set_t*
-realm_sync_subscription_commit(realm_flx_sync_mutable_subscription_set_t* mutable_subscription_set)
+realm_sync_subscription_commit(const realm_flx_sync_subscription_set_t* subscription) noexcept
 {
-    if (mutable_subscription_set == nullptr)
+    if (subscription == nullptr)
         return nullptr;
-    return new realm_flx_sync_subscription_set_t{std::move(*mutable_subscription_set).commit()};
+
+    return wrap_err([&]() {
+        return new realm_flx_sync_subscription_set_t{std::move(subscription->make_mutable_copy()).commit()};
+    });
 }
 
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config) noexcept
