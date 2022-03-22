@@ -1289,3 +1289,14 @@ void RealmCoordinator::async_request_write_mutex(Realm& realm)
         });
     });
 }
+
+void RealmCoordinator::async_request_write_mutex(Realm& realm)
+{
+    auto tr = Realm::Internal::get_transaction_ref(realm);
+    m_db->async_request_write_mutex(tr, [realm = realm.shared_from_this()]() mutable {
+        auto& scheduler = *realm->scheduler();
+        scheduler.invoke([realm = std::move(realm)] {
+            Realm::Internal::run_writes(*realm);
+        });
+    });
+}
