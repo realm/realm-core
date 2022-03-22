@@ -2159,9 +2159,9 @@ TEST_CASE("migration: ReadOnly") {
     }
 }
 
-TEST_CASE("migration: ResetFile") {
+TEST_CASE("migration: SoftResetFile") {
     TestFile config;
-    config.schema_mode = SchemaMode::ResetFile;
+    config.schema_mode = SchemaMode::SoftResetFile;
 
     Schema schema = {
         {"object",
@@ -2254,6 +2254,82 @@ TEST_CASE("migration: ResetFile") {
         realm->update_schema(schema);
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
         REQUIRE(ino == get_fileid());
+    }
+}
+
+TEST_CASE("migration: HardResetFile") {
+    TestFile config;
+
+    Schema schema = {
+        {"object",
+         {
+             {"value", PropertyType::Int},
+         }},
+        {"object 2",
+         {
+             {"value", PropertyType::Int},
+         }},
+    };
+
+// To verify that the file has actually be deleted and recreated, on
+// non-Windows we need to hold an open file handle to the old file to force
+// using a new inode, but on Windows we *can't*
+#ifdef _WIN32
+    auto get_fileid = [&] {
+        // this is wrong for non-ascii but it's what core does
+        std::wstring ws(config.path.begin(), config.path.end());
+        HANDLE handle =
+            CreateFile2(ws.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, nullptr);
+        REQUIRE(handle != INVALID_HANDLE_VALUE);
+        auto close = util::make_scope_exit([=]() noexcept {
+            CloseHandle(handle);
+        });
+
+        BY_HANDLE_FILE_INFORMATION info{};
+        REQUIRE(GetFileInformationByHandle(handle, &info));
+        return (DWORDLONG)info.nFileIndexHigh + (DWORDLONG)info.nFileIndexLow;
+    };
+#else
+    auto get_fileid = [&] {
+        util::File::UniqueID id;
+        util::File::get_unique_id(config.path, id);
+        return id.inode;
+    };
+    util::File holder(config.path, util::File::mode_Write);
+#endif
+
+    {
+        auto realm = Realm::get_shared_realm(config);
+        auto ino = get_fileid();
+        realm->update_schema(schema);
+        REQUIRE(ino == get_fileid());
+        realm->begin_transaction();
+        ObjectStore::table_for_object_type(realm->read_group(), "object")->create_object();
+        realm->commit_transaction();
+    }
+    config.schema_mode = SchemaMode::HardResetFile;
+    auto realm = Realm::get_shared_realm(config);
+    auto ino = get_fileid();
+
+    SECTION("file is reset when schema version increases") {
+        realm->update_schema(schema, 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 0);
+        REQUIRE(ino != get_fileid());
+    }
+
+    SECTION("file is reset when an existing table is modified") {
+        realm->update_schema(add_property(schema, "object", {"value 2", PropertyType::Int}));
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 0);
+        REQUIRE(ino != get_fileid());
+    }
+
+    SECTION("file is reset when adding a new table") {
+        realm->update_schema(add_table(schema, {"object 3",
+                                                {
+                                                    {"value", PropertyType::Int},
+                                                }}));
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 0);
+        REQUIRE(ino != get_fileid());
     }
 }
 

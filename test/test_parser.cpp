@@ -157,6 +157,7 @@ static std::vector<std::string> valid_queries = {
     "'a'CONTAINS[c]b",
     "0 BeGiNsWiTh 0",
     "0 ENDSWITH 0",
+    "in in 'in'",
     "contains contains 'contains'",
     "beginswith beginswith 'beginswith'",
     "endswith endswith 'endswith'",
@@ -3856,20 +3857,26 @@ TEST(Parser_Object)
 }
 
 
-TEST(Parser_Between)
+TEST(Parser_OddColumnNames)
 {
     Group g;
     TableRef table = g.add_table("table");
     auto int_col_key = table->add_column(type_Int, "age", true);
     auto between_col_key = table->add_column(type_Int, "between", true);
+    auto in_col_key = table->add_column(type_Int, "in", true);
     for (int i = 0; i < 3; ++i) {
-        table->create_object().set(int_col_key, i + 24).set(between_col_key, i);
+        table->create_object().set(int_col_key, i + 24).set(between_col_key, i).set(in_col_key, i + 100);
     }
 
     // normal querying on a property named "between" is allowed.
     verify_query(test_context, table, "between == 0", 1);
     verify_query(test_context, table, "between > 0", 2);
     verify_query(test_context, table, "between <= 3", 3);
+
+    // normal querying on a property named "in" is allowed.
+    verify_query(test_context, table, "in == 100", 1);
+    verify_query(test_context, table, "in > 100", 2);
+    verify_query(test_context, table, "in <= 103", 3);
 
     verify_query(test_context, table, "age between {24, 26}", 3);
 

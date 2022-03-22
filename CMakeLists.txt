@@ -209,8 +209,16 @@ find_package(Threads REQUIRED)
 find_package(BISON 3.8.2 EXACT)
 find_package(FLEX 2.6.4 EXACT)
 
-option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
-if(NOT APPLE OR REALM_FORCE_OPENSSL)
+if(REALM_ENABLE_SYNC)
+    option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
+    if(CMAKE_SYSTEM_NAME MATCHES "^Windows|Linux|Android")
+        set(REALM_NEEDS_OPENSSL TRUE)
+    endif()
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+    set(REALM_NEEDS_OPENSSL TRUE)
+endif()
+
+if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
     set(OPENSSL_USE_STATIC_LIBS ON)
     if(VCPKG_TOOLCHAIN)
         # If we're building with vcpkg, prefer to find OpenSSL there first
@@ -259,7 +267,7 @@ if(NOT APPLE OR REALM_FORCE_OPENSSL)
 
     set(REALM_HAVE_OPENSSL ON)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
-else()
+elseif(APPLE)
     set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
@@ -308,21 +316,24 @@ if (REALM_BUILD_DOGLESS)
     add_subdirectory(src/dogless)
 endif()
 
-# Enable CTest and include unit tests
-if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
-    enable_testing()
-    add_subdirectory(test)
-    if (REALM_BUILD_TEST_CLIENT)
-        add_subdirectory(test/client)
-    endif()
-endif()
-
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
-# Only prepare install/package targets if we're not a submodule
+# Only prepare test/install/package targets if we're not a submodule
 if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     return()
+endif()
+
+# Enable CTest and include unit tests
+enable_testing()
+
+if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+    set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
+endif()
+add_subdirectory(test ${REALM_EXCLUDE_TESTS})
+
+if (REALM_BUILD_TEST_CLIENT)
+    add_subdirectory(test/client)
 endif()
 
 # Make the project importable from the build directory
@@ -354,9 +365,22 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_NAME "realm-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+
+# Generators that don't support build-time configuration selection.
+# Others like Xcode and Visual Studio can determine the package name
+# based on the build configuration at build-time.
+set(_single_config_generators
+    Ninja
+    "Unix Makefiles"
+)
+if(CMAKE_GENERATOR IN_LIST _single_config_generators)
+    set(CPACK_PACKAGE_NAME "realm-${CMAKE_BUILD_TYPE}")
+else()
+    set(CPACK_PACKAGE_NAME "realm-\${CPACK_BUILD_CONFIG}")
+endif()
+
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)
 cpack_add_component(devel DEPENDS devel)

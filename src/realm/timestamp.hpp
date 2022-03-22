@@ -200,6 +200,10 @@ private:
 template <class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
+    if (d.is_null()) {
+        out << "null";
+        return out;
+    }
     auto seconds = time_t(d.get_seconds());
     struct tm buf;
 #ifdef _MSC_VER

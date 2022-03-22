@@ -4108,7 +4108,6 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
                                     util::UniqueFunction<void(const Response&)>&& completion_block) override
 
         {
-            std::cerr << request.url << std::endl;
             if (request.url.find("/login") != std::string::npos) {
                 CHECK(state.get() == TestState::location);
                 state.advance_to(TestState::login);
@@ -4171,21 +4170,15 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
     auto app = sync_manager.app();
 
     {
-        std::mutex mutex;
-        std::shared_ptr<SyncUser> cur_user;
+        auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
         app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                         std::lock_guard lock(mutex);
-                                         CHECK(user);
+                                     [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                                             util::Optional<AppError> error) mutable {
                                          REQUIRE_FALSE(error);
-                                         cur_user = std::move(user);
+                                         promise.emplace_value(std::move(user));
                                      });
 
-        state.wait_for(TestState::profile_2);
-        util::EventLoop::main().run_until([&] {
-            std::lock_guard lock(mutex);
-            return cur_user != nullptr;
-        });
+        auto cur_user = std::move(cur_user_future).get();
         CHECK(cur_user);
 
         Realm::Config realm_config;
@@ -4377,4 +4370,97 @@ TEST_CASE("app: sync_user_profile unit tests", "[sync][app]") {
         CHECK(profile.min_age() == "0");
         CHECK(profile.max_age() == "100");
     }
+}
+
+TEST_CASE("app: app cannot get deallocated during log in", "[sync][app]") {
+    AsyncMockNetworkTransport mock_transport_worker;
+    enum class TestState { unknown, location, login, app_deallocated, profile };
+    struct TestStateBundle {
+        void advance_to(TestState new_state)
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            state = new_state;
+            cond.notify_one();
+        }
+
+        TestState get() const
+        {
+            std::lock_guard<std::mutex> lk(mutex);
+            return state;
+        }
+
+        void wait_for(TestState new_state)
+        {
+            std::unique_lock<std::mutex> lk(mutex);
+            cond.wait(lk, [&] {
+                return state == new_state;
+            });
+        }
+
+        mutable std::mutex mutex;
+        std::condition_variable cond;
+
+        TestState state = TestState::unknown;
+    } state;
+    struct transport : public GenericNetworkTransport {
+        transport(AsyncMockNetworkTransport& worker, TestStateBundle& state)
+            : mock_transport_worker(worker)
+            , state(state)
+        {
+        }
+
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+
+        {
+            if (request.url.find("/login") != std::string::npos) {
+                state.advance_to(TestState::login);
+                state.wait_for(TestState::app_deallocated);
+                mock_transport_worker.add_work_item(
+                    Response{200, 0, {}, user_json(encode_fake_jwt("access token")).dump()},
+                    std::move(completion_block));
+            }
+            else if (request.url.find("/profile") != std::string::npos) {
+                state.advance_to(TestState::profile);
+                mock_transport_worker.add_work_item(Response{200, 0, {}, user_profile_json().dump()},
+                                                    std::move(completion_block));
+            }
+            else if (request.url.find("/location") != std::string::npos) {
+                CHECK(request.method == HttpMethod::get);
+                state.advance_to(TestState::location);
+                mock_transport_worker.add_work_item(
+                    Response{200,
+                             0,
+                             {},
+                             "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                             "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"},
+                    std::move(completion_block));
+            }
+        }
+
+        AsyncMockNetworkTransport& mock_transport_worker;
+        TestStateBundle& state;
+    };
+
+    auto [cur_user_promise, cur_user_future] = util::make_promise_future<std::shared_ptr<SyncUser>>();
+    auto transporter = std::make_shared<transport>(mock_transport_worker, state);
+
+    {
+        TestSyncManager sync_manager(get_config(transporter));
+        auto app = sync_manager.app();
+
+        app->log_in_with_credentials(AppCredentials::anonymous(),
+                                     [promise = std::move(cur_user_promise)](std::shared_ptr<SyncUser> user,
+                                                                             util::Optional<AppError> error) mutable {
+                                         REQUIRE_FALSE(error);
+                                         promise.emplace_value(std::move(user));
+                                     });
+    }
+
+    // At this point the test does not hold any reference to `app`.
+    state.advance_to(TestState::app_deallocated);
+    auto cur_user = std::move(cur_user_future).get();
+    CHECK(cur_user);
+
+    mock_transport_worker.mark_complete();
 }

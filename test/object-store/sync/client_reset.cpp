@@ -98,6 +98,7 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
 
+#if REALM_ENABLE_AUTH_TESTS
 
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
@@ -134,7 +135,6 @@ TEST_CASE("sync: client reset", "[client reset]") {
              partition_prop,
          }},
     };
-#if REALM_ENABLE_AUTH_TESTS
     std::string base_url = get_base_url();
     REQUIRE(!base_url.empty());
     auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
@@ -154,26 +154,6 @@ TEST_CASE("sync: client reset", "[client reset]") {
                           Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
         return reset_utils::make_baas_client_reset(config_local, config_remote, sync_manager);
     };
-
-#else
-    TestSyncManager sync_manager;
-    auto get_valid_config = [&]() -> SyncTestFile {
-        return SyncTestFile(sync_manager.app(), "default");
-    };
-    SyncTestFile local_config = get_valid_config();
-    local_config.schema = schema;
-    SyncTestFile remote_config = get_valid_config();
-    remote_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        CAPTURE(err.message);
-        CAPTURE(remote_config.path);
-        // There is a race in the test code of the sync test server where somehow the
-        // remote Realm is also reset sometimes. We ignore it as it shouldn't affect the result.
-    };
-    auto make_reset = [&](const Realm::Config& config_local,
-                          const Realm::Config& config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
-        return reset_utils::make_test_server_client_reset(config_local, config_remote, sync_manager);
-    };
-#endif
 
     // this is just for ease of debugging
     local_config.path = local_config.path + ".local";
@@ -373,6 +353,58 @@ TEST_CASE("sync: client reset", "[client reset]") {
             make_reset(local_config, remote_config)->run();
             REQUIRE(before_callback_invoctions == 0);
             REQUIRE(after_callback_invocations == 0);
+        }
+
+        SECTION("notifiers work if the session instance changes") {
+            // run this test with ASAN to check for use after free
+            size_t before_callback_invoctions_2 = 0;
+            size_t after_callback_invocations_2 = 0;
+            std::shared_ptr<SyncSession> session;
+            std::unique_ptr<SyncConfig> config_copy;
+            {
+                SyncTestFile temp_config = get_valid_config();
+                temp_config.persist();
+                temp_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+                config_copy = std::make_unique<SyncConfig>(*temp_config.sync_config);
+                config_copy->notify_before_client_reset = [&](SharedRealm) {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    ++before_callback_invoctions_2;
+                };
+                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm) {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    ++after_callback_invocations_2;
+                };
+
+                temp_config.sync_config->notify_before_client_reset = [&](SharedRealm) {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    ++before_callback_invoctions;
+                    REQUIRE(session);
+                    REQUIRE(config_copy);
+                    session->update_configuration(*config_copy);
+                };
+
+                auto realm = Realm::get_shared_realm(temp_config);
+                wait_for_download(*realm);
+
+                session = sync_manager.app()->sync_manager()->get_existing_session(temp_config.path);
+                REQUIRE(session);
+            }
+            realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
+                                       "A fake client reset error", true);
+            SyncSession::OnlyForTesting::handle_error(*session, synthetic);
+
+            session->revive_if_needed();
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return before_callback_invoctions > 0;
+                },
+                std::chrono::seconds(120));
+            millisleep(500); // just make some space for the after callback to be attempted
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
+            REQUIRE(before_callback_invoctions_2 == 0);
+            REQUIRE(after_callback_invocations_2 == 0);
         }
 
         SECTION("an interrupted reset can recover on the next session") {
@@ -976,6 +1008,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
     }
 }
 
+#endif // REALM_ENABLE_AUTH_TESTS
+
 namespace cf = realm::collection_fixtures;
 TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
@@ -1060,16 +1094,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
         }
     };
 
-    // The following can be used to perform the client reset proper, but these tests
-    // are only intended to check the transfer_group logic for different types,
-    // so to save local test time, we call it directly instead.
-#if 0
-    std::unique_ptr<reset_utils::TestClientReset> test_reset =
-        reset_utils::make_test_server_client_reset(config, config2, init_sync_manager);
-#else
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
-#endif
 
     SECTION("property") {
         REQUIRE(values.size() >= 2);
@@ -1505,16 +1531,8 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
     SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = schema;
 
-    // The following can be used to perform the client reset proper, but these tests
-    // are only intended to check the transfer_group logic for different types,
-    // so to save local test time, we call it directly instead.
-#if 0
-    std::unique_ptr<reset_utils::TestClientReset> test_reset =
-        reset_utils::make_test_server_client_reset(config, config2, init_sync_manager);
-#else
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
-#endif
 
     CppContext c;
     auto create_one_source_object = [&](realm::SharedRealm r, int64_t val, std::vector<ObjLink> links = {}) {

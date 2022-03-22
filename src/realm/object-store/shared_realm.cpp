@@ -287,11 +287,13 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             return false;
 
-        case SchemaMode::ResetFile:
+        case SchemaMode::SoftResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
                 return true;
             if (m_schema_version == version && !ObjectStore::needs_migration(changes))
                 return true;
+            REALM_FALLTHROUGH;
+        case SchemaMode::HardResetFile:
             reset_file(schema, changes);
             return true;
 
@@ -347,7 +349,8 @@ void Realm::set_schema_subset(Schema schema)
     std::vector<SchemaChange> changes = m_schema.compare(schema, m_config.schema_mode);
     switch (m_config.schema_mode) {
         case SchemaMode::Automatic:
-        case SchemaMode::ResetFile:
+        case SchemaMode::SoftResetFile:
+        case SchemaMode::HardResetFile:
             ObjectStore::verify_no_migration_required(changes);
             break;
 
@@ -816,7 +819,8 @@ auto Realm::async_begin_transaction(util::UniqueFunction<void()>&& the_write_blo
     auto handle = m_async_commit_handle++;
     m_async_write_q.push_back({std::move(the_write_block), notify_only, handle});
 
-    if (!m_is_running_async_writes && !m_transaction->is_async()) {
+    if (!m_is_running_async_writes && !m_transaction->is_async() &&
+        m_transaction->get_transact_stage() != DB::transact_Writing) {
         m_coordinator->async_request_write_mutex(*this);
     }
     return handle;
@@ -960,8 +964,7 @@ void Realm::commit_transaction()
         // Any previous async commits got flushed along with the sync commit
         call_completion_callbacks();
         // If we have pending async writes we need to rerequest the write mutex
-        if (!m_async_write_q.empty())
-            m_coordinator->async_request_write_mutex(*this);
+        check_pending_write_requests();
     }
     if (auto audit = audit_context()) {
         audit->record_write(prev_version, transaction().get_version_of_current_transaction());

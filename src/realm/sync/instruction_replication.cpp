@@ -534,10 +534,6 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
         return;
     REALM_ASSERT(!row_ndx.is_unresolved());
 
-    // FIXME: This probably belongs in a function similar to sync::create_object().
-    if (table->get_name().begins_with("class_")) {
-    }
-
     if (select_table(*table)) {
         Instruction::EraseObject instr;
         instr.table = m_last_class_name;

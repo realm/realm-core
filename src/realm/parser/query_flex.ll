@@ -34,7 +34,7 @@ blank   [ \t\r]
 
 "+"|"-"|"*"|"/"             return yytext[0];
 ("=="|"=")                  return yy::parser::make_EQUAL  ();
-("in"|"IN")                 return yy::parser::make_IN  ();
+("in"|"IN")                 return yy::parser::make_IN  (yytext);
 ("!="|"<>")                 return yy::parser::make_NOT_EQUAL();
 "<"                         return yy::parser::make_LESS   ();
 ">"                         return yy::parser::make_GREATER();
