@@ -572,16 +572,20 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
     SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.persist();
 
-    auto orig_realm = Realm::get_shared_realm(config);
-    auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
-    mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
-    std::move(mut_subs).commit();
-    orig_realm->close();
+    {
+        auto orig_realm = Realm::get_shared_realm(config);
+        auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
+        std::move(mut_subs).commit();
+        orig_realm->close();
+    }
 
-    auto new_realm = Realm::get_shared_realm(config);
-    auto latest_subs = new_realm->get_latest_subscription_set();
-    CHECK(latest_subs.size() == 1);
-    latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    {
+        auto new_realm = Realm::get_shared_realm(config);
+        auto latest_subs = new_realm->get_latest_subscription_set();
+        CHECK(latest_subs.size() == 1);
+        latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
 }
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {
