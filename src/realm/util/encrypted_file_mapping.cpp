@@ -135,7 +135,7 @@ void direct_copy(FileDesc origin_file, FileDesc target_file)
         File::write_static(target_file, buffer.get(), n);                     // Throws
         total += n;
         if (n < buffer_size) {
-            std::cout << "Done with total = " << total << "    and n = " << n << std::endl;
+            std::cout << "Made copy with size = " << total << "    and n = " << n << std::endl;
             break;
         }
     }
@@ -147,8 +147,12 @@ void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
 {
     uint64_t orig = File::get_file_pos(fd);
     File::seek_static(fd, pos);
-    File::write_static(fd, static_cast<const char*>(data), len);
-    File::seek_static(fd, orig);
+    unsigned cut = 0;
+    if (len > 1024) {
+        // split the write
+        cut = 27;
+        File::write_static(fd, static_cast<const char*>(data), cut);
+    }
 
     ++write_cnt;
     auto size = File::get_size_static(fd);
@@ -158,6 +162,8 @@ void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
         direct_copy(fd, f_out.get_descriptor());
         std::cout << "Wrote: " << name << "   with size " << size << std::endl;
     }
+    File::write_static(fd, static_cast<const char*>(data) + cut, len - cut);
+    File::seek_static(fd, orig);
 }
 
 size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
