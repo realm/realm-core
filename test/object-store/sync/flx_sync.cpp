@@ -406,7 +406,7 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
         },
         default_schema.schema);
 }
-#if 0
+
 TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_offline_writes");
 
@@ -437,7 +437,10 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         realm->commit_transaction();
 
         wait_for_upload(*realm);
+        wait_for_download(*realm);
         sync_session->close();
+
+        // Make it so the subscriptions only match the "foo" object
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -445,6 +448,9 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
+        // Make foo so that it will match the next subscription update. This checks whether you can do
+        // multiple subscription set updates offline and that the last one eventually takes effect when
+        // you come back online and fully synchronize.
         {
             Results results(realm, table);
             realm->begin_transaction();
@@ -453,6 +459,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             realm->commit_transaction();
         }
 
+        // Update our subscriptions so that both foo/bar will be included
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -460,18 +467,22 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
-        Results results(realm, table);
-        realm->begin_transaction();
-        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
-        foo_obj.set<int64_t>(queryable_int_field, 0);
-        realm->commit_transaction();
+        // Make foo out of view for the current subscription.
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 0);
+            realm->commit_transaction();
+        }
 
         sync_session->revive_if_needed();
+        wait_for_upload(*realm);
         wait_for_download(*realm);
 
         realm->refresh();
-        CHECK(results.size() == 2);
-        CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+        Results results(realm, table);
+        CHECK(results.size() == 1);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
@@ -505,6 +516,8 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
         realm->commit_transaction();
 
         wait_for_upload(*realm);
+
+        // Make it so the subscriptions only match the "foo" object
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -512,6 +525,9 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
+        // Make foo so that it will match the next subscription update. This checks whether you can do
+        // multiple subscription set updates without waiting and that the last one eventually takes effect when
+        // you fully synchronize.
         {
             Results results(realm, table);
             realm->begin_transaction();
@@ -520,6 +536,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             realm->commit_transaction();
         }
 
+        // Update our subscriptions so that both foo/bar will be included
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -527,21 +544,24 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
-        Results results(realm, table);
-        realm->begin_transaction();
-        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
-        foo_obj.set<int64_t>(queryable_int_field, 0);
-        realm->commit_transaction();
+        // Make foo out-of-view for the current subscription.
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 0);
+            realm->commit_transaction();
+        }
 
+        wait_for_upload(*realm);
         wait_for_download(*realm);
 
         realm->refresh();
-        CHECK(results.size() == 2);
-        CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+        Results results(realm, table);
+        CHECK(results.size() == 1);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
-#endif
 
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
@@ -552,16 +572,20 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
     SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.persist();
 
-    auto orig_realm = Realm::get_shared_realm(config);
-    auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
-    mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
-    std::move(mut_subs).commit();
-    orig_realm->close();
+    {
+        auto orig_realm = Realm::get_shared_realm(config);
+        auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
+        std::move(mut_subs).commit();
+        orig_realm->close();
+    }
 
-    auto new_realm = Realm::get_shared_realm(config);
-    auto latest_subs = new_realm->get_latest_subscription_set();
-    CHECK(latest_subs.size() == 1);
-    latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    {
+        auto new_realm = Realm::get_shared_realm(config);
+        auto latest_subs = new_realm->get_latest_subscription_set();
+        CHECK(latest_subs.size() == 1);
+        latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
 }
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {

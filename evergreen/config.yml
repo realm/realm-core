@@ -184,6 +184,17 @@ functions:
   - command: attach.results
     params:
       file_location: realm-core/${task_name}_results.json
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/baas-work-dir/baas_server.log'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/baas_server.log'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: baas server logs
+      optional: true
 
   "run hang analyzer":
   - command: shell.exec
@@ -583,20 +594,6 @@ task_groups:
   tasks:
   - compile
   - .test_suite
-
-- name: compile_test_flx
-  max_hosts: 1
-  setup_group_can_fail_task: true
-  setup_group:
-  - func: "fetch source"
-  - func: "fetch binaries"
-  teardown_task:
-  - func: "upload test results"
-  timeout:
-  - func: "run hang analyzer"
-  tasks:
-  - compile
-  - object-store-tests
 
 - name: benchmarks
   setup_group_can_fail_task: true
