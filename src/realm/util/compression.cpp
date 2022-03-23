@@ -28,6 +28,7 @@
 
 #if REALM_USE_LIBCOMPRESSION
 #include <compression.h>
+#include <os/availability.h>
 #endif
 
 using namespace realm;
@@ -300,6 +301,8 @@ compression_algorithm algorithm_to_compression_algorithm(Algorithm a)
     }
 }
 
+API_AVAILABLE_BEGIN(macos(10.11))
+
 class DecompressInputStreamLibCompression final : public NoCopyInputStream {
 public:
     DecompressInputStreamLibCompression(NoCopyInputStream& s, Span<const char> b, Header h)
@@ -374,6 +377,8 @@ private:
     compression_stream m_strm = {};
     AppendBuffer<char> m_buffer;
 };
+
+API_AVAILABLE_END
 #endif
 
 std::error_code decompress_none(NoCopyInputStream& compressed, Span<const char> compressed_buf,
@@ -481,6 +486,7 @@ std::error_code decompress_zlib(NoCopyInputStream& compressed, Span<const char> 
 }
 
 #if REALM_USE_LIBCOMPRESSION
+API_AVAILABLE_BEGIN(macos(10.11))
 std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<const char> compressed_buf,
                                           Span<char> decompressed_buf, Algorithm algorithm, bool has_header)
 {
@@ -511,9 +517,15 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
     if (rc != COMPRESSION_STATUS_OK)
         return error::decompress_error;
 
-    util::ScopeExit cleanup([&]() noexcept {
-        compression_stream_destroy(&strm);
-    });
+    // Using ScopeExit here hits a bug in Xcode 12's availability checking and
+    // produces an incorrect warning
+    struct Cleanup {
+        compression_stream* strm;
+        ~Cleanup()
+        {
+            compression_stream_destroy(strm);
+        }
+    } cleanup{&strm};
 
     strm.dst_size = decompressed_buf.size();
     strm.dst_ptr = to_bytef(decompressed_buf.data());
@@ -566,6 +578,7 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
         return error::corrupt_input;
     return std::error_code{};
 }
+API_AVAILABLE_END
 #endif
 
 std::error_code decompress(NoCopyInputStream& compressed, Span<const char> compressed_buf,
@@ -629,6 +642,7 @@ void record_compression_result(size_t, size_t) {}
 #endif
 
 #if REALM_USE_LIBCOMPRESSION
+API_AVAILABLE_BEGIN(macos(10.11))
 std::error_code compress_lzfse(Span<const char> uncompressed_buf, Span<char> compressed_buf,
                                std::size_t& compressed_size, compression::Alloc* custom_allocator)
 {
@@ -667,6 +681,7 @@ std::error_code compress_lzfse(Span<const char> uncompressed_buf, Span<char> com
     compressed_size = bytes + 4;
     return std::error_code{};
 }
+API_AVAILABLE_END
 #endif
 
 std::error_code compress_lzfse_or_zlib(Span<const char> uncompressed_buf, Span<char> compressed_buf,
@@ -675,7 +690,7 @@ std::error_code compress_lzfse_or_zlib(Span<const char> uncompressed_buf, Span<c
 {
     using namespace compression;
 #if REALM_USE_LIBCOMPRESSION
-    if (__builtin_available(macOS 10.10, *)) {
+    if (__builtin_available(macOS 10.11, *)) {
         size_t len = write_header({Algorithm::Lzfse, uncompressed_buf.size()}, compressed_buf);
         auto ec = compress_lzfse(uncompressed_buf, compressed_buf.sub_span(len), compressed_size, custom_allocator);
         if (ec != error::compress_input_too_long)
@@ -923,7 +938,7 @@ std::unique_ptr<NoCopyInputStream> compression::decompress_nonportable_input_str
     if (header.algorithm == Algorithm::None)
         return std::make_unique<DecompressInputStreamNone>(source, first_block);
 #if REALM_USE_LIBCOMPRESSION
-    if (__builtin_available(macOS 10.10, *)) {
+    if (__builtin_available(macOS 10.11, *)) {
         if (header.algorithm == Algorithm::Deflate || header.algorithm == Algorithm::Lzfse)
             return std::make_unique<DecompressInputStreamLibCompression>(source, first_block, header);
     }
