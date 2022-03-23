@@ -130,6 +130,7 @@ TEST_CASE("list") {
                     lst.remove(5);
             });
             REQUIRE_INDICES(change.deletions, 5);
+            REQUIRE(!change.collection_was_cleared);
         }
 
         SECTION("modifying a different list doesn't send a change notification") {
@@ -140,13 +141,24 @@ TEST_CASE("list") {
             });
         }
 
-        SECTION("clearing list sets correct flag") {
+        SECTION("clearing list sets cleared flag") {
             auto token = require_change();
             write([&] {
                 lst.remove_all();
             });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
             REQUIRE(change.collection_was_cleared);
+        }
+
+        SECTION("removing all elements from list does not set cleared flag") {
+            auto token = require_change();
+            write([&] {
+                auto size = lst.size();
+                for(size_t i=0; i<size; i++)
+                    lst.remove(0);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+            REQUIRE(!change.collection_was_cleared);
         }
 
         SECTION("deleting the list sends a change notification") {
