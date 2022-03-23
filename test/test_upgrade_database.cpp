@@ -2009,4 +2009,81 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     _impl::GroupFriend::fake_target_file_format({});
 }
 
+TEST_IF(Upgrade_Database_22, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_22.realm";
+
+    std::map<std::string, Mixed> dict_values = {
+        {"one", 1},         {"two", 2.},      {"three", "John"},   {"four", "Paul"},
+        {"five", "George"}, {"six", "Ringo"}, {"seven", "Morgan"}, {"eight", Timestamp(4, 5)}};
+    // The string an binary values will be intermixed using the old algorithm
+    std::vector<Mixed> set_values = {1, 2., "John", "Ringo", BinaryData("Paul"), BinaryData("George"), "Beatles"};
+
+#if TEST_READ_UPGRADE_MODE
+    CHECK_OR_RETURN(File::exists(path));
+
+    SHARED_GROUP_TEST_PATH(temp_copy);
+
+    // Make a copy of the database so that we keep the original file intact and unmodified
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history();
+    auto sg = DB::create(*hist, temp_copy);
+    auto rt = sg->start_read();
+
+    auto t = rt->get_table("table");
+    auto target = rt->get_table("target");
+    auto col_dict = t->get_column_key("dict");
+    auto col_set = t->get_column_key("set");
+
+    auto obj = t->get_object_with_primary_key(1);
+    auto obj1 = target->get_object_with_primary_key(47);
+
+    auto dict = obj.get_dictionary(col_dict);
+    CHECK_EQUAL(dict.size(), dict_values.size() + 1);
+    for (auto& entry : dict_values) {
+        auto val = dict.get(entry.first);
+        CHECK_EQUAL(val, entry.second);
+    }
+    auto link = dict["nine"].get_link();
+    CHECK_EQUAL(link, obj1.get_link());
+
+    auto set = obj.get_set<Mixed>(col_set);
+    CHECK_EQUAL(set.size(), set_values.size() + 1);
+    for (auto& val : set_values) {
+        CHECK(set.find(val) != realm::npos);
+    }
+    CHECK(set.find(obj1.get_link()) != realm::npos);
+
+    CHECK_EQUAL(obj1.get_backlink_count(), 2);
+
+    rt->verify();
+
+#else
+    // NOTE: This code must be executed from an old file-format-version 22
+    // core in order to create a file-format-version 10 test file!
+
+    Group g;
+    TableRef t = g.add_table_with_primary_key("table", type_Int, "id", false);
+    TableRef target = g.add_table_with_primary_key("target", type_Int, "id", false);
+    auto col_dict = t->add_column_dictionary(type_Mixed, "dict", true, type_String);
+    auto col_set = t->add_column_set(type_Mixed, "set", true);
+
+    auto obj = t->create_object_with_primary_key(1);
+    auto obj1 = target->create_object_with_primary_key(47);
+    auto dict = obj.get_dictionary(col_dict);
+    for (auto& entry : dict_values) {
+        dict.insert(entry.first, entry.second);
+    }
+    dict.insert("nine", obj1);
+    auto set = obj.get_set<Mixed>(col_set);
+    for (auto& val : set_values) {
+        set.insert(val);
+    }
+    set.insert(obj1.get_link());
+    g.to_json(std::cout);
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
 #endif // TEST_GROUP
