@@ -196,3 +196,13 @@ RLM_API const char* realm_config_get_fifo_path(realm_config_t* realm_config) noe
 {
     return realm_config->fifo_files_fallback_path.c_str();
 }
+
+RLM_API void realm_config_set_cached(realm_config_t* realm_config, bool cached) noexcept
+{
+    realm_config->cache = cached;
+}
+
+RLM_API bool realm_config_get_cached(realm_config_t* realm_config) noexcept
+{
+    return realm_config->cache;
+}

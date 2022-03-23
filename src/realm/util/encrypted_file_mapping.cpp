@@ -28,9 +28,9 @@
 
 #ifdef REALM_DEBUG
 #include <cstdio>
-#include <iostream>
 #endif
 
+#include <iostream>
 #include <cstring>
 
 #if defined(_WIN32)
@@ -330,6 +330,39 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
         size -= block_size;
     }
     return true;
+}
+
+void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
+{
+    ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
+
+    if (bytes_read == 0) {
+        std::cerr << "Read failed: 0x" << std::hex << pos << std::endl;
+        memset(dst, 0x55, block_size);
+        return;
+    }
+
+    iv_table& iv = get_iv_table(fd, pos);
+    if (iv.iv1 == 0) {
+        std::cerr << "Block never written: 0x" << std::hex << pos << std::endl;
+        memset(dst, 0xAA, block_size);
+        return;
+    }
+
+    if (!check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac1)) {
+        if (iv.iv2 == 0) {
+            std::cerr << "First write interrupted: 0x" << std::hex << pos << std::endl;
+        }
+
+        if (check_hmac(m_rw_buffer.get(), bytes_read, iv.hmac2)) {
+            std::cerr << "Restore old IV: 0x" << std::hex << pos << std::endl;
+            memcpy(&iv.iv1, &iv.iv2, 32);
+        }
+        else {
+            std::cerr << "Checksum failed: 0x" << std::hex << pos << std::endl;
+        }
+    }
+    crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
 }
 
 void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept

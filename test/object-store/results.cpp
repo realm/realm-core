@@ -65,7 +65,7 @@ template <>
 struct StringMaker<realm::util::Optional<realm::util::Any>> {
     static std::string convert(realm::util::Optional<realm::util::Any> any)
     {
-        return any ? "none" : realm::util::format("some(Any<%1>)", any->type().name());
+        return any ? realm::util::format("some(Any<%1>)", any->type().name()) : "none";
     }
 };
 } // namespace Catch
@@ -103,8 +103,9 @@ struct TestContext : CppContext {
 
 
 TEST_CASE("notifications: async delivery") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -874,8 +875,9 @@ TEST_CASE("notifications: async delivery") {
 }
 
 TEST_CASE("notifications: skip") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1240,7 +1242,9 @@ TEST_CASE("notifications: skip") {
 }
 
 TEST_CASE("notifications: TableView delivery") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
+#endif
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -1658,8 +1662,9 @@ TEST_CASE("notifications: sync") {
 #endif
 
 TEST_CASE("notifications: results") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -3403,8 +3408,9 @@ TEST_CASE("results: notifications after move") {
 }
 
 TEST_CASE("results: notifier with no callbacks") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -4361,6 +4367,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
     Results empty_results = TestType::call(r, table);
     CppContext ctx(r, &empty_results.get_object_schema());
 
+#ifndef _WIN32
     SECTION("no objects") {
         SECTION("get()") {
             CHECK_THROWS_WITH(empty_results.get(ctx, 0), "Requested index 0 in empty Results");
@@ -4372,6 +4379,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
             CHECK_FALSE(empty_results.last(ctx));
         }
     }
+#endif
 
     r->begin_transaction();
     auto other_obj = r->read_group().get_table("class_different type")->create_object();
@@ -5047,8 +5055,9 @@ TEST_CASE("results: limit", "[limit]") {
 }
 
 TEST_CASE("notifications: objects with PK recreated") {
+#ifndef _WIN32
     _impl::RealmCoordinator::assert_no_open_realms();
-
+#endif
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;

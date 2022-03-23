@@ -46,7 +46,7 @@ int main(int argc, char const* argv[])
     realm::JSONOutputMode output_mode = realm::output_mode_json;
 
     abort_if(argc <= 1, legend);
-
+    std::string table_filter, query_filter;
     // Parse from 1'st argument until before source args
     for (int idx = 1; idx < argc - 1; ++idx) {
         realm::StringData arg(argv[idx]);
@@ -75,6 +75,14 @@ int main(int argc, char const* argv[])
                 }
             }
         }
+        else if (arg == "--filter") {
+            std::string filter_val = argv[++idx];
+            auto sep = filter_val.find(":");
+            abort_if(filter_val.size() < 3, "Expected filter of form 'class_Name:query'");
+            abort_if(sep == std::string::npos, "Expected filter of form 'class_Name:query'");
+            table_filter = filter_val.substr(0, sep);
+            query_filter = filter_val.substr(sep + 1);
+        }
         else {
             abort_if(true, "Received unknown option '%s' - please see description below\n\n%s", argv[idx], legend);
         }
@@ -88,6 +96,15 @@ int main(int argc, char const* argv[])
         realm::Group g(path);
         if (output_schema) {
             g.schema_to_json(std::cout, &renames);
+        }
+        else if (table_filter.size()) {
+            realm::TableRef target = g.get_table(table_filter);
+            abort_if(!target, "table not found: '%s'", table_filter.c_str());
+            realm::Query q = target->query(query_filter);
+            realm::TableView results = q.find_all();
+            std::cout << realm::util::format("filter '%1' found %2 results", query_filter, results.size())
+                      << std::endl;
+            results.to_json(std::cout, link_depth, renames, output_mode);
         }
         else {
             g.to_json(std::cout, link_depth, &renames, output_mode);

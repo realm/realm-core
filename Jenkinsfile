@@ -79,7 +79,8 @@ jobWrapper {
         stage('FormatCheck') {
             rlmNode('docker') {
                 getArchive()
-                docker.build('realm-core-clang:snapshot', '-f clang.Dockerfile .').inside() {
+
+                buildDockerEnv('testing.Dockerfile').inside {
                     echo "Checking code formatting"
                     modifications = sh(returnStdout: true, script: "git clang-format --diff ${targetSHA1}").trim()
                     try {
@@ -122,8 +123,9 @@ jobWrapper {
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
-            buildUWP_ARM_Debug      : doBuildWindows('Debug', true, 'ARM', false),
-            buildiosDebug           : doBuildAppleDevice('iphoneos', 'Debug'),
+            buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
+            buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
+            checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
@@ -155,7 +157,7 @@ jobWrapper {
 
             parallelExecutors = [
                 buildMacOsRelease   : doBuildMacOs(buildOptions + [buildType : "Release"]),
-                buildCatalystRelease: doBuildMacOsCatalyst('Release'),
+                buildCatalystRelease: doBuildApplePlatform('maccatalyst', 'Release'),
 
                 buildLinuxASAN      : doBuildLinuxClang("RelASAN"),
                 buildLinuxTSAN      : doBuildLinuxClang("RelTSAN")
@@ -175,7 +177,7 @@ jobWrapper {
                          'watchos', 'watchsimulator']
 
             for (sdk in appleSdks) {
-                parallelExecutors[sdk] = doBuildAppleDevice(sdk, 'Release')
+                parallelExecutors[sdk] = doBuildApplePlatform(sdk, 'Release')
             }
 
             linuxBuildTypes = ['Debug', 'Release', 'RelAssert']
@@ -184,7 +186,7 @@ jobWrapper {
             }
 
             windowsBuildTypes = ['Debug', 'Release']
-            windowsPlatforms = ['Win32', 'x64']
+            windowsPlatforms = ['Win32', 'x64', 'ARM64']
 
             for (buildType in windowsBuildTypes) {
                 for (platform in windowsPlatforms) {
@@ -203,11 +205,9 @@ jobWrapper {
                     unstash name: cocoaStash
                 }
                 sh 'tools/build-cocoa.sh -x'
-                archiveArtifacts('realm-*.tar.*')
-                stash includes: 'realm-*.tar.xz', name: "cocoa-xz"
-                stash includes: 'realm-*.tar.gz', name: "cocoa-gz"
-                publishingStashes << "cocoa-xz"
-                publishingStashes << "cocoa-gz"
+                archiveArtifacts('realm-*.tar.xz')
+                stash includes: 'realm-*.tar.xz', name: "cocoa"
+                publishingStashes << "cocoa"
             }
         }
         stage('Publish to S3') {
@@ -256,17 +256,17 @@ def doCheckInDocker(Map options = [:]) {
     return {
         rlmNode('docker') {
             getArchive()
-            def sourcesDir = pwd()
-            def buildEnv = docker.build 'realm-core-linux:21.04'
+
+            def buildEnv = buildDockerEnv('testing.Dockerfile')
+
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
 
             def buildSteps = { String dockerArgs = "" ->
-                withEnv(environment) {
-                    buildEnv.inside(dockerArgs) {
+                buildEnv.inside(dockerArgs) {
+                    withEnv(environment) {
                         try {
                             dir('build-dir') {
                                 sh "cmake ${cmakeDefinitions} -G Ninja .."
@@ -347,11 +347,13 @@ def doCheckSanity(Map options = [:]) {
     return {
         rlmNode('docker') {
             getArchive()
-            def buildEnv = docker.build('realm-core-linux:clang', '-f clang.Dockerfile .')
-            def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                buildEnv.inside(privileged) {
+
+            def environment = environment() + [
+              'CC=clang',
+              'CXX=clang++'
+            ]
+            buildDockerEnv('testing.Dockerfile').inside(privileged) {
+                withEnv(environment) {
                     try {
                         dir('build-dir') {
                             sh "cmake ${cmakeDefinitions} -G Ninja .."
@@ -378,12 +380,12 @@ def doBuildLinux(String buildType) {
         rlmNode('docker') {
             getSourceArchive()
 
-            docker.build('realm-core-generic:gcc-11', '-f generic.Dockerfile .').inside {
+            buildDockerEnv('packaging.Dockerfile').inside {
                 sh """
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   scl enable devtoolset-11 -- cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -403,18 +405,27 @@ def doBuildLinuxClang(String buildType) {
     return {
         rlmNode('docker') {
             getArchive()
-            docker.build('realm-core-linux:clang', '-f clang.Dockerfile .').inside() {
-                dir('build-dir') {
-                    sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
-                    runAndCollectWarnings(
-                        script: 'ninja',
-                        parser: "clang",
-                        name: "linux-clang-${buildType}",
-                        filters: warningFilters,
-                    )
-                    sh 'cpack -G TGZ'
+
+            def environment = environment() + [
+              'CC=clang',
+              'CXX=clang++'
+            ]
+
+            buildDockerEnv('testing.Dockerfile').inside {
+                withEnv(environment) {
+                    dir('build-dir') {
+                        sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
+                        runAndCollectWarnings(
+                            script: 'ninja',
+                            parser: "clang",
+                            name: "linux-clang-${buildType}",
+                            filters: warningFilters,
+                        )
+                        sh 'cpack -G TGZ'
+                    }
                 }
             }
+
             dir('build-dir') {
                 archiveArtifacts("*.tar.gz")
                 def stashName = "linux___${buildType}"
@@ -429,30 +440,30 @@ def doCheckValgrind() {
     return {
         rlmNode('docker') {
             getArchive()
-            def buildEnv = docker.build 'realm-core-linux:21.04'
+
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
-            withEnv(environment) {
-                buildEnv.inside {
-                    def workspace = pwd()
+            environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
+
+            buildDockerEnv('testing.Dockerfile').inside {
+                withEnv(environment) {
                     try {
-                        sh """
+                        sh '''
                            mkdir build-dir
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -D REALM_VALGRIND=ON -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D REALM_MAX_BPNODE_SIZE=1000 -G Ninja ..
-                        """
+                        '''
                         runAndCollectWarnings(
                             script: 'cd build-dir && ninja',
                             name: "linux-valgrind",
                             filters: warningFilters,
                         )
-                        sh """
+                        sh '''
                             cd build-dir/test
                             valgrind --version
-                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=${workspace}/test/valgrind.suppress --error-exitcode=1 ./realm-tests --no-error-exitcode
-                        """
+                            valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$WORKSPACE/test/valgrind.suppress --error-exitcode=1 ./realm-tests
+                        '''
                     } finally {
-                        recordTests("Linux-ValgrindDebug")
+                        recordTests('Linux-Valgrind')
                     }
                 }
             }
@@ -466,9 +477,10 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             getArchive()
             def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}".replaceAll('___', '-')
-            def buildEnv = buildDockerEnv('ci/realm-core:android', extra_args: '-f android.Dockerfile', push: env.BRANCH_NAME == 'master')
+
+            def buildEnv = buildDockerEnv('android.Dockerfile')
+
             def environment = environment()
-            environment << 'UNITTEST_PROGRESS=1'
             def cmakeArgs = ''
             if (test == TestAction.None) {
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
@@ -550,7 +562,11 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       CMAKE_BUILD_TYPE: buildType,
       REALM_ENABLE_SYNC: "ON",
       CPACK_SYSTEM_NAME: cpackSystemName,
-      CMAKE_TOOLCHAIN_FILE: "c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+      CMAKE_TOOLCHAIN_FILE: '%WORKSPACE%/tools/vcpkg/ports/scripts/buildsystems/vcpkg.cmake',
+      VCPKG_MANIFEST_DIR: '%WORKSPACE%/tools/vcpkg',
+      VCPKG_OVERLAY_TRIPLETS: '%WORKSPACE%/tools/vcpkg/triplets',
+      // set a custom buildtrees path because the default one is too long and msbuild tasks fail
+      VCPKG_INSTALL_OPTIONS: '--x-buildtrees-root=%WORKSPACE%/vcpkg-buildtrees',
       VCPKG_TARGET_TRIPLET: triplet,
     ]
 
@@ -559,15 +575,16 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
         CMAKE_SYSTEM_NAME: 'WindowsStore',
         CMAKE_SYSTEM_VERSION: '10.0',
       ]
-    } else {
-      cmakeOptions << [
-        CMAKE_SYSTEM_VERSION: '8.1',
-      ]
     }
+
     if (!runTests) {
       cmakeOptions << [
         REALM_NO_TESTS: '1',
       ]
+    } else {
+        cmakeOptions << [
+            VCPKG_MANIFEST_FEATURES: 'tests'
+        ]
     }
 
     def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
@@ -577,7 +594,11 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             getArchive()
 
             dir('build-dir') {
-                bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
+                withAWS(credentials: 'aws-credentials', region: 'eu-west-1') {
+                    withEnv(["VCPKG_BINARY_SOURCES=clear;x-aws,s3://vcpkg-binary-caches,readwrite"]) {
+                        bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
+                    }
+                }
                 withEnv(["_MSPDBSRV_ENDPOINT_=${UUID.randomUUID().toString()}"]) {
                     runAndCollectWarnings(
                         parser: 'msbuild',
@@ -596,13 +617,12 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 }
             }
             if (runTests && !isUWP) {
-                def environment = environment() << "TMP=${env.WORKSPACE}\\temp"
-                environment << 'UNITTEST_PROGRESS=1'
+                def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1' ]
                 withEnv(environment) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
-                          realm-tests.exe --no-error-exit-code
+                          realm-tests.exe
                           copy unit-test-report.xml ..\\core-results.xml
                           rmdir /Q /S %TMP%
                         '''
@@ -617,8 +637,19 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
-                          realm-sync-tests.exe --no-error-exit-code
+                          realm-sync-tests.exe
                           copy unit-test-report.xml ..\\sync-results.xml
+                          rmdir /Q /S %TMP%
+                        '''
+                    }
+                }
+
+                withEnv(environment) {
+                    dir("build-dir/test/object-store/${buildType}") {
+                        bat '''
+                          mkdir %TMP%
+                          realm-object-store-tests.exe
+                          copy unit-test-report.xml ..\\..\\object-store-results.xml
                           rmdir /Q /S %TMP%
                         '''
                     }
@@ -626,6 +657,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 def prefix = "Windows-${platform}-${buildType}";
                 recordTests("${prefix}-core", "core-results.xml")
                 recordTests("${prefix}-sync", "sync-results.xml")
+                recordTests("${prefix}-object-store", "object-store-results.xml")
             }
         }
     }
@@ -669,7 +701,7 @@ def buildPerformance() {
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
       // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      docker.build('realm-core-linux:21.04').inside {
+      buildDockerEnv('testing.Dockerfile').inside {
         withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
           rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
           sh 'unzip core-benchmarks.zip -d test/bench/'
@@ -696,48 +728,48 @@ def buildPerformance() {
 
 def doBuildMacOs(Map options = [:]) {
     def buildType = options.buildType;
-    def sdk = 'macosx'
 
     def cmakeOptions = [
-        CMAKE_BUILD_TYPE: options.buildType,
-        CMAKE_TOOLCHAIN_FILE: "../tools/cmake/macosx.toolchain.cmake",
+        CMAKE_TOOLCHAIN_FILE: '$WORKSPACE/tools/cmake/xcode.toolchain.cmake',
+        CMAKE_SYSTEM_NAME: 'Darwin',
+        CPACK_SYSTEM_NAME: 'macosx',
+        CMAKE_OSX_ARCHITECTURES: 'x86_64;arm64',
+        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',
         REALM_ENABLE_SYNC: options.enableSync,
+        REALM_VERSION: gitDescribeVersion
     ]
     if (!options.runTests) {
         cmakeOptions << [
-            REALM_NO_TESTS: "ON",
+            REALM_NO_TESTS: 'ON',
         ]
     }
     if (longRunningTests) {
         cmakeOptions << [
-            CMAKE_CXX_FLAGS: '"-DTEST_DURATION=1"',
+            CMAKE_CXX_FLAGS: '-DTEST_DURATION=1',
         ]
     }
 
-    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=$v" }.join(' ')
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=\"$v\"" }.join(' ')
 
     return {
         rlmNode('osx') {
             getArchive()
 
-            dir("build-macosx-${buildType}") {
+            dir('build-macosx') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
                     retry(3) {
                         timeout(time: 2, unit: 'MINUTES') {
-                            sh """
-                                rm -rf *
-                                cmake ${cmakeDefinitions} -D REALM_VERSION=${gitDescribeVersion} -G Ninja ..
-                            """
+                            sh "cmake ${cmakeDefinitions} -G Xcode .."
                         }
                     }
 
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: 'ninja package',
-                        name: "osx-clang-${buildType}",
+                        script: "cmake --build . --config ${buildType} --target package -- ONLY_ACTIVE_ARCH=NO",
+                        name: "xcode-macosx-${buildType}",
                         filters: warningFilters,
                     )
                 }
@@ -746,34 +778,34 @@ def doBuildMacOs(Map options = [:]) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
-                    name: "osx-clang-xcrun-swift-${buildType}",
+                    name: "swift-build-macosx-${buildType}",
                     filters: warningFilters,
                 )
                 sh 'xcrun swift run ObjectStoreTests'
             }
 
-            archiveArtifacts("build-macosx-${buildType}/*.tar.gz")
+            String tarball = "realm-${buildType}-${gitDescribeVersion}-macosx-*.tar.gz"
+            archiveArtifacts tarball
 
             def stashName = "macosx___${buildType}"
-            stash includes:"build-macosx-${buildType}/*.tar.gz", name:stashName
+            stash includes: tarball, name: stashName
             cocoaStashes << stashName
             publishingStashes << stashName
 
             if (options.runTests) {
                 try {
                     def environment = environment()
-                    environment << 'UNITTEST_PROGRESS=1'
                     environment << 'CTEST_OUTPUT_ON_FAILURE=1'
-                    dir("build-macosx-${buildType}") {
+                    dir('build-macosx') {
                         withEnv(environment) {
-                            sh "${ctest_cmd}"
+                            sh "${ctest_cmd} -C ${buildType}"
                         }
                     }
                 } finally {
                     // recordTests expects the test results xml file in a build-dir/test/ folder
                     sh """
                         mkdir -p build-dir/test
-                        cp build-macosx-${buildType}/test/unit-test-report.xml build-dir/test/
+                        cp build-macosx/test/${buildType}/unit-test-report.xml build-dir/test/
                     """
                     recordTests("macosx_${buildType}")
                 }
@@ -782,63 +814,60 @@ def doBuildMacOs(Map options = [:]) {
     }
 }
 
-def doBuildMacOsCatalyst(String buildType) {
+def doBuildApplePlatform(String platform, String buildType, boolean test = false) {
+    def cmakeOptions = [
+        CMAKE_TOOLCHAIN_FILE: '$WORKSPACE/tools/cmake/xcode.toolchain.cmake',
+        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',
+        REALM_VERSION: gitDescribeVersion,
+        REALM_BUILD_LIB_ONLY: 'ON'
+    ]
+    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=\"$v\"" }.join(' ')
+
+    String buildDestination = "generic/platform=${platform}"
+    if (platform == 'maccatalyst') {
+        buildDestination = 'generic/platform=macOS,variant=Mac Catalyst'
+    }
+
     return {
         rlmNode('osx') {
             getArchive()
 
-            dir("build-maccatalyst-${buildType}") {
+            dir('build-xcode-platforms') {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
-                    sh """
-                            rm -rf *
-                            cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/maccatalyst.toolchain.cmake \\
-                                  -D CMAKE_BUILD_TYPE=${buildType} \\
-                                  -D REALM_VERSION=${gitDescribeVersion} \\
-                                  -D REALM_SKIP_SHARED_LIB=ON \\
-                                  -D REALM_BUILD_LIB_ONLY=ON \\
-                                  -G Ninja ..
-                        """
+                    sh "cmake ${cmakeDefinitions} -G Xcode .."
                     runAndCollectWarnings(
                         parser: 'clang',
-                        script: 'ninja package',
-                        name: "osx-maccatalyst-${buildType}",
+                        script: """
+                            xcodebuild -scheme ALL_BUILD -configuration ${buildType} -destination "${buildDestination}"
+                        """,
+                        name: "xcode-${platform}-${buildType}",
                         filters: warningFilters,
                     )
-                }
-            }
+                    sh "PLATFORM_NAME=${platform} EFFECTIVE_PLATFORM_NAME=-${platform} cpack -C ${buildType}"
 
-            archiveArtifacts("build-maccatalyst-${buildType}/*.tar.gz")
-
-            def stashName = "maccatalyst__${buildType}"
-            stash includes:"build-maccatalyst-${buildType}/*.tar.gz", name:stashName
-            cocoaStashes << stashName
-            publishingStashes << stashName
-        }
-    }
-}
-
-def doBuildAppleDevice(String sdk, String buildType) {
-    return {
-        rlmNode('osx') {
-            getArchive()
-
-            withEnv(["DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/"]) {
-                retry(3) {
-                    timeout(time: 45, unit: 'MINUTES') {
-                        sh """
-                            rm -rf build-*
-                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                        """
+                    if (test) {
+                        if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
+                        sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
+                        def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
+                        withEnv(env) {
+                            runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.core.CoreTests', '$WORKSPACE/')
+                        }
+                        sh '''
+                            mkdir -p $WORKSPACE/build-dir/test
+                            cp $WORKSPACE/unit-test-report.xml $WORKSPACE/build-dir/test
+                        '''
                     }
                 }
             }
-            archiveArtifacts("build-${sdk}-${buildType}/*.tar.gz")
-            def stashName = "${sdk}___${buildType}"
-            stash includes:"build-${sdk}-${buildType}/*.tar.gz", name:stashName
+            if (test) recordTests("${platform}_${buildType}")
+
+            String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
+            archiveArtifacts tarball
+
+            def stashName = "${platform}__${buildType}"
+            stash includes: tarball, name: stashName
             cocoaStashes << stashName
-            if(gitTag) {
-                publishingStashes << stashName
-            }
+            publishingStashes << stashName
         }
     }
 }
@@ -847,28 +876,26 @@ def doBuildCoverage() {
   return {
     rlmNode('docker') {
       getArchive()
-      docker.build('realm-core-linux:21.04').inside {
-        def workspace = pwd()
-        sh """
+
+      buildDockerEnv('testing.Dockerfile').inside {
+        sh '''
           mkdir build
           cd build
           cmake -G Ninja -D REALM_COVERAGE=ON ..
           ninja
           cd ..
-          lcov --no-external --capture --initial --directory . --output-file ${workspace}/coverage-base.info
+          lcov --no-external --capture --initial --directory . --output-file $WORKSPACE/coverage-base.info
           cd build/test
           ulimit -c unlimited
           UNITTEST_PROGRESS=1 ./realm-tests
           cd ../..
-          lcov --no-external --directory . --capture --output-file ${workspace}/coverage-test.info
-          lcov --add-tracefile ${workspace}/coverage-base.info --add-tracefile coverage-test.info --output-file ${workspace}/coverage-total.info
-          lcov --remove ${workspace}/coverage-total.info '/usr/*' '${workspace}/test/*' --output-file ${workspace}/coverage-filtered.info
+          lcov --no-external --directory . --capture --output-file $WORKSPACE/coverage-test.info
+          lcov --add-tracefile $WORKSPACE/coverage-base.info --add-tracefile coverage-test.info --output-file $WORKSPACE/coverage-total.info
+          lcov --remove $WORKSPACE/coverage-total.info '/usr/*' '$WORKSPACE/test/*' --output-file $WORKSPACE/coverage-filtered.info
           rm coverage-base.info coverage-test.info coverage-total.info
-        """
+        '''
         withCredentials([[$class: 'StringBinding', credentialsId: 'codecov-token-core', variable: 'CODECOV_TOKEN']]) {
-          sh '''
-            curl -s https://codecov.io/bash | bash
-          '''
+          sh 'curl -s https://codecov.io/bash | bash'
         }
       }
     }
@@ -888,8 +915,9 @@ def recordTests(tag, String reportName = "unit-test-report.xml") {
 def environment() {
     return [
         "UNITTEST_SHUFFLE=1",
-        "UNITTEST_XML=1"
-        ]
+        "UNITTEST_XML=1",
+        "UNITTEST_PROGRESS=1"
+    ]
 }
 
 def readGitTag() {
@@ -908,6 +936,16 @@ def setBuildName(newBuildName) {
 def getArchive() {
     deleteDir()
     unstash 'core-source'
+
+    // If the current node's clock is behind the clock of the node that stashed the sources originally
+    // the CMake generated files will always be out-of-date compared to the source files,
+    // which can lead Ninja into a loop.
+    // Touching all source files to reset their timestamp relative to the current node works around that.
+    if (isUnix()) {
+        sh 'find . -type f -exec touch {} +'
+    } else {
+        powershell 'Get-ChildItem . * -recurse | ForEach-Object{$_.LastWriteTime = get-date}'
+    }
 }
 
 def getSourceArchive() {
@@ -922,6 +960,14 @@ def getSourceArchive() {
           userRemoteConfigs: scm.userRemoteConfigs
         ]
     )
+}
+
+def buildDockerEnv(String dockerfile = 'Dockerfile', String extraArgs = '') {
+    def buildEnv
+    docker.withRegistry('https://ghcr.io', 'github-packages-token') {
+        buildEnv = docker.build("ci/realm-core:${dockerfile}", ". -f ${dockerfile} ${extraArgs}")
+    }
+    return buildEnv
 }
 
 enum TestAction {

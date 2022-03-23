@@ -222,6 +222,7 @@ set(REALM_INSTALL_HEADERS
     util/encrypted_file_mapping.hpp
     util/errno.hpp
     util/features.h
+    util/flat_map.hpp
     util/fifo_helper.hpp
     util/file.hpp
     util/file_mapper.hpp

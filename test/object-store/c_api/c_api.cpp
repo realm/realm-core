@@ -392,7 +392,8 @@ TEST_CASE("C API (non-database)") {
             check_mode(RLM_SCHEMA_MODE_AUTOMATIC);
             check_mode(RLM_SCHEMA_MODE_IMMUTABLE);
             check_mode(RLM_SCHEMA_MODE_READ_ONLY);
-            check_mode(RLM_SCHEMA_MODE_RESET_FILE);
+            check_mode(RLM_SCHEMA_MODE_SOFT_RESET_FILE);
+            check_mode(RLM_SCHEMA_MODE_HARD_RESET_FILE);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_EXPLICIT);
             check_mode(RLM_SCHEMA_MODE_ADDITIVE_DISCOVERED);
             check_mode(RLM_SCHEMA_MODE_MANUAL);
@@ -617,14 +618,14 @@ static CPtr<realm_schema_t> make_schema()
         {
             "Bar",
             "int", // primary key
-            2,     // properties
+            3,     // properties
             1,     // computed properties,
             RLM_INVALID_CLASS_KEY,
             RLM_CLASS_NORMAL,
         },
     };
 
-    const realm_property_info_t bar_properties[3] = {
+    const realm_property_info_t bar_properties[4] = {
         {
             "int",
             "",
@@ -644,6 +645,16 @@ static CPtr<realm_schema_t> make_schema()
             "",
             RLM_INVALID_PROPERTY_KEY,
             RLM_PROPERTY_NORMAL | RLM_PROPERTY_NULLABLE,
+        },
+        {
+            "doubles",
+            "",
+            RLM_PROPERTY_TYPE_DOUBLE,
+            RLM_COLLECTION_TYPE_NONE,
+            "",
+            "",
+            RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NORMAL,
         },
         {
             "linking_objects",
@@ -815,6 +826,16 @@ TEST_CASE("C API") {
 
     CHECK(realm_get_num_classes(realm) == 2);
 
+    SECTION("cached realm") {
+        auto config2 = make_config(test_file.path.c_str(), false);
+        realm_config_set_cached(config2.get(), true);
+        REQUIRE(realm_config_get_cached(config2.get()));
+        auto realm2 = cptr(realm_open(config2.get()));
+        CHECK(!realm_equals(realm, realm2.get()));
+        auto realm3 = cptr(realm_open(config2.get()));
+        REQUIRE(realm_equals(realm3.get(), realm2.get()));
+    }
+
     SECTION("native ptr conversion") {
         realm::SharedRealm native;
         _realm_get_native_ptr(realm, &native, sizeof(native));
@@ -827,12 +848,12 @@ TEST_CASE("C API") {
 
     SECTION("realm changed notification") {
         bool realm_changed_callback_called = false;
-        realm_add_realm_changed_callback(
+        auto token = cptr(realm_add_realm_changed_callback(
             realm,
             [](void* userdata) {
                 *reinterpret_cast<bool*>(userdata) = true;
             },
-            &realm_changed_callback_called, [](void*) {});
+            &realm_changed_callback_called, [](void*) {}));
 
         realm_begin_write(realm);
         realm_commit(realm);
@@ -885,7 +906,7 @@ TEST_CASE("C API") {
             realm_schema_t* expected_schema;
             bool result;
         } context = {new_schema, false};
-        realm_add_schema_changed_callback(
+        auto token = realm_add_schema_changed_callback(
             realm,
             [](void* userdata, auto* new_schema) {
                 auto& ctx = *reinterpret_cast<Context*>(userdata);
@@ -913,6 +934,7 @@ TEST_CASE("C API") {
         }
         free(properties);
         realm_release(new_schema);
+        realm_release(token);
     }
 
     SECTION("schema validates") {
@@ -977,6 +999,10 @@ TEST_CASE("C API") {
         REQUIRE(found);
         bar_properties["strings"] = info.key;
 
+        REQUIRE(checked(realm_find_property(realm, class_bar.key, "doubles", &found, &info)));
+        REQUIRE(found);
+        bar_properties["doubles"] = info.key;
+
         REQUIRE(checked(realm_find_property(realm, class_bar.key, "linking_objects", &found, &info)));
         REQUIRE(found);
         bar_properties["linking_objects"] = info.key;
@@ -987,6 +1013,7 @@ TEST_CASE("C API") {
     realm_property_key_t foo_links_key = foo_properties["link_list"];
     realm_property_key_t bar_int_key = bar_properties["int"];
     realm_property_key_t bar_strings_key = bar_properties["strings"];
+    realm_property_key_t bar_doubles_key = bar_properties["doubles"];
 
     SECTION("realm_freeze()") {
         auto realm2 = cptr_checked(realm_freeze(realm));
@@ -1058,7 +1085,7 @@ TEST_CASE("C API") {
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 3, &num_found)));
         CHECK(num_found == 3);
-        CHECK(properties[2] == bar_properties["linking_objects"]);
+        CHECK(properties[2] == bar_properties["doubles"]);
 
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 1, &num_found)));
@@ -1075,7 +1102,7 @@ TEST_CASE("C API") {
         CHECK(num_found == class_foo.num_properties + class_foo.num_computed_properties);
 
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, ps.data(), ps.size(), &num_found)));
-        CHECK(num_found == 3);
+        CHECK(num_found == 4);
     }
 
     SECTION("realm_get_property()") {
@@ -1642,6 +1669,18 @@ TEST_CASE("C API") {
                     }
                 }
 
+                SECTION("empty result") {
+                    auto q2 =
+                        cptr_checked(realm_query_parse(realm, class_foo.key, "string == 'boogeyman'", 0, nullptr));
+                    auto r2 = cptr_checked(realm_query_find_all(q2.get()));
+                    size_t count;
+                    CHECK(checked(realm_results_count(r2.get(), &count)));
+                    CHECK(count == 0);
+                    realm_value_t value = rlm_null();
+                    CHECK(!realm_results_get(r2.get(), 0, &value));
+                    CHECK_ERR(RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                }
+
                 SECTION("realm_results_get()") {
                     realm_value_t value = rlm_null();
                     CHECK(checked(realm_results_get(r.get(), 0, &value)));
@@ -2156,6 +2195,7 @@ TEST_CASE("C API") {
                     CPtr<realm_collection_changes_t> changes;
                     CPtr<realm_async_error_t> error;
                     bool destroyed = false;
+                    bool called = false;
                 };
 
                 State state;
@@ -2163,6 +2203,7 @@ TEST_CASE("C API") {
                 auto on_change = [](void* userdata, const realm_collection_changes_t* changes) {
                     auto* state = static_cast<State*>(userdata);
                     state->changes = clone_cptr(changes);
+                    state->called = true;
                 };
 
                 auto on_error = [](void* userdata, const realm_async_error_t* err) {
@@ -2177,8 +2218,8 @@ TEST_CASE("C API") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_list_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                   on_change, on_error, nullptr));
+                    auto token = cptr_checked(realm_list_add_notification_callback(
+                        strings.get(), &state, nullptr, nullptr, on_change, on_error, nullptr));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2189,7 +2230,7 @@ TEST_CASE("C API") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -2219,6 +2260,40 @@ TEST_CASE("C API") {
                                                         0, nullptr, 0, nullptr, 0);
                     CHECK(insertion_range.from == 0);
                     CHECK(insertion_range.to == 3);
+                }
+
+                SECTION("modifying target of list with a filter") {
+                    auto bars = cptr_checked(realm_get_list(obj1.get(), foo_links_key));
+                    write([&]() {
+                        auto bar_link = realm_object_as_link(obj2.get());
+                        realm_value_t bar_link_val;
+                        bar_link_val.type = RLM_TYPE_LINK;
+                        bar_link_val.link = bar_link;
+                        CHECK(checked(realm_list_insert(bars.get(), 0, bar_link_val)));
+                    });
+
+                    realm_key_path_elem_t bar_strings[] = {{class_bar.key, bar_doubles_key}};
+                    realm_key_path_t key_path_bar_strings[] = {{1, bar_strings}};
+                    realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
+                    auto token = cptr_checked(realm_list_add_notification_callback(
+                        bars.get(), &state, nullptr, &key_path_array, on_change, on_error, nullptr));
+                    checked(realm_refresh(realm));
+
+                    state.called = false;
+                    write([&]() {
+                        checked(realm_set_value(obj2.get(), bar_doubles_key, rlm_double_val(5.0), false));
+                    });
+                    REQUIRE(state.called);
+                    CHECK(!state.error);
+                    CHECK(state.changes);
+
+                    state.called = false;
+                    write([&]() {
+                        checked(realm_list_insert(strings.get(), 0, str1));
+                        checked(realm_list_insert(strings.get(), 1, str2));
+                        checked(realm_list_insert(strings.get(), 2, null));
+                    });
+                    REQUIRE(!state.called);
                 }
 
                 SECTION("insertion, deletion, modification, modification after") {
@@ -2651,8 +2726,8 @@ TEST_CASE("C API") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_set_add_notification_callback(strings.get(), &state, nullptr,
-                                                                                  on_change, on_error, nullptr));
+                    auto token = cptr_checked(realm_set_add_notification_callback(
+                        strings.get(), &state, nullptr, nullptr, on_change, on_error, nullptr));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2663,7 +2738,7 @@ TEST_CASE("C API") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3174,7 +3249,7 @@ TEST_CASE("C API") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, on_change, on_error, nullptr));
+                        strings.get(), &state, nullptr, nullptr, on_change, on_error, nullptr));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3185,7 +3260,7 @@ TEST_CASE("C API") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3228,6 +3303,7 @@ TEST_CASE("C API") {
             struct State {
                 CPtr<realm_object_changes_t> changes;
                 CPtr<realm_async_error_t> error;
+                bool called;
             };
 
             State state;
@@ -3235,6 +3311,7 @@ TEST_CASE("C API") {
             auto on_change = [](void* userdata, const realm_object_changes_t* changes) {
                 auto state = static_cast<State*>(userdata);
                 state->changes = clone_cptr(changes);
+                state->called = true;
             };
 
             auto on_error = [](void* userdata, const realm_async_error_t* err) {
@@ -3243,8 +3320,8 @@ TEST_CASE("C API") {
             };
 
             auto require_change = [&]() {
-                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, on_change,
-                                                                         on_error, nullptr));
+                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr,
+                                                                         on_change, on_error, nullptr));
                 checked(realm_refresh(realm));
                 return token;
             };
@@ -3283,6 +3360,32 @@ TEST_CASE("C API") {
 
                 n = realm_object_changes_get_modified_properties(state.changes.get(), modified_keys, 0);
                 CHECK(n == 0);
+            }
+            SECTION("modifying the object while observing a specific value") {
+                realm_key_path_elem_t origin_value[] = {{class_foo.key, foo_int_key}};
+                realm_key_path_t key_path_origin_value[] = {{1, origin_value}};
+                realm_key_path_array_t key_path_array = {1, key_path_origin_value};
+                auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array,
+                                                                         on_change, on_error, nullptr));
+                checked(realm_refresh(realm));
+                state.called = false;
+                write([&]() {
+                    checked(realm_set_value(obj1.get(), foo_int_key, rlm_int_val(999), false));
+                });
+                REQUIRE(state.called);
+                CHECK(!state.error);
+                CHECK(state.changes);
+                realm_property_key_t modified_keys[2];
+                size_t n = realm_object_changes_get_modified_properties(state.changes.get(), modified_keys, 2);
+                CHECK(n == 1);
+                CHECK(modified_keys[0] == foo_int_key);
+
+                state.called = false;
+                write([&]() {
+                    // checked(realm_set_value(obj1.get(), foo_int_key, rlm_int_val(999), false));
+                    checked(realm_set_value(obj1.get(), foo_str_key, rlm_str_val("aaa"), false));
+                });
+                REQUIRE(!state.called);
             }
         }
     }

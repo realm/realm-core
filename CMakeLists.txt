@@ -126,11 +126,20 @@ set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_definitions(
-        /DWIN32_LEAN_AND_MEAN
-        /DUNICODE
-        /D_UNICODE
+    add_compile_definitions(
+        WIN32_LEAN_AND_MEAN # include minimal Windows.h for faster builds
+        UNICODE # prefer Unicode variants of Windows APIs over ANSI variants
+        _UNICODE # prefer Unicode variants of C runtime APIs over ANSI variants
     )
+    if(NOT WINDOWS_STORE)
+        # for regular Windows target Windows 8.1 as the minimum version
+        # see https://docs.microsoft.com/en-us/windows/win32/WinProg/using-the-windows-headers
+        add_compile_definitions(
+            _WIN32_WINNT=0x0603
+            WINVER=0x603
+            NTDDI_VERSION=0x06030000
+        )
+    endif()
 endif()
 
 if(MSVC)
@@ -194,60 +203,72 @@ option(REALM_METRICS "Enable various metric tracking" ON)
 option(REALM_INCLUDE_CERTS "Include a list of trust certificates in the build for SSL certificate verification" ${REALM_INCLUDE_CERTS_DEFAULT})
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
-if(APPLE AND NOT REALM_FORCE_OPENSSL)
-    set(REALM_HAVE_SECURE_TRANSPORT "1")
-endif()
-
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 find_package(BISON 3.8.2 EXACT)
 find_package(FLEX 2.6.4 EXACT)
 
-set(REALM_NEEDS_OPENSSL ${REALM_FORCE_OPENSSL})
-if(UNIX AND NOT APPLE)
-    set(REALM_NEEDS_OPENSSL ON)
-elseif(REALM_ENABLE_SYNC AND CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    set(REALM_NEEDS_OPENSSL ON)
-    set(REALM_USE_SYSTEM_OPENSSL ON)
+if(REALM_ENABLE_SYNC)
+    option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
+    if(CMAKE_SYSTEM_NAME MATCHES "^Windows|Linux|Android")
+        set(REALM_NEEDS_OPENSSL TRUE)
+    endif()
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
+    set(REALM_NEEDS_OPENSSL TRUE)
 endif()
-if(REALM_NEEDS_OPENSSL)
-    if(REALM_USE_SYSTEM_OPENSSL)
-        # Use system OpenSSL
-        find_package(OpenSSL REQUIRED)
-    else()
-        # Use our OpenSSL
-        if(NOT OpenSSL_DIR)
-            if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
-                if(ANDROID)
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tar.gz")
-                else()
-                    set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tar.gz")
-                endif()
 
-                message(STATUS "Getting ${OPENSSL_URL}...")
-                file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tar.gz" STATUS download_status)
-
-                list(GET download_status 0 status_code)
-                if (NOT "${status_code}" STREQUAL "0")
-                    message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
-                endif()
-
-                message(STATUS "Uncompressing OpenSSL...")
-                execute_process(
-                    COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tar.gz"
-                    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
-                )
-            endif()
-
-            set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+if(REALM_NEEDS_OPENSSL OR REALM_FORCE_OPENSSL)
+    set(OPENSSL_USE_STATIC_LIBS ON)
+    if(VCPKG_TOOLCHAIN)
+        # If we're building with vcpkg, prefer to find OpenSSL there first
+        find_package(OpenSSL)
+    endif()
+    # We aren't building with vcpkg, or it didn't have OpenSSL
+    if(NOT OpenSSL_FOUND)
+        if(ANDROID OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64"))
+            # We have prebuilt OpenSSL tarballs for Android and Linux x86_64
+            set(_realm_have_prebuilt_openssl ON)
         endif()
-        find_package(OpenSSL REQUIRED CONFIG)
-        target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
+        if(NOT REALM_USE_SYSTEM_OPENSSL AND _realm_have_prebuilt_openssl)
+            # Use our own prebuilt OpenSSL
+            if(NOT OpenSSL_DIR)
+                if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
+                    if(ANDROID)
+                        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${CMAKE_ANDROID_ARCH_ABI}/openssl.tar.gz")
+                    else()
+                        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Linux/x86_64/openssl.tar.gz")
+                    endif()
+
+                    message(STATUS "Getting ${OPENSSL_URL}...")
+                    file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_CURRENT_BINARY_DIR}/openssl/openssl.tar.gz" STATUS download_status)
+
+                    list(GET download_status 0 status_code)
+                    if (NOT "${status_code}" STREQUAL "0")
+                        message(FATAL_ERROR "Downloading ${url}... Failed. Status: ${download_status}")
+                    endif()
+
+                    message(STATUS "Uncompressing OpenSSL...")
+                    execute_process(
+                        COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tar.gz"
+                        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/openssl"
+                    )
+                endif()
+
+                set(OpenSSL_DIR "${CMAKE_CURRENT_BINARY_DIR}/openssl/lib/cmake/OpenSSL")
+            endif()
+            find_package(OpenSSL REQUIRED CONFIG)
+            target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
+        else()
+            # Use whatever OpenSSL CMake finds on the system
+            find_package(OpenSSL REQUIRED)
+        endif()
     endif()
 
     set(REALM_HAVE_OPENSSL ON)
     string(REGEX MATCH "^([0-9]+)\\.([0-9]+)" OPENSSL_VERSION_MAJOR_MINOR ${OPENSSL_VERSION})
+elseif(APPLE)
+    set(REALM_HAVE_SECURE_TRANSPORT "1")
 endif()
 
 # Use Zlib for Sync, but allow integrators to override it
@@ -295,21 +316,24 @@ if (REALM_BUILD_DOGLESS)
     add_subdirectory(src/dogless)
 endif()
 
-# Enable CTest and include unit tests
-if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
-    enable_testing()
-    add_subdirectory(test)
-    if (REALM_BUILD_TEST_CLIENT)
-        add_subdirectory(test/client)
-    endif()
-endif()
-
 # Install the licence and changelog files
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
-# Only prepare install/package targets if we're not a submodule
+# Only prepare test/install/package targets if we're not a submodule
 if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
     return()
+endif()
+
+# Enable CTest and include unit tests
+enable_testing()
+
+if(REALM_BUILD_LIB_ONLY OR REALM_NO_TESTS)
+    set(REALM_EXCLUDE_TESTS EXCLUDE_FROM_ALL)
+endif()
+add_subdirectory(test ${REALM_EXCLUDE_TESTS})
+
+if (REALM_BUILD_TEST_CLIENT)
+    add_subdirectory(test/client)
 endif()
 
 # Make the project importable from the build directory
@@ -341,9 +365,22 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/RealmConfig.cmake
 
 # CPack
 set(CPACK_GENERATOR "TGZ")
-set(CPACK_PACKAGE_NAME "realm-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+
+# Generators that don't support build-time configuration selection.
+# Others like Xcode and Visual Studio can determine the package name
+# based on the build configuration at build-time.
+set(_single_config_generators
+    Ninja
+    "Unix Makefiles"
+)
+if(CMAKE_GENERATOR IN_LIST _single_config_generators)
+    set(CPACK_PACKAGE_NAME "realm-${CMAKE_BUILD_TYPE}")
+else()
+    set(CPACK_PACKAGE_NAME "realm-\${CPACK_BUILD_CONFIG}")
+endif()
+
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)
 cpack_add_component(devel DEPENDS devel)

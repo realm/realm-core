@@ -6,7 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Fixed a potential crash if a sync session is stopped in the middle of a `DiscardLocal` client reset. ([#5295](https://github.com/realm/realm-core/issues/5295), since v11.5.0) 
+* Opening an encrypted Realm while the keychain is locked on macOS would crash ([Swift #7438](https://github.com/realm/realm-swift/issues/7438)).
  
 ### Breaking changes
 * None.
@@ -17,7 +18,52 @@
 -----------
 
 ### Internals
-* None.
+* Catch2 was updated to 2.13.8. ([#5327](https://github.com/realm/realm-core/pull/5327))
+* Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
+
+----------------------------------------------
+
+# 11.12.0 Release notes
+
+### Enhancements
+* Support for new SchemaMode::HardResetFile added. ([#4782](https://github.com/realm/realm-core/issues/4782))
+* Support for keypaths in change notifications added to C-API ([#5216](https://github.com/realm/realm-core/issues/5216))
+* Release of callback functions done through realm_release() ([#5217](https://github.com/realm/realm-core/issues/5217))
+
+### Fixed
+* Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
+* Application would sometimes crash with exceptions like 'KeyNotFound' or assertion "has_refs()". Other issues indicating file corruption may also be fixed by this. The one mentioned here is the one that lead to solving the problem. ([#5283](https://github.com/realm/realm-core/issues/5283), since v6.0.0)
+* Refreshing the user profile after the app has been destroyed leads to assertion failure ([#5238](https://github.com/realm/realm-core/issues/5238))
+ 
+### Breaking changes
+* SchemaMode::ResetFile renamed to SchemaMode::SoftResetFile.
+* Token type changed for registration of callback functions for changes on Realm and Schema. The functions are unregistered be releasing the token through 'realm_release()'.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The previous release broke the `REALM_ENABLE_SYNC` CMake option on Windows in that OpenSSL was always a required dependency, regardless of whether Sync was enabled or not. This has been fixed.
+
+----------------------------------------------
+
+# 11.11.0 Release notes
+
+### Enhancements
+* Added support for configuring caching of Realms in C-API. ([#5275](https://github.com/realm/realm-core/issues/5275))
+
+### Fixed
+* The Swift package set the linker flags on the wrong target, resulting in linker errors when SPM decides to build the core library as a dynamic library ([Swift #7266](https://github.com/realm/realm-swift/issues/7266)).
+* Wrong error code returned from C-API on MacOS ([#5233](https://github.com/realm/realm-core/issues/5233), since v10.0.0)
+* Mixed::compare() used inconsistent rounding for comparing a Decimal128 to a float, giving different results from comparing those values directly ([#5270](https://github.com/realm/realm-core/pull/5270)).
+* Calling Realm::async_begin_transaction() from within a write transaction while the async state was idle would hit an assertion failure (since v11.10.0).
+* Fix issue with scheduler being deleted on wrong thread. This caused async open to hang in eg. realm-js. ([#5287](https://github.com/realm/realm-core/pull/5287), Since v11.10.0)
+* Waiting for upload after opening a bundled realm file could hang. ([#5277](https://github.com/realm/realm-core/issues/5277), since v11.5.0)
+ 
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 
@@ -52,6 +98,7 @@
 * Fix an error when compiling a watchOS Simulator target not supporting Thread-local storage ([#7623](https://github.com/realm/realm-swift/issues/7623), since v11.7.0)
 * Check, when opening a realm, that in-memory realms are not encrypted ([#5195](https://github.com/realm/realm-core/issues/5195))
 * Changed parsed queries using the `between` operator to be inclusive of the limits, a closed interval instead of an open interval. This is to conform to the published documentation and for parity with NSPredicate's definition. ([#5262](https://github.com/realm/realm-core/issues/5262), since the introduction of this operator in v11.3.0)
+* Using a SubscriptionSet after closing the realm could result in a use-after-free violation ([#5208](https://github.com/realm/realm-core/issues/5208), since v11.6.1)
  
 ### Breaking changes
 * Renamed SubscriptionSet::State::Superceded -> Superseded to correct typo.
@@ -70,6 +117,7 @@
 * Many functions which previously took `std::function` parameters now take `util::UniqueFunction` parameters. This generally should not require SDK-side changes, but there may be opportunities for binary-size improvements by propagating this change outward in the SDK code.
 * realm_results_snapshot actually implemented. ([#5154](https://github.com/realm/realm-core/issues/5154))
 * Updated apply_to_state_command tool to support query based sync download messages. ([#5226](https://github.com/realm/realm-core/pull/5226))
+* Fixed an issue that made it necessary to always compile with the Windows 8.1 SDK to produce binaries able to run on Windows 8.1. ([#5247](https://github.com/realm/realm-core/pull/5247))
 
 ----------------------------------------------
 

@@ -211,6 +211,13 @@ TEST(Mixed_Compare)
     CHECK(Mixed(0 - int64_t(0x1234567812345678)) > Mixed(-1.e19));  // double more negative than most negative int
     CHECK(Mixed(nan("123")) < 5);
 
+    CHECK_EQUAL(Mixed(double(2.2f)), Mixed(2.2f));
+    CHECK_EQUAL(Mixed(2.2f), Mixed(double(2.2f)));
+    CHECK_EQUAL(Mixed(Decimal128(2.2)), Mixed(2.2));
+    CHECK_EQUAL(Mixed(Decimal128(2.2f)), Mixed(2.2f));
+    CHECK_EQUAL(Mixed(2.2), Mixed(Decimal128(2.2)));
+    CHECK_EQUAL(Mixed(2.2f), Mixed(Decimal128(2.2f)));
+
     std::string str("Hello");
     CHECK(Mixed(str) == Mixed(BinaryData(str)));
     CHECK_NOT(Mixed::types_are_comparable(Mixed(), Mixed()));
@@ -224,6 +231,24 @@ TEST(Mixed_Compare)
     CHECK(Mixed("a") < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Decimal128("25")) < Mixed(Timestamp(1, 2)));
     CHECK(Mixed(Timestamp(2, 3)) < Mixed(ObjectId(Timestamp(1, 2), 0, 0))); // Not value comparable
+}
+
+// This test takes ~10 minutes in a Release build so it's disabled by default
+TEST_IF(Mixed_Compare_Float_Decimal128, false)
+{
+    static_assert(sizeof(float) == sizeof(uint32_t));
+    // Test every non-NaN, non-Inf float by iterating over every possible bit pattern
+    for (uint64_t i = 0; i <= std::numeric_limits<uint32_t>::max(); ++i) {
+        auto j = static_cast<uint32_t>(i);
+        float f;
+        memcpy(&f, &j, sizeof(j));
+        if (!std::isfinite(f))
+            continue;
+        Mixed m1{f};
+        Mixed m2{Decimal128(f)};
+        CHECK_EQUAL(m1, m2);
+        CHECK_EQUAL(m2, m1);
+    }
 }
 
 #endif // TEST_ARRAY_VARIANT

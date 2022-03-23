@@ -26,9 +26,7 @@
 #include <realm/util/serializer.hpp>
 
 namespace realm {
-
-namespace _impl {
-
+namespace {
 static const int sorting_rank[19] = {
     // Observe! Changing these values breaks the file format for Set<Mixed>
 
@@ -55,14 +53,14 @@ static const int sorting_rank[19] = {
     // Observe! Changing these values breaks the file format for Set<Mixed>
 };
 
-inline int compare_string(StringData a, StringData b)
+int compare_string(StringData a, StringData b)
 {
     if (a == b)
         return 0;
     return utf8_compare(a, b) ? -1 : 1;
 }
 
-inline int compare_binary(BinaryData a, BinaryData b)
+int compare_binary(BinaryData a, BinaryData b)
 {
     size_t asz = a.size();
     size_t bsz = b.size();
@@ -97,7 +95,7 @@ struct IntTypeForSize<8> {
 };
 
 template <typename Float>
-inline int compare_float(Float a_raw, Float b_raw)
+int compare_float(Float a_raw, Float b_raw)
 {
     bool a_nan = std::isnan(a_raw);
     bool b_nan = std::isnan(b_raw);
@@ -107,7 +105,7 @@ inline int compare_float(Float a_raw, Float b_raw)
     }
     if (a_nan && b_nan) {
         // Compare the nan values as unsigned
-        using IntType = typename _impl::IntTypeForSize<sizeof(Float)>::type;
+        using IntType = typename IntTypeForSize<sizeof(Float)>::type;
         IntType a = 0, b = 0;
         memcpy(&a, &a_raw, sizeof(Float));
         memcpy(&b, &b_raw, sizeof(Float));
@@ -119,19 +117,9 @@ inline int compare_float(Float a_raw, Float b_raw)
 }
 
 template <typename T>
-inline int compare_generic(T lhs, T rhs)
+int compare_generic(T lhs, T rhs)
 {
     return lhs == rhs ? 0 : lhs < rhs ? -1 : 1;
-}
-
-inline int compare_decimals(Decimal128 lhs, Decimal128 rhs)
-{
-    return lhs.compare(rhs);
-}
-
-inline int compare_decimal_to_double(Decimal128 lhs, double rhs)
-{
-    return lhs.compare(Decimal128(rhs));
 }
 
 // This is the tricky one. Needs to support the following cases:
@@ -140,7 +128,7 @@ inline int compare_decimal_to_double(Decimal128 lhs, double rhs)
 // * Doubles outside of the range of Longs (including +/- Inf).
 // * NaN (defined by us as less than all Longs)
 // * Return value is always -1, 0, or 1 to ensure it is safe to negate.
-inline int compare_long_to_double(int64_t lhs, double rhs)
+int compare_long_to_double(int64_t lhs, double rhs)
 {
     // All Longs are > NaN
     if (std::isnan(rhs))
@@ -165,7 +153,7 @@ inline int compare_long_to_double(int64_t lhs, double rhs)
     // truncation of the fractional component since low-magnitude lhs were handled above.
     return compare_generic(lhs, int64_t(rhs));
 }
-} // namespace _impl
+} // anonymous namespace
 
 Mixed::Mixed(const Obj& obj) noexcept
     : Mixed(ObjLink(obj.get_table()->get_key(), obj.get_key()))
@@ -249,42 +237,42 @@ int Mixed::compare(const Mixed& b) const
     switch (type) {
         case type_Bool: {
             if (b.get_type() == type_Bool) {
-                return _impl::compare_generic(bool_val, b.bool_val);
+                return compare_generic(bool_val, b.bool_val);
             }
             break;
         }
         case type_Int:
             switch (b.get_type()) {
                 case type_Int:
-                    return _impl::compare_generic(int_val, b.int_val);
+                    return compare_generic(int_val, b.int_val);
                 case type_Float:
-                    return _impl::compare_long_to_double(int_val, b.float_val);
+                    return compare_long_to_double(int_val, b.float_val);
                 case type_Double:
-                    return _impl::compare_long_to_double(int_val, b.double_val);
+                    return compare_long_to_double(int_val, b.double_val);
                 case type_Decimal:
-                    return _impl::compare_decimals(Decimal128(int_val), b.decimal_val);
+                    return Decimal128(int_val).compare(b.decimal_val);
                 default:
                     break;
             }
             break;
         case type_String:
             if (b.get_type() == type_String)
-                return _impl::compare_string(get<StringData>(), b.get<StringData>());
+                return compare_string(get<StringData>(), b.get<StringData>());
             [[fallthrough]];
         case type_Binary:
             if (b.get_type() == type_String || b.get_type() == type_Binary)
-                return _impl::compare_binary(get<BinaryData>(), b.get<BinaryData>());
+                return compare_binary(get<BinaryData>(), b.get<BinaryData>());
             break;
         case type_Float:
             switch (b.get_type()) {
                 case type_Int:
-                    return -_impl::compare_long_to_double(b.int_val, float_val);
+                    return -compare_long_to_double(b.int_val, float_val);
                 case type_Float:
-                    return _impl::compare_float(float_val, b.float_val);
+                    return compare_float(float_val, b.float_val);
                 case type_Double:
-                    return _impl::compare_float(double(float_val), b.double_val);
+                    return compare_float(double(float_val), b.double_val);
                 case type_Decimal:
-                    return -_impl::compare_decimal_to_double(b.decimal_val, double(float_val));
+                    return Decimal128(float_val).compare(b.decimal_val);
                 default:
                     break;
             }
@@ -292,70 +280,68 @@ int Mixed::compare(const Mixed& b) const
         case type_Double:
             switch (b.get_type()) {
                 case type_Int:
-                    return -_impl::compare_long_to_double(b.int_val, double_val);
+                    return -compare_long_to_double(b.int_val, double_val);
                 case type_Float:
-                    return _impl::compare_float(double_val, double(b.float_val));
+                    return compare_float(double_val, double(b.float_val));
                 case type_Double:
-                    return _impl::compare_float(double_val, b.double_val);
+                    return compare_float(double_val, b.double_val);
                 case type_Decimal:
-                    return -_impl::compare_decimal_to_double(b.decimal_val, double_val);
+                    return Decimal128(double_val).compare(b.decimal_val);
                 default:
                     break;
             }
             break;
         case type_Timestamp:
             if (b.get_type() == type_Timestamp) {
-                return _impl::compare_generic(date_val, b.date_val);
+                return compare_generic(date_val, b.date_val);
             }
             break;
         case type_ObjectId:
             if (b.get_type() == type_ObjectId) {
-                return _impl::compare_generic(id_val, b.id_val);
+                return compare_generic(id_val, b.id_val);
             }
             break;
         case type_Decimal:
             switch (b.get_type()) {
                 case type_Int:
-                    return _impl::compare_decimals(decimal_val, Decimal128(b.int_val));
+                    return decimal_val.compare(Decimal128(b.int_val));
                 case type_Float:
-                    return _impl::compare_decimal_to_double(decimal_val, double(b.float_val));
+                    return decimal_val.compare(Decimal128(b.float_val));
                 case type_Double:
-                    return _impl::compare_decimal_to_double(decimal_val, b.double_val);
+                    return decimal_val.compare(Decimal128(b.double_val));
                 case type_Decimal:
-                    return _impl::compare_decimals(decimal_val, b.decimal_val);
+                    return decimal_val.compare(b.decimal_val);
                 default:
                     break;
             }
             break;
         case type_Link:
             if (b.get_type() == type_Link) {
-                return _impl::compare_generic(int_val, b.int_val);
+                return compare_generic(int_val, b.int_val);
             }
             break;
         case type_TypedLink:
             if (b.is_type(type_TypedLink)) {
-                return _impl::compare_generic(link_val, b.link_val);
+                return compare_generic(link_val, b.link_val);
             }
             break;
         case type_UUID:
             if (b.get_type() == type_UUID) {
-                return _impl::compare_generic(uuid_val, b.uuid_val);
+                return compare_generic(uuid_val, b.uuid_val);
             }
             break;
         default:
             if (type == type_TypeOfValue && b.get_type() == type_TypeOfValue) {
-                return TypeOfValue(int_val).matches(TypeOfValue(b.int_val))
-                           ? 0
-                           : _impl::compare_generic(int_val, b.int_val);
+                return TypeOfValue(int_val).matches(TypeOfValue(b.int_val)) ? 0 : compare_generic(int_val, b.int_val);
             }
             REALM_ASSERT_RELEASE(false && "Compare not supported for this column type");
             break;
     }
 
     // Comparing rank of types as a fallback makes it possible to sort of a list of Mixed
-    REALM_ASSERT(_impl::sorting_rank[m_type] != _impl::sorting_rank[b.m_type]);
+    REALM_ASSERT(sorting_rank[m_type] != sorting_rank[b.m_type]);
     // Using rank table will ensure that all numeric values are kept together
-    return (_impl::sorting_rank[m_type] > _impl::sorting_rank[b.m_type]) ? 1 : -1;
+    return (sorting_rank[m_type] > sorting_rank[b.m_type]) ? 1 : -1;
 
     // Observe! Changing this function breaks the file format for Set<Mixed>
 }

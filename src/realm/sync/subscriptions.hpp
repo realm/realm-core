@@ -184,12 +184,15 @@ protected:
     struct SupersededTag {
     };
 
-    explicit SubscriptionSet(const SubscriptionStore* mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
 
     void load_from_database(TransactionRef tr, Obj obj);
 
-    const SubscriptionStore* m_mgr;
+    // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
+    std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
+
+    std::weak_ptr<const SubscriptionStore> m_mgr;
 
     DB::version_type m_cur_version = 0;
     int64_t m_version = 0;
@@ -253,7 +256,7 @@ public:
 protected:
     friend class SubscriptionStore;
 
-    MutableSubscriptionSet(const SubscriptionStore* mgr, TransactionRef tr, Obj obj);
+    MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
 
     void insert_sub(const Subscription& sub);
 
@@ -263,6 +266,8 @@ private:
 
     std::pair<iterator, bool> insert_or_assign_impl(iterator it, util::Optional<std::string> name,
                                                     std::string object_class_name, std::string query_str);
+    // Throws is m_tr is in the wrong state.
+    void check_is_mutable() const;
 
     void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                          StringData object_class_name, StringData query_str);
@@ -274,10 +279,16 @@ private:
     State m_old_state;
 };
 
-// A SubscriptionStore manages the FLX metadata tables and the lifecycles of SubscriptionSets and Subscriptions.
-class SubscriptionStore {
+class SubscriptionStore;
+using SubscriptionStoreRef = std::shared_ptr<SubscriptionStore>;
+
+// A SubscriptionStore manages the FLX metadata tables, SubscriptionSets and Subscriptions.
+class SubscriptionStore : public std::enable_shared_from_this<SubscriptionStore> {
 public:
-    explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
+    static SubscriptionStoreRef create(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
+
+    SubscriptionStore(const SubscriptionStore&) = delete;
+    SubscriptionStore& operator=(const SubscriptionStore&) = delete;
 
     // Get the latest subscription created by calling update_latest(). Once bootstrapping is complete,
     // this and get_active() will return the same thing. If no SubscriptionSet has been set, then
@@ -310,9 +321,12 @@ public:
                                                                  DB::version_type after_client_version) const;
 
 private:
+    using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
     DBRef m_db;
 
 protected:
+    explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
+
     struct SubscriptionKeys {
         TableKey table;
         ColKey id;

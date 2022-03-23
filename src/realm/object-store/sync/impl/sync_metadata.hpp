@@ -277,6 +277,9 @@ private:
     SyncAppMetadata::Schema m_app_metadata_schema;
 
     std::shared_ptr<Realm> get_realm() const;
+    std::shared_ptr<Realm> try_get_realm() const;
+    std::shared_ptr<Realm> open_realm(bool should_encrypt, bool caller_supplied_key);
+
 
     util::Optional<SyncAppMetadata> m_app_metadata;
 };

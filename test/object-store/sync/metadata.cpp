@@ -22,6 +22,7 @@
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/object-store/impl/apple/keychain_helper.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
@@ -339,6 +340,7 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
     util::try_make_dir(base_path);
     auto close = util::make_scope_exit([=]() noexcept {
         util::try_remove_dir_recursive(base_path);
+        keychain::delete_metadata_realm_encryption_key();
     });
 
     const auto identity0 = "identity0";
@@ -406,7 +408,6 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
     SECTION("works when enabled") {
         std::vector<char> key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
-        const auto auth_url = "https://realm.example.org";
         SyncMetadataManager manager(metadata_path, true, key);
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_url);
         REQUIRE(bool(user_metadata));
@@ -421,6 +422,68 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         CHECK(user_metadata_2->identity() == identity);
         CHECK(user_metadata_2->provider_type() == auth_url);
         CHECK(user_metadata_2->is_valid());
+    }
+
+    SECTION("enabled without custom encryption key") {
+#if REALM_PLATFORM_APPLE
+        static bool can_access_keychain = [] {
+            bool can_acesss = keychain::create_new_metadata_realm_key() != none;
+            if (!can_acesss) {
+                std::cout << "Skipping keychain tests as the keychain is not accessible\n";
+            }
+            return can_acesss;
+        }();
+        if (!can_access_keychain) {
+            return;
+        }
+
+        SECTION("automatically generates an encryption key for new files") {
+            {
+                SyncMetadataManager manager(metadata_path, true, none);
+                manager.set_current_user_identity(identity0);
+            }
+
+            // Should be able to reopen and read data
+            {
+                SyncMetadataManager manager(metadata_path, true, none);
+                REQUIRE(manager.get_current_user_identity() == identity0);
+            }
+
+            // Verify that the file is actually encrypted
+            REQUIRE_THROWS_AS(Group(metadata_path), InvalidDatabase);
+        }
+
+        SECTION("leaves existing unencrypted files unencrypted") {
+            {
+                SyncMetadataManager manager(metadata_path, false, none);
+                manager.set_current_user_identity(identity0);
+            }
+            {
+                SyncMetadataManager manager(metadata_path, true, none);
+                REQUIRE(manager.get_current_user_identity() == identity0);
+            }
+            REQUIRE_NOTHROW(Group(metadata_path));
+        }
+
+        SECTION("recreates the file if the old encryption key was lost") {
+            {
+                SyncMetadataManager manager(metadata_path, true, none);
+                manager.set_current_user_identity(identity0);
+            }
+
+            keychain::delete_metadata_realm_encryption_key();
+
+            {
+                // File should now be missing the data
+                SyncMetadataManager manager(metadata_path, true, none);
+                REQUIRE(manager.get_current_user_identity() == none);
+            }
+            // New file should be encrypted
+            REQUIRE_THROWS_AS(Group(metadata_path), InvalidDatabase);
+        }
+#else
+        REQUIRE_THROWS(SyncMetadataManager(metadata_path, true, none));
+#endif
     }
 }
 

@@ -54,9 +54,12 @@ public:
             (*m_func)(std::forward<Args>(args)...);
             return;
         }
-        m_scheduler->invoke([func = m_func, args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
-            std::apply(*func, std::move(args));
-        });
+        m_scheduler->invoke(
+            [scheduler = m_scheduler, func = m_func, args = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+                std::apply(*func, std::move(args));
+                // Each invocation block will retain the scheduler, so the scheduler
+                // will not be released until all blocks are called
+            });
     }
 };
 

@@ -652,7 +652,7 @@ void InstructionApplier::operator()(const Instruction::EraseColumn& instr)
 
 void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
 {
-    auto callback = util::overload{
+    ListCallback callback =
         [&](LstBase& list, size_t index) {
             auto col = list.get_col_key();
             auto data_type = DataType(col.get_type());
@@ -751,99 +751,48 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             };
 
             visit_payload(instr.value, inserter);
-        },
-        [&](LstBase&) {
-            bad_transaction_log("Invalid path for ArrayInsert (list)");
-        },
-        [&](SetBase&) {
-            bad_transaction_log("Invalid path for ArrayInsert (set)");
-        },
-        [&](Dictionary&) {
-            bad_transaction_log("Invalid path for ArrayInsert (dictionary)");
-        },
-        [&](Dictionary&, Mixed) {
-            bad_transaction_log("Invalid path for ArrayInsert (dictionary, key)");
-        },
-        [&](Obj&, ColKey) {
-            bad_transaction_log("Invalid path for ArrayInsert (obj, col)");
-        }};
+        };
 
-    resolve_path(instr, "ArrayInsert", std::move(callback));
+    resolve_list(instr, "ArrayInsert", std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
 {
-    auto callback = util::overload{
-        [&](LstBase& list, size_t index) {
-            if (index >= list.size()) {
-                bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", instr.index(), list.size());
-            }
-            if (instr.ndx_2 >= list.size()) {
-                bad_transaction_log("ArrayMove to out of bounds (%1 >= %2)", instr.ndx_2, list.size());
-            }
-            if (index == instr.ndx_2) {
-                // FIXME: Does this really need to be an error?
-                bad_transaction_log("ArrayMove to same location (%1)", instr.index());
-            }
-
-            if (instr.prior_size != list.size()) {
-                bad_transaction_log("ArrayMove: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
-                                    instr.prior_size);
-            }
-            list.move(index, instr.ndx_2);
-        },
-        [&](LstBase&) {
-            bad_transaction_log("Invalid path for ArrayMove (list)");
-        },
-        [&](SetBase&) {
-            bad_transaction_log("Invalid path for ArrayMove (set)");
-        },
-        [&](Dictionary&) {
-            bad_transaction_log("Invalid path for ArrayMove (dictionary)");
-        },
-        [&](Dictionary&, Mixed) {
-            bad_transaction_log("Invalid path for ArrayMove (dictionary, key)");
-        },
-        [&](Obj&, ColKey) {
-            bad_transaction_log("Invalid path for ArrayMove (obj, col)");
-        }};
-    resolve_path(instr, "ArrayMove", std::move(callback));
+    resolve_list(instr, "ArrayMove", [&](LstBase& list, size_t index) {
+        if (index >= list.size()) {
+            bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", instr.index(), list.size());
+        }
+        if (instr.ndx_2 >= list.size()) {
+            bad_transaction_log("ArrayMove to out of bounds (%1 >= %2)", instr.ndx_2, list.size());
+        }
+        if (index == instr.ndx_2) {
+            // FIXME: Does this really need to be an error?
+            bad_transaction_log("ArrayMove to same location (%1)", instr.index());
+        }
+        if (instr.prior_size != list.size()) {
+            bad_transaction_log("ArrayMove: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                instr.prior_size);
+        }
+        list.move(index, instr.ndx_2);
+    });
 }
 
 void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
 {
-    auto callback =
-        util::overload{[&](LstBase& list, size_t index) {
-                           if (index >= instr.prior_size) {
-                               bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
-                                                   instr.prior_size);
-                           }
-                           if (index >= list.size()) {
-                               bad_transaction_log("ArrayErase: Index out of bounds (%1 >= %2)", index, list.size());
-                           }
-                           if (instr.prior_size != list.size()) {
-                               bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)",
-                                                   list.size(), instr.prior_size);
-                           }
+    resolve_list(instr, "ArrayErase", [&](LstBase& list, size_t index) {
+        if (index >= instr.prior_size) {
+            bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index, instr.prior_size);
+        }
+        if (index >= list.size()) {
+            bad_transaction_log("ArrayErase: Index out of bounds (%1 >= %2)", index, list.size());
+        }
+        if (instr.prior_size != list.size()) {
+            bad_transaction_log("ArrayErase: Invalid prior_size (list size = %1, prior_size = %2)", list.size(),
+                                instr.prior_size);
+        }
 
-                           list.remove(index, index + 1);
-                       },
-                       [&](LstBase&) {
-                           bad_transaction_log("Invalid path for ArrayErase (list)");
-                       },
-                       [&](SetBase&) {
-                           bad_transaction_log("Invalid path for ArrayErase (set)");
-                       },
-                       [&](Dictionary&) {
-                           bad_transaction_log("Invalid path for ArrayErase (dictionary)");
-                       },
-                       [&](Dictionary&, Mixed) {
-                           bad_transaction_log("Invalid path for ArrayErase (dictionary, key)");
-                       },
-                       [&](Obj&, ColKey) {
-                           bad_transaction_log("Invalid path for ArrayErase (obj, col)");
-                       }};
-    resolve_path(instr, "ArrayErase", std::move(callback));
+        list.remove(index, index + 1);
+    });
 }
 
 void InstructionApplier::operator()(const Instruction::Clear& instr)
@@ -873,6 +822,30 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
                                 [&](Obj&, ColKey&) {
                                     bad_transaction_log("Invalid path for Clear (object, column)");
                                 }});
+}
+
+void InstructionApplier::resolve_list(const Instruction::PathInstruction& instr, const char* instr_name,
+                                      ListCallback&& list_callback)
+{
+    auto callback = util::overload{[lcb = std::move(list_callback)](LstBase& list, size_t index) {
+                                       lcb(list, index);
+                                   },
+                                   [&](LstBase&) {
+                                       bad_transaction_log("Invalid path for %1 (list)", instr_name);
+                                   },
+                                   [&](SetBase&) {
+                                       bad_transaction_log("Invalid path for %1 (set)", instr_name);
+                                   },
+                                   [&](Dictionary&) {
+                                       bad_transaction_log("Invalid path for %1 (dictionary)", instr_name);
+                                   },
+                                   [&](Dictionary&, Mixed) {
+                                       bad_transaction_log("Invalid path for %1 (dictionary, key)", instr_name);
+                                   },
+                                   [&](Obj&, ColKey) {
+                                       bad_transaction_log("Invalid path for %1 (obj, col)", instr_name);
+                                   }};
+    resolve_path(instr, instr_name, std::move(callback));
 }
 
 void InstructionApplier::operator()(const Instruction::SetInsert& instr)
