@@ -103,8 +103,6 @@ void allocate_and_compress_decompress_compare(test_util::unit_test::TestContext&
         compare(test_context, uncompressed_buf, decompressed_buf);
 }
 
-} // anonymous namespace
-
 
 TEST(Compression_Compress_Buffer_Too_Small)
 {
@@ -197,7 +195,7 @@ TEST(Compression_Compressible_Data_Small)
         0, 1, 2, 256, 1 << 10, 1 << 20,
     };
     for (size_t uncompressed_size : uncompressed_sizes) {
-        compress_decompress_compare(test_context, generate_compressible_data(size_t(uncompressed_size)));
+        compress_decompress_compare(test_context, generate_compressible_data(uncompressed_size));
     }
 }
 
@@ -206,8 +204,8 @@ TEST(Compression_Compressible_Data_Small)
 TEST_IF(Compression_Compressible_Data_Large, false)
 {
     uint64_t uncompressed_sizes[] = {(uint64_t(1) << 32) - 1, (uint64_t(1) << 32) + 500, uint64_t(1) << 33};
-    for (size_t uncompressed_size : uncompressed_sizes) {
-        compress_decompress_compare(test_context, generate_compressible_data(size_t(uncompressed_size)));
+    for (uint64_t uncompressed_size : uncompressed_sizes) {
+        compress_decompress_compare(test_context, generate_compressible_data(to_size_t(uncompressed_size)));
     }
 }
 
@@ -227,8 +225,8 @@ TEST(Compression_Non_Compressible_Data_Small)
 TEST_IF(Compression_Non_Compressible_Data_Large, false)
 {
     uint64_t uncompressed_sizes[] = {(uint64_t(1) << 32) - 1, (uint64_t(1) << 32) + 100};
-    for (size_t uncompressed_size : uncompressed_sizes) {
-        compress_decompress_compare(test_context, generate_non_compressible_data(size_t(uncompressed_size)));
+    for (uint64_t uncompressed_size : uncompressed_sizes) {
+        compress_decompress_compare(test_context, generate_non_compressible_data(to_size_t(uncompressed_size)));
     }
 }
 
@@ -245,7 +243,7 @@ TEST(Compression_Allocate_And_Compress_Small)
 TEST_IF(Compression_Allocate_And_Compress_Large, false)
 {
     uint64_t uncompressed_size = (uint64_t(1) << 32) + 100;
-    allocate_and_compress_decompress_compare(test_context, generate_compressible_data(size_t(uncompressed_size)));
+    allocate_and_compress_decompress_compare(test_context, generate_compressible_data(to_size_t(uncompressed_size)));
 }
 
 namespace {
@@ -296,22 +294,22 @@ TEST(Compression_Decompress_Stream_SmallBlocks)
 // Verify that things work with > 4 GB blocks
 TEST_IF(Compression_Decompress_Stream_LargeBlocks, false)
 {
-    size_t uncompressed_size = (uint64_t(1) << 33) + (uint64_t(1) << 32); // 12 GB
-    auto uncompressed_buf = generate_non_compressible_data(uncompressed_size);
+    uint64_t uncompressed_size = (uint64_t(1) << 33) + (uint64_t(1) << 32); // 12 GB
+    auto uncompressed_buf = generate_non_compressible_data(to_size_t(uncompressed_size));
     auto compressed_buf = compress_buffer(test_context, uncompressed_buf);
-    Buffer<char> decompressed_buf(uncompressed_size);
+    Buffer<char> decompressed_buf{to_size_t(uncompressed_size)};
 
     ChunkingStream stream;
 
     // Everything in one > 4 GB block
-    stream.block_size = uint64_t(1) << 34;
+    stream.block_size = to_size_t(uint64_t(1) << 34);
     stream.input = compressed_buf;
     auto ec = compression::decompress(stream, decompressed_buf);
     CHECK_NOT(ec);
     compare(test_context, uncompressed_buf, decompressed_buf);
 
     // Multiple > 4 GB blocks
-    stream.block_size = (uint64_t(1) << 32) + 100;
+    stream.block_size = to_size_t((uint64_t(1) << 32) + 100);
     stream.input = compressed_buf;
     ec = compression::decompress(stream, decompressed_buf);
     CHECK_NOT(ec);
@@ -480,8 +478,8 @@ TEST(Compression_DecompressInputStream_Compressible_Small)
 
 TEST_IF(Compression_DecompressInputStream_Compressible_Large, false)
 {
-    size_t uncompressed_size = (uint64_t(1) << 32) + 100;
-    auto uncompressed = generate_compressible_data(uncompressed_size);
+    uint64_t uncompressed_size = (uint64_t(1) << 32) + 100;
+    auto uncompressed = generate_compressible_data(to_size_t(uncompressed_size));
     auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
     test_decompress_stream(test_context, uncompressed, compressed);
 }
@@ -496,8 +494,10 @@ TEST(Compression_DecompressInputStream_NonCompressible_Small)
 
 TEST_IF(Compression_DecompressInputStream_NonCompressible_Large, false)
 {
-    size_t uncompressed_size = (uint64_t(1) << 32) + 100;
-    auto uncompressed = generate_non_compressible_data(uncompressed_size);
+    uint64_t uncompressed_size = (uint64_t(1) << 32) + 100;
+    auto uncompressed = generate_non_compressible_data(to_size_t(uncompressed_size));
     auto compressed = compression::allocate_and_compress_nonportable(uncompressed);
     test_decompress_stream(test_context, uncompressed, compressed);
 }
+
+} // anonymous namespace
