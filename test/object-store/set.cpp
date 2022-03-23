@@ -719,6 +719,7 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             });
             REQUIRE(link_set.size() == 2);
             REQUIRE_INDICES(change.deletions, 1);
+            REQUIRE(!change.collection_was_cleared);
         }
 
         SECTION("modifying a different set doesn't send a change notification") {
@@ -757,6 +758,39 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
                 table->create_object();
             });
             REQUIRE(change.empty());
+        }
+
+        SECTION("removing all elements from set does not set cleared flag") {
+            auto token = require_change();
+
+            Obj target1, target2, target3;
+            write([&]() {
+                target1 = table2->create_object_with_primary_key(123);
+                target2 = table2->create_object_with_primary_key(456);
+                target3 = table2->create_object_with_primary_key(789);
+            });
+
+            write([&]() {
+                CHECK(link_set.insert(target1).second);
+                CHECK(!link_set.insert(target1).second);
+                CHECK(link_set.insert(target2).second);
+                CHECK(link_set.insert(target3).second);
+            });
+
+            write([&] {
+                link_set.remove(target1);
+                link_set.remove(target2);
+                link_set.remove(target3);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
+        SECTION("modifying a different set doesn't send a change notification") {
+            auto token = require_no_change();
+            write([&] {
+                CHECK(int_set.insert(123).second);
+            });
         }
 
         SECTION("deleting an empty set sends a change notification") {
