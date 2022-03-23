@@ -720,15 +720,15 @@ TEST_CASE("collection_change: merge()") {
         REQUIRE(c.collection_was_cleared);
 
         c = {{1, 2, 3}, {}, {}, {}, true};
-        c.merge({{}, {1, 2 ,3}, {}, {}, false});
+        c.merge({{}, {1, 2, 3}, {}, {}, false});
         REQUIRE(!c.collection_was_cleared);
 
         c = {{1, 2, 3}, {}, {}, {}, true};
-        c.merge({{1, 2, 3}, {1, 2 ,3}, {}, {}, true});
+        c.merge({{1, 2, 3}, {1, 2, 3}, {}, {}, true});
         REQUIRE(c.collection_was_cleared);
 
         c = {{1, 2, 3}, {4, 5}, {}, {}, false};
-        c.merge({{}, {1, 2 ,3}, {}, {}, false});
+        c.merge({{}, {1, 2, 3}, {}, {}, false});
         REQUIRE(!c.collection_was_cleared);
     }
 

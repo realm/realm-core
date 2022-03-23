@@ -154,7 +154,7 @@ TEST_CASE("list") {
             auto token = require_change();
             write([&] {
                 auto size = lst.size();
-                for(size_t i=0; i<size; i++)
+                for (size_t i = 0; i < size; i++)
                     lst.remove(0);
             });
             REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
