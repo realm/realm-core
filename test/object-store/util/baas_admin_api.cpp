@@ -851,6 +851,7 @@ AppSession create_app(const AppCreateConfig& config)
         {"type", "mongodb"},
         {"config", {{"uri", config.mongo_uri}}},
     };
+    nlohmann::json sync_config;
     if (config.flx_sync_config) {
         auto queryable_fields = nlohmann::json::array();
         const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
@@ -866,8 +867,7 @@ AppSession create_app(const AppCreateConfig& config)
                    {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}})}}}};
     }
     else {
-        mongo_service_def["config"]["sync"] = nlohmann::json{
-            {"state", "enabled"},
+        sync_config = nlohmann::json{
             {"database_name", config.mongo_dbname},
             {"partition",
              {
@@ -881,6 +881,7 @@ AppSession create_app(const AppCreateConfig& config)
                   }},
              }},
         };
+        mongo_service_def["config"]["sync"] = sync_config;
     }
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
@@ -918,6 +919,14 @@ AppSession create_app(const AppCreateConfig& config)
         auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
         schema_to_create["_id"] = schema_id->second;
         schemas[schema_id->second].put_json(schema_to_create);
+    }
+
+    // For PBS, enable sync after schema is created.
+    if (!config.flx_sync_config) {
+        AdminAPISession::ServiceConfig service_config;
+        service_config.database_name = sync_config["database_name"];
+        service_config.partition = sync_config["partition"];
+        session.enable_sync(app_id, mongo_service_id, service_config);
     }
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
