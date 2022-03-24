@@ -40,6 +40,7 @@ endif()
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_test_utils.hpp
+        sync/flx_sync_harness.hpp
         sync/session/session_util.hpp
     )
     list(APPEND SOURCES

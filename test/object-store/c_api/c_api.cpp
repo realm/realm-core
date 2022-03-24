@@ -2,13 +2,17 @@
 
 #include <realm.h>
 #include <realm/object-store/object.hpp>
+#include <realm/object-store/c_api/types.hpp>
+#include <realm/object-store/sync/generic_network_transport.hpp>
 
-#include <realm/util/file.hpp>
-#include "util/test_file.hpp"
+#include "sync/flx_sync_harness.hpp"
+#include "realm/object-store/impl/object_accessor_impl.hpp"
 
 #include <cstring>
 #include <numeric>
 #include <thread>
+
+using namespace realm;
 
 extern "C" int realm_c_api_tests(const char* file);
 
@@ -3702,4 +3706,147 @@ TEST_CASE("C API") {
     realm_close(realm);
     REQUIRE(realm_is_closed(realm));
     realm_release(realm);
+}
+
+TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
+    using namespace realm::app;
+
+    auto make_schema = []() -> auto
+    {
+
+        Schema schema{ObjectSchema("Obj", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                           {"name", PropertyType::String | PropertyType::Nullable},
+                                           {"value", PropertyType::Int | PropertyType::Nullable}})};
+
+        return FLXSyncTestHarness::ServerSchema{std::move(schema), {"name", "value"}};
+    };
+
+    FLXSyncTestHarness harness("c_api_flx_sync_test", make_schema());
+    auto foo_obj_id = ObjectId::gen();
+    auto bar_obj_id = ObjectId::gen();
+
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "Obj",
+                       util::Any(AnyDict{
+                           {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
+        Object::create(c, realm, "Obj",
+                       util::Any(AnyDict{
+                           {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
+
+        realm->commit_transaction();
+        wait_for_upload(*realm);
+    });
+
+    harness.do_with_new_realm([&](SharedRealm realm) {
+        realm_t c_wrap_realm(realm);
+
+        wait_for_download(*realm);
+        {
+            auto empty_subs = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            CHECK(realm_sync_subscription_set_size(empty_subs) == 0);
+            CHECK(realm_sync_subscription_set_version(empty_subs) == 0);
+            realm_sync_on_subscription_set_state_change_async(
+                empty_subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE,
+                [](const realm_flx_sync_subscription_set_t*, realm_flx_sync_subscription_set_state_e) {});
+        }
+        auto table = realm->read_group().get_table("class_Obj");
+        auto name_col_key = table->get_column_key("name");
+        // auto value_col_key = table->get_column_key("value");
+
+        Query query_foo(table);
+        Query query_bar(table);
+
+        query_foo.equal(name_col_key, "foo");
+        auto c_wrap_query_foo = new realm_query_t{query_foo, query_foo.get_ordering(), realm};
+
+        query_bar.equal(name_col_key, "bar");
+        auto c_wrap_query_bar = new realm_query_t{query_bar, query_bar.get_ordering(), realm};
+        {
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            CHECK(sub != nullptr);
+            auto new_subs = realm_sync_make_subscription_set_mutable(sub);
+            auto result = realm_sync_subscription_set_insert_or_assing(new_subs, c_wrap_query_foo);
+            CHECK(result != nullptr);
+            CHECK(result->inserted());
+            CHECK(result->get_index() == 0);
+            auto subs = realm_sync_subscription_set_commit(new_subs);
+
+            auto state = realm_sync_on_subscription_set_state_change_wait(
+                subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+        }
+
+        wait_for_download(*realm);
+        {
+            realm->refresh();
+            Results results(realm, table);
+            CHECK(results.size() == 1);
+            auto obj = results.get<Obj>(0);
+            CHECK(obj.is_valid());
+            CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
+        }
+
+        {
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            realm_sync_subscription_set_insert_or_assing(mut_sub, c_wrap_query_bar);
+            sub = realm_sync_subscription_set_commit(mut_sub);
+            auto state = realm_sync_on_subscription_set_state_change_wait(
+                sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+        }
+
+        {
+            realm->refresh();
+            Results results(realm, Query(table));
+            CHECK(results.size() == 2);
+        }
+
+        {
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            auto s = realm_sync_find_subscription_by_query(sub, c_wrap_query_foo);
+            CHECK(s != nullptr);
+            auto erased = realm_sync_subscription_set_erase_by_query(mut_sub, c_wrap_query_foo);
+            CHECK(erased);
+            Query new_query_bar(table);
+            new_query_bar.equal(name_col_key, "bar");
+            auto c_wrap_new_query_bar = new realm_query_t{query_bar, query_bar.get_ordering(), realm};
+            auto res = realm_sync_subscription_set_insert_or_assing(mut_sub, c_wrap_new_query_bar);
+            CHECK(res);
+            CHECK(!res->inserted());
+            sub = realm_sync_subscription_set_commit(mut_sub);
+            auto state = realm_sync_on_subscription_set_state_change_wait(
+                sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+        }
+
+        {
+            realm->refresh();
+            Results results(realm, Query(table));
+            CHECK(results.size() == 1);
+            auto obj = results.get<Obj>(0);
+            CHECK(obj.is_valid());
+            CHECK(obj.get<ObjectId>("_id") == bar_obj_id);
+        }
+
+        {
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            auto cleared = realm_sync_subscription_set_clear(mut_sub);
+            CHECK(cleared);
+            sub = realm_sync_subscription_set_commit(mut_sub);
+            auto state = realm_sync_on_subscription_set_state_change_wait(
+                sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+        }
+
+        {
+            realm->refresh();
+            Results results(realm, table);
+            CHECK(results.size() == 0);
+        }
+    });
 }

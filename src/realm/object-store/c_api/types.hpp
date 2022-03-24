@@ -658,6 +658,13 @@ struct realm_flx_sync_subscription_set : realm::c_api::WrapC, realm::sync::Subsc
     }
 };
 
+struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC, realm::sync::MutableSubscriptionSet {
+    realm_flx_sync_mutable_subscription_set(realm::sync::MutableSubscriptionSet&& subscription_set)
+        : realm::sync::MutableSubscriptionSet(std::move(subscription_set))
+    {
+    }
+};
+
 struct realm_flx_sync_subscription_desc : realm::c_api::WrapC {
     realm_flx_sync_subscription_desc(size_t index, bool inserted)
         : m_index(index)
