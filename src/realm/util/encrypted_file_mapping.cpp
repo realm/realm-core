@@ -361,7 +361,9 @@ public:
     std::vector<Patch> the_queue;
     ~WriteQueueImpl()
     {
-        REALM_ASSERT(the_queue.size() == 1);
+        // Wont do:
+        // REALM_ASSERT(the_queue.size() == 1);
+        // -> in case of an exception, it will be ok to back out and loose any pending writes
     }
 };
 
@@ -382,7 +384,8 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     }
     if (patch_size % sizeof(Patch) != 0) {
         // Patch ignored, size wrong (we assume patch wasn't completely written)
-        ftruncate(patch_f, 0);
+        auto retval = ftruncate(patch_f, 0);
+        REALM_ASSERT(retval == 0);
         return;
     }
     unsigned entries = patch_size / sizeof(Patch);
@@ -393,7 +396,8 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     if (read != (signed)patch_size) {
         // Reading patch file failed, ignoring patch
         // this is actually fatal, isn't it?
-        ftruncate(patch_f, 0);
+        auto retval = ftruncate(patch_f, 0);
+        REALM_ASSERT(retval == 0);
         return;
     }
     // the actual number of entries may be less than what's in the file:
@@ -403,7 +407,8 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     auto check_size = check_end - check_start;
     if (!check_hmac(check_start, check_size, data->meta.hmac)) {
         // Patch ignored, check_hmac fails - we assume patch was only partially written
-        ftruncate(patch_f, 0);
+        auto retval = ftruncate(patch_f, 0);
+        REALM_ASSERT(retval == 0);
         return;
     }
     // We have a valid patch. now patch the realm file.
@@ -418,11 +423,15 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     }
     fsync(f);
     // With the realm file patched and sync'ed to stable storage, we invalidate the patch file.
-    ftruncate(patch_f, 0);
+    auto retval = ftruncate(patch_f, 0);
+    REALM_ASSERT(retval == 0);
 }
 
 void AESCryptor::flush_queue(FileDesc fd, FileDesc patch_fd, const WriteQueue& q)
 {
+    if (q->the_queue.size() == 1) {
+        return;
+    }
     // Compute hmac to ensure entegrity of the patch (include number of entries)
     auto data = q->the_queue.data();
     auto entries = q->the_queue.size();
@@ -457,7 +466,10 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
         iv_table& iv = get_iv_table(fd, pos);
-
+        if (patch_fd >= 0) {
+            q->the_queue.emplace_back(Patch());            
+        }
+        char* buffer = q->the_queue.back().payload.buffer;
         memcpy(&iv.iv2, &iv.iv1, 32);
         do {
             ++iv.iv1;
@@ -465,8 +477,8 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
             if (iv.iv1 == 0)
                 ++iv.iv1;
 
-            crypt(mode_Encrypt, pos, m_rw_buffer.get(), src, reinterpret_cast<const char*>(&iv.iv1));
-            calc_hmac(m_rw_buffer.get(), block_size, iv.hmac1, m_hmacKey);
+            crypt(mode_Encrypt, pos, buffer, src, reinterpret_cast<const char*>(&iv.iv1));
+            calc_hmac(buffer, block_size, iv.hmac1, m_hmacKey);
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
@@ -474,18 +486,13 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
 
         if (patch_fd >= 0) {
             REALM_ASSERT(q);
-            q->the_queue.emplace_back(Patch());
             Patch& patch = q->the_queue.back();
             patch.payload.pos = pos;
             memcpy(&patch.payload.iv, &iv, sizeof(iv));
-            // uint8_t hmac_tmp[32];
-            // memcpy(&hmac_tmp, &patch.payload.iv.hmac1, 32);
-            memcpy(&patch.payload.buffer, m_rw_buffer.get(), block_size);
-            // calc_hmac(&patch.payload, sizeof(patch.payload), patch.hmac, m_hmacKey);
         }
         else {
             check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
-            check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
+            check_write(fd, real_offset(pos), buffer, block_size);
         }
 
         pos += block_size;
@@ -617,7 +624,6 @@ EncryptedFileMapping::~EncryptedFileMapping()
 {
     if (m_access == File::access_ReadWrite) {
         flush();
-        sync();
     }
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
