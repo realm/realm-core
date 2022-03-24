@@ -3097,41 +3097,38 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
 // flx sync c-api
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
-RLM_API realm_flx_sync_subscription_set_state_e
-realm_sync_on_subscription_set_state_change_wait(const realm_flx_sync_subscription_set_t*,
-                                               realm_flx_sync_subscription_set_state_e) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_state_change_wait(
+    const realm_flx_sync_subscription_set_t*, realm_flx_sync_subscription_set_state_e) RLM_API_NOEXCEPT;
 RLM_API bool
 realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t*,
-                                               realm_flx_sync_subscription_set_state_e,
-                                               realm_sync_on_subscription_state_changed) RLM_API_NOEXCEPT;
-RLM_API int64_t realm_sync_subscription_set_version(const realm_flx_sync_subscription_set_t*)
-    RLM_API_NOEXCEPT;
+                                                  realm_flx_sync_subscription_set_state_e,
+                                                  realm_sync_on_subscription_state_changed) RLM_API_NOEXCEPT;
+RLM_API int64_t realm_sync_subscription_set_version(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
 RLM_API realm_flx_sync_subscription_set_state_e
 realm_sync_subscription_set_state(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
-RLM_API const char*
-realm_sync_subscription_set_error_str(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
-RLM_API size_t realm_sync_subscription_set_size(const realm_flx_sync_subscription_set_t*)
-    RLM_API_NOEXCEPT;
-RLM_API realm_flx_sync_subscription_t*
-realm_sync_subscription_at(const realm_flx_sync_subscription_set_t*, size_t) RLM_API_NOEXCEPT;
-RLM_API realm_flx_sync_subscription_t*
-realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*, const char*) RLM_API_NOEXCEPT;
-RLM_API realm_flx_sync_subscription_t*
-realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t*, realm_query_t*) RLM_API_NOEXCEPT;
+RLM_API const char* realm_sync_subscription_set_error_str(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API size_t realm_sync_subscription_set_size(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_t* realm_sync_subscription_at(const realm_flx_sync_subscription_set_t*,
+                                                                  size_t) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*,
+                                                                            const char*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t*,
+                                                                             realm_query_t*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
 
-RLM_API realm_flx_sync_mutable_subscription_set_t* realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_mutable_subscription_set_t*
+realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
 RLM_API realm_flx_sync_subscription_desc_t*
-realm_sync_subscription_set_insert_or_assing_with_name(realm_flx_sync_mutable_subscription_set_t*,
-                                                         const char*, const realm_query_t*) RLM_API_NOEXCEPT;
+realm_sync_subscription_set_insert_or_assing_with_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
+                                                       const realm_query_t*) RLM_API_NOEXCEPT;
 RLM_API realm_flx_sync_subscription_desc_t*
 realm_sync_subscription_set_insert_or_assing(realm_flx_sync_mutable_subscription_set_t*,
-                                               const realm_query_t*) RLM_API_NOEXCEPT;
+                                             const realm_query_t*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*,
-                                                   const char*) RLM_API_NOEXCEPT;
+                                                       const char*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*,
-                                                   realm_query_t*) RLM_API_NOEXCEPT;
+                                                        realm_query_t*) RLM_API_NOEXCEPT;
 RLM_API realm_flx_sync_subscription_set_t*
 realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
 
