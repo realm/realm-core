@@ -678,6 +678,13 @@ void advance(Transaction& tr, TransactionChangeInfo& info, VersionID version)
     }
 }
 
+void observe(Transaction& tr, TransactionChangeInfo& info, VersionID from_version, VersionID to_version)
+{
+    if (info.track_all || !info.tables.empty() || !info.lists.empty()) {
+        tr.observe(TransactLogObserver(info), from_version, to_version);
+    }
+}
+
 } // namespace transaction
 } // namespace _impl
 } // namespace realm

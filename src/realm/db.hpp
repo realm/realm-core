@@ -647,6 +647,8 @@ public:
         advance_read(o, target_version);
     }
     template <class O>
+    void observe(O&& observer, VersionID from, VersionID to);
+    template <class O>
     bool promote_to_write(O* observer, bool nonblocking = false) REQUIRES(!m_async_mutex);
     bool promote_to_write(bool nonblocking = false) REQUIRES(!m_async_mutex)
     {
@@ -980,6 +982,27 @@ inline void Transaction::advance_read(O* observer, VersionID version_id)
         throw LogicError(LogicError::no_history);
 
     internal_advance_read(observer, version_id, *hist, false); // Throws
+}
+
+template <class O>
+inline void Transaction::observe(O&& observer, VersionID from, VersionID to)
+{
+    if (m_transact_stage != DB::transact_Reading)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    if (_impl::History* hist = get_history()) {
+        using gf = _impl::GroupFriend;
+        ref_type hist_ref = gf::get_history_ref(m_alloc, m_read_lock.m_top_ref);
+        hist->update_from_ref_and_version(hist_ref, m_read_lock.m_version);
+
+        _impl::TransactLogParser parser;
+        _impl::ChangesetInputStream in(*hist, from.version, to.version);
+        parser.parse(in, observer); // Throws
+        observer.parse_complete();  // Throws
+    }
+    else {
+        throw LogicError(LogicError::no_history);
+    }
 }
 
 template <class O>

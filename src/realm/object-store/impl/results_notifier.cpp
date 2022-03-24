@@ -324,7 +324,7 @@ void ListResultsNotifier::calculate_changes()
 
 void ListResultsNotifier::run()
 {
-    if (!m_list->is_attached()) {
+    if (!m_list || !m_list->is_attached()) {
         // List was deleted, so report all of the rows being removed
         m_change = {};
         m_change.deletions.set(m_previous_indices.size());

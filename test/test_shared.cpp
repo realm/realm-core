@@ -3773,9 +3773,9 @@ TEST_IF(Shared_LinksToSameCluster, REALM_ENABLE_ENCRYPTION)
     std::unique_ptr<Replication> hist(make_in_realm_history());
     DBRef db = DB::create(*hist, path, DBOptions(key));
     std::vector<ObjKey> keys;
+    auto rt = db->start_read();
     {
         auto wt = db->start_write();
-        auto rt = db->start_read();
         std::vector<TableView> table_views;
 
         auto t = wt->add_table("Table_0");

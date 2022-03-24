@@ -54,6 +54,9 @@ void cancel(Transaction& sg, BindingContext* binding_context);
 
 // Advance the read transaction version, with change information gathered in info
 void advance(Transaction& sg, TransactionChangeInfo& info, VersionID version = VersionID{});
+
+void observe(Transaction& tr, TransactionChangeInfo& info, VersionID from_version, VersionID to_version);
+
 } // namespace transaction
 } // namespace _impl
 } // namespace realm

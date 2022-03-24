@@ -913,13 +913,16 @@ namespace {
 bool compare_notifier_versions(const std::shared_ptr<_impl::CollectionNotifier>& a,
                                const std::shared_ptr<_impl::CollectionNotifier>& b)
 {
-    return a->version() < b->version();
+    if (a->version() < b->version()) {
+        return true;
+    }
+    return false;
 }
 
 class IncrementalChangeInfo {
 public:
     IncrementalChangeInfo(Transaction& sg, std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
-        : m_sg(sg)
+        : m_rt(sg)
     {
         if (notifiers.empty())
             return;
@@ -938,6 +941,7 @@ public:
         m_info.reserve(count);
         m_info.resize(1);
         m_current = &m_info[0];
+        m_current_version = (*notifiers.begin())->version();
     }
 
     TransactionChangeInfo& current() const
@@ -947,13 +951,14 @@ public:
 
     bool advance_incremental(VersionID version)
     {
-        if (version != m_sg.get_version_of_current_transaction()) {
-            transaction::advance(m_sg, *m_current, version);
+        if (version != m_current_version) {
+            transaction::observe(m_rt, *m_current, m_current_version, version);
             m_info.push_back({std::move(m_current->lists)});
             auto next = &m_info.back();
             for (auto& table : m_current->tables)
                 next->tables[table.first];
             m_current = next;
+            m_current_version = version;
             return true;
         }
         return false;
@@ -962,11 +967,16 @@ public:
     void advance_to_final(VersionID version)
     {
         if (!m_current) {
-            transaction::advance(m_sg, nullptr, version);
             return;
         }
 
-        transaction::advance(m_sg, *m_current, version);
+        if (version > m_rt.get_version_of_current_transaction()) {
+            REALM_ASSERT(m_rt.get_version_of_current_transaction() == m_current_version);
+            transaction::advance(m_rt, *m_current, version);
+        }
+        else {
+            transaction::observe(m_rt, *m_current, m_current_version, version);
+        }
 
         // We now need to combine the transaction change info objects so that all of
         // the notifiers see the complete set of changes from their first version to
@@ -1005,7 +1015,8 @@ public:
 private:
     std::vector<TransactionChangeInfo> m_info;
     TransactionChangeInfo* m_current = nullptr;
-    Transaction& m_sg;
+    Transaction& m_rt;
+    VersionID m_current_version;
 };
 } // anonymous namespace
 
@@ -1083,16 +1094,14 @@ void RealmCoordinator::run_async_notifiers()
         //  - Notifier C has a source version of 5
         // Notifier A wants the changes from versions 2-latest, B wants 7-latest,
         // and C wants 5-latest. We achieve this by starting at version 2 and
-        // attaching A, then advancing to version 5 (letting A gather changes
+        // attaching A, then advancing to version 5 (letting A gather cemplacehanges
         // from 2-5). We then attach C and advance to 7, then attach B and advance
         // to the latest.
-        std::sort(new_notifiers.begin(), new_notifiers.end(), compare_notifier_versions);
-        new_notifier_transaction = m_db->start_read(new_notifiers.front()->version());
+        new_notifier_transaction = m_db->start_read(version);
 
         new_notifier_change_info.emplace(*new_notifier_transaction, new_notifiers);
         for (auto& notifier : new_notifiers) {
             new_notifier_change_info->advance_incremental(notifier->version());
-            notifier->attach_to(new_notifier_transaction);
             notifier->add_required_change_info(new_notifier_change_info->current());
         }
         new_notifier_change_info->advance_to_final(version);
