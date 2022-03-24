@@ -3713,7 +3713,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
 
     auto make_schema = []() -> auto
     {
-
         Schema schema{ObjectSchema("Obj", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                            {"name", PropertyType::String | PropertyType::Nullable},
                                            {"value", PropertyType::Int | PropertyType::Nullable}})};
