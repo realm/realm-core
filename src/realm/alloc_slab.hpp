@@ -153,8 +153,6 @@ public:
     /// Get the attached file. Only valid when called on an allocator with
     /// an attached file.
     util::File& get_file();
-    /// Get patch file used by encryption.
-    util::File& get_patch_file();
 
     /// Attach this allocator to the specified memory buffer.
     ///
@@ -577,7 +575,6 @@ private:
     uint64_t m_youngest_live_version = 1;
     std::mutex m_mapping_mutex;
     util::File m_file;
-    util::File m_encryption_patch_file;
     util::SharedFileInfo* m_realm_file_info = nullptr;
     // vectors where old mappings, are held from deletion to ensure translations are
     // kept open and ref->ptr translations work for other threads..
@@ -645,9 +642,6 @@ private:
     // Gets the path of the attached file, or other relevant debugging info.
     std::string get_file_path_for_assertions() const;
 
-    // Apply a pending patch on an encrypted file if the patch is valid.
-    // Then mark the patch as invalid.
-    void apply_pending_patch();
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
     friend class Group;

@@ -1279,7 +1279,11 @@ void* File::map_reserve(AccessMode a, size_t size, size_t offset) const
 #if REALM_ENABLE_ENCRYPTION
 void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
 {
-    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+    auto retval = realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+    if (mapping && m_patch_file) {
+        mapping->set_patch_file(m_patch_file->get_descriptor());
+    }
+    return retval;
 }
 
 void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
@@ -1650,6 +1654,15 @@ void File::set_encryption_key(const char* key)
     }
 #endif
 }
+
+void File::set_encryption_patch_file(std::unique_ptr<File>& patch_file)
+{
+    m_patch_file = std::move(patch_file);
+    if (m_patch_file) { // it could be nullptr
+        EncryptedFileMapping::static_apply_pending_patch(*this, *m_patch_file);
+    }
+}
+
 
 const char* File::get_encryption_key() const
 {

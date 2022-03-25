@@ -466,10 +466,11 @@ void AESCryptor::write(FileDesc fd, FileDesc patch_fd, off_t pos, const char* sr
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
         iv_table& iv = get_iv_table(fd, pos);
+        char* buffer = m_rw_buffer.get();
         if (patch_fd >= 0) {
-            q->the_queue.emplace_back(Patch());            
+            q->the_queue.emplace_back(Patch());
+            buffer = q->the_queue.back().payload.buffer;
         }
-        char* buffer = q->the_queue.back().payload.buffer;
         memcpy(&iv.iv2, &iv.iv1, 32);
         do {
             ++iv.iv1;

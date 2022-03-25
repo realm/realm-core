@@ -40,7 +40,7 @@ using namespace realm::metrics;
 // Class controlling a memory mapped window into a file
 class GroupWriter::MapWindow {
 public:
-    MapWindow(size_t alignment, util::File& f, util::File& patch_f, ref_type start_ref, size_t initial_size);
+    MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t initial_size);
     ~MapWindow();
 
     // translate a ref to a pointer
@@ -122,16 +122,12 @@ bool GroupWriter::MapWindow::extends_to_match(util::File& f, ref_type start_ref,
     return true;
 }
 
-GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, util::File& patch_f, ref_type start_ref, size_t size)
+GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type start_ref, size_t size)
     : m_alignment(alignment)
 {
     m_base_ref = aligned_to_mmap_block(start_ref);
     size_t window_size = get_window_size(f, start_ref, size);
     m_map.map(f, File::access_ReadWrite, window_size, 0, m_base_ref);
-    EncryptedFileMapping* efm = m_map.get_encrypted_mapping();
-    if (efm) {
-        efm->set_patch_file(patch_f.get_descriptor());
-    }
 }
 
 GroupWriter::MapWindow::~MapWindow()
@@ -307,7 +303,7 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
         m_map_windows.back()->flush();
         m_map_windows.pop_back();
     }
-    auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), m_alloc.get_patch_file(), start_ref, size);
+    auto new_window = std::make_unique<MapWindow>(m_window_alignment, m_alloc.get_file(), start_ref, size);
     m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
     return m_map_windows[0].get();
 }

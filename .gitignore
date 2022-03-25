@@ -90,3 +90,6 @@ compile_commands.json
 # Swift package manager
 /.swiftpm
 /.build
+
+.fake
+.ionide
