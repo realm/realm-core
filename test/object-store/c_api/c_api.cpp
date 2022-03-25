@@ -3749,13 +3749,12 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto empty_subs = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             CHECK(realm_sync_subscription_set_size(empty_subs) == 0);
             CHECK(realm_sync_subscription_set_version(empty_subs) == 0);
-            realm_sync_on_subscription_set_state_change_async(
-                empty_subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE,
-                [](const realm_flx_sync_subscription_set_t*, realm_flx_sync_subscription_set_state_e) {});
+            realm_sync_on_subscription_set_state_change_wait(
+                empty_subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            realm_release(empty_subs);
         }
         auto table = realm->read_group().get_table("class_Obj");
         auto name_col_key = table->get_column_key("name");
-        // auto value_col_key = table->get_column_key("value");
 
         Query query_foo(table);
         Query query_bar(table);
@@ -3778,6 +3777,11 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+
+            realm_release(sub);
+            realm_release(new_subs);
+            realm_release(result);
+            realm_release(subs);
         }
 
         wait_for_download(*realm);
@@ -3793,11 +3797,16 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
         {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
-            realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar);
-            sub = realm_sync_subscription_set_commit(mut_sub);
+            auto result = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar);
+            auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
-                sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+
+            realm_release(sub);
+            realm_release(mut_sub);
+            realm_release(result);
+            realm_release(sub_c);
         }
 
         {
@@ -3819,10 +3828,17 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto res = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar);
             CHECK(res);
             CHECK(!res->inserted());
-            sub = realm_sync_subscription_set_commit(mut_sub);
+            auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
-                sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+
+            realm_release(s);
+            realm_release(sub);
+            realm_release(mut_sub);
+            realm_release(res);
+            realm_release(sub_c);
+            realm_release(c_wrap_new_query_bar);
         }
 
         {
@@ -3839,10 +3855,14 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             auto cleared = realm_sync_subscription_set_clear(mut_sub);
             CHECK(cleared);
-            sub = realm_sync_subscription_set_commit(mut_sub);
+            auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
-                sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+
+            realm_release(sub);
+            realm_release(mut_sub);
+            realm_release(sub_c);
         }
 
         {
@@ -3850,6 +3870,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
+
+        realm_release(c_wrap_query_foo);
+        realm_release(c_wrap_query_bar);
     });
 }
 #endif // REALM_ENABLE_AUTH_TESTS
