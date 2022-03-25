@@ -156,6 +156,10 @@ public:
     {
         return m_path + ".lock"; // ".management/access_control";
     }
+    std::string get_patch_path() const
+    {
+        return m_path + ".patch"; // ".management/access_control";
+    }
     ~DBTestPathGuard() noexcept;
     DBTestPathGuard(DBTestPathGuard&&) = default;
     DBTestPathGuard& operator=(DBTestPathGuard&&) = default;
