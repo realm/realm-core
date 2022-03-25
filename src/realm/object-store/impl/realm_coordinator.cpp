@@ -913,16 +913,13 @@ namespace {
 bool compare_notifier_versions(const std::shared_ptr<_impl::CollectionNotifier>& a,
                                const std::shared_ptr<_impl::CollectionNotifier>& b)
 {
-    if (a->version() < b->version()) {
-        return true;
-    }
-    return false;
+    return a->version() < b->version();
 }
 
 class IncrementalChangeInfo {
 public:
     IncrementalChangeInfo(Transaction& sg, std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
-        : m_rt(sg)
+        : m_tr(sg)
     {
         if (notifiers.empty())
             return;
@@ -952,7 +949,7 @@ public:
     bool advance_incremental(VersionID version)
     {
         if (version != m_current_version) {
-            transaction::observe(m_rt, *m_current, m_current_version, version);
+            transaction::observe(m_tr, *m_current, m_current_version, version);
             m_info.push_back({std::move(m_current->lists)});
             auto next = &m_info.back();
             for (auto& table : m_current->tables)
@@ -970,12 +967,12 @@ public:
             return;
         }
 
-        if (version > m_rt.get_version_of_current_transaction()) {
-            REALM_ASSERT(m_rt.get_version_of_current_transaction() == m_current_version);
-            transaction::advance(m_rt, *m_current, version);
+        if (version > m_tr.get_version_of_current_transaction()) {
+            REALM_ASSERT(m_tr.get_version_of_current_transaction() == m_current_version);
+            transaction::advance(m_tr, *m_current, version);
         }
         else {
-            transaction::observe(m_rt, *m_current, m_current_version, version);
+            transaction::observe(m_tr, *m_current, m_current_version, version);
         }
 
         // We now need to combine the transaction change info objects so that all of
@@ -1015,7 +1012,7 @@ public:
 private:
     std::vector<TransactionChangeInfo> m_info;
     TransactionChangeInfo* m_current = nullptr;
-    Transaction& m_rt;
+    Transaction& m_tr;
     VersionID m_current_version;
 };
 } // anonymous namespace
@@ -1094,7 +1091,7 @@ void RealmCoordinator::run_async_notifiers()
         //  - Notifier C has a source version of 5
         // Notifier A wants the changes from versions 2-latest, B wants 7-latest,
         // and C wants 5-latest. We achieve this by starting at version 2 and
-        // attaching A, then advancing to version 5 (letting A gather cemplacehanges
+        // attaching A, then advancing to version 5 (letting A gather changes
         // from 2-5). We then attach C and advance to 7, then attach B and advance
         // to the latest.
         new_notifier_transaction = m_db->start_read(version);
