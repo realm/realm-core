@@ -613,14 +613,6 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
     file.mappings.push_back(this);
 }
 
-void EncryptedFileMapping::static_apply_pending_patch(const File& f, const File& patch_f)
-{
-    SharedFileInfo* info = util::get_file_info_for_file(f);
-    if (info) {
-        info->cryptor.apply_pending_patch(f.get_descriptor(), patch_f.get_descriptor());
-    }
-}
-
 void EncryptedFileMapping::set_patch_file(const FileDesc& patch)
 {
     m_file.patch_fd = patch;

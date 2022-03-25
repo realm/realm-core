@@ -48,6 +48,7 @@
 #include <realm/util/string_buffer.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/aes_cryptor.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -1659,7 +1660,10 @@ void File::set_encryption_patch_file(std::unique_ptr<File>& patch_file)
 {
     m_patch_file = std::move(patch_file);
     if (m_patch_file) { // it could be nullptr
-        EncryptedFileMapping::static_apply_pending_patch(*this, *m_patch_file);
+        auto info = util::get_file_info_for_file(*this);
+        if (info) {
+            info->cryptor.apply_pending_patch(m_fd, info->patch_fd);
+        }
     }
 }
 

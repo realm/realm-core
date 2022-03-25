@@ -85,7 +85,6 @@ public:
     }
 
     void set_patch_file(const FileDesc& patch);
-    static void static_apply_pending_patch(const File& f, const File& patch_f);
 
 private:
     SharedFileInfo& m_file;
