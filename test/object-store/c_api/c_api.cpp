@@ -3711,7 +3711,6 @@ TEST_CASE("C API") {
 
 #ifdef REALM_ENABLE_AUTH_TESTS
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
-
     using namespace realm::app;
 
     auto make_schema = []() -> auto
