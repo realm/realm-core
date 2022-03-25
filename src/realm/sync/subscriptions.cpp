@@ -405,6 +405,28 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     return std::move(future);
 }
 
+MutableSubscriptionSet::~MutableSubscriptionSet()
+{
+    // If we never committed anything, then we should cancel any registered notifications since they'll never
+    // fire, or will fire on a future MutableSubscriptionSet.
+    if (m_tr->get_transact_stage() == DB::transact_Writing) {
+        auto mgr = get_flx_subscription_store();
+        auto my_version = version();
+
+        std::unique_lock<std::mutex> lk(mgr->m_pending_notifications_mutex);
+        for (auto it = mgr->m_pending_notifications.begin(); it != mgr->m_pending_notifications.end();) {
+            if (it->version != my_version) {
+                ++it;
+                continue;
+            }
+
+            it->promise.set_error(
+                {ErrorCodes::RuntimeError, "MutableSubscriptionSet destroyed before it could be committed"});
+            it = mgr->m_pending_notifications.erase(it);
+        }
+    }
+}
+
 void MutableSubscriptionSet::process_notifications()
 {
     auto mgr = get_flx_subscription_store(); // Throws

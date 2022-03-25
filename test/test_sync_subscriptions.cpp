@@ -396,6 +396,43 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
+TEST(Sync_SubscriptionStoreAborted)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    std::atomic<int64_t> last_seen_sub_version = -1;
+
+    auto store = SubscriptionStore::create(fixture.db, [&last_seen_sub_version](int64_t version) {
+        last_seen_sub_version.store(version);
+    });
+
+    util::Future<SubscriptionSet::State> aborted_state_future;
+    {
+        auto mut_subs = store->get_latest().make_mutable_copy();
+        aborted_state_future = mut_subs.get_state_change_notification(SubscriptionSet::State::Complete);
+    }
+
+    CHECK_EQUAL(aborted_state_future.get_no_throw(), ErrorCodes::RuntimeError);
+
+    auto committed_version = [&] {
+        auto mut_subs = store->get_latest().make_mutable_copy();
+        aborted_state_future = mut_subs.get_state_change_notification(SubscriptionSet::State::Complete);
+        return std::move(mut_subs).commit().version();
+    }();
+
+    CHECK_EQUAL(committed_version, int64_t(1));
+    {
+        auto mut_subs = store->get_mutable_by_version(committed_version);
+        mut_subs.update_state(SubscriptionSet::State::Complete);
+        std::move(mut_subs).commit();
+    }
+
+    CHECK_EQUAL(store->get_by_version(committed_version)
+                    .get_state_change_notification(SubscriptionSet::State::Complete)
+                    .get(),
+                SubscriptionSet::State::Complete);
+}
+
 TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
