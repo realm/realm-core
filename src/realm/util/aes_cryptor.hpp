@@ -103,7 +103,7 @@ struct ReaderInfo {
 
 struct SharedFileInfo {
     FileDesc fd;
-    FileDesc patch_fd = -1;
+    FileDesc patch_fd = NoFileDesc;
     AESCryptor cryptor;
     std::vector<EncryptedFileMapping*> mappings;
     uint64_t last_scanned_version = 0;
@@ -118,7 +118,7 @@ struct SharedFileInfo {
 
 inline void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
 {
-    write(fd, -1, pos, src, size, nullptr);
+    write(fd, NoFileDesc, pos, src, size, nullptr);
 }
 
 } // namespace util
