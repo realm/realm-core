@@ -299,7 +299,7 @@ void ClientHistory::set_sync_progress(const SyncProgress& progress, const std::u
     ensure_updated(local_version); // Throws
     prepare_for_write();           // Throws
 
-    update_sync_progress(progress, downloadable_bytes); // Throws
+    update_sync_progress(progress, downloadable_bytes, wt); // Throws
 
     // Note: This transaction produces an empty changeset. Empty changesets are
     // not uploaded to the server.
@@ -501,7 +501,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
     // synthetic server version that represents synthetic changesets generated from state on the server.
     if (batch_state == DownloadBatchState::LastInBatch) {
-        update_sync_progress(progress, downloadable_bytes); // Throws
+        update_sync_progress(progress, downloadable_bytes, transact); // Throws
     }
 
     version_type new_version = transact->commit_and_continue_as_read().version; // Throws
@@ -727,7 +727,8 @@ void ClientHistory::add_sync_history_entry(HistoryEntry entry)
 }
 
 
-void ClientHistory::update_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes)
+void ClientHistory::update_sync_progress(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
+                                         TransactionRef wt)
 {
     Array& root = m_arrays->root;
 
@@ -775,6 +776,9 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
     if (progress.upload.last_integrated_server_version > 0) {
         root.set(s_progress_upload_server_version_iip,
                  RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
+    }
+    if (previous_upload_client_version < progress.upload.client_version) {
+        _impl::client_reset::remove_pending_client_resets(wt);
     }
     if (downloadable_bytes) {
         root.set(s_progress_downloadable_bytes_iip,

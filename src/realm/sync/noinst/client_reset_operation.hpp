@@ -31,9 +31,9 @@ namespace realm::_impl {
 class ClientResetOperation {
 public:
     using CallbackBeforeType = util::UniqueFunction<void(std::string)>;
-    using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID)>;
+    using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID, bool)>;
 
-    ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool discard_local,
+    ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, ClientResyncMode mode,
                          CallbackBeforeType notify_before, CallbackAfterType notify_after);
 
     // When the client has received the salted file ident from the server, it
@@ -52,7 +52,7 @@ private:
     util::Logger& m_logger;
     DB& m_db;
     DBRef m_db_fresh;
-    bool m_discard_local;
+    ClientResyncMode m_mode;
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};
     realm::VersionID m_client_reset_old_version;
     realm::VersionID m_client_reset_new_version;

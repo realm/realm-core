@@ -31,22 +31,6 @@ static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type
 
 using ProtocolError = realm::sync::ProtocolError;
 
-std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
-{
-    switch (mode) {
-        case ClientResyncMode::Manual:
-            os << "Manual";
-            break;
-        case ClientResyncMode::DiscardLocal:
-            os << "DiscardLocal";
-            break;
-        case ClientResyncMode::Recover:
-            os << "Recover";
-            break;
-    }
-    return os;
-}
-
 bool SyncError::is_client_error() const
 {
     return error_code.category() == realm::sync::client_error_category();

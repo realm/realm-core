@@ -149,7 +149,7 @@ TEST(ClientReset_NoLocalChanges)
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.discard_local = true;
+                client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.fresh_copy = std::move(sg_fresh);
                 session_config.client_reset_config = std::move(client_reset_config);
             }
@@ -222,7 +222,7 @@ TEST(ClientReset_InitialLocalChanges)
     Session::Config session_config_2;
     {
         Session::Config::ClientReset client_reset_config;
-        client_reset_config.discard_local = true;
+        client_reset_config.mode = ClientResyncMode::DiscardLocal;
         client_reset_config.fresh_copy = std::move(sg_fresh);
         session_config_2.client_reset_config = std::move(client_reset_config);
     }
@@ -349,7 +349,7 @@ TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
 
     Session::Config session_config_3;
     session_config_3.client_reset_config = Session::Config::ClientReset{};
-    session_config_3.client_reset_config->discard_local = !recover;
+    session_config_3.client_reset_config->mode = recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal;
     session_config_3.client_reset_config->fresh_copy = std::move(sg_fresh1);
     Session session_3 = fixture.make_session(sg, std::move(session_config_3));
     fixture.bind_session(session_3, server_path);
@@ -593,14 +593,14 @@ TEST(ClientReset_ThreeClients)
             Session::Config session_config_1;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.discard_local = true;
+                client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.fresh_copy = std::move(sg_fresh1);
                 session_config_1.client_reset_config = std::move(client_reset_config);
             }
             Session::Config session_config_2;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.discard_local = true;
+                client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.fresh_copy = std::move(sg_fresh2);
                 session_config_2.client_reset_config = std::move(client_reset_config);
             }
@@ -719,7 +719,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.discard_local = true;
+            client_reset_config.mode = ClientResyncMode::DiscardLocal;
             client_reset_config.fresh_copy = std::move(sg_fresh1);
             session_config.client_reset_config = std::move(client_reset_config);
         }
@@ -805,7 +805,7 @@ TEST(ClientReset_PinnedVersion)
         Session::Config session_config;
         {
             session_config.client_reset_config = Session::Config::ClientReset{};
-            session_config.client_reset_config->discard_local = true;
+            session_config.client_reset_config->mode = ClientResyncMode::DiscardLocal;
             session_config.client_reset_config->fresh_copy = std::move(sg_fresh);
         }
 

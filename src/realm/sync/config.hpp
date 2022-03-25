@@ -22,6 +22,7 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 
 #include <functional>
 #include <memory>
@@ -92,17 +93,6 @@ struct SyncError {
 
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 
-enum class ClientResyncMode : unsigned char {
-    // Fire a client reset error
-    Manual,
-    // Discard local changes, without disrupting accessors or closing the Realm
-    DiscardLocal,
-    // Attempt to recover unsynchronized but committed changes.
-    Recover,
-};
-
-std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
-
 enum class ReconnectMode {
     /// This is the mode that should always be used in production. In this
     /// mode the client uses a scheme for determining a reconnect delay that
@@ -163,7 +153,8 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
+    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after, bool did_recover)>
+        notify_after_client_reset;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

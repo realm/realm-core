@@ -25,16 +25,17 @@
 
 namespace realm::_impl {
 
-ClientResetOperation::ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, bool discard_local,
+ClientResetOperation::ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, ClientResyncMode mode,
                                            CallbackBeforeType notify_before, CallbackAfterType notify_after)
     : m_logger{logger}
     , m_db{db}
     , m_db_fresh(std::move(db_fresh))
-    , m_discard_local(discard_local)
+    , m_mode(mode)
     , m_notify_before(std::move(notify_before))
     , m_notify_after(std::move(notify_after))
 {
-    logger.debug("Create ClientResetOperation, realm_path = %1, discard_local = %2", m_db.get_path(), discard_local);
+    REALM_ASSERT_RELEASE(m_mode != ClientResyncMode::Manual);
+    logger.debug("Create ClientResetOperation, realm_path = %1, mode = %2", m_db.get_path(), m_mode);
 }
 
 std::string ClientResetOperation::get_fresh_path_for(const std::string& path)
@@ -55,9 +56,9 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
     // sync should be able to continue as normal
     bool local_realm_exists = m_db.get_version_of_latest_snapshot() != 0;
     if (local_realm_exists) {
-        REALM_ASSERT_EX(m_db_fresh, m_db.get_path(), m_discard_local);
-        m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, discard_local = %3",
-                       m_db.get_path(), local_realm_exists, m_discard_local);
+        REALM_ASSERT_EX(m_db_fresh, m_db.get_path(), m_mode);
+        m_logger.debug("ClientResetOperation::finalize, realm_path = %1, local_realm_exists = %2, mode = %3",
+                       m_db.get_path(), local_realm_exists, m_mode);
 
         client_reset::LocalVersionIDs local_version_ids;
         auto always_try_clean_up = util::make_scope_exit([&]() noexcept {
@@ -74,11 +75,12 @@ bool ClientResetOperation::finalize(sync::SaltedFileIdent salted_file_ident)
         if (m_notify_after) {
             previous_state = m_db.start_frozen();
         }
-        local_version_ids = client_reset::perform_client_reset_diff(m_db, m_db_fresh, m_salted_file_ident, m_logger,
-                                                                    !m_discard_local); // throws
+        bool did_recover_out = false;
+        local_version_ids = client_reset::perform_client_reset_diff(m_db, *m_db_fresh, m_salted_file_ident, m_logger,
+                                                                    m_mode, &did_recover_out); // throws
 
         if (m_notify_after) {
-            m_notify_after(local_path, previous_state->get_version_of_current_transaction());
+            m_notify_after(local_path, previous_state->get_version_of_current_transaction(), did_recover_out);
         }
 
         m_client_reset_old_version = local_version_ids.old_version;

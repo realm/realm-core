@@ -1061,7 +1061,7 @@ bool compare_groups(const Transaction& group_1, const Transaction& group_2,
         for (auto i : table_keys) {
             ConstTableRef table = group.get_table(i);
             StringData name = table->get_name();
-            if (name != "pk" && name != "metadata" && filter_func(name))
+            if (name != "pk" && name != "metadata" && name != "client_reset_metadata" && filter_func(name))
                 tables.push_back(name);
         }
     };

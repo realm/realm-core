@@ -171,7 +171,7 @@ Once authorized, run the following docker command from the top directory to star
 
 ```
 export MDBREALM_TEST_SERVER_TAG=$(grep MDBREALM_TEST_SERVER_TAG dependencies.list |cut -f 2 -d=)
-docker run --rm -p 9090:9090 -v ~/.aws/credentials:/root/.aws/credentials -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
+docker run --rm -p 9090:9090 -v ~/.aws/credentials:/root/.aws/credentials -it ghcr.io/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
 ```
 
 This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".
