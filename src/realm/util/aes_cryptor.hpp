@@ -59,6 +59,7 @@ public:
     void apply_pending_patch(FileDesc f, FileDesc f_patch);
     WriteQueue make_queue();
     void flush_queue(FileDesc f, FileDesc f_patch, const WriteQueue& q);
+
 private:
     enum EncryptionMode {
 #if REALM_PLATFORM_APPLE
@@ -102,6 +103,7 @@ struct ReaderInfo {
 
 struct SharedFileInfo {
     FileDesc fd;
+    FileDesc patch_fd = -1;
     AESCryptor cryptor;
     std::vector<EncryptedFileMapping*> mappings;
     uint64_t last_scanned_version = 0;

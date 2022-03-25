@@ -84,15 +84,11 @@ public:
         return m_first_page;
     }
 
-    void set_patch_file(const FileDesc& patch)
-    {
-        m_patch_fd = patch;
-    }
+    void set_patch_file(const FileDesc& patch);
     static void static_apply_pending_patch(const File& f, const File& patch_f);
 
 private:
     SharedFileInfo& m_file;
-    FileDesc m_patch_fd = -1;
     size_t m_page_shift;
     size_t m_blocks_per_page;
 

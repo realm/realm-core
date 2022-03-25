@@ -621,6 +621,13 @@ void EncryptedFileMapping::static_apply_pending_patch(const File& f, const File&
     }
 }
 
+void EncryptedFileMapping::set_patch_file(const FileDesc& patch)
+{
+    m_file.patch_fd = patch;
+    // m_patch_fd = patch;
+}
+
+
 EncryptedFileMapping::~EncryptedFileMapping()
 {
     if (m_access == File::access_ReadWrite) {
@@ -895,12 +902,12 @@ void EncryptedFileMapping::flush() noexcept
         }
 
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        m_file.cryptor.write(m_file.fd, m_patch_fd, off_t(page_ndx_in_file << m_page_shift),
+        m_file.cryptor.write(m_file.fd, m_file.patch_fd, off_t(page_ndx_in_file << m_page_shift),
                              page_addr(local_page_ndx), static_cast<size_t>(1ULL << m_page_shift), m_file.wq);
         clear(m_page_state[local_page_ndx], Dirty);
     }
-    if (m_patch_fd >= 0) {
-        m_file.cryptor.flush_queue(m_file.fd, m_patch_fd, m_file.wq);
+    if (m_file.patch_fd >= 0) {
+        m_file.cryptor.flush_queue(m_file.fd, m_file.patch_fd, m_file.wq);
     }
     validate();
 }
@@ -910,7 +917,7 @@ void EncryptedFileMapping::flush() noexcept
 #endif
 void EncryptedFileMapping::sync() noexcept
 {
-    if (m_patch_fd >= 0) {
+    if (m_file.patch_fd >= 0) {
         REALM_ASSERT(m_file.wq->the_queue.size() == 1);
     }
 #ifdef _WIN32
