@@ -19,6 +19,7 @@
 ### Internals
 * Catch2 was updated to 2.13.8. ([#5327](https://github.com/realm/realm-core/pull/5327))
 * Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
+* When advancing the notifiers we will no longer attach to intermediate versions. We will always work from the latest version.
 
 ----------------------------------------------
 
