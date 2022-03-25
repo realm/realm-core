@@ -6,6 +6,7 @@
 #include <realm/object-store/sync/generic_network_transport.hpp>
 
 #include "sync/flx_sync_harness.hpp"
+#include "util/test_file.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 
 #include <cstring>
@@ -3708,9 +3709,8 @@ TEST_CASE("C API") {
     realm_release(realm);
 }
 
+#ifdef REALM_ENABLE_AUTH_TESTS
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
-
-#if defined(REALM_ENABLE_SYNC) && defined(REALM_ENABLE_AUTH_TESTS) && defined(REALM_MONGODB_ENDPOINT)
 
     using namespace realm::app;
 
@@ -3851,5 +3851,5 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             CHECK(results.size() == 0);
         }
     });
-#endif
 }
+#endif // REALM_ENABLE_AUTH_TESTS

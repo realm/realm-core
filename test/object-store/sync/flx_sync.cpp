@@ -21,6 +21,7 @@
 #include <catch2/catch.hpp>
 
 #include "flx_sync_harness.hpp"
+#include "util/test_file.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/sync/protocol.hpp"
 
