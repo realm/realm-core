@@ -1564,7 +1564,7 @@ bool Session::wait_for_download_complete_or_client_stopped()
 }
 
 
-void Session::refresh(std::string signed_access_token)
+void Session::refresh(const std::string& signed_access_token)
 {
     m_impl->refresh(signed_access_token); // Throws
 }
