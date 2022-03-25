@@ -644,6 +644,48 @@ struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSess
     }
 };
 
+struct realm_flx_sync_subscription : realm::c_api::WrapC, realm::sync::Subscription {
+    realm_flx_sync_subscription(realm::sync::Subscription&& subscription)
+        : realm::sync::Subscription(std::move(subscription))
+    {
+    }
+};
+
+struct realm_flx_sync_subscription_set : realm::c_api::WrapC, realm::sync::SubscriptionSet {
+    realm_flx_sync_subscription_set(realm::sync::SubscriptionSet&& subscription_set)
+        : realm::sync::SubscriptionSet(std::move(subscription_set))
+    {
+    }
+};
+
+struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC, realm::sync::MutableSubscriptionSet {
+    realm_flx_sync_mutable_subscription_set(realm::sync::MutableSubscriptionSet&& subscription_set)
+        : realm::sync::MutableSubscriptionSet(std::move(subscription_set))
+    {
+    }
+};
+
+struct realm_flx_sync_subscription_desc : realm::c_api::WrapC {
+    realm_flx_sync_subscription_desc(size_t index, bool inserted)
+        : m_index(index)
+        , m_inserted(inserted)
+    {
+    }
+
+    size_t get_index() const
+    {
+        return m_index;
+    }
+
+    bool inserted() const
+    {
+        return m_inserted;
+    }
+
+    size_t m_index;
+    bool m_inserted;
+};
+
 struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {
     realm_async_open_task(std::shared_ptr<realm::AsyncOpenTask> task)
         : std::shared_ptr<realm::AsyncOpenTask>{std::move(task)}
