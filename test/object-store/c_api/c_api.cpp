@@ -3870,7 +3870,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
-
         realm_release(c_wrap_query_foo);
         realm_release(c_wrap_query_bar);
     });
