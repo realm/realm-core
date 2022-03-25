@@ -18,6 +18,7 @@
 
 #ifndef FLX_SYNC_HARNESS_H
 #define FLX_SYNC_HARNESS_H
+#if defined(REALM_ENABLE_SYNC) && defined(REALM_ENABLE_AUTH_TESTS) && defined(REALM_MONGODB_ENDPOINT)
 
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
@@ -119,7 +120,6 @@ private:
     app::App::Config m_app_config;
     Schema m_schema;
 };
-
 } // namespace realm::app
-
+#endif // defined(REALM_ENABLE_SYNC) && defined(REALM_ENABLE_AUTH_TESTS) && defined(REALM_MONGODB_ENDPOINT)
 #endif // FLX_SYNC_HARNESS_H

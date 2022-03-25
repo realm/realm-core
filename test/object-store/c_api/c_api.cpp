@@ -3709,6 +3709,9 @@ TEST_CASE("C API") {
 }
 
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
+
+#if defined(REALM_ENABLE_SYNC) && defined(REALM_ENABLE_AUTH_TESTS) && defined(REALM_MONGODB_ENDPOINT)
+
     using namespace realm::app;
 
     auto make_schema = []() -> auto
@@ -3766,7 +3769,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             CHECK(sub != nullptr);
             auto new_subs = realm_sync_make_subscription_set_mutable(sub);
-            auto result = realm_sync_subscription_set_insert_or_assing(new_subs, c_wrap_query_foo);
+            auto result = realm_sync_subscription_set_insert_or_assign(new_subs, c_wrap_query_foo);
             CHECK(result != nullptr);
             CHECK(result->inserted());
             CHECK(result->get_index() == 0);
@@ -3790,7 +3793,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
         {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
-            realm_sync_subscription_set_insert_or_assing(mut_sub, c_wrap_query_bar);
+            realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar);
             sub = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 sub, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
@@ -3813,7 +3816,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             Query new_query_bar(table);
             new_query_bar.equal(name_col_key, "bar");
             auto c_wrap_new_query_bar = new realm_query_t{query_bar, query_bar.get_ordering(), realm};
-            auto res = realm_sync_subscription_set_insert_or_assing(mut_sub, c_wrap_new_query_bar);
+            auto res = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar);
             CHECK(res);
             CHECK(!res->inserted());
             sub = realm_sync_subscription_set_commit(mut_sub);
@@ -3848,4 +3851,5 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             CHECK(results.size() == 0);
         }
     });
+#endif
 }

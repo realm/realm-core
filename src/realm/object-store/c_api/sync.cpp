@@ -579,7 +579,7 @@ RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscripti
 }
 
 RLM_API realm_flx_sync_subscription_desc_t*
-realm_sync_subscription_set_insert_or_assing_with_name(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+realm_sync_subscription_set_insert_or_assign_with_name(realm_flx_sync_mutable_subscription_set_t* subscription_set,
                                                        const char* name, const realm_query_t* query) noexcept
 {
     if (subscription_set == nullptr || query == nullptr)
@@ -593,7 +593,7 @@ realm_sync_subscription_set_insert_or_assing_with_name(realm_flx_sync_mutable_su
 }
 
 RLM_API realm_flx_sync_subscription_desc_t*
-realm_sync_subscription_set_insert_or_assing(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t* subscription_set,
                                              const realm_query_t* query) noexcept
 {
     if (subscription_set == nullptr || query == nullptr)
