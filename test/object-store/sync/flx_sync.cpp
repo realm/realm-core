@@ -694,7 +694,6 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 
     CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
 }
-
 } // namespace realm::app
 
 #endif
