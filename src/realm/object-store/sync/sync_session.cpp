@@ -256,7 +256,10 @@ std::shared_ptr<sync::SubscriptionStore> SyncSession::make_flx_subscription_stor
         if (m_state != State::Active && m_state != State::WaitingForAccessToken) {
             return;
         }
-        m_session->on_new_flx_sync_subscription(new_version);
+        // There may be no session yet (i.e., waiting to refresh the access token).
+        if (m_session) {
+            m_session->on_new_flx_sync_subscription(new_version);
+        }
     });
 }
 
