@@ -21,6 +21,7 @@
 * Upgraded OpenSSL from v1.1.1g to v1.1.1n.
 * Catch2 was updated to 2.13.8. ([#5327](https://github.com/realm/realm-core/pull/5327))
 * Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
+* Update test harness to use app.schemas endpoint. ([#5333](https://github.com/realm/realm-core/pull/5333))
 
 ----------------------------------------------
 
