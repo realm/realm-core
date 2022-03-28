@@ -738,7 +738,7 @@ void File::resize_static(FileDesc fd, SizeType size)
     // Windows docs say "it is not an error to set the file pointer to a position beyond the end of the file."
     // so seeking with SetFilePointerEx() will not error out even if there is no disk space left.
     // In this scenario though, the following call to SedEndOfFile() will fail if there is no disk space left.
-    seek(size);
+    seek_static(fd, size);
 
     if (!SetEndOfFile(fd)) {
         DWORD err = GetLastError(); // Eliminate any risk of clobbering
@@ -750,7 +750,7 @@ void File::resize_static(FileDesc fd, SizeType size)
     }
 
     // Restore file position
-    seek(p);
+    seek_static(fd, p);
 
 #else // POSIX version
 
@@ -1663,6 +1663,7 @@ void File::set_encryption_key(const char* key)
 
 void File::set_encryption_patch_file(std::unique_ptr<File>& patch_file)
 {
+#if REALM_ENABLE_ENCRYPTION
     m_patch_file = std::move(patch_file);
     if (m_patch_file) { // it could be nullptr
         auto info = util::get_file_info_for_file(*this);
@@ -1670,6 +1671,11 @@ void File::set_encryption_patch_file(std::unique_ptr<File>& patch_file)
             info->cryptor.apply_pending_patch(m_fd, info->patch_fd);
         }
     }
+#else
+    if (patch_file) {
+        throw util::runtime_error("Encryption not enabled");
+    }
+#endif
 }
 
 

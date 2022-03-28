@@ -344,7 +344,7 @@ void AESCryptor::try_read_block(FileDesc fd, off_t pos, char* dst) noexcept
 union Patch {
     struct Meta {         // first patch entry holds the metadata for all entries
         uint8_t hmac[32]; // for validation of the rest
-        int num_blocks;
+        size_t num_blocks;
     };
     struct Payload { // each following entry hold a payload
         off_t pos;
@@ -391,8 +391,8 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     std::vector<Patch> patches;
     patches.resize(entries);
     auto data = patches.data();
-    int read = File::read_static(patch_f, reinterpret_cast<char*>(data), patch_size);
-    if (read != (signed)patch_size) {
+    auto read = File::read_static(patch_f, reinterpret_cast<char*>(data), patch_size);
+    if (read != patch_size) {
         // Reading patch file failed, ignoring patch
         // this is actually fatal, isn't it?
         File::resize_static(patch_f, 0);
