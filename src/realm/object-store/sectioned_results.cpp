@@ -22,21 +22,26 @@
 namespace realm {
 
 static std::vector<SectionRange> calculate_sections(Results& results,
-                                                    const SectionedResults::ComparisonFunc2& callback) {
+                                                    const SectionedResults::ComparisonFunc& callback) {
 
     auto sections = std::map<Mixed, SectionRange>();
     auto offset_ranges = std::vector<SectionRange>();
-    const size_t size = results.size();
+    // Take a snapshot in case the underlying results change while
+    // the calculation is being performed.
+    auto snapshot = results.snapshot();
+    const size_t size = snapshot.size();
     size_t current_section = 0;
     for (size_t i = 0; i < size; ++i) {
-        if (sections.find(callback(results.get_any(i))) == sections.end()) {
+        auto section_key = callback(snapshot.get_any(i));
+        if (sections.find(section_key) == sections.end()) {
             SectionRange section;
             section.index = current_section;
+            section.key = section_key;
             section.indices.push_back(i);
-            sections[callback(results.get_any(i))] = section;
+            sections[section_key] = section;
             current_section++;
         } else {
-            sections[callback(results.get_any(i))].indices.push_back(i);
+            sections[section_key].indices.push_back(i);
         }
     }
 
@@ -44,6 +49,27 @@ static std::vector<SectionRange> calculate_sections(Results& results,
               sections.end(),
               back_inserter(offset_ranges), [](const std::map<Mixed, SectionRange>::value_type& val) { return val.second; });
     return offset_ranges;
+}
+
+static SectionedResults::ComparisonFunc builtin_comparison(Results& results,
+                                                           util::Optional<StringData> prop_name,
+                                                           Results::SectionedResultsOperator op)
+{
+    switch (op) {
+        case Results::SectionedResultsOperator::FirstLetter:
+            if (results.get_type() == PropertyType::Object) {
+                return [r = results.get_realm(), p = *prop_name](Mixed value) {
+                    auto obj = Object(r, value.get_link());
+                    auto v = obj.get_column_value<StringData>(p);
+                    return v.size() > 1 ? v.prefix(1) : "";
+                };
+            } else {
+                return [r = results.get_realm()](Mixed value) {
+                    auto v = value.get_string();
+                    return v.size() > 1 ? v.prefix(1) : "";
+                };
+            }
+    }
 }
 
 static SectionRange section_for_index(std::vector<SectionRange> offsets, size_t index) {
@@ -55,7 +81,7 @@ static SectionRange section_for_index(std::vector<SectionRange> offsets, size_t 
             return offset;
         }
     }
-    // throw
+    throw std::logic_error("Section for given index not found.");
 }
 
 struct SectionedResultsNotificationHandler {
@@ -114,7 +140,6 @@ public:
         auto modified_sections = std::map<size_t, std::vector<size_t>>();
         for (auto i : indicies) {
             auto range = section_for_index(offsets, i);
-//            modified_sections[range.index].push_back(i - range.begin);
             auto it = std::find(range.indices.begin(), range.indices.end(), i);
             if (it != range.indices.end()) {
                 auto index = std::distance(range.indices.begin(), it);
@@ -138,6 +163,11 @@ Mixed ResultsSection::operator[](size_t idx) const
     return m_parent->m_results.get_any(m_parent->m_offset_ranges[m_index].indices[idx]);
 }
 
+Mixed ResultsSection::key()
+{
+    return m_parent->m_offset_ranges[m_index].key;
+}
+
 template <typename Context>
 auto ResultsSection::get(Context& ctx, size_t row_ndx)
 {
@@ -148,7 +178,7 @@ size_t ResultsSection::size()
 {
     m_parent->calculate_sections_if_required();
     auto range = m_parent->m_offset_ranges[m_index];
-    return range.indices.size();//(range.end + 1) - range.begin;
+    return range.indices.size();
 }
 
 NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificatonCallback callback,
@@ -158,16 +188,24 @@ NotificationToken ResultsSection::add_notification_callback(SectionedResultsNoti
 }
 
 SectionedResults::SectionedResults(Results results,
-                                   ComparisonFunc2 comparison_func):
+                                   ComparisonFunc comparison_func):
 m_results(results),
 m_callback(std::move(comparison_func)) {
     m_offset_ranges = calculate_sections(m_results, m_callback);
 };
 
+SectionedResults::SectionedResults(Results results,
+                                   util::Optional<StringData> prop_name,
+                                   Results::SectionedResultsOperator op):
+m_results(results),
+m_callback(builtin_comparison(results, prop_name, op)) {
+    m_offset_ranges = calculate_sections(m_results, m_callback);
+};
+
 void SectionedResults::calculate_sections_if_required(Results::EvaluateMode mode) {
-    //if (!m_results.ensure_up_to_date(mode)) {
+    if (!m_results.ensure_up_to_date(mode)) {
         m_offset_ranges = calculate_sections(m_results, m_callback);
-    //}
+    }
 }
 
 size_t SectionedResults::size()

@@ -194,6 +194,11 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             // Tables are always up-to-date
             return;
         case Mode::Collection: {
+            bool needs_update = m_collection->has_changed();
+
+            if (needs_update)
+                return false;
+
             // Collections themselves are always up-to-date, but we may need
             // to apply sort descriptors
             if (m_descriptor_ordering.is_empty())
@@ -215,7 +220,6 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
                 return;
 
-            bool needs_update = m_collection->has_changed();
             if (!m_list_indices) {
                 m_list_indices = std::vector<size_t>{};
                 needs_update = true;
@@ -1156,9 +1160,14 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     return distinct({std::move(column_keys)});
 }
 
-SectionedResults Results::sectioned_results(SectionedResults::ComparisonFunc2 comparison_func)
+SectionedResults Results::sectioned_results(SectionedResults::ComparisonFunc comparison_func)
 {
     return SectionedResults(*this, std::move(comparison_func));
+}
+
+SectionedResults Results::sectioned_results(util::Optional<StringData> prop_name, SectionedResultsOperator op) REQUIRES(m_mutex)
+{
+    return SectionedResults(*this, prop_name, op);
 }
 
 Results Results::snapshot() const&
