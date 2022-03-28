@@ -718,25 +718,29 @@ File::SizeType File::get_size() const
         return size;
 }
 
-
 void File::resize(SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
+    if (m_encryption_key)
+        size = data_size_to_encrypted_size(size);
+
+    File::resize_static(m_fd, size);
+}
+
+void File::resize_static(FileDesc fd, SizeType size)
+{
 #ifdef _WIN32 // Windows version
 
     // Save file position
-    SizeType p = get_file_pos(m_fd);
-
-    if (m_encryption_key)
-        size = data_size_to_encrypted_size(size);
+    SizeType p = get_file_pos(fd);
 
     // Windows docs say "it is not an error to set the file pointer to a position beyond the end of the file."
     // so seeking with SetFilePointerEx() will not error out even if there is no disk space left.
     // In this scenario though, the following call to SedEndOfFile() will fail if there is no disk space left.
     seek(size);
 
-    if (!SetEndOfFile(m_fd)) {
+    if (!SetEndOfFile(fd)) {
         DWORD err = GetLastError(); // Eliminate any risk of clobbering
         if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
             std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
@@ -750,16 +754,13 @@ void File::resize(SizeType size)
 
 #else // POSIX version
 
-    if (m_encryption_key)
-        size = data_size_to_encrypted_size(size);
-
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
         throw util::overflow_error("File size overflow");
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
-    if (::ftruncate(m_fd, size2) != 0) {
+    if (::ftruncate(fd, size2) != 0) {
         int err = errno; // Eliminate any risk of clobbering
         if (err == ENOSPC || err == EDQUOT) {
             std::string msg = get_errno_msg("ftruncate() failed: ", err);
@@ -999,29 +1000,33 @@ void File::seek_static(FileDesc fd, SizeType position)
 // actually written to disk. POSIX is rather vague on what fsync() has
 // to do unless _POSIX_SYNCHRONIZED_IO is defined. See also
 // http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
-void File::sync()
+void File::sync_static(FileDesc fd)
 {
-    REALM_ASSERT_RELEASE(is_attached());
-
 #if defined _WIN32 // Windows version
 
-    if (FlushFileBuffers(m_fd))
+    if (FlushFileBuffers(fd))
         return;
     throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
 
 #elif REALM_PLATFORM_APPLE
 
-    if (::fcntl(m_fd, F_FULLFSYNC) == 0)
+    if (::fcntl(fd, F_FULLFSYNC) == 0)
         return;
     throw std::system_error(errno, std::system_category(), "fcntl() with F_FULLSYNC failed");
 
 #else // POSIX version
 
-    if (::fsync(m_fd) == 0)
+    if (::fsync(fd) == 0)
         return;
     throw std::system_error(errno, std::system_category(), "fsync() failed");
 
 #endif
+}
+
+void File::sync()
+{
+    REALM_ASSERT_RELEASE(is_attached());
+    File::sync_static(m_fd);
 }
 
 #ifndef _WIN32

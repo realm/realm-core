@@ -384,8 +384,7 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     }
     if (patch_size % sizeof(Patch) != 0) {
         // Patch ignored, size wrong (we assume patch wasn't completely written)
-        auto retval = ftruncate(patch_f, 0);
-        REALM_ASSERT(retval == 0);
+        File::resize_static(patch_f, 0);
         return;
     }
     unsigned entries = patch_size / sizeof(Patch);
@@ -396,8 +395,7 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     if (read != (signed)patch_size) {
         // Reading patch file failed, ignoring patch
         // this is actually fatal, isn't it?
-        auto retval = ftruncate(patch_f, 0);
-        REALM_ASSERT(retval == 0);
+        File::resize_static(patch_f, 0);
         return;
     }
     // the actual number of entries may be less than what's in the file:
@@ -407,8 +405,7 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
     auto check_size = check_end - check_start;
     if (!check_hmac(check_start, check_size, data->meta.hmac)) {
         // Patch ignored, check_hmac fails - we assume patch was only partially written
-        auto retval = ftruncate(patch_f, 0);
-        REALM_ASSERT(retval == 0);
+        File::resize_static(patch_f, 0);
         return;
     }
     // We have a valid patch. now patch the realm file.
@@ -421,10 +418,9 @@ void AESCryptor::apply_pending_patch(FileDesc f, FileDesc patch_f)
         File::seek_static(f, real_offset(patch.payload.pos));
         File::write_static(f, reinterpret_cast<char*>(patch.payload.buffer), block_size);
     }
-    fsync(f);
+    File::sync_static(f);
     // With the realm file patched and sync'ed to stable storage, we invalidate the patch file.
-    auto retval = ftruncate(patch_f, 0);
-    REALM_ASSERT(retval == 0);
+    File::resize_static(patch_f, 0);
 }
 
 void AESCryptor::flush_queue(FileDesc fd, FileDesc patch_fd, const WriteQueue& q)

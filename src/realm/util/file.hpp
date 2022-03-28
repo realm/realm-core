@@ -279,6 +279,7 @@ public:
     /// an open file has undefined behavior. Calling this function on
     /// a file that is opened in read-only mode, is an error.
     void resize(SizeType);
+    static void resize_static(FileDesc, SizeType);
 
     /// Same effect as prealloc_if_supported(original_size, new_size);
     ///
@@ -326,6 +327,7 @@ public:
     /// calls `fsync()`. On Apple platforms if calls `fcntl()` with command
     /// `F_FULLFSYNC`.
     void sync();
+    static void sync_static(FileDesc);
 
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released.
