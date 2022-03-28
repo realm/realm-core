@@ -123,7 +123,7 @@ AppSession make_app_from_server_schema(const std::string& test_name,
 FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema,
                                        std::shared_ptr<GenericNetworkTransport> transport)
     : m_app_session(make_app_from_server_schema(test_name, server_schema))
-    , m_app_config(get_config(transport, m_app_session))
+    , m_app_config(get_config(std::move(transport), m_app_session))
     , m_schema(std::move(server_schema.schema))
 {
 }
@@ -699,29 +699,6 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
-    sync::AccessToken token;
-    {
-        FLXSyncTestHarness harness("flx_wait_access_token");
-        auto sync_manager = harness.make_sync_manager();
-        auto app = sync_manager.app();
-        create_user_and_log_in(app);
-        std::shared_ptr<SyncUser> user = app->current_user();
-        SyncTestFile config(sync_manager.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-        config.persist();
-        auto r = Realm::get_shared_realm(config);
-
-        sync::AccessToken::ParseError error_state = realm::sync::AccessToken::ParseError::none;
-        sync::AccessToken::parse(user->access_token(), token, error_state, nullptr);
-        REQUIRE(error_state == sync::AccessToken::ParseError::none);
-        REQUIRE(token.timestamp);
-        REQUIRE(token.expires);
-        REQUIRE(token.timestamp < token.expires);
-        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
-        using namespace std::chrono_literals;
-        token.expires = std::chrono::system_clock::to_time_t(now - 30s);
-        REQUIRE(token.expired(now));
-    }
-
     class HookedTransport : public SynchronousTestTransport {
     public:
         void send_request_to_server(Request&& request,
@@ -731,13 +708,9 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
                 request_hook(request);
             }
             SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
-                if (response_hook) {
-                    response_hook(request, const_cast<Response&>(response));
-                }
                 completion_block(response);
             });
         }
-        util::UniqueFunction<void(Request&, Response&)> response_hook;
         util::UniqueFunction<void(Request&)> request_hook;
     };
 
@@ -751,7 +724,10 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     REQUIRE(user);
     REQUIRE(!user->access_token_refresh_required());
     // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
-    user->update_access_token(encode_fake_jwt("fake_access_token", token.expires, token.timestamp));
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    using namespace std::chrono_literals;
+    auto expires = std::chrono::system_clock::to_time_t(now - 30s);
+    user->update_access_token(encode_fake_jwt("fake_access_token", expires));
     REQUIRE(user->access_token_refresh_required());
 
     bool seen_waiting_for_access_token = false;
@@ -773,7 +749,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
         }
     };
     SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    config.persist();
+    // This triggers the token refresh.
     auto r = Realm::get_shared_realm(config);
     REQUIRE(seen_waiting_for_access_token);
 }
