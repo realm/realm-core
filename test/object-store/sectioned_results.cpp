@@ -52,10 +52,6 @@ struct Base {
     {
         return fn(value);
     }
-
-    static Mixed comparison_value(Mixed value) {
-        return value;
-    }
 };
 
 struct Int : Base<PropertyType::Int, int64_t> {
@@ -64,9 +60,21 @@ struct Int : Base<PropertyType::Int, int64_t> {
         return {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
     }
 
+    static std::vector<int64_t> expected_unsorted()
+    {
+        return {2, 4, 2, 4, 1, 3, 5, 1, 3, 5};
+    }
+
     static Mixed comparison_value(Mixed value) {
         // Section odd and even numbers.
+        if (value.is_null()) {
+            return "nulls";
+        }
         return value.get_int() % 2;
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
@@ -76,9 +84,21 @@ struct Bool : Base<PropertyType::Bool, bool> {
         return {true, false, true, false};
     }
 
+    static std::vector<bool> expected_unsorted()
+    {
+        return {false, false, true, true};
+    }
+
     static Mixed comparison_value(Mixed value) {
         // Section true from false
+        if (value.is_null()) {
+            return "nulls";
+        }
         return value.get_bool();
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
@@ -88,9 +108,21 @@ struct Float : Base<PropertyType::Float, float> {
         return {1.1f, 2.2f, 3.3f, 4.4f, 5.5f, 1.1f, 2.2f, 3.3f, 4.4f, 5.5f};
     }
 
+    static std::vector<float> expected_unsorted()
+    {
+        return {2.2f, 4.4f, 2.2f, 4.4f, 1.1f, 3.3f, 5.5f, 1.1f, 3.3f, 5.5f};
+    }
+
     static Mixed comparison_value(Mixed value) {
         // Section odd and even numbers.
+        if (value.is_null()) {
+            return "nulls";
+        }
         return int(value.get_float()) % 2;
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
@@ -100,9 +132,21 @@ struct Double : Base<PropertyType::Double, double> {
         return {1.1, 2.2, 3.3, 4.4, 5.5, 1.2, 2.3, 3.4, 4.5, 5.6};
     }
 
+    static std::vector<double> expected_unsorted()
+    {
+        return {2.2, 4.4, 2.3, 4.5, 1.1, 3.3, 5.5, 1.2, 3.4, 5.6};
+    }
+
     static Mixed comparison_value(Mixed value) {
         // Section odd and even numbers.
+        if (value.is_null()) {
+            return "nulls";
+        }
         return int(value.get_double()) % 2;
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
@@ -116,16 +160,39 @@ struct String : Base<PropertyType::String, StringData> {
         };
     }
 
+    static std::vector<StringData> expected_unsorted()
+    {
+        return {
+            "apple", "apples", "banana", "bananas", "cherry", "cherries",
+            "dragon fruit", "dragon fruit's", "elderberry", "elderberries"
+        };
+    }
+
     static Mixed comparison_value(Mixed value) {
         // Return first char of string.
+        if (value.is_null()) {
+            return "nulls";
+        }
         auto str = value.get_string();
         return str.size() > 0 ? str.prefix(1) : str;
+    }
+
+    static size_t expected_size() {
+        return 5;
     }
 };
 
 struct Binary : Base<PropertyType::Data, BinaryData> {
     using Boxed = std::string;
     static std::vector<BinaryData> values()
+    {
+        return {
+            BinaryData("a", 1), BinaryData("aa", 2), BinaryData("b", 1), BinaryData("bb", 2), BinaryData("c", 1),
+            BinaryData("cc", 2), BinaryData("d", 1), BinaryData("dd", 2), BinaryData("e", 1), BinaryData("ee", 2)
+        };
+    }
+
+    static std::vector<BinaryData> expected_unsorted()
     {
         return {
             BinaryData("a", 1), BinaryData("b", 1), BinaryData("c", 1), BinaryData("d", 1), BinaryData("e", 1),
@@ -135,12 +202,27 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
 
     static Mixed comparison_value(Mixed value) {
         // Seperate by size of data
+        if (value.is_null()) {
+            return "nulls";
+        }
         return (int)value.get_binary().size();
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
 struct Date : Base<PropertyType::Date, Timestamp> {
     static std::vector<Timestamp> values()
+    {
+        return {
+            Timestamp(1, 1), Timestamp(20, 2), Timestamp(3, 1), Timestamp(40, 2), Timestamp(5, 1),
+            Timestamp(10, 2), Timestamp(2, 1), Timestamp(30, 2), Timestamp(4, 1), Timestamp(50, 2)
+        };
+    }
+
+    static std::vector<Timestamp> expected_unsorted()
     {
         return {
             Timestamp(1, 1), Timestamp(2, 1), Timestamp(3, 1), Timestamp(4, 1), Timestamp(5, 1),
@@ -150,27 +232,55 @@ struct Date : Base<PropertyType::Date, Timestamp> {
 
     static Mixed comparison_value(Mixed value) {
         // Seperate by size of data
+        if (value.is_null()) {
+            return "nulls";
+        }
         return value.get_timestamp().get_seconds() < 10 ? "shorter" : "longer";
     }
-};
 
-struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
-    static std::vector<realm::Mixed> values()
-    {
-        return {
-            Mixed{realm::UUID()}, Mixed{int64_t(1)}, Mixed{}, Mixed{"hello world"}, Mixed{Timestamp(1, 1)},
-            Mixed{Decimal128("300")}, Mixed{double(2.2)}, Mixed{float(3.3)}, Mixed{BinaryData("a", 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}
-        };
-    }
-
-    static Mixed comparison_value(Mixed value) {
-        // Seperate numeric from non numeric
-        return Mixed::is_numeric(value.get_type()) ? "Numerics" : "Alphanumeric";
+    static size_t expected_size() {
+        return 2;
     }
 };
+
+//struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
+//    static std::vector<realm::Mixed> values()
+//    {
+//        return {
+//            Mixed{realm::UUID()}, Mixed{int64_t(1)}, Mixed{}, Mixed{"hello world"}, Mixed{Timestamp(1, 1)},
+//            Mixed{Decimal128("300")}, Mixed{double(2.2)}, Mixed{float(3.3)}, Mixed{BinaryData("a", 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}
+//        };
+//    }
+//
+//    static Mixed comparison_value(Mixed value) {
+//        // Seperate numeric from non numeric
+//        return Mixed::is_numeric(value.get_type()) ? "Numerics" : "Alphanumeric";
+//    }
+//
+//    static PropertyType property_type()
+//    {
+//        return PropertyType::Mixed | PropertyType::Nullable;
+//    }
+//};
 
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
     static std::vector<ObjectId> values()
+    {
+        return {
+            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
+        };
+    }
+
+    static std::vector<ObjectId> expected_unsorted()
     {
         return {
             ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
@@ -188,12 +298,35 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
 
     static Mixed comparison_value(Mixed value) {
         // Seperate by sections containing the same ObjectId's
+        if (value.is_null()) {
+            return "nulls";
+        }
         return value.get_object_id();
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
 struct UUID : Base<PropertyType::UUID, realm::UUID> {
     static std::vector<realm::UUID> values()
+    {
+        return {
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+        };
+    }
+
+    static std::vector<realm::UUID> expected_unsorted()
     {
         return {
             realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
@@ -211,7 +344,14 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
 
     static Mixed comparison_value(Mixed value) {
         // Seperate by sections containing the same UUID's
+        if (value.is_null()) {
+            return "nulls";
+        }
         return value.get_uuid();
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
@@ -227,9 +367,32 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
         };
     }
 
+    static std::vector<Decimal128> expected_unsorted()
+    {
+        return {
+            Decimal128("876.54e32"),
+            Decimal128("876.54e32"),
+            Decimal128("876.54e32"),
+            Decimal128("876.54e32"),
+            Decimal128("876.54e32"),
+            Decimal128("123.45e6"),
+            Decimal128("123.45e6"),
+            Decimal128("123.45e6"),
+            Decimal128("123.45e6"),
+            Decimal128("123.45e6")
+        };
+    }
+
     static Mixed comparison_value(Mixed value) {
         // Seperate smaller values
+        if (value.is_null()) {
+            return "nulls";
+        }
         return value.get_decimal() < Decimal128("876.54e32");
+    }
+
+    static size_t expected_size() {
+        return 2;
     }
 };
 
@@ -263,6 +426,19 @@ struct BoxedOptional : BaseT {
     {
         return value ? fn(*value) : fn(null());
     }
+
+    static size_t expected_size() {
+        return BaseT::expected_size() + 1;
+    }
+
+    static std::vector<Type> expected_unsorted() {
+        std::vector<Type> ret;
+        for (auto v : BaseT::expected_unsorted())
+            ret.push_back(Type(v));
+        ret.push_back(util::none);
+        return ret;
+    }
+
 };
 
 template <typename BaseT>
@@ -275,6 +451,23 @@ struct UnboxedOptional : BaseT {
     static auto values() -> decltype(BaseT::values())
     {
         auto ret = BaseT::values();
+        if constexpr (std::is_same_v<BaseT, sectioned_results_fixtures::Decimal>) {
+            // The default Decimal128 ctr is 0, but we want a null value
+            ret.push_back(Decimal128(realm::null()));
+        }
+        else {
+            ret.push_back(typename BaseT::Type());
+        }
+        return ret;
+    }
+
+    static size_t expected_size() {
+        return BaseT::expected_size() + 1;
+    }
+
+    static auto expected_unsorted() -> decltype(BaseT::values())
+    {
+        auto ret = BaseT::expected_unsorted();
         if constexpr (std::is_same_v<BaseT, sectioned_results_fixtures::Decimal>) {
             // The default Decimal128 ctr is 0, but we want a null value
             ret.push_back(Decimal128(realm::null()));
@@ -417,6 +610,140 @@ TEST_CASE("sectioned results") {
         }
 
         REQUIRE(count == 10);
+    }
+
+    SECTION("FirstLetter builtin with link") {
+        auto sr = sorted.sectioned_results(util::Optional<StringData>("name_col"), Results::SectionedResultsOperator::FirstLetter);
+
+        REQUIRE(sr.size() == 3);
+        REQUIRE(sr[0].size() == 3);
+        REQUIRE(sr[1].size() == 1);
+        REQUIRE(sr[2].size() == 1);
+
+        std::vector<std::string> expected {
+            "apple",
+            "apples",
+            "apricot",
+            "banana",
+            "orange"
+        };
+
+        std::vector<std::string> expected_keys {
+            "a",
+            "b",
+            "o"
+        };
+
+        int section_count = 0;
+        int element_count = 0;
+        for (size_t i = 0; i < sr.size(); i++) {
+            auto section = sr[i];
+            REQUIRE(section.key().get_string() == expected_keys[section_count]);
+            section_count++;
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                REQUIRE(expected[element_count] == val);
+                element_count++;
+            }
+        }
+        REQUIRE(section_count == 3);
+        REQUIRE(element_count == 5);
+
+        // Insert empty string
+        coordinator->on_change();
+        r->begin_transaction();
+        table->create_object().set(name_col, "");
+        r->commit_transaction();
+
+        expected.insert(expected.begin(), 1, "");
+        expected_keys.insert(expected_keys.begin(), 1, "");
+
+        section_count = 0;
+        element_count = 0;
+        for (size_t i = 0; i < sr.size(); i++) {
+            auto section = sr[i];
+            REQUIRE(section.key().get_string() == expected_keys[section_count]);
+            section_count++;
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                REQUIRE(expected[element_count] == val);
+                element_count++;
+            }
+        }
+        REQUIRE(section_count == 4);
+        REQUIRE(element_count == 6);
+    }
+
+    SECTION("FirstLetter builtin with primitive") {
+        r->begin_transaction();
+        auto o1 = table->create_object();
+        auto str_list = o1.get_list<StringData>(array_string_col);
+        str_list.add("apple");
+        str_list.add("apples");
+        str_list.add("apricot");
+        str_list.add("banana");
+        str_list.add("orange");
+        r->commit_transaction();
+        List lst(r, o1, array_string_col);
+        auto sr = lst.as_results().sectioned_results(util::none, Results::SectionedResultsOperator::FirstLetter);
+
+        REQUIRE(sr.size() == 3);
+        REQUIRE(sr[0].size() == 3);
+        REQUIRE(sr[1].size() == 1);
+        REQUIRE(sr[2].size() == 1);
+
+        std::vector<std::string> expected {
+            "apple",
+            "apples",
+            "apricot",
+            "banana",
+            "orange"
+        };
+
+        std::vector<std::string> expected_keys {
+            "a",
+            "b",
+            "o"
+        };
+
+        int section_count = 0;
+        int element_count = 0;
+        for (size_t i = 0; i < sr.size(); i++) {
+            auto section = sr[i];
+            REQUIRE(section.key().get_string() == expected_keys[section_count]);
+            section_count++;
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = section[y].get_string();
+                REQUIRE(expected[element_count] == val);
+                element_count++;
+            }
+        }
+        REQUIRE(section_count == 3);
+        REQUIRE(element_count == 5);
+
+        // Insert empty string
+        coordinator->on_change();
+        r->begin_transaction();
+        lst.add(StringData(""));
+        r->commit_transaction();
+
+        expected.insert(expected.begin(), 1, "");
+        expected_keys.insert(expected_keys.begin(), 1, "");
+
+        section_count = 0;
+        element_count = 0;
+        for (size_t i = 0; i < sr.size(); i++) {
+            auto section = sr[i];
+            REQUIRE(section.key().get_string() == expected_keys[section_count]);
+            section_count++;
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = section[y].get_string();
+                REQUIRE(expected[element_count] == val);
+                element_count++;
+            }
+        }
+        REQUIRE(section_count == 4);
+        REQUIRE(element_count == 6);
     }
 
     SECTION("notifications") {
@@ -605,11 +932,11 @@ TEST_CASE("sectioned results") {
 
 namespace cf = realm::sectioned_results_fixtures;
 
-TEMPLATE_TEST_CASE("results types", "[sectioned_results]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
-                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
+TEMPLATE_TEST_CASE("sectioned results types", "[sectioned_results]", /*cf::MixedVal, */cf::Int, cf::Bool, cf::Float, cf::Double,
+                   cf::String, cf::Binary/*, cf::Date*/, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
                    cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
-                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
-                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
+                   /*cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,*/ cf::UnboxedOptional<cf::String>,
+                   cf::UnboxedOptional<cf::Binary>/*, cf::UnboxedOptional<cf::Date>*/, cf::UnboxedOptional<cf::Decimal>)
 {
     using T = typename TestType::Type;
     using Boxed = typename TestType::Boxed;
@@ -634,91 +961,55 @@ TEMPLATE_TEST_CASE("results types", "[sectioned_results]", cf::MixedVal, cf::Int
     auto array_col = table->get_column_key("array_col");
 
     auto values = TestType::values();
+    auto exp_values = TestType::expected_unsorted();
+
     r->begin_transaction();
+    auto o = table->create_object();
+    auto list = o.get_list<T>(array_col);
     for (size_t i = 0; i < values.size(); ++i) {
-        auto o = table->create_object();
-        o.set(value_col, T(values[i]));
+        list.add(T(values[i]));
     }
     r->commit_transaction();
-
-    Results results(r, table);
-//    auto sorted = results.sort({{"name_col", true}});
-//    auto sectioned_results = results.sectioned_results([r](Mixed value) {
-//        auto obj = Object(r, value.get_link());
-//        auto v = obj.get_column_value<StringData>("name_col");
-//        return v.prefix(1);
-//    });
+    List lst(r, o, array_col);
+    auto results = lst.as_results();
 
     SECTION("primitives section correctly") {
         auto sectioned_results = results.sectioned_results([r](Mixed value) -> Mixed {
             return TestType::comparison_value(value);
         });
-        REQUIRE(sectioned_results.size() == 2);
-
+        REQUIRE(sectioned_results.size() == TestType::expected_size());
+        auto size = sectioned_results.size();
+        auto results_idx = 0;
+        for (size_t section_idx = 0; section_idx < size; section_idx++) {
+            auto section = sectioned_results[section_idx];
+            for (size_t element_idx = 0; element_idx < section.size(); element_idx++) {
+                auto element = sectioned_results[section_idx][element_idx];
+                Mixed value = T(exp_values[results_idx]);
+                std::cout << element << " : " << value << "\n";
+                REQUIRE(element == value);
+                results_idx++;
+            }
+        }
     }
 
-//    SECTION("key type") {
-//        REQUIRE(keys_as_results.get_type() == PropertyType::String);
-//    }
-//
-//    SECTION("value type") {
-//        REQUIRE(values_as_results.get_type() == TestType::property_type());
-//    }
-//
-//    SECTION("size()") {
-//        REQUIRE(dict.size() == keys.size());
-//        dict.remove_all();
-//        REQUIRE(dict.size() == 0);
-//    }
-//
-//    SECTION("is_valid()") {
-//        object_store::Dictionary unattached;
-//        REQUIRE(dict.is_valid());
-//        REQUIRE(!unattached.is_valid());
-//    }
-//
-//    SECTION("verify_attached()") {
-//        object_store::Dictionary unattached;
-//        REQUIRE_NOTHROW(dict.verify_attached());
-//        REQUIRE_THROWS_WITH(unattached.verify_attached(), "Access to invalidated Dictionary object");
-//    }
-//
-//    SECTION("verify_in_transaction()") {
-//        object_store::Dictionary unattached;
-//        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
-//        REQUIRE_NOTHROW(dict.verify_in_transaction());
-//        r->commit_transaction();
-//        REQUIRE_THROWS_AS(dict.verify_in_transaction(), InvalidTransactionException);
-//        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
-//    }
-//
-//    SECTION("clear()") {
-//        REQUIRE(dict.size() == keys.size());
-//        values_as_results.clear();
-//        REQUIRE(dict.size() == 0);
-//        REQUIRE(values_as_results.size() == 0);
-//    }
-//
-//    SECTION("equality and assign") {
-//        REQUIRE(dict == dict);
-//        REQUIRE(!(dict != dict));
-//        object_store::Dictionary same(r, obj, col);
-//        REQUIRE(dict == same);
-//        REQUIRE(!(dict != same));
-//        object_store::Dictionary other(r, obj1, col);
-//        REQUIRE(!(dict == other));
-//        REQUIRE(dict != other);
-//        REQUIRE(other == other);
-//        REQUIRE(!(other != other));
-//
-//        for (size_t i = 0; i < keys.size(); ++i) {
-//            other.insert(keys[i], T(values[i]));
+//    SECTION("primitives section correctly with sort") {
+//        auto sorted = results.sort({{"self", true}});
+//        auto sectioned_results = sorted.sectioned_results([r](Mixed value) -> Mixed {
+//            return TestType::comparison_value(value);
+//        });
+//        REQUIRE(sectioned_results.size() == TestType::expected_size());
+//        auto size = sectioned_results.size();
+//        auto results_idx = 0;
+//        for (size_t section_idx = 0; section_idx < size; section_idx++) {
+//            auto section = sectioned_results[section_idx];
+//            for (size_t element_idx = 0; element_idx < section.size(); element_idx++) {
+//                auto element = sectioned_results[section_idx][element_idx];
+//                Mixed value = T(exp_values[results_idx]);
+//                std::cout << element << " : " << value << "\n";
+//                REQUIRE(element == value);
+//                results_idx++;
+//            }
 //        }
-//        REQUIRE(!(dict == other));
-//        REQUIRE(dict != other);
-//
-//        other = dict;
-//        REQUIRE(dict == other);
-//        REQUIRE(!(dict != other));
 //    }
+
 }

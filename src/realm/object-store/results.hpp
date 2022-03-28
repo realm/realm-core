@@ -340,6 +340,13 @@ public:
 
     SectionedResults sectioned_results(util::UniqueFunction<Mixed(Mixed value)> comparison_func) REQUIRES(m_mutex);
 
+    enum class SectionedResultsOperator {
+        FirstLetter // Section by the first letter of each string element. Note col must be a string.
+    };
+
+    /// Takes a property name if sectioning on a collection of links, the property name needs to reference the column being sectioned on.
+    SectionedResults sectioned_results(util::Optional<StringData> property_name, SectionedResultsOperator op) REQUIRES(m_mutex);
+
 private:
     std::shared_ptr<Realm> m_realm;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;

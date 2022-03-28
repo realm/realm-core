@@ -29,6 +29,7 @@ class Mixed;
 
 struct SectionRange {
     size_t index;
+    Mixed key;
     std::vector<size_t> indices;
 };
 
@@ -47,6 +48,8 @@ public:
     template <typename Context>
     auto get(Context&, size_t index);
 
+    Mixed key();
+
     size_t size();
 
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
@@ -60,10 +63,12 @@ private:
 
 class SectionedResults {
 public:
-    using ComparisonFunc = util::UniqueFunction<bool(Mixed first, Mixed second)>;
-    using ComparisonFunc2 = util::UniqueFunction<Mixed(Mixed value)>;
+    using ComparisonFunc = util::UniqueFunction<Mixed(Mixed value)>;
 
-    SectionedResults(Results results, ComparisonFunc2 comparison_func);
+    SectionedResults(Results results, ComparisonFunc comparison_func);
+    SectionedResults(Results results,
+                     util::Optional<StringData> prop_name,
+                     Results::SectionedResultsOperator op);
 
     ResultsSection operator[](size_t idx);
 
@@ -84,7 +89,7 @@ private:
     friend class realm::ResultsSection;
     Results m_results;
     std::vector<SectionRange> m_offset_ranges;
-    ComparisonFunc2 m_callback;
+    ComparisonFunc m_callback;
 };
 
 struct SectionedResultsChangeSet {
