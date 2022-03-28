@@ -27,6 +27,7 @@
 
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/sync/protocol.hpp"
+#include <realm/sync/noinst/server/access_token.hpp>
 
 namespace realm::app {
 
@@ -40,7 +41,8 @@ public:
 
     static ServerSchema default_server_schema();
 
-    FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
+    FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
+                       std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>);
 
     template <typename Func>
     void do_with_new_user(Func&& func)
@@ -118,9 +120,10 @@ AppSession make_app_from_server_schema(const std::string& test_name,
 }
 
 
-FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema)
+FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema,
+                                       std::shared_ptr<GenericNetworkTransport> transport)
     : m_app_session(make_app_from_server_schema(test_name, server_schema))
-    , m_app_config(get_config(instance_of<SynchronousTestTransport>, m_app_session))
+    , m_app_config(get_config(std::move(transport), m_app_session))
     , m_schema(std::move(server_schema.schema))
 {
 }
@@ -693,6 +696,62 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
     });
 
     CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
+}
+
+TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
+    class HookedTransport : public SynchronousTestTransport {
+    public:
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        {
+            if (request_hook) {
+                request_hook(request);
+            }
+            SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
+                completion_block(response);
+            });
+        }
+        util::UniqueFunction<void(Request&)> request_hook;
+    };
+
+    auto transport = std::make_shared<HookedTransport>();
+    FLXSyncTestHarness harness("flx_wait_access_token2", FLXSyncTestHarness::default_server_schema(), transport);
+
+    auto sync_mgr = harness.make_sync_manager();
+    auto creds = create_user_and_log_in(sync_mgr.app());
+    auto app = sync_mgr.app();
+    std::shared_ptr<SyncUser> user = app->current_user();
+    REQUIRE(user);
+    REQUIRE(!user->access_token_refresh_required());
+    // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    using namespace std::chrono_literals;
+    auto expires = std::chrono::system_clock::to_time_t(now - 30s);
+    user->update_access_token(encode_fake_jwt("fake_access_token", expires));
+    REQUIRE(user->access_token_refresh_required());
+
+    bool seen_waiting_for_access_token = false;
+    // Commit a subcription set while there is no sync session.
+    // A session is created when the access token is refreshed.
+    transport->request_hook = [&](Request&) {
+        auto user = app->current_user();
+        REQUIRE(user);
+        for (auto& session : user->all_sessions()) {
+            if (session->state() == SyncSession::State::WaitingForAccessToken) {
+                REQUIRE(!seen_waiting_for_access_token);
+                seen_waiting_for_access_token = true;
+
+                REQUIRE(session->has_flx_subscription_store());
+                auto store = session->get_flx_subscription_store();
+                auto mut_subs = store->get_latest().make_mutable_copy();
+                std::move(mut_subs).commit();
+            }
+        }
+    };
+    SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    // This triggers the token refresh.
+    auto r = Realm::get_shared_realm(config);
+    REQUIRE(seen_waiting_for_access_token);
 }
 } // namespace realm::app
 
