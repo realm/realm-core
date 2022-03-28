@@ -3776,7 +3776,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
 
         wait_for_download(*realm);
         {
-            realm->refresh();
+            realm_refresh(&c_wrap_realm);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = 0;
             realm_results_count(results, &count);
@@ -3804,7 +3804,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
         }
 
         {
-            realm->refresh();
+            realm_refresh(&c_wrap_realm);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = 0;
             realm_results_count(results, &count);
@@ -3836,7 +3836,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
         }
 
         {
-            realm->refresh();
+            realm_refresh(&c_wrap_realm);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = 0;
             realm_results_count(results, &count);
@@ -3863,7 +3863,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
         }
 
         {
-            realm->refresh();
+            realm_refresh(&c_wrap_realm);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = std::numeric_limits<std::size_t>::max();
             realm_results_count(results, &count);
@@ -3912,7 +3912,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
         }
 
         {
-            realm->refresh();
+            realm_refresh(&c_wrap_realm);
             auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
             size_t count = std::numeric_limits<std::size_t>::max();
             realm_results_count(results, &count);
