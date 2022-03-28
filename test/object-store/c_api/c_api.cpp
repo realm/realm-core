@@ -3752,66 +3752,64 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                 empty_subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             realm_release(empty_subs);
         }
-        auto table = realm->read_group().get_table("class_Obj");
-        auto name_col_key = table->get_column_key("name");
-
-        Query query_foo(table);
-        Query query_bar(table);
-
-        query_foo.equal(name_col_key, "foo");
-        auto c_wrap_query_foo = new realm_query_t{query_foo, query_foo.get_ordering(), realm};
-
-        query_bar.equal(name_col_key, "bar");
-        auto c_wrap_query_bar = new realm_query_t{query_bar, query_bar.get_ordering(), realm};
+        realm_class_info_t table_info;
+        bool found;
+        CHECK(realm_find_class(&c_wrap_realm, "Obj", &found, &table_info));
+        auto c_wrap_query_foo = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'foo'", 0, nullptr);
+        auto c_wrap_query_bar = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
         {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             CHECK(sub != nullptr);
             auto new_subs = realm_sync_make_subscription_set_mutable(sub);
-            auto result = realm_sync_subscription_set_insert_or_assign(new_subs, c_wrap_query_foo);
-            CHECK(result != nullptr);
-            CHECK(result->inserted());
-            CHECK(result->get_index() == 0);
+            std::size_t index = -1;
+            auto inserted = realm_sync_subscription_set_insert_or_assign(new_subs, c_wrap_query_foo, nullptr, &index);
+            CHECK(inserted == true);
+            CHECK(index == 0);
             auto subs = realm_sync_subscription_set_commit(new_subs);
-
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
-
             realm_release(sub);
             realm_release(new_subs);
-            realm_release(result);
             realm_release(subs);
         }
 
         wait_for_download(*realm);
         {
             realm->refresh();
-            Results results(realm, table);
-            CHECK(results.size() == 1);
-            auto obj = results.get<Obj>(0);
-            CHECK(obj.is_valid());
-            CHECK(obj.get<ObjectId>("_id") == foo_obj_id);
+            auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
+            size_t count = 0;
+            realm_results_count(results, &count);
+            CHECK(count == 1);
+            auto object = realm_results_get_object(results, 0);
+            REQUIRE(realm_object_is_valid(object));
+            REQUIRE(object->get_column_value<ObjectId>("_id") == foo_obj_id);
+            realm_release(object);
+            realm_release(results);
         }
 
         {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
-            auto result = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar);
+            std::size_t index = -1;
+            auto inserted = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index);
+            CHECK(inserted);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
-
             realm_release(sub);
             realm_release(mut_sub);
-            realm_release(result);
             realm_release(sub_c);
         }
 
         {
             realm->refresh();
-            Results results(realm, Query(table));
-            CHECK(results.size() == 2);
+            auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
+            size_t count = 0;
+            realm_results_count(results, &count);
+            CHECK(count == 2);
+            realm_release(results);
         }
 
         {
@@ -3821,32 +3819,33 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             CHECK(s != nullptr);
             auto erased = realm_sync_subscription_set_erase_by_query(mut_sub, c_wrap_query_foo);
             CHECK(erased);
-            Query new_query_bar(table);
-            new_query_bar.equal(name_col_key, "bar");
-            auto c_wrap_new_query_bar = new realm_query_t{query_bar, query_bar.get_ordering(), realm};
-            auto res = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar);
-            CHECK(res);
-            CHECK(!res->inserted());
+            auto c_wrap_new_query_bar = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
+            std::size_t index = -1;
+            bool inserted =
+                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, nullptr, &index);
+            CHECK(!inserted);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
-
             realm_release(s);
             realm_release(sub);
             realm_release(mut_sub);
-            realm_release(res);
             realm_release(sub_c);
             realm_release(c_wrap_new_query_bar);
         }
 
         {
             realm->refresh();
-            Results results(realm, Query(table));
-            CHECK(results.size() == 1);
-            auto obj = results.get<Obj>(0);
-            CHECK(obj.is_valid());
-            CHECK(obj.get<ObjectId>("_id") == bar_obj_id);
+            auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
+            size_t count = 0;
+            realm_results_count(results, &count);
+            CHECK(count == 1);
+            auto object = realm_results_get_object(results, 0);
+            REQUIRE(realm_object_is_valid(object));
+            realm_release(object);
+            realm_release(results);
+            REQUIRE(object->get_column_value<ObjectId>("_id") == bar_obj_id);
         }
 
         {
@@ -3858,7 +3857,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
-
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);
@@ -3866,8 +3864,116 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
 
         {
             realm->refresh();
-            Results results(realm, table);
-            CHECK(results.size() == 0);
+            auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
+            size_t count = std::numeric_limits<std::size_t>::max();
+            realm_results_count(results, &count);
+            CHECK(count == 0);
+            realm_release(results);
+        }
+
+        {
+            auto c_wrap_new_query_bar = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            std::size_t index = -1;
+            bool inserted =
+                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, "bar", &index);
+            CHECK(inserted);
+            auto sub_c = realm_sync_subscription_set_commit(mut_sub);
+            auto state = realm_sync_on_subscription_set_state_change_wait(
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            realm_release(sub);
+            realm_release(mut_sub);
+            realm_release(sub_c);
+            realm_release(c_wrap_new_query_bar);
+        }
+
+        {
+            realm->refresh();
+            auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
+            size_t count = std::numeric_limits<std::size_t>::max();
+            realm_results_count(results, &count);
+            CHECK(count == 1);
+            realm_release(results);
+        }
+
+        {
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            realm_sync_subscription_set_erase_by_name(mut_sub, "bar");
+            auto sub_c = realm_sync_subscription_set_commit(mut_sub);
+            auto state = realm_sync_on_subscription_set_state_change_wait(
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+            realm_release(sub);
+            realm_release(mut_sub);
+            realm_release(sub_c);
+        }
+
+        {
+            realm->refresh();
+            auto results = realm_object_find_all(&c_wrap_realm, table_info.key);
+            size_t count = std::numeric_limits<std::size_t>::max();
+            realm_results_count(results, &count);
+            CHECK(count == 0);
+            realm_release(results);
+        }
+
+        {
+            auto test_query = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
+            auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
+            auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
+            std::size_t index = -1;
+            auto inserted = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index);
+            CHECK(inserted);
+            auto sub_c = realm_sync_subscription_set_commit(mut_sub);
+
+            // lambdas with state cannot be easily converted to function pointers, add a simple singleton that syncs
+            // the state among threads
+            struct SyncObject {
+                std::mutex m_mutex;
+                std::condition_variable m_cv;
+                realm_flx_sync_subscription_set_state m_state{RLM_SYNC_SUBSCRIPTION_UNCOMMITTED};
+
+                static SyncObject& create()
+                {
+                    static SyncObject sync_object;
+                    return sync_object;
+                }
+
+                void set_state_and_notify(realm_flx_sync_subscription_set_state state)
+                {
+                    {
+                        std::lock_guard<std::mutex> guard{m_mutex};
+                        m_state = state;
+                    }
+                    m_cv.notify_one();
+                }
+
+                realm_flx_sync_subscription_set_state wait_state()
+                {
+                    using namespace std::chrono_literals;
+                    std::unique_lock<std::mutex> lock{m_mutex};
+                    m_cv.wait_for(lock, 300ms, [this]() {
+                        return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE;
+                    });
+                    return m_state;
+                }
+            };
+
+            auto callback = [](auto, realm_flx_sync_subscription_set_state_e sub_state) {
+                SyncObject::create().set_state_and_notify(sub_state);
+            };
+            realm_sync_on_subscription_set_state_change_async(
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE, callback);
+            CHECK(SyncObject::create().wait_state() ==
+                  realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
+
+            realm_release(sub);
+            realm_release(mut_sub);
+            realm_release(sub_c);
+            realm_release(test_query);
         }
         realm_release(c_wrap_query_foo);
         realm_release(c_wrap_query_bar);

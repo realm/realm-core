@@ -3119,12 +3119,9 @@ RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set
 RLM_API realm_flx_sync_mutable_subscription_set_t*
 realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
-RLM_API realm_flx_sync_subscription_desc_t*
-realm_sync_subscription_set_insert_or_assign_with_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
-                                                       const realm_query_t*) RLM_API_NOEXCEPT;
-RLM_API realm_flx_sync_subscription_desc_t*
+RLM_API bool
 realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t*,
-                                             const realm_query_t*) RLM_API_NOEXCEPT;
+                                             realm_query_t*, const char*, size_t*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*,
                                                        const char*) RLM_API_NOEXCEPT;
 RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*,
