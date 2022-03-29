@@ -1,19 +1,14 @@
-# NEXT RELEASE
+# 11.13.0 Release notes
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Sync changesets waiting to be uploaded to the server are now compressed, reducing the disk space needed when large write transactions are performed while offline or limited in bandwidth. This bumps the sync history schema version, meaning that synchronized Realms written by this version cannot be opened by older versions. Older Realms are seamlessly upgraded and local Realms are uneffected. ([PR 5260](https://github.com/realm/realm-core/pull/5260)).
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fixed a potential crash if a sync session is stopped in the middle of a `DiscardLocal` client reset. ([#5295](https://github.com/realm/realm-core/issues/5295), since v11.5.0) 
 * Opening an encrypted Realm while the keychain is locked on macOS would crash ([Swift #7438](https://github.com/realm/realm-swift/issues/7438)).
 * Updating subscription while refreshing the access token would crash ([#5343](https://github.com/realm/realm-core/issues/5343), since v11.8.0)
 * Fix several race conditions in SyncSession related to calling `update_configuration()` on one thread while using the SyncSession on another thread. It does not appear that it was possible to hit the broken scenarios via the SDKs public APIs.
  
-### Breaking changes
-* None.
-
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
