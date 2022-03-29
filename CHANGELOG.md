@@ -31,6 +31,7 @@
 * Support for new SchemaMode::HardResetFile added. ([#4782](https://github.com/realm/realm-core/issues/4782))
 * Support for keypaths in change notifications added to C-API ([#5216](https://github.com/realm/realm-core/issues/5216))
 * Release of callback functions done through realm_release() ([#5217](https://github.com/realm/realm-core/issues/5217))
+* Supporting flexible sync for C-API. ([#5110](https://github.com/realm/realm-core/issues/5110), Since v11.10.0)
 
 ### Fixed
 * Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
@@ -63,7 +64,7 @@
 * Calling Realm::async_begin_transaction() from within a write transaction while the async state was idle would hit an assertion failure (since v11.10.0).
 * Fix issue with scheduler being deleted on wrong thread. This caused async open to hang in eg. realm-js. ([#5287](https://github.com/realm/realm-core/pull/5287), Since v11.10.0)
 * Waiting for upload after opening a bundled realm file could hang. ([#5277](https://github.com/realm/realm-core/issues/5277), since v11.5.0)
- 
+
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
