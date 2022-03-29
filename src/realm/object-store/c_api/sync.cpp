@@ -493,9 +493,7 @@ realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t* su
     auto it = subscription_set->find(name);
     if (it == subscription_set->end())
         return nullptr;
-
-    Subscription sub = *it;
-    return new realm_flx_sync_subscription_t(std::move(sub));
+    return new realm_flx_sync_subscription_t(*it);
 }
 
 RLM_API realm_flx_sync_subscription_t*

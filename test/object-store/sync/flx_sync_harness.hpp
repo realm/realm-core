@@ -61,9 +61,10 @@ public:
         return create_app(server_app_config);
     }
 
-    FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema())
+    FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
+                       std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>)
         : m_app_session(make_app_from_server_schema(test_name, server_schema))
-        , m_app_config(get_config(instance_of<SynchronousTestTransport>, m_app_session))
+        , m_app_config(get_config(std::move(transport), m_app_session))
         , m_schema(std::move(server_schema.schema))
     {
     }
