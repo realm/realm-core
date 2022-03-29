@@ -26,7 +26,6 @@
 #include <realm/object_id.hpp>
 #include <realm/decimal128.hpp>
 #include <realm/uuid.hpp>
-#include <realm/util/string_buffer.hpp>
 #include <realm/util/any.hpp>
 #include <realm/mixed.hpp>
 
@@ -138,7 +137,7 @@ public:
 
     // dynamic conversion space with lifetime tied to this
     // it is used for storing literal binary/string data
-    std::vector<util::StringBuffer> buffer_space;
+    std::vector<std::string> buffer_space;
 
 protected:
     void verify_ndx(size_t ndx) const

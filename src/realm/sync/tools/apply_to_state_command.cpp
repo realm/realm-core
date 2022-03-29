@@ -7,8 +7,8 @@
 #include "realm/sync/protocol.hpp"
 #include "realm/sync/transform.hpp"
 #include "realm/sync/changeset_parser.hpp"
-#include "realm/sync/noinst/compression.hpp"
 #include "realm/util/cli_args.hpp"
+#include "realm/util/compression.hpp"
 #include "realm/util/load_file.hpp"
 #include "realm/util/safe_int_ops.hpp"
 
@@ -114,8 +114,8 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
     if (is_body_compressed) {
         uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
-        std::error_code ec = _impl::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                            uncompressed_body_buffer.get(), uncompressed_body_size);
+        std::error_code ec =
+            util::compression::decompress(compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
 
         if (ec) {
             throw ProtocolCodecException("error decompressing download message");
@@ -138,7 +138,7 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
 
         realm::sync::Changeset parsed_changeset;
         auto changeset_data = body.read_sized_data<BinaryData>(changeset_size);
-        auto changeset_stream = realm::_impl::SimpleNoCopyInputStream(changeset_data.data(), changeset_data.size());
+        auto changeset_stream = realm::util::SimpleNoCopyInputStream(changeset_data);
         realm::sync::parse_changeset(changeset_stream, parsed_changeset);
         logger.trace("found download changeset: serverVersion: %1, clientVersion: %2, origin: %3 %4",
                      cur_changeset.remote_version, cur_changeset.last_integrated_local_version,
@@ -169,8 +169,8 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
 
-        std::error_code ec = _impl::compression::decompress(compressed_body.data(), compressed_body.size(),
-                                                            uncompressed_body_buffer.get(), uncompressed_body_size);
+        std::error_code ec =
+            util::compression::decompress(compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
 
         if (ec) {
             throw ProtocolCodecException("error decompressing upload message");
@@ -195,7 +195,7 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
         logger.trace("found upload changeset: %1 %2 %3 %4 %5", cur_changeset.last_integrated_remote_version,
                      cur_changeset.version, cur_changeset.origin_timestamp, cur_changeset.origin_file_ident,
                      changeset_size);
-        realm::_impl::SimpleNoCopyInputStream changeset_stream(changeset_buffer.data(), changeset_buffer.size());
+        realm::util::SimpleNoCopyInputStream changeset_stream(changeset_buffer);
         try {
             realm::sync::parse_changeset(changeset_stream, cur_changeset);
         }

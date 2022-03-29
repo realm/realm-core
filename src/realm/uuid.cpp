@@ -116,10 +116,10 @@ std::string UUID::to_base64() const
     std::copy(std::begin(m_bytes), std::end(m_bytes), std::begin(bytes));
     char* bytes_ptr = &bytes[0];
 
-    util::StringBuffer encode_buffer;
+    std::string encode_buffer;
     encode_buffer.resize(util::base64_encoded_size(UUID::num_bytes));
     util::base64_encode(bytes_ptr, UUID::num_bytes, encode_buffer.data(), encode_buffer.size());
-    return encode_buffer.str();
+    return encode_buffer;
 }
 
 } // namespace realm

@@ -6,7 +6,6 @@ set(SYNC_SOURCES
     noinst/client_reset.cpp
     noinst/client_reset_operation.cpp
     noinst/compact_changesets.cpp
-    noinst/compression.cpp
     noinst/protocol_codec.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
@@ -57,7 +56,6 @@ set(NOINST_HEADERS
     noinst/client_reset.hpp
     noinst/client_reset_operation.hpp
     noinst/compact_changesets.hpp
-    noinst/compression.hpp
     noinst/integer_codec.hpp
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
@@ -75,15 +73,6 @@ set_target_properties(Sync PROPERTIES
 )
 
 target_link_libraries(Sync PUBLIC Storage)
-
-# Use Zlib if the imported target is defined, otherise use -lz on Apple platforms
-if(TARGET ZLIB::ZLIB)
-    target_link_libraries(Sync PUBLIC ZLIB::ZLIB)
-elseif(APPLE)
-    target_link_options(Sync PUBLIC "-lz")
-else()
-    message(FATAL_ERROR "No zlib dependency defined for Realm::Sync")
-endif()
 
 if(APPLE AND NOT REALM_FORCE_OPENSSL)
     target_link_options(Sync INTERFACE "SHELL:-framework Security")

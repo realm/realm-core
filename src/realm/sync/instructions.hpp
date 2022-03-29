@@ -2,21 +2,20 @@
 #ifndef REALM_IMPL_INSTRUCTIONS_HPP
 #define REALM_IMPL_INSTRUCTIONS_HPP
 
-#include <vector>
-#include <unordered_map>
 #include <iosfwd> // string conversion, debug prints
 #include <memory> // shared_ptr
 #include <type_traits>
+#include <unordered_map>
+#include <vector>
 
 #include <external/mpark/variant.hpp>
-#include <realm/util/string_buffer.hpp>
-#include <realm/string_data.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/data_type.hpp>
-#include <realm/timestamp.hpp>
+#include <realm/string_data.hpp>
 #include <realm/sync/object_id.hpp>
-#include <realm/impl/input_stream.hpp>
 #include <realm/table_ref.hpp>
+#include <realm/timestamp.hpp>
+#include <realm/util/input_stream.hpp>
 #include <realm/util/overload.hpp>
 
 namespace realm {

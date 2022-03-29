@@ -11,11 +11,11 @@ using realm::sync::Changeset;
 namespace {
 Changeset encode_then_parse(const Changeset& changeset)
 {
-    using realm::_impl::SimpleNoCopyInputStream;
+    using realm::util::SimpleNoCopyInputStream;
 
     sync::ChangesetEncoder::Buffer buffer;
     encode_changeset(changeset, buffer);
-    SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+    SimpleNoCopyInputStream stream{buffer};
     Changeset parsed;
     parse_changeset(stream, parsed);
     return parsed;
@@ -271,8 +271,8 @@ TEST(ChangesetEncoding_AccentWords)
     encoder.intern_string("Program");
     auto& buffer = encoder.buffer();
 
-    using realm::_impl::SimpleNoCopyInputStream;
-    SimpleNoCopyInputStream stream{buffer.data(), buffer.size()};
+    using realm::util::SimpleNoCopyInputStream;
+    SimpleNoCopyInputStream stream{buffer};
     Changeset parsed;
     // This will throw if a string is interned twice.
     CHECK_NOTHROW(parse_changeset(stream, parsed));

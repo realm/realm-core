@@ -45,7 +45,6 @@
 #include <realm/util/errno.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/util/safe_int_ops.hpp>
-#include <realm/util/string_buffer.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 
@@ -59,8 +58,8 @@ namespace {
 
 std::string get_last_error_msg(const char* prefix, DWORD err)
 {
-    StringBuffer buffer;
-    buffer.append_c_str(prefix);
+    std::string buffer;
+    buffer.append(prefix);
     size_t offset = buffer.size();
     size_t max_msg_size = 1024;
     buffer.resize(offset + max_msg_size);
@@ -69,10 +68,10 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
     DWORD size =
         FormatMessageA(flags, 0, err, language_id, buffer.data() + offset, static_cast<DWORD>(max_msg_size), 0);
     if (0 < size)
-        return std::string(buffer.data(), offset + size);
+        return buffer;
     buffer.resize(offset);
-    buffer.append_c_str("Unknown error");
-    return buffer.str();
+    buffer.append("Unknown error");
+    return buffer;
 }
 
 std::wstring string_to_wstring(const std::string& str)

@@ -73,6 +73,7 @@ set(UTIL_SOURCES
     util/base64.cpp
     util/basic_system_errors.cpp
     util/cli_args.cpp
+    util/compression.cpp
     util/encrypted_file_mapping.cpp
     util/fifo_helper.cpp
     util/file.cpp
@@ -198,9 +199,9 @@ set(REALM_INSTALL_HEADERS
     backup_restore.hpp
 
     impl/array_writer.hpp
+    impl/changeset_input_stream.hpp
     impl/cont_transact_hist.hpp
     impl/destroy_guard.hpp
-    impl/input_stream.hpp
     impl/output_stream.hpp
     impl/simulated_failure.hpp
     impl/transact_log.hpp
@@ -219,6 +220,7 @@ set(REALM_INSTALL_HEADERS
     util/call_with_tuple.hpp
     util/cf_ptr.hpp
     util/checked_mutex.hpp
+    util/compression.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
     util/features.h
@@ -231,6 +233,7 @@ set(REALM_INSTALL_HEADERS
     util/functional.hpp
     util/future.hpp
     util/hex_dump.hpp
+    util/input_stream.hpp
     util/inspect.hpp
     util/interprocess_condvar.hpp
     util/interprocess_mutex.hpp
@@ -247,7 +250,7 @@ set(REALM_INSTALL_HEADERS
     util/scope_exit.hpp
     util/serializer.hpp
     util/sha_crypto.hpp
-    util/string_buffer.hpp
+    util/span.hpp
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp
@@ -328,6 +331,19 @@ target_link_libraries(Storage INTERFACE Threads::Threads)
 
 if(UNIX AND NOT APPLE)
     target_link_libraries(Storage PUBLIC OpenSSL::Crypto)
+endif()
+
+# Use Zlib if the imported target is defined, otherise use -lz on Apple platforms
+if(TARGET ZLIB::ZLIB)
+    target_link_libraries(Storage PUBLIC ZLIB::ZLIB)
+elseif(APPLE)
+    target_link_options(Storage PUBLIC "-lz")
+else()
+    message(FATAL_ERROR "No zlib dependency defined")
+endif()
+
+if(APPLE)
+    target_link_libraries(Storage PUBLIC "-lcompression")
 endif()
 
 install(TARGETS Storage EXPORT realm

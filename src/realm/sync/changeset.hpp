@@ -23,7 +23,6 @@ struct Changeset {
     using timestamp_type = uint_fast64_t;
     using file_ident_type = uint_fast64_t;
     using version_type = uint_fast64_t; // FIXME: Get from `History`.
-    using StringBuffer = util::BasicStringBuffer<util::MeteredAllocator>;
 
     Changeset();
     struct share_buffers_tag {
@@ -38,8 +37,8 @@ struct Changeset {
     InternString find_string(StringData) const noexcept; // Slow!
     StringData string_data() const noexcept;
 
-    StringBuffer& string_buffer() noexcept;
-    const StringBuffer& string_buffer() const noexcept;
+    std::string& string_buffer() noexcept;
+    const std::string& string_buffer() const noexcept;
     const InternStrings& interned_strings() const noexcept;
     InternStrings& interned_strings() noexcept;
 
@@ -186,7 +185,7 @@ struct Changeset {
 
 private:
     util::metered::vector<Instruction> m_instructions;
-    std::shared_ptr<StringBuffer> m_string_buffer;
+    std::shared_ptr<std::string> m_string_buffer;
     std::shared_ptr<InternStrings> m_strings;
     bool m_is_dirty = false;
 
@@ -484,12 +483,12 @@ inline const InternStrings& Changeset::interned_strings() const noexcept
     return *m_strings;
 }
 
-inline auto Changeset::string_buffer() noexcept -> StringBuffer&
+inline auto Changeset::string_buffer() noexcept -> std::string&
 {
     return *m_string_buffer;
 }
 
-inline auto Changeset::string_buffer() const noexcept -> const StringBuffer&
+inline auto Changeset::string_buffer() const noexcept -> const std::string&
 {
     return *m_string_buffer;
 }

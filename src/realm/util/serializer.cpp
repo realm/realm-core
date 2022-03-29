@@ -26,7 +26,6 @@
 #include <realm/table.hpp>
 #include <realm/timestamp.hpp>
 #include <realm/util/base64.hpp>
-#include <realm/util/string_buffer.hpp>
 
 #include <cctype>
 #include <cmath>
@@ -114,10 +113,10 @@ std::string print_value<>(StringData data)
     const size_t len = data.size();
 
     if (contains_invalids(data)) {
-        util::StringBuffer encode_buffer;
+        std::string encode_buffer;
         encode_buffer.resize(util::base64_encoded_size(len));
         util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-        out = "B64\"" + encode_buffer.str() + "\"";
+        out = "B64\"" + encode_buffer + "\"";
     }
     else {
         out.reserve(len + 2);

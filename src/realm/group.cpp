@@ -1769,7 +1769,7 @@ void Group::refresh_dirty_accessors()
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, _impl::NoCopyInputStream& in, bool writable)
+void Group::advance_transact(ref_type new_top_ref, util::NoCopyInputStream& in, bool writable)
 {
     REALM_ASSERT(is_attached());
     // Exception safety: If this function throws, the group accessor and all of
