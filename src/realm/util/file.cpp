@@ -446,8 +446,6 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         flags2 |= O_TRUNC;
     if (flags & flag_Append)
         flags2 |= O_APPEND;
-    if (flags & flag_Direct)
-        flags2 |= O_DIRECT;
     if (flags & flag_Sync)
         flags2 |= O_SYNC;
     if (flags & flag_DSync)
