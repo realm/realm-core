@@ -170,6 +170,11 @@ public:
         return m_db_path;
     }
 
+    const char* get_encryption_key() const noexcept
+    {
+        return m_key;
+    }
+
 #ifdef REALM_DEBUG
     /// Deprecated method, only called from a unit test
     ///

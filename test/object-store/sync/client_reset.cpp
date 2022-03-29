@@ -448,7 +448,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             }
         }
 
-        SECTION("failing to download a fresh copy results in an error") {
+        SECTION("invalid files at the fresh copy path are cleaned up") {
             ThreadSafeSyncError err;
             local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 err = error;
@@ -458,6 +458,22 @@ TEST_CASE("sync: client reset", "[client reset]") {
             f.write("a non empty file");
             f.sync();
             f.close();
+
+            make_reset(local_config, remote_config)->run();
+            REQUIRE(!err);
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
+        }
+
+        SECTION("failing to download a fresh copy results in an error") {
+            ThreadSafeSyncError err;
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                err = error;
+            };
+            std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+            // create a non-empty directory that we'll fail to delete
+            util::make_dir(fresh_path);
+            util::File(util::File::resolve("file", fresh_path), util::File::mode_Write);
 
             REQUIRE(!err);
             make_reset(local_config, remote_config)

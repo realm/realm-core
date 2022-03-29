@@ -512,7 +512,7 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     CHECK(!wait_for_download(*realm));
     CHECK(!wait_for_upload(*realm));
 
-    CHECK(!realm->sync_session()->has_flx_subscription_store());
+    CHECK(!realm->sync_session()->get_flx_subscription_store());
 }
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
@@ -635,8 +635,8 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
                 REQUIRE(!seen_waiting_for_access_token);
                 seen_waiting_for_access_token = true;
 
-                REQUIRE(session->has_flx_subscription_store());
                 auto store = session->get_flx_subscription_store();
+                REQUIRE(store);
                 auto mut_subs = store->get_latest().make_mutable_copy();
                 std::move(mut_subs).commit();
             }
@@ -649,4 +649,4 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
 }
 } // namespace realm::app
 
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS
