@@ -699,36 +699,36 @@ TEST_CASE("collection_change: merge()") {
     }
 
     SECTION("clear collection flag gets propagated") {
-        c = {{1, 2, 3}, {}, {}, {}, true};
+        c = {{1, 2, 3}, {}, {}, {}, false, true};
         c.merge({});
         REQUIRE(c.collection_was_cleared);
 
-        c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false};
+        c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false, false};
         c.merge({});
         REQUIRE(!c.collection_was_cleared);
 
         c = {};
-        c.merge({{1, 2, 3}, {}, {}, {}, true});
+        c.merge({{1, 2, 3}, {}, {}, {}, false, true});
         REQUIRE(c.collection_was_cleared);
 
         c = {};
-        c.merge({{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false});
+        c.merge({{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false, false});
         REQUIRE(!c.collection_was_cleared);
 
-        c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false};
-        c.merge({{1, 2, 3}, {}, {}, {}, true});
+        c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false, false};
+        c.merge({{1, 2, 3}, {}, {}, {}, false, true});
         REQUIRE(c.collection_was_cleared);
 
-        c = {{1, 2, 3}, {}, {}, {}, true};
-        c.merge({{}, {1, 2, 3}, {}, {}, false});
+        c = {{1, 2, 3}, {}, {}, {}, false, true};
+        c.merge({{}, {1, 2, 3}, {}, {}, false, false});
         REQUIRE(!c.collection_was_cleared);
 
-        c = {{1, 2, 3}, {}, {}, {}, true};
-        c.merge({{1, 2, 3}, {1, 2, 3}, {}, {}, true});
+        c = {{1, 2, 3}, {}, {}, {}, false, true};
+        c.merge({{1, 2, 3}, {1, 2, 3}, {}, {}, false, true});
         REQUIRE(c.collection_was_cleared);
 
-        c = {{1, 2, 3}, {4, 5}, {}, {}, false};
-        c.merge({{}, {1, 2, 3}, {}, {}, false});
+        c = {{1, 2, 3}, {4, 5}, {}, {}, false, false};
+        c.merge({{}, {1, 2, 3}, {}, {}, false, false});
         REQUIRE(!c.collection_was_cleared);
     }
 

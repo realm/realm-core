@@ -89,13 +89,13 @@ struct CollectionChangeSet {
     // unreported moves which show up only as a delete/insert pair.
     std::vector<Move> moves;
 
-    // This flag indicates if the collection was cleared.
-    bool collection_was_cleared = false;
-
     // This flag indicates whether the underlying object which is the source of this
     // collection was deleted. This applies to lists, dictionaries and sets.
     // This enables notifiers to report a change on empty collections that have been deleted.
     bool collection_root_was_deleted = false;
+
+    // This flag indicates if the collection was cleared.
+    bool collection_was_cleared = false;
 
     // Per-column version of `modifications`
     std::unordered_map<int64_t, IndexSet> columns;

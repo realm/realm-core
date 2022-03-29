@@ -150,6 +150,18 @@ TEST_CASE("list") {
             REQUIRE(change.collection_was_cleared);
         }
 
+        SECTION("clearing list followed by insertion does not set cleared flag") {
+            auto token = require_change();
+            write([&] {
+                lst.remove_all();
+                Obj obj = target->get_object(target_keys[5]);
+                lst.add(obj);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
         SECTION("removing all elements from list does not set cleared flag") {
             auto token = require_change();
             write([&] {

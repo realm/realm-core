@@ -760,6 +760,32 @@ TEMPLATE_TEST_CASE("set", "[set]", CreateNewSet<void>, ReuseSet<void>)
             REQUIRE(change.empty());
         }
 
+        SECTION("deleting the set and adding an element does not set cleared flag") {
+            auto token = require_change();
+
+            Obj target1, target2, target3, target4;
+            write([&]() {
+                target1 = table2->create_object_with_primary_key(123);
+                target2 = table2->create_object_with_primary_key(456);
+                target3 = table2->create_object_with_primary_key(789);
+                target4 = table2->create_object_with_primary_key(101);
+            });
+
+            write([&]() {
+                CHECK(link_set.insert(target1).second);
+                CHECK(link_set.insert(target2).second);
+                CHECK(link_set.insert(target3).second);
+            });
+
+            write([&] {
+                link_set.remove_all();
+                CHECK(link_set.insert(target4).second);
+            });
+            REQUIRE_INDICES(change.deletions, 0, 1, 2);
+            REQUIRE_INDICES(change.insertions, 0);
+            REQUIRE(!change.collection_was_cleared);
+        }
+
         SECTION("removing all elements from set does not set cleared flag") {
             auto token = require_change();
 
