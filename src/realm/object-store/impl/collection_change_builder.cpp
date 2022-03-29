@@ -704,6 +704,7 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
     // but we don't want inserts in the final modification set
     modifications.remove(insertions);
 
-    return {std::move(deletions), std::move(insertions),  std::move(modifications_in_old), std::move(modifications),
-            std::move(moves), collection_root_was_deleted, collection_was_cleared, std::move(columns)};
+    return {std::move(deletions),     std::move(insertions), std::move(modifications_in_old),
+            std::move(modifications), std::move(moves),      collection_root_was_deleted,
+            collection_was_cleared,   std::move(columns)};
 }
