@@ -16,10 +16,42 @@
  *
  **************************************************************************/
 
-#include <realm/obj_list.hpp>
+#include <realm/table_view.hpp>
+#include <set>
 
 namespace realm {
 
 ObjList::~ObjList() {}
+
+TableView ObjList::links(ColKey col_key) const
+{
+    std::set<ObjKey> keys;
+    for (size_t i = 0; i < size(); i++) {
+        auto obj = get_object(i);
+        keys.insert(obj.get<ObjKey>(col_key));
+    }
+    TableView ret(get_target_table());
+    for (auto k : keys) {
+        ret.m_key_values.add(k);
+    }
+    return ret;
+}
+
+TableView ObjList::intersection(const ObjList& list) const
+{
+    REALM_ASSERT(get_target_table() == list.get_target_table());
+    std::set<ObjKey> mykeys;
+    for (size_t i = 0; i < size(); i++) {
+        mykeys.insert(get_key(i));
+    }
+    TableView ret(get_target_table());
+    for (size_t i = 0; i < list.size(); i++) {
+        auto key = list.get_key(i);
+        if (mykeys.find(key) != mykeys.end()) {
+            ret.m_key_values.add(key);
+        }
+    }
+    return ret;
+}
 
 } // namespace realm

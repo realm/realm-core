@@ -21,8 +21,6 @@
 #include <realm/index_string.hpp>
 #include <realm/transaction.hpp>
 
-#include <unordered_set>
-
 using namespace realm;
 
 void TableView::KeyValues::copy_from(const KeyValues& rhs)

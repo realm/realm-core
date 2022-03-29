@@ -64,6 +64,10 @@ public:
         return get_object(ndx);
     }
 
+    // Return the set of object linked by this collection
+    TableView links(ColKey column) const;
+    TableView intersection(const ObjList& list) const;
+
     template <class F>
     void for_each(F func) const
     {
