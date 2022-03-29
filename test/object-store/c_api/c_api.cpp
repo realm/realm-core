@@ -3849,9 +3849,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             CHECK(count == 1);
             auto object = realm_results_get_object(results, 0);
             REQUIRE(realm_object_is_valid(object));
+            REQUIRE(object->get_column_value<ObjectId>("_id") == bar_obj_id);
             realm_release(object);
             realm_release(results);
-            REQUIRE(object->get_column_value<ObjectId>("_id") == bar_obj_id);
         }
 
         {
