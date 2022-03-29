@@ -3762,9 +3762,12 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             CHECK(sub != nullptr);
             auto new_subs = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
-            auto inserted = realm_sync_subscription_set_insert_or_assign(new_subs, c_wrap_query_foo, nullptr, &index);
+            bool inserted = false;
+            auto res =
+                realm_sync_subscription_set_insert_or_assign(new_subs, c_wrap_query_foo, nullptr, &index, &inserted);
             CHECK(inserted == true);
             CHECK(index == 0);
+            CHECK(res);
             auto subs = realm_sync_subscription_set_commit(new_subs);
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 subs, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
@@ -3792,7 +3795,8 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
-            auto inserted = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index);
+            bool inserted = false;
+            realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index, &inserted);
             CHECK(inserted);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
@@ -3821,9 +3825,11 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             CHECK(erased);
             auto c_wrap_new_query_bar = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
             std::size_t index = -1;
-            bool inserted =
-                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, nullptr, &index);
+            bool inserted = false;
+            bool updated = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, nullptr,
+                                                                        &index, &inserted);
             CHECK(!inserted);
+            CHECK(updated);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
@@ -3876,9 +3882,11 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
-            bool inserted =
-                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, "bar", &index);
+            bool inserted = false;
+            bool success =
+                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, "bar", &index, &inserted);
             CHECK(inserted);
+            CHECK(success);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
@@ -3925,10 +3933,12 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
-            auto inserted = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index);
+            bool inserted = false;
+            bool success =
+                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index, &inserted);
             CHECK(inserted);
+            CHECK(success);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
-
             // lambdas with state cannot be easily converted to function pointers, add a simple singleton that syncs
             // the state among threads
             struct SyncObject {

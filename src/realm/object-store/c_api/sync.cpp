@@ -501,7 +501,7 @@ realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t* su
 RLM_API realm_flx_sync_subscription_t*
 realm_sync_subscription_at(const realm_flx_sync_subscription_set_t* subscription_set, size_t index) noexcept
 {
-    REALM_ASSERT(subscription_set != nullptr && index >= 0 && index < subscription_set->size());
+    REALM_ASSERT(subscription_set != nullptr && index < subscription_set->size());
     try {
         return new realm_flx_sync_subscription_t{subscription_set->at(index)};
     }
@@ -549,15 +549,16 @@ RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscripti
 }
 
 RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t* subscription_set,
-                                                          realm_query_t* query, const char* name,
-                                                          size_t* index) noexcept
+                                                          realm_query_t* query, const char* name, size_t* index,
+                                                          bool* inserted) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
     return wrap_err([&]() {
-        const auto [it, inserted] = name ? subscription_set->insert_or_assign(name, query->get_query())
-                                         : subscription_set->insert_or_assign(query->get_query());
+        const auto [it, successful] = name ? subscription_set->insert_or_assign(name, query->get_query())
+                                           : subscription_set->insert_or_assign(query->get_query());
         *index = std::distance(subscription_set->begin(), it);
-        return inserted;
+        *inserted = successful;
+        return true;
     });
 }
 
@@ -565,20 +566,26 @@ RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_su
                                                        const char* name) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr && name != nullptr);
-    if (auto it = subscription_set->find(name); it != subscription_set->end()) {
-        return subscription_set->erase(it) != subscription_set->end();
-    }
-    return false;
+    return wrap_err([&]() {
+        if (auto it = subscription_set->find(name); it != subscription_set->end()) {
+            subscription_set->erase(it);
+            return true;
+        }
+        return false;
+    });
 }
 
 RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t* subscription_set,
                                                         realm_query_t* query) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
-    if (auto it = subscription_set->find(query->get_query()); it != subscription_set->end()) {
-        return subscription_set->erase(it) != subscription_set->end();
-    }
-    return false;
+    return wrap_err([&]() {
+        if (auto it = subscription_set->find(query->get_query()); it != subscription_set->end()) {
+            subscription_set->erase(it);
+            return true;
+        }
+        return false;
+    });
 }
 
 RLM_API realm_flx_sync_subscription_set_t*
