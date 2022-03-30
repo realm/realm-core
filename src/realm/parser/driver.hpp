@@ -513,7 +513,7 @@ public:
 
 private:
     // The string being parsed.
-    util::StringBuffer parse_buffer;
+    std::string parse_buffer;
     std::string error_string;
     void* scan_buffer = nullptr;
     bool parse_error = false;

@@ -43,7 +43,7 @@ struct TestValueGenerator {
     }
 
 private:
-    std::vector<util::StringBuffer> m_buffer_space;
+    std::list<std::string> m_buffer_space;
 };
 
 
@@ -99,21 +99,15 @@ inline util::Optional<ObjectId> TestValueGenerator::convert_for_test<util::Optio
 template <>
 inline StringData TestValueGenerator::convert_for_test<StringData>(int64_t t)
 {
-    std::string str = util::format("string %1", t);
-    util::StringBuffer b;
-    b.append(str);
-    m_buffer_space.emplace_back(std::move(b));
-    return StringData(m_buffer_space[m_buffer_space.size() - 1].data(), str.size());
+    m_buffer_space.push_back(util::format("string %1", t));
+    return m_buffer_space.back();
 }
 
 template <>
 inline BinaryData TestValueGenerator::convert_for_test<BinaryData>(int64_t t)
 {
-    std::string str = util::format("string %1", t);
-    util::StringBuffer b;
-    b.append(str);
-    m_buffer_space.emplace_back(std::move(b));
-    return BinaryData(m_buffer_space[m_buffer_space.size() - 1].data(), str.size());
+    m_buffer_space.push_back(util::format("string %1", t));
+    return {m_buffer_space.back().data(), m_buffer_space.back().size()};
 }
 
 template <>

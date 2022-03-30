@@ -16,19 +16,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <ctime>
-#include <cstring>
-#include <algorithm>
-#include <utility>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
+#include <realm/util/compression.hpp>
 #include <realm/util/features.h>
 #include <realm/util/scope_exit.hpp>
-#include <realm/sync/noinst/client_history_impl.hpp>
-#include <realm/version.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
-#include <realm/sync/instruction_replication.hpp>
 #include <realm/sync/instruction_applier.hpp>
+#include <realm/sync/instruction_replication.hpp>
+#include <realm/version.hpp>
+
+#include <algorithm>
+#include <ctime>
+#include <cstring>
+#include <utility>
 
 namespace realm::sync {
 
@@ -136,12 +138,40 @@ void ClientReplication::upgrade_history_schema(int stored_schema_version)
     int orig_schema_version = stored_schema_version;
     int schema_version = orig_schema_version;
 
+    if (schema_version < 12) {
+        m_history.compress_stored_changesets();
+        schema_version = 12;
+    }
+
     // NOTE: Future migration steps go here.
 
     REALM_ASSERT(schema_version == get_client_history_schema_version());
 
     // Record migration event
     m_history.record_current_schema_version(); // Throws
+}
+
+void ClientHistory::compress_stored_changesets()
+{
+    using gf = _impl::GroupFriend;
+    Allocator& alloc = gf::get_alloc(*m_group);
+    auto ref = gf::get_history_ref(*m_group);
+    Arrays arrays{alloc, *m_group, ref};
+
+    util::AppendBuffer<char> compressed_buffer;
+    util::AppendBuffer<char> decompressed_buffer;
+    util::compression::CompressMemoryArena arena;
+    auto columns = {&arrays.reciprocal_transforms, &arrays.changesets};
+    for (auto column : columns) {
+        for (size_t i = 0; i < column->size(); ++i) {
+            ChunkedBinaryData data(*column, i);
+            if (data.is_null())
+                continue;
+            data.copy_to(compressed_buffer);
+            util::compression::allocate_and_compress_nonportable(arena, compressed_buffer, decompressed_buffer);
+            column->set(i, BinaryData{decompressed_buffer.data(), decompressed_buffer.size()}); // Throws
+        }
+    }
 }
 
 // Overriding member function in realm::Replication
@@ -166,7 +196,6 @@ void ClientReplication::finalize_changeset() noexcept
     m_history.m_changeset_from_server = util::none;
 }
 
-// Overriding member function in realm::ClientHistoryBase
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
                                SyncProgress& progress) const
 {
@@ -204,7 +233,6 @@ void ClientHistory::get_status(version_type& current_client_version, SaltedFileI
 }
 
 
-// Overriding member function in realm::sync::ClientHistoryBase
 void ClientHistory::set_client_file_ident(SaltedFileIdent client_file_ident, bool fix_up_object_ids)
 {
     REALM_ASSERT(client_file_ident.ident != 0);
@@ -250,8 +278,6 @@ void ClientHistory::set_sync_progress(const SyncProgress& progress, const std::u
     version_info.sync_version = {new_version, 0};
 }
 
-
-// Overriding member function in realm::sync::ClientHistoryBase
 void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, version_type end_version,
                                                std::vector<UploadChangeset>& uploadable_changesets,
                                                version_type& locked_server_version) const
@@ -285,14 +311,22 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
         begin_version_2 = version;
 
         UploadChangeset uc;
-        std::size_t size = entry.changeset.copy_to(uc.buffer);
+        util::AppendBuffer<char> decompressed;
+        ChunkedBinaryInputStream is(entry.changeset);
+        auto ec = util::compression::decompress_nonportable(is, decompressed);
+        if (ec == util::compression::error::decompress_unsupported) {
+            REALM_TERMINATE(
+                "Synchronized Realm files with unuploaded local changes cannot be copied between platforms.");
+        }
+        REALM_ASSERT_3(ec, ==, std::error_code{});
         uc.origin_timestamp = entry.origin_timestamp;
         uc.origin_file_ident = entry.origin_file_ident;
         uc.progress = UploadCursor{version, entry.remote_version};
-        uc.changeset = BinaryData{uc.buffer.get(), size};
+        uc.changeset = BinaryData{decompressed.data(), decompressed.size()};
+        uc.buffer = decompressed.release().release();
         uploadable_changesets.push_back(std::move(uc)); // Throws
 
-        accum_byte_size += size;
+        accum_byte_size += decompressed.size();
     }
 
     upload_progress = {std::min(begin_version_2, end_version), last_integrated_upstream_version};
@@ -469,7 +503,6 @@ void ClientHistory::get_upload_download_bytes(DB* db, std::uint_fast64_t& downlo
     }
 }
 
-// Overriding member function in realm::sync::TransformHistory
 auto ClientHistory::find_history_entry(version_type begin_version, version_type end_version,
                                        HistoryEntry& entry) const noexcept -> version_type
 {
@@ -479,9 +512,9 @@ auto ClientHistory::find_history_entry(version_type begin_version, version_type 
 }
 
 
-// Overriding member function in realm::sync::TransformHistory
-ChunkedBinaryData ClientHistory::get_reciprocal_transform(version_type version) const
+ChunkedBinaryData ClientHistory::get_reciprocal_transform(version_type version, bool& is_compressed) const
 {
+    is_compressed = true;
     REALM_ASSERT(version > m_sync_history_base_version);
 
     std::size_t index = to_size_t(version - m_sync_history_base_version) - 1;
@@ -494,7 +527,6 @@ ChunkedBinaryData ClientHistory::get_reciprocal_transform(version_type version) 
 }
 
 
-// Overriding member function in realm::sync::TransformHistory
 void ClientHistory::set_reciprocal_transform(version_type version, BinaryData data)
 {
     REALM_ASSERT(version > m_sync_history_base_version);
@@ -502,12 +534,8 @@ void ClientHistory::set_reciprocal_transform(version_type version, BinaryData da
     std::size_t index = size_t(version - m_sync_history_base_version) - 1;
     REALM_ASSERT(index < sync_history_size());
 
-    // FIXME: BinaryColumn::set() currently interprets BinaryData(0,0) as
-    // null. It should probably be changed such that BinaryData(0,0) is always
-    // interpreted as the empty string. For the purpose of setting null values,
-    // BinaryColumn::set() should accept values of type Optional<BinaryData>().
-    BinaryData data_2 = (data ? data : BinaryData("", 0));
-    m_arrays->reciprocal_transforms.set(index, data_2); // Throws
+    auto compressed = util::compression::allocate_and_compress_nonportable(data);
+    m_arrays->reciprocal_transforms.set(index, BinaryData{compressed.data(), compressed.size()}); // Throws
 }
 
 
@@ -569,7 +597,8 @@ std::uint_fast64_t ClientHistory::sum_of_history_entry_sizes(version_type begin_
             continue;
 
         ChunkedBinaryData changeset(m_arrays->changesets, offset + i);
-        sum_of_sizes += changeset.size();
+        ChunkedBinaryInputStream in{changeset};
+        sum_of_sizes += util::compression::get_uncompressed_size_from_header(in);
     }
 
     return sum_of_sizes;
@@ -611,7 +640,7 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
             changeset = *m_client_reset_changeset;
             m_client_reset_changeset = util::none;
         }
-        else {
+        else if (sync_changeset.size()) {
             changeset = sync_changeset;
         }
 
@@ -636,7 +665,6 @@ Replication::version_type ClientHistory::add_changeset(BinaryData ct_changeset, 
     return m_ct_history_base_version + ct_history_size();
 }
 
-
 void ClientHistory::add_sync_history_entry(HistoryEntry entry)
 {
     REALM_ASSERT(m_arrays->reciprocal_transforms.size() == sync_history_size());
@@ -644,20 +672,16 @@ void ClientHistory::add_sync_history_entry(HistoryEntry entry)
     REALM_ASSERT(m_arrays->origin_file_idents.size() == sync_history_size());
     REALM_ASSERT(m_arrays->origin_timestamps.size() == sync_history_size());
 
-    // FIXME: BinaryColumn::set() currently interprets BinaryData(0,0) as
-    // null. It should probably be changed such that BinaryData(0,0) is always
-    // interpreted as the empty string. For the purpose of setting null values,
-    // BinaryColumn::set() should accept values of type Optional<BinaryData>().
-    BinaryData changeset_2("", 0);
     if (!entry.changeset.is_null()) {
-        changeset_2 = entry.changeset.get_first_chunk();
+        auto changeset = entry.changeset.get_first_chunk();
+        auto compressed = util::compression::allocate_and_compress_nonportable(changeset);
+        m_arrays->changesets.add(BinaryData{compressed.data(), compressed.size()}); // Throws
     }
-    m_arrays->changesets.add(changeset_2); // Throws
+    else {
+        m_arrays->changesets.add(BinaryData()); // Throws
+    }
 
-    {
-        // inserts null
-        m_arrays->reciprocal_transforms.add(BinaryData{}); // Throws
-    }
+    m_arrays->reciprocal_transforms.add(BinaryData{});                                            // Throws
     m_arrays->remote_versions.insert(realm::npos, std::int_fast64_t(entry.remote_version));       // Throws
     m_arrays->origin_file_idents.insert(realm::npos, std::int_fast64_t(entry.origin_file_ident)); // Throws
     m_arrays->origin_timestamps.insert(realm::npos, std::int_fast64_t(entry.origin_timestamp));   // Throws
@@ -899,6 +923,9 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         return group.get_table(Group::class_name_to_table_name(class_name, buffer));
     };
 
+    util::compression::CompressMemoryArena arena;
+    util::AppendBuffer<char> compressed;
+
     // Fix up changesets.
     Array& root = m_arrays->root;
     uint64_t uploadable_bytes = root.get_as_ref_or_tagged(s_progress_uploadable_bytes_iip).get_as_int();
@@ -911,11 +938,14 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         // FIXME: We have to do this when transmitting/receiving changesets
         // over the network instead.
         ChunkedBinaryData changeset{m_arrays->changesets, i};
-        ChunkedBinaryInputStream in{changeset};
+        ChunkedBinaryInputStream is{changeset};
+        size_t decompressed_size;
+        auto decompressed = util::compression::decompress_nonportable_input_stream(is, decompressed_size);
+        if (!decompressed)
+            continue;
         Changeset log;
-        parse_changeset(in, log);
+        parse_changeset(*decompressed, log);
 
-        size_t size_before = changeset.size();
         bool did_modify = false;
         auto last_class_name = InternString::npos;
         ConstTableRef selected_table;
@@ -956,16 +986,16 @@ void ClientHistory::fix_up_client_file_ident_in_stored_changesets(Transaction& g
         if (did_modify) {
             ChangesetEncoder::Buffer modified;
             encode_changeset(log, modified);
-            BinaryData result = BinaryData{modified.data(), modified.size()};
-            m_arrays->changesets.set(i, result);
-            uploadable_bytes += (modified.size() - size_before);
+            util::compression::allocate_and_compress_nonportable(arena, modified, compressed);
+            m_arrays->changesets.set(i, BinaryData{compressed.data(), compressed.size()}); // Throws
+
+            uploadable_bytes += modified.size() - decompressed_size;
         }
     }
 
     root.set(s_progress_uploadable_bytes_iip, RefOrTagged::make_tagged(uploadable_bytes));
 }
 
-// Overriding member function in realm::sync::ClientHistory
 void ClientHistory::set_group(Group* group, bool updated)
 {
     _impl::History::set_group(group, updated);

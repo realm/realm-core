@@ -20,116 +20,13 @@
 
 #include <catch2/catch.hpp>
 
-#include "sync_test_utils.hpp"
-
-#include "util/baas_admin_api.hpp"
+#include "flx_sync_harness.hpp"
 #include "util/test_file.hpp"
-
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/sync/protocol.hpp"
+#include <realm/sync/noinst/server/access_token.hpp>
 
 namespace realm::app {
-
-class FLXSyncTestHarness {
-public:
-    struct ServerSchema {
-        Schema schema;
-        std::vector<std::string> queryable_fields;
-        bool dev_mode_enabled = false;
-    };
-
-    static ServerSchema default_server_schema();
-
-    FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema());
-
-    template <typename Func>
-    void do_with_new_user(Func&& func)
-    {
-        auto sync_mgr = make_sync_manager();
-        auto creds = create_user_and_log_in(sync_mgr.app());
-        func(sync_mgr.app()->current_user());
-    }
-
-    template <typename Func>
-    void do_with_new_realm(Func&& func, util::Optional<Schema> schema_for_realm = util::none)
-    {
-        do_with_new_user([&](std::shared_ptr<SyncUser> user) {
-            SyncTestFile config(user, schema_for_realm.value_or(schema()), SyncConfig::FLXSyncEnabled{});
-            func(Realm::get_shared_realm(config));
-        });
-    }
-
-
-    template <typename Func>
-    void load_initial_data(Func&& func)
-    {
-        do_with_new_realm([&](SharedRealm realm) {
-            {
-                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-                for (const auto& table : realm->schema()) {
-                    Query query_for_table(realm->read_group().get_table(table.table_key));
-                    mut_subs.insert_or_assign(query_for_table);
-                }
-                auto subs = std::move(mut_subs).commit();
-                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-            }
-            func(realm);
-        });
-    }
-
-    TestSyncManager make_sync_manager();
-
-    const Schema& schema() const
-    {
-        return m_schema;
-    }
-
-private:
-    AppSession m_app_session;
-    app::App::Config m_app_config;
-    Schema m_schema;
-};
-
-FLXSyncTestHarness::ServerSchema FLXSyncTestHarness::default_server_schema()
-{
-    Schema schema{
-        ObjectSchema("TopLevel",
-                     {
-                         {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                         {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-                         {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-                         {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
-                     }),
-    };
-
-    return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
-}
-
-AppSession make_app_from_server_schema(const std::string& test_name,
-                                       const FLXSyncTestHarness::ServerSchema& server_schema)
-{
-    auto server_app_config = minimal_app_config(get_base_url(), test_name, server_schema.schema);
-    server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
-    AppCreateConfig::FLXSyncConfig flx_config;
-    flx_config.queryable_fields = server_schema.queryable_fields;
-
-    server_app_config.flx_sync_config = std::move(flx_config);
-    return create_app(server_app_config);
-}
-
-
-FLXSyncTestHarness::FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema)
-    : m_app_session(make_app_from_server_schema(test_name, server_schema))
-    , m_app_config(get_config(instance_of<SynchronousTestTransport>, m_app_session))
-    , m_schema(std::move(server_schema.schema))
-{
-}
-
-TestSyncManager FLXSyncTestHarness::make_sync_manager()
-{
-    TestSyncManager::Config smc(m_app_config);
-    return TestSyncManager(std::move(smc), {});
-}
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     FLXSyncTestHarness harness("basic_flx_connect");
@@ -406,7 +303,7 @@ TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]"
         },
         default_schema.schema);
 }
-#if 0
+
 TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_offline_writes");
 
@@ -437,7 +334,10 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
         realm->commit_transaction();
 
         wait_for_upload(*realm);
+        wait_for_download(*realm);
         sync_session->close();
+
+        // Make it so the subscriptions only match the "foo" object
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -445,6 +345,9 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
+        // Make foo so that it will match the next subscription update. This checks whether you can do
+        // multiple subscription set updates offline and that the last one eventually takes effect when
+        // you come back online and fully synchronize.
         {
             Results results(realm, table);
             realm->begin_transaction();
@@ -453,6 +356,7 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             realm->commit_transaction();
         }
 
+        // Update our subscriptions so that both foo/bar will be included
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -460,18 +364,22 @@ TEST_CASE("flx: writes work offline", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
-        Results results(realm, table);
-        realm->begin_transaction();
-        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
-        foo_obj.set<int64_t>(queryable_int_field, 0);
-        realm->commit_transaction();
+        // Make foo out of view for the current subscription.
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 0);
+            realm->commit_transaction();
+        }
 
         sync_session->revive_if_needed();
+        wait_for_upload(*realm);
         wait_for_download(*realm);
 
         realm->refresh();
-        CHECK(results.size() == 2);
-        CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+        Results results(realm, table);
+        CHECK(results.size() == 1);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
@@ -505,6 +413,8 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
         realm->commit_transaction();
 
         wait_for_upload(*realm);
+
+        // Make it so the subscriptions only match the "foo" object
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -512,6 +422,9 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
+        // Make foo so that it will match the next subscription update. This checks whether you can do
+        // multiple subscription set updates without waiting and that the last one eventually takes effect when
+        // you fully synchronize.
         {
             Results results(realm, table);
             realm->begin_transaction();
@@ -520,6 +433,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             realm->commit_transaction();
         }
 
+        // Update our subscriptions so that both foo/bar will be included
         {
             auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
             mut_subs.clear();
@@ -527,21 +441,24 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
             std::move(mut_subs).commit();
         }
 
-        Results results(realm, table);
-        realm->begin_transaction();
-        auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
-        foo_obj.set<int64_t>(queryable_int_field, 0);
-        realm->commit_transaction();
+        // Make foo out-of-view for the current subscription.
+        {
+            Results results(realm, table);
+            realm->begin_transaction();
+            auto foo_obj = table->get_object_with_primary_key(Mixed{foo_obj_id});
+            foo_obj.set<int64_t>(queryable_int_field, 0);
+            realm->commit_transaction();
+        }
 
+        wait_for_upload(*realm);
         wait_for_download(*realm);
 
         realm->refresh();
-        CHECK(results.size() == 2);
-        CHECK(table->get_object_with_primary_key({foo_obj_id}).is_valid());
+        Results results(realm, table);
+        CHECK(results.size() == 1);
         CHECK(table->get_object_with_primary_key({bar_obj_id}).is_valid());
     });
 }
-#endif
 
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
@@ -552,16 +469,20 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
     SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.persist();
 
-    auto orig_realm = Realm::get_shared_realm(config);
-    auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
-    mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
-    std::move(mut_subs).commit();
-    orig_realm->close();
+    {
+        auto orig_realm = Realm::get_shared_realm(config);
+        auto mut_subs = orig_realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(orig_realm->read_group().get_table("class_TopLevel")));
+        std::move(mut_subs).commit();
+        orig_realm->close();
+    }
 
-    auto new_realm = Realm::get_shared_realm(config);
-    auto latest_subs = new_realm->get_latest_subscription_set();
-    CHECK(latest_subs.size() == 1);
-    latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    {
+        auto new_realm = Realm::get_shared_realm(config);
+        auto latest_subs = new_realm->get_latest_subscription_set();
+        CHECK(latest_subs.size() == 1);
+        latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    }
 }
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {
@@ -591,7 +512,7 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     CHECK(!wait_for_download(*realm));
     CHECK(!wait_for_upload(*realm));
 
-    CHECK(!realm->sync_session()->has_flx_subscription_store());
+    CHECK(!realm->sync_session()->get_flx_subscription_store());
 }
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
@@ -670,6 +591,62 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
 
     CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
 }
+
+TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {
+    class HookedTransport : public SynchronousTestTransport {
+    public:
+        void send_request_to_server(Request&& request,
+                                    util::UniqueFunction<void(const Response&)>&& completion_block) override
+        {
+            if (request_hook) {
+                request_hook(request);
+            }
+            SynchronousTestTransport::send_request_to_server(std::move(request), [&](const Response& response) {
+                completion_block(response);
+            });
+        }
+        util::UniqueFunction<void(Request&)> request_hook;
+    };
+
+    auto transport = std::make_shared<HookedTransport>();
+    FLXSyncTestHarness harness("flx_wait_access_token2", FLXSyncTestHarness::default_server_schema(), transport);
+
+    auto sync_mgr = harness.make_sync_manager();
+    auto creds = create_user_and_log_in(sync_mgr.app());
+    auto app = sync_mgr.app();
+    std::shared_ptr<SyncUser> user = app->current_user();
+    REQUIRE(user);
+    REQUIRE(!user->access_token_refresh_required());
+    // Set a bad access token, with an expired time. This will trigger a refresh initiated by the client.
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+    using namespace std::chrono_literals;
+    auto expires = std::chrono::system_clock::to_time_t(now - 30s);
+    user->update_access_token(encode_fake_jwt("fake_access_token", expires));
+    REQUIRE(user->access_token_refresh_required());
+
+    bool seen_waiting_for_access_token = false;
+    // Commit a subcription set while there is no sync session.
+    // A session is created when the access token is refreshed.
+    transport->request_hook = [&](Request&) {
+        auto user = app->current_user();
+        REQUIRE(user);
+        for (auto& session : user->all_sessions()) {
+            if (session->state() == SyncSession::State::WaitingForAccessToken) {
+                REQUIRE(!seen_waiting_for_access_token);
+                seen_waiting_for_access_token = true;
+
+                auto store = session->get_flx_subscription_store();
+                REQUIRE(store);
+                auto mut_subs = store->get_latest().make_mutable_copy();
+                std::move(mut_subs).commit();
+            }
+        }
+    };
+    SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    // This triggers the token refresh.
+    auto r = Realm::get_shared_realm(config);
+    REQUIRE(seen_waiting_for_access_token);
+}
 } // namespace realm::app
 
-#endif
+#endif // REALM_ENABLE_AUTH_TESTS

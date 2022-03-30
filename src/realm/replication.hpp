@@ -28,7 +28,6 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/buffer.hpp>
-#include <realm/util/string_buffer.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/impl/transact_log.hpp>
 
@@ -96,7 +95,7 @@ public:
 
     // Be sure to keep this type aligned with what is actually used in DB.
     using version_type = _impl::History::version_type;
-    using InputStream = _impl::NoCopyInputStream;
+    using InputStream = util::NoCopyInputStream;
     class TransactLogApplier;
     class Interrupted; // Exception
     class SimpleIndexTranslator;

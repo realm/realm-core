@@ -1,18 +1,18 @@
 #include <algorithm>
-#include <stack>
 #include <cstring>
+#include <stack>
 
-#include <realm/util/value_reset_guard.hpp>
-#include <realm/util/hex_dump.hpp>
-#include <realm/table_view.hpp>
-#include <realm/impl/input_stream.hpp>
-#include <realm/sync/impl/clamped_hex_dump.hpp>
-#include <realm/sync/noinst/server/server_history.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/instruction_applier.hpp>
-#include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/changeset_encoder.hpp>
+#include <realm/sync/changeset_parser.hpp>
+#include <realm/sync/impl/clamped_hex_dump.hpp>
+#include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/table_view.hpp>
+#include <realm/util/hex_dump.hpp>
+#include <realm/util/input_stream.hpp>
+#include <realm/util/value_reset_guard.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 using namespace realm::sync;
@@ -1079,7 +1079,7 @@ util::metered::vector<sync::Changeset> ServerHistory::get_parsed_changesets(vers
         std::size_t ndx = std::size_t(version - m_history_base_version - 1);
         Changeset changeset;
 
-        auto binary = BinaryIterator{&m_acc->sh_changesets, ndx};
+        auto binary = ChunkedBinaryData{m_acc->sh_changesets, ndx};
         ChunkedBinaryInputStream stream{binary};
         parse_changeset(stream, changeset); // Throws
 
@@ -1561,8 +1561,10 @@ public:
         return m_history.find_history_entry(m_remote_file_ident, begin_version, end_version, entry);
     }
 
-    ChunkedBinaryData get_reciprocal_transform(version_type server_version) const noexcept override final
+    ChunkedBinaryData get_reciprocal_transform(version_type server_version,
+                                               bool& is_compressed) const noexcept override final
     {
+        is_compressed = false;
         ChunkedBinaryData transform;
         if (m_recip_hist.get(server_version, transform))
             return transform;
@@ -2512,6 +2514,7 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
     const_cast<ServerHistory*>(this)->set_group(tr.get());
     ensure_updated(realm_version); // Throws
 
+    util::AppendBuffer<char> buffer;
     hc.client_files = {};
     for (std::size_t i = 0; i < m_num_client_files; ++i) {
         HistoryContents::ClientFile cf;
@@ -2529,10 +2532,8 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
             version_type version = recip_hist_base_version + i + 1;
             ChunkedBinaryData transform;
             if (recip_hist.get(version, transform)) {
-                std::unique_ptr<char[]> buffer{new char[transform.size()]};
-                std::size_t copied_bytes = transform.copy_to(buffer.get(), transform.size(), 0);
-                REALM_ASSERT(copied_bytes == transform.size());
-                cf.reciprocal_history.push_back(std::string{buffer.get(), transform.size()});
+                transform.copy_to(buffer);
+                cf.reciprocal_history.push_back(std::string{buffer.data(), buffer.size()});
             }
             else {
                 cf.reciprocal_history.push_back(util::none);
@@ -2553,9 +2554,8 @@ auto ServerHistory::get_history_contents() const -> HistoryContents
         he.timestamp = m_acc->sh_timestamps.get(i);
         he.cumul_byte_size = m_acc->sh_cumul_byte_sizes.get(i);
         ChunkedBinaryData chunked_changeset(m_acc->sh_changesets, i);
-        std::unique_ptr<char[]> buffer{};
         chunked_changeset.copy_to(buffer);
-        he.changeset = std::string(buffer.get(), chunked_changeset.size());
+        he.changeset = std::string(buffer.data(), buffer.size());
         hc.sync_history.push_back(he);
     }
 

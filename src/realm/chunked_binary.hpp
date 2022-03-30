@@ -23,8 +23,9 @@
 #include <realm/column_binary.hpp>
 #include <realm/table.hpp>
 
+#include <realm/util/buffer.hpp>
 #include <realm/util/buffer_stream.hpp>
-#include <realm/impl/input_stream.hpp>
+#include <realm/util/input_stream.hpp>
 
 
 namespace realm {
@@ -36,11 +37,6 @@ public:
     ChunkedBinaryData() {}
 
     ChunkedBinaryData(const BinaryData& bd)
-        : m_begin{bd}
-    {
-    }
-
-    ChunkedBinaryData(const BinaryIterator& bd)
         : m_begin{bd}
     {
     }
@@ -65,16 +61,9 @@ public:
 
     void write_to(util::ResettableExpandableBufferOutputStream& out) const;
 
-    /// copy_to() copies the chunked binary data to \a buffer of size
-    /// \a buffer_size starting at \a offset in the ChunkedBinary.
-    /// copy_to() copies until the end of \a buffer or the end of
-    /// the ChunkedBinary whichever comes first.
-    /// copy_to() returns the number of copied bytes.
-    size_t copy_to(char* buffer, size_t buffer_size, size_t offset) const;
-
-    /// copy_to() allocates a buffer of size() in \a dest and
-    /// copies the chunked binary data to \a dest.
-    size_t copy_to(std::unique_ptr<char[]>& dest) const;
+    /// copy_to() clears the target buffer and then copies the chunked binary
+    /// data to it.
+    void copy_to(util::AppendBuffer<char>& dest) const;
 
     /// get_first_chunk() is used in situations
     /// where it is known that there is exactly one
@@ -82,24 +71,22 @@ public:
     /// has been constructed from BinaryData.
     BinaryData get_first_chunk() const;
 
+    BinaryIterator iterator() const noexcept;
+
 private:
     BinaryIterator m_begin;
-    friend class ChunkedBinaryInputStream;
 };
 
-class ChunkedBinaryInputStream : public _impl::NoCopyInputStream {
+class ChunkedBinaryInputStream : public util::NoCopyInputStream {
 public:
     explicit ChunkedBinaryInputStream(const ChunkedBinaryData& chunks)
-        : m_it(chunks.m_begin)
+        : m_it(chunks.iterator())
     {
     }
 
-    bool next_block(const char*& begin, const char*& end) override
+    util::Span<const char> next_block() override
     {
-        BinaryData block = m_it.get_next();
-        begin = block.data();
-        end = begin + block.size();
-        return begin != end;
+        return m_it.get_next();
     }
 
 private:

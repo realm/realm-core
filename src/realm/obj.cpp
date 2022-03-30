@@ -797,10 +797,10 @@ void out_binary(std::ostream& out, BinaryData bin)
 {
     const char* start = bin.data();
     const size_t len = bin.size();
-    util::StringBuffer encode_buffer;
+    std::string encode_buffer;
     encode_buffer.resize(util::base64_encoded_size(len));
     util::base64_encode(start, len, encode_buffer.data(), encode_buffer.size());
-    out << encode_buffer.str();
+    out << encode_buffer;
 }
 
 void out_mixed_json(std::ostream& out, const Mixed& val)

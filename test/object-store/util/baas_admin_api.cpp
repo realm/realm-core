@@ -28,7 +28,6 @@
 
 #include "realm/object_id.hpp"
 #include "realm/util/scope_exit.hpp"
-#include "realm/util/string_buffer.hpp"
 
 namespace realm {
 namespace {
@@ -140,13 +139,13 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
         }
         else {
             REALM_ASSERT(target_obj->primary_key_property());
-            util::StringBuffer rel_name_buf;
+            std::string rel_name;
             for (const auto& path_elem : m_current_path) {
-                rel_name_buf.append(path_elem);
-                rel_name_buf.append(".", 1);
+                rel_name.append(path_elem);
+                rel_name.append(".");
             }
-            rel_name_buf.append(prop.name);
-            m_relationships[rel_name_buf.c_str()] = {
+            rel_name.append(prop.name);
+            m_relationships[rel_name] = {
                 {"ref",
                  util::format("#/relationship/%1/%2/%3", m_mongo_service_name, m_mongo_db_name, target_obj->name)},
                 {"foreign_key", target_obj->primary_key_property()->name},

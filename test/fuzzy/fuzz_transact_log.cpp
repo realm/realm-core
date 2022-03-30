@@ -25,15 +25,15 @@
 using namespace realm;
 using namespace realm::util;
 
-struct InputStreamAdapter : _impl::InputStream {
+struct InputStreamAdapter : InputStream {
     InputStreamAdapter(std::ifstream& s)
         : m_stream(s)
     {
     }
 
-    size_t read(char* buffer, size_t size) final
+    size_t read(Span<char> buffer) final
     {
-        return m_stream.read(buffer, size).gcount();
+        return m_stream.read(buffer.data(), buffer.size()).gcount();
     }
 
     std::ifstream& m_stream;
@@ -56,7 +56,7 @@ int main(int argc, const char* argv[])
     InputStreamAdapter in_a{in};
     std::vector<char> buffer;
     buffer.resize(1024);
-    _impl::NoCopyInputStreamAdaptor in_aa{in_a, buffer.data(), buffer.size()};
+    util::NoCopyInputStreamAdaptor in_aa{in_a, buffer};
 
     Group group;
     return 0;

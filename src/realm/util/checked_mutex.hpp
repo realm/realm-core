@@ -19,6 +19,8 @@
 #ifndef REALM_OS_CHECKED_MUTEX_HPP
 #define REALM_OS_CHECKED_MUTEX_HPP
 
+#include <realm/util/assert.hpp>
+
 #include <memory>
 #include <mutex>
 
@@ -56,6 +58,7 @@
 #define EXCLUDES(...) REALM_THREAD_ANNOTATION_ATTRIBUTE__(locks_excluded(__VA_ARGS__))
 
 #define NO_THREAD_SAFETY_ANALYSIS REALM_THREAD_ANNOTATION_ATTRIBUTE__(no_thread_safety_analysis)
+#define ASSERT_CAPABILITY(x) REALM_THREAD_ANNOTATION_ATTRIBUTE__(assert_capability(x))
 
 namespace realm {
 namespace util {
@@ -138,6 +141,17 @@ public:
     CheckedMutex const& operator!() const
     {
         return *this;
+    }
+
+    // Thread-safety analysis is purely function-local, so when we pass a
+    // UniqueLock to a function, the analysis doesn't know what mutex is
+    // released by unlock(). Unlocking via this function tells it which one is
+    // used.
+    void unlock(CheckedUniqueLock& lock) RELEASE()
+    {
+        REALM_ASSERT(lock.owns_lock());
+        REALM_ASSERT(lock.native_handle().mutex() == &m_mutex);
+        lock.unlock_unchecked();
     }
 
 private:

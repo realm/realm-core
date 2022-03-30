@@ -6,8 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fixed a potential crash if a sync session is stopped in the middle of a `DiscardLocal` client reset. ([#5295](https://github.com/realm/realm-core/issues/5295), since v11.5.0) 
-* Opening an encrypted Realm while the keychain is locked on macOS would crash ([Swift #7438](https://github.com/realm/realm-swift/issues/7438)).
+* None.
  
 ### Breaking changes
 * None.
@@ -18,6 +17,28 @@
 -----------
 
 ### Internals
+* None.
+
+----------------------------------------------
+
+# 11.13.0 Release notes
+
+### Enhancements
+* Sync changesets waiting to be uploaded to the server are now compressed, reducing the disk space needed when large write transactions are performed while offline or limited in bandwidth. This bumps the sync history schema version, meaning that synchronized Realms written by this version cannot be opened by older versions. Older Realms are seamlessly upgraded and local Realms are uneffected. ([PR 5260](https://github.com/realm/realm-core/pull/5260)).
+
+### Fixed
+* Fixed a potential crash if a sync session is stopped in the middle of a `DiscardLocal` client reset. ([#5295](https://github.com/realm/realm-core/issues/5295), since v11.5.0) 
+* Opening an encrypted Realm while the keychain is locked on macOS would crash ([Swift #7438](https://github.com/realm/realm-swift/issues/7438)).
+* Updating subscription while refreshing the access token would crash ([#5343](https://github.com/realm/realm-core/issues/5343), since v11.8.0)
+* Fix several race conditions in SyncSession related to calling `update_configuration()` on one thread while using the SyncSession on another thread. It does not appear that it was possible to hit the broken scenarios via the SDKs public APIs.
+ 
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Upgraded OpenSSL from v1.1.1g to v1.1.1n.
 * Catch2 was updated to 2.13.8. ([#5327](https://github.com/realm/realm-core/pull/5327))
 * Mutating a committed MutableSubscriptionSet will throw a LogicError. ([#5162](https://github.com/realm/realm-core/pull/5162))
 
@@ -29,6 +50,7 @@
 * Support for new SchemaMode::HardResetFile added. ([#4782](https://github.com/realm/realm-core/issues/4782))
 * Support for keypaths in change notifications added to C-API ([#5216](https://github.com/realm/realm-core/issues/5216))
 * Release of callback functions done through realm_release() ([#5217](https://github.com/realm/realm-core/issues/5217))
+* Supporting flexible sync for C-API. ([#5110](https://github.com/realm/realm-core/issues/5110), Since v11.10.0)
 
 ### Fixed
 * Query parser would not accept "in" as a property name ([#5312](https://github.com/realm/realm-core/issues/5312))
@@ -61,7 +83,7 @@
 * Calling Realm::async_begin_transaction() from within a write transaction while the async state was idle would hit an assertion failure (since v11.10.0).
 * Fix issue with scheduler being deleted on wrong thread. This caused async open to hang in eg. realm-js. ([#5287](https://github.com/realm/realm-core/pull/5287), Since v11.10.0)
 * Waiting for upload after opening a bundled realm file could hang. ([#5277](https://github.com/realm/realm-core/issues/5277), since v11.5.0)
- 
+
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 

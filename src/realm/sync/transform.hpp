@@ -108,7 +108,7 @@ public:
 
     /// Get the specified reciprocal changeset. The targeted history entry is
     /// the one whose untransformed changeset produced the specified version.
-    virtual ChunkedBinaryData get_reciprocal_transform(version_type version) const = 0;
+    virtual ChunkedBinaryData get_reciprocal_transform(version_type version, bool& is_compressed) const = 0;
 
     /// Replace the specified reciprocally transformed changeset. The targeted
     /// history entry is the one whose untransformed changeset produced the

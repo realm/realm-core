@@ -3,18 +3,17 @@
 #include <string>
 #include <iostream>
 
-#include <realm/util/load_file.hpp>
+#include <realm/util/compression.hpp>
 #include <realm/util/base64.hpp>
+#include <realm/util/load_file.hpp>
 #include <realm/sync/changeset.hpp>
 #include <realm/sync/changeset_parser.hpp>
-#include <realm/sync/noinst/compression.hpp>
-#include <cstring>
 
 using namespace realm;
 
 sync::Changeset changeset_binary_to_sync_changeset(const std::string& changeset_binary)
 {
-    _impl::SimpleInputStream input_stream{changeset_binary.data(), changeset_binary.size()};
+    util::SimpleInputStream input_stream{changeset_binary};
     sync::Changeset changeset;
     sync::parse_changeset(input_stream, changeset);
 
@@ -49,7 +48,7 @@ std::string changeset_compressed_to_binary(const std::string& changeset_compress
     // Decode from BASE64
     const size_t encoded_size = changeset_compressed.size() - (p - start);
     size_t buffer_size = util::base64_decoded_size(encoded_size);
-    util::StringBuffer decode_buffer;
+    std::string decode_buffer;
     decode_buffer.resize(buffer_size);
     StringData window(p, encoded_size);
     util::Optional<size_t> decoded_size = util::base64_decode(window, decode_buffer.data(), buffer_size);
@@ -58,15 +57,15 @@ std::string changeset_compressed_to_binary(const std::string& changeset_compress
     }
 
     // Decompress
-    std::unique_ptr<char[]> uncompressed_body_buffer(new char[decompressed_size]);
-    std::error_code ec = _impl::compression::decompress(decode_buffer.data(), *decoded_size,
-                                                        uncompressed_body_buffer.get(), decompressed_size);
+    std::string decompressed;
+    decompressed.resize(decompressed_size);
+    std::error_code ec = util::compression::decompress({decode_buffer.data(), *decoded_size}, decompressed);
 
     if (ec) {
-        throw std::runtime_error(util::format("compression::inflate: %1", ec.message()));
+        throw std::runtime_error(util::format("compression::decompress: %1", ec.message()));
     }
 
-    return {uncompressed_body_buffer.get(), decompressed_size};
+    return decompressed;
 }
 
 void print_changeset(const std::string& path, bool hex, bool compressed)

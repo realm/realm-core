@@ -22,6 +22,7 @@
 #include <realm/db_options.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
+#include <realm/impl/changeset_input_stream.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/metrics/metrics.hpp>
 #include <realm/replication.hpp>
@@ -38,10 +39,6 @@
 #include <condition_variable>
 
 namespace realm {
-
-namespace _impl {
-class WriteLogCollector;
-}
 
 class Transaction;
 using TransactionRef = std::shared_ptr<Transaction>;
@@ -171,6 +168,11 @@ public:
     const std::string& get_path() const noexcept
     {
         return m_db_path;
+    }
+
+    const char* get_encryption_key() const noexcept
+    {
+        return m_key;
     }
 
 #ifdef REALM_DEBUG
@@ -1045,7 +1047,7 @@ inline void Transaction::rollback_and_continue_as_read(O* observer)
     // Possible optimization: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
     // expensive.
-    _impl::SimpleInputStream in(uncommitted_changes.data(), uncommitted_changes.size());
+    util::SimpleInputStream in(uncommitted_changes);
     _impl::TransactLogParser parser; // Throws
     _impl::TransactReverser reverser;
     parser.parse(in, reverser); // Throws

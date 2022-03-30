@@ -2776,7 +2776,6 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  */
 RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
                                                                     const char* custom_filename) RLM_API_NOEXCEPT;
-
 RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
@@ -3023,6 +3022,21 @@ typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_sessi
 typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
 
+typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
+typedef struct realm_flx_sync_subscription_set realm_flx_sync_subscription_set_t;
+typedef struct realm_flx_sync_mutable_subscription_set realm_flx_sync_mutable_subscription_set_t;
+typedef struct realm_flx_sync_subscription_desc realm_flx_sync_subscription_desc_t;
+typedef enum realm_flx_sync_subscription_set_state {
+    RLM_SYNC_SUBSCRIPTION_UNCOMMITTED = 0,
+    RLM_SYNC_SUBSCRIPTION_PENDING,
+    RLM_SYNC_BOOTSTRAPPING,
+    RLM_SYNC_SUBSCRIPTION_COMPLETE,
+    RLM_SYNC_SUBSCRIPTION_ERROR,
+    RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
+} realm_flx_sync_subscription_set_state_e;
+typedef void (*realm_sync_on_subscription_state_changed)(const realm_flx_sync_subscription_set_t* subscription,
+                                                         realm_flx_sync_subscription_set_state_e state);
+
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
  *
@@ -3063,6 +3077,7 @@ RLM_API void realm_sync_client_config_set_fast_reconnect_limit(realm_sync_client
                                                                uint64_t) RLM_API_NOEXCEPT;
 
 RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const char* partition_value) RLM_API_NOEXCEPT;
+RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*,
                                                        realm_sync_session_stop_policy_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, realm_sync_error_handler_func_t,
@@ -3078,6 +3093,126 @@ RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, cons
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
                                                realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
+
+/**
+ * Get latest subscription set
+ * @return a non null subscription set pointer if such it exists.
+ */
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Get active subscription set
+ * @return a non null subscription set pointer if such it exists.
+ */
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Wait uptill subscripton set state is equal to the state passed as parameter.
+ * This is a blocking operation.
+ * @return the current subscription state
+ */
+RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_state_change_wait(
+    const realm_flx_sync_subscription_set_t*, realm_flx_sync_subscription_set_state_e) RLM_API_NOEXCEPT;
+
+/**
+ * Register a handler in order to be notified when subscription set is equal to the one passed as parameter
+ * This is an asynchronous operation.
+ * @return true/false if the handler was registered correctly
+ */
+RLM_API bool
+realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t*,
+                                                  realm_flx_sync_subscription_set_state_e,
+                                                  realm_sync_on_subscription_state_changed) RLM_API_NOEXCEPT;
+
+/**
+ *  Retrieve version for the subscription set passed as parameter
+ *  @return subscription set version if the poiter to the subscription is valid
+ */
+RLM_API int64_t realm_sync_subscription_set_version(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ * Fetch current state for the subscription set passed as parameter
+ *  @return the current state of the subscription_set
+ */
+RLM_API realm_flx_sync_subscription_set_state_e
+realm_sync_subscription_set_state(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Query subscription set error string
+ *  @return error string for the subscription passed as parameter
+ */
+RLM_API const char* realm_sync_subscription_set_error_str(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Retrieve the number of subscriptions for the subscription set passed as parameter
+ *  @return the number of subscriptions
+ */
+RLM_API size_t realm_sync_subscription_set_size(const realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Access the subscription at index.
+ *  @return the subscription or nullptr if the index is not valid
+ */
+RLM_API realm_flx_sync_subscription_t* realm_sync_subscription_at(const realm_flx_sync_subscription_set_t*,
+                                                                  size_t index) RLM_API_NOEXCEPT;
+/**
+ *  Find subscription by name
+ *  @return a pointer to the subscription with the name passed as parameter
+ */
+RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*,
+                                                                            const char* name) RLM_API_NOEXCEPT;
+/**
+ *  Find subscription associated to the query passed as parameter
+ *  @return a pointer to the subscription or nullptr if not found
+ */
+RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t*,
+                                                                             realm_query_t*) RLM_API_NOEXCEPT;
+/**
+ *  Refresh subscription
+ *  @return true/false if the operation was successful or not
+ */
+RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Convert a subscription into a mutable one in order to alter the subscription itself
+ *  @return a pointer to a mutable subscription
+ */
+RLM_API realm_flx_sync_mutable_subscription_set_t*
+realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Clear the subscription set passed as parameter
+ *  @return true/false if operation was successful
+ */
+RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Insert ot update a query for the subscription set passed as parameter, if successful the index where the query was
+ * inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
+ * specify a name for the query inserted (optional).
+ *  @return true/false if operation was successful
+ */
+RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t*, realm_query_t*,
+                                                          const char* name, size_t* out_index,
+                                                          bool* out_inserted) RLM_API_NOEXCEPT;
+/**
+ *  Erase from subscription set by name
+ *  @return true/false if operation was successful
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*,
+                                                       const char*) RLM_API_NOEXCEPT;
+/**
+ *  Erase from subscription set by query
+ *  @return true/false if operation was successful
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*,
+                                                        realm_query_t*) RLM_API_NOEXCEPT;
+/**
+ *  Commit the subscription_set passed as parameter (in order that all the changes made will take effect)
+ *  @return pointer to a valid immutable subscription if commit was successful
+ */
+RLM_API realm_flx_sync_subscription_set_t*
+realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
 
 /**
  * Create a task that will open a realm with the specific configuration

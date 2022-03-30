@@ -644,6 +644,31 @@ struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSess
     }
 };
 
+struct realm_flx_sync_subscription : realm::c_api::WrapC, realm::sync::Subscription {
+    realm_flx_sync_subscription(realm::sync::Subscription&& subscription)
+        : realm::sync::Subscription(std::move(subscription))
+    {
+    }
+    realm_flx_sync_subscription(const realm::sync::Subscription& subscription)
+        : realm::sync::Subscription(subscription)
+    {
+    }
+};
+
+struct realm_flx_sync_subscription_set : realm::c_api::WrapC, realm::sync::SubscriptionSet {
+    realm_flx_sync_subscription_set(realm::sync::SubscriptionSet&& subscription_set)
+        : realm::sync::SubscriptionSet(std::move(subscription_set))
+    {
+    }
+};
+
+struct realm_flx_sync_mutable_subscription_set : realm::c_api::WrapC, realm::sync::MutableSubscriptionSet {
+    realm_flx_sync_mutable_subscription_set(realm::sync::MutableSubscriptionSet&& subscription_set)
+        : realm::sync::MutableSubscriptionSet(std::move(subscription_set))
+    {
+    }
+};
+
 struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::AsyncOpenTask> {
     realm_async_open_task(std::shared_ptr<realm::AsyncOpenTask> task)
         : std::shared_ptr<realm::AsyncOpenTask>{std::move(task)}
