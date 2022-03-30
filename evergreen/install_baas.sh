@@ -52,7 +52,7 @@ case $(uname -s) in
                 case $DISTRO_VERSION_MAJOR in
                     7)
                         MONGODB_DOWNLOAD_URL="https://downloads.mongodb.com/linux/mongodb-linux-x86_64-enterprise-rhel70-5.0.3.tgz"
-+                       STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_0bdbed3d42ea136e166b3aad8f6fd09f336b1668_22_03_29_14_36_02/libmongo.so"
+                        STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_linux_64_0bdbed3d42ea136e166b3aad8f6fd09f336b1668_22_03_29_14_36_02/libmongo.so"
                         STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-rhel-70-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
                     ;;
                     *)
