@@ -246,9 +246,14 @@ RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* 
     return new realm_app_credentials_t(AppCredentials::facebook(access_token));
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_google(const char* id_token) noexcept
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google_id_token(const char* id_token) noexcept
 {
-    return new realm_app_credentials_t(AppCredentials::google(AuthCode(id_token)));
+    return new realm_app_credentials_t(AppCredentials::google(IdToken(id_token)));
+}
+
+RLM_API realm_app_credentials_t* realm_app_credentials_new_google_auth_code(const char* auth_code) noexcept
+{
+    return new realm_app_credentials_t(AppCredentials::google(AuthCode(auth_code)));
 }
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_apple(const char* id_token) noexcept

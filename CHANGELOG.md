@@ -6,6 +6,7 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
+* Added auth code and id token support for google c_api ([#5347]https://github.com/realm/realm-core/issues/5347)
  
 ### Breaking changes
 * None.
