@@ -26,6 +26,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 
+#include <realm/util/compression.hpp>
 #include <realm/util/flat_map.hpp>
 
 #include <algorithm>
@@ -953,8 +954,13 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 continue;
 
             ChunkedBinaryInputStream in{chunked_changeset};
+            size_t decompressed_size;
+            auto decompressed = util::compression::decompress_nonportable_input_stream(in, decompressed_size);
+            if (!decompressed)
+                continue;
+
             sync::Changeset parsed_changeset;
-            sync::parse_changeset(in, parsed_changeset); // Throws
+            sync::parse_changeset(*decompressed, parsed_changeset); // Throws
             // parsed_changeset.print(); // view the changes to be recovered in stdout for debugging
 
             InstructionApplier::begin_apply(parsed_changeset, &logger);

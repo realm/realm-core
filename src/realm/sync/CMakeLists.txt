@@ -19,6 +19,7 @@ set(SYNC_SOURCES
     protocol.cpp
     subscriptions.cpp
     transform.cpp
+    ../util/compression.cpp
     ../util/network_ssl.cpp
     ../util/network.cpp
     ../util/websocket.cpp
@@ -48,6 +49,7 @@ set(SYNC_INSTALL_HEADERS
 )
 
 set(NOINST_HEADERS
+    ../util/compression.hpp
     ../util/http.hpp
     ../util/websocket.hpp
     noinst/changeset_index.hpp
