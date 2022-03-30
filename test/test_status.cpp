@@ -19,6 +19,7 @@
 #include "test.hpp"
 
 #include "realm/status.hpp"
+#include "realm/status_with.hpp"
 
 namespace realm {
 namespace {
@@ -44,7 +45,7 @@ TEST(Status)
 
     auto caught_status = Status::OK();
     try {
-        throw ExceptionForStatus(err_status);
+        throw Exception(err_status);
     }
     catch (...) {
         caught_status = exception_to_status();
@@ -65,6 +66,18 @@ TEST(Status)
     }
     CHECK_EQUAL(caught_status, ErrorCodes::UnknownError);
     CHECK_NOT_EQUAL(caught_status.reason().find(exotic_error_reason), std::string::npos);
+}
+
+TEST(StatusWith)
+{
+    auto result = StatusWith<int>(5);
+    CHECK(result.is_ok());
+    CHECK_EQUAL(result.get_value(), 5);
+
+    const char* err_status_reason = "runtime error 1";
+    result = StatusWith<int>(ErrorCodes::RuntimeError, err_status_reason);
+    CHECK_EQUAL(result.get_status().code(), ErrorCodes::RuntimeError);
+    CHECK(!result.is_ok());
 }
 
 } // namespace

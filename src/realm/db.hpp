@@ -45,9 +45,9 @@ using TransactionRef = std::shared_ptr<Transaction>;
 
 /// Thrown by DB::create() if the lock file is already open in another
 /// process which can't share mutexes with this process
-struct IncompatibleLockFile : std::runtime_error {
+struct IncompatibleLockFile : RuntimeError {
     IncompatibleLockFile(const std::string& msg)
-        : std::runtime_error("Incompatible lock file. " + msg)
+        : RuntimeError(ErrorCodes::IncompatibleLockFile, "Incompatible lock file. " + msg)
     {
     }
 };
@@ -971,15 +971,15 @@ template <class O>
 inline void Transaction::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not a read transaction");
 
     // It is an error if the new version precedes the currently bound one.
     if (version_id.version < m_read_lock.m_version)
-        throw LogicError(LogicError::bad_version);
+        throw IllegalOperation("Requesting an older version when advancing");
 
     auto hist = get_history(); // Throws
     if (!hist)
-        throw LogicError(LogicError::no_history);
+        throw IllegalOperation("No transaction log when advancing");
 
     internal_advance_read(observer, version_id, *hist, false); // Throws
 }
@@ -988,7 +988,7 @@ template <class O>
 inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not a read transaction");
 
     if (!holds_write_mutex()) {
         if (nonblocking) {
@@ -1004,7 +1004,7 @@ inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
     try {
         Replication* repl = db->get_replication();
         if (!repl)
-            throw LogicError(LogicError::no_history);
+            throw IllegalOperation("No transaction log when promoting to write");
 
         VersionID version = VersionID(); // Latest
         m_history = repl->_get_history_write();
@@ -1036,11 +1036,11 @@ template <class O>
 inline void Transaction::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not a write transaction");
 
     Replication* repl = db->get_replication();
     if (!repl)
-        throw LogicError(LogicError::no_history);
+        throw IllegalOperation("No transaction log when rolling back");
 
     BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 

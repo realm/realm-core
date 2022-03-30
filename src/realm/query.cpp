@@ -259,7 +259,7 @@ namespace {
 
 REALM_NOINLINE REALM_COLD REALM_NORETURN void throw_type_mismatch_error()
 {
-    throw LogicError{LogicError::type_mismatch};
+    throw LogicError(ErrorCodes::TypeMismatch, "Could not build query");
 }
 
 template <class Node>
@@ -1982,7 +1982,7 @@ Query Query::operator&&(const Query& q)
 Query Query::operator!()
 {
     if (!root_node())
-        throw util::runtime_error("negation of empty query is not supported");
+        throw Exception(ErrorCodes::InvalidQuery, "negation of empty query is not supported");
     Query q(m_table);
     q.Not();
     q.and_query(*this);

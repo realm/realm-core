@@ -1453,14 +1453,11 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "(age > $0 || fees == $1) && age == $0", args, num_args, 1);
 
     // negative index
-    // FIXME: Should the error be std::out_of_range or SyntaxError?
-    CHECK_THROW(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0), std::runtime_error);
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0), query_parser::InvalidQueryError);
     // missing index
-    // FIXME: Should the error be SyntaxError?
-    CHECK_THROW(verify_query_sub(test_context, t, "age > $", args, num_args, 0), std::runtime_error);
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $", args, num_args, 0), query_parser::InvalidQueryError);
     // non-numerical index
-    // FIXME: Should the error be SyntaxError?
-    CHECK_THROW(verify_query_sub(test_context, t, "age > $age", args, num_args, 0), std::runtime_error);
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $age", args, num_args, 0), query_parser::InvalidQueryError);
     // leading zero index
     verify_query_sub(test_context, t, "name CONTAINS[c] $002", args, num_args, 2);
     // double digit index

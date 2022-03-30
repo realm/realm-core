@@ -35,9 +35,9 @@ void validate_key_value(const Mixed& key)
         auto str = key.get_string();
         if (str.size()) {
             if (str[0] == '$')
-                throw std::runtime_error("Dictionary::insert: key must not start with '$'");
+                throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: key must not start with '$'");
             if (memchr(str.data(), '.', str.size()))
-                throw std::runtime_error("Dictionary::insert: key must not contain '.'");
+                throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: key must not contain '.'");
         }
     }
 }
@@ -91,7 +91,7 @@ Mixed DictionaryClusterTree::get_key(const ClusterNode::State& s) const
             break;
         }
         default:
-            throw std::runtime_error("Dictionary keys can only be strings or integers");
+            throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary keys can only be strings or integers");
             break;
     }
     return key;
@@ -290,7 +290,7 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
 {
     if (!col_key.is_dictionary()) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a dictionary");
     }
 }
 
@@ -334,10 +334,8 @@ bool Dictionary::is_null(size_t ndx) const
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
-    // Note: `size()` calls `update_if_needed()`.
-    if (ndx >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    // Note: `check_index()` calls `update_if_needed()`.
+    check_index(ndx);
     ObjKey k;
     return do_get(m_clusters->get(ndx, k));
 }
@@ -345,9 +343,7 @@ Mixed Dictionary::get_any(size_t ndx) const
 std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
-    if (ndx >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    check_index(ndx);
     ObjKey k;
     return do_get_pair(m_clusters->get(ndx, k));
 }
@@ -355,9 +351,7 @@ std::pair<Mixed, Mixed> Dictionary::get_pair(size_t ndx) const
 Mixed Dictionary::get_key(size_t ndx) const
 {
     // Note: `size()` calls `update_if_needed()`.
-    if (ndx >= size()) {
-        throw std::out_of_range("ndx out of range");
-    }
+    check_index(ndx);
     ObjKey k;
     return do_get_key(m_clusters->get(ndx, k));
 }
@@ -513,7 +507,7 @@ Mixed Dictionary::get(Mixed key) const
     if (auto opt_val = try_get(key)) {
         return *opt_val;
     }
-    throw realm::KeyNotFound("Dictionary::get");
+    throw KeyNotFound("Dictionary::get");
 }
 
 util::Optional<Mixed> Dictionary::try_get(Mixed key) const noexcept
@@ -541,21 +535,21 @@ Dictionary::Iterator Dictionary::end() const
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
     if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: Invalid key type");
     }
     if (value.is_null()) {
         if (!m_col_key.is_nullable()) {
-            throw LogicError(LogicError::type_mismatch);
+            throw Exception(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Value cannot be null");
         }
     }
     else {
         if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
             if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
-                throw std::runtime_error("Dictionary::insert: Wrong object type");
+                throw Exception(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong object type");
             }
         }
         else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
-            throw LogicError(LogicError::type_mismatch);
+            throw Exception(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
         }
     }
 
@@ -572,14 +566,14 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
         auto key = value.get<ObjKey>();
         if (!key.is_unresolved() && !target_table->is_valid(key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+            InvalidArgument(ErrorCodes::InvalidProperty, "Invalid object key");
         }
         new_link = ObjLink(target_table->get_key(), key);
         value = Mixed(new_link);
     }
 
     if (!m_clusters) {
-        throw LogicError(LogicError::detached_accessor);
+        throw StaleAccessor("Stale dictionary");
     }
 
     ObjKey k = get_internal_obj_key(key);
@@ -1092,7 +1086,7 @@ auto Dictionary::Iterator::operator*() const -> value_type
             break;
         }
         default:
-            throw std::runtime_error("Not implemented");
+            REALM_UNREACHABLE();
             break;
     }
     ArrayMixed values(m_tree.get_alloc());

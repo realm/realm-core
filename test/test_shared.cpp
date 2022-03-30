@@ -2207,7 +2207,7 @@ TEST(Shared_EncryptionKeyCheck_2)
     try {
         DBRef sg_2 = DB::create(path, false, DBOptions(crypt_key(true)));
     }
-    catch (std::runtime_error&) {
+    catch (std::exception&) {
         ok = true;
     }
     CHECK(ok);
@@ -3355,12 +3355,12 @@ TEST(Shared_ConstObjectIterator)
     t4->clear();
     auto i5(i4);
     // dereferencing an invalid iterator will throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     // but moving it will not, it just stays invalid
     ++i5;
     i5 += 3;
     // so, should still throw
-    CHECK_THROW(*i5, std::logic_error);
+    CHECK_THROW(*i5, realm::Exception);
     CHECK(i5 == t4->end());
 }
 

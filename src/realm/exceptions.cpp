@@ -19,22 +19,34 @@
 #include <realm/exceptions.hpp>
 #include <realm/version.hpp>
 #include <realm/util/to_string.hpp>
+#include "realm/util/demangle.hpp"
 
-using namespace realm;
+namespace realm {
 
-DuplicatePrimaryKeyValueException::DuplicatePrimaryKeyValueException(std::string obj_type, std::string prop)
-    : logic_error(util::format("Primary key property '%1.%2' has duplicate values after migration.", obj_type, prop))
-    , m_object_type(obj_type)
-    , m_property(prop)
+Status exception_to_status() noexcept
 {
+    try {
+        throw;
+    }
+    catch (const Exception& e) {
+        return e.to_status();
+    }
+    catch (const std::exception& e) {
+        return Status(ErrorCodes::UnknownError,
+                      util::format("Caught std::exception of type %1: %2", util::get_type_name(e), e.what()));
+    }
+    catch (...) {
+        REALM_UNREACHABLE();
+    }
 }
 
 
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)
-const char* LogicError::message() const noexcept
+/*
+const char* LogicError::message(ErrorKind kind) noexcept
 {
-    switch (m_kind) {
+    switch (kind) {
         case string_too_big:
             return "String too big";
         case binary_too_big:
@@ -55,8 +67,8 @@ const char* LogicError::message() const noexcept
             return "Column index out of range";
         case string_position_out_of_range:
             return "String position out of range";
-        case link_index_out_of_range:
-            return "Link index out of range";
+        case collection_index_out_of_range:
+            return "Collection index out of range";
         case bad_version:
             return "Bad version number";
         case illegal_type:
@@ -109,4 +121,6 @@ const char* LogicError::message() const noexcept
     }
     return "Unknown error";
 }
+*/
 // LCOV_EXCL_STOP (LogicError messages)
+} // namespace realm

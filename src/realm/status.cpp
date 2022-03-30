@@ -18,63 +18,30 @@
 
 #include "realm/status.hpp"
 
-#include "realm/util/demangle.hpp"
-
 #include <iostream>
 
 namespace realm {
 
-Status::Status(ErrorCodes::Error code, StringData reason)
-    : m_error(ErrorInfo::create(code, reason))
-{
-    // OK status should be created by calling Status::OK() - which is a special case that doesn't allocate
-    // anything.
-    REALM_ASSERT(code != ErrorCodes::OK);
-}
-
-Status::Status(ErrorCodes::Error code, const std::string& reason)
-    : Status(code, StringData(reason))
-{
-}
-
-Status::Status(ErrorCodes::Error code, const char* reason)
-    : Status(code, StringData(reason, std::char_traits<char>::length(reason)))
-{
-}
-
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, StringData reason)
+Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code, std::string_view reason)
     : m_refs(0)
     , m_code(code)
     , m_reason(reason)
 {
 }
 
-util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, StringData reason)
+util::bind_ptr<Status::ErrorInfo> Status::ErrorInfo::create(ErrorCodes::Error code, std::string_view reason)
 {
-    return util::bind_ptr<Status::ErrorInfo>(new ErrorInfo(code, reason));
+    // OK status should be created by calling Status::OK() - which is a special case that doesn't allocate
+    // anything.
+    REALM_ASSERT(code != ErrorCodes::OK);
+
+    return util::bind_ptr<Status::ErrorInfo>(new ErrorInfo(code, std::move(reason)));
 }
 
 std::ostream& operator<<(std::ostream& out, const Status& val)
 {
     out << val.code_string() << ": " << val.reason();
     return out;
-}
-
-Status exception_to_status() noexcept
-{
-    try {
-        throw;
-    }
-    catch (const ExceptionForStatus& e) {
-        return e.to_status();
-    }
-    catch (const std::exception& e) {
-        return Status(ErrorCodes::UnknownError,
-                      util::format("Caught std::exception of type %1: %2", util::get_type_name(e), e.what()));
-    }
-    catch (...) {
-        REALM_UNREACHABLE();
-    }
 }
 
 } // namespace realm

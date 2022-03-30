@@ -60,7 +60,7 @@ struct null {
     constexpr null() = default;
     operator int64_t()
     {
-        throw(LogicError::type_mismatch);
+        throw LogicError(ErrorCodes::TypeMismatch, "Trying to convert null to int");
     }
     template <class T>
     operator util::Optional<T>()

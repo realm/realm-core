@@ -499,7 +499,7 @@ inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
 {
     if (!col_key.is_list()) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a list");
     }
 
     check_column_type<T>(m_col_key);
@@ -653,7 +653,7 @@ inline T Lst<T>::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds(util::format("Invalid index when getting from list: %1", CollectionBase::get_property_name()));
     }
     return m_tree->get(ndx);
 }
@@ -793,7 +793,7 @@ void Lst<T>::move(size_t from, size_t to)
 {
     auto sz = size();
     if (from >= sz || to >= sz) {
-        throw std::out_of_range{"index out of bounds"};
+        throw OutOfBounds("Invalid list index");
     }
 
     if (from != to) {
@@ -823,7 +823,7 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
     auto sz = size();
     if (ndx1 >= sz || ndx2 >= sz) {
-        throw std::out_of_range{"index out of bounds"};
+        throw OutOfBounds(util::format("Invalid index into list: %1", CollectionBase::get_property_name()));
     }
 
     if (ndx1 != ndx2) {
@@ -839,7 +839,7 @@ template <class T>
 T Lst<T>::set(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
-        throw LogicError(LogicError::column_not_nullable);
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable, util::format("List: %1", CollectionBase::get_property_name()));
 
     // get will check for ndx out of bounds
     T old = get(ndx);
@@ -857,11 +857,11 @@ template <class T>
 void Lst<T>::insert(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
-        throw LogicError(LogicError::column_not_nullable);
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable, util::format("List: %1", CollectionBase::get_property_name()));
 
     auto sz = size();
     if (ndx > sz)
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds(util::format("Invalid index into list: %1", CollectionBase::get_property_name()));
 
     ensure_created();
 
@@ -1043,7 +1043,7 @@ inline ObjKey LnkLst::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds(util::format("Invalid index into list: %1", CollectionBase::get_property_name()));
     }
     return m_list.m_tree->get(virtual2real(ndx));
 }
@@ -1065,7 +1065,7 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
 {
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation(util::format("Insert not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
 
     update_if_needed();
     m_list.insert(virtual2real(ndx), value);
@@ -1076,7 +1076,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 {
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation(util::format("Setting not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
 
     update_if_needed();
     ObjKey old = m_list.set(virtual2real(ndx), value);

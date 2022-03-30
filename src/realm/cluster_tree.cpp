@@ -938,7 +938,7 @@ ClusterNode::State ClusterTree::try_get(ObjKey k) const noexcept
 ClusterNode::State ClusterTree::get(size_t ndx, ObjKey& k) const
 {
     if (ndx >= m_size) {
-        throw std::out_of_range("Object was deleted");
+        throw Exception(ErrorCodes::InvalidatedObject, "Object was deleted");
     }
     ClusterNode::State state;
     k = m_root->get(ndx, state);
@@ -1077,7 +1077,7 @@ size_t ClusterTree::Iterator::get_position()
 {
     auto ndx = m_tree.get_ndx(m_key);
     if (ndx == realm::npos) {
-        throw std::logic_error("Outdated iterator");
+        throw StaleAccessor("Stale iterator");
     }
     return ndx;
 }
@@ -1102,7 +1102,7 @@ void ClusterTree::Iterator::go(size_t abs_pos)
 {
     size_t sz = m_tree.size();
     if (abs_pos >= sz) {
-        throw std::out_of_range("Index out of range");
+        throw OutOfBounds("Invalied iterator index");
     }
 
     m_position = abs_pos;
@@ -1129,7 +1129,7 @@ bool ClusterTree::Iterator::update() const
         ObjKey k = load_leaf(m_key);
         m_leaf_invalid = !k || (k != m_key);
         if (m_leaf_invalid) {
-            throw std::logic_error("Outdated iterator");
+            throw StaleAccessor("Stale iterator");
         }
         return true;
     }

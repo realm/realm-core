@@ -939,7 +939,7 @@ TEST(Query_Not)
 
     // applying not to an empty query is forbidden
     realm::Query q4 = table.where();
-    CHECK_THROW(!q4, std::runtime_error);
+    CHECK_THROW(!q4, realm::Exception);
 }
 
 

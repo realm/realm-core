@@ -192,6 +192,12 @@ private:
     {
         return update_if_needed() != UpdateStatus::Detached;
     }
+    inline void check_index(size_t ndx) const
+    {
+        if (ndx >= size()) {
+            throw OutOfBounds(util::format("Invalid index when accessing dictionary: %1", CollectionBase::get_property_name()));
+        }
+    }
 };
 
 class Dictionary::Iterator : public ClusterTree::Iterator {

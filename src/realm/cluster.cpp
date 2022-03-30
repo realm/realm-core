@@ -164,7 +164,7 @@ void Cluster::create()
                 do_create<ArrayBacklink>(col_key);
                 break;
             default:
-                throw LogicError(LogicError::illegal_type);
+                REALM_UNREACHABLE();
         }
         return false;
     };
@@ -614,7 +614,7 @@ void Cluster::insert_column(ColKey col_key)
             do_insert_column<ArrayBacklink>(col_key, nullable);
             break;
         default:
-            throw LogicError(LogicError::illegal_type);
+            REALM_UNREACHABLE();
             break;
     }
 }

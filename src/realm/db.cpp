@@ -1077,14 +1077,14 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 // make sure that all possible concurrent session participants
                 // use the same durability setting for the same Realm file.
                 if (Durability(info->durability) != options.durability)
-                    throw LogicError(LogicError::mixed_durability);
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "Durability not consistent");
 
                 // History type must be consistent across a session. An
                 // inconsistency is a logic error, as the user is required to
                 // make sure that all possible concurrent session participants
                 // use the same history type for the same Realm file.
                 if (info->history_type != openers_hist_type)
-                    throw LogicError(LogicError::mixed_history_type);
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "Historuy type not consistent");
 
                 // History schema version must be consistent across a
                 // session. An inconsistency is a logic error, as the user is
@@ -1092,7 +1092,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 // participants use the same history schema version for the same
                 // Realm file.
                 if (info->history_schema_version != openers_hist_schema_version)
-                    throw LogicError(LogicError::mixed_history_schema_version);
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "History schema version not consistent");
 #ifdef _WIN32
                 uint64_t pid = GetCurrentProcessId();
 #else
@@ -1104,7 +1104,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
                        << ".";
-                    throw std::runtime_error(ss.str());
+                    throw Exception(ErrorCodes::IllegalOperation, ss.str());
                 }
 
                 // We need per session agreement among all participants on the
@@ -1299,13 +1299,14 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
         if (!table->is_embedded()) {
             auto pk_col = table->get_primary_key_column();
             if (!pk_col)
-                throw std::runtime_error(
+                throw RuntimeError(
+                    ErrorCodes::BrokenInvariant,
                     util::format("Class '%1' must have a primary key", Group::table_name_to_class_name(table_name)));
             auto pk_name = table->get_column_name(pk_col);
             if (pk_name != "_id")
-                throw std::runtime_error(
-                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
-                                 Group::table_name_to_class_name(table_name), pk_name));
+                throw RuntimeError(ErrorCodes::BrokenInvariant,
+                                   util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
+                                                Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
                                             pk_col.is_nullable());
         }
@@ -1422,7 +1423,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     // Verify that the lock file is still attached. There is no attempt to guard against
     // a race between close() and compact().
     if (is_attached() == false) {
-        throw std::runtime_error(m_db_path + ": compact must be done on an open/attached DB");
+        throw Exception(ErrorCodes::IllegalOperation, m_db_path + ": compact must be done on an open/attached DB");
     }
     SharedInfo* info = m_file_map.get_addr();
     Durability dura = Durability(info->durability);
@@ -1523,7 +1524,8 @@ void DB::write_copy(StringData path, util::Optional<const char*> output_encrypti
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
         if (!hist->no_pending_local_changes(tr->get_version())) {
-            throw std::runtime_error("Could not write file as not all client changes are integrated in server");
+            throw Exception(ErrorCodes::IllegalOperation,
+                            "All client changes must be integrated in server before writing copy");
         }
     }
 
@@ -1595,7 +1597,7 @@ void DB::close(bool allow_open_read_transactions)
         {
             std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
             if (!allow_open_read_transactions && m_transaction_count)
-                throw LogicError(LogicError::wrong_transact_state);
+                throw WrongTransactioState("Closing with open read transactions");
         }
         if (m_alloc.is_attached())
             m_alloc.detach();
@@ -1615,9 +1617,9 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     {
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
         if (m_write_transaction_open)
-            throw LogicError(LogicError::wrong_transact_state);
+            throw WrongTransactioState("Closing with open write transactions");
         if (!allow_open_read_transactions && m_transaction_count)
-            throw LogicError(LogicError::wrong_transact_state);
+            throw WrongTransactioState("Closing with open read transactions");
     }
     SharedInfo* info = m_file_map.get_addr();
     {
@@ -2267,7 +2269,7 @@ void DB::finish_begin_write()
     SharedInfo* info = m_file_map.get_addr();
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
-        throw std::runtime_error("Crash of other process detected, session restart required");
+        throw RuntimeError(ErrorCodes::BrokenInvariant, "Crash of other process detected, session restart required");
     }
 
 
@@ -2323,9 +2325,9 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
 VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 {
     if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+        throw StaleAccessor("Stale transaction");
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not in writing mode when committing");
 
     flush_accessors_for_commit();
 
@@ -2632,7 +2634,7 @@ void DB::delete_files(const std::string& base_path, bool* did_delete, bool delet
 TransactionRef DB::start_read(VersionID version_id)
 {
     if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+        throw StaleAccessor("Stale transaction");
     TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Reading);
@@ -2652,7 +2654,7 @@ TransactionRef DB::start_read(VersionID version_id)
 TransactionRef DB::start_frozen(VersionID version_id)
 {
     if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+        throw StaleAccessor("Stale transaction");
     TransactionRef tr;
     if (m_fake_read_lock_if_immutable) {
         tr = make_transaction_ref(shared_from_this(), &m_alloc, *m_fake_read_lock_if_immutable, DB::transact_Frozen);
@@ -2697,7 +2699,7 @@ void Transaction::end_read()
     if (m_transact_stage == DB::transact_Ready)
         return;
     if (m_transact_stage == DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Illegal end_read when in write mode");
     do_end_read();
 }
 
@@ -2729,7 +2731,7 @@ void Transaction::do_end_read() noexcept
 TransactionRef Transaction::freeze()
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Can only freeze a read transaction");
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     return db->start_frozen(version);
 }
@@ -2742,7 +2744,8 @@ TransactionRef Transaction::duplicate()
     if (m_transact_stage == DB::transact_Frozen)
         return db->start_frozen(version);
 
-    throw LogicError(LogicError::wrong_transact_state);
+    throw WrongTransactioState("Can only duplicate a read/frozen transaction");
+    return {};
 }
 
 _impl::History* Transaction::get_history() const
@@ -2779,7 +2782,7 @@ void Transaction::rollback()
         return; // Idempotency
 
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not a write transaction");
     db->reset_free_space_tracking();
     if (!holds_write_mutex())
         db->end_write_on_correct_thread();
@@ -2798,10 +2801,10 @@ size_t Transaction::get_commit_size() const
 
 DB::version_type Transaction::commit()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
+
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not a write transaction");
 
     REALM_ASSERT(is_attached());
 
@@ -2828,10 +2831,9 @@ DB::version_type Transaction::commit()
 
 void Transaction::commit_and_continue_writing()
 {
-    if (!is_attached())
-        throw LogicError(LogicError::wrong_transact_state);
+    check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactioState("Not a write transaction");
 
     REALM_ASSERT(is_attached());
 
@@ -2893,7 +2895,7 @@ TransactionRef DB::start_write(bool nonblocking)
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
         if (!is_attached()) {
             end_write_on_correct_thread();
-            throw LogicError(LogicError::wrong_transact_state);
+            throw StaleAccessor("Stale transaction");
         }
         m_write_transaction_open = true;
     }

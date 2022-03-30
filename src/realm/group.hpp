@@ -812,6 +812,11 @@ private:
         if (m_table_names.find_first(name) != not_found)
             throw TableNameInUse();
     }
+    void check_attached() const
+    {
+        if (!is_attached())
+            throw StaleAccessor("Stale transaction");
+    }
 
     friend class Table;
     friend class GroupWriter;
@@ -936,8 +941,7 @@ inline TableKey Group::find_table(StringData name) const noexcept
 
 inline TableRef Group::get_table(TableKey key)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     Table* table = do_get_table(ndx); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -945,8 +949,7 @@ inline TableRef Group::get_table(TableKey key)
 
 inline ConstTableRef Group::get_table(TableKey key) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto ndx = key2ndx_checked(key);
     const Table* table = do_get_table(ndx); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
@@ -954,24 +957,21 @@ inline ConstTableRef Group::get_table(TableKey key) const
 
 inline TableRef Group::get_table(StringData name)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     Table* table = do_get_table(name); // Throws
     return TableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     const Table* table = do_get_table(name); // Throws
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
 inline TableRef Group::add_table(StringData name)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
     Table* table = do_add_table(name, false); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
@@ -979,8 +979,7 @@ inline TableRef Group::add_table(StringData name)
 
 inline TableRef Group::add_embedded_table(StringData name)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
     Table* table = do_add_table(name, true); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
@@ -988,8 +987,7 @@ inline TableRef Group::add_embedded_table(StringData name)
 
 inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
@@ -1005,7 +1003,7 @@ inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataTy
     if (TableRef table = get_table(name)) {
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
             table->is_nullable(table->get_primary_key_column()) != nullable) {
-            throw std::runtime_error("Inconsistent schema");
+            return {};
         }
         return table;
     }

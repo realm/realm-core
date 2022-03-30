@@ -20,7 +20,7 @@
 -----------
 
 ### Internals
-* None.
+* All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
 
 ----------------------------------------------
 

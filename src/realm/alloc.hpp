@@ -281,7 +281,7 @@ protected:
     inline uint_fast64_t get_storage_version(uint64_t instance_version)
     {
         if (instance_version != m_instance_versioning_counter) {
-            throw LogicError(LogicError::detached_accessor);
+            throw StaleAccessor("Stale acessor version");
         }
         return m_storage_versioning_counter.load(std::memory_order_acquire);
     }
@@ -507,7 +507,7 @@ inline void MemRef::set_addr(char* addr)
 inline MemRef Allocator::alloc(size_t size)
 {
     if (m_is_read_only)
-        throw realm::LogicError(realm::LogicError::wrong_transact_state);
+        throw realm::LogicError(ErrorCodes::IllegalOperation, "Read only state");
     return do_alloc(size);
 }
 
@@ -518,7 +518,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
     if (m_is_read_only)
-        throw realm::LogicError(realm::LogicError::wrong_transact_state);
+        throw realm::LogicError(ErrorCodes::IllegalOperation, "Read only state");
     return do_realloc(ref, const_cast<char*>(addr), old_size, new_size);
 }
 

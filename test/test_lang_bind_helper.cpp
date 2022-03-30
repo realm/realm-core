@@ -5758,7 +5758,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
         try {
             DBRef sg_encrypt = DB::create(*hist_encrypt, path, DBOptions(key));
         }
-        catch (std::runtime_error&) {
+        catch (std::exception&) {
             is_okay = true;
         }
         CHECK(is_okay);
