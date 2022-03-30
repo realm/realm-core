@@ -39,7 +39,8 @@ public:
     CollectionChangeBuilder& operator=(CollectionChangeBuilder&&) = default;
 
     CollectionChangeBuilder(IndexSet deletions = {}, IndexSet insertions = {}, IndexSet modification = {},
-                            std::vector<Move> moves = {}, bool root_was_deleted = false);
+                            std::vector<Move> moves = {}, bool collection_was_cleared = false,
+                            bool root_was_deleted = false);
 
     // Calculate where objects need to be inserted or deleted from old_objs to turn
     // it into new_objs, and check all matching objects for modifications

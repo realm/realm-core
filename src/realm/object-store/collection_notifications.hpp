@@ -94,13 +94,16 @@ struct CollectionChangeSet {
     // This enables notifiers to report a change on empty collections that have been deleted.
     bool collection_root_was_deleted = false;
 
+    // This flag indicates if the collection was cleared.
+    bool collection_was_cleared = false;
+
     // Per-column version of `modifications`
     std::unordered_map<int64_t, IndexSet> columns;
 
     bool empty() const noexcept
     {
         return deletions.empty() && insertions.empty() && modifications.empty() && modifications_new.empty() &&
-               moves.empty() && !collection_root_was_deleted;
+               moves.empty() && !collection_root_was_deleted && !collection_was_cleared;
     }
 };
 

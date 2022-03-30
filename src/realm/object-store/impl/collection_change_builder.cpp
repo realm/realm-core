@@ -26,13 +26,15 @@ using namespace realm;
 using namespace realm::_impl;
 
 CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions, IndexSet insertions, IndexSet modifications,
-                                                 std::vector<Move> moves, bool root_was_deleted)
+                                                 std::vector<Move> moves, bool root_was_deleted,
+                                                 bool collection_was_cleared)
     : CollectionChangeSet({std::move(deletions),
                            std::move(insertions),
                            std::move(modifications),
                            {},
                            std::move(moves),
-                           root_was_deleted})
+                           root_was_deleted,
+                           collection_was_cleared})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -147,6 +149,8 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
         collection_root_was_deleted = true;
     }
 
+    collection_was_cleared = c.collection_was_cleared;
+
     c = {};
     verify();
 }
@@ -202,6 +206,8 @@ void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_move
         if (move.to >= index)
             move.to += count;
     }
+
+    collection_was_cleared = false;
 }
 
 void CollectionChangeBuilder::erase(size_t index)
@@ -236,6 +242,7 @@ void CollectionChangeBuilder::clear(size_t old_size)
     moves.clear();
     columns.clear();
     deletions.set(old_size);
+    collection_was_cleared = true;
 }
 
 void CollectionChangeBuilder::move(size_t from, size_t to)
@@ -699,5 +706,5 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
 
     return {std::move(deletions),     std::move(insertions), std::move(modifications_in_old),
             std::move(modifications), std::move(moves),      collection_root_was_deleted,
-            std::move(columns)};
+            collection_was_cleared,   std::move(columns)};
 }

@@ -698,6 +698,40 @@ TEST_CASE("collection_change: merge()") {
         REQUIRE_MOVES(c, {8, 9});
     }
 
+    SECTION("clear collection flag gets propagated") {
+        c = {{1, 2, 3}, {}, {}, {}, false, true};
+        c.merge({});
+        REQUIRE(c.collection_was_cleared);
+
+        c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false, false};
+        c.merge({});
+        REQUIRE(!c.collection_was_cleared);
+
+        c = {};
+        c.merge({{1, 2, 3}, {}, {}, {}, false, true});
+        REQUIRE(c.collection_was_cleared);
+
+        c = {};
+        c.merge({{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false, false});
+        REQUIRE(!c.collection_was_cleared);
+
+        c = {{1, 2, 3}, {4, 5}, {6, 7}, {{8, 9}}, false, false};
+        c.merge({{1, 2, 3}, {}, {}, {}, false, true});
+        REQUIRE(c.collection_was_cleared);
+
+        c = {{1, 2, 3}, {}, {}, {}, false, true};
+        c.merge({{}, {1, 2, 3}, {}, {}, false, false});
+        REQUIRE(!c.collection_was_cleared);
+
+        c = {{1, 2, 3}, {}, {}, {}, false, true};
+        c.merge({{1, 2, 3}, {1, 2, 3}, {}, {}, false, true});
+        REQUIRE(c.collection_was_cleared);
+
+        c = {{1, 2, 3}, {4, 5}, {}, {}, false, false};
+        c.merge({{}, {1, 2, 3}, {}, {}, false, false});
+        REQUIRE(!c.collection_was_cleared);
+    }
+
     SECTION("shifts deletions by previous deletions") {
         c = {{5}, {}, {}, {}};
         c.merge({{3}, {}, {}, {}});
