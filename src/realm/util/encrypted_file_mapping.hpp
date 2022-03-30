@@ -97,10 +97,9 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
-        Touched = 1,    // a ref->ptr translation has taken place
-        UpToDate = 2,   // the page is fully up to date
-        GrowingOld = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8       // the page has been modified with respect to what's on file.
+        Touched = 1,  // a ref->ptr translation has taken place
+        UpToDate = 2, // the page is fully up to date
+        Dirty = 4     // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
@@ -133,10 +132,9 @@ private:
 
     char* page_addr(size_t local_page_ndx) const noexcept;
 
-    void mark_outdated(size_t local_page_ndx) noexcept;
     bool copy_up_to_date_page(size_t local_page_ndx) noexcept;
     void refresh_page(size_t local_page_ndx);
-    void write_page(size_t local_page_ndx) noexcept;
+    void flush_page(size_t local_page_ndx) noexcept;
     void write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept;
     void reclaim_page(size_t page_ndx);
     void validate_page(size_t local_page_ndx) noexcept;
