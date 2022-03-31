@@ -2512,8 +2512,12 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:
-                if (commit_to_disk)
+                if (commit_to_disk) {
                     out.commit(new_top_ref); // Throws
+                }
+                else {
+                    out.flush_all_mappings();
+                }
                 break;
             case Durability::MemOnly:
                 // In Durability::MemOnly mode, we just use the file as backing for
