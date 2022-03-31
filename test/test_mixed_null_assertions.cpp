@@ -78,3 +78,126 @@ TEST(List_Mixed_do_insert)
     list.insert_null(0);
     list.insert(0, Mixed("hello world"));
 }
+
+TEST(Mixed_List_unresolved_as_null)
+{
+    Group g;
+    auto t = g.add_table("foo");
+    t->add_column_list(type_Mixed, "mixeds");
+    auto obj = t->create_object();
+    auto obj1 = t->create_object();
+
+    auto list = obj.get_list<Mixed>("mixeds");
+
+    list.insert_null(0);
+    list.insert(1, Mixed{"test"});
+    obj1.invalidate();
+    list.insert(2, obj1);
+
+    CHECK(list.size() == 3);
+
+    {
+        // find all mixed nulls or unresolved link should work the same way
+        list.find_all(realm::null(), [this](size_t pos) {
+            CHECK(pos == 0 || pos == 2);
+        });
+        list.find_all(obj1, [this](size_t pos) {
+            CHECK(pos == 0 || pos == 2);
+        });
+    }
+
+    {
+        // find null or unresolved link must work the same way
+        auto index = list.find_any(realm::null());
+        CHECK(index == 0);
+        index = list.find_first(obj1);
+        CHECK(index == 0);
+    }
+
+    {
+        // is null for unresolved links and null must behave the same way
+        CHECK(list.is_null(0));
+        CHECK(list.is_null(2));
+    }
+
+    {
+        std::vector<size_t> indices{0, 1, 2};
+        list.sort(indices);
+        CHECK(indices.size() == 3);
+        CHECK(indices.at(0) == 0);
+        CHECK(indices.at(1) == 2);
+        CHECK(indices.at(2) == 1);
+        CHECK(list.is_null(indices[0]));
+        CHECK(list.is_null(indices[1]));
+        CHECK(!list.is_null(indices[2]));
+    }
+
+    {
+        std::vector<size_t> indices{0, 1, 2};
+        list.distinct(indices);
+        CHECK(indices.size() == 2);
+        CHECK(indices.at(0) == 0);
+        CHECK(indices.at(1) == 1);
+        CHECK(list.is_null(indices[0]));
+        CHECK(!list.is_null(indices[1]));
+        CHECK(list.find_any(realm::null()) == 0);
+    }
+
+    {
+        list.remove(0);
+        CHECK(list.find_any(realm::null()) == 1);
+        list.remove(1);
+        CHECK(list.find_any(realm::null()) == npos);
+        CHECK(list.size() == 1);
+    }
+}
+
+ONLY(Mixed_Set_unresolved_as_null)
+{
+    Group g;
+
+    auto t = g.add_table("foo");
+    t->add_column_set(type_Mixed, "mixeds");
+    auto obj = t->create_object();
+    auto obj1 = t->create_object();
+    auto obj2 = t->create_object();
+    obj1.invalidate();
+    obj2.invalidate();
+
+    auto set = obj.get_set<Mixed>("mixeds");
+    auto [it, success] = set.insert(Mixed{obj1});
+    CHECK(success);
+    auto [it1, success1] = set.insert(Mixed{"test"});
+    CHECK(success1);
+
+    {
+        CHECK(set.size() == 2);
+        set.insert_null();
+        // unresolved treated like nulls
+        CHECK(set.size() == 2);
+    }
+
+    {
+        // find all mixed nulls or unresolved link should work the same way
+        set.find_all(realm::null(), [this, &set](size_t pos) {
+            CHECK(pos != not_found);
+            CHECK(set.is_null(pos));
+        });
+    }
+
+    {
+        auto index = set.find_any(realm::null());
+        CHECK(index != not_found);
+        CHECK(set.is_null(index));
+    }
+
+    {
+        set.insert(Mixed{obj2});
+        CHECK(set.size() == 2);
+        std::vector<size_t> indices{0, 1};
+        set.sort(indices);
+        CHECK(indices.size() == 2);
+        CHECK(indices[0] == 0);
+        CHECK(indices[1] == 1);
+    }
+}
