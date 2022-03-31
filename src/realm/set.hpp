@@ -68,20 +68,14 @@ public:
 
     T get(size_t ndx) const
     {
-        const auto current_size = size();
-        if (ndx >= current_size) {
-            throw std::out_of_range("Index out of range");
-        }
-
+        auto value = get_internal(ndx);
         // proxy out the mixed value for links, we need to know if the link is valid or not (not necesseraly must it
         // be null)
-        if constexpr (std::is_same<T, Mixed>::value) {
-            Mixed mixed_link_value = m_tree->get(ndx);
-            if (mixed_link_value.is_unresolved_link())
+        if constexpr (std::is_same_v<T, Mixed>) {
+            if (value.is_type(type_TypedLink) && value.is_unresolved_link())
                 return Mixed{};
-            return mixed_link_value;
         }
-        return m_tree->get(ndx);
+        return value;
     }
 
     iterator begin() const noexcept
@@ -280,6 +274,8 @@ private:
     void assign_symmetric_difference(It1, It2);
 
     static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
+
+    T get_internal(std::size_t) const;
 };
 
 class LnkSet final : public ObjCollectionBase<SetBase> {
@@ -588,8 +584,25 @@ inline LnkSetPtr Obj::get_linkset_ptr(ColKey col_key) const
 }
 
 template <class T>
+T Set<T>::get_internal(std::size_t ndx) const
+{
+    const auto current_size = size();
+    if (ndx >= current_size) {
+        throw std::out_of_range("Index out of range");
+    }
+    return m_tree->get(ndx);
+}
+
+template <class T>
 size_t Set<T>::find(T value) const
 {
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
+            auto unresolved_link = m_obj.get_table()->create_object();
+            unresolved_link.invalidate();
+            value = Mixed{unresolved_link};
+        }
+    }
     auto it = find_impl(value);
     if (it != end() && SetElementEquals<T>{}(*it, value)) {
         return it.index();
@@ -633,6 +646,14 @@ std::pair<size_t, bool> Set<T>::insert(T value)
         throw LogicError(LogicError::column_not_nullable);
 
     ensure_created();
+    // if value is null, then convert it to unresolved link
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
+            auto unresolved_link = m_obj.get_table()->create_object();
+            unresolved_link.invalidate();
+            value = Mixed{unresolved_link};
+        }
+    }
     auto it = find_impl(value);
 
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
@@ -670,6 +691,15 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 template <class T>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
+    // Null Mixed must be treated as unresolved link
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
+            auto unresolved_link = m_obj.get_table()->create_object();
+            unresolved_link.invalidate();
+            value = Mixed{unresolved_link};
+        }
+    }
+
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
 
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {

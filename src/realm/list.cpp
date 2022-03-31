@@ -135,15 +135,14 @@ template <class T>
 void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     update_if_needed();
-    auto tree = m_tree.get();
     if (ascending) {
-        do_sort(indices, size(), [tree](size_t i1, size_t i2) noexcept {
-            return tree->get(i1) < tree->get(i2);
+        do_sort(indices, size(), [this](size_t i1, size_t i2) noexcept {
+            return get(i1) < get(i2);
         });
     }
     else {
-        do_sort(indices, size(), [tree](size_t i1, size_t i2) noexcept {
-            return tree->get(i1) > tree->get(i2);
+        do_sort(indices, size(), [this](size_t i1, size_t i2) noexcept {
+            return get(i1) > get(i2);
         });
     }
 }
@@ -153,9 +152,8 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 {
     indices.clear();
     sort(indices, sort_order.value_or(true));
-    auto tree = m_tree.get();
-    auto duplicates = std::unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
-        return tree->get(i1) == tree->get(i2);
+    auto duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) noexcept {
+        return get(i1) == get(i2);
     });
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
