@@ -10,7 +10,6 @@
 #endif // REALM_ENABLE_ENCRYPTION
 
 #include <realm/sync/history.hpp>
-#include <realm/sync/object.hpp>
 
 #include "../peer.hpp"
 
@@ -48,7 +47,7 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
             ColKey col_ndx;
             {
                 peer.start_transaction();
-                TableRef t = sync::create_table(*peer.group, "class_t");
+                TableRef t = peer.group->get_or_add_table("class_t");
                 col_ndx = t->add_column(type_Int, "i");
                 peer.commit();
             }
@@ -91,7 +90,7 @@ void transform_transactions(TestContext& test_context, BenchmarkResults& results
     }
 
     // results.finish(ident_preface, ident_preface);
-    results.finish(ident, ident);
+    results.finish(ident, ident, "runtime_secs");
 }
 
 // Two peers have 1 transaction each with 1000 instructions (8.3% of
@@ -145,7 +144,7 @@ void transform_instructions(TestContext& test_context, BenchmarkResults& results
     }
 
     // results.finish(ident_preface, ident_preface);
-    results.finish(ident, ident);
+    results.finish(ident, ident, "runtime_secs");
 }
 
 template <size_t num_iterations>
@@ -164,7 +163,7 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
 
         auto make_instructions = [](Peer& peer) {
             peer.start_transaction();
-            TableRef t = sync::create_table_with_primary_key(*peer.group, "class_t", type_String, "pk");
+            TableRef t = peer.group->get_or_add_table_with_primary_key("class_t", type_String, "pk");
             auto col_key = t->add_column(*t, "l");
 
             // Everything links to this object!
@@ -194,7 +193,7 @@ void connected_objects(TestContext& test_context, BenchmarkResults& results)
         results.submit(ident.c_str(), t.get_elapsed_time());
     }
 
-    results.finish(ident, ident);
+    results.finish(ident, ident, "runtime_secs");
 }
 
 } // namespace bench
@@ -443,12 +442,12 @@ TEST(BenchMergeManyConnectedObjects)
     std::string results_file_stem = test_util::get_test_path_prefix() + "connected_objects";
     BenchmarkResults results(max_lead_text_width, results_file_stem.c_str());
 
-    bench::connected_objects<8000>(test_context, results);
+    bench::connected_objects<1000>(test_context, results);
 }
 
 #if !REALM_IOS
-int main(int argc, char** argv)
+int main()
 {
-    return test_all(argc, argv, nullptr);
+    return test_all(nullptr);
 }
 #endif // REALM_IOS
