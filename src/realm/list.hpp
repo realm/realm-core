@@ -145,13 +145,6 @@ public:
     void find_all(value_type value, Func&& func) const
     {
         if (update()) {
-            if constexpr (std::is_same_v<T, Mixed>) {
-                if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
-                    auto unresolved_link = m_obj.get_table()->create_object();
-                    unresolved_link.invalidate();
-                    m_tree->find_all(unresolved_link, std::forward<Func>(func));
-                }
-            }
             m_tree->find_all(value, std::forward<Func>(func));
         }
     }
@@ -692,14 +685,6 @@ inline size_t Lst<T>::find_first(const T& value) const
 {
     if (!update())
         return not_found;
-
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
-            auto unresolved_link = m_obj.get_table()->create_object();
-            unresolved_link.invalidate();
-            return m_tree->find_first(unresolved_link);
-        }
-    }
     return m_tree->find_first(value);
 }
 
@@ -901,14 +886,6 @@ void Lst<T>::insert(size_t ndx, T value)
         throw std::out_of_range("Index out of range");
 
     ensure_created();
-
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
-            auto unresolved_link = m_obj.get_table()->create_object();
-            unresolved_link.invalidate();
-            value = Mixed{unresolved_link};
-        }
-    }
 
     if (Replication* repl = this->m_obj.get_replication()) {
         repl->list_insert(*this, ndx, value, sz);

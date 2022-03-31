@@ -596,13 +596,6 @@ T Set<T>::get_internal(std::size_t ndx) const
 template <class T>
 size_t Set<T>::find(T value) const
 {
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
-            auto unresolved_link = m_obj.get_table()->create_object();
-            unresolved_link.invalidate();
-            value = Mixed{unresolved_link};
-        }
-    }
     auto it = find_impl(value);
     if (it != end() && SetElementEquals<T>{}(*it, value)) {
         return it.index();
@@ -646,14 +639,6 @@ std::pair<size_t, bool> Set<T>::insert(T value)
         throw LogicError(LogicError::column_not_nullable);
 
     ensure_created();
-    // if value is null, then convert it to unresolved link
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
-            auto unresolved_link = m_obj.get_table()->create_object();
-            unresolved_link.invalidate();
-            value = Mixed{unresolved_link};
-        }
-    }
     auto it = find_impl(value);
 
     if (it != this->end() && SetElementEquals<T>{}(*it, value)) {
@@ -691,15 +676,6 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 template <class T>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
-    // Null Mixed must be treated as unresolved link
-    if constexpr (std::is_same_v<T, Mixed>) {
-        if (value.is_null() || (value.is_type(type_TypedLink) && value.get_link().is_null())) {
-            auto unresolved_link = m_obj.get_table()->create_object();
-            unresolved_link.invalidate();
-            value = Mixed{unresolved_link};
-        }
-    }
-
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
 
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
