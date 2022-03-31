@@ -55,72 +55,19 @@ public:
     /// with an external memory buffer.
     Group();
 
-    enum OpenMode {
-        /// Open in read-only mode. Fail if the file does not already exist.
-        mode_ReadOnly,
-        /// Open in read/write mode. Create the file if it doesn't exist.
-        mode_ReadWrite,
-        /// Open in read/write mode. Fail if the file does not already exist.
-        mode_ReadWriteNoCreate
-    };
-
-    /// Equivalent to calling open(const std::string&, const char*, OpenMode)
-    /// on an unattached group accessor.
-    explicit Group(const std::string& file, const char* encryption_key = nullptr, OpenMode = mode_ReadOnly);
-
-    /// Equivalent to calling open(BinaryData, bool) on an unattached
-    /// group accessor. Note that if this constructor throws, the
-    /// ownership of the memory buffer will remain with the caller,
-    /// regardless of whether \a take_ownership is set to `true` or
-    /// `false`.
-    explicit Group(BinaryData, bool take_ownership = true);
-
-    struct unattached_tag {
-    };
-
-    /// Create a Group instance in its unattached state. It may then
-    /// be attached to a database file later by calling one of the
-    /// open() methods. You may test whether this instance is
-    /// currently in its attached state by calling
-    /// is_attached(). Calling any other method (except the
-    /// destructor) while in the unattached state has undefined
-    /// behavior.
-    Group(unattached_tag) noexcept;
-
-    Group(const Group&) = delete;
-    Group& operator=(const Group&) = delete;
-
-    ~Group() noexcept override;
-
     /// Attach this Group instance to the specified database file.
     ///
-    /// By default, the specified file is opened in read-only mode
-    /// (mode_ReadOnly). This allows opening a file even when the
-    /// caller lacks permission to write to that file. The opened
-    /// group may still be modified freely, but the changes cannot be
-    /// written back to the same file using the commit() function. An
-    /// attempt to do that, will cause an exception to be thrown. When
-    /// opening in read-only mode, it is an error if the specified
+    /// The specified file is opened in read-only mode. This allows opening
+    /// a file even when the caller lacks permission to write to that file.
+    /// The opened group may still be modified freely, but the changes cannot be
+    /// written back to the same file. Tt is an error if the specified
     /// file does not already exist in the file system.
     ///
-    /// Alternatively, the file can be opened in read/write mode
-    /// (mode_ReadWrite). This allows use of the commit() function,
-    /// but, of course, it also requires that the caller has
-    /// permission to write to the specified file. When opening in
-    /// read-write mode, an attempt to create the specified file will
-    /// be made, if it does not already exist in the file system.
-    ///
-    /// In any case, if the file already exists, it must contain a
-    /// valid Realm database. In many cases invalidity will be
-    /// detected and cause the InvalidDatabase exception to be thrown,
+    /// The file must contain a valid Realm database. In many cases invalidity
+    /// will be detected and cause the InvalidDatabase exception to be thrown,
     /// but you should not rely on it.
     ///
-    /// Note that changes made to the database via a Group instance
-    /// are not automatically committed to the specified file. You
-    /// may, however, at any time, explicitly commit your changes by
-    /// calling the commit() method, provided that the specified
-    /// open-mode is not mode_ReadOnly. Alternatively, you may call
-    /// write() to write the entire database to a new file. Writing
+    /// You may call write() to write the entire database to a new file. Writing
     /// the database to a new file does not end, or in any other way
     /// change the association between the Group instance and the file
     /// that was specified in the call to open().
@@ -128,11 +75,7 @@ public:
     /// A Realm file that contains a history (see Replication::HistoryType) may
     /// be opened via Group::open(), as long as the application can ensure that
     /// there is no concurrent access to the file (see below for more on
-    /// concurrency), but if the file is modified via Group::commit() the
-    /// history will be discarded. To retain the history, the application must
-    /// instead access the file in shared mode, i.e., via DB, and
-    /// supply the right kind of replication plugin (see
-    /// Replication::get_history_type()).
+    /// concurrency).
     ///
     /// A file that is passed to Group::open(), may not be modified by
     /// a third party until after the Group object is
@@ -169,18 +112,12 @@ public:
     /// \param encryption_key 32-byte key used to encrypt and decrypt
     /// the database file, or nullptr to disable encryption.
     ///
-    /// \param mode Specifying a mode that is not mode_ReadOnly
-    /// requires that the specified file can be opened in read/write
-    /// mode. In general there is no reason to open a group in
-    /// read/write mode unless you want to be able to call
-    /// Group::commit().
-    ///
     /// \throw util::File::AccessError If the file could not be
     /// opened. If the reason corresponds to one of the exception
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. Note that InvalidDatabase is
     /// among these derived exception types.
-    void open(const std::string& file, const char* encryption_key = nullptr, OpenMode mode = mode_ReadOnly);
+    explicit Group(const std::string& file, const char* encryption_key = nullptr);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -210,7 +147,16 @@ public:
     ///
     /// \throw InvalidDatabase If the specified buffer does not appear
     /// to contain a valid database.
-    void open(BinaryData, bool take_ownership = true);
+    /// Note that if this constructor throws, the
+    /// ownership of the memory buffer will remain with the caller,
+    /// regardless of whether \a take_ownership is set to `true` or
+    /// `false`.
+    explicit Group(BinaryData, bool take_ownership = true);
+
+    Group(const Group&) = delete;
+    Group& operator=(const Group&) = delete;
+
+    ~Group() noexcept override;
 
     /// A group may be created in the unattached state, and then later
     /// attached to a file with a call to open(). Calling any method
@@ -416,19 +362,6 @@ public:
     /// caller. The memory will have been allocated using
     /// std::malloc().
     BinaryData write_to_mem() const;
-
-    /// Commit changes to the attached file. This requires that the
-    /// attached file is opened in read/write mode.
-    ///
-    /// Calling this function on an unattached group, a free-standing
-    /// group, a group whose attached file is opened in read-only
-    /// mode, a group that is attached to a memory buffer, or a group
-    /// that is managed by a shared group, is an error and will result
-    /// in undefined behavior.
-    ///
-    /// Table accesors will remain valid across the commit. Note that
-    /// this is not the case when working with proper transactions.
-    void commit();
 
     //@{
     /// Some operations on Tables in a Group can cause indirect changes to other
@@ -658,7 +591,6 @@ private:
     mutable int m_num_tables = 0;
     bool m_attached = false;
     bool m_is_writable = true;
-    const bool m_is_shared;
     static std::optional<int> fake_target_file_format;
 
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
@@ -679,10 +611,6 @@ private:
     static constexpr size_t s_sync_file_id_ndx = 10;
 
     static constexpr size_t s_group_max_size = 11;
-
-    struct shared_tag {
-    };
-    Group(shared_tag) noexcept;
 
     Group(SlabAlloc* alloc) noexcept;
     void init_array_parents() noexcept;
@@ -721,7 +649,7 @@ private:
     /// accessors. This includes cached array accessors in any
     /// currently attached table accessors. This ensures that the
     /// group instance itself, as well as any attached table accessor
-    /// that exists across Group::commit() will remain valid. This
+    /// that exists across Transaction::commit() will remain valid. This
     /// function is not appropriate for use in conjunction with
     /// commits via shared group.
     void update_refs(ref_type top_ref) noexcept;

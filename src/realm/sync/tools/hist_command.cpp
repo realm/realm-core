@@ -2237,14 +2237,13 @@ int main(int argc, char* argv[])
 
     std::unique_ptr<CursorFactory> factory = std::make_unique<NullCursorFactory>(); // Throws
 
-    Group::OpenMode open_mode = Group::mode_ReadOnly;
     std::string encryption_key_2;
     const char* encryption_key_3 = nullptr;
     if (!encryption_key.empty()) {
         encryption_key_2 = util::load_file(encryption_key); // Throws
         encryption_key_3 = encryption_key_2.data();
     }
-    Group group{realm_path, encryption_key_3, open_mode}; // Throws
+    Group group{realm_path, encryption_key_3}; // Throws
     using gf = _impl::GroupFriend;
     int file_format_version = gf::get_file_format_version(group);
     if (file_format_version != 9) {
