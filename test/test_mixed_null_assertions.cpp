@@ -152,7 +152,7 @@ TEST(Mixed_List_unresolved_as_null)
     }
 }
 
-ONLY(Mixed_Set_unresolved_as_null)
+TEST(Mixed_Set_unresolved_as_null)
 {
     Group g;
 
