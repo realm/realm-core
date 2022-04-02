@@ -5794,39 +5794,6 @@ TEST(LangBindHelper_EnumColumnAddZeroRows)
 }
 
 
-TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
-{
-    // Create a Realm file with a history (history_type !=
-    // Reaplication::hist_None, path).
-    SHARED_GROUP_TEST_PATH(path);
-    {
-        std::unique_ptr<Replication> history(make_in_realm_history());
-        DBRef sg = DB::create(*history, path);
-        WriteTransaction wt{sg};
-        wt.add_table("foo");
-        wt.commit();
-    }
-
-    // Since the stored history type is now Replication::hist_InRealm, it should
-    // now be impossible to open in shared mode with no replication plugin
-    // (Replication::hist_None).
-    CHECK_THROW(DB::create(path), IncompatibleHistories);
-
-    // Now modify the file in nonshared mode, which will discard the history (as
-    // nonshared mode does not understand how to update it correctly).
-    {
-        const char* crypt_key = nullptr;
-        Group group{path, crypt_key, Group::mode_ReadWriteNoCreate};
-        group.commit();
-    }
-
-    // Check the the history was actually discarded (reset to
-    // Replication::hist_None).
-    DBRef sg = DB::create(path);
-    ReadTransaction rt{sg};
-    CHECK(rt.has_table("foo"));
-}
-
 TEST(LangBindHelper_RemoveObject)
 {
     SHARED_GROUP_TEST_PATH(path);
