@@ -116,10 +116,7 @@ public:
 
     /// Erase an element from the set, returning true if the set contained the element.
     /// In case of null mixed links by default all the nulls will be deleted
-    enum class MixedNullLink {
-        EraseAll = 0,
-        EraseOne = 1
-    };
+    enum class MixedNullLink { EraseAll = 0, EraseOne = 1 };
     template <MixedNullLink e = MixedNullLink::EraseAll>
     std::pair<size_t, bool> erase(T value);
 
