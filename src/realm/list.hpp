@@ -229,9 +229,6 @@ protected:
     void do_remove(size_t ndx);
     void do_clear();
 
-    // internal getter for mixed
-    T get_mixed_value(size_t ndx) const;
-
     // BPlusTree must be wrapped in an `std::unique_ptr` because it is not
     // default-constructible, due to its `Allocator&` member.
     mutable std::unique_ptr<BPlusTree<T>> m_tree;
@@ -666,16 +663,6 @@ inline T Lst<T>::get(size_t ndx) const
         if (mixed_value.is_type(type_TypedLink) && mixed_value.is_unresolved_link())
             return Mixed{};
         return mixed_value;
-    }
-    return m_tree->get(ndx);
-}
-
-template <class T>
-inline T Lst<T>::get_mixed_value(size_t ndx) const
-{
-    const auto current_size = size();
-    if (ndx >= current_size) {
-        throw std::out_of_range("Index out of range");
     }
     return m_tree->get(ndx);
 }

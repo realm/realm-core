@@ -98,11 +98,21 @@ TEST(Mixed_List_unresolved_as_null)
 
     {
         // find all mixed nulls or unresolved link should work the same way
-        list.find_all(realm::null(), [this](size_t pos) {
-            CHECK(pos == 0 || pos == 2);
+        int cnt = 0;
+        list.find_all(realm::null(), [this, &cnt](size_t pos) {
+            if(cnt == 0)
+                CHECK(pos == 0);
+            else if(cnt == 1)
+                CHECK(pos == 2);
+            cnt += 1;
         });
-        list.find_all(obj1, [this](size_t pos) {
-            CHECK(pos == 0 || pos == 2);
+        cnt = 0;
+        list.find_all(obj1, [this, &cnt](size_t pos) {
+            if(cnt == 0)
+                CHECK(pos == 0);
+            else if(cnt == 1)
+                CHECK(pos == 2);
+            cnt += 1;
         });
     }
 
@@ -171,18 +181,25 @@ TEST(Mixed_Set_unresolved_as_null)
     CHECK(success1);
 
     {
+        //null treated as invalalid link
         CHECK(set.size() == 2);
-        set.insert_null();
-        // unresolved treated like nulls
+        auto [it, success] = set.insert(Mixed{});
+        CHECK(!success);
+        auto [it1, success1] = set.insert_null();
+        CHECK(!success1);
         CHECK(set.size() == 2);
     }
 
     {
         // find all mixed nulls or unresolved link should work the same way
-        set.find_all(realm::null(), [this, &set](size_t pos) {
+        // there can only be 1 NULL
+        int cnt = 0;
+        set.find_all(realm::null(), [this, &set, &cnt](size_t pos) {
             CHECK(pos != not_found);
             CHECK(set.is_null(pos));
+            cnt += 1;
         });
+        CHECK(cnt == 1);
     }
 
     {
@@ -192,12 +209,71 @@ TEST(Mixed_Set_unresolved_as_null)
     }
 
     {
-        set.insert(Mixed{obj2});
+        auto [it, success] = set.insert(Mixed{obj2});
+        CHECK(!success);
         CHECK(set.size() == 2);
         std::vector<size_t> indices{0, 1};
         set.sort(indices);
         CHECK(indices.size() == 2);
         CHECK(indices[0] == 0);
         CHECK(indices[1] == 1);
+    }
+    
+    {
+        //trigger interface exception, we ended up with multiple nulls
+        Group g;
+        auto t = g.add_table("foo");
+        t->add_column_set(type_Mixed, "mixeds");
+        auto obj = t->create_object();
+        auto obj1 = t->create_object();
+        auto obj2 = t->create_object();
+        auto set = obj.get_set<Mixed>("mixeds");
+        auto [it, success] = set.insert(obj1);
+        auto [it1, success1] = set.insert(obj2);
+        CHECK(success);
+        CHECK(success1);
+        CHECK(set.size() == 2);
+        CHECK(!set.is_null(0));
+        CHECK(!set.is_null(1));
+        obj1.invalidate();
+        CHECK(set.is_null(0));
+        CHECK(!set.is_null(1));
+        obj2.invalidate();
+        //this is the only violation we allow right now, we have ended up with 2 nulls
+        CHECK(set.is_null(0));
+        CHECK(set.is_null(1));
+        auto obj3 = t->create_object();
+        set.insert(obj3);
+        CHECK(set.size() == 3);
+        int cnt = 0;
+        //we can now do find_all for nulls
+        set.find_all(Mixed{}, [this, &set, &cnt](size_t index) {
+            CHECK(index == 0 || index == 1);
+            CHECK(set.is_null(index));
+            cnt += 1;
+        });
+        CHECK(cnt == 2);
+        //erase null will erase all the nulls
+        set.erase_null();
+        CHECK(set.size() == 1);
+        auto obj4 = t->create_object();
+        auto obj5 = t->create_object();
+        set.insert(obj4);
+        set.insert(obj5);
+        CHECK(set.size() == 3);
+        //erase all the nulls by default
+        obj4.invalidate();
+        obj5.invalidate();
+        set.erase(Mixed{});
+        CHECK(set.size() == 1);
+        auto obj6 = t->create_object();
+        auto obj7 = t->create_object();
+        set.insert(obj6);
+        set.insert(obj7);
+        CHECK(set.size() == 3);
+        obj6.invalidate();
+        //remove only the first null
+        set.erase<false>(Mixed{});
+        CHECK(set.size() == 2);
     }
 }
