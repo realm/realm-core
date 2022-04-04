@@ -91,29 +91,32 @@ TEST(Mixed_List_unresolved_as_null)
 
     list.insert_null(0);
     list.insert(1, Mixed{"test"});
-    obj1.invalidate();
     list.insert(2, obj1);
+    obj1.invalidate();
 
     CHECK(list.size() == 3);
 
     {
         // find all mixed nulls or unresolved link should work the same way
-        int cnt = 0;
-        list.find_all(realm::null(), [this, &cnt](size_t pos) {
-            if (cnt == 0)
-                CHECK(pos == 0);
-            else if (cnt == 1)
-                CHECK(pos == 2);
-            cnt += 1;
+        std::vector<size_t> found;
+        std::vector<size_t> expected = {0, 2};
+        auto check_results = [&]() {
+            CHECK_EQUAL(found.size(), expected.size());
+            std::sort(found.begin(), found.end());
+            std::sort(expected.begin(), expected.end());
+            for (size_t i = 0; i < found.size(); ++i) {
+                CHECK_EQUAL(found[i], expected[i]);
+            }
+        };
+        list.find_all(realm::null(), [&](size_t pos) {
+            found.push_back(pos);
         });
-        cnt = 0;
-        list.find_all(obj1, [this, &cnt](size_t pos) {
-            if (cnt == 0)
-                CHECK(pos == 0);
-            else if (cnt == 1)
-                CHECK(pos == 2);
-            cnt += 1;
+        check_results();
+        found = {};
+        list.find_all(obj1, [&](size_t pos) {
+            found.push_back(pos);
         });
+        check_results();
     }
 
     {
