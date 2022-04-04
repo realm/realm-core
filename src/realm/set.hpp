@@ -744,9 +744,9 @@ inline std::pair<size_t, bool> Set<T>::insert_null()
 template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
-    const auto& res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
-    if (res.second)
-        return erase_null();
+    auto res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
+    if(res.second)
+        erase_null();
     return res;
 }
 
