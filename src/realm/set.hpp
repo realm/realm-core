@@ -94,14 +94,8 @@ public:
     }
 
     template <class Func>
-    void find_all(T value, Func&& func) const
-    {
-        size_t found = find(value);
-        if (found != not_found) {
-            func(found);
-        }
-    }
-
+    void find_all(const T& value, Func&& func) const;
+    
     bool is_subset_of(const CollectionBase&) const;
     bool is_strict_subset_of(const CollectionBase& rhs) const;
     bool is_superset_of(const CollectionBase& rhs) const;
@@ -121,8 +115,9 @@ public:
     size_t find(T value) const;
 
     /// Erase an element from the set, returning true if the set contained the element.
+    template<bool AllNull = true>
     std::pair<size_t, bool> erase(T value);
-
+    
     // Overriding members of CollectionBase:
     size_t size() const final;
     bool is_null(size_t ndx) const final;
@@ -251,6 +246,7 @@ private:
     void do_clear();
 
     iterator find_impl(const T& value) const;
+    iterator find_impl(iterator iterator, const T& value) const;
 
     template <class It1, class It2>
     bool is_subset_of(It1, It2) const;
@@ -276,6 +272,8 @@ private:
     static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
 
     T get_internal(std::size_t) const;
+    
+    std::pair<size_t, bool> erase_all_nulls(T value);
 };
 
 class LnkSet final : public ObjCollectionBase<SetBase> {
@@ -631,6 +629,33 @@ REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 }
 
 template <class T>
+REALM_NOINLINE auto Set<T>::find_impl(iterator it, const T& value) const -> iterator
+{
+    auto b = it;
+    auto e = this->end(); // Note: This ends up calling `update_if_needed()`.
+    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
+}
+
+template <class T>
+template <class Func>
+void Set<T>::find_all(const T& value, Func&& func) const
+{
+    auto it = find_impl(value);
+    
+    if(it == end())
+    {
+        func(not_found);
+        return;
+    }
+        
+    while (it != end() && SetElementEquals<T>{}(*it, value)) {
+        func(it.index());
+        it += 1;
+        it = find_impl(it, value);
+    }
+}
+
+template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
     update_if_needed();
@@ -674,10 +699,15 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 }
 
 template <class T>
+template <bool AllNull>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
+    if constexpr(std::is_same_v<Mixed, T> && AllNull) {
+        if(value.is_null())
+            return erase_null();
+    }
+    
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
-
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
@@ -715,7 +745,10 @@ inline std::pair<size_t, bool> Set<T>::insert_null()
 template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
-    return erase(BPlusTree<T>::default_value(this->m_nullable));
+    const auto& res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
+    if(res.second)
+        return erase_null();
+    return res;
 }
 
 template <class T>
