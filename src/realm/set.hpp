@@ -745,7 +745,7 @@ template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
     auto res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
-    if(res.second)
+    if (res.second)
         erase_null();
     return res;
 }
