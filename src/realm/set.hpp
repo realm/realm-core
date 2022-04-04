@@ -95,7 +95,7 @@ public:
 
     template <class Func>
     void find_all(const T& value, Func&& func) const;
-    
+
     bool is_subset_of(const CollectionBase&) const;
     bool is_strict_subset_of(const CollectionBase& rhs) const;
     bool is_superset_of(const CollectionBase& rhs) const;
@@ -115,9 +115,9 @@ public:
     size_t find(T value) const;
 
     /// Erase an element from the set, returning true if the set contained the element.
-    template<bool AllNull = true>
+    template <bool AllNull = true>
     std::pair<size_t, bool> erase(T value);
-    
+
     // Overriding members of CollectionBase:
     size_t size() const final;
     bool is_null(size_t ndx) const final;
@@ -272,7 +272,7 @@ private:
     static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
 
     T get_internal(std::size_t) const;
-    
+
     std::pair<size_t, bool> erase_all_nulls(T value);
 };
 
@@ -641,13 +641,12 @@ template <class Func>
 void Set<T>::find_all(const T& value, Func&& func) const
 {
     auto it = find_impl(value);
-    
-    if(it == end())
-    {
+
+    if (it == end()) {
         func(not_found);
         return;
     }
-        
+
     while (it != end() && SetElementEquals<T>{}(*it, value)) {
         func(it.index());
         it += 1;
@@ -702,11 +701,11 @@ template <class T>
 template <bool AllNull>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
-    if constexpr(std::is_same_v<Mixed, T> && AllNull) {
-        if(value.is_null())
+    if constexpr (std::is_same_v<Mixed, T> && AllNull) {
+        if (value.is_null())
             return erase_null();
     }
-    
+
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
@@ -746,7 +745,7 @@ template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
     const auto& res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
-    if(res.second)
+    if (res.second)
         return erase_null();
     return res;
 }
