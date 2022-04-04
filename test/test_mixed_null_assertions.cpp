@@ -100,17 +100,17 @@ TEST(Mixed_List_unresolved_as_null)
         // find all mixed nulls or unresolved link should work the same way
         int cnt = 0;
         list.find_all(realm::null(), [this, &cnt](size_t pos) {
-            if(cnt == 0)
+            if (cnt == 0)
                 CHECK(pos == 0);
-            else if(cnt == 1)
+            else if (cnt == 1)
                 CHECK(pos == 2);
             cnt += 1;
         });
         cnt = 0;
         list.find_all(obj1, [this, &cnt](size_t pos) {
-            if(cnt == 0)
+            if (cnt == 0)
                 CHECK(pos == 0);
-            else if(cnt == 1)
+            else if (cnt == 1)
                 CHECK(pos == 2);
             cnt += 1;
         });
@@ -181,7 +181,7 @@ TEST(Mixed_Set_unresolved_as_null)
     CHECK(success1);
 
     {
-        //null treated as invalalid link
+        // null treated as invalalid link
         CHECK(set.size() == 2);
         auto [it, success] = set.insert(Mixed{});
         CHECK(!success);
@@ -218,9 +218,9 @@ TEST(Mixed_Set_unresolved_as_null)
         CHECK(indices[0] == 0);
         CHECK(indices[1] == 1);
     }
-    
+
     {
-        //trigger interface exception, we ended up with multiple nulls
+        // trigger interface exception, we ended up with multiple nulls
         Group g;
         auto t = g.add_table("foo");
         t->add_column_set(type_Mixed, "mixeds");
@@ -239,21 +239,21 @@ TEST(Mixed_Set_unresolved_as_null)
         CHECK(set.is_null(0));
         CHECK(!set.is_null(1));
         obj2.invalidate();
-        //this is the only violation we allow right now, we have ended up with 2 nulls
+        // this is the only violation we allow right now, we have ended up with 2 nulls
         CHECK(set.is_null(0));
         CHECK(set.is_null(1));
         auto obj3 = t->create_object();
         set.insert(obj3);
         CHECK(set.size() == 3);
         int cnt = 0;
-        //we can now do find_all for nulls
+        // we can now do find_all for nulls
         set.find_all(Mixed{}, [this, &set, &cnt](size_t index) {
             CHECK(index == 0 || index == 1);
             CHECK(set.is_null(index));
             cnt += 1;
         });
         CHECK(cnt == 2);
-        //erase null will erase all the nulls
+        // erase null will erase all the nulls
         set.erase_null();
         CHECK(set.size() == 1);
         auto obj4 = t->create_object();
@@ -261,7 +261,7 @@ TEST(Mixed_Set_unresolved_as_null)
         set.insert(obj4);
         set.insert(obj5);
         CHECK(set.size() == 3);
-        //erase all the nulls by default
+        // erase all the nulls by default
         obj4.invalidate();
         obj5.invalidate();
         set.erase(Mixed{});
@@ -272,7 +272,7 @@ TEST(Mixed_Set_unresolved_as_null)
         set.insert(obj7);
         CHECK(set.size() == 3);
         obj6.invalidate();
-        //remove only the first null
+        // remove only the first null
         set.erase<false>(Mixed{});
         CHECK(set.size() == 2);
     }
