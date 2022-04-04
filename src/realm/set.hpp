@@ -115,7 +115,12 @@ public:
     size_t find(T value) const;
 
     /// Erase an element from the set, returning true if the set contained the element.
-    template <bool AllNull = true>
+    /// In case of null mixed links by default all the nulls will be deleted
+    enum class MixedNullLink {
+        EraseAll = 0,
+        EraseOne = 1
+    };
+    template <MixedNullLink e = MixedNullLink::EraseAll>
     std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
@@ -698,10 +703,10 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 }
 
 template <class T>
-template <bool AllNull>
+template <typename Set<T>::MixedNullLink e>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
-    if constexpr (std::is_same_v<Mixed, T> && AllNull) {
+    if constexpr (std::is_same_v<Mixed, T> && e == MixedNullLink::EraseAll) {
         if (value.is_null())
             return erase_null();
     }
@@ -744,7 +749,7 @@ inline std::pair<size_t, bool> Set<T>::insert_null()
 template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
-    auto res = erase<false>(BPlusTree<T>::default_value(this->m_nullable));
+    auto res = erase<MixedNullLink::EraseOne>(BPlusTree<T>::default_value(this->m_nullable));
     if (res.second)
         erase_null();
     return res;

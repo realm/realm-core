@@ -273,7 +273,8 @@ TEST(Mixed_Set_unresolved_as_null)
         CHECK(set.size() == 3);
         obj6.invalidate();
         // remove only the first null
-        set.erase<false>(Mixed{});
+        using erase_one = Set<Mixed>::MixedNullLink::One;
+        set.erase<erase_one>(Mixed{});
         CHECK(set.size() == 2);
     }
 }
