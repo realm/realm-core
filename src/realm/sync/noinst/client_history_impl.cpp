@@ -293,6 +293,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
     const auto sync_history_base_version = rt->get_version() - sync_history_size;
 
     std::size_t accum_byte_size_soft_limit = 0x20000; // 128 KB
+    std::size_t accum_byte_size_hard_limit = 16777216; // server-imposed limit
     std::size_t accum_byte_size = 0;
 
     version_type begin_version_2 = std::max(upload_progress.client_version, sync_history_base_version);
@@ -301,32 +302,40 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 
     while (accum_byte_size < accum_byte_size_soft_limit) {
         HistoryEntry entry;
+        version_type last_integrated_upstream_version_2;
         version_type version = find_sync_history_entry(arrays, sync_history_base_version, begin_version_2,
-                                                       end_version_2, entry, last_integrated_upstream_version);
+                                                       end_version_2, entry, last_integrated_upstream_version_2);
 
         if (version == 0) {
             begin_version_2 = end_version_2;
+            last_integrated_upstream_version = last_integrated_upstream_version_2;
             break;
         }
+
+        ChunkedBinaryInputStream is(entry.changeset);
+        size_t size = util::compression::get_uncompressed_size_from_header(is);
+        if (accum_byte_size + size >= accum_byte_size_hard_limit && !uploadable_changesets.empty())
+            break;
+        accum_byte_size += size;
+        last_integrated_upstream_version = last_integrated_upstream_version_2;
         begin_version_2 = version;
 
         UploadChangeset uc;
         util::AppendBuffer<char> decompressed;
-        ChunkedBinaryInputStream is(entry.changeset);
-        auto ec = util::compression::decompress_nonportable(is, decompressed);
+        ChunkedBinaryInputStream is_2(entry.changeset);
+        auto ec = util::compression::decompress_nonportable(is_2, decompressed);
         if (ec == util::compression::error::decompress_unsupported) {
             REALM_TERMINATE(
                 "Synchronized Realm files with unuploaded local changes cannot be copied between platforms.");
         }
         REALM_ASSERT_3(ec, ==, std::error_code{});
+
         uc.origin_timestamp = entry.origin_timestamp;
         uc.origin_file_ident = entry.origin_file_ident;
         uc.progress = UploadCursor{version, entry.remote_version};
         uc.changeset = BinaryData{decompressed.data(), decompressed.size()};
         uc.buffer = decompressed.release().release();
         uploadable_changesets.push_back(std::move(uc)); // Throws
-
-        accum_byte_size += decompressed.size();
     }
 
     upload_progress = {std::min(begin_version_2, end_version), last_integrated_upstream_version};

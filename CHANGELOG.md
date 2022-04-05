@@ -2,12 +2,12 @@
 
 ### Enhancements
 * Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
+* Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
-* Added auth code and id token support for google c_api ([#5347]https://github.com/realm/realm-core/issues/5347)
- 
+* Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data (since 11.13.0).
+
 ### Breaking changes
 * None.
 
