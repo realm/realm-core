@@ -339,6 +339,13 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t* config, const 
     config->sdk_version = std::string(sdk_version);
 }
 
+RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t* app_credentials) noexcept
+{
+    return wrap_err([&] {
+        return duplicate_string(app_credentials->serialize_as_json());
+    });
+}
+
 RLM_API realm_app_t* realm_app_get(const realm_app_config_t* app_config,
                                    const realm_sync_client_config_t* sync_client_config)
 {
