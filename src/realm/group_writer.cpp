@@ -132,7 +132,8 @@ GroupWriter::MapWindow::MapWindow(size_t alignment, util::File& f, ref_type star
 
 GroupWriter::MapWindow::~MapWindow()
 {
-    m_map.unmap(); /* Apparently no effect - how odd */
+    m_map.flush();
+    m_map.unmap();
 }
 
 void GroupWriter::MapWindow::flush()
