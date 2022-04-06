@@ -125,11 +125,11 @@ TEST(Mixed_List_unresolved_as_null)
         CHECK(index == 0);
         index = list.find_first(obj1);
         CHECK(index == 2);
-        //but both should look like nulls
+        // but both should look like nulls
         CHECK(list.is_null(0));
         CHECK(list.is_null(2));
     }
-    
+
     {
         std::vector<size_t> indices{0, 1, 2};
         list.sort(indices);
