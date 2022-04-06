@@ -100,124 +100,12 @@ void setup_table(T t)
 } // Anonymous namespace
 
 
-TEST(Group_Unattached)
-{
-    Group group((Group::unattached_tag()));
-
-    CHECK(!group.is_attached());
-}
-
-
-TEST(Group_UnattachedErrorHandling)
-{
-    Group group((Group::unattached_tag()));
-
-    CHECK_EQUAL(false, group.is_empty());
-    CHECK_EQUAL(TableKey(), group.find_table("foo"));
-    CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table(TableKey()), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.remove_table(TableKey()), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.rename_table(TableKey(), "bar", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.commit(), LogicError::detached_accessor);
-
-    {
-        const Group& const_group = group;
-        CHECK_LOGIC_ERROR(const_group.get_table(TableKey()), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table("foo"), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table(TableKey()), LogicError::detached_accessor);
-    }
-
-    {
-        bool f = false;
-        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
-    }
-    {
-        std::ostringstream out;
-        size_t link_depth = 0;
-        std::map<std::string, std::string> renames;
-        CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames), LogicError::detached_accessor);
-    }
-}
-
-
-TEST(Group_OpenFile)
-{
-    GROUP_TEST_PATH(path);
-
-    {
-        Group group((Group::unattached_tag()));
-        group.open(path, crypt_key(), Group::mode_ReadWrite);
-        CHECK(group.is_attached());
-    }
-
-    {
-        Group group((Group::unattached_tag()));
-        group.open(path, crypt_key(), Group::mode_ReadWriteNoCreate);
-        CHECK(group.is_attached());
-    }
-
-    {
-        Group group((Group::unattached_tag()));
-        group.open(path, crypt_key(), Group::mode_ReadOnly);
-        CHECK(group.is_attached());
-    }
-}
-
-// Ensure that Group throws when you attempt to attach it twice in a row
-TEST(Group_DoubleOpening)
-{
-    // File-based open()
-    {
-        GROUP_TEST_PATH(path);
-        Group group((Group::unattached_tag()));
-
-        group.open(path, crypt_key(), Group::mode_ReadWrite);
-        CHECK_LOGIC_ERROR(group.open(path, crypt_key(), Group::mode_ReadWrite), LogicError::wrong_group_state);
-    }
-
-    // Buffer-based open()
-    {
-        // Produce a valid buffer
-        std::unique_ptr<char[]> buffer;
-        size_t buffer_size;
-
-        {
-            GROUP_TEST_PATH(path);
-            {
-                Group group;
-                group.write(path);
-            }
-            {
-                File file(path);
-                buffer_size = size_t(file.get_size());
-                buffer.reset(new char[buffer_size]);
-                CHECK(bool(buffer));
-                file.read(buffer.get(), buffer_size);
-            }
-        }
-
-        Group group((Group::unattached_tag()));
-        bool take_ownership = false;
-
-        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
-        CHECK_LOGIC_ERROR(group.open(BinaryData(buffer.get(), buffer_size), take_ownership),
-                          LogicError::wrong_group_state);
-    }
-}
-
 #if REALM_ENABLE_ENCRYPTION
 TEST(Group_OpenUnencryptedFileWithKey)
 {
     GROUP_TEST_PATH(path);
     {
-        Group group(path, nullptr, Group::mode_ReadWrite);
+        Group group;
 
         // We want the file to be exactly three pages in size so that trying to
         // read the footer would use the first non-zero field of the header as
@@ -228,12 +116,14 @@ TEST(Group_OpenUnencryptedFileWithKey)
         table->create_object().set<String>(col, data);
         table->create_object().set<String>(col, data);
 
-        group.commit();
+        group.write(path);
     }
 
     {
-        Group group((Group::unattached_tag()));
-        CHECK_THROW(group.open(path, crypt_key(true), Group::mode_ReadWrite), InvalidDatabase);
+        auto group_open = [&] {
+            Group group(path, crypt_key(true));
+        };
+        CHECK_THROW(group_open(), InvalidDatabase);
     }
 }
 #endif // REALM_ENABLE_ENCRYPTION
@@ -268,11 +158,10 @@ TEST(Group_Permissions)
 #endif
 
     {
-        Group group2((Group::unattached_tag()));
-
-        // Following two lines fail under Windows, fixme
-        CHECK_THROW(group2.open(path, crypt_key(), Group::mode_ReadOnly), File::PermissionDenied);
-        CHECK(!group2.is_attached());
+        auto group_open = [&] {
+            Group group(path, crypt_key());
+        };
+        CHECK_THROW(group_open(), File::PermissionDenied);
     }
 }
 #endif
@@ -280,7 +169,6 @@ TEST(Group_Permissions)
 TEST(Group_BadFile)
 {
     GROUP_TEST_PATH(path_1);
-    GROUP_TEST_PATH(path_2);
 
     {
         File file(path_1, File::mode_Append);
@@ -288,17 +176,12 @@ TEST(Group_BadFile)
     }
 
     {
-        Group group((Group::unattached_tag()));
-        CHECK_THROW(group.open(path_1, crypt_key(), Group::mode_ReadOnly), InvalidDatabase);
-        CHECK(!group.is_attached());
-        CHECK_THROW(group.open(path_1, crypt_key(), Group::mode_ReadOnly), InvalidDatabase); // Again
-        CHECK(!group.is_attached());
-        CHECK_THROW(group.open(path_1, crypt_key(), Group::mode_ReadWrite), InvalidDatabase);
-        CHECK(!group.is_attached());
-        CHECK_THROW(group.open(path_1, crypt_key(), Group::mode_ReadWriteNoCreate), InvalidDatabase);
-        CHECK(!group.is_attached());
-        group.open(path_2, crypt_key(), Group::mode_ReadWrite); // This one must work
-        CHECK(group.is_attached());
+        auto group_open = [&] {
+            Group group(path_1, crypt_key());
+        };
+
+        CHECK_THROW(group_open(), InvalidDatabase);
+        CHECK_THROW(group_open(), InvalidDatabase); // Again
     }
 }
 
@@ -325,47 +208,17 @@ TEST(Group_OpenBuffer)
 
     // Keep ownership of buffer
     {
-        Group group((Group::unattached_tag()));
         bool take_ownership = false;
-        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        Group group(BinaryData(buffer.get(), buffer_size), take_ownership);
         CHECK(group.is_attached());
     }
 
     // Pass ownership of buffer
     {
-        Group group((Group::unattached_tag()));
         bool take_ownership = true;
-        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        Group group(BinaryData(buffer.get(), buffer_size), take_ownership);
         CHECK(group.is_attached());
         buffer.release();
-    }
-}
-
-
-TEST(Group_BadBuffer)
-{
-    GROUP_TEST_PATH(path);
-
-    // Produce an invalid buffer
-    char buffer[32];
-    for (size_t i = 0; i < sizeof buffer; ++i)
-        buffer[i] = char((i + 192) % 128);
-
-    {
-        Group group((Group::unattached_tag()));
-        bool take_ownership = false;
-        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
-        CHECK(!group.is_attached());
-        // Check that ownership is not passed on failure during
-        // open. If it was, we would get a bad delete on stack
-        // allocated memory wich would at least be caught by Valgrind.
-        take_ownership = true;
-        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
-        CHECK(!group.is_attached());
-        // Check that the group is still able to attach to a file,
-        // even after failures.
-        group.open(path, crypt_key(), Group::mode_ReadWrite);
-        CHECK(group.is_attached());
     }
 }
 
@@ -1131,65 +984,6 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL("binary", obj.get<Binary>(cols[4]).data());
 }
 
-TEST(Group_Persist)
-{
-    GROUP_TEST_PATH(path);
-
-    // Create new database
-    Group db(path, crypt_key(), Group::mode_ReadWrite);
-
-    // Insert some data
-    TableRef table = db.add_table("test");
-    table->add_column(type_Int, "int");
-    table->add_column(type_Bool, "bool");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Timestamp, "timestamp");
-    table->create_object(ObjKey(0)).set_all(12, true, "test", BinaryData("binary", 7), Timestamp{111, 222});
-
-    // Write changes to file
-    db.commit();
-
-#ifdef REALM_DEBUG
-    db.verify();
-#endif
-
-    {
-        CHECK_EQUAL(5, table->get_column_count());
-        CHECK_EQUAL(1, table->size());
-        auto cols = table->get_column_keys();
-        Obj obj = table->get_object(ObjKey(0));
-        CHECK_EQUAL(12, obj.get<Int>(cols[0]));
-        CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
-        CHECK_EQUAL("test", obj.get<String>(cols[2]));
-        CHECK_EQUAL(7, obj.get<Binary>(cols[3]).size());
-        CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
-        CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
-
-        // Change a bit
-        obj.set(cols[2], "Changed!");
-
-        // Write changes to file
-        db.commit();
-    }
-
-#ifdef REALM_DEBUG
-    db.verify();
-#endif
-
-    {
-        CHECK_EQUAL(5, table->get_column_count());
-        CHECK_EQUAL(1, table->size());
-        auto cols = table->get_column_keys();
-        Obj obj = table->get_object(ObjKey(0));
-        CHECK_EQUAL(12, obj.get<Int>(cols[0]));
-        CHECK_EQUAL(true, obj.get<Bool>(cols[1]));
-        CHECK_EQUAL("Changed!", obj.get<String>(cols[2]));
-        CHECK_EQUAL(7, obj.get<Binary>(cols[3]).size());
-        CHECK_EQUAL("binary", obj.get<Binary>(cols[3]).data());
-        CHECK(obj.get<Timestamp>(cols[4]) == Timestamp(111, 222));
-    }
-}
 
 TEST(Group_ToJSON)
 {
@@ -1286,73 +1080,9 @@ TEST(Group_IndexString)
     CHECK_EQUAL(k6, m8);
 }
 
-TEST(Group_StockBug)
-{
-    // This test is a regression test - it once triggered a bug.
-    // the bug was fixed in pr 351. In release mode, it crashes
-    // the application. To get an assert in debug mode, the max
-    // list size should be set to 1000.
-    GROUP_TEST_PATH(path);
-    Group group(path, crypt_key(), Group::mode_ReadWrite);
-
-    TableRef table = group.add_table("stocks");
-    auto col = table->add_column(type_String, "ticker");
-
-    for (size_t i = 0; i < 100; ++i) {
-        table->verify();
-        group.verify();
-        table->create_object().set(col, "123456789012345678901234567890123456789");
-        table->verify();
-        group.commit();
-    }
-}
-
-TEST(Group_CommitLinkListChange)
-{
-    GROUP_TEST_PATH(path);
-    Group group(path, crypt_key(), Group::mode_ReadWrite);
-    TableRef origin = group.add_table("origin");
-    TableRef target = group.add_table("target");
-    auto col_link = origin->add_column_list(*target, "links");
-    target->add_column(type_Int, "integers");
-    auto k = target->create_object().get_key();
-    origin->create_object().get_linklist(col_link).add(k);
-    group.commit();
-    group.verify();
-}
-
-TEST(Group_Commit_Update_Integer_Index)
-{
-    // This reproduces a bug where a commit would fail to update the Column::m_search_index pointer
-    // and hence crash or behave erratic for subsequent index operations
-    GROUP_TEST_PATH(path);
-
-    Group g(path, 0, Group::mode_ReadWrite);
-    TableRef t = g.add_table("table");
-    auto col = t->add_column(type_Int, "integer");
-
-    auto k0 = t->create_object().set<Int>(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL).get_key();
-    for (size_t i = 1; i < 200; i++) {
-        t->create_object().set<Int>(col, (i + 1) * 0xeeeeeeeeeeeeeeeeULL);
-    }
-
-    t->add_search_index(col);
-
-    // This would always work
-    CHECK(t->find_first_int(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == k0);
-
-    g.commit();
-
-    // This would fail (sometimes return not_found, sometimes crash)
-    CHECK(t->find_first_int(col, (0 + 1) * 0xeeeeeeeeeeeeeeeeULL) == k0);
-}
-
-
 TEST(Group_CascadeNotify_SimpleWeak)
 {
-    GROUP_TEST_PATH(path);
-
-    Group g(path, 0, Group::mode_ReadWrite);
+    Group g;
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
     TableRef origin = g.add_table("origin");
@@ -1451,9 +1181,7 @@ TEST(Group_CascadeNotify_SimpleWeak)
 
 TEST(Group_CascadeNotify_TableClearWeak)
 {
-    GROUP_TEST_PATH(path);
-
-    Group g(path, 0, Group::mode_ReadWrite);
+    Group g;
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
     TableRef origin = g.add_table("origin");
@@ -1510,9 +1238,7 @@ TEST(Group_CascadeNotify_TableClearWeak)
 
 TEST(Group_CascadeNotify_TableViewClearWeak)
 {
-    GROUP_TEST_PATH(path);
-
-    Group g(path, 0, Group::mode_ReadWrite);
+    Group g;
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
     TableRef origin = g.add_table("origin");
@@ -1574,9 +1300,7 @@ void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int depth)
 
 TEST(Group_CascadeNotify_TreeCascade)
 {
-    GROUP_TEST_PATH(path);
-
-    Group g(path, 0, Group::mode_ReadWrite);
+    Group g;
     TableRef t = g.add_embedded_table("table");
     TableRef parent = g.add_table("parent");
     auto left = t->add_column(*t, "left");
@@ -1642,15 +1366,16 @@ TEST(Group_ChangeEmbeddedness)
 
 TEST(Group_WriteEmpty)
 {
-    GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_1);
     GROUP_TEST_PATH(path_2);
+    auto db = DB::create(path_1);
     {
         Group group;
         group.write(path_2);
     }
     File::remove(path_2);
     {
-        Group group(path_1, 0, Group::mode_ReadWrite);
+        Group group(path_1, 0);
         group.write(path_2);
     }
 }
@@ -1784,11 +1509,11 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
     }
 
     {
-        Group g1(path, crypt_key(), Group::mode_ReadOnly);
+        Group g1(path, crypt_key());
         auto table1 = g1.get_table("table");
         CHECK(table1 && table1->size() == 1);
 
-        Group g2(path, crypt_key(), Group::mode_ReadOnly);
+        Group g2(path, crypt_key());
         auto table2 = g2.get_table("table");
         CHECK(table2 && table2->size() == 1);
     }

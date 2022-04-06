@@ -2485,18 +2485,62 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
     }
 
-    SECTION("too large sync message error handling") {
-        TestSyncManager::Config test_config(app_config);
-        TestSyncManager sync_manager(test_config, {});
+    SECTION("large write transactions which would be too large if batched") {
+        TestSyncManager sync_manager(TestSyncManager::Config{app_config});
         auto app = sync_manager.app();
-        auto creds = create_user_and_log_in(sync_manager.app());
+        create_user_and_log_in(app);
+        SyncTestFile config(app, partition, schema);
+
+        std::mutex mutex;
+        bool done = false;
+        auto r = Realm::get_shared_realm(config);
+        r->sync_session()->close();
+
+        // Create 26 MB worth of dogs in 26 transactions, which should work but
+        // will result in an error from the server if the changesets are batched
+        // for upload.
+        CppContext c;
+        for (auto i = 'a'; i < 'z'; ++i) {
+            r->begin_transaction();
+            Object::create(c, r, "Dog",
+                           util::Any(AnyDict{{"_id", util::Any(ObjectId::gen())},
+                                             {"breed", std::string("bulldog")},
+                                             {"name", random_string(1024 * 1024)}}),
+                           CreatePolicy::ForceCreate);
+            r->commit_transaction();
+        }
+        r->sync_session()->wait_for_upload_completion([&](auto ec) {
+            std::lock_guard lk(mutex);
+            REQUIRE(!ec);
+            done = true;
+        });
+        r->sync_session()->revive_if_needed();
+
+        // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
+        // and we should fail the test.
+        timed_wait_for(
+            [&] {
+                std::lock_guard lk(mutex);
+                return done;
+            },
+            std::chrono::minutes(5));
+    }
+
+    SECTION("too large sync message error handling") {
+        TestSyncManager sync_manager(TestSyncManager::Config{app_config});
+        auto app = sync_manager.app();
+        create_user_and_log_in(app);
         SyncTestFile config(app, partition, schema);
 
         std::mutex sync_error_mutex;
-        std::vector<SyncError> sync_errors;
+        bool done = false;
         config.sync_config->error_handler = [&](auto, SyncError error) {
+            if (error.error_code.category() != util::websocket::websocket_close_status_category())
+                return;
             std::lock_guard<std::mutex> lk(sync_error_mutex);
-            sync_errors.push_back(std::move(error));
+            done = true;
+            REQUIRE(error.error_code.value() == 1009);
+            REQUIRE(error.message == "read limited at 16777217 bytes");
         };
         auto r = Realm::get_shared_realm(config);
 
@@ -2513,28 +2557,14 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
         r->commit_transaction();
 
-        auto pred = [](const SyncError& error) {
-            return error.error_code.category() == util::websocket::websocket_close_status_category();
-        };
         // If we haven't gotten an error in more than 5 minutes, then something has gone wrong
         // and we should fail the test.
         timed_wait_for(
             [&] {
                 std::lock_guard<std::mutex> lk(sync_error_mutex);
-                return std::any_of(sync_errors.begin(), sync_errors.end(), pred);
+                return done;
             },
             std::chrono::minutes(5));
-
-        auto captured_error = [&] {
-            std::lock_guard<std::mutex> lk(sync_error_mutex);
-            const auto it = std::find_if(sync_errors.begin(), sync_errors.end(), pred);
-            REQUIRE(it != sync_errors.end());
-            return *it;
-        }();
-
-        REQUIRE(captured_error.error_code.category() == util::websocket::websocket_close_status_category());
-        REQUIRE(captured_error.error_code.value() == 1009);
-        REQUIRE(captured_error.message == "read limited at 16777217 bytes");
     }
 
     SECTION("validation") {

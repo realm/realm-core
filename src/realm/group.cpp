@@ -62,7 +62,6 @@ Group::Group()
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_is_shared(false)
 {
     init_array_parents();
     m_alloc.attach_empty(); // Throws
@@ -74,18 +73,26 @@ Group::Group()
 }
 
 
-Group::Group(const std::string& file, const char* key, OpenMode mode)
+Group::Group(const std::string& file_path, const char* encryption_key)
     : m_local_alloc(new SlabAlloc) // Throws
     , m_alloc(*m_local_alloc)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_is_shared(false)
     , m_total_rows(0)
 {
     init_array_parents();
 
-    open(file, key, mode); // Throws
+    SlabAlloc::Config cfg;
+    cfg.read_only = true;
+    cfg.no_create = true;
+    cfg.encryption_key = encryption_key;
+    ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
+    // Non-Transaction Groups always allow writing and simply don't allow
+    // committing when opened in read-only mode
+    m_alloc.set_read_only(false);
+
+    open(top_ref, file_path);
 }
 
 
@@ -95,37 +102,17 @@ Group::Group(BinaryData buffer, bool take_ownership)
     , m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_is_shared(false)
     , m_total_rows(0)
 {
-    init_array_parents();
-    open(buffer, take_ownership); // Throws
-}
+    REALM_ASSERT(buffer.data());
 
-Group::Group(unattached_tag) noexcept
-    : m_local_alloc(new SlabAlloc) // Throws
-    , m_alloc(*m_local_alloc)
-    , // Throws
-    m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(false)
-    , m_total_rows(0)
-{
     init_array_parents();
-}
+    ref_type top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size()); // Throws
 
-Group::Group(shared_tag) noexcept
-    : m_local_alloc(new SlabAlloc) // Throws
-    , m_alloc(*m_local_alloc)
-    , // Throws
-    m_top(m_alloc)
-    , m_tables(m_alloc)
-    , m_table_names(m_alloc)
-    , m_is_shared(true)
-    , m_total_rows(0)
-{
-    init_array_parents();
+    open(top_ref, {});
+
+    if (take_ownership)
+        m_alloc.own_buffer();
 }
 
 Group::Group(SlabAlloc* alloc) noexcept
@@ -134,7 +121,6 @@ Group::Group(SlabAlloc* alloc) noexcept
     m_top(m_alloc)
     , m_tables(m_alloc)
     , m_table_names(m_alloc)
-    , m_is_shared(true)
     , m_total_rows(0)
 {
     init_array_parents();
@@ -606,40 +592,6 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     attach(top_ref, writable, create_group_when_missing); // Throws
     dg.release();                                         // Do not detach after all
 }
-
-void Group::open(const std::string& file_path, const char* encryption_key, OpenMode mode)
-{
-    if (is_attached() || m_is_shared)
-        throw LogicError(LogicError::wrong_group_state);
-
-    SlabAlloc::Config cfg;
-    cfg.read_only = mode == mode_ReadOnly;
-    cfg.no_create = mode == mode_ReadWriteNoCreate;
-    cfg.encryption_key = encryption_key;
-    ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
-    // Non-Transaction Groups always allow writing and simply don't allow
-    // committing when opened in read-only mode
-    m_alloc.set_read_only(false);
-
-    open(top_ref, file_path);
-}
-
-
-void Group::open(BinaryData buffer, bool take_ownership)
-{
-    REALM_ASSERT(buffer.data());
-
-    if (is_attached() || m_is_shared)
-        throw LogicError(LogicError::wrong_group_state);
-
-    ref_type top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size()); // Throws
-
-    open(top_ref, {});
-
-    if (take_ownership)
-        m_alloc.own_buffer();
-}
-
 
 Group::~Group() noexcept
 {
@@ -1358,45 +1310,6 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
     footer.m_top_ref = top_ref;
     footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
     out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
-}
-
-
-void Group::commit()
-{
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    if (m_is_shared)
-        throw LogicError(LogicError::wrong_group_state);
-
-    flush_accessors_for_commit();
-    GroupWriter out(*this); // Throws
-
-    // Recursively write all changed arrays to the database file. We
-    // postpone the commit until we are sure that no exceptions can be
-    // thrown.
-    ref_type top_ref = out.write_group(); // Throws
-
-    // Since the group is persisiting in single-thread (unshared)
-    // mode we have to make sure that the group stays valid after
-    // commit
-
-    // Mark all managed space (beyond the attached file) as free.
-    reset_free_space_tracking(); // Throws
-
-    // Update view of the file
-    size_t new_file_size = out.get_file_size();
-    m_alloc.update_reader_view(new_file_size); // Throws
-    update_allocator_wrappers(true);
-
-    out.commit(top_ref); // Throws
-
-    // Recursively update refs in all active tables (columns, arrays..)
-    auto mapping_version = m_alloc.get_mapping_version();
-    if (mapping_version != m_last_seen_mapping_version) {
-        // force re-translation of all refs
-        m_last_seen_mapping_version = mapping_version;
-    }
-    update_refs(top_ref);
 }
 
 

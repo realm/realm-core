@@ -192,7 +192,6 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
     }
 #endif
     Array& top = m_group.m_top;
-    bool is_shared = m_group.m_is_shared;
 
     m_free_positions.set_parent(&top, 3);
     m_free_lengths.set_parent(&top, 4);
@@ -230,41 +229,32 @@ GroupWriter::GroupWriter(Group& group, Durability dura)
         dg.release();
     }
 
-    if (is_shared) {
-        DB::version_type initial_version = 0;
+    DB::version_type initial_version = 0;
 
-        // Expand top array from 5 to 7 elements. Only nonshared Realms are
-        // allowed to have less than 7 elements.
-        if (top.size() < 7) {
-            REALM_ASSERT(top.size() == 5);
-            // m_free_versions
-            top.add(0); // Throws
-            // Transaction number / version
-            top.add(0); // Throws
-        }
-
-        if (ref_type ref = m_free_versions.get_ref_from_parent()) {
-            m_free_versions.init_from_ref(ref);
-            REALM_ASSERT_RELEASE_EX(m_free_versions.size() == m_free_lengths.size(), top.get_ref(),
-                                    m_free_versions.size(), m_free_lengths.size());
-        }
-        else {
-            int_fast64_t value = int_fast64_t(initial_version);
-            top.set(6, 1 + 2 * uint64_t(initial_version)); // Throws
-            size_t n = m_free_positions.size();
-            bool context_flag = false;
-            m_free_versions.create(Array::type_Normal, context_flag, n, value); // Throws
-            _impl::DestroyGuard<Array> dg(&m_free_versions);
-            m_free_versions.update_parent(); // Throws
-            dg.release();
-        }
+    // Expand top array from 5 to 7 elements. Only nonshared Realms are
+    // allowed to have less than 7 elements.
+    if (top.size() < 7) {
+        REALM_ASSERT(top.size() == 5);
+        // m_free_versions
+        top.add(0); // Throws
+        // Transaction number / version
+        top.add(0); // Throws
     }
-    else { // !is_shared
-        // Discard free-space versions and history information.
-        if (top.size() > 5) {
-            REALM_ASSERT(top.size() >= 7);
-            top.truncate_and_destroy_children(5);
-        }
+
+    if (ref_type ref = m_free_versions.get_ref_from_parent()) {
+        m_free_versions.init_from_ref(ref);
+        REALM_ASSERT_RELEASE_EX(m_free_versions.size() == m_free_lengths.size(), top.get_ref(),
+                                m_free_versions.size(), m_free_lengths.size());
+    }
+    else {
+        int_fast64_t value = int_fast64_t(initial_version);
+        top.set(6, 1 + 2 * uint64_t(initial_version)); // Throws
+        size_t n = m_free_positions.size();
+        bool context_flag = false;
+        m_free_versions.create(Array::type_Normal, context_flag, n, value); // Throws
+        _impl::DestroyGuard<Array> dg(&m_free_versions);
+        m_free_versions.update_parent(); // Throws
+        dg.release();
     }
 }
 
@@ -313,7 +303,6 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 ref_type GroupWriter::write_group()
 {
-    bool is_shared = m_group.m_is_shared;
 #if REALM_METRICS
     std::unique_ptr<MetricTimer> fsync_timer = Metrics::report_write_time(m_group);
 #endif // REALM_METRICS
@@ -354,7 +343,6 @@ ref_type GroupWriter::write_group()
     if (top.size() >= 8) {
         REALM_ASSERT(top.size() >= 10);
         // In nonshared mode, history must already have been discarded by GroupWriter constructor.
-        REALM_ASSERT(is_shared);
         if (ref_type history_ref = top.get_as_ref(8)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
@@ -412,7 +400,7 @@ ref_type GroupWriter::write_group()
 
     // If current size is less than 128 MB, the database need not expand above 2 GB
     // which means that the positions and sizes can still be in 32 bit.
-    int size_per_entry = ((top.get(2) >> 1) < 0x8000000 ? 8 : 16) + (is_shared ? 8 : 0);
+    int size_per_entry = ((top.get(2) >> 1) < 0x8000000 ? 8 : 16) + 8;
     size_t max_free_space_needed = Array::get_max_byte_size(top.size()) + size_per_entry * max_free_list_size;
 
 #if REALM_ALLOC_DEBUG
@@ -462,9 +450,9 @@ ref_type GroupWriter::write_group()
     // Get final sizes of free-list arrays
     size_t free_positions_size = m_free_positions.get_byte_size();
     size_t free_sizes_size = m_free_lengths.get_byte_size();
-    size_t free_versions_size = is_shared ? m_free_versions.get_byte_size() : 0;
-    REALM_ASSERT(!is_shared || Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
-                                   Array::wtype_Bits);
+    size_t free_versions_size = m_free_versions.get_byte_size();
+    REALM_ASSERT(Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
+                 Array::wtype_Bits);
 
     // Calculate write positions
     ref_type reserve_ref = to_ref(reserve_pos);
@@ -474,16 +462,10 @@ ref_type GroupWriter::write_group()
     ref_type top_ref = free_versions_ref + free_versions_size;
 
     // Update top to point to the calculated positions
-    int_fast64_t value_5 = from_ref(free_positions_ref);
-    int_fast64_t value_6 = from_ref(free_sizes_ref);
-    top.set(3, value_5); // Throws
-    top.set(4, value_6); // Throws
-    if (is_shared) {
-        int_fast64_t value_7 = from_ref(free_versions_ref);
-        int_fast64_t value_8 = 1 + 2 * int_fast64_t(m_current_version);
-        top.set(5, value_7); // Throws
-        top.set(6, value_8); // Throws
-    }
+    top.set(3, from_ref(free_positions_ref));                // Throws
+    top.set(4, from_ref(free_sizes_ref));                    // Throws
+    top.set(5, from_ref(free_versions_ref));                 // Throws
+    top.set(6, RefOrTagged::make_tagged(m_current_version)); // Throws
 
     // Get final sizes
     size_t top_byte_size = top.get_byte_size();
@@ -516,9 +498,7 @@ ref_type GroupWriter::write_group()
     window->encryption_read_barrier(start_addr, used);
     write_array_at(window, free_positions_ref, m_free_positions.get_header(), free_positions_size); // Throws
     write_array_at(window, free_sizes_ref, m_free_lengths.get_header(), free_sizes_size);           // Throws
-    if (is_shared) {
-        write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size); // Throws
-    }
+    write_array_at(window, free_versions_ref, m_free_versions.get_header(), free_versions_size);    // Throws
 
     // Write top
     write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
@@ -532,24 +512,21 @@ void GroupWriter::read_in_freelist()
 {
     FreeList free_in_file;
 
-    bool is_shared = m_group.m_is_shared;
     size_t limit = m_free_lengths.size();
     REALM_ASSERT_RELEASE_EX(m_free_positions.size() == limit, limit, m_free_positions.size());
-    REALM_ASSERT_RELEASE_EX(!is_shared || m_free_versions.size() == limit, limit, m_free_versions.size());
+    REALM_ASSERT_RELEASE_EX(m_free_versions.size() == limit, limit, m_free_versions.size());
 
     if (limit) {
-        auto limit_version = is_shared ? m_readlock_version : 0;
+        auto limit_version = m_readlock_version;
         for (size_t idx = 0; idx < limit; ++idx) {
             size_t ref = size_t(m_free_positions.get(idx));
             size_t size = size_t(m_free_lengths.get(idx));
 
-            if (is_shared) {
-                uint64_t version = m_free_versions.get(idx);
-                // Entries that are freed in still alive versions are not candidates for merge or allocation
-                if (version >= limit_version) {
-                    m_not_free_in_file.emplace_back(ref, size, version);
-                    continue;
-                }
+            uint64_t version = m_free_versions.get(idx);
+            // Entries that are freed in still alive versions are not candidates for merge or allocation
+            if (version >= limit_version) {
+                m_not_free_in_file.emplace_back(ref, size, version);
+                continue;
             }
 
             free_in_file.emplace_back(ref, size, 0);
@@ -558,8 +535,7 @@ void GroupWriter::read_in_freelist()
         // This will imply a copy-on-write
         m_free_positions.clear();
         m_free_lengths.clear();
-        if (is_shared)
-            m_free_versions.clear();
+        m_free_versions.clear();
     }
     else {
         // We need to free the space occupied by the free lists
@@ -567,8 +543,7 @@ void GroupWriter::read_in_freelist()
         // as clear would not copy-on-write an empty array.
         m_free_positions.copy_on_write();
         m_free_lengths.copy_on_write();
-        if (is_shared)
-            m_free_versions.copy_on_write();
+        m_free_versions.copy_on_write();
     }
 
     free_in_file.merge_adjacent_entries_in_freelist();
@@ -585,7 +560,6 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
     free_in_file.reserve(nb_elements);
 
     size_t reserve_ndx = realm::npos;
-    bool is_shared = m_group.m_is_shared;
 
     for (const auto& entry : m_size_map) {
         free_in_file.emplace_back(entry.second, entry.first, 0);
@@ -593,7 +567,6 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
 
     {
         size_t locked_space_size = 0;
-        REALM_ASSERT_RELEASE(m_not_free_in_file.empty() || is_shared);
         for (const auto& locked : m_not_free_in_file) {
             free_in_file.emplace_back(locked.ref, locked.size, locked.released_at_version);
             locked_space_size += locked.size;
@@ -648,8 +621,7 @@ size_t GroupWriter::recreate_freelist(size_t reserve_pos)
             }
             m_free_positions.add(free_space.ref);
             m_free_lengths.add(free_space.size);
-            if (is_shared)
-                m_free_versions.add(free_space.released_at_version);
+            m_free_versions.add(free_space.released_at_version);
             prev_ref = free_space.ref;
             prev_size = free_space.size;
         }
@@ -961,21 +933,12 @@ void GroupWriter::commit(ref_type new_top_ref)
 
 void GroupWriter::dump()
 {
-    bool is_shared = m_group.m_is_shared;
-
     size_t count = m_free_lengths.size();
     std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
               << "version >= " << m_readlock_version << "\n";
-    if (!is_shared) {
-        for (size_t i = 0; i < count; ++i) {
-            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << "\n";
-        }
-    }
-    else {
-        for (size_t i = 0; i < count; ++i) {
-            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << " - "
-                      << m_free_versions.get(i) << "\n";
-        }
+    for (size_t i = 0; i < count; ++i) {
+        std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << " - "
+                  << m_free_versions.get(i) << "\n";
     }
 }
 

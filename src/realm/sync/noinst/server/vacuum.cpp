@@ -200,7 +200,7 @@ struct SyncServerVacuumFile : Vacuum::VacuumFile, _impl::ServerHistory::DummyCom
 Replication::HistoryType detect_history_type(const std::string& file, const char* encryption_key)
 {
     // Open in read-only mode to detect the history type.
-    Group group{file, encryption_key, Group::OpenMode::mode_ReadOnly};
+    Group group{file, encryption_key};
     ref_type top_ref = GroupFriend::get_top_ref(group);
     if (top_ref == 0)
         return Replication::hist_None;
