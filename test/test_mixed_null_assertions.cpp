@@ -120,19 +120,16 @@ TEST(Mixed_List_unresolved_as_null)
     }
 
     {
-        // find null or unresolved link must work the same way
+        // find null or find unresolved link diverge, different objects should be returned
         auto index = list.find_any(realm::null());
         CHECK(index == 0);
         index = list.find_first(obj1);
-        CHECK(index == 0);
-    }
-
-    {
-        // is null for unresolved links and null must behave the same way
+        CHECK(index == 2);
+        //but both should look like nulls
         CHECK(list.is_null(0));
         CHECK(list.is_null(2));
     }
-
+    
     {
         std::vector<size_t> indices{0, 1, 2};
         list.sort(indices);
@@ -158,7 +155,7 @@ TEST(Mixed_List_unresolved_as_null)
 
     {
         list.remove(0);
-        CHECK(list.find_any(realm::null()) == 1);
+        CHECK(list.find_any(obj1) == 1);
         list.remove(1);
         CHECK(list.find_any(realm::null()) == npos);
         CHECK(list.size() == 1);
@@ -276,8 +273,7 @@ TEST(Mixed_Set_unresolved_as_null)
         CHECK(set.size() == 3);
         obj6.invalidate();
         // remove only the first null
-        using erase_one = Set<Mixed>::MixedNullLink::One;
-        set.erase<erase_one>(Mixed{});
+        set.erase<Set<Mixed>::MixedNullLink::EraseOne>(Mixed{});
         CHECK(set.size() == 2);
     }
 }
