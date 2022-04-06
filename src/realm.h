@@ -2587,7 +2587,9 @@ RLM_API void realm_app_config_set_platform_version(realm_app_config_t*, const ch
 RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) RLM_API_NOEXCEPT;
 /**
  * Get an existing @a realm_app_credentials_t and return it's json representation
- * @return: a non-null ptr to the string representing the json configuration
+ * Note: the caller must delete the pointer to the string via realm_release
+ *
+ * @return: a non-null ptr to the string representing the json configuration.
  */
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t*) RLM_API_NOEXCEPT;
 
