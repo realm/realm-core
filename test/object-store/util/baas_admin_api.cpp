@@ -80,7 +80,9 @@ public:
 
     nlohmann::json property_to_jsonschema(const Property& prop);
     nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema, bool clear_path = false);
-    nlohmann::json object_schema_to_baas_rule(const ObjectSchema& obj_schema);
+    nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema);
+
+    static nlohmann::json generic_baas_rule(const std::string& db_name, const std::string& schema_name);
 
 private:
     const Schema& m_schema;
@@ -174,7 +176,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
     return type_output;
 }
 
-nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& obj_schema)
+nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema& obj_schema)
 {
     auto schema_json = object_schema_to_jsonschema(obj_schema, true);
     schema_json.emplace("title", obj_schema.name);
@@ -187,10 +189,19 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_rule(const ObjectSchema& o
     }
     std::string test = schema_json.dump();
     return {
-        {"database", m_mongo_db_name},
-        {"collection", obj_schema.name},
-        {"relationships", m_relationships},
         {"schema", schema_json},
+        {"metadata", nlohmann::json::object({{"database", m_mongo_db_name},
+                                             {"collection", obj_schema.name},
+                                             {"data_source", m_mongo_service_name}})},
+        {"relationships", m_relationships},
+    };
+}
+
+nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& db_name, const std::string& schema_name)
+{
+    return {
+        {"database", db_name},
+        {"collection", schema_name},
         {"roles", nlohmann::json::array({{{"name", "default"},
                                           {"apply_when", nlohmann::json::object()},
                                           {"insert", true},
@@ -839,6 +850,7 @@ AppSession create_app(const AppCreateConfig& config)
         {"type", "mongodb"},
         {"config", {{"uri", config.mongo_uri}}},
     };
+    nlohmann::json sync_config;
     if (config.flx_sync_config) {
         auto queryable_fields = nlohmann::json::array();
         const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
@@ -854,8 +866,7 @@ AppSession create_app(const AppCreateConfig& config)
                    {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}})}}}};
     }
     else {
-        mongo_service_def["config"]["sync"] = nlohmann::json{
-            {"state", "enabled"},
+        sync_config = nlohmann::json{
             {"database_name", config.mongo_dbname},
             {"partition",
              {
@@ -869,11 +880,13 @@ AppSession create_app(const AppCreateConfig& config)
                   }},
              }},
         };
+        mongo_service_def["config"]["sync"] = sync_config;
     }
 
     auto create_mongo_service_resp = services.post_json(std::move(mongo_service_def));
     std::string mongo_service_id = create_mongo_service_resp["_id"];
     auto rules = services[mongo_service_id]["rules"];
+    auto schemas = app["schemas"];
 
     std::unordered_map<std::string, std::string> obj_schema_name_to_id;
     for (const auto& obj_schema : config.schema) {
@@ -885,10 +898,12 @@ AppSession create_app(const AppCreateConfig& config)
                                      [&](const Property& prop) {
                                          return prop.name == "_id" || prop.name == config.partition_key.name;
                                      });
-        auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
+        auto schema_create_resp = schemas.post_json(schema_to_create);
+        obj_schema_name_to_id.insert({obj_schema.name, schema_create_resp["_id"]});
 
+        schema_to_create = BaasRuleBuilder::generic_baas_rule(config.mongo_dbname, obj_schema.name);
         auto rule_create_resp = rules.post_json(schema_to_create);
-        obj_schema_name_to_id.insert({obj_schema.name, rule_create_resp["_id"]});
     }
 
     for (const auto& obj_schema : config.schema) {
@@ -896,14 +911,21 @@ AppSession create_app(const AppCreateConfig& config)
             continue;
         }
 
-        auto rule_id = obj_schema_name_to_id.find(obj_schema.name);
-        REALM_ASSERT(rule_id != obj_schema_name_to_id.end());
+        auto schema_id = obj_schema_name_to_id.find(obj_schema.name);
+        REALM_ASSERT(schema_id != obj_schema_name_to_id.end());
         BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
                                      include_all_props);
-        auto schema_to_create = rule_builder.object_schema_to_baas_rule(obj_schema);
-        schema_to_create["_id"] = rule_id->second;
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
+        schema_to_create["_id"] = schema_id->second;
+        schemas[schema_id->second].put_json(schema_to_create);
+    }
 
-        rules[rule_id->second].put_json(schema_to_create);
+    // For PBS, enable sync after schema is created.
+    if (!config.flx_sync_config) {
+        AdminAPISession::ServiceConfig service_config;
+        service_config.database_name = sync_config["database_name"];
+        service_config.partition = sync_config["partition"];
+        session.enable_sync(app_id, mongo_service_id, service_config);
     }
 
     app["sync"]["config"].put_json({{"development_mode_enabled", config.dev_mode_enabled}});
@@ -919,8 +941,6 @@ AppSession create_app(const AppCreateConfig& config)
              {"delete", true},
              {"additional_fields", nlohmann::json::object()},
          }}},
-        {"schema", nlohmann::json::object()},
-        {"relationships", nlohmann::json::object()},
     });
 
     app["custom_user_data"].patch_json({

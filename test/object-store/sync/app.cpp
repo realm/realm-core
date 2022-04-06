@@ -1989,18 +1989,22 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
-        timed_wait_for([&] {
-            return called.load();
-        });
+        timed_wait_for(
+            [&] {
+                return called.load();
+            },
+            std::chrono::milliseconds(10000));
         REQUIRE(called);
         called.store(false);
         session->wait_for_download_completion([&](std::error_code err) {
             REQUIRE(err == std::error_code{});
             called.store(true);
         });
-        timed_wait_for([&] {
-            return called.load();
-        });
+        timed_wait_for(
+            [&] {
+                return called.load();
+            },
+            std::chrono::milliseconds(10000));
         return Results(r, r->read_group().get_table("class_Dog"));
     };
 
@@ -3954,65 +3958,64 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
          Get profile - get the profile with the new token
          */
 
-            struct transport : GenericNetworkTransport {
-                bool login_hit = false;
-                bool get_profile_1_hit = false;
-                bool get_profile_2_hit = false;
-                bool refresh_hit = false;
+        struct transport : GenericNetworkTransport {
+            bool login_hit = false;
+            bool get_profile_1_hit = false;
+            bool get_profile_2_hit = false;
+            bool refresh_hit = false;
 
-                void send_request_to_server(Request&& request,
-                                            util::UniqueFunction<void(const Response&)>&& completion_block) override
-                {
-                    if (request.url.find("/login") != std::string::npos) {
-                        login_hit = true;
-                        completion_block({200, 0, {}, user_json(good_access_token).dump()});
-                    }
-                    else if (request.url.find("/profile") != std::string::npos) {
-                        CHECK(login_hit);
+            void send_request_to_server(Request&& request,
+                                        util::UniqueFunction<void(const Response&)>&& completion_block) override
+            {
+                if (request.url.find("/login") != std::string::npos) {
+                    login_hit = true;
+                    completion_block({200, 0, {}, user_json(good_access_token).dump()});
+                }
+                else if (request.url.find("/profile") != std::string::npos) {
+                    CHECK(login_hit);
 
-                        auto access_token = request.headers.at("Authorization");
-                        // simulated bad token request
-                        if (access_token.find(good_access_token2) != std::string::npos) {
-                            CHECK(login_hit);
-                            CHECK(get_profile_1_hit);
-                            CHECK(refresh_hit);
-
-                            get_profile_2_hit = true;
-
-                            completion_block({200, 0, {}, user_profile_json().dump()});
-                        }
-                        else if (access_token.find(good_access_token) != std::string::npos) {
-                            CHECK(!get_profile_2_hit);
-                            get_profile_1_hit = true;
-
-                            completion_block({401, 0, {}});
-                        }
-                    }
-                    else if (request.url.find("/session") != std::string::npos &&
-                             request.method == HttpMethod::post) {
+                    auto access_token = request.headers.at("Authorization");
+                    // simulated bad token request
+                    if (access_token.find(good_access_token2) != std::string::npos) {
                         CHECK(login_hit);
                         CHECK(get_profile_1_hit);
-                        CHECK(!get_profile_2_hit);
-                        refresh_hit = true;
+                        CHECK(refresh_hit);
 
-                        nlohmann::json json{{"access_token", good_access_token2}};
-                        completion_block({200, 0, {}, json.dump()});
+                        get_profile_2_hit = true;
+
+                        completion_block({200, 0, {}, user_profile_json().dump()});
                     }
-                    else if (request.url.find("/location") != std::string::npos) {
-                        CHECK(request.method == HttpMethod::get);
-                        completion_block({200,
-                                          0,
-                                          {},
-                                          "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
-                                          "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
+                    else if (access_token.find(good_access_token) != std::string::npos) {
+                        CHECK(!get_profile_2_hit);
+                        get_profile_1_hit = true;
+
+                        completion_block({401, 0, {}});
                     }
                 }
-            };
+                else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+                    CHECK(login_hit);
+                    CHECK(get_profile_1_hit);
+                    CHECK(!get_profile_2_hit);
+                    refresh_hit = true;
 
-            TestSyncManager sync_manager(get_config(instance_of<transport>));
-            auto app = sync_manager.app();
-            setup_user(app);
-            REQUIRE(log_in(app));
+                    nlohmann::json json{{"access_token", good_access_token2}};
+                    completion_block({200, 0, {}, json.dump()});
+                }
+                else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::get);
+                    completion_block({200,
+                                      0,
+                                      {},
+                                      "{\"deployment_model\":\"GLOBAL\",\"location\":\"US-VA\",\"hostname\":"
+                                      "\"http://localhost:9090\",\"ws_hostname\":\"ws://localhost:9090\"}"});
+                }
+            }
+        };
+
+        TestSyncManager sync_manager(get_config(instance_of<transport>));
+        auto app = sync_manager.app();
+        setup_user(app);
+        REQUIRE(log_in(app));
     }
 }
 
