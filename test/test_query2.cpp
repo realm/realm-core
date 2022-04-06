@@ -4477,8 +4477,8 @@ TEST(Query_ColumnDeletionSimple)
     foo.remove_column(col_int0);
 
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q1.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q1.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv1.size(), 0);
 
@@ -4489,8 +4489,8 @@ TEST(Query_ColumnDeletionSimple)
     CHECK_EQUAL(tv2.size(), 2);
 
     x = 0;
-    CHECK_LOGIC_ERROR(x = q3.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q3.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv3.size(), 0);
 }
@@ -4540,9 +4540,9 @@ TEST(Query_ColumnDeletionExpression)
 
     foo.remove_column(col_int0);
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(x = q.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv.size(), 0);
 
@@ -4554,8 +4554,8 @@ TEST(Query_ColumnDeletionExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv1.size(), 1);
     foo.remove_column(col_date3);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // StringNodeBase
     q = foo.column<String>(col_str4) == StringData("Hello, world");
@@ -4565,22 +4565,22 @@ TEST(Query_ColumnDeletionExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv1.size(), 4);
     foo.remove_column(col_str4);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // FloatDoubleNode
     q = foo.column<Float>(col_float5) > 0.0f;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
     foo.remove_column(col_float5);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
 
     // BinaryNode
     q = foo.column<Binary>(col_bin6) != BinaryData("Binary", 6);
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 4);
     foo.remove_column(col_bin6);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
 }
 
 
@@ -4628,12 +4628,12 @@ TEST(Query_ColumnDeletionLinks)
     CHECK_EQUAL(tv.size(), 1);
     // remove link column, disaster
     bar->remove_column(col_link0);
-    CHECK_LOGIC_ERROR(bar->check_column(col_link0), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(bar->check_column(col_link0), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), ErrorCodes::InvalidProperty);
     foo->remove_column(col_link1);
-    CHECK_LOGIC_ERROR(foo->check_column(col_link1), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(foo->check_column(col_link1), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(q1.count(), ErrorCodes::InvalidProperty);
+    CHECK_LOGIC_ERROR(q2.count(), ErrorCodes::InvalidProperty);
 }
 
 

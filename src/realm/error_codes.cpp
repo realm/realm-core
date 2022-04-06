@@ -21,6 +21,16 @@
 
 namespace realm {
 
+ErrorCategory ErrorCodes::error_categories(Error code)
+{
+    switch (code) {
+    case RuntimeError:
+        return ErrorCategory().set(ErrorCategory::runtime_error);
+    default:
+        break;
+    }
+    return {};
+}
 
 std::string_view ErrorCodes::error_string(Error code)
 {

@@ -263,7 +263,7 @@ TEST(StringIndex_NonIndexable)
     table->add_column(type_Binary, "binary");
 
     for (auto col : table->get_column_keys()) {
-        CHECK_LOGIC_ERROR(table->add_search_index(col), LogicError::illegal_combination);
+        CHECK_LOGIC_ERROR(table->add_search_index(col), ErrorCodes::IllegalOperation);
     }
 }
 

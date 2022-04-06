@@ -232,8 +232,8 @@ TEST(Links_SetLinkLogicErrors)
     target->create_object(ObjKey(10));
 
     // FIXME: Not really possible with column keys?
-    // CHECK_LOGIC_ERROR(obj.set(2, Key(10)), LogicError::column_index_out_of_range);
-    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(5)), LogicError::target_row_index_out_of_range);
+    // CHECK_LOGIC_ERROR(obj.set(2, Key(10)), ErrorCodes::KeyNotFound);
+    CHECK_LOGIC_ERROR(obj.set(col0, ObjKey(5)), ErrorCodes::KeyNotFound);
 
     // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does
     // not properly check it yet.

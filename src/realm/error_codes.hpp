@@ -76,8 +76,8 @@ public:
     enum Error : std::int32_t {
         OK = 0,
         UnknownError = 1,
-        RangeError = 2,
-        TypeMismatch = 3,
+        RuntimeError = 2,
+        LogicError = 3,
         BrokenPromise = 4,
         InvalidName = 5,
         OutOfMemory = 6,
@@ -121,6 +121,8 @@ public:
         IncompatibleSession = 44,
         BrokenInvariant = 45,
         SubscriptionFailed = 46,
+        RangeError = 47,
+        TypeMismatch = 48,
         MaxError
     };
 

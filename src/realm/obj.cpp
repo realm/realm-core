@@ -1435,7 +1435,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     if (target_key) {
         ClusterTree* ct = target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
         if (!ct->is_valid(target_key)) {
-            InvalidArgument(ErrorCodes::InvalidProperty, "Invalid object key");
+            InvalidArgument(ErrorCodes::KeyNotFound, "Invalid object key");
         }
         if (target_table->is_embedded()) {
             throw IllegalOperation(

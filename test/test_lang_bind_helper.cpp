@@ -5274,7 +5274,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history();
-        CHECK_LOGIC_ERROR(DB::create(*hist, path, DBOptions(crypt_key())), LogicError::mixed_history_type);
+        CHECK_LOGIC_ERROR(DB::create(*hist, path, DBOptions(crypt_key())), ErrorCodes::IncompatibleSession);
     }
 }
 
