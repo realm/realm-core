@@ -103,7 +103,7 @@ TEST(ClientReset_NoLocalChanges)
         // The session that receives an error.
         {
             BowlOfStonesSemaphore bowl;
-            auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+            auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
@@ -552,7 +552,7 @@ TEST(ClientReset_ThreeClients)
         // The clients get session errors.
         {
             BowlOfStonesSemaphore bowl;
-            auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+            auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error_info);
@@ -725,14 +725,15 @@ TEST(ClientReset_DoNotRecoverSchema)
         }
         Session session = fixture.make_session(path_1, std::move(session_config));
         BowlOfStonesSemaphore bowl;
-        session.set_connection_state_change_listener([&](ConnectionState state, const ErrorInfo* error_info) {
-            if (state != ConnectionState::disconnected)
-                return;
-            REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            CHECK_EQUAL(ec, sync::Client::Error::auto_client_reset_failure);
-            bowl.add_stone();
-        });
+        session.set_connection_state_change_listener(
+            [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+                if (state != ConnectionState::disconnected)
+                    return;
+                REALM_ASSERT(error_info);
+                std::error_code ec = error_info->error_code;
+                CHECK_EQUAL(ec, sync::Client::Error::auto_client_reset_failure);
+                bowl.add_stone();
+            });
         fixture.bind_session(session, server_path_2);
         bowl.get_stone();
     }

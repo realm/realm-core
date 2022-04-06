@@ -22,6 +22,8 @@
 #include <realm/sync/protocol.hpp>
 #include <realm/sync/transform.hpp>
 
+#include <external/json/json.hpp>
+
 namespace realm::_impl {
 struct ProtocolCodecException : public std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -254,7 +256,28 @@ public:
 
                 auto message = msg.read_sized_data<StringData>(message_size);
 
-                connection.receive_error_message(error_code, message, try_again, session_ident); // Throws
+                connection.receive_error_message(error_code, sync::ProtocolErrorInfo{message, try_again},
+                                                 session_ident); // Throws
+            }
+            else if (message_type == "json_error") { // introduced in protocol 4
+                sync::ProtocolErrorInfo info{};
+                int error_code = msg.read_next<int>();
+                auto message_size = msg.read_next<size_t>();
+                auto session_ident = msg.read_next<session_ident_type>('\n');
+                auto json_raw = msg.read_sized_data<std::string_view>(message_size);
+                try {
+                    auto json = nlohmann::json::parse(json_raw);
+                    info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
+                    info.try_again = json["tryAgain"];
+                    info.message = util::format("%1 Logs: %2", json["message"], json["logURL"]);
+                }
+                catch (const std::exception& e) {
+                    // If any of the above json fields are not present, this is a fatal error
+                    // however, additional optional fields may be added in the future.
+                    return report_error(Error::bad_syntax, "Failed to parse 'json_error' with error_code %1: '%2'",
+                                        error_code, e.what());
+                }
+                connection.receive_error_message(error_code, info, session_ident); // Throws
             }
             else if (message_type == "query_error") {
                 auto error_code = msg.read_next<int>();

@@ -22,12 +22,15 @@ namespace sync {
 //
 //   3 Support for Mixed, TypeLinks, Set, and Dictionary columns.
 //
+//   4 Error messaging format accepts a flexible JSON field in 'json_error'.
+//     JSONErrorMessage.IsClientReset controls recovery mode.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 3;
+    return 4;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
@@ -185,6 +188,23 @@ struct SyncProgress {
     UploadCursor upload = {0, 0};
 };
 
+struct ProtocolErrorInfo {
+    ProtocolErrorInfo() = default;
+    ProtocolErrorInfo(const std::string& msg, bool do_try_again)
+        : message(msg)
+        , try_again(do_try_again)
+        , client_reset_recovery_is_disabled(false)
+    {
+    }
+    std::string message;
+    bool try_again = false;
+    bool client_reset_recovery_is_disabled = false;
+
+    bool is_fatal() const
+    {
+        return !try_again;
+    }
+};
 
 /// \brief Protocol errors discovered by the server, and reported to the client
 /// by way of ERROR messages.

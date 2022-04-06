@@ -307,9 +307,9 @@ private:
     void on_sync_progress();
     void on_upload_completion();
     void on_download_completion();
-    void on_suspended(std::error_code ec, StringData message, bool is_fatal);
+    void on_suspended(const SessionErrorInfo& error_info);
     void on_resumed();
-    void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
+    void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
     void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
 
@@ -627,7 +627,8 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 // ################ SessionImpl ################
 
 
-inline void SessionImpl::on_connection_state_changed(ConnectionState state, const SessionErrorInfo* error_info)
+inline void SessionImpl::on_connection_state_changed(ConnectionState state,
+                                                     const util::Optional<SessionErrorInfo>& error_info)
 {
     m_wrapper.on_connection_state_changed(state, error_info); // Throws
 }
@@ -704,9 +705,9 @@ void SessionImpl::on_download_completion()
 }
 
 
-void SessionImpl::on_suspended(std::error_code ec, StringData message, bool is_fatal)
+void SessionImpl::on_suspended(const SessionErrorInfo& error_info)
 {
-    m_wrapper.on_suspended(ec, message, is_fatal); // Throws
+    m_wrapper.on_suspended(error_info); // Throws
 }
 
 
@@ -1123,9 +1124,9 @@ void SessionWrapper::actualize(ServerEndpoint endpoint)
     if (m_connection_state_change_listener) {
         ConnectionState state = conn.get_state();
         if (state != ConnectionState::disconnected) {
-            m_connection_state_change_listener(ConnectionState::connecting, nullptr); // Throws
+            m_connection_state_change_listener(ConnectionState::connecting, util::none); // Throws
             if (state == ConnectionState::connected)
-                m_connection_state_change_listener(ConnectionState::connected, nullptr); // Throws
+                m_connection_state_change_listener(ConnectionState::connected, util::none); // Throws
         }
     }
 
@@ -1245,16 +1246,13 @@ void SessionWrapper::on_download_completion()
 }
 
 
-void SessionWrapper::on_suspended(std::error_code ec, StringData message, bool is_fatal)
+void SessionWrapper::on_suspended(const SessionErrorInfo& error_info)
 {
     m_suspended = true;
     if (m_connection_state_change_listener) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {
-            std::string message_2{message}; // Throws (copy)
-            ConnectionState state = ConnectionState::disconnected;
-            SessionErrorInfo error_info{ec, is_fatal, message_2};
-            m_connection_state_change_listener(state, &error_info); // Throws
+            m_connection_state_change_listener(ConnectionState::disconnected, error_info); // Throws
         }
     }
 }
@@ -1266,15 +1264,16 @@ void SessionWrapper::on_resumed()
     if (m_connection_state_change_listener) {
         ClientImpl::Connection& conn = m_sess->get_connection();
         if (conn.get_state() != ConnectionState::disconnected) {
-            m_connection_state_change_listener(ConnectionState::connecting, nullptr); // Throws
+            m_connection_state_change_listener(ConnectionState::connecting, util::none); // Throws
             if (conn.get_state() == ConnectionState::connected)
-                m_connection_state_change_listener(ConnectionState::connected, nullptr); // Throws
+                m_connection_state_change_listener(ConnectionState::connected, util::none); // Throws
         }
     }
 }
 
 
-void SessionWrapper::on_connection_state_changed(ConnectionState state, const SessionErrorInfo* error_info)
+void SessionWrapper::on_connection_state_changed(ConnectionState state,
+                                                 const util::Optional<SessionErrorInfo>& error_info)
 {
     if (state == ConnectionState::connected && m_sess) {
         ClientImpl::Connection& conn = m_sess->get_connection();
@@ -1420,7 +1419,8 @@ std::string ClientImpl::Connection::make_logger_prefix(connection_ident_type ide
 }
 
 
-void ClientImpl::Connection::report_connection_state_change(ConnectionState state, const SessionErrorInfo* error_info)
+void ClientImpl::Connection::report_connection_state_change(ConnectionState state,
+                                                            util::Optional<SessionErrorInfo> error_info)
 {
     auto handler = [=](ClientImpl::Session& sess) {
         SessionImpl& sess_2 = static_cast<SessionImpl&>(sess);

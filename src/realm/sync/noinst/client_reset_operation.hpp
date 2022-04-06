@@ -34,7 +34,7 @@ public:
     using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID, bool)>;
 
     ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
-                         CallbackBeforeType notify_before, CallbackAfterType notify_after);
+                         CallbackBeforeType notify_before, CallbackAfterType notify_after, bool recovery_is_allowed);
 
     // When the client has received the salted file ident from the server, it
     // should deliver the ident to the ClientResetOperation object. The ident
@@ -58,6 +58,7 @@ private:
     realm::VersionID m_client_reset_new_version;
     CallbackBeforeType m_notify_before;
     CallbackAfterType m_notify_after;
+    bool m_recovery_is_allowed;
 };
 
 // Implementation

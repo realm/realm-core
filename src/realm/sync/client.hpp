@@ -459,7 +459,7 @@ public:
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
 
 
-    using ConnectionStateChangeListener = void(ConnectionState, const SessionErrorInfo*);
+    using ConnectionStateChangeListener = void(ConnectionState, const util::Optional<SessionErrorInfo>);
 
     /// \brief Install a connection state change listener.
     ///
@@ -498,7 +498,7 @@ public:
 
     //@{
     /// Deprecated! Use set_connection_state_change_listener() instead.
-    using ErrorHandler = void(std::error_code, bool is_fatal, const std::string& detailed_message);
+    using ErrorHandler = void(const SessionErrorInfo&);
     void set_error_handler(util::UniqueFunction<ErrorHandler>);
     //@}
 
@@ -761,14 +761,12 @@ inline void Session::detach() noexcept
 
 inline void Session::set_error_handler(util::UniqueFunction<ErrorHandler> handler)
 {
-    auto handler_2 = [handler = std::move(handler)](ConnectionState state, const SessionErrorInfo* error_info) {
+    auto handler_2 = [handler = std::move(handler)](ConnectionState state,
+                                                    const util::Optional<SessionErrorInfo>& error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
-        std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal;
-        const std::string& detailed_message = error_info->detailed_message;
-        handler(ec, is_fatal, detailed_message); // Throws
+        handler(*error_info); // Throws
     };
     set_connection_state_change_listener(std::move(handler_2)); // Throws
 }

@@ -1498,8 +1498,65 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 std::chrono::seconds(120));
             REQUIRE(!err);
         }
-
     } // end cycle detection
+    SECTION("The server can prohibit recovery") {
+        auto sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+        auto sync_config = app_session.admin_api.get_config(app_session.server_app_id, sync_service);
+        REQUIRE(!sync_config.recovery_is_disabled);
+        constexpr bool recovery_is_disabled = true;
+        app_session.admin_api.set_disable_recovery_to(app_session.server_app_id, sync_service.id, sync_config,
+                                                      recovery_is_disabled);
+        sync_config = app_session.admin_api.get_config(app_session.server_app_id, sync_service);
+        REQUIRE(sync_config.recovery_is_disabled);
+
+        SECTION("In Recover mode, a manual client reset is triggered") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            ThreadSafeSyncError err;
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                err = error;
+            };
+            make_reset(local_config, remote_config)
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
+                    });
+                })
+                ->run();
+            REQUIRE(err);
+            SyncError error = *err.value();
+            REQUIRE(error.is_client_reset_requested());
+            REQUIRE(error.user_info.size() >= 2);
+            REQUIRE(error.user_info.count(SyncError::c_original_file_path_key) == 1);
+            REQUIRE(error.user_info.count(SyncError::c_recovery_file_path_key) == 1);
+        }
+        SECTION("In RecoverOrDiscard mode, DiscardLocal is selected") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+            constexpr int64_t new_value = 123456;
+            make_reset(local_config, remote_config)
+                ->make_local_changes([&](SharedRealm local) {
+                    auto table = get_table(*local, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    auto obj = create_object(*local, "object", partition);
+                    auto col = obj.get_table()->get_column_key("value");
+                    REQUIRE(table->size() == 2);
+                    obj.set(col, new_value);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 2);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1); // insert was discarded
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 6);
+                    CHECK(object.is_valid());
+                    CHECK(object.obj().get<Int>("value") == 6);
+                })
+                ->run();
+        }
+    } // end: The server can prohibit recovery
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

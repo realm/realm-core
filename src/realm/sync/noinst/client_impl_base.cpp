@@ -413,7 +413,8 @@ bool Connection::websocket_close_message_received(std::error_code error_code, St
     if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
         error_code.value() != 1000) {
         m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-        involuntary_disconnect(error_code, false, &message);
+        constexpr bool try_again = true;
+        involuntary_disconnect(SessionErrorInfo{error_code, message, try_again});
     }
 
     return bool(m_websocket);
@@ -602,7 +603,7 @@ void Connection::initiate_reconnect()
     REALM_ASSERT(m_activated);
 
     m_state = ConnectionState::connecting;
-    report_connection_state_change(ConnectionState::connecting, nullptr); // Throws
+    report_connection_state_change(ConnectionState::connecting); // Throws
     m_websocket.reset();
 
     // In most cases, the reconnect delay will be counting from the point in
@@ -690,10 +691,8 @@ void Connection::handle_connect_wait(std::error_code ec)
     REALM_ASSERT(m_state == ConnectionState::connecting);
     m_reconnect_info.m_reason = ConnectionTerminationReason::sync_connect_timeout;
     logger.info("Connect timeout"); // Throws
-    std::error_code ec_2 = ClientError::connect_timeout;
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec_2, is_fatal, custom_message); // Throws
+    constexpr bool try_again = true;
+    involuntary_disconnect(SessionErrorInfo{ClientError::connect_timeout, try_again}); // Throws
 }
 
 
@@ -720,7 +719,7 @@ void Connection::handle_connection_established()
         sess.connection_established(fast_reconnect); // Throws
     }
 
-    report_connection_state_change(ConnectionState::connected, nullptr); // Throws
+    report_connection_state_change(ConnectionState::connected); // Throws
 }
 
 
@@ -980,9 +979,8 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 void Connection::websocket_connect_error_handler(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec, is_fatal, custom_message); // Throws
+    constexpr bool try_again = true;
+    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
 }
 
 void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
@@ -1037,16 +1035,16 @@ void Connection::close_due_to_missing_protocol_feature()
 void Connection::close_due_to_client_side_error(std::error_code ec, bool is_fatal)
 {
     logger.info("Connection closed due to error"); // Throws
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec, is_fatal, custom_message); // Throws
+    const bool try_again = !is_fatal;
+    involuntary_disconnect(SessionErrorInfo{ec, try_again}); // Throws
 }
 
 
 // Close connection due to error discovered on the server-side, and then
 // reported to the client by way of a connection-level ERROR message.
-void Connection::close_due_to_server_side_error(ProtocolError error_code, StringData message, bool try_again)
+void Connection::close_due_to_server_side_error(ProtocolError error_code, const ProtocolErrorInfo& info)
 {
-    if (try_again) {
+    if (info.try_again) {
         m_reconnect_info.m_reason = ConnectionTerminationReason::server_said_try_again_later;
     }
     else {
@@ -1062,15 +1060,15 @@ void Connection::close_due_to_server_side_error(ProtocolError error_code, String
     // at all.
     m_reconnect_info.m_time_point = monotonic_clock_now();
 
-    logger.info("Connection closed due to error reported by server: %1 (%2)", message, int(error_code)); // Throws
+    logger.info("Connection closed due to error reported by server: %1 (%2)", info.message,
+                int(error_code)); // Throws
 
     std::error_code ec = make_error_code(error_code);
-    bool is_fatal = !try_again;
-    involuntary_disconnect(ec, is_fatal, &message); // Throws
+    involuntary_disconnect(SessionErrorInfo{info, ec}); // Throws
 }
 
 
-void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custom_message)
+void Connection::disconnect(const SessionErrorInfo& info)
 {
     // Cancel connect timeout watchdog
     m_connect_timer = util::none;
@@ -1106,17 +1104,13 @@ void Connection::disconnect(std::error_code ec, bool is_fatal, StringData* custo
     m_heartbeat_timer = util::none;
     m_previous_ping_rtt = 0;
 
-    // Must do this before resetting the websocket since that can invalidate custom_message.
-    std::string detailed_message = (custom_message ? std::string(*custom_message) : ec.message()); // Throws
-
     m_websocket.reset();
     m_input_body_buffer.reset();
     m_sending_session = nullptr;
     m_sessions_enlisted_to_send.clear();
     m_sending = false;
 
-    SessionErrorInfo error_info{ec, is_fatal, detailed_message};
-    report_connection_state_change(ConnectionState::disconnected, &error_info); // Throws
+    report_connection_state_change(ConnectionState::disconnected, info); // Throws
     initiate_reconnect_wait();                     // Throws
 }
 
@@ -1168,7 +1162,7 @@ void Connection::receive_pong(milliseconds_type timestamp)
 }
 
 
-void Connection::receive_error_message(int raw_error_code, StringData message, bool try_again,
+void Connection::receive_error_message(int raw_error_code, const ProtocolErrorInfo& info,
                                        session_ident_type session_ident)
 {
     Session* sess = nullptr;
@@ -1180,7 +1174,7 @@ void Connection::receive_error_message(int raw_error_code, StringData message, b
             close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
             return;
         }
-        std::error_code ec = sess->receive_error_message(raw_error_code, message, try_again); // Throws
+        std::error_code ec = sess->receive_error_message(raw_error_code, info); // Throws
         if (ec) {
             close_due_to_protocol_error(ec); // Throws
             return;
@@ -1194,14 +1188,14 @@ void Connection::receive_error_message(int raw_error_code, StringData message, b
         return;
     }
 
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", message, raw_error_code,
-                try_again, session_ident); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", info.message,
+                raw_error_code, info.try_again, session_ident); // Throws
 
     bool known_error_code = bool(get_protocol_error_message(raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
         ProtocolError error_code = ProtocolError(raw_error_code);
         if (REALM_LIKELY(!is_session_level_error(error_code))) {
-            close_due_to_server_side_error(error_code, message, try_again); // Throws
+            close_due_to_server_side_error(error_code, info); // Throws
             return;
         }
         logger.error("Not a connection-level error code"); // Throws
@@ -1480,7 +1474,8 @@ void Session::activate()
             m_client_reset_operation = std::make_unique<_impl::ClientResetOperation>(
                 logger, get_db(), std::move(client_reset_config->fresh_copy), client_reset_config->mode,
                 std::move(client_reset_config->notify_before_client_reset),
-                std::move(client_reset_config->notify_after_client_reset)); // Throws
+                std::move(client_reset_config->notify_after_client_reset),
+                client_reset_config->recovery_is_allowed); // Throws
         }
 
         if (!m_client_reset_operation) {
@@ -2151,9 +2146,10 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
-std::error_code Session::receive_error_message(int error_code, StringData message, bool try_again)
+std::error_code Session::receive_error_message(int error_code, const ProtocolErrorInfo& info)
 {
-    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3)", message, error_code, try_again); // Throws
+    logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, recovery_disabled=%4)", info.message,
+                error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2200,11 +2196,11 @@ std::error_code Session::receive_error_message(int error_code, StringData messag
     if (m_state == Active) {
         m_conn.one_less_active_unsuspended_session(); // Throws
         std::error_code ec = make_error_code(error_code_2);
-        bool is_fatal = !try_again;
-        on_suspended(ec, message, is_fatal); // Throws
+        SessionErrorInfo error_info(info, ec);
+        on_suspended(error_info); // Throws
     }
 
-    if (try_again) {
+    if (info.try_again) {
         begin_resumption_delay();
     }
 

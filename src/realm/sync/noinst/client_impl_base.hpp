@@ -449,15 +449,14 @@ private:
     void close_due_to_protocol_error(std::error_code);
     void close_due_to_missing_protocol_feature();
     void close_due_to_client_side_error(std::error_code, bool is_fatal);
-    void close_due_to_server_side_error(ProtocolError, StringData message, bool try_again);
+    void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
-    void involuntary_disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
-    void disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
+    void involuntary_disconnect(const SessionErrorInfo& info);
+    void disconnect(const SessionErrorInfo& info);
     void change_state_to_disconnected() noexcept;
-
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
-    void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
+    void receive_error_message(int error_code, const ProtocolErrorInfo& info, session_ident_type);
     void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
                                      session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
@@ -478,7 +477,7 @@ private:
 
     static std::string make_logger_prefix(connection_ident_type);
 
-    void report_connection_state_change(ConnectionState, const SessionErrorInfo*);
+    void report_connection_state_change(ConnectionState, util::Optional<SessionErrorInfo> error_info = util::none);
 
     friend ClientProtocol;
     friend class Session;
@@ -735,7 +734,7 @@ public:
 
     void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
 
-    void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
+    void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
 
     /// The application must ensure that the new session object is either
     /// activated (Connection::activate_session()) or destroyed before the
@@ -854,7 +853,7 @@ private:
     ///
     /// These functions are guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    void on_suspended(std::error_code ec, StringData message, bool is_fatal);
+    void on_suspended(const SessionErrorInfo& error_info);
     void on_resumed();
     //@}
 
@@ -1046,7 +1045,7 @@ private:
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_unbound_message();
-    std::error_code receive_error_message(int error_code, StringData message, bool try_again);
+    std::error_code receive_error_message(int error_code, const ProtocolErrorInfo& info);
     std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
 
     void initiate_rebind();
@@ -1148,17 +1147,14 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
     REALM_ASSERT(m_reconnect_info.m_reason && was_voluntary(*m_reconnect_info.m_reason));
-    std::error_code ec = ClientError::connection_closed;
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    disconnect(ec, is_fatal, custom_message); // Throws
+    constexpr bool try_again = true;
+    disconnect(SessionErrorInfo{ClientError::connection_closed, try_again}); // Throws
 }
 
-inline void ClientImpl::Connection::involuntary_disconnect(std::error_code ec, bool is_fatal,
-                                                           StringData* custom_message)
+inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info)
 {
     REALM_ASSERT(m_reconnect_info.m_reason && !was_voluntary(*m_reconnect_info.m_reason));
-    disconnect(ec, is_fatal, custom_message); // Throws
+    disconnect(info); // Throws
 }
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept

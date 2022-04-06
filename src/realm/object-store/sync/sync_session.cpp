@@ -294,6 +294,21 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 
 void SyncSession::download_fresh_realm()
 {
+    {
+        // first check that recovery will not be prevented
+        auto mode = config(&SyncConfig::client_resync_mode);
+        if (mode == ClientResyncMode::Recover) {
+            bool deny = false;
+            {
+                util::CheckedLockGuard state_lock(m_state_mutex);
+                deny = !m_server_allows_recovery_on_client_reset;
+            }
+            if (deny) {
+                handle_fresh_realm_downloaded(
+                    nullptr, {"A client reset is required but the server does not permit recovery for this client"});
+            }
+        }
+    }
     DBOptions options;
     options.encryption_key = m_db->get_encryption_key();
     options.allow_file_format_upgrade = false;
@@ -563,7 +578,8 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
 }
 
-static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy)
+static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy,
+                                                            bool recovery_is_allowed)
 {
     sync::Session::Config::ClientReset config;
     REALM_ASSERT(session_config.client_resync_mode != ClientResyncMode::Manual);
@@ -602,6 +618,7 @@ static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& s
         }
     };
     config.fresh_copy = std::move(fresh_copy);
+    config.recovery_is_allowed = recovery_is_allowed;
     return config;
 }
 
@@ -642,7 +659,8 @@ void SyncSession::create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        session_config.client_reset_config = make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy));
+        session_config.client_reset_config = make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy),
+                                                                      m_server_allows_recovery_on_client_reset);
         m_force_client_reset = false;
     }
 
@@ -673,35 +691,38 @@ void SyncSession::create_sync_session()
 
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
-    m_session->set_connection_state_change_listener([weak_self](sync::ConnectionState state,
-                                                                const sync::Session::ErrorInfo* error) {
-        // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
-        // nothing useful we can do with them.
-        if (auto self = weak_self.lock()) {
-            util::CheckedUniqueLock lock(self->m_state_mutex);
-            auto old_state = self->m_connection_state;
-            using cs = sync::ConnectionState;
-            switch (state) {
-                case cs::disconnected:
-                    self->m_connection_state = ConnectionState::Disconnected;
-                    break;
-                case cs::connecting:
-                    self->m_connection_state = ConnectionState::Connecting;
-                    break;
-                case cs::connected:
-                    self->m_connection_state = ConnectionState::Connected;
-                    break;
-                default:
-                    REALM_UNREACHABLE();
+    m_session->set_connection_state_change_listener(
+        [weak_self](sync::ConnectionState state, const util::Optional<sync::Session::ErrorInfo>& error) {
+            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+            // nothing useful we can do with them.
+            if (auto self = weak_self.lock()) {
+                util::CheckedUniqueLock lock(self->m_state_mutex);
+                auto old_state = self->m_connection_state;
+                using cs = sync::ConnectionState;
+                switch (state) {
+                    case cs::disconnected:
+                        self->m_connection_state = ConnectionState::Disconnected;
+                        break;
+                    case cs::connecting:
+                        self->m_connection_state = ConnectionState::Connecting;
+                        break;
+                    case cs::connected:
+                        self->m_connection_state = ConnectionState::Connected;
+                        break;
+                    default:
+                        REALM_UNREACHABLE();
+                }
+                auto new_state = self->m_connection_state;
+                if (error) {
+                    self->m_server_allows_recovery_on_client_reset = !error->client_reset_recovery_is_disabled;
+                }
+                lock.unlock();
+                self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
+                if (error) {
+                    self->handle_error(SyncError{error->error_code, std::string(error->message), error->is_fatal()});
+                }
             }
-            auto new_state = self->m_connection_state;
-            lock.unlock();
-            self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
-            if (error) {
-                self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
-            }
-        }
-    });
+        });
 }
 
 void SyncSession::set_sync_transact_callback(util::UniqueFunction<sync::Session::SyncTransactCallback> callback)

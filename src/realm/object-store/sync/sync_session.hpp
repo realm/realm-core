@@ -370,6 +370,7 @@ private:
     const std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
     bool m_force_client_reset GUARDED_BY(m_state_mutex) = false;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
+    bool m_server_allows_recovery_on_client_reset GUARDED_BY(m_state_mutex) = false;
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;
 
