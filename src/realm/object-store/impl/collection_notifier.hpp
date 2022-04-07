@@ -92,10 +92,12 @@ public:
      * @param key_path_array An array of all key paths that should be filtered for. If a changed
      *                       table/column combination is not part of the `key_path_array`, no
      *                       notification will be sent.
+     * @param notify_initially Should the callback be called initially?
      *
      * @return A token which can be passed to `remove_callback()`.
      */
-    uint64_t add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) REQUIRES(!m_callback_mutex);
+    uint64_t add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array,
+                          bool notify_initially = true) REQUIRES(!m_callback_mutex);
 
     /**
      * Remove a previously added token.

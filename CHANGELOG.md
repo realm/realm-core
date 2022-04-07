@@ -12,7 +12,7 @@
 * Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data (since 11.13.0).
 
 ### Breaking changes
-* None.
+* Removed the initial notification fired when adding a listener on an object. ([#5380](https://github.com/realm/realm-core/issues/5380))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

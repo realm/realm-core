@@ -150,7 +150,8 @@ static bool all_have_filters(std::vector<NotificationCallback> const& callbacks)
     });
 }
 
-uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array)
+uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, KeyPathArray key_path_array,
+                                          bool notify_initially)
 {
     m_realm->verify_thread();
 
@@ -163,7 +164,7 @@ uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback, Key
     }
 
     auto token = m_next_token++;
-    m_callbacks.push_back({std::move(callback), {}, {}, std::move(key_path_array), token, false, false});
+    m_callbacks.push_back({std::move(callback), {}, {}, std::move(key_path_array), token, !notify_initially, false});
 
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
         Realm::Internal::get_coordinator(*m_realm).wake_up_notifier_worker();
