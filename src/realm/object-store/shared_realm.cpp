@@ -581,11 +581,6 @@ bool Realm::verify_notifications_available(bool throw_on_error) const
             throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
         return false;
     }
-    if (is_in_transaction()) {
-        if (throw_on_error)
-            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
-        return false;
-    }
 
     return true;
 }

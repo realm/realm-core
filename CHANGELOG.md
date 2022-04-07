@@ -10,6 +10,7 @@
 * Fixed various corruption bugs when encryption is used. Issues were caused by a missing "flush" of pending changes. Since v11.8.0. Fixes meta-issue https://github.com/realm/realm-core/issues/5360: (https://github.com/realm/realm-core/issues/5332, https://github.com/realm/realm-swift/issues/7659, https://github.com/realm/realm-core/issues/5230, https://github.com/realm/realm-core/issues/5190, https://github.com/realm/realm-swift/issues/7640, https://github.com/realm/realm-js/issues/4428, https://github.com/realm/realm-java/issues/7652, https://github.com/realm/realm-js/issues/4358)
 * Added AppCredentials::serialize_as_json() support for c_api ([#5348]https://github.com/realm/realm-core/issues/5348)
 * Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data (since 11.13.0).
+* Allowing adding a notification callback while in the transaction. ([#5376](https://github.com/realm/realm-core/issues/5376))
 
 ### Breaking changes
 * None.
