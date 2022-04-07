@@ -122,8 +122,13 @@ void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFil
         do_encryption_write_barrier(addr, size, mapping);
 }
 
-
 extern util::Mutex& mapping_mutex;
+
+void inline encryption_flush(EncryptedFileMapping* mapping)
+{
+    UniqueLock lock(mapping_mutex);
+    mapping->flush();
+}
 
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)

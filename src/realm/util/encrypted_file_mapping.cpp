@@ -497,7 +497,6 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
     // Precondition: this method must never be called for a page which
     // is already up to date.
     REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
-    bool got_copy = false;
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -506,21 +505,12 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (is(m->m_page_state[shadow_mapping_local_ndx], UpToDate)) {
-            if (got_copy) {
-#ifdef REALM_DEBUG
-                // validate that all copies are in fact copies
-                REALM_ASSERT(0 == memcmp(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
-                                         static_cast<size_t>(1ULL << m_page_shift)));
-#endif
-            }
-            else {
                 memcpy(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
                        static_cast<size_t>(1ULL << m_page_shift));
-                got_copy = true;
-            }
+                return true;
         }
     }
-    return got_copy;
+    return false;
 }
 
 void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
