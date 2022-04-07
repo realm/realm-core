@@ -52,6 +52,8 @@
 
 #include <array>
 
+#define ASYNC_WRITES_ENABLED 0
+
 namespace realm {
 class TestHelper {
 public:
@@ -66,10 +68,12 @@ public:
     }
 };
 
+#if ASYNC_WRITES_ENABLED
 static bool operator==(IndexSet const& a, IndexSet const& b)
 {
     return std::equal(a.as_indexes().begin(), a.as_indexes().end(), b.as_indexes().begin(), b.as_indexes().end());
 }
+#endif
 } // namespace realm
 
 using namespace realm;
@@ -935,6 +939,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 }
 #endif
 
+#if ASYNC_WRITES_ENABLED
 #ifndef _WIN32
 TEST_CASE("SharedRealm: async writes") {
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -1751,6 +1756,7 @@ TEST_CASE("SharedRealm: async writes") {
     });
 }
 #endif
+
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms
 #if REALM_PLATFORM_APPLE
@@ -2003,6 +2009,7 @@ TEST_CASE("SharedRealm: async_writes_2") {
     REQUIRE(done);
 }
 #endif
+#endif
 
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())
@@ -2064,6 +2071,7 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 1);
     }
 
+#if ASYNC_WRITES_ENABLED
     SECTION("notifications created in async transaction are sent synchronously") {
         realm->async_begin_transaction([&] {
             REQUIRE(change_count == 0);
@@ -2079,6 +2087,7 @@ TEST_CASE("SharedRealm: notifications") {
             return !realm->has_pending_async_work();
         });
     }
+#endif
 #endif
     SECTION("refresh() from within changes_available() refreshes") {
         context->changes_available_fn = [&] {

@@ -502,7 +502,8 @@ void RealmCoordinator::open_db()
         }
 
         DBOptions options;
-        options.enable_async_writes = true;
+        // FIXME: async writes seems not to work with encryption enabled
+        // options.enable_async_writes = true;
         options.durability = m_config.in_memory ? DBOptions::Durability::MemOnly : DBOptions::Durability::Full;
         options.is_immutable = m_config.immutable();
 

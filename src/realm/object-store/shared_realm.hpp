@@ -255,7 +255,8 @@ public:
     //   executed in order.
     // * A later call to async_begin_transaction() will wait for any earlier write blocks.
     using AsyncHandle = unsigned;
-    AsyncHandle async_begin_transaction(util::UniqueFunction<void()>&& the_block, bool notify_only = false);
+    [[deprecated("Not enabled")]] AsyncHandle async_begin_transaction(util::UniqueFunction<void()>&& the_block,
+                                                                      bool notify_only = false);
 
     // Asynchronous commit.
     // * 'the_done_block' is queued for execution on the scheduler associated with
