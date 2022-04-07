@@ -25,7 +25,31 @@ ErrorCategory ErrorCodes::error_categories(Error code)
 {
     switch (code) {
     case RuntimeError:
+    case RangeError:
+    case IncompatibleSession:
+    case IncompatibleLockFile:
+    case DecryptionFailed:
+    case InvalidQuery:
+    case BrokenInvariant:
         return ErrorCategory().set(ErrorCategory::runtime_error);
+    case PropertyNotNullable:
+    case InvalidProperty:
+    case InvalidName:
+    case InvalidDictionaryValue:
+    case InvalidSortDescriptor:
+    case SyntaxError:
+    case InvalidQueryArg:
+    case KeyNotFound:
+    case OutOfBounds:
+    case LimitExceeded:
+        return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+    case WrongTransactioState:
+    case SerialisationError:
+    case IllegalOperation:
+    case StaleAccessor:
+    case TypeMismatch:
+    case ReadOnly:
+        return ErrorCategory().set(ErrorCategory::logic_error);
     default:
         break;
     }

@@ -274,7 +274,7 @@ TEST(Group_TableNameTooLong)
     Group group;
     size_t buf_len = 64;
     std::unique_ptr<char[]> buf(new char[buf_len]);
-    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), ErrorCodes::RangeError);
+    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), ErrorCodes::InvalidName);
     group.add_table(StringData(buf.get(), buf_len - 1));
 }
 

@@ -2502,7 +2502,7 @@ TEST(Shared_SessionDurabilityConsistency)
         DBRef sg = DB::create(path, no_create, DBOptions(durability_1));
 
         DBOptions::Durability durability_2 = DBOptions::Durability::MemOnly;
-        CHECK_LOGIC_ERROR(DB::create(path, no_create, DBOptions(durability_2)), ErrorCodes::IncompatibleSession);
+        CHECK_RUNTIME_ERROR(DB::create(path, no_create, DBOptions(durability_2)), ErrorCodes::IncompatibleSession);
     }
 }
 

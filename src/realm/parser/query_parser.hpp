@@ -227,10 +227,10 @@ private:
     }
 };
 
-class NoArgsError : public std::out_of_range {
+class NoArgsError : public InvalidQueryArgError {
 public:
     NoArgsError()
-        : std::out_of_range("Attempt to retreive an argument when no arguments were given")
+        : InvalidQueryArgError("Attempt to retreive an argument when no arguments were given")
     {
     }
 };

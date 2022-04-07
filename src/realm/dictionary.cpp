@@ -535,21 +535,21 @@ Dictionary::Iterator Dictionary::end() const
 std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
 {
     if (m_key_type != type_Mixed && key.get_type() != m_key_type) {
-        throw Exception(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: Invalid key type");
+        throw InvalidArgument(ErrorCodes::InvalidDictionaryKey, "Dictionary::insert: Invalid key type");
     }
     if (value.is_null()) {
         if (!m_col_key.is_nullable()) {
-            throw Exception(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Value cannot be null");
+            throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Value cannot be null");
         }
     }
     else {
         if (m_col_key.get_type() == col_type_Link && value.get_type() == type_TypedLink) {
             if (m_obj.get_table()->get_opposite_table_key(m_col_key) != value.get<ObjLink>().get_table_key()) {
-                throw Exception(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong object type");
+                throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong object type");
             }
         }
         else if (m_col_key.get_type() != col_type_Mixed && value.get_type() != DataType(m_col_key.get_type())) {
-            throw Exception(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
+            throw InvalidArgument(ErrorCodes::InvalidDictionaryValue, "Dictionary::insert: Wrong value type");
         }
     }
 
@@ -566,7 +566,7 @@ std::pair<Dictionary::Iterator, bool> Dictionary::insert(Mixed key, Mixed value)
         auto target_table = m_obj.get_table()->get_opposite_table(m_col_key);
         auto key = value.get<ObjKey>();
         if (!key.is_unresolved() && !target_table->is_valid(key)) {
-            InvalidArgument(ErrorCodes::InvalidProperty, "Invalid object key");
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
         }
         new_link = ObjLink(target_table->get_key(), key);
         value = Mixed(new_link);

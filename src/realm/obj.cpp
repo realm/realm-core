@@ -1588,13 +1588,13 @@ template <>
 inline void check_range(const StringData& val)
 {
     if (REALM_UNLIKELY(val.size() > Table::max_string_size))
-        throw RuntimeError(ErrorCodes::RangeError, "String too big");
+        throw LogicError(ErrorCodes::LimitExceeded, "String too big");
 }
 template <>
 inline void check_range(const BinaryData& val)
 {
     if (REALM_UNLIKELY(val.size() > ArrayBlob::max_binary_size))
-        throw RuntimeError(ErrorCodes::RangeError, "Binary too big");
+        throw LogicError(ErrorCodes::LimitExceeded, "Binary too big");
 }
 } // namespace
 
@@ -1869,8 +1869,11 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
             backlink_col_key = m_table->get_opposite_column(col_key);
         }
         auto obj_key = new_link.get_obj_key();
-        auto target_obj =
-            obj_key.is_unresolved() ? target_table->get_tombstone(obj_key) : target_table->get_object(obj_key);
+        auto target_obj = obj_key.is_unresolved() ? target_table->try_get_tombstone(obj_key)
+                                                  : target_table->try_get_object(obj_key);
+        if (!target_obj) {
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
+        }
         target_obj.add_backlink(backlink_col_key, m_key);
     }
 }

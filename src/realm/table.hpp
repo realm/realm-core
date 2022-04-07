@@ -312,11 +312,11 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
-    Obj get_tombstone(ObjKey key) const
+    Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
         REALM_ASSERT(m_tombstones);
-        return m_tombstones->get(key);
+        return m_tombstones->try_get_obj(key);
     }
 
     void clear();

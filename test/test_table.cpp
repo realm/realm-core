@@ -933,8 +933,8 @@ TEST(Table_StringOrBinaryTooBig)
     size_t large_bin_size = 0xFFFFF1;
     size_t large_str_size = 0xFFFFF0; // null-terminate reduces max size by 1
     std::unique_ptr<char[]> large_buf(new char[large_bin_size]);
-    CHECK_LOGIC_ERROR(obj.set(col_string, StringData(large_buf.get(), large_str_size)), ErrorCodes::RangeError);
-    CHECK_LOGIC_ERROR(obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size)), ErrorCodes::RangeError);
+    CHECK_LOGIC_ERROR(obj.set(col_string, StringData(large_buf.get(), large_str_size)), ErrorCodes::LimitExceeded);
+    CHECK_LOGIC_ERROR(obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size)), ErrorCodes::LimitExceeded);
     obj.set(col_string, StringData(large_buf.get(), large_str_size - 1));
     obj.set(col_binary, BinaryData(large_buf.get(), large_bin_size - 1));
 }

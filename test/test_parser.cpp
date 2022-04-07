@@ -627,7 +627,7 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_EX(
-        verify_query(test_context, t, "buddy.age > $0", 0), std::out_of_range,
+        verify_query(test_context, t, "buddy.age > $0", 0), query_parser::InvalidQueryArgError,
         CHECK_EQUAL(std::string(e.what()), "Attempt to retreive an argument when no arguments were given"));
     CHECK_THROW_EX(verify_query(test_context, t, "age == infinity", 0), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));

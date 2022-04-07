@@ -198,7 +198,7 @@ TEST(Dictionary_Links)
 
         auto invalid_link = pluto.get_link();
         pluto.remove();
-        CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+        CHECK_THROW(dict.insert("Pet", invalid_link), InvalidArgument);
 
         dict = bernie.get_dictionary(col_dict);
         dict.insert("Pet", lady);
@@ -253,7 +253,7 @@ TEST(Dictionary_TypedLinks)
 
         auto invalid_link = pluto.get_link();
         pluto.remove();
-        CHECK_THROW(dict.insert("Pet", invalid_link), LogicError);
+        CHECK_THROW(dict.insert("Pet", invalid_link), InvalidArgument);
 
         dict.insert("Pet", Mixed(ObjLink(dogs->get_key(), dogs->get_objkey_from_primary_key("pongo"))));
         cmp(dict["Pet"], Mixed());

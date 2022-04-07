@@ -212,35 +212,6 @@ public:
     }
 };
 
-namespace query_parser {
-
-/// Exception thrown when parsing fails due to invalid syntax.
-struct SyntaxError : Exception {
-    SyntaxError(const std::string& msg)
-        : Exception(ErrorCodes::SyntaxError, msg)
-    {
-    }
-};
-
-/// Exception thrown when binding a syntactically valid query string in a
-/// context where it does not make sense.
-struct InvalidQueryError : Exception {
-    InvalidQueryError(const std::string& msg)
-        : Exception(ErrorCodes::InvalidQuery, msg)
-    {
-    }
-};
-
-/// Exception thrown when there is a problem accessing the arguments in a query string
-struct InvalidQueryArgError : Exception {
-    InvalidQueryArgError(const std::string& msg)
-        : Exception(ErrorCodes::InvalidQueryArg, msg)
-    {
-    }
-};
-
-} // namespace query_parser
-
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
 /// been stated) in the documentation of the public API, and only in cases
@@ -272,107 +243,10 @@ struct InvalidQueryArgError : Exception {
 /// constraining the database to handle every and any use-case thrown at it.
 class LogicError : public Exception {
 public:
-    /*
-       enum ErrorKind {
-           string_too_big,
-           binary_too_big,
-           table_name_too_long,
-           column_name_too_long,
-           column_name_in_use,
-           invalid_column_name,
-           table_index_out_of_range,
-           row_index_out_of_range,
-           column_index_out_of_range,
-           string_position_out_of_range,
-           collection_index_out_of_range,
-           bad_version,
-           illegal_type,
-
-           /// Indicates that an argument has a value that is illegal in combination
-           /// with another argument, or with the state of an involved object.
-           illegal_combination,
-
-           /// Indicates a data type mismatch, such as when `Table::find_pkey_int()` is
-           /// called and the type of the primary key is not `type_Int`.
-           type_mismatch,
-
-           /// Indicates that two involved tables are not in the same group.
-           group_mismatch,
-
-           /// Indicates that an involved descriptor is of the wrong kind, i.e., if
-           /// it is a subtable descriptor, and the function requires a root table
-           /// descriptor.
-           wrong_kind_of_descriptor,
-
-           /// Indicates that an involved table is of the wrong kind, i.e., if it
-           /// is a subtable, and the function requires a root table, or if it is a
-           /// free-standing table, and the function requires a group-level table.
-           wrong_kind_of_table,
-
-           /// Indicates that an involved accessor is was detached, i.e., was not
-           /// attached to an underlying object.
-           detached_accessor,
-
-           /// Indicates that a specified row index of a target table (a link) is
-           /// out of range. This is used for disambiguation in cases such as
-           /// Table::set_link() where one specifies both a row index of the origin
-           /// table, and a row index of the target table.
-           target_row_index_out_of_range,
-
-           // Indicates that an involved column lacks a search index.
-           no_search_index,
-
-           /// Indicates that a modification was attempted that would have produced a
-           /// duplicate primary value.
-           unique_constraint_violation,
-
-           /// User attempted to insert null in non-nullable column
-           column_not_nullable,
-
-           /// Group::open() is called on a group accessor that is already in the
-           /// attached state. Or Group::open() or Group::commit() is called on a
-           /// group accessor that is managed by a DB object.
-           wrong_group_state,
-
-           /// No active transaction on a particular Transaction object (e.g. after commit)
-           /// or the Transaction object is of the wrong type (write to a read-only transaction)
-           wrong_transact_state,
-
-           /// Attempted use of a continuous transaction through a DB
-           /// object with no history. See Replication::get_history().
-           no_history,
-
-           /// Durability setting (as passed to the DB constructor) was
-           /// not consistent across the session.
-           mixed_durability,
-
-           /// History type (as specified by the Replication implementation passed
-           /// to the DB constructor) was not consistent across the
-           /// session.
-           mixed_history_type,
-
-           /// History schema version (as specified by the Replication
-           /// implementation passed to the DB constructor) was not
-           /// consistent across the session.
-           mixed_history_schema_version,
-
-           /// Adding rows to a table with no columns is not supported.
-           table_has_no_columns,
-
-           /// Referring to a column that has been deleted.
-           column_does_not_exist,
-
-           /// You can not add index on a subtable of a subtable
-           subtable_of_subtable_index,
-
-           /// You try to instantiate a collection object not matching column type
-           collection_type_mismatch
-       };
-   */
     LogicError(ErrorCodes::Error code, const std::string& msg)
         : Exception(code, msg)
     {
-        REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::runtime_error));
+        REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::logic_error));
     }
 };
 
@@ -385,10 +259,10 @@ public:
     }
 };
 
-class InvalidArgument : public Exception {
+class InvalidArgument : public LogicError {
 public:
     InvalidArgument(ErrorCodes::Error code, const std::string& msg)
-        : Exception(code, msg)
+        : LogicError(code, msg)
     {
         REALM_ASSERT(ErrorCodes::error_categories(code).test(ErrorCategory::invalid_argument));
     }
@@ -441,6 +315,36 @@ public:
     {
     }
 };
+
+namespace query_parser {
+
+/// Exception thrown when parsing fails due to invalid syntax.
+struct SyntaxError : InvalidArgument {
+    SyntaxError(const std::string& msg)
+        : InvalidArgument(ErrorCodes::SyntaxError, msg)
+    {
+    }
+};
+
+/// Exception thrown when binding a syntactically valid query string in a
+/// context where it does not make sense.
+struct InvalidQueryError : RuntimeError {
+    InvalidQueryError(const std::string& msg)
+        : RuntimeError(ErrorCodes::InvalidQuery, msg)
+    {
+    }
+};
+
+/// Exception thrown when there is a problem accessing the arguments in a query string
+struct InvalidQueryArgError : InvalidArgument {
+    InvalidQueryArgError(const std::string& msg)
+        : InvalidArgument(ErrorCodes::InvalidQueryArg, msg)
+    {
+    }
+};
+
+} // namespace query_parser
+
 } // namespace realm
 
 

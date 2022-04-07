@@ -123,6 +123,7 @@ public:
         SubscriptionFailed = 46,
         RangeError = 47,
         TypeMismatch = 48,
+        LimitExceeded = 49,
         MaxError
     };
 
