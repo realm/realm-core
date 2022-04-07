@@ -819,7 +819,7 @@ buildvariants:
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     run_with_encryption: On
   tasks:
-  - name: compile_test
+  - name: compile_core_tests
 
 - name: macos-1015-release
   display_name: "MacOS 10.15 x86_64 (Release build)"
