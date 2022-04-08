@@ -177,6 +177,11 @@ functions:
           if [[ -n "${report_test_progress|}" ]]; then
               export UNITTEST_PROGRESS=${report_test_progress|}
           fi
+
+          if [[ -n "${run_with_encryption}" ]]; then
+              export UNITTEST_ENCRYPT_ALL=1
+          fi
+
           cd build
           $CTEST -C ${cmake_build_type|Debug} -V $TEST_FLAGS
 
@@ -593,6 +598,20 @@ task_groups:
   - compile
   - .test_suite
 
+- name: compile_core_tests
+  max_hosts: 1
+  setup_group_can_fail_task: true
+  setup_group:
+  - func: "fetch source"
+  - func: "fetch binaries"
+  teardown_task:
+  - func: "upload test results"
+  timeout:
+  - func: "run hang analyzer"
+  tasks:
+  - compile
+  - core-tests
+
 - name: benchmarks
   setup_group_can_fail_task: true
   setup_group:
@@ -637,6 +656,42 @@ buildvariants:
   tasks:
   - name: lint
   - name: compile_test
+    distros:
+    - ubuntu2004-large
+
+- name: ubuntu2004-encryption-tsan
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Encryption Enabled w/TSAN)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    run_with_encryption: On
+    enable_tsan: On
+  tasks:
+  - name: compile_core_tests
+    distros:
+    - ubuntu2004-large
+
+- name: ubuntu2004-encryption-asan
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Encryption Enabled w/ASAN)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    run_with_encryption: On
+    enable_asan: On
+  tasks:
+  - name: compile_core_tests
     distros:
     - ubuntu2004-large
 
@@ -749,6 +804,22 @@ buildvariants:
   tasks:
   - name: compile_test
   - name: swift-build-and-test
+
+- name: macos-1015-encrypted
+  display_name: "MacOS 10.15 x86_64 (Encryption enabled)"
+  run_on: macos-1015
+  expansions:
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-macos-universal.tar.gz"
+    cmake_bindir: "./cmake_binaries/CMake.app/Contents/bin"
+    cmake_toolchain_file: "./tools/cmake/xcode.toolchain.cmake"
+    cmake_generator: Xcode
+    max_jobs: $(sysctl -n hw.logicalcpu)
+    run_tests_against_baas: On
+    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
+    run_with_encryption: On
+  tasks:
+  - name: compile_core_tests
 
 - name: macos-1015-release
   display_name: "MacOS 10.15 x86_64 (Release build)"
