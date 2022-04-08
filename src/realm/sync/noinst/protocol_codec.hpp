@@ -272,7 +272,7 @@ public:
                     info.message = util::format("%1 Logs: %2", json["message"], json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
                 }
-                catch (const std::exception& e) {
+                catch (const nlohmann::json::exception& e) {
                     // If any of the above json fields are not present, this is a fatal error
                     // however, additional optional fields may be added in the future.
                     return report_error(Error::bad_syntax, "Failed to parse 'json_error' with error_code %1: '%2'",
