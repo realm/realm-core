@@ -125,6 +125,12 @@ void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFil
 
 extern util::Mutex& mapping_mutex;
 
+void inline encryption_flush(EncryptedFileMapping* mapping)
+{
+    UniqueLock lock(mapping_mutex);
+    mapping->flush();
+}
+
 inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)
 {
@@ -140,26 +146,18 @@ inline void do_encryption_write_barrier(const void* addr, size_t size, Encrypted
 
 #else
 
-void inline set_page_reclaim_governor(PageReclaimGovernor*)
-{
-}
+void inline set_page_reclaim_governor(PageReclaimGovernor*) {}
 
 size_t inline get_num_decrypted_pages()
 {
     return 0;
 }
 
-void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr)
-{
-}
+void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize = nullptr) {}
 
-void inline encryption_write_barrier(const void*, size_t)
-{
-}
+void inline encryption_write_barrier(const void*, size_t) {}
 
-void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
-{
-}
+void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*) {}
 
 #endif
 
@@ -182,6 +180,6 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
 
 size_t round_up_to_page_size(size_t size) noexcept;
-}
-}
+} // namespace util
+} // namespace realm
 #endif
