@@ -778,6 +778,13 @@ void ClientHistory::update_sync_progress(const SyncProgress& progress, const std
                  RefOrTagged::make_tagged(progress.upload.last_integrated_server_version)); // Throws
     }
     if (previous_upload_client_version < progress.upload.client_version) {
+        // This is part of the client reset cycle detection.
+        // A client reset operation will write a flag to an internal table indicating that
+        // the changes there are a result of a successful reset. However, it is not possible to
+        // know if a recovery has been successful until the changes have been acknowledged by the
+        // server. The situation we want to avoid is that a recovery itself causes another reset
+        // which creates a reset cycle. However, at this point, upload progress has been made
+        // and we can remove the cycle detection flag if there is one.
         _impl::client_reset::remove_pending_client_resets(wt);
     }
     if (downloadable_bytes) {
