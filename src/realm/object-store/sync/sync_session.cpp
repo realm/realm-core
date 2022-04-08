@@ -429,7 +429,14 @@ void SyncSession::handle_error(SyncError error)
         SimplifiedProtocolError simplified =
             get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
         if (error.server_requests_client_reset) {
-            simplified = SimplifiedProtocolError::ClientResetRequested;
+            if (*error.server_requests_client_reset) {
+                simplified = SimplifiedProtocolError::ClientResetRequested;
+            }
+            else if (simplified == SimplifiedProtocolError::ClientResetRequested) {
+                // Server says not to do a client reset, but the client wants
+                // to do one; make a fatal (non-reset) error instead.
+                simplified = SimplifiedProtocolError::UnexpectedInternalIssue;
+            }
         }
         switch (simplified) {
             case SimplifiedProtocolError::ConnectionIssue:

@@ -194,13 +194,13 @@ struct ProtocolErrorInfo {
         : message(msg)
         , try_again(do_try_again)
         , client_reset_recovery_is_disabled(false)
-        , should_client_reset(false)
+        , should_client_reset(util::none)
     {
     }
     std::string message;
     bool try_again = false;
     bool client_reset_recovery_is_disabled = false;
-    bool should_client_reset = false;
+    util::Optional<bool> should_client_reset;
 
     bool is_fatal() const
     {

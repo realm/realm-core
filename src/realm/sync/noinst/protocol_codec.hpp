@@ -270,7 +270,7 @@ public:
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
                     info.message = util::format("%1 Logs: %2", json["message"], json["logURL"]);
-                    info.should_client_reset = json["shouldClientReset"];
+                    info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
                 }
                 catch (const std::exception& e) {
                     // If any of the above json fields are not present, this is a fatal error
