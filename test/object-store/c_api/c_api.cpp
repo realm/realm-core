@@ -1141,7 +1141,7 @@ TEST_CASE("C API") {
             write([&]() {
                 auto p = realm_object_create_with_primary_key(realm, class_bar.key, rlm_str_val("Hello"));
                 CHECK(!p);
-                CHECK_ERR(RLM_ERR_WRONG_PRIMARY_KEY_TYPE);
+                CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
             });
 
             write([&]() {
@@ -1163,7 +1163,7 @@ TEST_CASE("C API") {
                 cptr_checked(realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123)));
                 auto p = realm_object_create_with_primary_key(realm, class_bar.key, rlm_int_val(123));
                 CHECK(!p);
-                CHECK_ERR(RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE);
+                CHECK_ERR(RLM_ERR_OBJECT_ALREADY_EXISTS);
             });
         }
 

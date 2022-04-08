@@ -45,13 +45,15 @@ bool Object::is_frozen() const noexcept
 }
 
 InvalidatedObjectException::InvalidatedObjectException(const std::string& object_type)
-    : std::logic_error("Accessing object of type " + object_type + " which has been invalidated or deleted")
+    : LogicError(ErrorCodes::InvalidatedObject,
+                 "Accessing object of type " + object_type + " which has been invalidated or deleted")
     , object_type(object_type)
 {
 }
 
 InvalidPropertyException::InvalidPropertyException(const std::string& object_type, const std::string& property_name)
-    : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
+    : LogicError(ErrorCodes::InvalidProperty,
+                 util::format("Property '%1.%2' does not exist", object_type, property_name))
     , object_type(object_type)
     , property_name(property_name)
 {
@@ -59,27 +61,30 @@ InvalidPropertyException::InvalidPropertyException(const std::string& object_typ
 
 MissingPropertyValueException::MissingPropertyValueException(const std::string& object_type,
                                                              const std::string& property_name)
-    : std::logic_error(util::format("Missing value for property '%1.%2'", object_type, property_name))
+    : LogicError(ErrorCodes::MissingPropertyValue,
+                 util::format("Missing value for property '%1.%2'", object_type, property_name))
     , object_type(object_type)
     , property_name(property_name)
 {
 }
 
 MissingPrimaryKeyException::MissingPrimaryKeyException(const std::string& object_type)
-    : std::logic_error(util::format("'%1' does not have a primary key defined", object_type))
+    : LogicError(ErrorCodes::MissingPrimaryKey, util::format("'%1' does not have a primary key defined", object_type))
     , object_type(object_type)
 {
 }
 
 ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name)
-    : std::logic_error(util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
+    : LogicError(ErrorCodes::ReadOnlyProperty,
+                 util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
     , object_type(object_type)
     , property_name(property_name)
 {
 }
 
 ModifyPrimaryKeyException::ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name)
-    : std::logic_error(util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
+    : LogicError(ErrorCodes::ModifyPrimaryKey,
+                 util::format("Cannot modify primary key after creation: '%1.%2'", object_type, property_name))
     , object_type(object_type)
     , property_name(property_name)
 {

@@ -290,7 +290,7 @@ Dictionary::Dictionary(const Obj& obj, ColKey col_key)
     , m_key_type(m_obj.get_table()->get_dictionary_key_type(m_col_key))
 {
     if (!col_key.is_dictionary()) {
-        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a dictionary");
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a dictionary");
     }
 }
 

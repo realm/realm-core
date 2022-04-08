@@ -1191,10 +1191,10 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     CascadeState state;
 
     if (type != col_type_Mixed)
-        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a Mixed");
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a Mixed");
 
     if (value.is_type(type_Link)) {
-        throw InvalidArgument(ErrorCodes::InvalidProperty, "Link must be fully qualified");
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Link must be fully qualified");
     }
 
     if (value.is_type(type_TypedLink)) {
@@ -1306,7 +1306,7 @@ Obj& Obj::set<int64_t>(ColKey col_key, int64_t value, bool is_default)
     auto col_ndx = col_key.get_index();
 
     if (col_key.get_type() != ColumnTypeTraits<int64_t>::column_id)
-        throw InvalidArgument(ErrorCodes::InvalidProperty,
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
 
     StringIndex* index = m_table->get_search_index(col_key);
@@ -1428,7 +1428,7 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != ColumnTypeTraits<ObjKey>::column_id)
-        throw InvalidArgument(ErrorCodes::InvalidProperty,
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
     TableRef target_table = get_target_table(col_key);
     TableKey target_table_key = target_table->get_key();
@@ -1483,7 +1483,7 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != ColumnTypeTraits<ObjLink>::column_id)
-        throw InvalidArgument(ErrorCodes::InvalidProperty,
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
     m_table->get_parent_group()->validate(target_link);
 
@@ -1528,7 +1528,7 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
     if (type != col_type_Link)
-        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a link type");
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a link type");
     TableRef target_table = get_target_table(col_key);
     Table& t = *target_table;
     TableKey target_table_key = t.get_key();
@@ -1621,11 +1621,10 @@ Obj& Obj::set(ColKey col_key, T value, bool is_default)
     auto col_ndx = col_key.get_index();
 
     if (type != ColumnTypeTraits<T>::column_id)
-        throw InvalidArgument(ErrorCodes::InvalidProperty,
+        throw InvalidArgument(ErrorCodes::TypeMismatch,
                               util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
     if (value_is_null(value) && !attrs.test(col_attr_Nullable))
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
-                              util::format("Property not nullable: %1", m_table->get_column_name(col_key)));
+        throw NotNullable(Group::table_name_to_class_name(m_table->get_name()), m_table->get_column_name(col_key));
 
     check_range(value);
 
@@ -2189,8 +2188,8 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     else {
         auto attrs = col_key.get_attrs();
         if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
-            throw InvalidArgument(ErrorCodes::PropertyNotNullable,
-                                  util::format("Property not nullable: %1", m_table->get_column_name(col_key)));
+            throw NotNullable(Group::table_name_to_class_name(m_table->get_name()),
+                              m_table->get_column_name(col_key));
         }
 
         update_if_needed();

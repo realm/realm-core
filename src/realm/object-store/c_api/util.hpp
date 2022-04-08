@@ -61,7 +61,7 @@ inline void check_value_assignable(const SharedRealm& realm, const Table& table,
             return;
         }
         auto& schema = schema_for_table(realm, table.get_key());
-        throw NotNullableException{schema.name, table.get_column_name(col_key)};
+        throw NotNullable{schema.name, table.get_column_name(col_key)};
     }
 
     if (val.get_type() == type_TypedLink &&

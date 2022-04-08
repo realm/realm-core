@@ -165,7 +165,7 @@ inline void check_column_type<ObjKey>(ColKey col)
         bool is_link_list = (col.get_type() == col_type_LinkList);
         bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
         if (!(is_link_list || is_link_set))
-            throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a list or set");
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list or set");
     }
 }
 

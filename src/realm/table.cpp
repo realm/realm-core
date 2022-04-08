@@ -2934,11 +2934,22 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 {
     auto primary_key_col = get_primary_key_column();
     if (m_is_embedded || !primary_key_col)
-        throw IllegalOperation(util::format("Table has no primary key: %1", get_name()));
+        throw InvalidArgument(ErrorCodes::UnexpectedPrimaryKey,
+                              util::format("Table has no primary key: %1", get_name()));
 
     DataType type = DataType(primary_key_col.get_type());
-    REALM_ASSERT((primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) ||
-                 primary_key.get_type() == type);
+
+    if (primary_key.is_null() && !primary_key_col.is_nullable()) {
+        throw InvalidArgument(
+            ErrorCodes::PropertyNotNullable,
+            util::format("Primary key for class %1 cannot be NULL", Group::table_name_to_class_name(get_name())));
+    }
+
+    if (!(primary_key.is_null() && primary_key_col.get_attrs().test(col_attr_Nullable)) &&
+        primary_key.get_type() != type) {
+        throw InvalidArgument(ErrorCodes::TypeMismatch, util::format("Wrong primary key type for class %1",
+                                                                     Group::table_name_to_class_name(get_name())));
+    }
 
     REALM_ASSERT(type == type_String || type == type_ObjectId || type == type_Int || type == type_UUID);
 
@@ -3566,7 +3577,7 @@ bool Table::contains_unique_values(ColKey col) const
 void Table::validate_column_is_unique(ColKey col) const
 {
     if (!contains_unique_values(col)) {
-        throw DuplicatePrimaryKeyValueException(util::format(
+        throw DuplicatePrimaryKeyValue(util::format(
             "Primary key property '%1.%2' has duplicate values after migration.", get_name(), get_column_name(col)));
     }
 }

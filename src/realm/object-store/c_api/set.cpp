@@ -44,7 +44,7 @@ RLM_API bool realm_set_find(const realm_set_t* set, realm_value_t value, size_t*
         try {
             check_value_assignable(*set, val);
         }
-        catch (const NotNullableException&) {
+        catch (const NotNullable&) {
             if (out_index)
                 *out_index = realm::not_found;
             if (out_found)
@@ -92,7 +92,7 @@ RLM_API bool realm_set_erase(realm_set_t* set, realm_value_t value, bool* out_er
         try {
             check_value_assignable(*set, val);
         }
-        catch (const NotNullableException&) {
+        catch (const NotNullable&) {
             if (out_erased)
                 *out_erased = false;
             return true;

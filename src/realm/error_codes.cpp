@@ -31,6 +31,15 @@ ErrorCategory ErrorCodes::error_categories(Error code)
     case DecryptionFailed:
     case InvalidQuery:
     case BrokenInvariant:
+    case DuplicatePrimaryKeyValue:
+    case OutOfMemory:
+    case UnsupportedFileFormatVersion:
+    case MultipleSyncAgents:
+    case AddressSpaceExhausted:
+    case ObjectAlreadyExists:
+    case OutOfDiskSpace:
+    case CallbackFailed:
+    case NotCloneable:
         return ErrorCategory().set(ErrorCategory::runtime_error);
     case PropertyNotNullable:
     case InvalidProperty:
@@ -42,14 +51,28 @@ ErrorCategory ErrorCodes::error_categories(Error code)
     case KeyNotFound:
     case OutOfBounds:
     case LimitExceeded:
+    case UnexpectedPrimaryKey:
+    case ModifyPrimaryKey:
+    case ReadOnlyProperty:
+    case TypeMismatch:
+    case MissingPrimaryKey:
+    case MissingPropertyValue:
+    case NoSuchTable:
         return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+    case LogicError:
+    case BrokenPromise:
+    case CrossTableLinkTarget:
+    case KeyAlreadyUsed:
     case WrongTransactioState:
     case SerialisationError:
     case IllegalOperation:
     case StaleAccessor:
-    case TypeMismatch:
     case ReadOnly:
+    case InvalidatedObject:
         return ErrorCategory().set(ErrorCategory::logic_error);
+    case OK:
+    case UnknownError:
+        break;
     default:
         break;
     }
@@ -119,8 +142,8 @@ std::string_view ErrorCodes::error_string(Error code)
             return "MissingPrimaryKey";
         case UnexpectedPrimaryKey:
             return "UnexpectedPrimaryKey";
-        case WrongPrimaryKeyType:
-            return "WrongPrimaryKeyType";
+        case ObjectAlreadyExists:
+            return "ObjectAlreadyExists";
         case ModifyPrimaryKey:
             return "ModifyPrimaryKey";
         case ReadOnly:
@@ -216,8 +239,8 @@ ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
         return MissingPrimaryKey;
     if (name == std::string_view("UnexpectedPrimaryKey"))
         return UnexpectedPrimaryKey;
-    if (name == std::string_view("WrongPrimaryKeyType"))
-        return WrongPrimaryKeyType;
+    if (name == std::string_view("ObjectAlreadyExists"))
+        return ObjectAlreadyExists;
     if (name == std::string_view("ModifyPrimaryKey"))
         return ModifyPrimaryKey;
     if (name == std::string_view("ReadOnly"))

@@ -499,7 +499,7 @@ inline Set<T>::Set(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
 {
     if (!col_key.is_set()) {
-        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a set");
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a set");
     }
 
     check_column_type<value_type>(m_col_key);

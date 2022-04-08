@@ -4732,7 +4732,7 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     SECTION("primarykey property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), std::logic_error);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), ModifyPrimaryKeyException);
         realm->cancel_transaction();
     }
 

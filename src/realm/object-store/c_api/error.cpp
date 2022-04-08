@@ -97,45 +97,71 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         std::rethrow_exception(eptr);
     }
 
-    // C API exceptions:
-    catch (const NotClonableException& ex) {
-        populate_error(ex, RLM_ERR_NOT_CLONABLE);
-    }
-    catch (const InvalidatedObjectException& ex) {
-        populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
-    }
-    catch (const UnexpectedPrimaryKeyException& ex) {
-        populate_error(ex, RLM_ERR_UNEXPECTED_PRIMARY_KEY);
-    }
-    catch (const DuplicatePrimaryKeyException& ex) {
-        populate_error(ex, RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE);
-    }
-    catch (const InvalidPropertyKeyException& ex) {
-        populate_error(ex, RLM_ERR_INVALID_PROPERTY);
-    }
-    catch (const CallbackFailed& ex) {
-        populate_error(ex, RLM_ERR_CALLBACK);
-    }
-
     // Core exceptions:
-    catch (const NoSuchTable& ex) {
-        populate_error(ex, RLM_ERR_NO_SUCH_TABLE);
-    }
-    catch (const KeyNotFound& ex) {
-        populate_error(ex, RLM_ERR_NO_SUCH_OBJECT);
-    }
-    catch (const LogicError& ex) {
-        using Kind = LogicError::ErrorKind;
-        switch (ex.kind()) {
-            case Kind::column_does_not_exist:
-            case Kind::column_index_out_of_range:
+    catch (const Exception& ex) {
+        switch (ex.code()) {
+            case ErrorCodes::InvalidProperty:
                 populate_error(ex, RLM_ERR_INVALID_PROPERTY);
                 break;
-            case Kind::wrong_transact_state:
+            case ErrorCodes::WrongTransactioState:
                 populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
                 break;
-            default:
+            case ErrorCodes::SyntaxError:
+                populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
+                break;
+            case ErrorCodes::InvalidQuery:
+                populate_error(ex, RLM_ERR_INVALID_QUERY);
+                break;
+            case ErrorCodes::InvalidQueryArg:
+                populate_error(ex, RLM_ERR_INVALID_QUERY_ARG);
+                break;
+            case ErrorCodes::OutOfBounds:
+                populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+                break;
+            case ErrorCodes::PropertyNotNullable:
+                populate_error(ex, RLM_ERR_PROPERTY_NOT_NULLABLE);
+                break;
+            case ErrorCodes::TypeMismatch:
+                populate_error(ex, RLM_ERR_PROPERTY_TYPE_MISMATCH);
+                break;
+            case ErrorCodes::MissingPrimaryKey:
+                populate_error(ex, RLM_ERR_MISSING_PRIMARY_KEY);
+                break;
+            case ErrorCodes::NotCloneable:
+                populate_error(ex, RLM_ERR_NOT_CLONABLE);
+                break;
+            case ErrorCodes::CallbackFailed:
+                populate_error(ex, RLM_ERR_CALLBACK);
+                break;
+            case ErrorCodes::InvalidatedObject:
+                populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
+                break;
+            case ErrorCodes::UnexpectedPrimaryKey:
+                populate_error(ex, RLM_ERR_UNEXPECTED_PRIMARY_KEY);
+                break;
+            case ErrorCodes::ReadOnly:
+                populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
+                break;
+            case ErrorCodes::NoSuchTable:
+                populate_error(ex, RLM_ERR_NO_SUCH_TABLE);
+                break;
+            case ErrorCodes::KeyNotFound:
+                populate_error(ex, RLM_ERR_NO_SUCH_OBJECT);
+                break;
+            case ErrorCodes::OutOfDiskSpace:
+                populate_error(ex, RLM_ERR_OUT_OF_DISK_SPACE);
+                break;
+            case ErrorCodes::ObjectAlreadyExists:
+                populate_error(ex, RLM_ERR_OBJECT_ALREADY_EXISTS);
+                break;
+            case ErrorCodes::LogicError:
                 populate_error(ex, RLM_ERR_LOGIC);
+                break;
+            case ErrorCodes::RuntimeError:
+                populate_error(ex, RLM_ERR_RUNTIME);
+                break;
+            default:
+                populate_error(ex, RLM_ERR_UNKNOWN);
         }
     }
 
@@ -159,30 +185,6 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     }
     catch (const List::InvalidatedException& ex) {
         populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
-    }
-    catch (const MissingPrimaryKeyException& ex) {
-        populate_error(ex, RLM_ERR_MISSING_PRIMARY_KEY);
-    }
-    catch (const WrongPrimaryKeyTypeException& ex) {
-        populate_error(ex, RLM_ERR_WRONG_PRIMARY_KEY_TYPE);
-    }
-    catch (const PropertyTypeMismatch& ex) {
-        populate_error(ex, RLM_ERR_PROPERTY_TYPE_MISMATCH);
-    }
-    catch (const NotNullableException& ex) {
-        populate_error(ex, RLM_ERR_PROPERTY_NOT_NULLABLE);
-    }
-    catch (const object_store::Collection::OutOfBoundsIndexException& ex) {
-        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
-    }
-    catch (const Results::OutOfBoundsIndexException& ex) {
-        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
-    }
-    catch (const query_parser::InvalidQueryError& ex) {
-        populate_error(ex, RLM_ERR_INVALID_QUERY);
-    }
-    catch (const query_parser::SyntaxError& ex) {
-        populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
     }
 
     // Generic exceptions:

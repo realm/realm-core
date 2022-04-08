@@ -77,16 +77,6 @@ private:
 Status exception_to_status() noexcept;
 
 
-/// Thrown by various functions to indicate that a specified table does not
-/// exist.
-class NoSuchTable : public Exception {
-public:
-    NoSuchTable()
-        : Exception(ErrorCodes::NoSuchTable, "No such table exists")
-    {
-    }
-};
-
 class InvalidTableRef : public Exception {
 public:
     InvalidTableRef(const char* cause)
@@ -102,17 +92,6 @@ class TableNameInUse : public Exception {
 public:
     TableNameInUse()
         : Exception(ErrorCodes::TableNameInUse, "The specified table name is already in use")
-    {
-    }
-};
-
-
-// Thrown by functions that require a table to **not** be the target of link
-// columns, unless those link columns are part of the table itself.
-class CrossTableLinkTarget : public Exception {
-public:
-    CrossTableLinkTarget()
-        : Exception(ErrorCodes::CrossTableLinkTarget, "Multiple sync agents attempted to join the same session")
     {
     }
 };
@@ -177,15 +156,6 @@ public:
     /// runtime_error::what() returns the msg provided in the constructor.
 };
 
-/// Thrown when a key can not by found
-class KeyNotFound : public Exception {
-public:
-    KeyNotFound(const std::string& msg)
-        : Exception(ErrorCodes::KeyNotFound, msg)
-    {
-    }
-};
-
 /// Thrown when a key is already existing when trying to create a new object
 class KeyAlreadyUsed : public Exception {
 public:
@@ -200,14 +170,6 @@ class InvalidPathError : public Exception {
 public:
     InvalidPathError(const std::string& msg)
         : Exception(ErrorCodes::InvalidPath, msg)
-    {
-    }
-};
-
-class DuplicatePrimaryKeyValueException : public Exception {
-public:
-    DuplicatePrimaryKeyValueException(std::string_view msg)
-        : Exception(ErrorCodes::DuplicatePrimaryKeyValue, msg)
     {
     }
 };
@@ -270,8 +232,53 @@ public:
 
 class InvalidColumnKey : public InvalidArgument {
 public:
+    template <class T>
+    InvalidColumnKey(const T& name)
+        : InvalidArgument(ErrorCodes::InvalidProperty, util::format("Invalid property for object type %1", name))
+    {
+    }
     InvalidColumnKey()
         : InvalidArgument(ErrorCodes::InvalidProperty, "Invalid column key")
+    {
+    }
+};
+
+/// Thrown by various functions to indicate that a specified table does not
+/// exist.
+class NoSuchTable : public InvalidArgument {
+public:
+    NoSuchTable()
+        : InvalidArgument(ErrorCodes::NoSuchTable, "No such table exists")
+    {
+    }
+};
+
+/// Thrown when a key can not by found
+class KeyNotFound : public InvalidArgument {
+public:
+    KeyNotFound(const std::string& msg)
+        : InvalidArgument(ErrorCodes::KeyNotFound, msg)
+    {
+    }
+};
+
+
+class NotNullable : public InvalidArgument {
+public:
+    template <class T, class U>
+    NotNullable(const T& object_type, const U& property_name)
+        : InvalidArgument(ErrorCodes::PropertyNotNullable,
+                          util::format("Property '%2' of class '%1' cannot be NULL", object_type, property_name))
+    {
+    }
+};
+
+class PropertyTypeMismatch : public InvalidArgument {
+public:
+    template <class T, class U>
+    PropertyTypeMismatch(const T& object_type, const U& property_name)
+        : InvalidArgument(ErrorCodes::TypeMismatch,
+                          util::format("Type mismatch for property '%2' of class '%1'", object_type, property_name))
     {
     }
 };
@@ -312,6 +319,44 @@ class SerialisationError : public LogicError {
 public:
     SerialisationError(const std::string& msg)
         : LogicError(ErrorCodes::SerialisationError, msg)
+    {
+    }
+};
+
+class NotImplemented : public LogicError {
+public:
+    NotImplemented()
+        : LogicError(ErrorCodes::IllegalOperation, "Not implemented")
+    {
+    }
+};
+
+class DuplicatePrimaryKeyValue : public RuntimeError {
+public:
+    DuplicatePrimaryKeyValue(const std::string& msg)
+        : RuntimeError(ErrorCodes::DuplicatePrimaryKeyValue, msg)
+    {
+    }
+};
+
+class ObjectAlreadyExists : public RuntimeError {
+public:
+    template <class T, class U>
+    ObjectAlreadyExists(const U& object_type, T pk_val)
+        : RuntimeError(
+              ErrorCodes::ObjectAlreadyExists,
+              util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'",
+                           object_type, pk_val))
+    {
+    }
+};
+
+// Thrown by functions that require a table to **not** be the target of link
+// columns, unless those link columns are part of the table itself.
+class CrossTableLinkTarget : public LogicError {
+public:
+    CrossTableLinkTarget()
+        : LogicError(ErrorCodes::CrossTableLinkTarget, "Multiple sync agents attempted to join the same session")
     {
     }
 };

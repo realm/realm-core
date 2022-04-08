@@ -43,7 +43,7 @@ ConstTableRef Set::get_table() const
     verify_attached();
     if (m_type == PropertyType::Object)
         return set_base().get_target_table();
-    throw std::runtime_error("not implemented");
+    throw NotImplemented();
 }
 
 template <class T>
@@ -60,7 +60,7 @@ size_t Set::find(Query&& q) const
         ObjKey key = get_query().and_query(std::move(q)).find();
         return key ? as<Obj>().find_first(key) : not_found;
     }
-    throw std::runtime_error("not implemented");
+    throw NotImplemented();
 }
 
 template <typename T>

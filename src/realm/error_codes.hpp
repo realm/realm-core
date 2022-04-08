@@ -103,7 +103,7 @@ public:
         InvalidProperty = 26,
         MissingPrimaryKey = 27,
         UnexpectedPrimaryKey = 28,
-        WrongPrimaryKeyType = 29,
+        ObjectAlreadyExists = 29,
         ModifyPrimaryKey = 30,
         ReadOnly = 31,
         PropertyNotNullable = 32,
@@ -124,6 +124,10 @@ public:
         RangeError = 47,
         TypeMismatch = 48,
         LimitExceeded = 49,
+        MissingPropertyValue = 50,
+        ReadOnlyProperty = 51,
+        CallbackFailed = 52,
+        NotCloneable = 53,
         MaxError
     };
 

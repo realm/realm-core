@@ -499,7 +499,7 @@ inline Lst<T>::Lst(const Obj& obj, ColKey col_key)
     : Base(obj, col_key)
 {
     if (!col_key.is_list()) {
-        throw InvalidArgument(ErrorCodes::InvalidProperty, "Property not a list");
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list");
     }
 
     check_column_type<T>(m_col_key);

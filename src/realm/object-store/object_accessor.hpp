@@ -298,9 +298,8 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
             obj = table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
             if (!created && !policy.update) {
                 if (!realm->is_in_migration()) {
-                    throw std::logic_error(util::format(
-                        "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                        object_schema.name, primary_value ? ctx.print(*primary_value) : "null"));
+                    auto pk_val = primary_value ? ctx.print(*primary_value) : "null";
+                    throw ObjectAlreadyExists(object_schema.name, pk_val);
                 }
                 table->set_primary_key_column(ColKey{});
                 skip_primary = false;

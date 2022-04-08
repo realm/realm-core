@@ -279,11 +279,14 @@ public:
     bool has_table(StringData name) const noexcept;
     TableKey find_table(StringData name) const noexcept;
     StringData get_table_name(TableKey key) const;
+    StringData get_class_name(TableKey key) const
+    {
+        return table_name_to_class_name(get_table_name(key));
+    }
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
-        REALM_ASSERT(table_name.begins_with(g_class_name_prefix));
-        return table_name.substr(g_class_name_prefix_len);
+        return table_name.begins_with(g_class_name_prefix) ? table_name.substr(g_class_name_prefix_len) : table_name;
     }
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
