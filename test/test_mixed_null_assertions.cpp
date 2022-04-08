@@ -171,11 +171,10 @@ TEST(Mixed_Set_unresolved_as_null)
     auto obj = t->create_object();
     auto obj1 = t->create_object();
     auto obj2 = t->create_object();
-    obj1.invalidate();
-    obj2.invalidate();
-
     auto set = obj.get_set<Mixed>("mixeds");
     auto [it, success] = set.insert(Mixed{obj1});
+    obj1.invalidate();
+
     CHECK(success);
     auto [it1, success1] = set.insert(Mixed{"test"});
     CHECK(success1);
@@ -210,13 +209,15 @@ TEST(Mixed_Set_unresolved_as_null)
 
     {
         auto [it, success] = set.insert(Mixed{obj2});
-        CHECK(!success);
-        CHECK(set.size() == 2);
-        std::vector<size_t> indices{0, 1};
+        obj2.invalidate();
+        CHECK(success);
+        CHECK(set.size() == 3);
+        std::vector<size_t> indices{1, 0, 2};
         set.sort(indices);
-        CHECK(indices.size() == 2);
+        CHECK(indices.size() == 3);
         CHECK(indices[0] == 0);
         CHECK(indices[1] == 1);
+        CHECK(indices[2] == 2);
     }
 
     {

@@ -677,15 +677,13 @@ inline T Lst<T>::get(size_t ndx) const
         throw std::out_of_range("Index out of range");
     }
 
-    // proxy out the mixed value for links, we need to know if the link is valid or not (not necesseraly must it be
-    // null)
+    auto value = m_tree->get(ndx);
     if constexpr (std::is_same_v<T, Mixed>) {
-        Mixed mixed_value = m_tree->get(ndx);
-        if (mixed_value.is_type(type_TypedLink) && mixed_value.is_unresolved_link())
+        // return a null for mixed unresolved link
+        if (value.is_type(type_TypedLink) && value.is_unresolved_link())
             return Mixed{};
-        return mixed_value;
     }
-    return m_tree->get(ndx);
+    return value;
 }
 
 template <class T>
