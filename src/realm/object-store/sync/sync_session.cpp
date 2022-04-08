@@ -428,6 +428,9 @@ void SyncSession::handle_error(SyncError error)
     else if (error_code.category() == realm::sync::protocol_error_category()) {
         SimplifiedProtocolError simplified =
             get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
+        if (error.server_requests_client_reset) {
+            simplified = SimplifiedProtocolError::ClientResetRequested;
+        }
         switch (simplified) {
             case SimplifiedProtocolError::ConnectionIssue:
                 // Not real errors, don't need to be reported to the binding.
@@ -719,7 +722,9 @@ void SyncSession::create_sync_session()
                 lock.unlock();
                 self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
                 if (error) {
-                    self->handle_error(SyncError{error->error_code, std::string(error->message), error->is_fatal()});
+                    SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal()};
+                    sync_error.server_requests_client_reset = error->should_client_reset;
+                    self->handle_error(std::move(sync_error));
                 }
             }
         });

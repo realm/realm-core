@@ -57,6 +57,9 @@ bool SyncError::is_session_level_protocol_error() const
 /// The error indicates a client reset situation.
 bool SyncError::is_client_reset_requested() const
 {
+    if (server_requests_client_reset) {
+        return true;
+    }
     if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
         return true;
     }

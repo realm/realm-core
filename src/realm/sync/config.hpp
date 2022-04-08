@@ -67,6 +67,7 @@ struct SyncError {
     /// whether because of a version mismatch or an oversight. It is still valuable
     /// to expose these errors so that users can do something about them.
     bool is_unrecognized_by_client = false;
+    bool server_requests_client_reset = false;
 
     SyncError(std::error_code error_code, std::string message, bool is_fatal)
         : error_code(std::move(error_code))
