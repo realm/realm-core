@@ -100,23 +100,27 @@ TEST(Mixed_List_unresolved_as_null)
         // find all mixed nulls or unresolved link should work the same way
         std::vector<size_t> found;
         std::vector<size_t> expected = {0, 2};
-        auto check_results = [&]() {
-            CHECK_EQUAL(found.size(), expected.size());
+        auto check_results = [&]() -> bool {
+            if (found.size() != expected.size())
+                return false;
+
             std::sort(found.begin(), found.end());
             std::sort(expected.begin(), expected.end());
             for (size_t i = 0; i < found.size(); ++i) {
-                CHECK_EQUAL(found[i], expected[i]);
+                if (found[i] != expected[i])
+                    return false;
             }
+            return true;
         };
         list.find_all(realm::null(), [&](size_t pos) {
             found.push_back(pos);
         });
-        check_results();
+        CHECK(check_results());
         found = {};
         list.find_all(obj1, [&](size_t pos) {
             found.push_back(pos);
         });
-        check_results();
+        CHECK(!check_results());
     }
 
     {
