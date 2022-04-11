@@ -139,11 +139,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
     REQUIRE(!base_url.empty());
     auto server_app_config = minimal_app_config(base_url, "client_reset_tests", schema);
     server_app_config.partition_key = partition_prop;
-    AppSession app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
-
-    TestSyncManager sync_manager(TestSyncManager::Config(app_config, &app_session), {});
-    auto app = sync_manager.app();
+    TestAppSession test_app_session(create_app(server_app_config));
+    auto app = test_app_session.app();
     auto get_valid_config = [&]() -> SyncTestFile {
         create_user_and_log_in(app);
         return SyncTestFile(app->current_user(), partition.value, schema);
@@ -152,7 +149,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     SyncTestFile remote_config = get_valid_config();
     auto make_reset = [&](Realm::Config config_local,
                           Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
-        return reset_utils::make_baas_client_reset(config_local, config_remote, sync_manager);
+        return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
     // this is just for ease of debugging
@@ -174,7 +171,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             recovery_path = recovery_path_it->second;
             REQUIRE(util::File::exists(orig_path));
             REQUIRE(!util::File::exists(recovery_path));
-            bool did_reset_files = sync_manager.app()->sync_manager()->immediately_run_file_actions(orig_path);
+            bool did_reset_files = test_app_session.app()->sync_manager()->immediately_run_file_actions(orig_path);
             REQUIRE(did_reset_files);
             REQUIRE(!util::File::exists(orig_path));
             REQUIRE(util::File::exists(recovery_path));
@@ -386,7 +383,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 auto realm = Realm::get_shared_realm(temp_config);
                 wait_for_download(*realm);
 
-                session = sync_manager.app()->sync_manager()->get_existing_session(temp_config.path);
+                session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
             }
             realm::SyncError synthetic(sync::make_error_code(sync::ProtocolError::bad_client_file),
@@ -437,7 +434,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     },
                     std::chrono::seconds(20));
             }
-            auto session = sync_manager.app()->sync_manager()->get_existing_session(local_config.path);
+            auto session = test_app_session.app()->sync_manager()->get_existing_session(local_config.path);
             if (session) {
                 session->shutdown_and_wait();
             }

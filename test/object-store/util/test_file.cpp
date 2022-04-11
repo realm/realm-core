@@ -278,33 +278,89 @@ std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
     return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
 }
 
+namespace {
+void set_app_config_defaults(app::App::Config& app_config,
+                             const std::shared_ptr<app::GenericNetworkTransport>& transport)
+{
+    if (!app_config.transport)
+        app_config.transport = transport;
+    if (app_config.platform.empty())
+        app_config.platform = "Object Store Test Platform";
+    if (app_config.platform_version.empty())
+        app_config.platform_version = "Object Store Test Platform Version";
+    if (app_config.sdk_version.empty())
+        app_config.sdk_version = "SDK Version";
+    if (app_config.app_id.empty())
+        app_config.app_id = "app_id";
+    if (!app_config.local_app_version)
+        app_config.local_app_version.emplace("A Local App Version");
+}
+} // anonymous namespace
+
+// MARK: - TestAppSession
+
+#if REALM_ENABLE_AUTH_TESTS
+
+TestAppSession::TestAppSession()
+    : TestAppSession(get_runtime_app_session(get_base_url()), nullptr, DeleteApp{false})
+{
+}
+
+TestAppSession::TestAppSession(AppSession session,
+                               std::shared_ptr<realm::app::GenericNetworkTransport> custom_transport,
+                               DeleteApp delete_app)
+    : m_app_session(std::make_unique<AppSession>(session))
+    , m_base_file_path(util::make_temp_dir() + random_string(10))
+    , m_delete_app(delete_app)
+    , m_transport(custom_transport)
+{
+    if (!m_transport)
+        m_transport = instance_of<SynchronousTestTransport>;
+    auto app_config = get_config(m_transport, *m_app_session);
+    set_app_config_defaults(app_config, m_transport);
+
+    util::try_make_dir(m_base_file_path);
+    SyncClientConfig sc_config;
+    sc_config.base_file_path = m_base_file_path;
+    sc_config.log_level = TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+
+    m_app = app::App::get_uncached_app(app_config, sc_config);
+
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
+    create_user_and_log_in(m_app);
+}
+
+TestAppSession::~TestAppSession()
+{
+    if (util::File::exists(m_base_file_path)) {
+        try {
+            m_app->sync_manager()->reset_for_testing();
+            util::try_remove_dir_recursive(m_base_file_path);
+        }
+        catch (const std::exception& ex) {
+            std::cerr << ex.what() << "\n";
+        }
+        app::App::clear_cached_apps();
+    }
+    if (m_delete_app) {
+        m_app_session->admin_api.delete_app(m_app_session->server_app_id);
+    }
+}
+
+#endif
+
 // MARK: - TestSyncManager
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
-    , m_app_session(config.app_session)
 {
+    if (config.transport)
+        transport = config.transport;
     app::App::Config app_config = config.app_config;
-    if (!app_config.transport) {
-        app_config.transport = transport;
-    }
-
-    if (app_config.platform.empty()) {
-        app_config.platform = "OS Test Platform";
-    }
-
-    if (app_config.platform_version.empty()) {
-        app_config.platform_version = "OS Test Platform Version";
-    }
-
-    if (app_config.sdk_version.empty()) {
-        app_config.sdk_version = "SDK Version";
-    }
-
-    if (app_config.app_id.empty()) {
-        app_config.app_id = "app_id";
-    }
+    set_app_config_defaults(app_config, transport);
 
     SyncClientConfig sc_config;
     m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
@@ -313,10 +369,9 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.metadata_mode = config.metadata_mode;
     sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
 
-    m_app = app::App::get_shared_app(app_config, sc_config);
+    m_app = app::App::get_uncached_app(app_config, sc_config);
     if (config.override_sync_route) {
-        m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) +
-                                              "/realm-sync");
+        m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
@@ -335,17 +390,7 @@ TestSyncManager::~TestSyncManager()
             }
             app::App::clear_cached_apps();
         }
-#if REALM_ENABLE_AUTH_TESTS
-        if (m_app_session) {
-            m_app_session->admin_api.delete_app(m_app_session->server_app_id);
-        }
-#endif
     }
-}
-
-std::shared_ptr<app::App> TestSyncManager::app() const
-{
-    return m_app;
 }
 
 #endif // REALM_ENABLE_SYNC

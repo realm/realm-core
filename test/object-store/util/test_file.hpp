@@ -143,7 +143,7 @@ public:
     }
 
 private:
-    friend struct TestSyncManager;
+    friend class TestSyncManager;
     SyncServer(const Config& config);
     std::string m_local_root_dir;
     std::unique_ptr<realm::util::Logger> m_logger;
@@ -176,35 +176,61 @@ struct SyncTestFile : TestFile {
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
 };
 
-struct TestSyncManager {
-    struct Config {
-#if TEST_ENABLE_SYNC_LOGGING
-        static constexpr bool default_logging = true;
-#else
-        static constexpr bool default_logging = false;
+#if REALM_ENABLE_AUTH_TESTS
+using DeleteApp = realm::util::TaggedBool<struct DeleteAppTag>;
+class TestAppSession {
+public:
+    TestAppSession();
+    TestAppSession(realm::AppSession, std::shared_ptr<realm::app::GenericNetworkTransport> = nullptr,
+                   DeleteApp = true);
+    ~TestAppSession();
+
+    std::shared_ptr<realm::app::App> app() const noexcept
+    {
+        return m_app;
+    }
+    const realm::AppSession& app_session() const noexcept
+    {
+        return *m_app_session;
+    }
+    realm::app::GenericNetworkTransport* transport()
+    {
+        return m_transport.get();
+    }
+
+private:
+    std::shared_ptr<realm::app::App> m_app;
+    std::unique_ptr<realm::AppSession> m_app_session;
+    std::string m_base_file_path;
+    bool m_delete_app = true;
+    std::shared_ptr<realm::app::GenericNetworkTransport> m_transport;
+};
 #endif
+
+class TestSyncManager {
+public:
+    struct Config {
         Config() {}
-        Config(std::string, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-        Config(std::string, std::string,
-               realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
-        Config(const realm::app::App::Config&, realm::AppSession* = nullptr);
         realm::app::App::Config app_config;
         std::string base_path;
-        std::string base_url;
         realm::SyncManager::MetadataMode metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
         bool should_teardown_test_directory = true;
-        bool verbose_sync_client_logging = default_logging;
-        realm::AppSession* app_session = nullptr;
+        bool verbose_sync_client_logging = TEST_ENABLE_SYNC_LOGGING;
         bool override_sync_route = true;
+        std::shared_ptr<realm::app::GenericNetworkTransport> transport;
     };
 
+    TestSyncManager(realm::SyncManager::MetadataMode mode);
     TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
     ~TestSyncManager();
 
-    std::shared_ptr<realm::app::App> app() const;
-    realm::AppSession* app_session() const
+    std::shared_ptr<realm::app::App> app() const noexcept
     {
-        return m_app_session;
+        return m_app;
+    }
+    std::string base_file_path() const
+    {
+        return m_base_file_path;
     }
     SyncServer& sync_server()
     {
@@ -236,31 +262,17 @@ private:
     SyncServer m_sync_server;
     std::string m_base_file_path;
     bool m_should_teardown_test_directory = true;
-    realm::AppSession* m_app_session = nullptr;
 };
 
-inline TestSyncManager::Config::Config(std::string bp, realm::SyncManager::MetadataMode mdm)
-    : base_path(bp)
-    , metadata_mode(mdm)
+inline TestSyncManager::TestSyncManager(realm::SyncManager::MetadataMode mode)
+    : TestSyncManager([=] {
+        Config config;
+        config.metadata_mode = mode;
+        return config;
+    }())
 {
 }
 
-inline TestSyncManager::Config::Config(std::string app_id, std::string bp, realm::SyncManager::MetadataMode mdm)
-    : base_path(bp)
-    , metadata_mode(mdm)
-{
-    realm::app::App::Config app_cfg;
-    app_cfg.app_id = app_id;
-    app_config = app_cfg;
-}
-
-inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg, realm::AppSession* session)
-    : app_config(app_cfg)
-    , metadata_mode(realm::SyncManager::MetadataMode::NoEncryption)
-    , should_teardown_test_directory(true)
-    , app_session(session)
-{
-}
 
 std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));

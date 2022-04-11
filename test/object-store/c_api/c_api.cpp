@@ -3713,11 +3713,11 @@ TEST_CASE("C API") {
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
     using namespace realm::app;
 
-    auto make_schema = []() -> auto
-    {
-        Schema schema{ObjectSchema("Obj", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                           {"name", PropertyType::String | PropertyType::Nullable},
-                                           {"value", PropertyType::Int | PropertyType::Nullable}})};
+    auto make_schema = [] {
+        Schema schema{{"Obj",
+                       {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                        {"name", PropertyType::String | PropertyType::Nullable},
+                        {"value", PropertyType::Int | PropertyType::Nullable}}}};
 
         return FLXSyncTestHarness::ServerSchema{std::move(schema), {"name", "value"}};
     };
@@ -3726,18 +3726,14 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
     auto foo_obj_id = ObjectId::gen();
     auto bar_obj_id = ObjectId::gen();
 
-    harness.load_initial_data([&](SharedRealm realm) {
+    harness.load_initial_data([&](SharedRealm& realm) {
         CppContext c(realm);
-        realm->begin_transaction();
         Object::create(c, realm, "Obj",
                        util::Any(AnyDict{
                            {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
         Object::create(c, realm, "Obj",
                        util::Any(AnyDict{
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
-
-        realm->commit_transaction();
-        wait_for_upload(*realm);
     });
 
     harness.do_with_new_realm([&](SharedRealm realm) {

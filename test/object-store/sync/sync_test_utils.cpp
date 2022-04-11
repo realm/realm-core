@@ -155,27 +155,6 @@ ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::
 
 #if REALM_ENABLE_SYNC
 
-void wait_for_sync_changes(std::shared_ptr<SyncSession> session)
-{
-    std::atomic<bool> called{false};
-    session->wait_for_upload_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-    REQUIRE(called);
-    called.store(false);
-    session->wait_for_download_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-}
-
 #if REALM_ENABLE_AUTH_TESTS
 
 #ifdef REALM_MONGODB_ENDPOINT
@@ -207,12 +186,12 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
     AutoVerifiedEmailCredentials creds;
     app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
         creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-            CHECK(!error);
+            REQUIRE(!error);
         });
     app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
                                  [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
                                      REQUIRE(user);
-                                     CHECK(!error);
+                                     REQUIRE(!error);
                                  });
     return creds;
 }
@@ -330,23 +309,22 @@ struct FakeLocalClientReset : public TestClientReset {
 
 struct BaasClientReset : public TestClientReset {
     BaasClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
-                    TestSyncManager& test_sync_manager)
+                    TestAppSession& test_app_session)
         : TestClientReset(local_config, remote_config)
-        , m_test_sync_manager(test_sync_manager)
+        , m_test_app_session(test_app_session)
     {
     }
 
     void run() override
     {
         m_did_run = true;
-        AppSession* app_session = m_test_sync_manager.app_session();
-        REALM_ASSERT(app_session);
-        auto sync_manager = m_test_sync_manager.app()->sync_manager();
+        const AppSession& app_session = m_test_app_session.app_session();
+        auto sync_manager = m_test_app_session.app()->sync_manager();
         std::string partition_value = m_local_config.sync_config->partition_value;
         REALM_ASSERT(partition_value.size() > 2 && *partition_value.begin() == '"' &&
                      *(partition_value.end() - 1) == '"');
         partition_value = partition_value.substr(1, partition_value.size() - 2);
-        Partition partition = {app_session->config.partition_key.name, partition_value};
+        Partition partition = {app_session.config.partition_key.name, partition_value};
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
@@ -378,7 +356,7 @@ struct BaasClientReset : public TestClientReset {
             // the meaning of "upload complete" to include writing to atlas then this would
             // not be necessary.
             app::MongoClient remote_client = m_local_config.sync_config->user->mongo_client("BackingDB");
-            app::MongoDatabase db = remote_client.db(app_session->config.mongo_dbname);
+            app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
             app::MongoCollection object_coll = db[object_schema_name];
             uint64_t count_external = 0;
 
@@ -409,15 +387,15 @@ struct BaasClientReset : public TestClientReset {
 
         // cause a client reset by restarting the sync service
         // this causes the server's sync history to be resynthesized
-        auto baas_sync_service = app_session->admin_api.get_sync_service(app_session->server_app_id);
-        auto baas_sync_config = app_session->admin_api.get_config(app_session->server_app_id, baas_sync_service);
-        REQUIRE(app_session->admin_api.is_sync_enabled(app_session->server_app_id));
-        app_session->admin_api.disable_sync(app_session->server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(!app_session->admin_api.is_sync_enabled(app_session->server_app_id));
-        app_session->admin_api.enable_sync(app_session->server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(app_session->admin_api.is_sync_enabled(app_session->server_app_id));
-        if (app_session->config.dev_mode_enabled) { // dev mode is not sticky across a reset
-            app_session->admin_api.set_development_mode_to(app_session->server_app_id, true);
+        auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+        auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
+            app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         }
 
         {
@@ -471,14 +449,14 @@ struct BaasClientReset : public TestClientReset {
     }
 
 private:
-    TestSyncManager& m_test_sync_manager;
+    TestAppSession& m_test_app_session;
 };
 
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
-                                                        TestSyncManager& test_sync_manager)
+                                                        TestAppSession& test_app_session)
 {
-    return std::make_unique<BaasClientReset>(local_config, remote_config, test_sync_manager);
+    return std::make_unique<BaasClientReset>(local_config, remote_config, test_app_session);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

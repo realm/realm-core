@@ -28,6 +28,15 @@
 
 namespace realm::app {
 
+namespace {
+const Schema g_minimal_schema{
+    {"TopLevel",
+     {
+         {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+     }},
+};
+}
+
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     FLXSyncTestHarness harness("basic_flx_connect");
 
@@ -35,7 +44,6 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     auto bar_obj_id = ObjectId::gen();
     harness.load_initial_data([&](SharedRealm realm) {
         CppContext c(realm);
-        realm->begin_transaction();
         Object::create(c, realm, "TopLevel",
                        util::Any(AnyDict{{"_id", foo_obj_id},
                                          {"queryable_str_field", std::string{"foo"}},
@@ -46,9 +54,6 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
                                          {"queryable_str_field", std::string{"bar"}},
                                          {"queryable_int_field", static_cast<int64_t>(10)},
                                          {"non_queryable_field", std::string{"non queryable 2"}}}));
-
-        realm->commit_transaction();
-        wait_for_upload(*realm);
     });
 
     harness.do_with_new_realm([&](SharedRealm realm) {
@@ -462,12 +467,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
 
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
-
-    auto sync_mgr = harness.make_sync_manager();
-    auto creds = create_user_and_log_in(sync_mgr.app());
-
-    SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
-    config.persist();
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
 
     {
         auto orig_realm = Realm::get_shared_realm(config);
@@ -487,26 +487,9 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {
     const std::string base_url = get_base_url();
-
-    Schema schema{
-        ObjectSchema("TopLevel",
-                     {
-                         {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                     }),
-    };
-
-    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", schema);
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
-
-    TestSyncManager::Config smc(app_config);
-    TestSyncManager sync_manager(std::move(smc), {});
-    auto app = sync_manager.app();
-
-    auto creds = create_user_and_log_in(app);
-    auto user = app->current_user();
-
-    SyncTestFile config(app, bson::Bson{}, schema);
+    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
+    TestAppSession session(create_app(server_app_config));
+    SyncTestFile config(session.app(), bson::Bson{}, g_minimal_schema);
 
     auto realm = Realm::get_shared_realm(config);
     CHECK(!wait_for_download(*realm));
@@ -517,10 +500,7 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("connect_to_flx_as_pbs");
-
-    auto tsm = harness.make_sync_manager();
-    create_user_and_log_in(tsm.app());
-    SyncTestFile config(tsm.app(), bson::Bson{}, harness.schema());
+    SyncTestFile config(harness.app(), bson::Bson{}, harness.schema());
     std::mutex sync_error_mutex;
     util::Optional<SyncError> sync_error;
     config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) mutable {
@@ -538,10 +518,7 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
 
 TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][flx][app]") {
     FLXSyncTestHarness harness("connect_to_flx_as_pbs");
-
-    auto tsm = harness.make_sync_manager();
-    create_user_and_log_in(tsm.app());
-    SyncTestFile config(tsm.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.sync_config->partition_value = "\"foobar\"";
 
     CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
@@ -550,25 +527,12 @@ TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][f
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
     const std::string base_url = get_base_url();
 
-    Schema schema{
-        ObjectSchema("TopLevel",
-                     {
-                         {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                     }),
-    };
-
-    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", schema);
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
-
-    TestSyncManager::Config smc(app_config);
-    TestSyncManager sync_manager(std::move(smc), {});
-    auto app = sync_manager.app();
-
-    auto creds = create_user_and_log_in(app);
+    auto server_app_config = minimal_app_config(base_url, "flx_connect_as_pbs", g_minimal_schema);
+    TestAppSession session(create_app(server_app_config));
+    auto app = session.app();
     auto user = app->current_user();
 
-    SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
+    SyncTestFile config(user, g_minimal_schema, SyncConfig::FLXSyncEnabled{});
 
     std::mutex sync_error_mutex;
     util::Optional<SyncError> sync_error;
@@ -610,10 +574,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
 
     auto transport = std::make_shared<HookedTransport>();
     FLXSyncTestHarness harness("flx_wait_access_token2", FLXSyncTestHarness::default_server_schema(), transport);
-
-    auto sync_mgr = harness.make_sync_manager();
-    auto creds = create_user_and_log_in(sync_mgr.app());
-    auto app = sync_mgr.app();
+    auto app = harness.app();
     std::shared_ptr<SyncUser> user = app->current_user();
     REQUIRE(user);
     REQUIRE(!user->access_token_refresh_required());
@@ -642,7 +603,7 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
             }
         }
     };
-    SyncTestFile config(sync_mgr.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     // This triggers the token refresh.
     auto r = Realm::get_shared_realm(config);
     REQUIRE(seen_waiting_for_access_token);
