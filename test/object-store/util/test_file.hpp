@@ -262,8 +262,8 @@ inline TestSyncManager::Config::Config(const realm::app::App::Config& app_cfg, r
 {
 }
 
-std::error_code wait_for_upload(realm::Realm& realm);
-std::error_code wait_for_download(realm::Realm& realm);
+std::error_code wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
+std::error_code wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 
 #endif // REALM_ENABLE_SYNC
 

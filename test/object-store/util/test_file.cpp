@@ -246,7 +246,8 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
 }
 
 static std::error_code wait_for_session(Realm& realm,
-                                        void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&))
+                                        void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&),
+                                        std::chrono::seconds timeout)
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
@@ -260,20 +261,21 @@ static std::error_code wait_for_session(Realm& realm,
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(wait_mutex);
-    cv.wait(lock, [&]() {
+    bool completed = cv.wait_for(lock, timeout, [&]() {
         return wait_flag == true;
     });
+    REALM_ASSERT_RELEASE(completed);
     return ec;
 }
 
-std::error_code wait_for_upload(Realm& realm)
+std::error_code wait_for_upload(Realm& realm, std::chrono::seconds timeout)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+    return wait_for_session(realm, &SyncSession::wait_for_upload_completion, timeout);
 }
 
-std::error_code wait_for_download(Realm& realm)
+std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_download_completion);
+    return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
 }
 
 // MARK: - TestSyncManager
