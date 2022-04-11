@@ -145,17 +145,13 @@ public:
     void find_all(value_type value, Func&& func) const
     {
         if (update()) {
-            m_tree->find_all(value, std::forward<Func>(func));
             if constexpr (std::is_same_v<T, Mixed>) {
-                if (value.is_unresolved_link()) {
-                    // if value is a mixed which contains an unresolved link, find all the nulls
-                    m_tree->find_all(realm::null(), std::forward<Func>(func));
-                }
-                else if (value.is_null()) {
+                if (value.is_null()) {
                     // if value is null then we find all the unresolved links with a linear scan
                     find_all_mixed_unresolved_links(std::forward<Func>(func));
                 }
             }
+            m_tree->find_all(value, std::forward<Func>(func));
         }
     }
 

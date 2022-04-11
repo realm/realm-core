@@ -1691,9 +1691,11 @@ TEMPLATE_TEST_CASE("DeepChangeChecker collections", "[notifications]", cf::ListO
         objects[obj_ndx_to_invalidate].invalidate();
         if (TestType::allows_storing_nulls) {
             REQUIRE(test_type.size_of_collection(objects[0]) == 3);
-            REQUIRE(test_type.count_unresolved_links(objects[0]) == 1);
-            REQUIRE(test_type.count_unresolved_links(objects[1]) == 1);
-            REQUIRE(test_type.count_unresolved_links(objects[2]) == 1);
+            const auto type = test_type.property().type;
+            size_t unresolved_links_counter = (is_mixed(type) && (is_set(type) || is_array(type))) ? 0 : 1;
+            REQUIRE(test_type.count_unresolved_links(objects[0]) == unresolved_links_counter);
+            REQUIRE(test_type.count_unresolved_links(objects[1]) == unresolved_links_counter);
+            REQUIRE(test_type.count_unresolved_links(objects[2]) == unresolved_links_counter);
         }
         else {
             // LnkLst actually has 3 entries but hides one
