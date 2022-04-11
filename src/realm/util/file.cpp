@@ -1695,7 +1695,7 @@ void File::MapBase::flush()
     REALM_ASSERT(m_addr);
 #if REALM_ENABLE_ENCRYPTION
     if (m_encrypted_mapping) {
-        m_encrypted_mapping->flush();
+        realm::util::encryption_flush(m_encrypted_mapping);
     }
 #endif
 }
