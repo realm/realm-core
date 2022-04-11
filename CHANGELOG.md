@@ -1,27 +1,17 @@
-# NEXT RELEASE
+# 11.14.0 Release notes
 
 ### Enhancements
 * Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
 * Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
+* Added AppCredentials::serialize_as_json() support for c_api ([#5348](https://github.com/realm/realm-core/issues/5348))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Added auth code and id token support for google c_api ([#5347]https://github.com/realm/realm-core/issues/5347)
-* Fixed potential future bug in how async write/commit used encryption ([#5369]https://github.com/realm/realm-core/pull/5369)
+* Fixed potential future bug in how async write/commit used encryption ([#5369](https://github.com/realm/realm-core/pull/5369))
 * Fixed various corruption bugs when encryption is used. Issues caused by not locking a mutex when needed. Since v11.8.0. Fixes meta-issue https://github.com/realm/realm-core/issues/5360: (https://github.com/realm/realm-core/issues/5332, https://github.com/realm/realm-swift/issues/7659, https://github.com/realm/realm-core/issues/5230, https://github.com/realm/realm-core/issues/5190, https://github.com/realm/realm-swift/issues/7640, https://github.com/realm/realm-js/issues/4428, https://github.com/realm/realm-java/issues/7652, https://github.com/realm/realm-js/issues/4358)
-* Added AppCredentials::serialize_as_json() support for c_api ([#5348]https://github.com/realm/realm-core/issues/5348)
-* Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data (since 11.13.0).
-
-### Breaking changes
-* None.
+* Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data ([#5373](https://github.com/realm/realm-core/pull/5373), since 11.13.0).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
-
------------
-
-### Internals
-* None.
 
 ----------------------------------------------
 
