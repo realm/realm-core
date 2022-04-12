@@ -32,7 +32,7 @@ static std::vector<SectionRange> calculate_sections(Results& results,
     const size_t size = snapshot.size();
     size_t current_section = 0;
     for (size_t i = 0; i < size; ++i) {
-        auto section_key = callback(snapshot.get_any(i));
+        auto section_key = callback(snapshot.get_any(i), snapshot.get_realm());
         if (sections.find(section_key) == sections.end()) {
             SectionRange section;
             section.index = current_section;
@@ -58,13 +58,13 @@ static SectionedResults::ComparisonFunc builtin_comparison(Results& results,
     switch (op) {
         case Results::SectionedResultsOperator::FirstLetter:
             if (results.get_type() == PropertyType::Object) {
-                return [r = results.get_realm(), p = *prop_name](Mixed value) {
-                    auto obj = Object(r, value.get_link());
+                return [p = *prop_name](Mixed value, std::shared_ptr<Realm> realm) {
+                    auto obj = Object(realm, value.get_link());
                     auto v = obj.get_column_value<StringData>(p);
                     return v.size() > 1 ? v.prefix(1) : "";
                 };
             } else {
-                return [r = results.get_realm()](Mixed value) {
+                return [](Mixed value, std::shared_ptr<Realm>) {
                     auto v = value.get_string();
                     return v.size() > 1 ? v.prefix(1) : "";
                 };
@@ -91,13 +91,9 @@ public:
                                         util::Optional<size_t> section_filter = util::none)
     : m_sectioned_results(sectioned_results)
     , m_cb(std::move(cb))
-    , m_prev_rt(static_cast<Transaction*>(sectioned_results.m_results.get_table()->get_parent_group())->duplicate())
     , m_section_filter(section_filter)
-    {
-        auto table_view = m_sectioned_results.m_results.get_tableview();
-        std::unique_ptr<TableView> prev_table_view = m_prev_rt->import_copy_of(table_view, PayloadPolicy::Copy);
-        m_prev_results = Results(m_sectioned_results.m_results.get_realm(), *prev_table_view);
-    }
+    , m_prev_realm(m_sectioned_results.m_results.get_realm()->freeze())
+    , m_prev_results(m_sectioned_results.m_results.freeze(m_prev_realm)) {}
 
     void before(CollectionChangeSet const& c) {}
     void after(CollectionChangeSet const& c)
@@ -127,8 +123,9 @@ public:
             }, {});
         }
 
-        auto current_tr = static_cast<Transaction*>(m_sectioned_results.m_results.get_table()->get_parent_group());
-        m_prev_rt->advance_read(current_tr->get_version_of_current_transaction());
+        REALM_ASSERT(m_sectioned_results.m_results.is_valid());
+        m_prev_realm = m_sectioned_results.m_results.get_realm()->freeze();
+        m_prev_results = m_sectioned_results.m_results.freeze(m_prev_realm);
     }
     void error(std::exception_ptr ptr)
     {
@@ -152,7 +149,7 @@ private:
     SectionedResultsNotificatonCallback m_cb;
     SectionedResults& m_sectioned_results;
 
-    TransactionRef m_prev_rt;
+    std::shared_ptr<Realm> m_prev_realm;
     Results m_prev_results;
     util::Optional<size_t> m_section_filter;
 };
@@ -203,9 +200,13 @@ m_callback(builtin_comparison(results, prop_name, op)) {
 };
 
 void SectionedResults::calculate_sections_if_required(Results::EvaluateMode mode) {
-    if (!m_results.ensure_up_to_date(mode)) {
-        m_offset_ranges = calculate_sections(m_results, m_callback);
+    if ((m_results.get_collection() != nullptr) && !m_results.get_collection()->has_changed()) {
+        return;
+    } else if ((m_results.get_collection() == nullptr) && m_results.ensure_up_to_date(mode)) {
+        return;
     }
+
+    m_offset_ranges = calculate_sections(m_results, m_callback);
 }
 
 size_t SectionedResults::size()
