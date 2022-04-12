@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* The query parser build will no longer attempt to run Bison or Flex when building realm-core as a submodule.
 
 ----------------------------------------------
 
