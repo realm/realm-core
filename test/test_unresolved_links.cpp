@@ -452,6 +452,8 @@ TEST(Unresolved_PkCollission)
     auto t = g.add_table_with_primary_key("Table", type_Int, "id");
     auto col_str = t->add_column(type_String, "str");
     t->add_search_index(col_str);
+    auto o = g.add_table_with_primary_key("Origin", type_Int, "id");
+    auto col_link = o->add_column(*t, "links");
 
     // This pk will collide with plain '7'
     int64_t pk7 = int64_t(7 + (1ull << 63));
@@ -483,7 +485,7 @@ TEST(Unresolved_PkCollission)
     k2 = t->get_objkey_from_primary_key(5);
     CHECK_NOT_EQUAL(k1, k2);
     CHECK_EQUAL(t->nb_unresolved(), 2);
-    t->create_object_with_primary_key(pk5, {{col_str, "Foo"}}).get_key();
+    t->create_object_with_primary_key(pk5, {{col_str, "Foo"}});
     k2 = t->create_object_with_primary_key(5, {{col_str, "Bar"}}).get_key();
     CHECK_EQUAL(t->nb_unresolved(), 0);
     CHECK_EQUAL(t->size(), 6);
@@ -491,6 +493,15 @@ TEST(Unresolved_PkCollission)
     k3 = t->create_object_with_primary_key(5, {{col_str, "Bar"}}).get_key();
     // Collision table should have be cleared
     CHECK_NOT_EQUAL(k2, k3);
+    auto k4 = t->create_object_with_primary_key(pk5, {{col_str, "Foo"}}).get_key();
+    auto o1 = o->create_object_with_primary_key(1).set(col_link, k3);
+    auto o2 = o->create_object_with_primary_key(2).set(col_link, k4);
+    t->invalidate_object(k3);
+    t->invalidate_object(k4);
+    k4 = t->create_object_with_primary_key(pk5, {{col_str, "Foo"}}).get_key();
+    k3 = t->create_object_with_primary_key(5, {{col_str, "Bar"}}).get_key();
+    CHECK_EQUAL(o1.get<ObjKey>(col_link), k3);
+    CHECK_EQUAL(o2.get<ObjKey>(col_link), k4);
 }
 
 TEST(Unresolved_CondensedIndices)
