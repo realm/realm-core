@@ -18,6 +18,7 @@
 
 ### Internals
 * The Xcode toolchain no longer explicitly sets `CMAKE_OSX_ARCHITECTURES`. This was a problem with the latest Xcode release complaining about explicit mentions of `i386`.
+* The query parser build will no longer attempt to run Bison or Flex when building realm-core as a submodule.
 
 ----------------------------------------------
 
