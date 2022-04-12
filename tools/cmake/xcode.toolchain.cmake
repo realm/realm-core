@@ -18,13 +18,6 @@ set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "$(MACOSX_DEPLOYMENT_TARGET_C
 set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET_CATALYST_NO "10.9")
 set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET_CATALYST_YES "10.15")
 
-if(NOT CMAKE_OSX_ARCHITECTURES)
-    # Explicitly enumerate all the possible architectures this build tree can produce.
-    # The actual build-time values are overriden below in the ARCHS setting,
-    # but CMake needs this list at configure-time to generate multi-arch build rules.
-    set(CMAKE_OSX_ARCHITECTURES "arm64;i386;x86_64;armv7;armv7k;arm64_32")
-endif()
-
 set(CMAKE_XCODE_ATTRIBUTE_ARCHS "$(ARCHS_STANDARD)")
 set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "armv7 arm64")
 
