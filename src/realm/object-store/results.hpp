@@ -338,10 +338,10 @@ public:
         m_update_policy = policy;
     }
 
-    SectionedResults sectioned_results(util::UniqueFunction<Mixed(Mixed value)> comparison_func) REQUIRES(m_mutex);
+    SectionedResults sectioned_results(util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)> comparison_func) REQUIRES(m_mutex);
 
     enum class SectionedResultsOperator {
-        FirstLetter // Section by the first letter of each string element. Note col must be a string.
+        FirstLetter // Section by the first letter of each string element. Note that col must be a string.
     };
 
     /// Takes a property name if sectioning on a collection of links, the property name needs to reference the column being sectioned on.

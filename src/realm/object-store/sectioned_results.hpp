@@ -63,7 +63,7 @@ private:
 
 class SectionedResults {
 public:
-    using ComparisonFunc = util::UniqueFunction<Mixed(Mixed value)>;
+    using ComparisonFunc = util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)>;
 
     SectionedResults(Results results, ComparisonFunc comparison_func);
     SectionedResults(Results results,

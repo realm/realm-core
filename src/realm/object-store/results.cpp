@@ -194,11 +194,6 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             // Tables are always up-to-date
             return;
         case Mode::Collection: {
-            bool needs_update = m_collection->has_changed();
-
-            if (needs_update)
-                return false;
-
             // Collections themselves are always up-to-date, but we may need
             // to apply sort descriptors
             if (m_descriptor_ordering.is_empty())
@@ -220,6 +215,7 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             if (m_notifier && m_notifier->get_list_indices(m_list_indices) && !m_realm->is_in_transaction())
                 return;
 
+            bool needs_update = m_collection->has_changed();
             if (!m_list_indices) {
                 m_list_indices = std::vector<size_t>{};
                 needs_update = true;

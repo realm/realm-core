@@ -523,8 +523,8 @@ TEST_CASE("sectioned results") {
 
     Results results(r, table);
     auto sorted = results.sort({{"name_col", true}});
-    auto sectioned_results = sorted.sectioned_results([r](Mixed value) {
-        auto obj = Object(r, value.get_link());
+    auto sectioned_results = sorted.sectioned_results([r](Mixed value, std::shared_ptr<Realm> realm) {
+        auto obj = Object(realm, value.get_link());
         auto v = obj.get_column_value<StringData>("name_col");
         return v.prefix(1);
     });
@@ -795,14 +795,14 @@ TEST_CASE("sectioned results") {
         REQUIRE(changes.deletions.empty());
 
         // Deletions
-//        r->begin_transaction();
-//        table->remove_object(o3.get_key());
-//        r->commit_transaction();
-//        advance_and_notify(*r);
-//        REQUIRE(changes.deletions.size() == 1);
-//        REQUIRE(changes.deletions[2][0] == 1);
-//        REQUIRE(changes.insertions.empty());
-//        REQUIRE(changes.modifications.empty());
+        r->begin_transaction();
+        table->remove_object(o3.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.deletions[2][0] == 1);
+        REQUIRE(changes.insertions.empty());
+        REQUIRE(changes.modifications.empty());
     }
 
     SECTION("notifications on section") {
@@ -866,16 +866,16 @@ TEST_CASE("sectioned results") {
         REQUIRE(section1_changes.deletions.empty());
 
         // Deletions
-//        r->begin_transaction();
-//        table->remove_object(o2.get_key());
-//        r->commit_transaction();
-//        advance_and_notify(*r);
-//        REQUIRE(section1_notification_calls == 2);
-//        REQUIRE(section2_notification_calls == 2);
-//        REQUIRE(section1_changes.deletions.size() == 1);
-//        REQUIRE(section1_changes.deletions[0][0] == 1);
-//        REQUIRE(section1_changes.insertions.empty());
-//        REQUIRE(section1_changes.modifications.empty());
+        r->begin_transaction();
+        table->remove_object(o2.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(section1_notification_calls == 2);
+        REQUIRE(section2_notification_calls == 2);
+        REQUIRE(section2_changes.deletions.size() == 1);
+        REQUIRE(section2_changes.deletions[1][0] == 1);
+        REQUIRE(section2_changes.insertions.empty());
+        REQUIRE(section2_changes.modifications.empty());
     }
 
     SECTION("primitive collection") {
@@ -893,7 +893,7 @@ TEST_CASE("sectioned results") {
         List lst(r, o1, array_string_col);
 
         auto results = lst.sort({{"self", true}});
-        auto sectioned_primitives = results.sectioned_results([](Mixed first/*, Mixed second*/) {
+        auto sectioned_primitives = results.sectioned_results([](Mixed first, std::shared_ptr<Realm>) {
             return first.get_string().prefix(1);
         });
 
@@ -916,7 +916,7 @@ TEST_CASE("sectioned results") {
         List lst(r, o1, array_int_col);
 
         auto results = lst.sort({{"self", true}});
-        auto sectioned_primitives = results.sectioned_results([](Mixed value) {
+        auto sectioned_primitives = results.sectioned_results([](Mixed value, std::shared_ptr<Realm>) {
             return value.get_int() % 2;
         });
 
@@ -974,7 +974,7 @@ TEMPLATE_TEST_CASE("sectioned results types", "[sectioned_results]", /*cf::Mixed
     auto results = lst.as_results();
 
     SECTION("primitives section correctly") {
-        auto sectioned_results = results.sectioned_results([r](Mixed value) -> Mixed {
+        auto sectioned_results = results.sectioned_results([r](Mixed value, std::shared_ptr<Realm>) -> Mixed {
             return TestType::comparison_value(value);
         });
         REQUIRE(sectioned_results.size() == TestType::expected_size());
