@@ -135,18 +135,31 @@ template <class T>
 void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     update_if_needed();
-    auto comparator = [this, &ascending](size_t i1, size_t i2) {
-        if constexpr (std::is_same_v<T, Mixed>) {
-            return ascending ? get(i1) < get(i2) : get(i1) > get(i2);
+
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (ascending) {
+            do_sort(indices, size(), [this](size_t i1, size_t i2) {
+                return get(i1) < get(i2);
+            });
         }
         else {
-            return ascending ? m_tree->get(i1) < m_tree->get(i2) : m_tree->get(i1) > m_tree->get(i2);
+            do_sort(indices, size(), [this](size_t i1, size_t i2) {
+                return get(i1) > get(i2);
+            });
         }
-    };
-
-    do_sort(indices, size(), [&comparator](size_t i1, size_t i2) {
-        return comparator(i1, i2);
-    });
+    }
+    else {
+        if (ascending) {
+            do_sort(indices, size(), [this](size_t i1, size_t i2) {
+                return m_tree->get(i1) < m_tree->get(i2);
+            });
+        }
+        else {
+            do_sort(indices, size(), [this](size_t i1, size_t i2) {
+                return m_tree->get(i1) > m_tree->get(i2);
+            });
+        }
+    }
 }
 
 template <class T>

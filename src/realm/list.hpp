@@ -147,7 +147,7 @@ public:
         if (update()) {
             if constexpr (std::is_same_v<T, Mixed>) {
                 if (value.is_null()) {
-                    // if value is null then we find all the unresolved links with a linear scan
+                    // if value is null then we find also all the unresolved links with a O(n lg n) scan
                     find_all_mixed_unresolved_links(std::forward<Func>(func));
                 }
             }

@@ -98,7 +98,13 @@ public:
     }
 
     template <class Func>
-    void find_all(const T& value, Func&& func) const;
+    void find_all(const T& value, Func&& func) const
+    {
+        size_t found = find(value);
+        if (found != not_found) {
+            func(found);
+        }
+    }
 
     bool is_subset_of(const CollectionBase&) const;
     bool is_strict_subset_of(const CollectionBase& rhs) const;
@@ -119,9 +125,6 @@ public:
     size_t find(T value) const;
 
     /// Erase an element from the set, returning true if the set contained the element.
-    /// In case of null mixed links by default all the nulls will be deleted
-    enum class MixedNullLink { EraseAll = 0, EraseOne = 1 };
-    template <MixedNullLink e = MixedNullLink::EraseAll>
     std::pair<size_t, bool> erase(T value);
 
     // Overriding members of CollectionBase:
@@ -623,32 +626,6 @@ REALM_NOINLINE auto Set<T>::find_impl(const T& value) const -> iterator
 }
 
 template <class T>
-REALM_NOINLINE auto Set<T>::find_impl(iterator it, const T& value) const -> iterator
-{
-    auto b = it;
-    auto e = this->end(); // Note: This ends up calling `update_if_needed()`.
-    return std::lower_bound(b, e, value, SetElementLessThan<T>{});
-}
-
-template <class T>
-template <class Func>
-void Set<T>::find_all(const T& value, Func&& func) const
-{
-    auto it = find_impl(value);
-
-    if (it == end()) {
-        func(not_found);
-        return;
-    }
-
-    while (it != end() && SetElementEquals<T>{}(*it, value)) {
-        func(it.index());
-        it += 1;
-        it = find_impl(it, value);
-    }
-}
-
-template <class T>
 std::pair<size_t, bool> Set<T>::insert(T value)
 {
     update_if_needed();
@@ -692,14 +669,8 @@ std::pair<size_t, bool> Set<T>::insert_any(Mixed value)
 }
 
 template <class T>
-template <typename Set<T>::MixedNullLink e>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
-    if constexpr (std::is_same_v<Mixed, T> && e == MixedNullLink::EraseAll) {
-        if (value.is_null())
-            return erase_null();
-    }
-
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
@@ -710,6 +681,13 @@ std::pair<size_t, bool> Set<T>::erase(T value)
     }
     do_erase(it.index());
     bump_content_version();
+
+    if constexpr (std::is_same_v<Mixed, T>) {
+        // only for mixed nulls, eagerly remove all the nulls
+        if (value.is_null()) {
+            erase(value);
+        }
+    }
     return {it.index(), true};
 }
 
@@ -738,10 +716,13 @@ inline std::pair<size_t, bool> Set<T>::insert_null()
 template <class T>
 std::pair<size_t, bool> Set<T>::erase_null()
 {
-    auto res = erase<MixedNullLink::EraseOne>(BPlusTree<T>::default_value(this->m_nullable));
-    if (res.second)
-        erase_null();
-    return res;
+    if constexpr (std::is_same_v<Mixed, T>) {
+        auto res = erase(BPlusTree<T>::default_value(this->m_nullable));
+        if (res.second)
+            erase_null();
+        return res;
+    }
+    return erase(BPlusTree<T>::default_value(this->m_nullable));
 }
 
 template <class T>
