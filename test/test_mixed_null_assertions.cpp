@@ -99,8 +99,7 @@ TEST(Mixed_List_unresolved_as_null)
     {
         // find all mixed nulls or unresolved link should work the same way
         std::vector<size_t> found;
-        std::vector<size_t> expected = {0, 2};
-        auto check_results = [&]() -> bool {
+        auto check_results = [&](std::vector<size_t> expected) -> bool {
             if (found.size() != expected.size())
                 return false;
 
@@ -115,12 +114,12 @@ TEST(Mixed_List_unresolved_as_null)
         list.find_all(realm::null(), [&](size_t pos) {
             found.push_back(pos);
         });
-        CHECK(check_results());
+        CHECK(check_results({0, 2}));
         found = {};
         list.find_all(obj1, [&](size_t pos) {
             found.push_back(pos);
         });
-        CHECK(!check_results());
+        CHECK(check_results({2}));
     }
 
     {
@@ -250,15 +249,12 @@ TEST(Mixed_Set_unresolved_as_null)
         auto obj3 = t->create_object();
         set.insert(obj3);
         CHECK(set.size() == 3);
-        int cnt = 0;
-        // we can now do find_all for nulls
-        set.find_all(Mixed{}, [this, &set, &cnt](size_t index) {
-            CHECK(index == 0 || index == 1);
+        // we can now do find_all for nulls (only actual null values will be returned, no unresolved links)
+        set.find_all(Mixed{}, [this, &set](size_t index) {
+            CHECK(index == 0);
             CHECK(set.is_null(index));
-            cnt += 1;
         });
-        CHECK(cnt == 2);
-        // erase null will erase all the nulls
+        // erase null will erase only nulls (no unresolved)
         set.erase_null();
         CHECK(set.size() == 1);
         auto obj4 = t->create_object();
@@ -269,7 +265,7 @@ TEST(Mixed_Set_unresolved_as_null)
         // erase all the nulls by default
         obj4.invalidate();
         obj5.invalidate();
-        set.erase(Mixed{});
+        set.erase_null();
         CHECK(set.size() == 1);
         auto obj6 = t->create_object();
         auto obj7 = t->create_object();
@@ -277,8 +273,11 @@ TEST(Mixed_Set_unresolved_as_null)
         set.insert(obj7);
         CHECK(set.size() == 3);
         obj6.invalidate();
-        // remove only the first null
-        set.erase<Set<Mixed>::MixedNullLink::EraseOne>(Mixed{});
-        CHECK(set.size() == 2);
+        // remove only obj6 (no allowed)
+        set.erase(obj6);
+        CHECK(set.size() == 3);
+        obj7.invalidate();
+        set.erase(Mixed{});
+        CHECK(set.size() == 1);
     }
 }
