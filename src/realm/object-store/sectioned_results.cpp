@@ -23,7 +23,6 @@ namespace realm {
 
 static std::vector<SectionRange> calculate_sections(Results& results,
                                                     const SectionedResults::ComparisonFunc& callback) {
-
     auto sections = std::map<Mixed, SectionRange>();
     auto offset_ranges = std::vector<SectionRange>();
     // Take a snapshot in case the underlying results change while
@@ -47,26 +46,38 @@ static std::vector<SectionRange> calculate_sections(Results& results,
 
     transform(sections.begin(),
               sections.end(),
-              back_inserter(offset_ranges), [](const std::map<Mixed, SectionRange>::value_type& val) { return val.second; });
+              back_inserter(offset_ranges),
+              [](const std::map<Mixed, SectionRange>::value_type& val) { return val.second; });
+    auto desc = results.get_descriptor_ordering();
+    if (desc.will_apply_sort()) {
+        const SortDescriptor* sort_desc = static_cast<const SortDescriptor*>(desc[0]);
+        auto is_asc = sort_desc->is_ascending(0);
+        if (is_asc) {
+            bool is_ascending = *is_asc;
+            std::sort(offset_ranges.begin(), offset_ranges.end(), [&is_ascending](SectionRange a, SectionRange b) {
+                return is_ascending ? (a.key < b.key) : (a.key > b.key);
+            });
+        }
+    }
     return offset_ranges;
 }
 
 static SectionedResults::ComparisonFunc builtin_comparison(Results& results,
-                                                           util::Optional<StringData> prop_name,
-                                                           Results::SectionedResultsOperator op)
+                                                           Results::SectionedResultsOperator op,
+                                                           util::Optional<StringData> prop_name)
 {
     switch (op) {
         case Results::SectionedResultsOperator::FirstLetter:
             if (results.get_type() == PropertyType::Object) {
-                return [p = *prop_name](Mixed value, std::shared_ptr<Realm> realm) {
+                return [p = *prop_name](Mixed value, SharedRealm realm) {
                     auto obj = Object(realm, value.get_link());
                     auto v = obj.get_column_value<StringData>(p);
-                    return v.size() > 1 ? v.prefix(1) : "";
+                    return v.size() > 0 ? v.prefix(1) : "";
                 };
             } else {
-                return [](Mixed value, std::shared_ptr<Realm>) {
+                return [](Mixed value, SharedRealm) {
                     auto v = value.get_string();
-                    return v.size() > 1 ? v.prefix(1) : "";
+                    return v.size() > 0 ? v.prefix(1) : "";
                 };
             }
     }
@@ -92,21 +103,15 @@ public:
     : m_sectioned_results(sectioned_results)
     , m_cb(std::move(cb))
     , m_section_filter(section_filter)
-    , m_prev_realm(m_sectioned_results.m_results.get_realm()->freeze())
-    , m_prev_results(m_sectioned_results.m_results.freeze(m_prev_realm)) {}
+    , m_prev_offset_ranges(m_sectioned_results.m_offset_ranges) {}
 
     void before(CollectionChangeSet const& c) {}
     void after(CollectionChangeSet const& c)
     {
-        std::map<size_t, std::vector<size_t>> deletions = {};
-        if (!c.deletions.empty()) {
-            auto offsets = calculate_sections(m_prev_results, m_sectioned_results.m_callback);
-            deletions = convert_indicies(offsets, c.deletions.as_indexes());
-        }
-
         m_sectioned_results.calculate_sections_if_required();
         auto insertions = convert_indicies(m_sectioned_results.m_offset_ranges, c.insertions.as_indexes());
         auto modifications = convert_indicies(m_sectioned_results.m_offset_ranges, c.modifications.as_indexes());
+        auto deletions = convert_indicies(m_prev_offset_ranges, c.deletions.as_indexes());
 
         bool should_notify = true;
         if (m_section_filter) {
@@ -124,8 +129,7 @@ public:
         }
 
         REALM_ASSERT(m_sectioned_results.m_results.is_valid());
-        m_prev_realm = m_sectioned_results.m_results.get_realm()->freeze();
-        m_prev_results = m_sectioned_results.m_results.freeze(m_prev_realm);
+        m_prev_offset_ranges = m_sectioned_results.m_offset_ranges;
     }
     void error(std::exception_ptr ptr)
     {
@@ -148,9 +152,7 @@ public:
 private:
     SectionedResultsNotificatonCallback m_cb;
     SectionedResults& m_sectioned_results;
-
-    std::shared_ptr<Realm> m_prev_realm;
-    Results m_prev_results;
+    std::vector<SectionRange> m_prev_offset_ranges;
     util::Optional<size_t> m_section_filter;
 };
 
@@ -168,6 +170,7 @@ Mixed ResultsSection::key()
 template <typename Context>
 auto ResultsSection::get(Context& ctx, size_t row_ndx)
 {
+    m_parent->calculate_sections_if_required();
     return this->m_parent->m_results.get(ctx, m_parent->m_offset_ranges[m_index].indices[row_ndx]);
 }
 
@@ -192,14 +195,17 @@ m_callback(std::move(comparison_func)) {
 };
 
 SectionedResults::SectionedResults(Results results,
-                                   util::Optional<StringData> prop_name,
-                                   Results::SectionedResultsOperator op):
+                                   Results::SectionedResultsOperator op,
+                                   util::Optional<StringData> prop_name):
 m_results(results),
-m_callback(builtin_comparison(results, prop_name, op)) {
+m_callback(builtin_comparison(results, op, prop_name)) {
     m_offset_ranges = calculate_sections(m_results, m_callback);
 };
 
 void SectionedResults::calculate_sections_if_required(Results::EvaluateMode mode) {
+    // m_results.ensure_up_to_date may indicate that the underlying collection has not changed
+    // even though it may have changed. To solve this, query the collection directly with
+    // `m_results.get_collection()->has_changed()` to get the actual source of truth.
     if ((m_results.get_collection() != nullptr) && !m_results.get_collection()->has_changed()) {
         return;
     } else if ((m_results.get_collection() == nullptr) && m_results.ensure_up_to_date(mode)) {

@@ -1161,9 +1161,9 @@ SectionedResults Results::sectioned_results(SectionedResults::ComparisonFunc com
     return SectionedResults(*this, std::move(comparison_func));
 }
 
-SectionedResults Results::sectioned_results(util::Optional<StringData> prop_name, SectionedResultsOperator op) REQUIRES(m_mutex)
+SectionedResults Results::sectioned_results(SectionedResultsOperator op, util::Optional<StringData> prop_name) REQUIRES(m_mutex)
 {
-    return SectionedResults(*this, prop_name, op);
+    return SectionedResults(*this, op, prop_name);
 }
 
 Results Results::snapshot() const&
