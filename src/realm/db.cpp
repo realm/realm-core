@@ -105,10 +105,10 @@ const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anyt
 // older free space and recycled.
 //
 // Only write transactions allocate and write new version entries. Also,
-// Only write transactions scan the ringbuffer for older versions which
+// Only write transactions scan the VersionList for older versions which
 // are not used (count is zero) and free them. As write transactions are
 // atomic (ensured by mutex), there is no race between freeing entries
-// in the ringbuffer and allocating and writing them.
+// in the VersionList and allocating and writing them.
 //
 // There are no race conditions between read transactions. Read transactions
 // never change the versioning information, only increment or decrement the
@@ -142,7 +142,7 @@ const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anyt
 //   *acquire* when the free field is set (by the write transaction).
 //
 // 3 Reads of the counter is synchronized by accesses to the put_pos variable
-//   in the ringbuffer. Reading put_pos is an acquire and writing put_pos is
+//   in the VersionList. Reading put_pos is an acquire and writing put_pos is
 //   a release. Put pos is only ever written when a write transaction updates
 //   the ring buffer.
 //
@@ -204,10 +204,10 @@ void atomic_dec(std::atomic<T>& counter)
     counter.fetch_sub(1, std::memory_order_release);
 }
 
-// nonblocking ringbuffer
-class Ringbuffer {
+// nonblocking VersionList
+class VersionList {
 public:
-    // the ringbuffer is a circular list of ReadCount structures.
+    // the VersionList is a circular list of ReadCount structures.
     // Entries from old_pos to put_pos are considered live and may
     // have an even value in 'count'. The count indicates the
     // number of referring transactions times 2.
@@ -231,7 +231,7 @@ public:
         uint32_t next;
     };
 
-    Ringbuffer() noexcept
+    VersionList() noexcept
     {
         entries = init_readers_size;
         for (int i = 0; i < init_readers_size; i++) {
@@ -284,7 +284,7 @@ public:
     static size_t compute_required_space(uint_fast32_t num_entries) noexcept
     {
         // get space required for given number of entries beyond the initial count.
-        // NB: this not the size of the ringbuffer, it is the size minus whatever was
+        // NB: this not the size of the VersionList, it is the size minus whatever was
         // the initial size.
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
@@ -309,9 +309,9 @@ public:
         return get(last());
     }
 
-    // This method re-initialises the last used ringbuffer entry to hold a new entry.
+    // This method re-initialises the last used VersionList entry to hold a new entry.
     // Precondition: This should *only* be done if the caller has established that she
-    // is the only thread/process that has access to the ringbuffer. It is currently
+    // is the only thread/process that has access to the VersionList. It is currently
     // called from init_versioning(), which is called by DB::open() under the
     // condition that it is the session initiator and under guard by the control mutex,
     // thus ensuring the precondition.
@@ -381,8 +381,8 @@ private:
     const static int init_readers_size = 32;
 
     // IMPORTANT: The actual data comprising the linked list MUST BE PLACED LAST in
-    // the RingBuffer structure, as the linked list area is extended at run time.
-    // Similarly, the RingBuffer must be the final element of the SharedInfo structure.
+    // the VersionList structure, as the linked list area is extended at run time.
+    // Similarly, the VersionList must be the final element of the SharedInfo structure.
     // IMPORTANT II:
     // To ensure proper alignment across all platforms, the SharedInfo structure
     // should NOT have a stricter alignment requirement than the ReadCount structure.
@@ -420,7 +420,7 @@ TransactionRef make_transaction_ref(Args&&... args)
 /// Members `init_complete`, `shared_info_version`, `size_of_mutex`, and
 /// `size_of_condvar` may only be modified only while holding an exclusive lock
 /// on the file, and may be read only while holding a shared (or exclusive) lock
-/// on the file. All other members (except for the Ringbuffer) may be accessed
+/// on the file. All other members (except for the VersionList) may be accessed
 /// only while holding a lock on `controlmutex`.
 ///
 /// SharedInfo must be 8-byte aligned. On 32-bit Apple platforms, mutexes store their
@@ -445,7 +445,7 @@ struct alignas(8) DB::SharedInfo {
     /// Like size_of_mutex, but for condition variable members of SharedInfo.
     uint8_t size_of_condvar; // Offset 2
 
-    /// Set during the critical phase of a commit, when the logs, the ringbuffer
+    /// Set during the critical phase of a commit, when the logs, the VersionList
     /// and the database may be out of sync with respect to each other. If a
     /// writer crashes during this phase, there is no safe way of continuing
     /// with further write transactions. When beginning a write transaction,
@@ -531,8 +531,8 @@ struct alignas(8) DB::SharedInfo {
     std::atomic<uint32_t> next_ticket;
     std::atomic<uint32_t> next_served = 0;
 
-    // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
-    Ringbuffer readers;
+    // IMPORTANT: The VersionList MUST be the last field in SharedInfo - see above.
+    VersionList readers;
 
     SharedInfo(Durability, Replication::HistoryType, int history_schema_version);
     ~SharedInfo() noexcept {}
@@ -540,7 +540,7 @@ struct alignas(8) DB::SharedInfo {
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
-        Ringbuffer::ReadCount& r = readers.reinit_last();
+        VersionList::ReadCount& r = readers.reinit_last();
         r.filesize = file_size;
         r.version = initial_version;
         r.current_top = top_ref;
@@ -873,8 +873,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            // we need a thread-local copy of the number of ringbuffer entries in order
-            // to later detect concurrent expansion of the ringbuffer.
+            // we need a thread-local copy of the number of VersionList entries in order
+            // to later detect concurrent expansion of the VersionList.
             m_local_max_entry = info->readers.get_num_entries();
 
             // We need to map the info file once more for the readers part
@@ -1449,7 +1449,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         File::try_remove(tmp_path);
 
         // Using start_read here ensures that we have access to the latest entry
-        // in the ringbuffer. We need to have access to that later to update top_ref and file_size.
+        // in the VersionList. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
         TransactionRef tr = start_read();
 
@@ -1476,7 +1476,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         }
         {
             SharedInfo* r_info = m_reader_map.get_addr();
-            Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
+            VersionList::ReadCount& rc = const_cast<VersionList::ReadCount&>(r_info->readers.get_last());
             REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
@@ -1574,7 +1574,7 @@ void DB::release_all_read_locks() noexcept
     SharedInfo* r_info = m_reader_map.get_addr();
     for (auto& read_lock : m_local_locks_held) {
         --m_transaction_count;
-        const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+        const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
         atomic_double_dec(r.count);
     }
     m_local_locks_held.clear();
@@ -2101,7 +2101,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
     }
     --m_transaction_count;
     SharedInfo* r_info = m_reader_map.get_addr();
-    const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+    const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
     atomic_double_dec(r.count); // <-- most of the exec time spent here
 }
 
@@ -2119,7 +2119,7 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
                 continue;
             }
             r_info = m_reader_map.get_addr();
-            const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+            const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
             // if the entry is stale and has been cleared by the cleanup process,
             // we need to start all over again. This is extremely unlikely, but possible.
             if (!atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
@@ -2143,20 +2143,20 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
             continue;
         }
         r_info = m_reader_map.get_addr();
-        const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+        const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
 
         // if the entry is stale and has been cleared by the cleanup process,
         // the requested version is no longer available
         while (!atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
             // we failed to lock the version. This could be because the version
             // is being cleaned up, but also because the cleanup is probing for access
-            // to it. If it's being probed, the tail ptr of the ringbuffer will point
+            // to it. If it's being probed, the tail ptr of the VersionList will point
             // to it. If so we retry. If the tail ptr points somewhere else, the entry
             // has been cleaned up.
             if (&r_info->readers.get_oldest() != &r)
                 throw BadVersion();
         }
-        // we managed to lock an entry in the ringbuffer, but it may be so old that
+        // we managed to lock an entry in the VersionList, but it may be so old that
         // the version doesn't match the specific request. In that case we must release and fail
         if (r.version != version_id.version) {
             atomic_double_dec(r.count); // <-- release
@@ -2419,7 +2419,7 @@ VersionID DB::get_version_id_of_latest_snapshot()
         return {m_fake_read_lock_if_immutable->m_version, 0};
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     // As get_version_of_latest_snapshot() may be called outside of the write
-    // mutex, another thread may be performing changes to the ringbuffer
+    // mutex, another thread may be performing changes to the VersionList
     // concurrently. It may even cleanup and recycle the current entry from
     // under our feet, so we need to protect the entry by temporarily
     // incrementing the reader ref count until we've got a safe reading of the
@@ -2429,7 +2429,7 @@ VersionID DB::get_version_id_of_latest_snapshot()
         SharedInfo* r_info;
         do {
             // make sure that the index we are about to dereference falls within
-            // the portion of the ringbuffer that we have mapped - if not, extend
+            // the portion of the VersionList that we have mapped - if not, extend
             // the mapping to fit.
             r_info = m_reader_map.get_addr();
             index = r_info->readers.last();
@@ -2437,7 +2437,7 @@ VersionID DB::get_version_id_of_latest_snapshot()
 
         // now (double) increment the read count so that no-one cleans up the entry
         // while we read it.
-        const Ringbuffer::ReadCount& r = r_info->readers.get(index);
+        const VersionList::ReadCount& r = r_info->readers.get(index);
         if (!atomic_double_inc_if_even(r.count)) {
             continue;
         }
@@ -2473,7 +2473,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
             r_info = m_reader_map.get_addr();
         }
         r_info->readers.cleanup();
-        const Ringbuffer::ReadCount& rc = r_info->readers.get_oldest();
+        const VersionList::ReadCount& rc = r_info->readers.get_oldest();
         oldest_version = rc.version;
 
         // Allow for trimming of the history. Some types of histories do not
@@ -2531,7 +2531,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // version through the ring buffer. If not, a reader may start updating the allocators
         // mappings while the allocator is in dirty state.
         reset_free_space_tracking();
-        // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
+        // Update reader info. If this fails in any way, the VersionList may be corrupted.
         // This can lead to other readers seing invalid data which is likely to cause them
         // to crash. Other writers *must* be prevented from writing any further updates
         // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
@@ -2550,7 +2550,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
                 m_local_max_entry = entries;
                 r_info->readers.expand_to(entries);
             }
-            Ringbuffer::ReadCount& r = r_info->readers.get_next();
+            VersionList::ReadCount& r = r_info->readers.get_next();
             r.current_top = new_top_ref;
             r.filesize = new_file_size;
             r.version = new_version;
@@ -2559,7 +2559,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
             // REALM_ASSERT(m_alloc.matches_section_boundary(new_file_size));
             REALM_ASSERT(new_top_ref < new_file_size);
         }
-        // At this point, the ringbuffer has been succesfully updated, and the next writer
+        // At this point, the VersionList has been succesfully updated, and the next writer
         // can safely proceed once the writemutex has been lifted.
         info->commit_in_critical_phase = 0;
     }
