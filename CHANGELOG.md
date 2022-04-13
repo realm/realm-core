@@ -7,7 +7,8 @@
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
- 
+* Close realm when exception is thrown during initialization ([#5363](https://github.com/realm/realm-core/issues/5363))
+
 ### Breaking changes
 * None.
 
