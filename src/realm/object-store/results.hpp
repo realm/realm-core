@@ -34,8 +34,6 @@
 #include <realm/util/checked_mutex.hpp>
 #include <realm/util/optional.hpp>
 
-#include <iostream>
-
 namespace realm {
 class Mixed;
 class SectionedResults;
@@ -344,8 +342,14 @@ public:
         FirstLetter // Section by the first letter of each string element. Note that col must be a string.
     };
 
-    /// Takes a property name if sectioning on a collection of links, the property name needs to reference the column being sectioned on.
-    SectionedResults sectioned_results(util::Optional<StringData> property_name, SectionedResultsOperator op) REQUIRES(m_mutex);
+    /** Creates a SectionedResults object by using a built in sectioning algorithm to help with efficiency and reduce overhead from the SDK level.
+     *
+     * @param op The `SectionedResultsOperator` operator to use
+     * @param property_name Takes a property name if sectioning on a collection of links, the property name needs to reference the column being sectioned on.
+     *
+     * @return A SectionedResults object with results sectioned based on the chosen built in operator.
+     */
+    SectionedResults sectioned_results(SectionedResultsOperator op, util::Optional<StringData> property_name = util::none) REQUIRES(m_mutex);
 
 private:
     std::shared_ptr<Realm> m_realm;
