@@ -1289,7 +1289,7 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
             throw DeleteOnOpenRealmException(realm_file_path);
         }
     }
-    catch (const util::File::NotFound&) {
+    catch (const FileAccessError&) {
         // Thrown only if the parent directory of the lock file does not exist,
         // which obviously indicates that we didn't need to delete anything
         if (did_delete_realm) {

@@ -33,6 +33,7 @@ struct ErrorCategory {
         runtime_error = RLM_ERR_CAT_RUNTIME,
         invalid_argument = RLM_ERR_CAT_INVALID_ARG,
         file_access = RLM_ERR_CAT_FILE_ACCESS,
+        system_error = RLM_ERR_CAT_SYSTEM_ERROR,
     };
     constexpr ErrorCategory()
         : m_value(0)
@@ -140,6 +141,7 @@ public:
         FileOperationFailed = RLM_ERR_FILE_OPERATION_FAILED,
         FileNotFound = RLM_ERR_FILE_NOT_FOUND,
         FileAlreadyExists = RLM_ERR_FILE_ALREADY_EXISTS,
+        SystemError = RLM_ERR_SYSTEM_ERROR,
         InvalidDatabase = RLM_ERR_INVALID_DATABASE,
         IncompatibleHistories = RLM_ERR_INCOMPATIBLE_HISTORIES,
         DeleteOnOpenRealm = RLM_ERR_DELETE_OPENED_REALM,

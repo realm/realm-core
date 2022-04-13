@@ -24,7 +24,6 @@
 #include <ctime>
 #include <functional>
 #include <memory>
-#include <stdexcept>
 #include <streambuf>
 #include <string>
 
@@ -34,7 +33,7 @@
 
 #include <realm/utilities.hpp>
 #include <realm/util/assert.hpp>
-#include <realm/util/backtrace.hpp>
+#include <realm/exceptions.hpp>
 #include <realm/util/features.h>
 #include <realm/util/function_ref.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -935,60 +934,6 @@ private:
     void flush();
 };
 
-/// Used for any I/O related exception. Note the derived exception
-/// types that are used for various specific types of errors.
-class File::AccessError : public ExceptionWithBacktrace<std::runtime_error> {
-public:
-    AccessError(const std::string& msg, const std::string& path);
-
-    /// Return the associated file system path, or the empty string if there is
-    /// no associated file system path, or if the file system path is unknown.
-    const std::string& get_path() const;
-
-    void set_path(std::string path)
-    {
-        m_path = std::move(path);
-    }
-
-    const char* message() const noexcept
-    {
-        m_buffer = std::runtime_error::what();
-        if (m_path.size() > 0)
-            m_buffer += (std::string(" Path: ") + m_path);
-        return m_buffer.c_str();
-    }
-
-private:
-    std::string m_path;
-    mutable std::string m_buffer;
-};
-
-
-/// Thrown if the user does not have permission to open or create
-/// the specified file in the specified access mode.
-class File::PermissionDenied : public AccessError {
-public:
-    PermissionDenied(const std::string& msg, const std::string& path);
-};
-
-
-/// Thrown if the directory part of the specified path was not
-/// found, or create_Never was specified and the file did no
-/// exist.
-class File::NotFound : public AccessError {
-public:
-    NotFound(const std::string& msg, const std::string& path);
-};
-
-
-/// Thrown if create_Always was specified and the file did already
-/// exist.
-class File::Exists : public AccessError {
-public:
-    Exists(const std::string& msg, const std::string& path);
-};
-
-
 class DirScanner {
 public:
     DirScanner(const std::string& path, bool allow_missing = false);
@@ -1275,7 +1220,7 @@ inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios
     flush();
     SizeType pos2 = 0;
     if (int_cast_with_overflow_detect(std::streamsize(pos), pos2))
-        throw util::overflow_error("Seek position overflow");
+        throw RuntimeError(ErrorCodes::RangeError, "Seek position overflow");
     m_file.seek(pos2);
     return pos;
 }
@@ -1289,36 +1234,10 @@ inline void File::Streambuf::flush()
     }
 }
 
-inline File::AccessError::AccessError(const std::string& msg, const std::string& path)
-    : ExceptionWithBacktrace<std::runtime_error>(msg)
-    , m_path(path)
-{
-}
-
-inline const std::string& File::AccessError::get_path() const
-{
-    return m_path;
-}
-
-inline File::PermissionDenied::PermissionDenied(const std::string& msg, const std::string& path)
-    : AccessError(msg, path)
-{
-}
-
-inline File::NotFound::NotFound(const std::string& msg, const std::string& path)
-    : AccessError(msg, path)
-{
-}
-
-inline File::Exists::Exists(const std::string& msg, const std::string& path)
-    : AccessError(msg, path)
-{
-}
-
 inline bool operator==(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
+    throw NotImplemented;
 #else // POSIX version
     return lhs.device == rhs.device && lhs.inode == rhs.inode;
 #endif
@@ -1332,7 +1251,7 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
+    throw NotImplemented;
 #else // POSIX version
     if (lhs.device < rhs.device)
         return true;

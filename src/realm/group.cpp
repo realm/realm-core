@@ -562,7 +562,8 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+        throw FileAccessError(ErrorCodes::FileFormatUpgradeRequired,
+                              "Realm file needs upgrade before opening in RO mode", path, 0);
     return file_format_version;
 }
 

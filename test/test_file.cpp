@@ -33,7 +33,7 @@
 #include <unistd.h>
 #endif
 
-
+using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
 
@@ -388,14 +388,14 @@ TEST(File_NotFound)
 {
     TEST_PATH(path);
     File file;
-    CHECK_THROW_EX(file.open(path), File::NotFound, e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path), FileAccessError, e.get_path() == std::string(path));
 }
 
 
 TEST(File_PathNotFound)
 {
     File file;
-    CHECK_THROW(file.open(""), File::NotFound);
+    CHECK_THROW_EX(file.open(""), FileAccessError, e.code() == ErrorCodes::FileNotFound);
 }
 
 
@@ -405,8 +405,8 @@ TEST(File_Exists)
     File file;
     file.open(path, File::mode_Write); // Create the file
     file.close();
-    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), File::Exists,
-                   e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), FileAccessError,
+                   e.get_path() == std::string(path) && e.code() == ErrorCodes::FileAlreadyExists);
 }
 
 

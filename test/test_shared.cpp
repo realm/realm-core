@@ -2190,7 +2190,7 @@ TEST(Shared_EncryptionKeyCheck)
     try {
         DBRef sg_2 = DB::create(path, false, DBOptions());
     }
-    catch (std::runtime_error&) {
+    catch (const Exception&) {
         ok = true;
     }
     CHECK(ok);

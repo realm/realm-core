@@ -130,7 +130,7 @@ void SyncManager::configure(std::shared_ptr<app::App> app, const std::string& sy
                     m_file_manager->remove_user_realms(user.identity(), user.realm_file_paths());
                     dead_users.emplace_back(std::move(user));
                 }
-                catch (util::File::AccessError const&) {
+                catch (FileAccessError const&) {
                     continue;
                 }
             }

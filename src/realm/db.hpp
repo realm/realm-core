@@ -61,9 +61,9 @@ struct IncompatibleLockFile : RuntimeError {
 /// This exception will also be thrown if the history schema version is lower
 /// than required, and no migration is possible
 /// (Replication::is_upgradable_history_schema()).
-struct IncompatibleHistories : util::File::AccessError {
+struct IncompatibleHistories : FileAccessError {
     IncompatibleHistories(const std::string& msg, const std::string& path)
-        : util::File::AccessError("Incompatible histories. " + msg, path)
+        : FileAccessError(ErrorCodes::IncompatibleHistories, "Incompatible histories. " + msg, path, 0)
     {
     }
 };
@@ -76,9 +76,10 @@ struct IncompatibleHistories : util::File::AccessError {
 /// for read or write operations.
 /// It will also be thrown if a realm which requires upgrade is opened in read-only
 /// mode (Group::open).
-struct FileFormatUpgradeRequired : util::File::AccessError {
-    FileFormatUpgradeRequired(const std::string& msg, const std::string& path)
-        : util::File::AccessError(msg, path)
+struct FileFormatUpgradeRequired : FileAccessError {
+    FileFormatUpgradeRequired(const std::string& path)
+        : FileAccessError(ErrorCodes::FileFormatUpgradeRequired,
+                          "The Realm file format must be allowed to be upgraded in order to proceed.", path, 0)
     {
     }
 };

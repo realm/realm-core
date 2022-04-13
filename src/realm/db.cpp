@@ -849,7 +849,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 continue;
             }
             std::stringstream ss;
-            ss << "Condtion var size doesn't match: " << info->size_of_condvar << " " << sizeof(info->room_to_write)
+            ss << "Condition var size doesn't match: " << info->size_of_condvar << " " << sizeof(info->room_to_write)
                << ".";
             throw IncompatibleLockFile(ss.str());
         }
@@ -955,9 +955,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                     top.init_from_ref(top_ref);
                     Group::validate_top_array(top, alloc);
                 }
-                catch (InvalidDatabase& e) {
+                catch (const InvalidDatabase& e) {
                     if (e.get_path().empty()) {
-                        e.set_path(path);
+                        throw InvalidDatabase(e.what(), path);
                     }
                     throw;
                 }
@@ -2043,7 +2043,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         bool need_hist_schema_upgrade = (current_hist_schema_version_2 < target_hist_schema_version);
         if (need_hist_schema_upgrade) {
             if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired("Database upgrade required but prohibited", this->m_db_path);
+                throw FileFormatUpgradeRequired(this->m_db_path);
 
             Replication* repl = get_replication();
             repl->upgrade_history_schema(current_hist_schema_version_2); // Throws
@@ -2061,7 +2061,7 @@ void DB::upgrade_file_format(bool allow_file_format_upgrade, int target_file_for
         bool need_file_format_upgrade = (current_file_format_version_2 < target_file_format_version);
         if (need_file_format_upgrade) {
             if (!allow_file_format_upgrade)
-                throw FileFormatUpgradeRequired("Database upgrade required but prohibited", this->m_db_path);
+                throw FileFormatUpgradeRequired(this->m_db_path);
             wt->upgrade_file_format(target_file_format_version); // Throws
             // Note: The file format version stored in the Realm file will be
             // updated to the new file format version as part of the following

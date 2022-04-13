@@ -30,7 +30,11 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case FileAlreadyExists:
         case InvalidDatabase:
         case DecryptionFailed:
+        case IncompatibleHistories:
+        case FileFormatUpgradeRequired:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::file_access);
+        case SystemError:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::system_error);
         case RuntimeError:
         case RangeError:
         case IncompatibleSession:

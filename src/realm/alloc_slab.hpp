@@ -666,9 +666,9 @@ private:
 
 // Implementation:
 
-struct InvalidDatabase : util::File::AccessError {
+struct InvalidDatabase : FileAccessError {
     InvalidDatabase(const std::string& msg, const std::string& path)
-        : util::File::AccessError(msg, path)
+        : FileAccessError(ErrorCodes::InvalidDatabase, msg, path, 0)
     {
     }
 };

@@ -161,7 +161,7 @@ TEST(Group_Permissions)
         auto group_open = [&] {
             Group group(path, crypt_key());
         };
-        CHECK_THROW(group_open(), File::PermissionDenied);
+        CHECK_THROW_EX(group_open(), FileAccessError, e.code() == ErrorCodes::PermissionDenied);
     }
 }
 #endif
@@ -650,7 +650,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group(path, crypt_key()), File::NotFound);
+    CHECK_THROW_EX(Group(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileNotFound);
 }
 
 TEST(Group_Invalid2)
@@ -666,11 +666,11 @@ TEST(Group_Overwrite)
     {
         Group g;
         g.write(path, crypt_key());
-        CHECK_THROW(g.write(path, crypt_key()), File::Exists);
+        CHECK_THROW_EX(g.write(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileAlreadyExists);
     }
     {
         Group g(path, crypt_key());
-        CHECK_THROW(g.write(path, crypt_key()), File::Exists);
+        CHECK_THROW_EX(g.write(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileAlreadyExists);
     }
     {
         Group g;

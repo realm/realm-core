@@ -23,6 +23,7 @@
 #define RLM_ERR_CAT_RUNTIME 4
 #define RLM_ERR_CAT_INVALID_ARG 8
 #define RLM_ERR_CAT_FILE_ACCESS 16
+#define RLM_ERR_CAT_SYSTEM_ERROR 32
 
 typedef enum realm_errno {
     RLM_ERR_NONE = 0,
@@ -91,6 +92,8 @@ typedef enum realm_errno {
     RLM_ERR_FILE_PERMISSION_DENIED,
     RLM_ERR_FILE_NOT_FOUND,
     RLM_ERR_FILE_ALREADY_EXISTS,
+
+    RLM_ERR_SYSTEM_ERROR,
 
     RLM_ERR_DELETE_OPENED_REALM,
 

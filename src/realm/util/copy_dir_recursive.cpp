@@ -24,7 +24,7 @@ void util::copy_dir_recursive(const std::string& origin_path, const std::string&
             File::copy(origin_subpath, target_subpath); // Throws
         }
         else if (!skip_special_files) {
-            throw util::File::AccessError("Cannot copy special file", origin_subpath);
+            throw FileAccessError(ErrorCodes::FileOperationFailed, "Cannot copy special file", origin_subpath, 0);
         }
     }
 }

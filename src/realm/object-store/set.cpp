@@ -25,6 +25,7 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/exceptions.hpp>
 
 namespace realm::object_store {
 
