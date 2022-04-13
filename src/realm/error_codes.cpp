@@ -24,57 +24,65 @@ namespace realm {
 ErrorCategory ErrorCodes::error_categories(Error code)
 {
     switch (code) {
-    case RuntimeError:
-    case RangeError:
-    case IncompatibleSession:
-    case IncompatibleLockFile:
-    case DecryptionFailed:
-    case InvalidQuery:
-    case BrokenInvariant:
-    case DuplicatePrimaryKeyValue:
-    case OutOfMemory:
-    case UnsupportedFileFormatVersion:
-    case MultipleSyncAgents:
-    case AddressSpaceExhausted:
-    case ObjectAlreadyExists:
-    case OutOfDiskSpace:
-    case CallbackFailed:
-    case NotCloneable:
-        return ErrorCategory().set(ErrorCategory::runtime_error);
-    case PropertyNotNullable:
-    case InvalidProperty:
-    case InvalidName:
-    case InvalidDictionaryValue:
-    case InvalidSortDescriptor:
-    case SyntaxError:
-    case InvalidQueryArg:
-    case KeyNotFound:
-    case OutOfBounds:
-    case LimitExceeded:
-    case UnexpectedPrimaryKey:
-    case ModifyPrimaryKey:
-    case ReadOnlyProperty:
-    case TypeMismatch:
-    case MissingPrimaryKey:
-    case MissingPropertyValue:
-    case NoSuchTable:
-        return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
-    case LogicError:
-    case BrokenPromise:
-    case CrossTableLinkTarget:
-    case KeyAlreadyUsed:
-    case WrongTransactioState:
-    case SerialisationError:
-    case IllegalOperation:
-    case StaleAccessor:
-    case ReadOnly:
-    case InvalidatedObject:
-        return ErrorCategory().set(ErrorCategory::logic_error);
-    case OK:
-    case UnknownError:
-        break;
-    default:
-        break;
+        case FileOperationFailed:
+        case PermissionDenied:
+        case FileNotFound:
+        case FileAlreadyExists:
+        case InvalidDatabase:
+        case DecryptionFailed:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::file_access);
+        case RuntimeError:
+        case RangeError:
+        case IncompatibleSession:
+        case IncompatibleLockFile:
+        case InvalidQuery:
+        case BrokenInvariant:
+        case DuplicatePrimaryKeyValue:
+        case OutOfMemory:
+        case UnsupportedFileFormatVersion:
+        case MultipleSyncAgents:
+        case AddressSpaceExhausted:
+        case ObjectAlreadyExists:
+        case OutOfDiskSpace:
+        case CallbackFailed:
+        case NotCloneable:
+            return ErrorCategory().set(ErrorCategory::runtime_error);
+        case InvalidArgument:
+        case PropertyNotNullable:
+        case InvalidProperty:
+        case InvalidName:
+        case InvalidDictionaryValue:
+        case InvalidSortDescriptor:
+        case SyntaxError:
+        case InvalidQueryArg:
+        case KeyNotFound:
+        case OutOfBounds:
+        case LimitExceeded:
+        case UnexpectedPrimaryKey:
+        case ModifyPrimaryKey:
+        case ReadOnlyProperty:
+        case TypeMismatch:
+        case MissingPrimaryKey:
+        case MissingPropertyValue:
+        case NoSuchTable:
+            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+        case LogicError:
+        case BrokenPromise:
+        case CrossTableLinkTarget:
+        case KeyAlreadyUsed:
+        case WrongTransactioState:
+        case SerializationError:
+        case IllegalOperation:
+        case StaleAccessor:
+        case ReadOnly:
+        case InvalidatedObject:
+        case NotSuported:
+            return ErrorCategory().set(ErrorCategory::logic_error);
+        case OK:
+        case UnknownError:
+            break;
+        default:
+            break;
     }
     return {};
 }
@@ -164,8 +172,6 @@ std::string_view ErrorCodes::error_string(Error code)
             return "InvalidDictionaryValue";
         case StaleAccessor:
             return "StaleAccessor";
-        case SerialisationError:
-            return "SerialisationError";
         case IncompatibleLockFile:
             return "IncompatibleLockFile";
         case InvalidSortDescriptor:
@@ -261,8 +267,6 @@ ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
         return InvalidDictionaryValue;
     if (name == std::string_view("StaleAccessor"))
         return StaleAccessor;
-    if (name == std::string_view("SerialisationError"))
-        return SerialisationError;
     if (name == std::string_view("IncompatibleLockFile"))
         return IncompatibleLockFile;
     if (name == std::string_view("InvalidSortDescriptor"))

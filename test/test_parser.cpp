@@ -504,13 +504,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerialisationError);
+    CHECK_THROW(q.get_description(), SerializationError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerialisationError);
+    CHECK_THROW(q2.get_description(), SerializationError);
 }
 
 TEST(Parser_basic_serialisation)

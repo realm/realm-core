@@ -36,7 +36,8 @@ QueryInfo::QueryInfo(const Query* query, QueryType type)
 
     try {
         m_description = query->get_description();
-    } catch (const SerialisationError& e) {
+    }
+    catch (const SerializationError& e) {
         m_description = e.what();
     }
     m_table_name = query->m_table->get_name();

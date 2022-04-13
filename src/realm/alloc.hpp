@@ -507,7 +507,8 @@ inline void MemRef::set_addr(char* addr)
 inline MemRef Allocator::alloc(size_t size)
 {
     if (m_is_read_only)
-        throw realm::LogicError(ErrorCodes::ReadOnly, "Trying to modify database while in read transaction");
+        throw realm::LogicError(ErrorCodes::WrongTransactioState,
+                                "Trying to modify database while in read transaction");
     return do_alloc(size);
 }
 
@@ -518,7 +519,8 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
     if (m_is_read_only)
-        throw realm::LogicError(ErrorCodes::ReadOnly, "Trying to modify database while in read transaction");
+        throw realm::LogicError(ErrorCodes::WrongTransactioState,
+                                "Trying to modify database while in read transaction");
     return do_realloc(ref, const_cast<char*>(addr), old_size, new_size);
 }
 

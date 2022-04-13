@@ -78,9 +78,9 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     }
 
     m_err.emplace();
-    m_err->kind.code = 0;
-    auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
-        m_err->error = error_number;
+    auto populate_error = [&](const std::exception& ex, ErrorCodes::Error error_code) {
+        m_err->error = realm_errno_e(error_code);
+        m_err->categories = ErrorCodes::error_categories(error_code).value();
         try {
             m_message_buf = ex.what();
             m_err->message = m_message_buf.c_str();
@@ -99,109 +99,38 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     // Core exceptions:
     catch (const Exception& ex) {
-        switch (ex.code()) {
-            case ErrorCodes::InvalidProperty:
-                populate_error(ex, RLM_ERR_INVALID_PROPERTY);
-                break;
-            case ErrorCodes::WrongTransactioState:
-                populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
-                break;
-            case ErrorCodes::SyntaxError:
-                populate_error(ex, RLM_ERR_INVALID_QUERY_STRING);
-                break;
-            case ErrorCodes::InvalidQuery:
-                populate_error(ex, RLM_ERR_INVALID_QUERY);
-                break;
-            case ErrorCodes::InvalidQueryArg:
-                populate_error(ex, RLM_ERR_INVALID_QUERY_ARG);
-                break;
-            case ErrorCodes::OutOfBounds:
-                populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
-                break;
-            case ErrorCodes::PropertyNotNullable:
-                populate_error(ex, RLM_ERR_PROPERTY_NOT_NULLABLE);
-                break;
-            case ErrorCodes::TypeMismatch:
-                populate_error(ex, RLM_ERR_PROPERTY_TYPE_MISMATCH);
-                break;
-            case ErrorCodes::MissingPrimaryKey:
-                populate_error(ex, RLM_ERR_MISSING_PRIMARY_KEY);
-                break;
-            case ErrorCodes::NotCloneable:
-                populate_error(ex, RLM_ERR_NOT_CLONABLE);
-                break;
-            case ErrorCodes::CallbackFailed:
-                populate_error(ex, RLM_ERR_CALLBACK);
-                break;
-            case ErrorCodes::InvalidatedObject:
-                populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
-                break;
-            case ErrorCodes::UnexpectedPrimaryKey:
-                populate_error(ex, RLM_ERR_UNEXPECTED_PRIMARY_KEY);
-                break;
-            case ErrorCodes::ReadOnly:
-                populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
-                break;
-            case ErrorCodes::NoSuchTable:
-                populate_error(ex, RLM_ERR_NO_SUCH_TABLE);
-                break;
-            case ErrorCodes::KeyNotFound:
-                populate_error(ex, RLM_ERR_NO_SUCH_OBJECT);
-                break;
-            case ErrorCodes::OutOfDiskSpace:
-                populate_error(ex, RLM_ERR_OUT_OF_DISK_SPACE);
-                break;
-            case ErrorCodes::ObjectAlreadyExists:
-                populate_error(ex, RLM_ERR_OBJECT_ALREADY_EXISTS);
-                break;
-            case ErrorCodes::LogicError:
-                populate_error(ex, RLM_ERR_LOGIC);
-                break;
-            case ErrorCodes::RuntimeError:
-                populate_error(ex, RLM_ERR_RUNTIME);
-                break;
-            default:
-                populate_error(ex, RLM_ERR_UNKNOWN);
-        }
-    }
-
-    // File exceptions:
-    catch (const util::File::PermissionDenied& ex) {
-        populate_error(ex, RLM_ERR_FILE_PERMISSION_DENIED);
-    }
-    catch (const util::File::AccessError& ex) {
-        populate_error(ex, RLM_ERR_FILE_ACCESS_ERROR);
+        populate_error(ex, ex.code());
     }
 
     // Object Store exceptions:
     catch (const InvalidTransactionException& ex) {
-        populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
+        populate_error(ex, ErrorCodes::WrongTransactioState);
     }
     catch (const IncorrectThreadException& ex) {
-        populate_error(ex, RLM_ERR_WRONG_THREAD);
+        populate_error(ex, ErrorCodes::WrongThread);
     }
     catch (const DeleteOnOpenRealmException& ex) {
-        populate_error(ex, RLM_ERR_DELETE_OPENED_REALM);
+        populate_error(ex, ErrorCodes::DeleteOnOpenRealm);
     }
     catch (const List::InvalidatedException& ex) {
-        populate_error(ex, RLM_ERR_INVALIDATED_OBJECT);
+        populate_error(ex, ErrorCodes::InvalidatedObject);
     }
 
     // Generic exceptions:
     catch (const std::invalid_argument& ex) {
-        populate_error(ex, RLM_ERR_INVALID_ARGUMENT);
+        populate_error(ex, ErrorCodes::InvalidArgument);
     }
     catch (const std::out_of_range& ex) {
-        populate_error(ex, RLM_ERR_INDEX_OUT_OF_BOUNDS);
+        populate_error(ex, ErrorCodes::OutOfBounds);
     }
     catch (const std::logic_error& ex) {
-        populate_error(ex, RLM_ERR_LOGIC);
+        populate_error(ex, ErrorCodes::LogicError);
     }
     catch (const std::bad_alloc& ex) {
-        populate_error(ex, RLM_ERR_OUT_OF_MEMORY);
+        populate_error(ex, ErrorCodes::OutOfMemory);
     }
     catch (const std::exception& ex) {
-        populate_error(ex, RLM_ERR_OTHER_EXCEPTION);
+        populate_error(ex, ErrorCodes::GenericError);
     }
     // FIXME: Handle more exception types.
     catch (...) {

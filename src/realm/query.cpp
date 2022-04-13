@@ -1827,7 +1827,7 @@ std::string Query::get_description(util::serializer::SerialisationState& state) 
     std::string description;
     if (root_node()) {
         if (m_view) {
-            throw SerialisationError("Serialisation of a query constrained by a view is not currently supported");
+            throw SerializationError("Serialization of a query constrained by a view is not currently supported");
         }
         description = root_node()->describe_expression(state);
     }

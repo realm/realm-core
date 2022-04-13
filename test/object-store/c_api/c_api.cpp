@@ -1169,7 +1169,7 @@ TEST_CASE("C API") {
 
         SECTION("not in a transaction") {
             CHECK(!realm_object_create(realm, class_foo.key));
-            CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
         }
     }
 
@@ -1307,7 +1307,7 @@ TEST_CASE("C API") {
 
         SECTION("realm_set_value() errors") {
             CHECK(!realm_set_value(obj1.get(), foo_int_key, rlm_int_val(456), false));
-            CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
 
             write([&]() {
                 CHECK(!realm_set_value(obj1.get(), foo_int_key, rlm_null(), false));
@@ -1324,7 +1324,7 @@ TEST_CASE("C API") {
         SECTION("realm_set_values() errors") {
             realm_value_t int456 = rlm_int_val(456);
             CHECK(!realm_set_values(obj1.get(), 1, &foo_int_key, &int456, false));
-            CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+            CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
 
             write([&]() {
                 realm_value_t value;
@@ -1813,7 +1813,7 @@ TEST_CASE("C API") {
 
                 SECTION("realm_results_delete_all()") {
                     CHECK(!realm_results_delete_all(r.get()));
-                    CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
+                    CHECK_ERR(RLM_ERR_WRONG_TRANSACTION_STATE);
 
                     write([&]() {
                         size_t num_objects;

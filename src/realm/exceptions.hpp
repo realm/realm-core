@@ -315,10 +315,10 @@ public:
     }
 };
 
-class SerialisationError : public LogicError {
+class SerializationError : public LogicError {
 public:
-    SerialisationError(const std::string& msg)
-        : LogicError(ErrorCodes::SerialisationError, msg)
+    SerializationError(const std::string& msg)
+        : LogicError(ErrorCodes::SerializationError, msg)
     {
     }
 };
