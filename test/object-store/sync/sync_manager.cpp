@@ -464,13 +464,13 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     using Action = SyncFileActionMetadata::Action;
     reset_test_directory(base_path.string());
 
-    auto file_manager = SyncFileManager(base_path, "bar_app_id");
+    auto file_manager = SyncFileManager(base_path.string(), "bar_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 
     TestSyncManager::Config config;
     config.app_config.app_id = "bar_app_id";
-    config.base_path = base_path;
+    config.base_path = base_path.string();
     config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
     config.should_teardown_test_directory = false;
 
@@ -650,7 +650,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
         }
 
         SECTION("should change the action to delete if copy succeeds but delete fails") {
-            if (!chmod_supported(base_path)) {
+            if (!chmod_supported(base_path.string())) {
                 return;
             }
             // Create some Realms

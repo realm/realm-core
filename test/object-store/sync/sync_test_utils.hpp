@@ -54,8 +54,7 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
 
 struct ExpectedRealmPaths {
     ExpectedRealmPaths(const std::string& base_path, const std::string& app_id, const std::string& user_identity,
-                       const std::string& local_identity, const std::string& partition,
-                       util::Optional<std::string> name = util::none);
+                       const std::string& local_identity, const std::string& partition);
     std::string current_preferred_path;
     std::string fallback_hashed_path;
     std::string legacy_local_id_path;

@@ -96,56 +96,49 @@ auto do_hash = [](const std::string& name) -> std::string {
 
 ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::string& app_id,
                                        const std::string& identity, const std::string& local_identity,
-                                       const std::string& partition, util::Optional<std::string> name)
+                                       const std::string& partition)
 {
     // This is copied from SyncManager.cpp string_from_partition() in order to prevent
     // us changing that function and therefore breaking user's existing paths unknowingly.
-    std::string cleaned_partition = partition;
-    try {
-        bson::Bson partition_value = bson::parse(partition);
-        switch (partition_value.type()) {
-            case bson::Bson::Type::Int32:
-                cleaned_partition = util::format("i_%1", static_cast<int32_t>(partition_value));
-                break;
-            case bson::Bson::Type::Int64:
-                cleaned_partition = util::format("l_%1", static_cast<int64_t>(partition_value));
-                break;
-            case bson::Bson::Type::String:
-                cleaned_partition = util::format("s_%1", static_cast<std::string>(partition_value));
-                break;
-            case bson::Bson::Type::ObjectId:
-                cleaned_partition = util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
-                break;
-            case bson::Bson::Type::Uuid:
-                cleaned_partition = util::format("u_%1", static_cast<UUID>(partition_value).to_string());
-                break;
-            case bson::Bson::Type::Null:
-                cleaned_partition = "null";
-                break;
-            default:
-                REALM_ASSERT(false);
-        }
+    std::string cleaned_partition;
+    bson::Bson partition_value = bson::parse(partition);
+    switch (partition_value.type()) {
+        case bson::Bson::Type::Int32:
+            cleaned_partition = util::format("i_%1", static_cast<int32_t>(partition_value));
+            break;
+        case bson::Bson::Type::Int64:
+            cleaned_partition = util::format("l_%1", static_cast<int64_t>(partition_value));
+            break;
+        case bson::Bson::Type::String:
+            cleaned_partition = util::format("s_%1", static_cast<std::string>(partition_value));
+            break;
+        case bson::Bson::Type::ObjectId:
+            cleaned_partition = util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
+            break;
+        case bson::Bson::Type::Uuid:
+            cleaned_partition = util::format("u_%1", static_cast<UUID>(partition_value).to_string());
+            break;
+        case bson::Bson::Type::Null:
+            cleaned_partition = "null";
+            break;
+        default:
+            REALM_ASSERT(false);
     }
-    catch (...) {
-        // if the partition is not a bson string then it was from old sync tests and is a server path.
-    }
-    std::string clean_name = name ? util::make_percent_encoded_string(*name) : cleaned_partition;
+
+    std::string clean_name = cleaned_partition;
     std::string cleaned_app_id = util::make_percent_encoded_string(app_id);
     const auto manager_path = fs::path{base_path}.make_preferred() / "mongodb-realm" / cleaned_app_id;
     const auto preferred_name = manager_path / identity / clean_name;
     current_preferred_path = preferred_name.string() + ".realm";
-    fallback_hashed_path = (manager_path / do_hash(preferred_name)).string() + ".realm";
+    fallback_hashed_path = (manager_path / do_hash(preferred_name.string())).string() + ".realm";
     legacy_sync_directories_to_make.push_back((manager_path / local_identity).string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
-    legacy_local_id_path =
-        (manager_path / local_identity / (name ? util::make_percent_encoded_string(*name) : encoded_partition))
-            .concat(".realm")
-            .string();
+    legacy_local_id_path = (manager_path / local_identity / encoded_partition).concat(".realm").string();
     auto dir_builder = manager_path / "realm-object-server";
     legacy_sync_directories_to_make.push_back(dir_builder.string());
     dir_builder /= local_identity;
     legacy_sync_directories_to_make.push_back(dir_builder.string());
-    legacy_sync_path = (dir_builder / (name ? util::make_percent_encoded_string(*name) : cleaned_partition)).string();
+    legacy_sync_path = (dir_builder / cleaned_partition).string();
 }
 
 #if REALM_ENABLE_SYNC
