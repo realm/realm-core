@@ -3496,3 +3496,20 @@ TEST_CASE("KeyPathMapping generation") {
         REQUIRE(q.count() == 0);
     }
 }
+
+TEST_CASE("Close realm file in case of errors") {
+    TestFile config;
+    config.schema = Schema{
+        {"object", {{"value", PropertyType::Int}}},
+    };
+    SharedRealm shared_realm = nullptr;
+    config.initialization_function = [&shared_realm](SharedRealm realm) {
+        CHECK(realm);
+        shared_realm = realm;
+        throw std::runtime_error("test error");
+    };
+    REQUIRE_THROWS_WITH(Realm::get_shared_realm(config), Catch::Matchers::Contains("test error"));
+    // the file should now be closed.
+    CHECK(shared_realm->is_closed());
+    REQUIRE_THROWS(shared_realm->invalidate());
+}

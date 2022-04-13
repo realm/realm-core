@@ -273,16 +273,23 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     // we release the strong reference to realm, as Realm's destructor may want
     // to acquire the same lock
     std::shared_ptr<Realm> realm;
-    util::CheckedUniqueLock lock(m_realm_mutex);
-    set_config(config);
-    if ((realm = do_get_cached_realm(config))) {
-        if (version) {
-            REALM_ASSERT(realm->read_transaction_version() == version.value());
+    try {
+        util::CheckedUniqueLock lock(m_realm_mutex);
+        set_config(config);
+        if ((realm = do_get_cached_realm(config))) {
+            if (version) {
+                REALM_ASSERT(realm->read_transaction_version() == version.value());
+            }
+            return realm;
         }
+        do_get_realm(std::move(config), realm, version, lock);
         return realm;
     }
-    do_get_realm(std::move(config), realm, version, lock);
-    return realm;
+    catch (const std::exception&) {
+        if (realm)
+            realm->close();
+        throw;
+    }
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler)
@@ -557,8 +564,10 @@ void RealmCoordinator::open_db()
 
 void RealmCoordinator::close()
 {
-    m_db->close();
-    m_db = nullptr;
+    if (m_db) {
+        m_db->close();
+        m_db = nullptr;
+    }
 }
 
 TransactionRef RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
