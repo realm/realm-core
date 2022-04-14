@@ -28,8 +28,7 @@ class SectionedResults;
 struct SectionRange;
 struct SectionedResultsChangeSet;
 
-using SectionedResultsNotificatonCallback
-    = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
+using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
 
 /**
  * An instance of ResultsSection gives access to elements in the underlying collection that belong to a given section.
@@ -40,8 +39,11 @@ using SectionedResultsNotificatonCallback
  */
 class ResultsSection {
 public:
+    ResultsSection() = default;
+
     /// Retrieve an element from the section for a given index.
     Mixed operator[](size_t idx) const;
+
     template <typename Context>
     auto get(Context&, size_t index);
 
@@ -56,10 +58,10 @@ public:
      * The query will be run on a background thread and delivered to the callback,
      * and then rerun after each commit (if needed) and redelivered if it changed
      *
-     * @param callback The function to execute when a insertions, modification or deletion in this `ResultsSection` was
-     * detected.
-     * @param key_path_array A filter that can be applied to make sure the `SectionedResultsNotificatonCallback` is only executed
-     * when the property in the filter is changed but not otherwise.
+     * @param callback The function to execute when a insertions, modification or deletion in this `ResultsSection`
+     * was detected.
+     * @param key_path_array A filter that can be applied to make sure the `SectionedResultsNotificatonCallback` is
+     * only executed when the property in the filter is changed but not otherwise.
      *
      * @return A `NotificationToken` that is used to identify this callback. This token can be used to remove the
      * callback via `remove_callback`.
@@ -69,9 +71,11 @@ public:
 
 private:
     friend class SectionedResults;
-    ResultsSection(SectionedResults* parent, size_t index):
-    m_parent(parent),
-    m_index(index) { };
+    ResultsSection(SectionedResults* parent, size_t index)
+        : m_parent(parent)
+        , m_index(index)
+    {
+    }
 
     SectionedResults* m_parent;
     size_t m_index;
@@ -79,6 +83,8 @@ private:
 
 class SectionedResults {
 public:
+    SectionedResults() = default;
+
     using ComparisonFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
 
     ResultsSection operator[](size_t idx);
@@ -90,10 +96,10 @@ public:
      * The query will be run on a background thread and delivered to the callback,
      * and then rerun after each commit (if needed) and redelivered if it changed
      *
-     * @param callback The function to execute when a insertions, modification or deletion in this `SectionedResults` was
-     * detected.
-     * @param key_path_array A filter that can be applied to make sure the `SectionedResultsNotificatonCallback` is only executed
-     * when the property in the filter is changed but not otherwise.
+     * @param callback The function to execute when a insertions, modification or deletion in this `SectionedResults`
+     * was detected.
+     * @param key_path_array A filter that can be applied to make sure the `SectionedResultsNotificatonCallback` is
+     * only executed when the property in the filter is changed but not otherwise.
      *
      * @return A `NotificationToken` that is used to identify this callback. This token can be used to remove the
      * callback via `remove_callback`.
@@ -105,11 +111,9 @@ private:
     friend class Results;
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.
     SectionedResults(Results results, ComparisonFunc comparison_func);
-    SectionedResults(Results results,
-                     Results::SectionedResultsOperator op,
-                     util::Optional<StringData> prop_name);
+    SectionedResults(Results results, Results::SectionedResultsOperator op, util::Optional<StringData> prop_name);
 
-    friend class SectionedResultsNotificationHandler;
+    friend struct SectionedResultsNotificationHandler;
     void calculate_sections_if_required(Results::EvaluateMode mode = Results::EvaluateMode::Count);
 
     NotificationToken add_notification_callback_for_section(size_t section_index,
@@ -137,7 +141,6 @@ struct SectionRange {
     Mixed key;
     std::vector<size_t> indices;
 };
-
 
 } // namespace realm
 
