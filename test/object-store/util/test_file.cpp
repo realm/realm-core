@@ -64,10 +64,7 @@ TestFile::TestFile()
 {
     disable_sync_to_disk();
     m_temp_dir = util::make_temp_dir();
-    if (m_temp_dir.size() == 0 || m_temp_dir[m_temp_dir.size() - 1] != '/') {
-        m_temp_dir = m_temp_dir + "/";
-    }
-    path = fs::path(util::format("%1realm.XXXXXX", m_temp_dir)).string();
+    path = (fs::path(m_temp_dir) / "realm.XXXXXX").string();
     int fd = mkstemp(path.data());
     if (fd < 0) {
         int err = errno;
