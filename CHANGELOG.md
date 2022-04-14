@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Add `Results::sectioned_results` which allows Results to be accessed in sections specified by a comparison function. (PR [#5403](https://github.com/realm/realm-core/pull/5403))
 
 ### Fixed
 * Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
