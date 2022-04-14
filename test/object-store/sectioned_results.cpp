@@ -63,7 +63,8 @@ struct Int : Base<PropertyType::Int, int64_t> {
         return {0, 1};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Section odd and even numbers.
         if (value.is_null()) {
             return "nulls";
@@ -71,7 +72,8 @@ struct Int : Base<PropertyType::Int, int64_t> {
         return value.get_int() % 2;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -97,7 +99,8 @@ struct Bool : Base<PropertyType::Bool, bool> {
         return {false, true};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Section true from false
         if (value.is_null()) {
             return "nulls";
@@ -105,7 +108,8 @@ struct Bool : Base<PropertyType::Bool, bool> {
         return value.get_bool();
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -131,7 +135,8 @@ struct Float : Base<PropertyType::Float, float> {
         return {0, 1};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Section odd and even numbers.
         if (value.is_null()) {
             return "nulls";
@@ -139,7 +144,8 @@ struct Float : Base<PropertyType::Float, float> {
         return int(value.get_float()) % 2;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -165,7 +171,8 @@ struct Double : Base<PropertyType::Double, double> {
         return {0, 1};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Section odd and even numbers.
         if (value.is_null()) {
             return "nulls";
@@ -173,7 +180,8 @@ struct Double : Base<PropertyType::Double, double> {
         return int(value.get_double()) % 2;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -182,26 +190,20 @@ struct String : Base<PropertyType::String, StringData> {
     using Boxed = std::string;
     static std::vector<StringData> values()
     {
-        return {
-            "apple", "banana", "cherry", "dragon fruit", "elderberry",
-            "apples", "bananas", "cherries", "dragon fruit's", "elderberries"
-        };
+        return {"apple",  "banana",  "cherry",   "dragon fruit",   "elderberry",
+                "apples", "bananas", "cherries", "dragon fruit's", "elderberries"};
     }
 
     static std::vector<StringData> expected_unsorted()
     {
-        return {
-            "apple", "apples", "banana", "bananas", "cherry", "cherries",
-            "dragon fruit", "dragon fruit's", "elderberry", "elderberries"
-        };
+        return {"apple",    "apples",       "banana",         "bananas",    "cherry",
+                "cherries", "dragon fruit", "dragon fruit's", "elderberry", "elderberries"};
     }
 
     static std::vector<StringData> expected_sorted()
     {
-        return {
-            "apple", "apples", "banana", "bananas", "cherries", "cherry",
-            "dragon fruit", "dragon fruit's", "elderberries", "elderberry"
-        };
+        return {"apple",  "apples",       "banana",         "bananas",      "cherries",
+                "cherry", "dragon fruit", "dragon fruit's", "elderberries", "elderberry"};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -209,7 +211,8 @@ struct String : Base<PropertyType::String, StringData> {
         return {"a", "b", "c", "d", "e"};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Return first char of string.
         if (value.is_null()) {
             return "nulls";
@@ -218,7 +221,8 @@ struct String : Base<PropertyType::String, StringData> {
         return str.size() > 0 ? str.prefix(1) : str;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 5;
     }
 };
@@ -227,26 +231,23 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     using Boxed = std::string;
     static std::vector<BinaryData> values()
     {
-        return {
-            BinaryData("a", 1), BinaryData("aa", 2), BinaryData("b", 1), BinaryData("bb", 2), BinaryData("c", 1),
-            BinaryData("cc", 2), BinaryData("d", 1), BinaryData("dd", 2), BinaryData("e", 1), BinaryData("ee", 2)
-        };
+        return {BinaryData("a", 1), BinaryData("aa", 2), BinaryData("b", 1), BinaryData("bb", 2),
+                BinaryData("c", 1), BinaryData("cc", 2), BinaryData("d", 1), BinaryData("dd", 2),
+                BinaryData("e", 1), BinaryData("ee", 2)};
     }
 
     static std::vector<BinaryData> expected_unsorted()
     {
-        return {
-            BinaryData("a", 1), BinaryData("b", 1), BinaryData("c", 1), BinaryData("d", 1), BinaryData("e", 1),
-            BinaryData("aa", 2), BinaryData("bb", 2), BinaryData("cc", 2), BinaryData("dd", 2), BinaryData("ee", 2)
-        };
+        return {BinaryData("a", 1),  BinaryData("b", 1),  BinaryData("c", 1),  BinaryData("d", 1),
+                BinaryData("e", 1),  BinaryData("aa", 2), BinaryData("bb", 2), BinaryData("cc", 2),
+                BinaryData("dd", 2), BinaryData("ee", 2)};
     }
 
     static std::vector<BinaryData> expected_sorted()
     {
-        return {
-            BinaryData("a", 1), BinaryData("b", 1), BinaryData("c", 1), BinaryData("d", 1), BinaryData("e", 1),
-            BinaryData("aa", 2), BinaryData("bb", 2), BinaryData("cc", 2), BinaryData("dd", 2), BinaryData("ee", 2)
-        };
+        return {BinaryData("a", 1),  BinaryData("b", 1),  BinaryData("c", 1),  BinaryData("d", 1),
+                BinaryData("e", 1),  BinaryData("aa", 2), BinaryData("bb", 2), BinaryData("cc", 2),
+                BinaryData("dd", 2), BinaryData("ee", 2)};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -254,7 +255,8 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
         return {1, 2};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Seperate by size of data
         if (value.is_null()) {
             return "nulls";
@@ -262,7 +264,8 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
         return (int)value.get_binary().size();
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -270,26 +273,20 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
 struct Date : Base<PropertyType::Date, Timestamp> {
     static std::vector<Timestamp> values()
     {
-        return {
-            Timestamp(1, 1), Timestamp(20, 2), Timestamp(3, 1), Timestamp(40, 2), Timestamp(5, 1),
-            Timestamp(10, 2), Timestamp(2, 1), Timestamp(30, 2), Timestamp(4, 1), Timestamp(50, 2)
-        };
+        return {Timestamp(1, 1),  Timestamp(20, 2), Timestamp(3, 1),  Timestamp(40, 2), Timestamp(5, 1),
+                Timestamp(10, 2), Timestamp(2, 1),  Timestamp(30, 2), Timestamp(4, 1),  Timestamp(50, 2)};
     }
 
     static std::vector<Timestamp> expected_unsorted()
     {
-        return {
-            Timestamp(20, 2), Timestamp(40, 2), Timestamp(10, 2), Timestamp(30, 2), Timestamp(50, 2),
-            Timestamp(1, 1), Timestamp(3, 1), Timestamp(5, 1), Timestamp(2, 1), Timestamp(4, 1)
-        };
+        return {Timestamp(20, 2), Timestamp(40, 2), Timestamp(10, 2), Timestamp(30, 2), Timestamp(50, 2),
+                Timestamp(1, 1),  Timestamp(3, 1),  Timestamp(5, 1),  Timestamp(2, 1),  Timestamp(4, 1)};
     }
 
     static std::vector<Timestamp> expected_sorted()
     {
-        return {
-            Timestamp(10, 2), Timestamp(20, 2), Timestamp(30, 2), Timestamp(40, 2), Timestamp(50, 2),
-            Timestamp(1, 1), Timestamp(2, 1), Timestamp(3, 1), Timestamp(4, 1), Timestamp(5, 1)
-        };
+        return {Timestamp(10, 2), Timestamp(20, 2), Timestamp(30, 2), Timestamp(40, 2), Timestamp(50, 2),
+                Timestamp(1, 1),  Timestamp(2, 1),  Timestamp(3, 1),  Timestamp(4, 1),  Timestamp(5, 1)};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -297,7 +294,8 @@ struct Date : Base<PropertyType::Date, Timestamp> {
         return {"Bar", "Foo"};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Seperate by size of data
         if (value.is_null()) {
             return "nulls";
@@ -305,7 +303,8 @@ struct Date : Base<PropertyType::Date, Timestamp> {
         return value.get_timestamp().get_seconds() < 10 ? "Foo" : "Bar";
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -313,26 +312,34 @@ struct Date : Base<PropertyType::Date, Timestamp> {
 struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
     static std::vector<realm::Mixed> values()
     {
-        return {
-            Mixed{realm::UUID()}, Mixed{int64_t(1)}, Mixed{util::none}, Mixed{"hello world"}, Mixed{Timestamp(1, 1)},
-            Mixed{Decimal128("300")}, Mixed{double(2.2)}, Mixed{float(3.3)}, Mixed{BinaryData("a", 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}
-        };
+        return {Mixed{realm::UUID()},      Mixed{int64_t(1)},
+                Mixed{util::none},         Mixed{"hello world"},
+                Mixed{Timestamp(1, 1)},    Mixed{Decimal128("300")},
+                Mixed{double(2.2)},        Mixed{float(3.3)},
+                Mixed{BinaryData("a", 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}};
     }
 
     static std::vector<realm::Mixed> expected_unsorted()
     {
-        return {
-            Mixed{realm::UUID()}, Mixed{"hello world"}, Mixed{Timestamp(1, 1)}, Mixed{BinaryData("a", 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
-            Mixed{util::none}, Mixed{int64_t(1)}, Mixed{Decimal128("300")}, Mixed{double(2.2)}, Mixed{float(3.3)}
-        };
+        return {Mixed{realm::UUID()},
+                Mixed{"hello world"},
+                Mixed{Timestamp(1, 1)},
+                Mixed{BinaryData("a", 1)},
+                Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
+                Mixed{util::none},
+                Mixed{int64_t(1)},
+                Mixed{Decimal128("300")},
+                Mixed{double(2.2)},
+                Mixed{float(3.3)}};
     }
 
     static std::vector<realm::Mixed> expected_sorted()
     {
-        return {
-            Mixed{BinaryData("a", 1)}, Mixed{"hello world"}, Mixed{Timestamp(1, 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
-            Mixed{realm::UUID()}, Mixed{util::none}, Mixed{int64_t(1)}, Mixed{double(2.2)}, Mixed{float(3.3)}, Mixed{Decimal128("300")}
-        };
+        return {Mixed{BinaryData("a", 1)}, Mixed{"hello world"},
+                Mixed{Timestamp(1, 1)},    Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
+                Mixed{realm::UUID()},      Mixed{util::none},
+                Mixed{int64_t(1)},         Mixed{double(2.2)},
+                Mixed{float(3.3)},         Mixed{Decimal128("300")}};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -340,7 +347,8 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
         return {"Alphanumeric", "Empty", "Numerics"};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         if (value.is_null()) {
             return "Empty";
         }
@@ -353,7 +361,8 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
         return PropertyType::Mixed | PropertyType::Nullable;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 3;
     }
 };
@@ -361,50 +370,29 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
 struct OID : Base<PropertyType::ObjectId, ObjectId> {
     static std::vector<ObjectId> values()
     {
-        return {
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")
-        };
+        return {ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")};
     }
 
     static std::vector<ObjectId> expected_unsorted()
     {
-        return {
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
-        };
+        return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
     }
 
     static std::vector<ObjectId> expected_sorted()
     {
-        return {
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-            ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")
-        };
+        return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -412,7 +400,8 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
         return {"Bar", "Foo"};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Seperate by sections containing the same ObjectId's
         if (value.is_null()) {
             return "nulls";
@@ -420,7 +409,8 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
         return value.get_object_id() == ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa") ? "Foo" : "Bar";
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -429,49 +419,32 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
     static std::vector<realm::UUID> values()
     {
         return {
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
         };
     }
 
     static std::vector<realm::UUID> expected_unsorted()
     {
         return {
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962")
-        };
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962")};
     }
 
     static std::vector<realm::UUID> expected_sorted()
     {
         return {
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962")
-        };
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962")};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -479,7 +452,8 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
         return {"Bar", "Foo"};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Seperate by sections containing the same UUID's
         if (value.is_null()) {
             return "nulls";
@@ -487,7 +461,8 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
         return value.get_uuid() == realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962") ? "Foo" : "Bar";
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -496,44 +471,24 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
     static std::vector<Decimal128> values()
     {
         return {
-            Decimal128("876.54e32"), Decimal128("123.45e6"),
-            Decimal128("876.54e32"), Decimal128("123.45e6"),
-            Decimal128("876.54e32"), Decimal128("123.45e6"),
-            Decimal128("876.54e32"), Decimal128("123.45e6"),
+            Decimal128("876.54e32"), Decimal128("123.45e6"), Decimal128("876.54e32"), Decimal128("123.45e6"),
+            Decimal128("876.54e32"), Decimal128("123.45e6"), Decimal128("876.54e32"), Decimal128("123.45e6"),
             Decimal128("876.54e32"), Decimal128("123.45e6"),
         };
     }
 
     static std::vector<Decimal128> expected_unsorted()
     {
-        return {
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6")
-        };
+        return {Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"),
+                Decimal128("876.54e32"), Decimal128("123.45e6"),  Decimal128("123.45e6"),  Decimal128("123.45e6"),
+                Decimal128("123.45e6"),  Decimal128("123.45e6")};
     }
 
     static std::vector<Decimal128> expected_sorted()
     {
-        return {
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("876.54e32"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6"),
-            Decimal128("123.45e6")
-        };
+        return {Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"),
+                Decimal128("876.54e32"), Decimal128("123.45e6"),  Decimal128("123.45e6"),  Decimal128("123.45e6"),
+                Decimal128("123.45e6"),  Decimal128("123.45e6")};
     }
 
     static std::vector<Mixed> expected_keys()
@@ -541,7 +496,8 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
         return {false, true};
     }
 
-    static Mixed comparison_value(Mixed value) {
+    static Mixed comparison_value(Mixed value)
+    {
         // Seperate smaller values
         if (value.is_null()) {
             return "nulls";
@@ -549,7 +505,8 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
         return value.get_decimal() < Decimal128("876.54e32");
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return 2;
     }
 };
@@ -571,11 +528,13 @@ struct BoxedOptional : BaseT {
         return ret;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return BaseT::expected_size() + 1;
     }
 
-    static std::vector<Type> expected_unsorted() {
+    static std::vector<Type> expected_unsorted()
+    {
         std::vector<Type> ret;
         for (auto v : BaseT::expected_unsorted())
             ret.push_back(Type(v));
@@ -583,7 +542,8 @@ struct BoxedOptional : BaseT {
         return ret;
     }
 
-    static std::vector<Type> expected_sorted() {
+    static std::vector<Type> expected_sorted()
+    {
         std::vector<Type> ret;
         for (auto v : BaseT::expected_sorted())
             ret.push_back(Type(v));
@@ -619,7 +579,8 @@ struct UnboxedOptional : BaseT {
         return ret;
     }
 
-    static size_t expected_size() {
+    static size_t expected_size()
+    {
         return BaseT::expected_size() + 1;
     }
 
@@ -656,9 +617,9 @@ struct UnboxedOptional : BaseT {
         return exp_keys;
     }
 };
-}
+} // namespace realm::sectioned_results_fixtures
 
-TEST_CASE("sectioned results") {
+TEST_CASE("sectioned results", "[sectioned_results]") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
     InMemoryTestFile config;
@@ -666,12 +627,11 @@ TEST_CASE("sectioned results") {
 
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
-        {"object", {
-            {"name_col", PropertyType::String},
-            {"int_col", PropertyType::Int},
-            {"array_string_col", PropertyType::String | PropertyType::Array},
-            {"array_int_col", PropertyType::Int | PropertyType::Array}
-        }},
+        {"object",
+         {{"name_col", PropertyType::String},
+          {"int_col", PropertyType::Int},
+          {"array_string_col", PropertyType::String | PropertyType::Array},
+          {"array_int_col", PropertyType::Int | PropertyType::Array}}},
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
@@ -679,7 +639,6 @@ TEST_CASE("sectioned results") {
     auto name_col = table->get_column_key("name_col");
     auto int_col = table->get_column_key("int_col");
     auto array_string_col = table->get_column_key("array_string_col");
-    auto array_int_col = table->get_column_key("array_int_col");
 
     r->begin_transaction();
     auto o1 = table->create_object();
@@ -707,19 +666,6 @@ TEST_CASE("sectioned results") {
         return v.prefix(1);
     });
 
-    auto make_local_change = [&] {
-        r->begin_transaction();
-        table->begin()->set(name_col, "foo");
-        r->commit_transaction();
-    };
-
-    auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm();
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->begin()->set(name_col, "bar");
-        r2->commit_transaction();
-    };
-
     SECTION("sorts results correctly") {
         REQUIRE(sectioned_results.size() == 3);
         REQUIRE(sectioned_results[0].size() == 3);
@@ -727,13 +673,7 @@ TEST_CASE("sectioned results") {
         REQUIRE(sectioned_results[2].size() == 1);
 
 
-        std::vector<std::string> expected {
-            "apple",
-            "apples",
-            "apricot",
-            "banana",
-            "orange"
-        };
+        std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
 
         int count = 0;
         for (size_t i = 0; i < sectioned_results.size(); i++) {
@@ -764,18 +704,8 @@ TEST_CASE("sectioned results") {
         r->commit_transaction();
 
         REQUIRE(sectioned_results.size() == 6);
-        std::vector<std::string> expected {
-            "apple",
-            "apples",
-            "apricot",
-            "banana",
-            "cake",
-            "car",
-            "mail",
-            "orange",
-            "safari",
-            "stocks"
-        };
+        std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "cake",
+                                          "car",   "mail",   "orange",  "safari", "stocks"};
 
         int count = 0;
         for (size_t i = 0; i < sectioned_results.size(); i++) {
@@ -791,26 +721,17 @@ TEST_CASE("sectioned results") {
     }
 
     SECTION("FirstLetter builtin with link") {
-        auto sr = sorted.sectioned_results(Results::SectionedResultsOperator::FirstLetter, util::Optional<StringData>("name_col"));
+        auto sr = sorted.sectioned_results(Results::SectionedResultsOperator::FirstLetter,
+                                           util::Optional<StringData>("name_col"));
 
         REQUIRE(sr.size() == 3);
         REQUIRE(sr[0].size() == 3);
         REQUIRE(sr[1].size() == 1);
         REQUIRE(sr[2].size() == 1);
 
-        std::vector<std::string> expected {
-            "apple",
-            "apples",
-            "apricot",
-            "banana",
-            "orange"
-        };
+        std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
 
-        std::vector<std::string> expected_keys {
-            "a",
-            "b",
-            "o"
-        };
+        std::vector<std::string> expected_keys{"a", "b", "o"};
 
         int section_count = 0;
         int element_count = 0;
@@ -870,19 +791,9 @@ TEST_CASE("sectioned results") {
         REQUIRE(sr[1].size() == 1);
         REQUIRE(sr[2].size() == 1);
 
-        std::vector<std::string> expected {
-            "apple",
-            "apples",
-            "apricot",
-            "banana",
-            "orange"
-        };
+        std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
 
-        std::vector<std::string> expected_keys {
-            "a",
-            "b",
-            "o"
-        };
+        std::vector<std::string> expected_keys{"a", "b", "o"};
 
         int section_count = 0;
         int element_count = 0;
@@ -926,10 +837,11 @@ TEST_CASE("sectioned results") {
 
     SECTION("notifications") {
         SectionedResultsChangeSet changes;
-        auto token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-            REQUIRE_FALSE(err);
-            changes = c;
-        });
+        auto token =
+            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes = c;
+            });
 
         coordinator->on_change();
 
@@ -984,7 +896,6 @@ TEST_CASE("sectioned results") {
     }
 
     SECTION("notifications on section") {
-
         auto section1 = sectioned_results[0];
         int section1_notification_calls = 0;
         SectionedResultsChangeSet section1_changes;
@@ -1054,16 +965,28 @@ TEST_CASE("sectioned results") {
         REQUIRE(section2_changes.deletions[1][0] == 1);
         REQUIRE(section2_changes.insertions.empty());
         REQUIRE(section2_changes.modifications.empty());
+
+        r->begin_transaction();
+        table->remove_object(o5.get_key());
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(section1_notification_calls == 3);
+        REQUIRE(section2_notification_calls == 2);
+        REQUIRE(section1_changes.deletions.size() == 1);
+        REQUIRE(section1_changes.deletions[0][0] == 2);
+        REQUIRE(section1_changes.insertions.empty());
+        REQUIRE(section1_changes.modifications.empty());
     }
 }
 
 namespace cf = realm::sectioned_results_fixtures;
 
-TEMPLATE_TEST_CASE("sectioned results types", "[sectioned_results]", cf::MixedVal, cf::Int, cf::Bool, cf::Float, cf::Double,
-                   cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID, cf::BoxedOptional<cf::Int>,
-                   cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>, cf::BoxedOptional<cf::Double>,
-                   cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>, cf::UnboxedOptional<cf::String>,
-                   cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>, cf::UnboxedOptional<cf::Decimal>)
+TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", cf::MixedVal, cf::Int, cf::Bool,
+                   cf::Float, cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
+                   cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
+                   cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
+                   cf::UnboxedOptional<cf::String>, cf::UnboxedOptional<cf::Binary>, cf::UnboxedOptional<cf::Date>,
+                   cf::UnboxedOptional<cf::Decimal>)
 {
     using T = typename TestType::Type;
 
@@ -1074,15 +997,12 @@ TEMPLATE_TEST_CASE("sectioned results types", "[sectioned_results]", cf::MixedVa
 
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
-        {"object", {
-            {"value_col", TestType::property_type()},
-            {"array_col", PropertyType::Array | TestType::property_type()}
-        }},
+        {"object",
+         {{"value_col", TestType::property_type()}, {"array_col", PropertyType::Array | TestType::property_type()}}},
     });
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
-    auto value_col = table->get_column_key("value_col");
     auto array_col = table->get_column_key("array_col");
 
     auto values = TestType::values();
