@@ -81,10 +81,22 @@ public:
         int64_t last_modified;
     };
     struct ServiceConfig {
+        enum class SyncMode { Partitioned, Flexible, Disabled } mode = SyncMode::Partitioned;
         std::string database_name;
-        nlohmann::json partition;
+        util::Optional<nlohmann::json> partition;
+        util::Optional<nlohmann::json> queryable_field_names;
+        util::Optional<nlohmann::json> permissions;
         std::string state;
         bool recovery_is_disabled = false;
+        std::string_view sync_service_name()
+        {
+            if (mode == SyncMode::Flexible) {
+                return "flexible_sync";
+            }
+            else {
+                return "sync";
+            }
+        }
     };
     std::vector<Service> get_services(const std::string& app_id) const;
     Service get_sync_service(const std::string& app_id) const;

@@ -115,6 +115,11 @@ public:
         return m_test_session.app();
     }
 
+    const TestAppSession& session() const
+    {
+        return m_test_session;
+    }
+
 private:
     TestAppSession m_test_session;
     Schema m_schema;

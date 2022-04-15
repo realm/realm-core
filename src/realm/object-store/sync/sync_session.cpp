@@ -293,7 +293,6 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
         });
 }
 
-
 void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
 {
     // first check that recovery will not be prevented
@@ -348,20 +347,43 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
     }
 
     sync_session->assert_mutex_unlocked();
-    sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
-        // Keep the sync session alive while it's downloading, but then close
-        // it immediately
-        sync_session->close();
-        if (auto strong_self = weak_self.lock()) {
-            if (ec) {
-                strong_self->handle_fresh_realm_downloaded(nullptr, ec.message(), allowed_mode);
+    if (m_flx_subscription_store) {
+        m_flx_subscription_store->copy_to(db);
+        sync_session->nonsync_transact_notify(db->get_version_of_latest_snapshot());
+        sync_session->get_flx_subscription_store()
+            ->get_latest()
+            .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+                // Keep the sync session alive while it's downloading, but then close
+                // it immediately
+                sync_session->close();
+                if (auto strong_self = weak_self.lock()) {
+                    if (s.is_ok()) {
+                        strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
+                    }
+                    else {
+                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status().reason(), allowed_mode);
+                    }
+                }
+            });
+        sync_session->revive_if_needed();
+    }
+    else { // pbs
+        sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
+            // Keep the sync session alive while it's downloading, but then close
+            // it immediately
+            sync_session->close();
+            if (auto strong_self = weak_self.lock()) {
+                if (ec) {
+                    strong_self->handle_fresh_realm_downloaded(nullptr, ec.message(), allowed_mode);
+                }
+                else {
+                    strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
+                }
             }
-            else {
-                strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
-            }
-        }
-    });
-    sync_session->revive_if_needed();
+        });
+        sync_session->revive_if_needed();
+    }
 }
 
 void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
@@ -374,8 +396,12 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // The download can fail for many reasons. For example:
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
+    // - in FLX mode a subscription was added while offline which causes an error
     if (error_message) {
         lock.unlock();
+        if (m_flx_subscription_store) {
+            m_flx_subscription_store->client_reset_finished(error_message);
+        }
         const bool is_fatal = true;
         SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
                             util::format("A fatal error occured during client reset: '%1'", error_message), is_fatal);
@@ -615,6 +641,9 @@ static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& s
             REALM_ASSERT(!active_after->is_frozen());
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
+            if (auto sub_store = active_after->sync_session()->get_flx_subscription_store()) {
+                sub_store->client_reset_finished(util::none);
+            }
         }
         if (notify) {
             notify(frozen_before, active_after, did_recover);

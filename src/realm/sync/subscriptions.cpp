@@ -303,7 +303,7 @@ void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::s
             throw std::logic_error("cannot set subscription set state to uncommitted");
 
         case State::Error:
-            if (old_state != State::Bootstrapping && old_state != State::Pending) {
+            if (old_state != State::Bootstrapping && old_state != State::Pending && old_state != State::Uncommitted) {
                 throw std::logic_error(
                     "subscription set must be in Bootstrapping or Pending to update state to error");
             }
@@ -727,12 +727,78 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     }
 }
 
+void SubscriptionStore::copy_to(DBRef db) const
+{
+    REALM_ASSERT(db);
+    REALM_ASSERT(m_db);
+    REALM_ASSERT_EX(db->get_path() != m_db->get_path(), db->get_path());
+    SubscriptionSet src_subs = get_active();
+    SubscriptionStoreRef dest_store = SubscriptionStore::create(db, [](int64_t) {});
+    MutableSubscriptionSet dst_subs = dest_store->get_latest().make_mutable_copy();
+    dst_subs.clear();
+    for (const Subscription& sub : src_subs) {
+        dst_subs.insert_sub(sub);
+    }
+    dst_subs.m_snapshot_version = db->get_version_of_latest_snapshot();
+    std::move(dst_subs).commit();
+}
+
+void SubscriptionStore::client_reset_finished(const util::Optional<std::string>& error_message) const
+{
+    auto mut_sub = get_active().make_mutable_copy();
+    // In DiscardLocal mode, only the active subscription set is preserved
+    // this means that we have to remove all other subscriptions including later
+    // versioned ones.
+    supercede_all_except(mut_sub.m_tr, mut_sub);
+    if (error_message) {
+        mut_sub.update_state(sync::SubscriptionSet::State::Error,
+                             util::make_optional<std::string_view>(*error_message));
+    }
+    else {
+        mut_sub.update_state(sync::SubscriptionSet::State::Complete);
+    }
+    std::move(mut_sub).commit();
+}
+
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
 {
     auto sub_sets = tr->get_table(m_sub_set_table);
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
     remove_query.remove();
+}
+
+void SubscriptionStore::supercede_all_except(TransactionRef tr, MutableSubscriptionSet& mut_sub) const
+{
+    auto version_to_keep = mut_sub.version();
+
+    auto sub_sets = tr->get_table(m_sub_set_table);
+    Query remove_query(sub_sets);
+    remove_query.not_equal(sub_sets->get_primary_key_column(), version_to_keep);
+    remove_query.remove();
+
+    std::list<SubscriptionStore::NotificationRequest> to_finish;
+    std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
+    m_pending_notifications_cv.wait(lk, [&] {
+        return m_outstanding_requests == 0;
+    });
+    for (auto it = m_pending_notifications.begin(); it != m_pending_notifications.end();) {
+        if (it->version != version_to_keep) {
+            to_finish.splice(to_finish.end(), m_pending_notifications, it++);
+        }
+        else {
+            ++it;
+        }
+    }
+
+    REALM_ASSERT_EX(version_to_keep >= m_min_outstanding_version, version_to_keep, m_min_outstanding_version);
+    m_min_outstanding_version = version_to_keep;
+
+    lk.unlock();
+
+    for (auto& req : to_finish) {
+        req.promise.emplace_value(SubscriptionSet::State::Superseded);
+    }
 }
 
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const

@@ -312,6 +312,13 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
+    // Copy the active subscriptions into the provided db. Used to configure the
+    // fresh Realm during client reset.
+    void copy_to(DBRef db) const;
+
+    // A client reset occurred, update the active subscription accordingly and remove all others.
+    void client_reset_finished(const util::Optional<std::string>& error_message) const;
+
     struct PendingSubscription {
         int64_t query_version;
         DB::version_type snapshot_version;
@@ -342,6 +349,7 @@ protected:
     };
 
     void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
+    void supercede_all_except(TransactionRef tr, MutableSubscriptionSet& mut_sub) const;
 
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;

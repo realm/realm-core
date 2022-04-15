@@ -484,6 +484,11 @@ void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_
 
 namespace realm::_impl::client_reset {
 
+static inline bool should_skip_table(const Transaction& group, TableKey key)
+{
+    return !group.table_is_public(key);
+}
+
 void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
     logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
@@ -491,7 +496,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
     for (auto table_key : group_dst.get_table_keys()) {
-        if (!group_dst.table_is_public(table_key))
+        if (should_skip_table(group_dst, table_key))
             continue;
         StringData table_name = group_dst.get_table_name(table_key);
         logger.debug("key = %1, table_name = %2", table_key.value, table_name);
@@ -566,7 +571,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Create new tables in dst if needed.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -593,12 +598,12 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     {
         size_t num_tables_src = 0;
         for (auto table_key : group_src.get_table_keys()) {
-            if (group_src.table_is_public(table_key))
+            if (!should_skip_table(group_src, table_key))
                 ++num_tables_src;
         }
         size_t num_tables_dst = 0;
         for (auto table_key : group_dst.get_table_keys()) {
-            if (group_dst.table_is_public(table_key))
+            if (!should_skip_table(group_dst, table_key))
                 ++num_tables_dst;
         }
         REALM_ASSERT(num_tables_src == num_tables_dst);
@@ -608,7 +613,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Remove columns in dst if they are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -637,7 +642,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Add columns in dst if present in src and absent in dst.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -716,7 +721,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Remove objects in dst that are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         auto table_src = group_src.get_table(table_key);
         // There are no primary keys in embedded tables but this is ok, because
@@ -749,7 +754,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // There may be missing object from src and the values of existing objects may
     // still differ. Diff all the values and create missing objects on the fly.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         // Embedded objects don't have a primary key, so they are handled
