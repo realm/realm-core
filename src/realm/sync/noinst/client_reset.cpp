@@ -38,7 +38,7 @@ using namespace sync;
 
 namespace {
 
-struct EmbeddedObjectConverter {
+struct EmbeddedObjectConverter : std::enable_shared_from_this<EmbeddedObjectConverter> {
     // If an embedded object is encountered, add it to a list of embedded objects to process.
     // This relies on the property that embedded objects only have one incoming link
     // otherwise there could be an infinite loop while discovering embedded objects.
@@ -59,7 +59,7 @@ private:
 
 struct InterRealmValueConverter {
     InterRealmValueConverter(ConstTableRef src_table, ColKey src_col, ConstTableRef dst_table, ColKey dst_col,
-                             EmbeddedObjectConverter& ec)
+                             std::shared_ptr<EmbeddedObjectConverter> ec)
         : m_src_table(src_table)
         , m_dst_table(dst_table)
         , m_src_col(src_col)
@@ -82,7 +82,7 @@ struct InterRealmValueConverter {
 
     void track_new_embedded(Obj src, Obj dst)
     {
-        m_embedded_converter.track(src, dst);
+        m_embedded_converter->track(src, dst);
     }
 
     struct ConversionResult {
@@ -183,7 +183,7 @@ private:
     ColKey m_dst_col;
     TableRef m_opposite_of_src;
     TableRef m_opposite_of_dst;
-    EmbeddedObjectConverter& m_embedded_converter;
+    std::shared_ptr<EmbeddedObjectConverter> m_embedded_converter;
     bool m_is_embedded_link;
     const bool m_primitive_types_only;
 };
@@ -444,7 +444,8 @@ void copy_value(const Obj& src_obj, Obj& dst_obj, InterRealmValueConverter& conv
 }
 
 struct InterRealmObjectConverter {
-    InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst, EmbeddedObjectConverter& embedded_tracker)
+    InterRealmObjectConverter(ConstTableRef table_src, TableRef table_dst,
+                              std::shared_ptr<EmbeddedObjectConverter> embedded_tracker)
         : m_embedded_tracker(embedded_tracker)
     {
         populate_columns_from_table(table_src, table_dst);
@@ -474,7 +475,7 @@ private:
         }
     }
 
-    EmbeddedObjectConverter& m_embedded_tracker;
+    std::shared_ptr<EmbeddedObjectConverter> m_embedded_tracker;
     std::vector<InterRealmValueConverter> m_columns_cache;
 };
 
@@ -485,26 +486,17 @@ void EmbeddedObjectConverter::process_pending()
     // to be processed here is assumed to be small < 20, use linear search instead of
     // hashing. N is the depth to which embedded objects are connected and the upper
     // bound is the total number of tables which is finite, and is usually small.
-
-    std::vector<std::pair<TableKey, InterRealmObjectConverter>> converters; // FIXME: FlatMap
-    auto get_converter = [this, &converters](ConstTableRef src_table,
-                                             TableRef dst_table) -> InterRealmObjectConverter& {
-        TableKey dst_table_key = dst_table->get_key();
-        auto it = std::find_if(converters.begin(), converters.end(), [&dst_table_key](auto& val) {
-            return val.first == dst_table_key;
-        });
-        if (it == converters.end()) {
-            return converters.emplace_back(dst_table_key, InterRealmObjectConverter{src_table, dst_table, *this})
-                .second;
-        }
-        return it->second;
-    };
+    util::FlatMap<TableKey, InterRealmObjectConverter> converters;
 
     while (!embedded_pending.empty()) {
         EmbeddedToCheck pending = embedded_pending.back();
         embedded_pending.pop_back();
-        InterRealmObjectConverter& converter =
-            get_converter(pending.embedded_in_src.get_table(), pending.embedded_in_dst.get_table());
+        TableRef src_table = pending.embedded_in_src.get_table();
+        TableRef dst_table = pending.embedded_in_dst.get_table();
+        TableKey dst_table_key = dst_table->get_key();
+        auto it_with_did_insert =
+            converters.insert({dst_table_key, InterRealmObjectConverter{src_table, dst_table, shared_from_this()}});
+        InterRealmObjectConverter& converter = it_with_did_insert.first->second;
         converter.copy(pending.embedded_in_src, pending.embedded_in_dst, nullptr);
     }
 }
@@ -990,7 +982,8 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         // final state which would be [B].
         // IDEA: if a unique id were associated with each list element, we could recover lists correctly because
         // we would know where list elements ended up or if they were deleted by the server.
-        EmbeddedObjectConverter embedded_object_tracker;
+        std::shared_ptr<EmbeddedObjectConverter> embedded_object_tracker =
+            std::make_shared<EmbeddedObjectConverter>();
         for (auto& it : m_lists) {
             if (it.second.requires_manual_copy()) {
                 std::string path_str = it.first.path_to_string(remote, m_intern_keys);
@@ -1006,7 +999,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                     logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
                                  local_list.size());
                     copy_list(local_obj, remote_obj, value_converter, nullptr);
-                    embedded_object_tracker.process_pending();
+                    embedded_object_tracker->process_pending();
                 });
                 if (!did_translate) {
                     // object no longer exists in the local state, ignore and continue
@@ -1016,7 +1009,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
                 }
             }
         }
-        embedded_object_tracker.process_pending();
+        embedded_object_tracker->process_pending();
     }
 
     bool resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
@@ -1757,7 +1750,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
         }
     }
 
-    EmbeddedObjectConverter embedded_tracker;
+    std::shared_ptr<EmbeddedObjectConverter> embedded_tracker = std::make_shared<EmbeddedObjectConverter>();
 
     // Now src and dst have identical schemas and no extraneous objects from dst.
     // There may be missing object from src and the values of existing objects may
@@ -1795,7 +1788,7 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
                 logger.debug("  updating %1", src_pk);
             }
         }
-        embedded_tracker.process_pending();
+        embedded_tracker->process_pending();
     }
 }
 
