@@ -1506,6 +1506,19 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     }
 }
 
+bool DB::waiting_for_write_lock() const
+{
+    SharedInfo* info = m_file_map.get_addr();
+
+    uint32_t next_ticket = info->next_ticket.load(std::memory_order_relaxed);
+    uint32_t next_served = info->next_served.load(std::memory_order_relaxed);
+
+    // There is no thread waiting for the write lock if either:
+    //  a) No thread currently holds the write lock, or
+    //  b) One thread holds the lock and no other thread attempted to acquire it.
+    return !(next_ticket == next_served || next_ticket == next_served + 1);
+}
+
 class DB::AsyncCommitHelper {
 public:
     AsyncCommitHelper(DB* db)

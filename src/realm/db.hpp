@@ -408,6 +408,8 @@ public:
     void claim_sync_agent();
     void release_sync_agent();
 
+    bool waiting_for_write_lock() const;
+
 protected:
     explicit DB(const DBOptions& options); // Is this ever used?
 
