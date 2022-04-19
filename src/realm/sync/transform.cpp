@@ -1359,12 +1359,12 @@ struct Merge<A, B,
 ///
 ///  GET READY!
 ///
-///  Realm supports 12 instructions at the time of this writing. Each
+///  Realm supports 14 instructions at the time of this writing. Each
 ///  instruction type needs one rule for each other instruction type. We only
 ///  define one rule to handle each combination (A vs B and B vs A are handle by
 ///  a single rule).
 ///
-///  This gives (19 * (19 + 1)) / 2 = 78 merge rules below.
+///  This gives (14 * (14 + 1)) / 2 = 105 merge rules below.
 ///
 ///  Merge rules are ordered such that the second instruction type is always of
 ///  a lower enum value than the first.

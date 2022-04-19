@@ -136,7 +136,7 @@ public:
     /// changesets and all causally unrelated changesets in the local history. A
     /// changeset in the local history is causally unrelated if, and only if it
     /// occurs after the local changeset that produced
-    /// `remote_changeset.last_integrated_local_version` and is not a produced
+    /// `remote_changeset.last_integrated_local_version` and it is not produced
     /// by integration of a changeset received from P. This assumes that
     /// `remote_changeset.last_integrated_local_version` is set to the local
     /// version produced by the last local changeset, that was integrated by P
