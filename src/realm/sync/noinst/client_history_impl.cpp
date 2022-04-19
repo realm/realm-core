@@ -401,134 +401,173 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     // (due to technical debt) is unable in some cases to produce a correct
     // changeset while applying another one (i.e., it cannot carbon copy).
 
-    VersionID old_version;
-    TransactionRef transact = m_db->start_write(); // Throws
-    old_version = transact->get_version_of_current_transaction();
-    version_type local_version = old_version.version;
-
-    ensure_updated(local_version); // Throws
-    prepare_for_write();           // Throws
-
-    REALM_ASSERT(transact->get_sync_file_id() != 0);
-
-    std::vector<char> assembled_transformed_changeset;
     std::vector<Changeset> changesets;
     changesets.resize(num_changesets); // Throws
 
-    std::uint_fast64_t downloaded_bytes_in_message = 0;
+    std::uint_fast64_t incoming_instructions_count = 0;
 
+    // Parse incoming changesets without holding the write lock.
     try {
         for (std::size_t i = 0; i < num_changesets; ++i) {
             const RemoteChangeset& changeset = incoming_changesets[i];
-            REALM_ASSERT(changeset.last_integrated_local_version <= local_version);
-            REALM_ASSERT(changeset.origin_file_ident > 0 &&
-                         changeset.origin_file_ident != transact->get_sync_file_id());
-            downloaded_bytes_in_message += changeset.original_changeset_size;
-
+            // More validation is done at a later point when we start transactions.
             parse_remote_changeset(changeset, changesets[i]); // Throws
 
             changesets[i].transform_sequence = i;
-            // It is possible that the synchronization history has been trimmed
-            // to a point where a prefix of the merge window is no longer
-            // available, but this can only happen if that prefix consisted
-            // entirely of upload skippable entries. Since such entries (those
-            // that are empty or of remote origin) will be skipped by the
-            // transformer anyway, we can simply clamp the beginning of the
-            // merge window to the beginning of the synchronization history,
-            // when this situation occurs.
-            //
-            // See trim_sync_history() for further details.
-            if (changesets[i].last_integrated_remote_version < m_sync_history_base_version)
-                changesets[i].last_integrated_remote_version = m_sync_history_base_version;
+            incoming_instructions_count += changesets[i].size();
         }
-
-        if (m_replication.apply_server_changes()) {
-            Transformer& transformer = get_transformer(); // Throws
-            transformer.transform_remote_changesets(*this, transact->get_sync_file_id(), local_version,
-                                                    changesets.data(), changesets.size(),
-                                                    &logger); // Throws
-
-            for (std::size_t i = 0; i < num_changesets; ++i) {
-                ChangesetEncoder::Buffer transformed_changeset;
-                encode_changeset(changesets[i], transformed_changeset);
-
-                InstructionApplier applier{*transact};
-                {
-                    TempShortCircuitReplication tscr{m_replication};
-                    applier.apply(changesets[i], &logger); // Throws
-                }
-
-                // The need to produce a combined changeset is unfortunate from a
-                // memory pressure/allocation cost point of view. It is believed
-                // that the history (list of applied changesets) will be moved into
-                // the main Realm file eventually, and that would probably eliminate
-                // this problem.
-                std::size_t size_1 = assembled_transformed_changeset.size();
-                std::size_t size_2 = size_1;
-                if (util::int_add_with_overflow_detect(size_2, transformed_changeset.size()))
-                    throw util::overflow_error{"Changeset size overflow"};
-                assembled_transformed_changeset.resize(size_2); // Throws
-                std::copy(transformed_changeset.data(), transformed_changeset.data() + transformed_changeset.size(),
-                          assembled_transformed_changeset.data() + size_1);
-            }
-        }
-    }
-    catch (BadChangesetError& e) {
-        throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to parse, or apply received changeset: %1", e.what()));
     }
     catch (TransformError& e) {
         throw IntegrationException(ClientError::bad_changeset,
-                                   util::format("Failed to transform received changeset: %1", e.what()));
+                                   util::format("Failed to parse received changeset: %1", e.what()));
     }
 
-    // downloaded_bytes always contains the total number of downloaded bytes
-    // from the Realm. downloaded_bytes must be persisted in the Realm, since
-    // the downloaded changesets are trimmed after use, and since it would be
-    // expensive to traverse the entire history.
-    Array& root = m_arrays->root;
-    auto downloaded_bytes =
-        std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int());
-    downloaded_bytes += downloaded_bytes_in_message;
-    root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes)); // Throws
+    version_type new_version = 0;
+    const size_t max_number_of_transactions = m_replication.apply_server_changes() ? 10 : 1;
+    // Maximum number of subsets we split the `incoming_changesets` into.
+    // We aim that each subset of changesets has the same number of instructions,
+    // but this may not always be possible.
+    auto subsets_to_integrate = std::min(max_number_of_transactions, num_changesets);
+    std::uint_fast64_t instructions_per_subset = static_cast<std::uint_fast64_t>(
+        std::ceil(static_cast<double>(incoming_instructions_count) / subsets_to_integrate));
 
-    // The reason we can use the `origin_timestamp`, and the `origin_file_ident`
-    // from the last incoming changeset, and ignore all the other changesets, is
-    // that these values are actually irrelevant for changesets of remote origin
-    // stored in the client-side history (for now), except that
-    // `origin_file_ident` is required to be nonzero, to mark it as having been
-    // received from the server.
-    const Changeset& last_changeset = changesets.back();
-    HistoryEntry entry;
-    entry.origin_timestamp = last_changeset.origin_timestamp;
-    entry.origin_file_ident = last_changeset.origin_file_ident;
-    entry.remote_version = last_changeset.version;
-    entry.changeset = BinaryData(assembled_transformed_changeset.data(), assembled_transformed_changeset.size());
+    // Ideally, this loop runs only once, but it can run up to `subsets_to_integrate` times,
+    // depending on how many times the sync client needs to yield the write lock to allow
+    // the user to commit their changes.
+    // In each iteration, at least one subset of `incoming_changesets` is transformed and
+    // committed.
+    for (size_t changeset_ndx = 0; changeset_ndx < num_changesets;) {
+        VersionID old_version;
+        TransactionRef transact = m_db->start_write(); // Throws
+        old_version = transact->get_version_of_current_transaction();
+        version_type local_version = old_version.version;
 
-    // m_changeset_from_server is picked up by prepare_changeset(), which then
-    // calls add_sync_history_entry(). prepare_changeset() is called as a result
-    // of committing the current transaction even in the "short-circuited" mode,
-    // because replication isn't disabled.
-    m_changeset_from_server_owner = std::move(assembled_transformed_changeset);
-    REALM_ASSERT(!m_changeset_from_server);
-    m_changeset_from_server = entry;
+        ensure_updated(local_version); // Throws
+        prepare_for_write();           // Throws
 
-    // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
-    // synthetic server version that represents synthetic changesets generated from state on the server.
-    if (batch_state == DownloadBatchState::LastInBatch) {
-        update_sync_progress(progress, downloadable_bytes, transact); // Throws
+        REALM_ASSERT(transact->get_sync_file_id() != 0);
+
+        std::uint_fast64_t downloaded_bytes_in_subset = 0;
+
+        try {
+            // Transform and apply one subset of changesets at a time.
+            while (changeset_ndx < num_changesets) {
+                REALM_ASSERT(subsets_to_integrate > 0);
+
+                auto changeset_ndx_end = changeset_ndx;
+                std::uint_fast64_t instructions_so_far_count = 0;
+                // Find the changesets that are part of the current subset.
+                do {
+                    const RemoteChangeset& changeset = incoming_changesets[changeset_ndx_end];
+                    REALM_ASSERT(changeset.last_integrated_local_version <= local_version);
+                    REALM_ASSERT(changeset.origin_file_ident > 0 &&
+                                 changeset.origin_file_ident != transact->get_sync_file_id());
+                    downloaded_bytes_in_subset += changeset.original_changeset_size;
+
+                    // It is possible that the synchronization history has been trimmed
+                    // to a point where a prefix of the merge window is no longer
+                    // available, but this can only happen if that prefix consisted
+                    // entirely of upload skippable entries. Since such entries (those
+                    // that are empty or of remote origin) will be skipped by the
+                    // transformer anyway, we can simply clamp the beginning of the
+                    // merge window to the beginning of the synchronization history,
+                    // when this situation occurs.
+                    //
+                    // See trim_sync_history() for further details.
+                    if (changesets[changeset_ndx_end].last_integrated_remote_version < m_sync_history_base_version)
+                        changesets[changeset_ndx_end].last_integrated_remote_version = m_sync_history_base_version;
+
+                    instructions_so_far_count += changesets[changeset_ndx_end].size();
+                    ++changeset_ndx_end;
+                } while (changeset_ndx_end < num_changesets && instructions_so_far_count < instructions_per_subset);
+
+                if (m_replication.apply_server_changes()) {
+                    Transformer& transformer = get_transformer(); // Throws
+                    transformer.transform_remote_changesets(
+                        *this, transact->get_sync_file_id(), local_version, changesets.data() + changeset_ndx,
+                        changeset_ndx_end - changeset_ndx, &logger); // Throws
+
+                    while (changeset_ndx < changeset_ndx_end) {
+                        InstructionApplier applier{*transact};
+                        {
+                            TempShortCircuitReplication tscr{m_replication};
+                            applier.apply(changesets[changeset_ndx], &logger); // Throws
+                        }
+                        ++changeset_ndx;
+                    }
+
+                    subsets_to_integrate = subsets_to_integrate - 1;
+
+                    if (m_db->waiting_for_write_lock()) {
+                        // Stop if a user is waiting to commit.
+                        break;
+                    }
+                }
+            }
+        }
+        catch (BadChangesetError& e) {
+            throw IntegrationException(ClientError::bad_changeset,
+                                       util::format("Failed to apply received changeset: %1", e.what()));
+        }
+        catch (TransformError& e) {
+            throw IntegrationException(ClientError::bad_changeset,
+                                       util::format("Failed to transform received changeset: %1", e.what()));
+        }
+
+        // downloaded_bytes always contains the total number of downloaded bytes
+        // from the Realm. downloaded_bytes must be persisted in the Realm, since
+        // the downloaded changesets are trimmed after use, and since it would be
+        // expensive to traverse the entire history.
+        Array& root = m_arrays->root;
+        auto downloaded_bytes =
+            std::uint_fast64_t(root.get_as_ref_or_tagged(s_progress_downloaded_bytes_iip).get_as_int());
+        downloaded_bytes += downloaded_bytes_in_subset;
+        root.set(s_progress_downloaded_bytes_iip, RefOrTagged::make_tagged(downloaded_bytes)); // Throws
+
+        // The reason we can use the `origin_timestamp`, and the `origin_file_ident`
+        // from the last changeset in the subset, and ignore all the other changesets, is
+        // that these values are actually irrelevant for changesets of remote origin
+        // stored in the client-side history (for now), except that
+        // `origin_file_ident` is required to be nonzero, to mark it as having been
+        // received from the server.
+        const Changeset& last_changeset = changesets[changeset_ndx - 1];
+        HistoryEntry entry;
+        entry.origin_timestamp = last_changeset.origin_timestamp;
+        entry.origin_file_ident = last_changeset.origin_file_ident;
+        entry.remote_version = last_changeset.version;
+
+        // m_changeset_from_server is picked up by prepare_changeset(), which then
+        // calls add_sync_history_entry(). prepare_changeset() is called as a result
+        // of committing the current transaction even in the "short-circuited" mode,
+        // because replication isn't disabled.
+        REALM_ASSERT(!m_changeset_from_server);
+        m_changeset_from_server = entry;
+
+        // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
+        // synthetic server version that represents synthetic changesets generated from state on the server.
+        if (changeset_ndx == num_changesets && batch_state == DownloadBatchState::LastInBatch) {
+            update_sync_progress(progress, downloadable_bytes, transact); // Throws
+        }
+
+        // During the bootstrap phase in flexible sync, the server sends multiple download messages with the same
+        // synthetic server version that represents synthetic changesets generated from state on the server.
+        if (batch_state == DownloadBatchState::LastInBatch) {
+            update_sync_progress(progress, downloadable_bytes, transact); // Throws
+        }
+        if (run_in_write_tr) {
+            run_in_write_tr(transact);
+        }
+
+        new_version = transact->commit_and_continue_as_read().version; // Throws
+        if (transact_reporter) {
+            VersionID new_version_2 = transact->get_version_of_current_transaction();
+            transact_reporter->report_sync_transact(old_version, new_version_2); // Throws
+        }
     }
-    if (run_in_write_tr) {
-        run_in_write_tr(transact);
-    }
 
-    version_type new_version = transact->commit_and_continue_as_read().version; // Throws
-
-    if (transact_reporter) {
-        VersionID new_version_2 = transact->get_version_of_current_transaction();
-        transact_reporter->report_sync_transact(old_version, new_version_2); // Throws
-    }
-
+    // We don't expect to have split the incoming changesets into more subsets than initially planned.
+    REALM_ASSERT(subsets_to_integrate >= 0);
+    REALM_ASSERT(new_version != 0);
     version_info.realm_version = new_version;
     version_info.sync_version = {new_version, 0};
 }

@@ -381,7 +381,6 @@ private:
     // ServerHistory object.
     mutable util::Optional<Arrays> m_arrays;
 
-    mutable std::vector<char> m_changeset_from_server_owner;
     mutable util::Optional<HistoryEntry> m_changeset_from_server;
 
     util::Optional<BinaryData> m_client_reset_changeset;
