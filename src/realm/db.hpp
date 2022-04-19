@@ -414,6 +414,7 @@ protected:
 
 private:
     class AsyncCommitHelper;
+    class VersionManager;
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
@@ -443,16 +444,15 @@ private:
     int m_transaction_count = 0;
     SlabAlloc m_alloc;
     std::unique_ptr<Replication> m_history;
+    std::unique_ptr<VersionManager> m_version_manager;
     Replication* m_replication = nullptr;
     size_t m_free_space = 0;
     size_t m_locked_space = 0;
     size_t m_used_space = 0;
-    uint_fast32_t m_local_max_entry = 0;          // highest version observed by this DB
     std::vector<ReadLockInfo> m_local_locks_held; // tracks all read locks held by this DB
     util::File m_file;
-    util::File::Map<SharedInfo> m_file_map;   // Never remapped, provides access to everything but the ringbuffer
-    util::File::Map<SharedInfo> m_reader_map; // provides access to ringbuffer, remapped as needed when it grows
-    bool m_wait_for_change_enabled = true;    // Initially wait_for_change is enabled
+    util::File::Map<SharedInfo> m_file_map; // Never remapped, provides access to everything but the ringbuffer
+    bool m_wait_for_change_enabled = true;  // Initially wait_for_change is enabled
     bool m_write_transaction_open = false;
     std::string m_lockfile_path;
     std::string m_lockfile_prefix;

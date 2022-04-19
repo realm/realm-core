@@ -545,18 +545,13 @@ struct alignas(8) DB::SharedInfo {
         r.version = initial_version;
         r.current_top = top_ref;
     }
-
-    uint_fast64_t get_current_version_unchecked() const
-    {
-        return readers.get_last().version;
-    }
 };
 
 
 DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
-    , shared_writemutex() // Throws
+    , shared_writemutex()   // Throws
     , shared_controlmutex() // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
@@ -617,6 +612,165 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 #pragma GCC diagnostic pop
 #endif
 }
+
+class DB::VersionManager {
+public:
+    void grow_reader_mapping(uint_fast32_t index)
+    {
+        using _impl::SimulatedFailure;
+        SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
+
+        if (index >= m_local_max_entry) {
+            // handle mapping expansion if required
+            DB::SharedInfo* r_info = m_reader_map.get_addr();
+            m_local_max_entry = r_info->readers.get_num_entries();
+            REALM_ASSERT(index < m_local_max_entry);
+            size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+            // std::cout << "Growing reader mapping to " << infosize << std::endl;
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
+        }
+    }
+    void cleanup_versions()
+    {
+        grow_reader_mapping(r_info->readers.get_num_entries() - 1);
+        r_info->readers.cleanup();
+    }
+    version_type get_oldest_version()
+    {
+        const VersionList::ReadCount& rc = r_info->readers.get_oldest();
+        return rc.version;
+    }
+    version_type get_newest_version()
+    {
+        return r_info->readers.get_last().version;
+    }
+    VersionID get_version_id_of_latest_snapshot()
+    {
+        // As this method may be called outside of the write
+        // mutex, another thread may be performing changes to the VersionList
+        // concurrently. It may even cleanup and recycle the current entry from
+        // under our feet, so we need to protect the entry by temporarily
+        // incrementing the reader ref count until we've got a safe reading of the
+        // version number.
+        while (1) {
+            uint_fast32_t index;
+            SharedInfo* r_info;
+            r_info = m_reader_map.get_addr();
+            index = r_info->readers.last();
+            // make sure that the index we are about to dereference falls within
+            // the portion of the VersionList that we have mapped - if not, extend
+            // the mapping to fit.
+            grow_reader_mapping(index); // throws
+
+            // now (double) increment the read count so that no-one cleans up the entry
+            // while we read it.
+            const VersionList::ReadCount& r = r_info->readers.get(index);
+            if (!atomic_double_inc_if_even(r.count)) {
+                continue;
+            }
+            VersionID version{r.version, index};
+            // release the entry again:
+            atomic_double_dec(r.count);
+            return version;
+        }
+    }
+    VersionManager(File& file)
+        : m_file(file)
+    {
+        size_t size = m_file.get_size();
+        m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
+        r_info = m_reader_map.get_addr();
+        m_local_max_entry = r_info->readers.get_num_entries();
+        REALM_ASSERT(sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry) == size);
+    }
+    void release_read_lock(ReadLockInfo& read_lock)
+    {
+        const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+        atomic_double_dec(r.count); // <-- most of the exec time spent here
+    }
+    void grab_read_lock(ReadLockInfo& read_lock, VersionID version_id = {})
+    {
+        if (version_id.version == std::numeric_limits<version_type>::max()) {
+            for (;;) {
+                SharedInfo* r_info = m_reader_map.get_addr();
+                read_lock.m_reader_idx = r_info->readers.last();
+                grow_reader_mapping(read_lock.m_reader_idx);
+                const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+                // if the entry is stale and has been cleared by the cleanup process,
+                // we need to start all over again. This is extremely unlikely, but possible.
+                if (!atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
+                    continue;
+                read_lock.m_version = r.version;
+                read_lock.m_top_ref = to_size_t(r.current_top);
+                read_lock.m_file_size = to_size_t(r.filesize);
+                return;
+            }
+        }
+
+        for (;;) {
+            SharedInfo* r_info = m_reader_map.get_addr();
+            read_lock.m_reader_idx = version_id.index;
+            grow_reader_mapping(read_lock.m_reader_idx);
+            const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
+
+            // if the entry is stale and has been cleared by the cleanup process,
+            // the requested version is no longer available
+            while (!atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
+                // we failed to lock the version. This could be because the version
+                // is being cleaned up, but also because the cleanup is probing for access
+                // to it. If it's being probed, the tail ptr of the VersionList will point
+                // to it. If so we retry. If the tail ptr points somewhere else, the entry
+                // has been cleaned up.
+                if (&r_info->readers.get_oldest() != &r)
+                    throw BadVersion();
+            }
+            // we managed to lock an entry in the VersionList, but it may be so old that
+            // the version doesn't match the specific request. In that case we must release and fail
+            if (r.version != version_id.version) {
+                atomic_double_dec(r.count); // <-- release
+                throw BadVersion();
+            }
+            read_lock.m_version = r.version;
+            read_lock.m_top_ref = to_size_t(r.current_top);
+            read_lock.m_file_size = to_size_t(r.filesize);
+            return;
+        }
+    }
+    void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
+    {
+        if (r_info->readers.is_full()) {
+            // buffer expansion
+            uint_fast32_t entries = r_info->readers.get_num_entries();
+            entries = entries + 32;
+            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
+            // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
+            m_file.prealloc(new_info_size);                                          // Throws
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
+            r_info = m_reader_map.get_addr();
+            m_local_max_entry = entries;
+            r_info->readers.expand_to(entries);
+        }
+        VersionList::ReadCount& r = r_info->readers.get_next();
+        r.current_top = new_top_ref;
+        r.filesize = new_file_size;
+        r.version = new_version;
+        r_info->readers.use_next();
+    }
+    ~VersionManager()
+    {
+        m_reader_map.unmap();
+    }
+    void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
+    {
+        r_info->init_versioning(top_ref, file_size, initial_version);
+    }
+
+private:
+    unsigned int m_local_max_entry;
+    SharedInfo* r_info;
+    File& m_file;
+    File::Map<DB::SharedInfo> m_reader_map;
+};
 
 #if REALM_HAVE_STD_FILESYSTEM
 std::string DBOptions::sys_tmp_dir = std::filesystem::temp_directory_path().string();
@@ -873,17 +1027,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            // we need a thread-local copy of the number of VersionList entries in order
-            // to later detect concurrent expansion of the VersionList.
-            m_local_max_entry = info->readers.get_num_entries();
-
-            // We need to map the info file once more for the readers part
-            // since that part can be resized and as such remapped which
-            // could move our mutexes (which we don't want to risk moving while
-            // they are locked)
-            size_t reader_info_size = sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
-            m_reader_map.map(m_file, File::access_ReadWrite, reader_info_size, File::map_NoSync);
-            File::UnmapGuard fug_2(m_reader_map);
+            auto version_manager = std::make_unique<VersionManager>(m_file);
 
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
@@ -1066,10 +1210,9 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 info->latest_version_number = version;
                 alloc.init_mapping_management(version);
 
-                SharedInfo* r_info = m_reader_map.get_addr();
                 size_t file_size = alloc.get_baseline();
                 // REALM_ASSERT(m_alloc.matches_section_boundary(file_size));
-                r_info->init_versioning(top_ref, file_size, version);
+                version_manager->init_versioning(top_ref, file_size, version);
             }
             else { // Not the session initiator
                 // Durability setting must be consistent across a session. An
@@ -1147,8 +1290,8 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             ++info->num_participants;
 
             // Keep the mappings and file open:
+            m_version_manager = std::move(version_manager);
             alloc_detach_guard.release();
-            fug_2.release(); // Do not unmap
             fug_1.release(); // Do not unmap
             fcg.release();   // Do not close
         }
@@ -1474,12 +1617,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             }
             throw;
         }
-        {
-            SharedInfo* r_info = m_reader_map.get_addr();
-            VersionList::ReadCount& rc = const_cast<VersionList::ReadCount&>(r_info->readers.get_last());
-            REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
-            static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
-        }
         // if we've written a file with a bumped version number, we need to update the lock file to match.
         if (bump_version_number) {
             ++info->latest_version_number;
@@ -1508,9 +1645,8 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         top_ref = m_alloc.attach_file(m_db_path, cfg);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
-        SharedInfo* r_info = m_reader_map.get_addr();
         size_t file_size = m_alloc.get_baseline();
-        r_info->init_versioning(top_ref, file_size, info->latest_version_number);
+        m_version_manager->init_versioning(top_ref, file_size, info->latest_version_number);
     }
     return true;
 }
@@ -1571,11 +1707,9 @@ void DB::release_all_read_locks() noexcept
 {
     REALM_ASSERT(!m_fake_read_lock_if_immutable);
     std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
-    SharedInfo* r_info = m_reader_map.get_addr();
     for (auto& read_lock : m_local_locks_held) {
         --m_transaction_count;
-        const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-        atomic_double_dec(r.count);
+        m_version_manager->release_read_lock(read_lock);
     }
     m_local_locks_held.clear();
     REALM_ASSERT(m_transaction_count == 0);
@@ -1659,7 +1793,7 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
         // may
         // interleave which is not permitted on Windows. It is permitted on *nix.
         m_file_map.unmap();
-        m_reader_map.unmap();
+        m_version_manager.reset();
         m_file.unlock();
         // info->~SharedInfo(); // DO NOT Call destructor
         m_file.close();
@@ -2083,6 +2217,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
     if (m_fake_read_lock_if_immutable)
         return;
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
     bool found_match = false;
     // simple linear search and move-last-over if a match is found.
     // common case should have only a modest number of transactions in play..
@@ -2100,9 +2235,7 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
         return;
     }
     --m_transaction_count;
-    SharedInfo* r_info = m_reader_map.get_addr();
-    const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-    atomic_double_dec(r.count); // <-- most of the exec time spent here
+    m_version_manager->release_read_lock(read_lock);
 }
 
 
@@ -2110,67 +2243,12 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     REALM_ASSERT_RELEASE(is_attached());
-    if (version_id.version == std::numeric_limits<version_type>::max()) {
-        for (;;) {
-            SharedInfo* r_info = m_reader_map.get_addr();
-            read_lock.m_reader_idx = r_info->readers.last();
-            if (grow_reader_mapping(read_lock.m_reader_idx)) { // Throws
-                // remapping takes time, so retry with a fresh entry
-                continue;
-            }
-            r_info = m_reader_map.get_addr();
-            const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-            // if the entry is stale and has been cleared by the cleanup process,
-            // we need to start all over again. This is extremely unlikely, but possible.
-            if (!atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
-                continue;
-            read_lock.m_version = r.version;
-            read_lock.m_top_ref = to_size_t(r.current_top);
-            read_lock.m_file_size = to_size_t(r.filesize);
-            m_local_locks_held.emplace_back(read_lock);
-            ++m_transaction_count;
-            // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
-            REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
-            return;
-        }
-    }
+    m_version_manager->grab_read_lock(read_lock, version_id);
 
-    for (;;) {
-        SharedInfo* r_info = m_reader_map.get_addr();
-        read_lock.m_reader_idx = version_id.index;
-        if (grow_reader_mapping(read_lock.m_reader_idx)) { // Throws
-            // remapping takes time, so retry with a fresh entry
-            continue;
-        }
-        r_info = m_reader_map.get_addr();
-        const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-
-        // if the entry is stale and has been cleared by the cleanup process,
-        // the requested version is no longer available
-        while (!atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
-            // we failed to lock the version. This could be because the version
-            // is being cleaned up, but also because the cleanup is probing for access
-            // to it. If it's being probed, the tail ptr of the VersionList will point
-            // to it. If so we retry. If the tail ptr points somewhere else, the entry
-            // has been cleaned up.
-            if (&r_info->readers.get_oldest() != &r)
-                throw BadVersion();
-        }
-        // we managed to lock an entry in the VersionList, but it may be so old that
-        // the version doesn't match the specific request. In that case we must release and fail
-        if (r.version != version_id.version) {
-            atomic_double_dec(r.count); // <-- release
-            throw BadVersion();
-        }
-        read_lock.m_version = r.version;
-        read_lock.m_top_ref = to_size_t(r.current_top);
-        read_lock.m_file_size = to_size_t(r.filesize);
-        m_local_locks_held.emplace_back(read_lock);
-        ++m_transaction_count;
-        // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
-        REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
-        return;
-    }
+    m_local_locks_held.emplace_back(read_lock);
+    ++m_transaction_count;
+    // REALM_ASSERT(m_alloc.matches_section_boundary(read_lock.m_file_size));
+    REALM_ASSERT(read_lock.m_file_size > read_lock.m_top_ref);
 }
 
 void DB::leak_read_lock(ReadLockInfo& read_lock) noexcept
@@ -2299,8 +2377,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     version_type current_version;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        SharedInfo* r_info = m_reader_map.get_addr();
-        current_version = r_info->get_current_version_unchecked();
+        current_version = m_version_manager->get_newest_version();
     }
     version_type new_version = current_version + 1;
 
@@ -2309,7 +2386,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
         // fails. The application then has the option of terminating the
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(current_version); // Throws
+        new_version = repl->prepare_commit(current_version);        // Throws
         low_level_commit(new_version, transaction, commit_to_disk); // Throws
         repl->finalize_commit();
     }
@@ -2393,59 +2470,12 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     return VersionID{version, new_read_lock.m_reader_idx};
 }
 
-// Caller must lock m_mutex.
-bool DB::grow_reader_mapping(uint_fast32_t index)
-{
-    using _impl::SimulatedFailure;
-    SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
-
-    if (index >= m_local_max_entry) {
-        // handle mapping expansion if required
-        SharedInfo* r_info = m_reader_map.get_addr();
-        m_local_max_entry = r_info->readers.get_num_entries();
-        REALM_ASSERT(index < m_local_max_entry);
-        size_t info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
-        // std::cout << "Growing reader mapping to " << infosize << std::endl;
-        m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
-        return true;
-    }
-    return false;
-}
-
-
 VersionID DB::get_version_id_of_latest_snapshot()
 {
     if (m_fake_read_lock_if_immutable)
         return {m_fake_read_lock_if_immutable->m_version, 0};
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    // As get_version_of_latest_snapshot() may be called outside of the write
-    // mutex, another thread may be performing changes to the VersionList
-    // concurrently. It may even cleanup and recycle the current entry from
-    // under our feet, so we need to protect the entry by temporarily
-    // incrementing the reader ref count until we've got a safe reading of the
-    // version number.
-    while (1) {
-        uint_fast32_t index;
-        SharedInfo* r_info;
-        do {
-            // make sure that the index we are about to dereference falls within
-            // the portion of the VersionList that we have mapped - if not, extend
-            // the mapping to fit.
-            r_info = m_reader_map.get_addr();
-            index = r_info->readers.last();
-        } while (grow_reader_mapping(index)); // throws
-
-        // now (double) increment the read count so that no-one cleans up the entry
-        // while we read it.
-        const VersionList::ReadCount& r = r_info->readers.get(index);
-        if (!atomic_double_inc_if_even(r.count)) {
-            continue;
-        }
-        VersionID version{r.version, index};
-        // release the entry again:
-        atomic_double_dec(r.count);
-        return version;
-    }
+    return m_version_manager->get_version_id_of_latest_snapshot();
 }
 
 
@@ -2464,17 +2494,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     uint_fast64_t oldest_version;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        SharedInfo* r_info = m_reader_map.get_addr();
-
-        // the cleanup process may access the entire ring buffer, so make sure it is mapped.
-        // this is not ensured as part of begin_read, which only makes sure that the current
-        // last entry in the buffer is available. (Last entry is a get_num_entries() - 1).
-        if (grow_reader_mapping(r_info->readers.get_num_entries() - 1)) { // throws
-            r_info = m_reader_map.get_addr();
-        }
-        r_info->readers.cleanup();
-        const VersionList::ReadCount& rc = r_info->readers.get_oldest();
-        oldest_version = rc.version;
+        m_version_manager->cleanup_versions();
+        oldest_version = m_version_manager->get_oldest_version();
 
         // Allow for trimming of the history. Some types of histories do not
         // need store changesets prior to the oldest bound snapshot.
@@ -2537,24 +2558,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
         info->commit_in_critical_phase = 1;
         {
-            SharedInfo* r_info = m_reader_map.get_addr();
-            if (r_info->readers.is_full()) {
-                // buffer expansion
-                uint_fast32_t entries = r_info->readers.get_num_entries();
-                entries = entries + 32;
-                size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
-                // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
-                m_file.prealloc(new_info_size);                                          // Throws
-                m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
-                r_info = m_reader_map.get_addr();
-                m_local_max_entry = entries;
-                r_info->readers.expand_to(entries);
-            }
-            VersionList::ReadCount& r = r_info->readers.get_next();
-            r.current_top = new_top_ref;
-            r.filesize = new_file_size;
-            r.version = new_version;
-            r_info->readers.use_next();
+            m_version_manager->add_version(new_top_ref, new_file_size, new_version);
 
             // REALM_ASSERT(m_alloc.matches_section_boundary(new_file_size));
             REALM_ASSERT(new_top_ref < new_file_size);
