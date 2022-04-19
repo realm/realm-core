@@ -2417,6 +2417,16 @@ public:
         REALM_ASSERT(m_condition_column_key);
         if (m_target_keys.size() > 1)
             throw SerialisationError("Serializing a query which links to multiple objects is currently unsupported.");
+        auto target_table = m_table->get_opposite_table(m_condition_column_key);
+        if (ColKey pk_col = target_table ? target_table->get_primary_key_column() : ColKey{}) {
+            if (auto obj = target_table->try_get_object(m_target_keys[0])) {
+                auto pk_val = obj.get_any(pk_col);
+                std::ostringstream ostr;
+                ostr << "obj('" << target_table->get_name() << "'," << pk_val << ')';
+                return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " +
+                       describe_condition() + ostr.str();
+            }
+        }
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
                util::serializer::print_value(m_target_keys[0]);
     }

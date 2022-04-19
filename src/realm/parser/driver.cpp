@@ -490,8 +490,9 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
         else if (left_type == type_Link) {
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-            if (link_column && link_column->link_map().get_nb_hops() == 1 && link_column->get_comparison_type() &&
-                *link_column->get_comparison_type() == ExpressionComparisonType::Any) {
+            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
+                link_column->get_comparison_type().value_or(ExpressionComparisonType::Any) ==
+                    ExpressionComparisonType::Any) {
                 // We can use equal/not_equal and get a LinksToNode based query
                 if (op == CompareNode::EQUAL) {
                     return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
@@ -939,6 +940,19 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 {
     std::unique_ptr<Subexpr> ret;
     std::string explain_value_message = text;
+    if (target_table.length()) {
+        const Group* g = drv->m_base_table->get_parent_group();
+        TableKey table_key;
+        ObjKey obj_key;
+        if (auto table = g->get_table(target_table)) {
+            table_key = table->get_key();
+            target_table = "";
+            auto pk_val_node = visit(drv, hint); // call recursively
+            auto pk_val = pk_val_node->get_mixed();
+            obj_key = table->find_primary_key(pk_val);
+        }
+        return std::make_unique<Value<ObjLink>>(ObjLink(table_key, ObjKey(obj_key)));
+    }
     switch (type) {
         case Type::NUMBER: {
             if (hint == type_Decimal) {

@@ -737,18 +737,17 @@ TEST(Parser_LinksToDifferentTable)
         obj.set(discount_active_col, discount_info[i].second);
     }
 
-    TableRef items = g.add_table("class_Items");
-    ColKey item_name_col = items->add_column(type_String, "name");
+    TableRef items = g.add_table_with_primary_key("class_Items", type_String, "name");
     ColKey item_price_col = items->add_column(type_Double, "price");
     ColKey item_discount_col = items->add_column(*discounts, "discount");
     using item_t = std::pair<std::string, double>;
-    std::vector<item_t> item_info = {{"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}};
+    std::vector<item_t> item_info = {
+        {"milk", 5.5}, {"oranges", 4.0}, {"pizza", 9.5}, {"cereal", 6.5}, {"coffee", 17.5}};
     std::vector<ObjKey> item_keys;
-    items->create_objects(item_info.size(), item_keys);
-    for (size_t i = 0; i < item_keys.size(); ++i) {
-        Obj obj = items->get_object(item_keys[i]);
-        obj.set(item_name_col, StringData(item_info[i].first));
-        obj.set(item_price_col, item_info[i].second);
+    for (auto& item : item_info) {
+        Obj obj = items->create_object_with_primary_key(item.first);
+        obj.set(item_price_col, item.second);
+        item_keys.push_back(obj.get_key());
     }
     items->get_object(item_keys[0]).set(item_discount_col, discount_keys[2]); // milk -0.50
     items->get_object(item_keys[2]).set(item_discount_col, discount_keys[1]); // pizza -2.5
@@ -781,6 +780,9 @@ TEST(Parser_LinksToDifferentTable)
     list_2.add(item_keys[2]);
     list_2.add(item_keys[3]);
 
+    verify_query(test_context, t, "items = obj('class_Items', 'coffee')", 0); // nobody buys coffee
+    verify_query(test_context, t, "items = obj('class_Items', 'milk')", 2);   // but milk
+    verify_query(test_context, t, "items = O0", 2);              // how many people bought milk?
     verify_query(test_context, t, "items.@count > 2", 3);        // how many people bought more than two items?
     verify_query(test_context, t, "items.price > 3.0", 3);       // how many people buy items over $3.0?
     verify_query(test_context, t, "items.name ==[c] 'milk'", 2); // how many people buy milk?
@@ -4994,6 +4996,8 @@ TEST(Parser_DictionaryObjects)
     CHECK_EQUAL(q.count(), 1);
 
     verify_query(test_context, persons, "pets.@values.age > 4", 1);
+    verify_query(test_context, persons, "pets.@values == obj('dog', 'pluto')", 1);
+    verify_query(test_context, persons, "pets.@values == ANY { obj('dog', 'pluto'), obj('dog', 'astro') }", 2);
 }
 
 TEST_TYPES(Parser_DictionaryAggregates, Prop<float>, Prop<double>, Prop<Decimal128>)

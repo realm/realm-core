@@ -727,6 +727,11 @@ public:
         return {};
     }
 
+    virtual ConstTableRef get_target_table() const
+    {
+        return {};
+    }
+
     virtual DataType get_type() const = 0;
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -2589,6 +2594,11 @@ public:
         return type_Link;
     }
 
+    ConstTableRef get_target_table() const override
+    {
+        return link_map().get_target_table();
+    }
+
     bool has_multiple_values() const override
     {
         return m_is_list || !m_link_map.only_unary_links();
@@ -2735,6 +2745,10 @@ public:
     ConstTableRef get_base_table() const final
     {
         return m_link_map.get_base_table();
+    }
+    ConstTableRef get_target_table() const override
+    {
+        return m_link_map.get_target_table()->get_opposite_table(m_column_key);
     }
 
     Allocator& get_alloc() const
@@ -4201,6 +4215,23 @@ public:
                                                  m_left->description(state));
         }
         else {
+            if constexpr (std::is_same_v<TCond, Equal>) {
+                if (m_right->has_single_value()) {
+                    auto val = m_right->get_mixed();
+                    if (val.is_type(type_Link, type_TypedLink)) {
+                        auto target_table = m_left->get_target_table();
+                        if (ColKey pk_col = target_table ? target_table->get_primary_key_column() : ColKey{}) {
+                            if (auto obj = target_table->try_get_object(val.get<ObjKey>())) {
+                                auto pk_val = obj.get_any(pk_col);
+                                std::ostringstream ostr;
+                                ostr << "obj('" << target_table->get_name() << "'," << pk_val << ')';
+                                return util::serializer::print_value(m_left->description(state) +
+                                                                     " == " + ostr.str());
+                            }
+                        }
+                    }
+                }
+            }
             return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
                                                  m_right->description(state));
         }
