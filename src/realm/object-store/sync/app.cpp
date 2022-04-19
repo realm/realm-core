@@ -213,6 +213,14 @@ void App::clear_cached_apps()
     s_apps_cache.clear();
 }
 
+void App::close_all_sync_sessions()
+{
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
+    for (auto& app : s_apps_cache) {
+        app.second->sync_manager()->close_all_sessions();
+    }
+}
+
 App::App(const Config& config)
     : m_config(std::move(config))
     , m_base_url(config.base_url.value_or(default_base_url))

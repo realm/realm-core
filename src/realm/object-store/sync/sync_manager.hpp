@@ -205,6 +205,9 @@ public:
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const REQUIRES(!m_file_system_mutex);
 
+    // Immediately closes any open sync sessions for this sync manager
+    void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
+
     void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);

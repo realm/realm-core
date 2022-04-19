@@ -351,6 +351,11 @@ public:
 
     static void clear_cached_apps();
 
+    // Immediately close all open sync sessions for all cached apps.
+    // Used by JS SDK to ensure no sync clients remain open when a developer
+    // reloads an app (#5411).
+    static void close_all_sync_sessions();
+
 private:
     friend class Internal;
     friend class OnlyForTesting;
