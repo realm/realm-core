@@ -949,6 +949,13 @@ public:
     void async_wait_for_upload_completion(WaitOperCompletionHandler);
     void async_wait_for_download_completion(WaitOperCompletionHandler);
 
+    version_type get_last_integrated_server_version() const;
+
+    using SyncDownloadIntegrationCallback = Session::SyncDownloadIntegrationCallback;
+
+    void set_download_message_integration_started_callback(util::UniqueFunction<SyncDownloadIntegrationCallback>);
+    void set_download_message_integration_completed_callback(util::UniqueFunction<SyncDownloadIntegrationCallback>);
+
 private:
     struct SelfRef {
         util::Mutex mutex;
@@ -1015,8 +1022,8 @@ inline void RealmFixture::nonempty_transact()
 
 inline bool RealmFixture::transact(TransactFunc transact_func)
 {
-    auto tr = m_db->start_write();           // Throws
-    if (!transact_func(*tr))                 // Throws
+    auto tr = m_db->start_write(); // Throws
+    if (!transact_func(*tr))       // Throws
         return false;
     version_type new_version = tr->commit();        // Throws
     m_session.nonsync_transact_notify(new_version); // Throws
@@ -1063,4 +1070,92 @@ inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler>
     };
     m_session.set_connection_state_change_listener(std::move(listener));
 }
-} // namespace realm::fixtures
+
+inline void RealmFixture::set_download_message_integration_started_callback(
+    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
+{
+    m_session.set_download_message_integration_started_callback(std::move(handler));
+}
+
+inline void RealmFixture::set_download_message_integration_completed_callback(
+    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
+{
+    m_session.set_download_message_integration_completed_callback(std::move(handler));
+}
+
+
+namespace accounting {
+
+// Set up schema
+inline bool init(Transaction& tr, int account_identifier, std::int_fast64_t initial_balance)
+{
+    TableRef account = tr.add_table("class_Account");
+    ColKey col_ndx_identifier = account->add_column(type_Int, "identifier");
+    ColKey col_ndx_balance = account->add_column(type_Int, "balance");
+    account->create_object().set(col_ndx_identifier, account_identifier).set(col_ndx_balance, initial_balance);
+    return true;
+}
+
+// Add money to an account (or withdraw if amount is negative).
+inline bool credit(Transaction& tr, int account_identifier, std::int_fast64_t amount)
+{
+    TableRef account = tr.get_table("class_Account");
+    ColKey col_ndx_identifier = account->get_column_key("identifier");
+    ColKey col_ndx_balance = account->get_column_key("balance");
+    ObjKey obj_key = account->find_first_int(col_ndx_identifier, account_identifier);
+    Obj obj = account->get_object(obj_key);
+    auto balance = obj.get<Int>(col_ndx_balance);
+    balance += amount;
+    bool is_debit = (amount < 0);
+    if (is_debit && balance < 0)
+        return false;
+    obj.set(col_ndx_balance, balance);
+    return true;
+}
+
+} // namespace accounting
+
+
+inline TableRef find_or_create_result_sets_table(Transaction& g)
+{
+    TableRef result_sets = g.get_table(g_partial_sync_result_sets_table_name);
+    if (!result_sets) {
+        result_sets = g.add_table(g_partial_sync_result_sets_table_name);
+        result_sets->add_column(type_String, "query");
+        result_sets->add_column(type_String, "matches_property");
+        result_sets->add_column(type_Int, "status");
+        result_sets->add_column(type_String, "error_message");
+        result_sets->add_column(type_Int, "query_parse_counter");
+    }
+    return result_sets;
+}
+
+inline ObjKey add_partial_sync_subscription(Transaction& g, TableRef table, StringData query)
+{
+    TableRef result_sets = find_or_create_result_sets_table(g);
+    // Find a match column for the table, or add one.
+    ColKey matches_col;
+    for (ColKey col_key : result_sets->get_column_keys()) {
+        if (result_sets->get_column_type(col_key) == type_LinkList &&
+            result_sets->get_link_target(col_key) == table) {
+            matches_col = col_key;
+        }
+    }
+    if (!matches_col) {
+        std::stringstream ss;
+        ss << "matches_" << table->get_name();
+        std::string matches_col_name = ss.str();
+        matches_col = result_sets->add_column_list(*table, matches_col_name);
+    }
+
+    Obj result_set = result_sets->create_object();
+    ColKey col_ndx_query = result_sets->get_column_key("query");
+    ColKey col_ndx_matches_property = result_sets->get_column_key("matches_property");
+
+    result_set.set(col_ndx_query, query);
+    result_set.set(col_ndx_matches_property, result_sets->get_column_name(matches_col));
+    return result_set.get_key();
+}
+
+} // namespace fixtures
+} // namespace realm

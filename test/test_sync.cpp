@@ -4430,6 +4430,183 @@ TEST(Sync_MergeLargeChangesets)
     CHECK_EQUAL(table->size(), 2 * number_of_rows);
 }
 
+TEST(Sync_MergeMultipleChangesets)
+{
+    constexpr int number_of_changesets = 10;
+    constexpr int number_of_instructions = 100;
+
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    {
+        WriteTransaction wt(db_1);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(db_2);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_1);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_2);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j + 1);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(2, 1, dir, test_context);
+
+        Session session_1 = fixture.make_session(0, db_1);
+        fixture.bind_session(session_1, 0, "/test");
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
+
+        fixture.start();
+
+        session_1.wait_for_upload_complete_or_client_stopped();
+        session_2.wait_for_upload_complete_or_client_stopped();
+
+        // Wait to download and integrate the remote changes.
+        session_1.wait_for_download_complete_or_client_stopped();
+        session_2.wait_for_download_complete_or_client_stopped();
+    }
+
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
+    const Group& group = read_1;
+    CHECK(compare_groups(read_1, read_2));
+    ConstTableRef table = group.get_table("class_table name");
+    CHECK_EQUAL(table->size(), 2 * number_of_changesets * number_of_instructions);
+}
+
+TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
+{
+    constexpr int number_of_changesets = 10;
+    constexpr int number_of_instructions = 100;
+
+    TEST_CLIENT_DB(db_1);
+    TEST_CLIENT_DB(db_2);
+
+    {
+        WriteTransaction wt(db_1);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(db_2);
+        TableRef table = wt.add_table("class_table name");
+        table->add_column(type_Int, "integer column");
+        wt.commit();
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_1);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        for (int i = 0; i < number_of_changesets; ++i) {
+            WriteTransaction wt(db_2);
+            TableRef table = wt.get_table("class_table name");
+            for (int j = 0; j < number_of_instructions; ++j) {
+                auto obj = table->create_object();
+                obj.set("integer column", 2 * j + 1);
+            }
+            wt.commit();
+        }
+    }
+
+    {
+        TEST_DIR(dir);
+        MultiClientServerFixture fixture(2, 1, dir, test_context);
+        std::thread th;
+        version_type user_commit_version;
+
+        Session session_1 = fixture.make_session(0, db_1);
+        auto handler = [&](size_t num_changesets, DownloadBatchState) {
+            if (num_changesets == 0) {
+                return;
+            }
+
+            th = std::thread([&] {
+                auto write = db_1->start_write();
+                // Keep the transaction open until the sync client is waiting to acquire the write lock.
+                while (!db_1->waiting_for_write_lock()) {
+                    millisleep(1);
+                }
+                write->close();
+
+                // Sync client holds the write lock now, so commit a local change.
+                WriteTransaction wt(db_1);
+                TableRef table = wt.get_table("class_table name");
+                auto obj = table->create_object();
+                obj.set("integer column", 100000);
+                user_commit_version = wt.commit();
+            });
+        };
+        session_1.set_download_message_integration_started_callback(std::move(handler));
+
+        fixture.bind_session(session_1, 0, "/test");
+        Session session_2 = fixture.make_session(1, db_2);
+        fixture.bind_session(session_2, 0, "/test");
+
+        fixture.start();
+
+        session_1.wait_for_upload_complete_or_client_stopped();
+        session_2.wait_for_upload_complete_or_client_stopped();
+
+        // Wait to download and integrate the remote changes.
+        session_1.wait_for_download_complete_or_client_stopped();
+
+        th.join();
+        // Check that local change was commited before all remote changes were integrated.
+        ReadTransaction rt(db_1);
+        CHECK(user_commit_version < rt.get_version());
+    }
+
+    ReadTransaction read_1(db_1);
+    ReadTransaction read_2(db_2);
+    const Group& group_1 = read_1;
+    const Group& group_2 = read_1;
+    ConstTableRef table_1 = group_1.get_table("class_table name");
+    CHECK_EQUAL(table_1->size(), 2 * (number_of_changesets * number_of_instructions) + 1);
+    ConstTableRef table_2 = group_2.get_table("class_table name");
+    CHECK_EQUAL(table_2->size(), 2 * (number_of_changesets * number_of_instructions) + 1);
+}
+
 #endif // REALM_PLATFORM_WIN32
 
 
