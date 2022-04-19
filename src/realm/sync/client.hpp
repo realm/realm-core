@@ -130,7 +130,7 @@ class BadServerUrl; // Exception
 /// their bound state), as long as they are associated with the same client
 /// object, or with two different client objects that do not overlap in
 /// time. This means, in particular, that it is an error to create two bound
-/// session objects for the same local Realm file, it they are associated with
+/// session objects for the same local Realm file, if they are associated with
 /// two different client objects that overlap in time, even if the session
 /// objects do not overlap in time (in their bound state). It is the
 /// responsibility of the application to ensure that these rules are adhered
@@ -171,6 +171,7 @@ public:
     using WaitOperCompletionHandler = util::UniqueFunction<void(std::error_code)>;
     using SSLVerifyCallback = bool(const std::string& server_address, port_type server_port, const char* pem_data,
                                    size_t pem_size, int preverify_ok, int depth);
+    using SyncDownloadIntegrationCallback = void(size_t num_changesets, DownloadBatchState batch_state);
 
     struct Config {
         Config() {}
@@ -505,6 +506,13 @@ public:
     /// the session object is destroyed. Please see "Callback semantics" section
     /// under Session for more on this.
     void set_connection_state_change_listener(util::UniqueFunction<ConnectionStateChangeListener>);
+
+    /// \brief Set a function to be called when the local Realm starts the
+    /// integration of a downloaded message.
+    void set_download_message_integration_started_callback(util::UniqueFunction<SyncDownloadIntegrationCallback>);
+    /// \brief Set a function to be called when the local Realm has changed due
+    /// to integration of a downloaded message.
+    void set_download_message_integration_completed_callback(util::UniqueFunction<SyncDownloadIntegrationCallback>);
 
     //@{
     /// Deprecated! Use set_connection_state_change_listener() instead.

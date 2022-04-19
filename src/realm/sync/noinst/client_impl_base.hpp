@@ -916,10 +916,14 @@ private:
     bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
     bool m_error_message_received;   // Session specific ERROR message received
     bool m_unbound_message_received; // UNBOUND message received
+    bool m_error_to_send;
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
     int64_t m_last_sent_flx_query_version = 0;
+
+    util::Optional<IntegrationException> m_client_error;
+    bool m_connection_to_close;
 
     // `ident == 0` means unassigned.
     SaltedFileIdent m_client_file_ident = {0, 0};
@@ -1047,6 +1051,7 @@ private:
     void complete_deactivation();
     void connection_established(bool fast_reconnect);
     void connection_lost();
+    void close_connection();
     void send_message();
     void message_sent();
     void send_bind_message();
@@ -1056,6 +1061,7 @@ private:
     void send_alloc_message();
     void send_unbind_message();
     void send_query_change_message();
+    void send_json_error_message();
     std::error_code receive_ident_message(SaltedFileIdent);
     void receive_download_message(const SyncProgress&, std::uint_fast64_t downloadable_bytes,
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
@@ -1426,6 +1432,8 @@ inline void ClientImpl::Session::reset_protocol_state() noexcept
     // clang-format off
     m_enlisted_to_send                    = false;
     m_bind_message_sent                   = false;
+    m_connection_to_close                 = false;
+    m_error_to_send                       = false;
     m_ident_message_sent = false;
     m_unbind_message_sent = false;
     m_unbind_message_sent_2 = false;

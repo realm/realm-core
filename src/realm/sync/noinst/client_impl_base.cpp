@@ -2088,7 +2088,9 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     }
 
     update_progress(progress);                                                           // Throws
+    on_download_message_integration_started(received_changesets.size(), batch_state);
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
+    on_download_message_integration_completed(received_changesets.size(), batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
@@ -2291,7 +2293,7 @@ void Session::update_progress(const SyncProgress& progress)
 }
 
 
-bool ClientImpl::Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
+bool Session::check_received_sync_progress(const SyncProgress& progress, int& error_code) noexcept
 {
     const SyncProgress& a = m_progress;
     const SyncProgress& b = progress;
