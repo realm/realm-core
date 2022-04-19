@@ -38,6 +38,9 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/util/flat_map.hpp>
+#include <realm/util/overload.hpp>
+
+#include <external/mpark/variant.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -1854,41 +1857,41 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
 namespace test_instructions {
 
 struct Add {
-    Add(int64_t key)
+    Add(util::Optional<int64_t> key)
         : pk(key)
     {
     }
-    int64_t pk;
+    util::Optional<int64_t> pk;
 };
 
 struct Remove {
-    Remove(int64_t key)
+    Remove(util::Optional<int64_t> key)
         : pk(key)
     {
     }
-    int64_t pk;
+    util::Optional<int64_t> pk;
 };
 
 struct Clear {
 };
 
 struct RemoveObject {
-    RemoveObject(std::string_view name, int64_t key)
+    RemoveObject(std::string_view name, util::Optional<int64_t> key)
         : pk(key)
         , class_name(name)
     {
     }
-    int64_t pk;
+    util::Optional<int64_t> pk;
     std::string_view class_name;
 };
 
 struct CreateObject {
-    CreateObject(std::string_view name, int64_t key)
+    CreateObject(std::string_view name, util::Optional<int64_t> key)
         : pk(key)
         , class_name(name)
     {
     }
-    int64_t pk;
+    util::Optional<int64_t> pk;
     std::string_view class_name;
 };
 
@@ -1904,88 +1907,75 @@ struct Move {
 
 struct CollectionOperation {
     CollectionOperation(Add op)
-        : m_type(Type::Add)
-        , add_link(op)
+        : m_op(op)
     {
     }
     CollectionOperation(Remove op)
-        : m_type(Type::Remove)
-        , remove_link(op)
+        : m_op(op)
     {
     }
     CollectionOperation(RemoveObject op)
-        : m_type(Type::RemoveObject)
-        , remove_object(op)
+        : m_op(op)
     {
     }
     CollectionOperation(CreateObject op)
-        : m_type(Type::CreateObject)
-        , create_object(op)
+        : m_op(op)
     {
     }
     CollectionOperation(Clear op)
-        : m_type(Type::Clear)
-        , clear_collection(op)
+        : m_op(op)
     {
     }
     CollectionOperation(Move op)
-        : m_type(Type::Move)
-        , move(op)
+        : m_op(op)
     {
     }
     void apply(collection_fixtures::LinkedCollectionBase* collection, Obj src_obj, TableRef dst_table)
     {
-        switch (m_type) {
-            case Type::Add: {
-                ObjKey dst_key = dst_table->find_primary_key(Mixed{add_link.pk});
-                REALM_ASSERT(dst_key);
-                collection->add_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
-                break;
-            }
-            case Type::Remove: {
-                ObjKey dst_key = dst_table->find_primary_key(Mixed{remove_link.pk});
-                REALM_ASSERT(dst_key);
-                bool did_remove = collection->remove_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
-                REALM_ASSERT(did_remove);
-                break;
-            }
-            case Type::RemoveObject: {
-                Group* group = dst_table->get_parent_group();
-                Group::TableNameBuffer buffer;
-                TableRef table = group->get_table(Group::class_name_to_table_name(remove_object.class_name, buffer));
-                REALM_ASSERT(table);
-                ObjKey dst_key = table->find_primary_key(Mixed{remove_object.pk});
-                REALM_ASSERT(dst_key);
-                table->remove_object(dst_key);
-                break;
-            }
-            case Type::CreateObject: {
-                Group* group = dst_table->get_parent_group();
-                Group::TableNameBuffer buffer;
-                TableRef table = group->get_table(Group::class_name_to_table_name(create_object.class_name, buffer));
-                REALM_ASSERT(table);
-                table->create_object_with_primary_key(Mixed{create_object.pk});
-                break;
-            }
-            case Type::Clear:
-                collection->clear_collection(src_obj);
-                break;
-            case Type::Move:
-                collection->move(src_obj, move.from, move.to);
-                break;
-        }
+        mpark::visit(
+            util::overload{
+                [&](Add add_link) {
+                    Mixed pk_to_add = add_link.pk ? Mixed{add_link.pk} : Mixed{};
+                    ObjKey dst_key = dst_table->find_primary_key(pk_to_add);
+                    REALM_ASSERT(dst_key);
+                    collection->add_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                },
+                [&](Remove remove_link) {
+                    Mixed pk_to_remove = remove_link.pk ? Mixed{remove_link.pk} : Mixed{};
+                    ObjKey dst_key = dst_table->find_primary_key(pk_to_remove);
+                    REALM_ASSERT(dst_key);
+                    bool did_remove = collection->remove_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                    REALM_ASSERT(did_remove);
+                },
+                [&](RemoveObject remove_object) {
+                    Group* group = dst_table->get_parent_group();
+                    Group::TableNameBuffer buffer;
+                    TableRef table =
+                        group->get_table(Group::class_name_to_table_name(remove_object.class_name, buffer));
+                    REALM_ASSERT(table);
+                    ObjKey dst_key = table->find_primary_key(Mixed{remove_object.pk});
+                    REALM_ASSERT(dst_key);
+                    table->remove_object(dst_key);
+                },
+                [&](CreateObject create_object) {
+                    Group* group = dst_table->get_parent_group();
+                    Group::TableNameBuffer buffer;
+                    TableRef table =
+                        group->get_table(Group::class_name_to_table_name(create_object.class_name, buffer));
+                    REALM_ASSERT(table);
+                    table->create_object_with_primary_key(Mixed{create_object.pk});
+                },
+                [&](Clear) {
+                    collection->clear_collection(src_obj);
+                },
+                [&](Move move) {
+                    collection->move(src_obj, move.from, move.to);
+                }},
+            m_op);
     }
 
 private:
-    enum class Type { Add, Remove, Clear, RemoveObject, CreateObject, Move } m_type;
-    union {
-        Add add_link;
-        Remove remove_link;
-        Clear clear_collection;
-        RemoveObject remove_object;
-        CreateObject create_object;
-        Move move;
-    };
+    mpark::variant<Add, Remove, Clear, RemoveObject, CreateObject, Move> m_op;
 };
 
 } // namespace test_instructions
@@ -2048,18 +2038,28 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
         }
     };
 
-    auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
+    auto create_one_dest_object = [&](realm::SharedRealm r, util::Optional<int64_t> val) -> ObjLink {
+        util::Any v;
+        if (val) {
+            v = util::Any(*val);
+        }
         auto obj = Object::create(
             c, r, "dest",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            util::Any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
     };
 
-    auto require_links_to_match_ids = [&](std::vector<Obj>& links, std::vector<int64_t>& expected, bool sorted) {
-        std::vector<int64_t> actual;
+    auto require_links_to_match_ids = [&](std::vector<Obj>& links, std::vector<util::Optional<int64_t>>& expected,
+                                          bool sorted) {
+        std::vector<util::Optional<int64_t>> actual;
         for (auto obj : links) {
-            actual.push_back(obj.get<Int>(valid_pk_name));
+            if (obj.is_null(valid_pk_name)) {
+                actual.push_back(util::none);
+            }
+            else {
+                actual.push_back(obj.get<Int>(valid_pk_name));
+            }
         }
         if (sorted) {
             std::sort(actual.begin(), actual.end());
@@ -2068,11 +2068,11 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
     };
 
     constexpr int64_t source_pk = 0;
-    constexpr int64_t dest_pk_1 = 1;
-    constexpr int64_t dest_pk_2 = 2;
-    constexpr int64_t dest_pk_3 = 3;
-    constexpr int64_t dest_pk_4 = 4;
-    constexpr int64_t dest_pk_5 = 5;
+    constexpr util::Optional<int64_t> dest_pk_1 = 1;
+    constexpr util::Optional<int64_t> dest_pk_2 = 2;
+    constexpr util::Optional<int64_t> dest_pk_3 = 3;
+    constexpr util::Optional<int64_t> dest_pk_4 = 4;
+    constexpr util::Optional<int64_t> dest_pk_5 = 5;
 
     Results results;
     Object object;
@@ -2109,9 +2109,10 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
 
     auto reset_collection = [&](std::vector<CollectionOperation>&& local_ops,
                                 std::vector<CollectionOperation>&& remote_ops,
-                                std::vector<int64_t>&& expected_recovered_state, size_t num_expected_nulls = 0) {
-        std::vector<int64_t> remote_pks;
-        std::vector<int64_t> local_pks;
+                                std::vector<util::Optional<int64_t>>&& expected_recovered_state,
+                                size_t num_expected_nulls = 0) {
+        std::vector<util::Optional<int64_t>> remote_pks;
+        std::vector<util::Optional<int64_t>> local_pks;
         test_reset
             ->make_local_changes([&](SharedRealm local_realm) {
                 apply_instructions(local_realm, local_ops);
@@ -2119,8 +2120,9 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                 if (source_obj) {
                     auto local_links = test_type.get_links(source_obj);
                     std::transform(local_links.begin(), local_links.end(), std::back_inserter(local_pks),
-                                   [](auto obj) -> int64_t {
-                                       return obj.get_primary_key().get_int();
+                                   [](auto obj) -> util::Optional<int64_t> {
+                                       Mixed pk = obj.get_primary_key();
+                                       return pk.is_null() ? util::none : util::make_optional(pk.get_int());
                                    });
                 }
             })
@@ -2130,8 +2132,9 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                 if (source_obj) {
                     auto remote_links = test_type.get_links(source_obj);
                     std::transform(remote_links.begin(), remote_links.end(), std::back_inserter(remote_pks),
-                                   [](auto obj) -> int64_t {
-                                       return obj.get_primary_key().get_int();
+                                   [](auto obj) -> util::Optional<int64_t> {
+                                       Mixed pk = obj.get_primary_key();
+                                       return pk.is_null() ? util::none : util::make_optional(pk.get_int());
                                    });
                 }
             })
@@ -2147,7 +2150,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                 CHECK(results.size() == 1);
                 CHECK(object.is_valid());
                 auto linked_objects = test_type.get_links(results.get(0));
-                std::vector<int64_t>& expected_links = remote_pks;
+                std::vector<util::Optional<int64_t>>& expected_links = remote_pks;
                 if (test_mode == ClientResyncMode::Recover) {
                     expected_links = expected_recovered_state;
                     size_t expected_size = expected_links.size();
@@ -2238,8 +2241,16 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
     SECTION("remote removes last link") {
         reset_collection({}, {{Remove{dest_pk_3}}}, {dest_pk_1, dest_pk_2});
     }
+    SECTION("local adds a link with a null pk value") {
+        test_reset->setup([&](SharedRealm realm) {
+            test_type.reset_test_state();
+            create_one_dest_object(realm, util::none);
+            create_one_source_object(realm, source_pk, {});
+        });
+        reset_collection({Add{util::none}}, {}, {util::none});
+    }
     SECTION("removal of different links") {
-        std::vector<int64_t> expected = {dest_pk_2};
+        std::vector<util::Optional<int64_t>> expected = {dest_pk_2};
         if constexpr (test_type_is_array) {
             expected = {dest_pk_2, dest_pk_3}; // local client state wins
         }
@@ -2256,7 +2267,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_5});
     }
     SECTION("both addition of same items") {
-        std::vector<int64_t> expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4};
+        std::vector<util::Optional<int64_t>> expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4};
         if constexpr (test_type_is_array) {
             expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_4};
         }
@@ -2272,7 +2283,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
     }
     SECTION("local remove, remote add") {
-        std::vector<int64_t> expected = {dest_pk_1, dest_pk_3, dest_pk_4, dest_pk_5};
+        std::vector<util::Optional<int64_t>> expected = {dest_pk_1, dest_pk_3, dest_pk_4, dest_pk_5};
         if constexpr (test_type_is_array) {
             expected = {dest_pk_1, dest_pk_3}; // local client state wins
         }

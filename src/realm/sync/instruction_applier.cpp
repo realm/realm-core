@@ -827,47 +827,45 @@ void InstructionApplier::operator()(const Instruction::Clear& instr)
 void InstructionApplier::resolve_list(const Instruction::PathInstruction& instr, const char* instr_name,
                                       ListCallback&& list_callback)
 {
-    auto callback = util::overload{[lcb = std::move(list_callback)](LstBase& list, size_t index) {
-                                       lcb(list, index);
-                                   },
-                                   [&](LstBase&) {
-                                       bad_transaction_log("Invalid path for %1 (list)", instr_name);
-                                   },
-                                   [&](SetBase&) {
-                                       bad_transaction_log("Invalid path for %1 (set)", instr_name);
-                                   },
-                                   [&](Dictionary&) {
-                                       bad_transaction_log("Invalid path for %1 (dictionary)", instr_name);
-                                   },
-                                   [&](Dictionary&, Mixed) {
-                                       bad_transaction_log("Invalid path for %1 (dictionary, key)", instr_name);
-                                   },
-                                   [&](Obj&, ColKey) {
-                                       bad_transaction_log("Invalid path for %1 (obj, col)", instr_name);
-                                   }};
-    resolve_path(instr, instr_name, std::move(callback));
+    resolve_path(instr, instr_name,
+                 util::overload{[lcb = std::move(list_callback)](LstBase& list, size_t index) {
+                                    lcb(list, index);
+                                },
+                                [&](LstBase&) {
+                                    bad_transaction_log("Invalid path for %1 (list)", instr_name);
+                                },
+                                [&](SetBase&) {
+                                    bad_transaction_log("Invalid path for %1 (set)", instr_name);
+                                },
+                                [&](Dictionary&) {
+                                    bad_transaction_log("Invalid path for %1 (dictionary)", instr_name);
+                                },
+                                [&](Dictionary&, Mixed) {
+                                    bad_transaction_log("Invalid path for %1 (dictionary, key)", instr_name);
+                                },
+                                [&](Obj&, ColKey) {
+                                    bad_transaction_log("Invalid path for %1 (obj, col)", instr_name);
+                                }});
 }
 
 bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name)
 {
     bool allows_nulls = false;
-    auto callback = util::overload{[&](LstBase&, size_t) {},
-                                   [&](LstBase&) {},
-                                   [&](SetBase&) {},
-                                   [&](Dictionary&) {
-                                       allows_nulls = true;
-                                   },
-                                   [&](Dictionary&, Mixed) {
-                                       allows_nulls = true;
-                                   },
-                                   [&](Obj&, ColKey) {
-                                       allows_nulls = true;
-                                   }};
-    resolve_path(instr, instr_name, std::move(callback));
+    resolve_path(instr, instr_name,
+                 util::overload{[&](LstBase&, size_t) {}, [&](LstBase&) {}, [&](SetBase&) {},
+                                [&](Dictionary&) {
+                                    allows_nulls = true;
+                                },
+                                [&](Dictionary&, Mixed) {
+                                    allows_nulls = true;
+                                },
+                                [&](Obj&, ColKey) {
+                                    allows_nulls = true;
+                                }});
     return allows_nulls;
 }
 
-std::string InstructionApplier::print(const Instruction::PathInstruction& instr) const
+std::string InstructionApplier::to_string(const Instruction::PathInstruction& instr) const
 {
     REALM_ASSERT(m_log);
     std::stringstream ss;
@@ -893,7 +891,7 @@ bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
         Mixed linked_pk = mpark::visit(
             util::overload{
                 [&](mpark::monostate) {
-                    return Mixed{};
+                    return Mixed{}; // the link exists and the pk is null
                 },
                 [&](int64_t pk) {
                     return Mixed{pk};

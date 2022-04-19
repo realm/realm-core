@@ -501,6 +501,11 @@ void EmbeddedObjectConverter::process_pending()
     }
 }
 
+// State tracking of operations on list indices. All list operations in a recovered changeset
+// must apply to a "known" index. An index is known if the element at that position was added
+// by the recovery itself. If any operation applies to an "unknown" index, the list will go into
+// a requires_manual_copy state which means that all further operations on the list are ignored
+// and the entire list is copied over verbatim at the end.
 struct ListTracker {
 
     struct CrossListIndex {
@@ -773,7 +778,7 @@ private:
 // A wrapper around a PathInstruction which enables storing this path in a
 // FlatMap or other container. The advantage of using this instead of a PathInstruction
 // is the use of ColKey instead of column names and that because it is not possible to use
-// the InternStrings of a PathInstruction because they are tied to a specific Changeset, and
+// the InternStrings of a PathInstruction because they are tied to a specific Changeset,
 // while the ListPath can be used across multiple Changesets.
 struct ListPath {
     ListPath(TableKey table_key, ObjKey obj_key)

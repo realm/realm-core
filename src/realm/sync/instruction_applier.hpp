@@ -78,7 +78,7 @@ protected:
     void resolve_list(const Instruction::PathInstruction& instr, const char* instr_name, ListCallback&& callback);
     bool check_links_exist(const Instruction::Payload& payload);
     bool allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name);
-    std::string print(const Instruction::PathInstruction& instr) const;
+    std::string to_string(const Instruction::PathInstruction& instr) const;
 
 private:
     const Changeset* m_log = nullptr;
