@@ -106,7 +106,8 @@ RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t* d
         }
 
         StringData k{key.string.data, key.string.size};
-        return new realm_object_t({dict->get_realm(), dict->get_object(k)});
+        auto o = dict->get_object(k);
+        return o ? new realm_object_t({dict->get_realm(), o}) : nullptr;
     });
 }
 

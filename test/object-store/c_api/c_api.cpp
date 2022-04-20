@@ -1544,11 +1544,13 @@ TEST_CASE("C API") {
             REQUIRE(checked(realm_find_property(realm, class_bar.key, "sub", &found, &info)));
             REQUIRE(found);
 
+            auto embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
+            CHECK(!embedded);
             write([&]() {
                 auto embedded = cptr_checked(realm_set_embedded(obj2.get(), info.key));
                 CHECK(embedded);
             });
-            auto embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
+            embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
             CHECK(embedded);
         }
 
@@ -2109,6 +2111,7 @@ TEST_CASE("C API") {
 
                 CHECK(realm_list_get(int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
+                CHECK(!realm_list_get_linked_object(int_list.get(), 0));
                 CHECK(realm_list_get(bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
                 CHECK(realm_list_get(string_list.get(), 0, &value));

@@ -328,8 +328,8 @@ RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_prope
 {
     return wrap_err([&]() {
         obj->verify_attached();
-        auto o = obj->obj();
-        return new realm_object_t({obj->get_realm(), o.get_linked_object(ColKey(col))});
+        auto o = obj->obj().get_linked_object(ColKey(col));
+        return o ? new realm_object_t({obj->get_realm(), o}) : nullptr;
     });
 }
 

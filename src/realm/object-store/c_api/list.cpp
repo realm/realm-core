@@ -92,7 +92,8 @@ RLM_API realm_object_t* realm_list_get_linked_object(realm_list_t* list, size_t 
 {
     return wrap_err([&]() {
         list->verify_attached();
-        return new realm_object_t({list->get_realm(), list->get_object(index)});
+        auto o = list->get_object(index);
+        return o ? new realm_object_t({list->get_realm(), o}) : nullptr;
     });
 }
 
