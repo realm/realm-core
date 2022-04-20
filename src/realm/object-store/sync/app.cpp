@@ -681,16 +681,16 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
                     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
     if (!user) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "The specified user could not be found. Was it deleted?"));
+        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                                            "The specified user could not be found. Was it deleted?"));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                                   "The specified user is not logged in."));
+        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
+                                            "The specified user is not logged in."));
     }
     if (!verify_user_present(user)) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "The specified user was not found. Was it deleted?"));
+        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                                            "The specified user was not found. Was it deleted?"));
     }
 
     App::log_in_with_credentials(credentials, user, std::move(completion));
