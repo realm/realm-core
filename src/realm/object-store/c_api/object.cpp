@@ -371,4 +371,14 @@ RLM_API realm_dictionary_t* realm_get_dictionary(realm_object_t* object, realm_p
     });
 }
 
+RLM_API char* realm_object_to_string(realm_object_t* object)
+{
+    return wrap_err([&]() {
+        object->verify_attached();
+
+        auto obj = object->obj();
+        return duplicate_string(obj.to_string());
+    });
+}
+
 } // namespace realm::c_api
