@@ -236,7 +236,7 @@ TEST(Mixed_Set_unresolved_links)
         CHECK_EQUAL(set.size(), 2);
         obj1.invalidate();
         obj2.invalidate();
-        //this should be treated as null, but for set of mixed we decided to leave unresolved exposed
+        // this should be treated as null, but for set of mixed we decided to leave unresolved exposed
         CHECK(!set.is_null(0));
         CHECK(!set.is_null(1));
         set.insert(Mixed{1});
@@ -296,6 +296,6 @@ TEST(Mixed_Set_unresolved_links)
                 unresolved += 1;
         }
         CHECK_EQUAL(null, 1);
-        CHECK_EQUAL(unresolved,2);
+        CHECK_EQUAL(unresolved, 2);
     }
 }
