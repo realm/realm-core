@@ -888,28 +888,28 @@ bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
         if (target_table->is_embedded()) {
             bad_transaction_log("Link to embedded table '%1'", target_table_name);
         }
-        Mixed linked_pk = mpark::visit(
-            util::overload{
-                [&](mpark::monostate) {
-                    return Mixed{}; // the link exists and the pk is null
-                },
-                [&](int64_t pk) {
-                    return Mixed{pk};
-                },
-                [&](InternString interned_pk) {
-                    return Mixed{get_string(interned_pk)};
-                },
-                [&](GlobalKey) {
-                    REALM_UNREACHABLE(); // unexpected link to embedded object when validating a primary key
-                    return Mixed{};
-                },
-                [&](ObjectId pk) {
-                    return Mixed{pk};
-                },
-                [&](UUID pk) {
-                    return Mixed{pk};
-                }},
-            payload.data.link.target);
+        Mixed linked_pk =
+            mpark::visit(util::overload{[&](mpark::monostate) {
+                                            return Mixed{}; // the link exists and the pk is null
+                                        },
+                                        [&](int64_t pk) {
+                                            return Mixed{pk};
+                                        },
+                                        [&](InternString interned_pk) {
+                                            return Mixed{get_string(interned_pk)};
+                                        },
+                                        [&](GlobalKey) {
+                                            bad_transaction_log(
+                                                "Unexpected link to embedded object while validating a primary key");
+                                            return Mixed{};
+                                        },
+                                        [&](ObjectId pk) {
+                                            return Mixed{pk};
+                                        },
+                                        [&](UUID pk) {
+                                            return Mixed{pk};
+                                        }},
+                         payload.data.link.target);
 
         if (!target_table->find_primary_key(linked_pk)) {
             valid_payload = false;

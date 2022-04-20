@@ -113,7 +113,7 @@ public:
                                       SaltedVersion server_version, BinaryData uploadable_changeset);
 
     /// get_local_changes returns a list of changes which have not been uploaded yet
-    /// greater than or equal to 'begin_version'. 'begin_version' must be at least 1.
+    /// 'current_version' is the version that the history should be updated to.
     ///
     /// The history must be in a transaction when this function is called.
     std::vector<ChunkedBinaryData> get_local_changes(version_type current_version) const;

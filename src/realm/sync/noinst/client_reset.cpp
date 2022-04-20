@@ -788,17 +788,17 @@ struct ListPath {
     }
 
     struct Element {
-        Element(size_t stable_ndx)
+        explicit Element(size_t stable_ndx)
             : index(stable_ndx)
             , type(Type::ListIndex)
         {
         }
-        Element(const InternDictKey& str)
+        explicit Element(const InternDictKey& str)
             : intern_key(str)
             , type(Type::InternKey)
         {
         }
-        Element(ColKey key)
+        explicit Element(ColKey key)
             : col_key(key)
             , type(Type::ColumnKey)
         {
@@ -813,7 +813,8 @@ struct ListPath {
             ListIndex,
             ColumnKey,
         } type;
-        bool operator==(const Element& other) const
+
+        bool operator==(const Element& other) const noexcept
         {
             if (type == other.type) {
                 switch (type) {
@@ -827,11 +828,11 @@ struct ListPath {
             }
             return false;
         }
-        bool operator!=(const Element& other) const
+        bool operator!=(const Element& other) const noexcept
         {
             return !(operator==(other));
         }
-        bool operator<(const Element& other) const
+        bool operator<(const Element& other) const noexcept
         {
             if (type < other.type) {
                 return true;
@@ -849,16 +850,13 @@ struct ListPath {
             return false;
         }
     };
-    std::vector<Element> m_path;
-    TableKey m_table_key;
-    ObjKey m_obj_key;
 
     void append(const Element& item)
     {
         m_path.push_back(item);
     }
 
-    bool operator<(const ListPath& other) const
+    bool operator<(const ListPath& other) const noexcept
     {
         if (m_table_key < other.m_table_key || m_obj_key < other.m_obj_key || m_path.size() < other.m_path.size()) {
             return true;
@@ -866,7 +864,7 @@ struct ListPath {
         return std::lexicographical_compare(m_path.begin(), m_path.end(), other.m_path.begin(), other.m_path.end());
     }
 
-    bool operator==(const ListPath& other) const
+    bool operator==(const ListPath& other) const noexcept
     {
         if (m_table_key == other.m_table_key && m_obj_key == other.m_obj_key &&
             m_path.size() == other.m_path.size()) {
@@ -880,7 +878,7 @@ struct ListPath {
         return false;
     }
 
-    bool operator!=(const ListPath& other) const
+    bool operator!=(const ListPath& other) const noexcept
     {
         return !(operator==(other));
     }
@@ -906,6 +904,10 @@ struct ListPath {
         }
         return path;
     }
+
+    std::vector<Element> m_path;
+    TableKey m_table_key;
+    ObjKey m_obj_key;
 };
 
 struct RecoverLocalChangesetsHandler : public InstructionApplier {
@@ -990,28 +992,29 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
         std::shared_ptr<EmbeddedObjectConverter> embedded_object_tracker =
             std::make_shared<EmbeddedObjectConverter>();
         for (auto& it : m_lists) {
-            if (it.second.requires_manual_copy()) {
-                std::string path_str = it.first.path_to_string(remote, m_intern_keys);
-                bool did_translate = resolve(it.first, [&](LstBase& remote_list, LstBase& local_list) {
-                    ConstTableRef local_table = local_list.get_table();
-                    ConstTableRef remote_table = remote_list.get_table();
-                    ColKey local_col_key = local_list.get_col_key();
-                    ColKey remote_col_key = remote_list.get_col_key();
-                    Obj local_obj = local_list.get_obj();
-                    Obj remote_obj = remote_list.get_obj();
-                    InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
-                                                             embedded_object_tracker);
-                    logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
-                                 local_list.size());
-                    copy_list(local_obj, remote_obj, value_converter, nullptr);
-                    embedded_object_tracker->process_pending();
-                });
-                if (!did_translate) {
-                    // object no longer exists in the local state, ignore and continue
-                    logger.warn("Discarding a list recovery made to an object which could not be resolved. "
-                                "remote_path='%3'",
-                                path_str);
-                }
+            if (!it.second.requires_manual_copy())
+                continue;
+
+            std::string path_str = it.first.path_to_string(remote, m_intern_keys);
+            bool did_translate = resolve(it.first, [&](LstBase& remote_list, LstBase& local_list) {
+                ConstTableRef local_table = local_list.get_table();
+                ConstTableRef remote_table = remote_list.get_table();
+                ColKey local_col_key = local_list.get_col_key();
+                ColKey remote_col_key = remote_list.get_col_key();
+                Obj local_obj = local_list.get_obj();
+                Obj remote_obj = remote_list.get_obj();
+                InterRealmValueConverter value_converter(local_table, local_col_key, remote_table, remote_col_key,
+                                                         embedded_object_tracker);
+                logger.debug("Recovery overwrites list for '%1' size: %2 -> %3", path_str, remote_list.size(),
+                             local_list.size());
+                copy_list(local_obj, remote_obj, value_converter, nullptr);
+                embedded_object_tracker->process_pending();
+            });
+            if (!did_translate) {
+                // object no longer exists in the local state, ignore and continue
+                logger.warn("Discarding a list recovery made to an object which could not be resolved. "
+                            "remote_path='%3'",
+                            path_str);
             }
         }
         embedded_object_tracker->process_pending();
@@ -1076,20 +1079,22 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
     bool resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback)
     {
         auto remote_table = remote.get_table(path.m_table_key);
-        if (remote_table) {
-            auto local_table = local.get_table(remote_table->get_name());
-            if (local_table) {
-                auto remote_obj = remote_table->get_object(path.m_obj_key);
-                if (remote_obj) {
-                    auto local_obj_key = local_table->find_primary_key(remote_obj.get_primary_key());
-                    if (local_obj_key) {
-                        return resolve_path(path, remote_obj, local_table->get_object(local_obj_key),
-                                            std::move(callback));
-                    }
-                }
-            }
-        }
-        return false;
+        if (!remote_table)
+            return false;
+
+        auto local_table = local.get_table(remote_table->get_name());
+        if (!local_table)
+            return false;
+
+        auto remote_obj = remote_table->get_object(path.m_obj_key);
+        if (!remote_obj)
+            return false;
+
+        auto local_obj_key = local_table->find_primary_key(remote_obj.get_primary_key());
+        if (!local_obj_key)
+            return false;
+
+        return resolve_path(path, remote_obj, local_table->get_object(local_obj_key), std::move(callback));
     }
 
     enum class TranslateUpdateValue {
@@ -1162,7 +1167,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             return true;
         }
 
-        path.append(translated_key);
+        path.append(ListPath::Element(translated_key));
         auto col = dict.get_col_key();
         auto table = dict.get_table();
         auto field_name = table->get_column_name(col);
@@ -1208,7 +1213,7 @@ struct RecoverLocalChangesetsHandler : public InstructionApplier {
             handle_error(util::format("%1 instruction for path '%2.%3' could not be found", instr_name,
                                       obj.get_table()->get_name(), field_name));
         }
-        path.append(col);
+        path.append(ListPath::Element(col));
         if (begin == end) {
             if (col.is_list()) {
                 auto list = obj.get_listbase_ptr(col);
