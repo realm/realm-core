@@ -2,7 +2,7 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* `App::link_user()` and `App::delete_user()` now correctly report `ClientErrorCode::user_not_found` and `ClientErrorCode::user_not_logged_in` instead of only using `ClientErrorCode::user_not_found` for both error cases. ([#5402](https://github.com/realm/realm-core/issues/5402))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
