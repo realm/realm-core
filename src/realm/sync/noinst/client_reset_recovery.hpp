@@ -55,15 +55,13 @@ private:
 };
 
 struct InternDictKey {
-    size_t pos = realm::npos;
-    size_t size = realm::npos;
     bool is_null() const
     {
-        return pos == realm::npos && size == realm::npos;
+        return m_pos == realm::npos && m_size == realm::npos;
     }
     constexpr bool operator==(const InternDictKey& other) const noexcept
     {
-        return pos == other.pos && size == other.size;
+        return m_pos == other.m_pos && m_size == other.m_size;
     }
     constexpr bool operator!=(const InternDictKey& other) const noexcept
     {
@@ -71,14 +69,19 @@ struct InternDictKey {
     }
     constexpr bool operator<(const InternDictKey& other) const noexcept
     {
-        if (pos < other.pos) {
+        if (m_pos < other.m_pos) {
             return true;
         }
-        else if (pos == other.pos) {
-            return size < other.size;
+        else if (m_pos == other.m_pos) {
+            return m_size < other.m_size;
         }
         return false;
     }
+
+private:
+    friend struct InterningBuffer;
+    size_t m_pos = realm::npos;
+    size_t m_size = realm::npos;
 };
 
 struct InterningBuffer {
@@ -86,7 +89,6 @@ struct InterningBuffer {
     InternDictKey get_or_add(const StringData& str);
     InternDictKey get_interned_key(const StringData& str) const;
     std::string print() const;
-
 private:
     std::string m_dict_keys_buffer;
     std::vector<InternDictKey> m_dict_keys;
@@ -126,35 +128,49 @@ struct ListPath {
     bool operator!=(const ListPath& other) const noexcept;
     std::string path_to_string(Transaction& remote, const InterningBuffer& buffer);
 
+    using const_iterator = typename std::vector<Element>::const_iterator;
+    using iterator = typename std::vector<Element>::iterator;
+    const_iterator begin() const noexcept
+    {
+        return m_path.begin();
+    }
+    const_iterator end() const noexcept
+    {
+        return m_path.end();
+    }
+    TableKey table_key() const noexcept
+    {
+        return m_table_key;
+    }
+    ObjKey obj_key() const noexcept
+    {
+        return m_obj_key;
+    }
+
+private:
     std::vector<Element> m_path;
     TableKey m_table_key;
     ObjKey m_obj_key;
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    using Instruction = sync::Instruction;
-    using ListPathCallback = util::UniqueFunction<bool(LstBase&, uint32_t, const ListPath&)>;
-    Transaction& remote;
-    Transaction& local;
-    util::Logger& logger;
-    InterningBuffer m_intern_keys;
-
-    // Track any recovered operations on lists to make sure that they are allowed.
-    // If not, the lists here will be copied verbatim from the local state to the remote.
-    util::FlatMap<ListPath, ListTracker> m_lists;
 
     RecoverLocalChangesetsHandler(Transaction& remote_wt, Transaction& local_wt, util::Logger& logger);
-    REALM_NORETURN void handle_error(const std::string& message) const;
     void process_changesets(const std::vector<ChunkedBinaryData>& changesets);
-    void copy_lists_with_unrecoverable_changes();
 
-    bool resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
-                      util::UniqueFunction<void(LstBase&, LstBase&)> callback);
-    bool resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback);
+protected:
+    using Instruction = sync::Instruction;
+    using ListPathCallback = util::UniqueFunction<bool(LstBase&, uint32_t, const ListPath&)>;
     enum class TranslateUpdateValue {
         None,
         DeleteDictionaryKey,
     };
+
+    REALM_NORETURN void handle_error(const std::string& message) const;
+    void copy_lists_with_unrecoverable_changes();
+    bool resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
+                      util::UniqueFunction<void(LstBase&, LstBase&)> callback);
+    bool resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback);
     bool translate_list_element(LstBase& list, uint32_t index, Instruction::Path::iterator begin,
                                 Instruction::Path::const_iterator end, const char* instr_name,
                                 ListPathCallback list_callback, ListPath& path);
@@ -165,15 +181,22 @@ struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
     bool translate_field(Obj& obj, sync::InternString field, Instruction::Path::iterator begin,
                          Instruction::Path::const_iterator end, const char* instr_name,
                          ListPathCallback list_callback, TranslateUpdateValue update_value, ListPath& path);
-
     bool translate_path(sync::instr::PathInstruction& instr, const char* instr_name, ListPathCallback list_callback,
                         TranslateUpdateValue update_value = TranslateUpdateValue::None);
 
-protected:
 #define REALM_DECLARE_INSTRUCTION_HANDLER(X) void operator()(const Instruction::X&) override;
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_DECLARE_INSTRUCTION_HANDLER)
 #undef REALM_DECLARE_INSTRUCTION_HANDLER
     friend struct sync::Instruction; // to allow visitor
+
+private:
+    Transaction& m_remote;
+    Transaction& m_local;
+    util::Logger& m_logger;
+    InterningBuffer m_intern_keys;
+    // Track any recovered operations on lists to make sure that they are allowed.
+    // If not, the lists here will be copied verbatim from the local state to the remote.
+    util::FlatMap<ListPath, ListTracker> m_lists;
 };
 
 } // namespace client_reset
