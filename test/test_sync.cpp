@@ -4555,8 +4555,8 @@ TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
         std::thread th;
         version_type user_commit_version;
 
-        Session session_1 = fixture.make_session(0, db_1);
-        auto handler = [&](size_t num_changesets, DownloadBatchState) {
+        Session::Config config;
+        config.on_before_download_integrated = [&](size_t num_changesets) {
             if (num_changesets == 0) {
                 return;
             }
@@ -4577,8 +4577,7 @@ TEST(Sync_UserInterruptsIntegrationOfRemoteChanges)
                 user_commit_version = wt.commit();
             });
         };
-        session_1.set_download_message_integration_started_callback(std::move(handler));
-
+        Session session_1 = fixture.make_session(0, db_1, std::move(config));
         fixture.bind_session(session_1, 0, "/test");
         Session session_2 = fixture.make_session(1, db_2);
         fixture.bind_session(session_2, 0, "/test");

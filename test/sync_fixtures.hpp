@@ -951,11 +951,6 @@ public:
 
     version_type get_last_integrated_server_version() const;
 
-    using SyncDownloadIntegrationCallback = Session::SyncDownloadIntegrationCallback;
-
-    void set_download_message_integration_started_callback(util::UniqueFunction<SyncDownloadIntegrationCallback>);
-    void set_download_message_integration_completed_callback(util::UniqueFunction<SyncDownloadIntegrationCallback>);
-
 private:
     struct SelfRef {
         util::Mutex mutex;
@@ -1069,18 +1064,6 @@ inline void RealmFixture::setup_error_handler(util::UniqueFunction<ErrorHandler>
         handler(ec, is_fatal, detailed_message);
     };
     m_session.set_connection_state_change_listener(std::move(listener));
-}
-
-inline void RealmFixture::set_download_message_integration_started_callback(
-    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
-{
-    m_session.set_download_message_integration_started_callback(std::move(handler));
-}
-
-inline void RealmFixture::set_download_message_integration_completed_callback(
-    util::UniqueFunction<SyncDownloadIntegrationCallback> handler)
-{
-    m_session.set_download_message_integration_completed_callback(std::move(handler));
 }
 
 
