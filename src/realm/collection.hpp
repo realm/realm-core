@@ -652,6 +652,10 @@ struct CollectionIterator {
 
     pointer operator->() const
     {
+        if constexpr (std::is_same_v<L, Set<Mixed>>) {
+            m_val = m_list->get_internal(m_ndx);
+            return &m_val;
+        }
         m_val = m_list->get(m_ndx);
         return &m_val;
     }
