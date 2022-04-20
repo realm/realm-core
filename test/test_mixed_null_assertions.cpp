@@ -183,13 +183,13 @@ TEST(Mixed_Set_unresolved_as_null)
     CHECK(success1);
 
     {
-        // null treated as invalalid link
+        // null can be inserted in the set
         CHECK(set.size() == 2);
         auto [it, success] = set.insert(Mixed{});
-        CHECK(!success);
+        CHECK(success);
         auto [it1, success1] = set.insert_null();
         CHECK(!success1);
-        CHECK(set.size() == 2);
+        CHECK(set.size() == 3);
     }
 
     {
@@ -214,17 +214,18 @@ TEST(Mixed_Set_unresolved_as_null)
         auto [it, success] = set.insert(Mixed{obj2});
         obj2.invalidate();
         CHECK(success);
-        CHECK(set.size() == 3);
-        std::vector<size_t> indices{1, 0, 2};
+        CHECK(set.size() == 4);
+        std::vector<size_t> indices{1, 0, 2, 3};
         set.sort(indices);
-        CHECK(indices.size() == 3);
+        CHECK(indices.size() == 4);
         CHECK(indices[0] == 0);
         CHECK(indices[1] == 1);
         CHECK(indices[2] == 2);
+        CHECK(indices[3] == 3);
     }
 
     {
-        // trigger interface exception, we ended up with multiple nulls
+        // erase null but there are only unresolved links in the set
         Group g;
         auto t = g.add_table("foo");
         t->add_column_set(type_Mixed, "mixeds");
@@ -232,53 +233,71 @@ TEST(Mixed_Set_unresolved_as_null)
         auto obj1 = t->create_object();
         auto obj2 = t->create_object();
         auto set = obj.get_set<Mixed>("mixeds");
-        set.insert(Mixed(1));
-        auto [it, success] = set.insert(obj1);
-        auto [it1, success1] = set.insert(obj2);
-        CHECK(success);
-        CHECK(success1);
-        CHECK_EQUAL(set.size(), 3);
-        CHECK(!set.is_null(1));
-        CHECK(!set.is_null(2));
+        set.insert(obj1);
+        set.insert(obj2);
+        CHECK_EQUAL(set.size(), 2);
         obj1.invalidate();
-        CHECK(set.is_null(1));
-        CHECK(!set.is_null(2));
         obj2.invalidate();
-        // this is the only violation we allow right now, we have ended up with 2 nulls
+        CHECK(set.is_null(0));
         CHECK(set.is_null(1));
-        CHECK(set.is_null(2));
-        auto obj3 = t->create_object();
-        set.insert(obj3);
-        CHECK_EQUAL(set.size(), 4);
-        // we can now do find_all for nulls (only actual null values will be returned, no unresolved links)
-        set.find_all(Mixed{}, [this, &set](size_t index) {
+        set.insert(Mixed{1});
+        CHECK_EQUAL(set.size(), 3);
+        set.erase_null();
+        CHECK_EQUAL(set.size(), 3);
+        set.erase(Mixed{});
+        CHECK_EQUAL(set.size(), 3);
+    }
+
+    {
+        // erase null when there are unresolved and nulls
+        Group g;
+        auto t = g.add_table("foo");
+        t->add_column_set(type_Mixed, "mixeds");
+        auto obj = t->create_object();
+        auto obj1 = t->create_object();
+        auto obj2 = t->create_object();
+        auto set = obj.get_set<Mixed>("mixeds");
+        set.insert(obj1);
+        set.insert(obj2);
+        set.insert(Mixed{});
+        CHECK_EQUAL(set.size(), 3);
+        obj1.invalidate();
+        obj2.invalidate();
+        size_t cnt = 0;
+        set.find_all(Mixed{}, [this, &set, &cnt](size_t index) {
             CHECK(index == 0);
             CHECK(set.is_null(index));
+            cnt += 1;
         });
-        // erase null will erase only nulls (no unresolved)
-        set.erase_null();
-        CHECK_EQUAL(set.size(), 1);
-        auto obj4 = t->create_object();
-        auto obj5 = t->create_object();
-        set.insert(obj4);
-        set.insert(obj5);
-        CHECK_EQUAL(set.size(), 3);
-        // erase all the nulls by default
-        obj4.invalidate();
-        obj5.invalidate();
-        set.erase_null();
-        CHECK_EQUAL(set.size(), 1);
-        auto obj6 = t->create_object();
-        auto obj7 = t->create_object();
-        set.insert(obj6);
-        set.insert(obj7);
-        CHECK_EQUAL(set.size(), 3);
-        obj6.invalidate();
-        // remove only obj6 (no allowed)
-        set.erase(obj6);
-        CHECK_EQUAL(set.size(), 3);
-        obj7.invalidate();
+        CHECK_EQUAL(cnt, 1);
         set.erase(Mixed{});
-        CHECK_EQUAL(set.size(), 1);
+        CHECK_EQUAL(set.size(), 2);
+    }
+
+    {
+        // assure that random access iterator does not return an unresolved link
+        Group g;
+        auto t = g.add_table("foo");
+        t->add_column_set(type_Mixed, "mixeds");
+        auto obj = t->create_object();
+        auto obj1 = t->create_object();
+        auto obj2 = t->create_object();
+        auto set = obj.get_set<Mixed>("mixeds");
+        set.insert(obj1);
+        set.insert(obj2);
+        obj1.invalidate();
+        obj2.invalidate();
+        set.insert(Mixed{});
+        size_t unresolved = 0;
+        size_t null = 0;
+        for (auto& mixed : set) {
+            if (mixed.is_null())
+                null += 1;
+            if (mixed.is_unresolved_link())
+                unresolved += 1;
+        }
+        CHECK_EQUAL(null, 1);
+        CHECK_EQUAL(unresolved,
+                    2); // this is a limitation, iterating through the set we can still expose unresolved links
     }
 }
