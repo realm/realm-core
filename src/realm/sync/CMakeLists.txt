@@ -5,6 +5,7 @@ set(SYNC_SOURCES
     noinst/client_impl_base.cpp
     noinst/client_reset.cpp
     noinst/client_reset_operation.cpp
+    noinst/client_reset_recovery.cpp
     noinst/compact_changesets.cpp
     noinst/protocol_codec.cpp
     changeset_encoder.cpp
@@ -55,6 +56,7 @@ set(NOINST_HEADERS
     noinst/client_impl_base.hpp
     noinst/client_reset.hpp
     noinst/client_reset_operation.hpp
+    noinst/client_reset_recovery.hpp
     noinst/compact_changesets.hpp
     noinst/integer_codec.hpp
     noinst/protocol_codec.hpp

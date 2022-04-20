@@ -50,7 +50,7 @@ protected:
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;
-#define REALM_DECLARE_INSTRUCTION_HANDLER(X) void operator()(const Instruction::X&);
+#define REALM_DECLARE_INSTRUCTION_HANDLER(X) virtual void operator()(const Instruction::X&);
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_DECLARE_INSTRUCTION_HANDLER)
 #undef REALM_DECLARE_INSTRUCTION_HANDLER
     friend struct Instruction; // to allow visitor
