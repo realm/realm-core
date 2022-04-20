@@ -463,6 +463,7 @@ private:
     util::InterprocessMutex m_writemutex;
     std::unique_ptr<ReadLockInfo> m_fake_read_lock_if_immutable;
     util::InterprocessMutex m_controlmutex;
+    util::InterprocessMutex m_versionlist_mutex;
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;

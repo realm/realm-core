@@ -81,93 +81,8 @@ namespace {
 //         `write_fairness`
 // 10      Introducing SharedInfo::history_schema_version.
 // 11      New impl of InterprocessCondVar on windows.
-#ifdef _WIN32
-const uint_fast16_t g_shared_info_version = 11;
-#else
-const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anything on non-windows platforms
-#endif
-
-// The following functions are carefully designed for minimal overhead
-// in case of contention among read transactions. In case of contention,
-// they consume roughly 90% of the cycles used to start and end a read transaction.
-//
-// Each live version carries a "count" field, which combines a reference count
-// of the readers bound to that version, and a single-bit "free" flag, which
-// indicates that the entry does not hold valid data.
-//
-// The usage patterns are as follows:
-//
-// Read transactions guard their access to the version information by
-// increasing the count field for the duration of the transaction.
-// A non-zero count field also indicates that the free space associated
-// with the version must remain intact. A zero count field indicates that
-// no one refers to that version, so it's free lists can be merged into
-// older free space and recycled.
-//
-// Only write transactions allocate and write new version entries. Also,
-// Only write transactions scan the VersionList for older versions which
-// are not used (count is zero) and free them. As write transactions are
-// atomic (ensured by mutex), there is no race between freeing entries
-// in the VersionList and allocating and writing them.
-//
-// There are no race conditions between read transactions. Read transactions
-// never change the versioning information, only increment or decrement the
-// count (and do so solely through the use of atomic operations).
-//
-// There is a race between read transactions incrementing the count field and
-// a write transaction setting the free field. These are mutually exclusive:
-// if a read sees the free field set, it cannot use the entry. As it has already
-// incremented the count field (optimistically, anticipating that the free bit
-// was clear), it must immediately decrement it again. Likewise, it is possible
-// for one thread to set the free bit (anticipating a count of zero) while another
-// thread increments the count (anticipating a clear free bit). In such cases,
-// both threads undo their changes and back off.
-//
-// For all changes to the free field and the count field: It is important that changes
-// to the free field takes the count field into account and vice versa, because they
-// are changed optimistically but atomically. This is implemented by modifying the
-// count field only by atomic add/sub of '2', and modifying the free field only by
-// atomic add/sub of '1'.
-//
-// The following *memory* ordering is required for correctness:
-//
-// 1 Accesses within a transaction assumes the version info is valid *before*
-//   reading it. This is achieved by synchronizing on the count field. Reading
-//   the count field is an *acquire*, while clearing the free field is a *release*.
-//
-// 2 Accesses within a transaction assumes the version *remains* valid, so
-//   all memory accesses with a read transaction must happen before
-//   the changes to memory (by a write transaction). This is achieved
-//   by use of *release* when the count field is decremented, and use of
-//   *acquire* when the free field is set (by the write transaction).
-//
-// 3 Reads of the counter is synchronized by accesses to the put_pos variable
-//   in the VersionList. Reading put_pos is an acquire and writing put_pos is
-//   a release. Put pos is only ever written when a write transaction updates
-//   the ring buffer.
-//
-// Discussion:
-//
-// - The design forces release/acquire style synchronization on every
-//   begin_read/end_read. This feels like a bit too much, because *only* a write
-//   transaction ever changes memory contents. Read transactions do not communicate,
-//   so with the right scheme, synchronization should only be proportional to the
-//   number of write transactions, not all transactions. The original design achieved
-//   this by ONLY synchronizing on the put_pos (case 3 above), BUT the following
-//   problems forced the addition of further synchronization:
-//
-//   - during begin_read, after reading put_pos, a thread may be arbitrarily delayed.
-//     While delayed, the entry selected by put_pos may be freed and reused, and then
-//     we will lack synchronization. Hence case 1 was added.
-//
-//   - a read transaction must complete all reads of memory before it can be changed
-//     by another thread (this is an example of an anti-dependency). This requires
-//     the solution described as case 2 above.
-//
-// - The use of release (in case 2 above) could - in principle - be replaced
-//   by a read memory barrier which would be faster on some architectures, but
-//   there is no standardized support for it.
-//
+// 12      New impl of VersionList and added mutex for it (former RingBuffer)
+const uint_fast16_t g_shared_info_version = 12;
 
 template <typename T>
 bool atomic_double_inc_if_even(std::atomic<T>& counter)
@@ -204,51 +119,51 @@ void atomic_dec(std::atomic<T>& counter)
     counter.fetch_sub(1, std::memory_order_release);
 }
 
-// nonblocking VersionList
-class VersionList {
-public:
-    // the VersionList is a circular list of ReadCount structures.
-    // Entries from old_pos to put_pos are considered live and may
-    // have an even value in 'count'. The count indicates the
-    // number of referring transactions times 2.
-    // Entries from after put_pos up till (not including) old_pos
-    // are free entries and must have a count of ONE.
-    // Cleanup is performed by starting at old_pos and incrementing
-    // (atomically) from 0 to 1 and moving the put_pos. It stops
-    // if count is non-zero. This approach requires that only a single thread
-    // at a time tries to perform cleanup. This is ensured by doing the cleanup
-    // as part of write transactions, where mutual exclusion is assured by the
-    // write mutex.
+// VersionList
+struct VersionList {
+    // the VersionList is a doubly linked list of ReadCount structures.
+    // it also holds a freelist.
+    // it is placed in the "lock-file" and accessed via memory mapping
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
         uint64_t current_top;
-        // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc implies acquire with regard to memory consistency.
-        // Release is triggered by explicitly storing into count whenever a
-        // new entry has been initialized.
-        mutable std::atomic<uint32_t> count;
-        uint32_t next;
+        uint32_t count_live;
+        uint32_t count_frozen;
+        int32_t older;
+        int32_t newer;
     };
+
+    void expand_to(uint_fast32_t new_entries) noexcept
+    {
+        // std::cout << "expanding to " << new_entries << std::endl;
+        // dump();
+        for (uint32_t i = entries; i < new_entries; i++) {
+            data[i].version = 1;
+            data[i].count_live = 0;
+            data[i].count_frozen = 0;
+            data[i].current_top = 0;
+            data[i].filesize = 0;
+            data[i].older = i + 1;
+            data[i].newer = -1;
+        }
+        data[new_entries - 1].older = freelist;
+        freelist = entries;
+        entries = uint32_t(new_entries);
+        // dump();
+    }
 
     VersionList() noexcept
     {
-        entries = init_readers_size;
-        for (int i = 0; i < init_readers_size; i++) {
-            data[i].version = 1;
-            data[i].count.store(1, std::memory_order_relaxed);
-            data[i].current_top = 0;
-            data[i].filesize = 0;
-            data[i].next = i + 1;
-        }
-        old_pos = 0;
-        data[0].count.store(0, std::memory_order_relaxed);
-        data[init_readers_size - 1].next = 0;
-        put_pos.store(0, std::memory_order_release);
+        entries = 0;
+        oldest = newest = -1; // empty
+        freelist = -1;        // empty
+        expand_to(init_readers_size);
     }
 
     void dump()
     {
+        /*
         uint_fast32_t i = old_pos;
         std::cout << "--- " << std::endl;
         while (i != put_pos.load()) {
@@ -262,23 +177,7 @@ public:
             i = data[i].next;
         }
         std::cout << "--- Done" << std::endl;
-    }
-
-    void expand_to(uint_fast32_t new_entries) noexcept
-    {
-        // std::cout << "expanding to " << new_entries << std::endl;
-        // dump();
-        for (uint32_t i = entries; i < new_entries; i++) {
-            data[i].version = 1;
-            data[i].count.store(1, std::memory_order_relaxed);
-            data[i].current_top = 0;
-            data[i].filesize = 0;
-            data[i].next = i + 1;
-        }
-        data[new_entries - 1].next = old_pos;
-        data[put_pos.load(std::memory_order_relaxed)].next = entries;
-        entries = uint32_t(new_entries);
-        // dump();
+        */
     }
 
     static size_t compute_required_space(uint_fast32_t num_entries) noexcept
@@ -294,19 +193,66 @@ public:
         return entries;
     }
 
-    uint_fast32_t last() const noexcept
-    {
-        return put_pos.load(std::memory_order_acquire);
-    }
-
-    const ReadCount& get(uint_fast32_t idx) const noexcept
+    ReadCount& get(uint_fast32_t idx) noexcept
     {
         return data[idx];
     }
 
-    const ReadCount& get_last() const noexcept
+    ReadCount& get_oldest() noexcept
     {
-        return get(last());
+        return get(oldest);
+    }
+
+    ReadCount& get_newest() noexcept
+    {
+        return get(newest);
+    }
+    ReadCount& allocate_entry()
+    {
+        // grab entry from freelist:
+        REALM_ASSERT(freelist != -1);
+        auto& r = get(freelist);
+        freelist = r.older;
+
+        if (newest == -1) {
+            // list was empty
+            REALM_ASSERT(oldest == -1);
+            newest = oldest = index_of(r);
+            r.older = r.newer = -1;
+        }
+        else {
+            // add to existing list
+            auto& n = get(newest);
+            REALM_ASSERT(n.newer == -1);
+            r.newer = -1;
+            r.older = newest;
+            newest = index_of(r);
+            n.newer = newest;
+        }
+        return r;
+    }
+
+    int index_of(const ReadCount& rc)
+    {
+        return &rc - data;
+    }
+
+    void free_entry(int idx)
+    {
+        auto& r = get(idx);
+        if (idx == oldest)
+            oldest = r.newer;
+        if (idx == newest)
+            newest = r.older; // can this happen?
+        if (r.older != -1)
+            get(r.older).newer = r.newer;
+        if (r.newer != -1)
+            get(r.newer).older = r.older;
+
+        // add to freelist
+        r.newer = -1;
+        r.older = freelist;
+        freelist = idx;
     }
 
     // This method re-initialises the last used VersionList entry to hold a new entry.
@@ -316,67 +262,43 @@ public:
     // condition that it is the session initiator and under guard by the control mutex,
     // thus ensuring the precondition.
     // It is most likely not suited for any other use.
-    ReadCount& reinit_last() noexcept
+    ReadCount& init_versioning() noexcept
     {
-        ReadCount& r = data[last()];
-        // r.count is an atomic<> due to other usage constraints. Right here, we're
-        // operating under mutex protection, so the use of an atomic store is immaterial
-        // and just forced on us by the type of r.count.
-        // You'll find the full discussion of how r.count is operated and why it must be
-        // an atomic earlier in this file.
-        r.count.store(0, std::memory_order_relaxed);
+        int num_entries = entries;
+        entries = 0;
+        newest = oldest = freelist = -1;
+        expand_to(num_entries);
+        ReadCount& r = allocate_entry();
+        r.count_live = r.count_frozen = 0;
         return r;
-    }
-
-    const ReadCount& get_oldest() const noexcept
-    {
-        return get(old_pos.load(std::memory_order_relaxed));
     }
 
     bool is_full() const noexcept
     {
-        uint_fast32_t idx = get(last()).next;
-        return idx == old_pos.load(std::memory_order_relaxed);
-    }
-
-    uint_fast32_t next() const noexcept
-    {
-        // do not call this if the buffer is full!
-        uint_fast32_t idx = get(last()).next;
-        return idx;
-    }
-
-    ReadCount& get_next() noexcept
-    {
-        REALM_ASSERT(!is_full());
-        return data[next()];
-    }
-
-    void use_next() noexcept
-    {
-        atomic_dec(get_next().count); // .store_release(0);
-        put_pos.store(uint32_t(next()), std::memory_order_release);
+        return freelist == -1;
     }
 
     void cleanup() noexcept
     {
-        // invariant: entry held by put_pos has count > 1.
-        // std::cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
-        // dump();
-        while (old_pos.load(std::memory_order_relaxed) != put_pos.load(std::memory_order_relaxed)) {
-            const ReadCount& r = get(old_pos.load(std::memory_order_relaxed));
-            if (!atomic_one_if_zero(r.count))
+        // run through list of versions and reclaim unused entries until a live entry is met
+        auto next = oldest;
+        while (next != -1) {
+            auto& r = get(next);
+            if (r.count_live != 0)
                 break;
-            auto next_ndx = get(old_pos.load(std::memory_order_relaxed)).next;
-            old_pos.store(next_ndx, std::memory_order_relaxed);
+            next = r.newer;
+            if (r.count_frozen == 0) {
+                // destroys r.newer, so need to grab it above ^
+                r.version = 0;
+                free_entry(index_of(r));
+            }
         }
     }
 
-private:
-    // number of entries. Access synchronized through put_pos.
     uint32_t entries;
-    std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    std::atomic<uint32_t> old_pos; // only changed during write transactions and under lock
+    int32_t oldest;
+    int32_t newest;
+    int32_t freelist;
 
     const static int init_readers_size = 32;
 
@@ -523,6 +445,7 @@ struct alignas(8) DB::SharedInfo {
 
     InterprocessMutex::SharedPart shared_writemutex; // Offset 48
     InterprocessMutex::SharedPart shared_controlmutex;
+    InterprocessMutex::SharedPart shared_versionlist_mutex;
     InterprocessCondVar::SharedPart room_to_write;
     InterprocessCondVar::SharedPart work_to_do;
     InterprocessCondVar::SharedPart daemon_becomes_ready;
@@ -540,7 +463,7 @@ struct alignas(8) DB::SharedInfo {
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
         // Create our first versioning entry:
-        VersionList::ReadCount& r = readers.reinit_last();
+        VersionList::ReadCount& r = readers.init_versioning();
         r.filesize = file_size;
         r.version = initial_version;
         r.current_top = top_ref;
@@ -615,129 +538,80 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
 
 class DB::VersionManager {
 public:
-    void grow_reader_mapping(uint_fast32_t index)
-    {
-        using _impl::SimulatedFailure;
-        SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
-
-        if (index >= m_local_max_entry) {
-            // handle mapping expansion if required
-            DB::SharedInfo* r_info = m_reader_map.get_addr();
-            m_local_max_entry = r_info->readers.get_num_entries();
-            REALM_ASSERT(index < m_local_max_entry);
-            size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
-            // std::cout << "Growing reader mapping to " << infosize << std::endl;
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
-        }
-    }
-    void cleanup_versions()
-    {
-        grow_reader_mapping(r_info->readers.get_num_entries() - 1);
-        r_info->readers.cleanup();
-    }
-    version_type get_oldest_version()
-    {
-        const VersionList::ReadCount& rc = r_info->readers.get_oldest();
-        return rc.version;
-    }
-    version_type get_newest_version()
-    {
-        return r_info->readers.get_last().version;
-    }
-    VersionID get_version_id_of_latest_snapshot()
-    {
-        // As this method may be called outside of the write
-        // mutex, another thread may be performing changes to the VersionList
-        // concurrently. It may even cleanup and recycle the current entry from
-        // under our feet, so we need to protect the entry by temporarily
-        // incrementing the reader ref count until we've got a safe reading of the
-        // version number.
-        while (1) {
-            uint_fast32_t index;
-            SharedInfo* r_info;
-            r_info = m_reader_map.get_addr();
-            index = r_info->readers.last();
-            // make sure that the index we are about to dereference falls within
-            // the portion of the VersionList that we have mapped - if not, extend
-            // the mapping to fit.
-            grow_reader_mapping(index); // throws
-
-            // now (double) increment the read count so that no-one cleans up the entry
-            // while we read it.
-            const VersionList::ReadCount& r = r_info->readers.get(index);
-            if (!atomic_double_inc_if_even(r.count)) {
-                continue;
-            }
-            VersionID version{r.version, index};
-            // release the entry again:
-            atomic_double_dec(r.count);
-            return version;
-        }
-    }
-    VersionManager(File& file)
+    VersionManager(File& file, util::InterprocessMutex& mutex)
         : m_file(file)
+        , m_mutex(mutex)
     {
+        std::lock_guard lock(m_mutex);
         size_t size = m_file.get_size();
         m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
         r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
         REALM_ASSERT(sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry) == size);
     }
+
+    void cleanup_versions()
+    {
+        std::lock_guard lock(m_mutex);
+        ensure_full_reader_mapping();
+        r_info->readers.cleanup();
+    }
+
+    version_type get_oldest_version()
+    {
+        std::lock_guard lock(m_mutex);
+        const VersionList::ReadCount& rc = r_info->readers.get_oldest();
+        return rc.version;
+    }
+
+    version_type get_newest_version()
+    {
+        std::lock_guard lock(m_mutex);
+        return r_info->readers.get_newest().version;
+    }
+
+    VersionID get_version_id_of_latest_snapshot()
+    {
+        std::lock_guard lock(m_mutex);
+        ensure_full_reader_mapping();
+        uint_fast32_t index = r_info->readers.newest;
+        auto& r = r_info->readers.get_newest();
+        return {r.version, index};
+    }
+
     void release_read_lock(ReadLockInfo& read_lock)
     {
-        const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-        atomic_double_dec(r.count); // <-- most of the exec time spent here
+        std::lock_guard lock(m_mutex);
+        auto& r = r_info->readers.get(read_lock.m_reader_idx);
+        REALM_ASSERT(read_lock.m_version == r.version);
+        --r.count_live;
     }
+
     void grab_read_lock(ReadLockInfo& read_lock, VersionID version_id = {})
     {
+        std::lock_guard lock(m_mutex);
+        ensure_full_reader_mapping();
         if (version_id.version == std::numeric_limits<version_type>::max()) {
-            for (;;) {
-                SharedInfo* r_info = m_reader_map.get_addr();
-                read_lock.m_reader_idx = r_info->readers.last();
-                grow_reader_mapping(read_lock.m_reader_idx);
-                const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-                // if the entry is stale and has been cleared by the cleanup process,
-                // we need to start all over again. This is extremely unlikely, but possible.
-                if (!atomic_double_inc_if_even(r.count)) // <-- most of the exec time spent here!
-                    continue;
-                read_lock.m_version = r.version;
-                read_lock.m_top_ref = to_size_t(r.current_top);
-                read_lock.m_file_size = to_size_t(r.filesize);
-                return;
-            }
+            read_lock.m_reader_idx = r_info->readers.newest;
         }
-
-        for (;;) {
-            SharedInfo* r_info = m_reader_map.get_addr();
+        else {
             read_lock.m_reader_idx = version_id.index;
-            grow_reader_mapping(read_lock.m_reader_idx);
-            const VersionList::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
-
-            // if the entry is stale and has been cleared by the cleanup process,
-            // the requested version is no longer available
-            while (!atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
-                // we failed to lock the version. This could be because the version
-                // is being cleaned up, but also because the cleanup is probing for access
-                // to it. If it's being probed, the tail ptr of the VersionList will point
-                // to it. If so we retry. If the tail ptr points somewhere else, the entry
-                // has been cleaned up.
-                if (&r_info->readers.get_oldest() != &r)
-                    throw BadVersion();
-            }
-            // we managed to lock an entry in the VersionList, but it may be so old that
-            // the version doesn't match the specific request. In that case we must release and fail
-            if (r.version != version_id.version) {
-                atomic_double_dec(r.count); // <-- release
-                throw BadVersion();
-            }
-            read_lock.m_version = r.version;
-            read_lock.m_top_ref = to_size_t(r.current_top);
-            read_lock.m_file_size = to_size_t(r.filesize);
-            return;
         }
+        auto& r = r_info->readers.get(read_lock.m_reader_idx);
+        if (version_id.version != std::numeric_limits<version_type>::max()) {
+            if (version_id.version != r.version)
+                throw BadVersion();
+        }
+        ++r.count_live;
+        read_lock.m_version = r.version;
+        read_lock.m_top_ref = r.current_top;
+        read_lock.m_file_size = r.filesize;
+        return;
     }
+
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
     {
+        std::lock_guard lock(m_mutex);
         if (r_info->readers.is_full()) {
             // buffer expansion
             uint_fast32_t entries = r_info->readers.get_num_entries();
@@ -750,18 +624,20 @@ public:
             m_local_max_entry = entries;
             r_info->readers.expand_to(entries);
         }
-        VersionList::ReadCount& r = r_info->readers.get_next();
+        VersionList::ReadCount& r = r_info->readers.allocate_entry();
         r.current_top = new_top_ref;
         r.filesize = new_file_size;
         r.version = new_version;
-        r_info->readers.use_next();
     }
+
     ~VersionManager()
     {
         m_reader_map.unmap();
     }
+
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
+        std::lock_guard lock(m_mutex);
         r_info->init_versioning(top_ref, file_size, initial_version);
     }
 
@@ -770,6 +646,24 @@ private:
     SharedInfo* r_info;
     File& m_file;
     File::Map<DB::SharedInfo> m_reader_map;
+    util::InterprocessMutex& m_mutex;
+
+    void ensure_full_reader_mapping()
+    {
+        using _impl::SimulatedFailure;
+        SimulatedFailure::trigger(SimulatedFailure::shared_group__grow_reader_mapping); // Throws
+
+        auto index = r_info->readers.get_num_entries() - 1;
+        if (index >= m_local_max_entry) {
+            // handle mapping expansion if required
+            m_local_max_entry = r_info->readers.get_num_entries();
+            REALM_ASSERT(index < m_local_max_entry);
+            size_t info_size = sizeof(DB::SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+            // std::cout << "Growing reader mapping to " << infosize << std::endl;
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info_size); // Throws
+            r_info = m_reader_map.get_addr();
+        }
+    }
 };
 
 #if REALM_HAVE_STD_FILESYSTEM
@@ -1009,6 +903,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         }
         m_writemutex.set_shared_part(info->shared_writemutex, m_lockfile_prefix, "write");
         m_controlmutex.set_shared_part(info->shared_controlmutex, m_lockfile_prefix, "control");
+        m_versionlist_mutex.set_shared_part(info->shared_versionlist_mutex, m_lockfile_prefix, "versions");
 
         // even though fields match wrt alignment and size, there may still be incompatibilities
         // between implementations, so lets ask one of the mutexes if it thinks it'll work.
@@ -1027,7 +922,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
         // - Waiting for and signalling database changes
         {
             std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
-            auto version_manager = std::make_unique<VersionManager>(m_file);
+            auto version_manager = std::make_unique<VersionManager>(m_file, m_versionlist_mutex);
 
             // proceed to initialize versioning and other metadata information related to
             // the database. Also create the database if we're beginning a new session
