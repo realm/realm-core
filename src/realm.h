@@ -237,6 +237,7 @@ typedef enum realm_errno {
     RLM_ERR_FILE_PERMISSION_DENIED,
 
     RLM_ERR_DELETE_OPENED_REALM,
+    RLM_ERR_ILLEGAL_OPERATION,
 
     RLM_ERR_CALLBACK = 1000000, /**< A user-provided callback failed. */
 } realm_errno_e;
@@ -1431,6 +1432,19 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Create an embedded object in a given property.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t);
+
+/** Return the object linked by the given property
+ *
+ * @return A non-NULL pointer if an object is found.
+ */
+RLM_API realm_object_t* realm_get_linked_object(realm_object_t*, realm_property_key_t);
+
+/**
  * Set the values for several properties.
  *
  * This is provided as an alternative to calling `realm_get_value()` multiple
@@ -1548,6 +1562,27 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
  * @return True if no exception occurred.
  */
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
+
+/**
+ * Insert an embedded object at a given position.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_list_insert_embedded(realm_list_t*, size_t index);
+
+/**
+ * Create an embedded object at a given position.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_list_set_embedded(realm_list_t*, size_t index);
+
+/**
+ * Get object identified at index
+ *
+ * @return A non-NULL pointer if value is an object.
+ */
+RLM_API realm_object_t* realm_list_get_linked_object(realm_list_t*, size_t index);
 
 /**
  * Erase the element at @a index.
@@ -1980,6 +2015,20 @@ RLM_API bool realm_dictionary_get(const realm_dictionary_t*, size_t index, realm
  */
 RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, realm_value_t value, size_t* out_index,
                                      bool* out_inserted);
+
+/**
+ * Insert an embedded object.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
+
+/**
+ * Get object identified by key
+ *
+ * @return A non-NULL pointer if the value associated with key is an object.
+ */
+RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t*, realm_value_t key);
 
 /**
  * Erase a dictionary element.

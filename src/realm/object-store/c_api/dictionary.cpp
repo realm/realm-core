@@ -86,6 +86,30 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t* dict, realm_value_t key
     });
 }
 
+RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t* dict, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_object_t({dict->get_realm(), dict->insert_embedded(k)});
+    });
+}
+
+RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t* dict, realm_value_t key)
+{
+    return wrap_err([&]() {
+        if (key.type != RLM_TYPE_STRING) {
+            throw std::invalid_argument{"Only string keys are supported in dictionaries"};
+        }
+
+        StringData k{key.string.data, key.string.size};
+        return new realm_object_t({dict->get_realm(), dict->get_object(k)});
+    });
+}
+
 RLM_API bool realm_dictionary_erase(realm_dictionary_t* dict, realm_value_t key, bool* out_erased)
 {
     return wrap_err([&]() {
