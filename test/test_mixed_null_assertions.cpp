@@ -232,23 +232,24 @@ TEST(Mixed_Set_unresolved_as_null)
         auto obj1 = t->create_object();
         auto obj2 = t->create_object();
         auto set = obj.get_set<Mixed>("mixeds");
+        set.insert(Mixed(1));
         auto [it, success] = set.insert(obj1);
         auto [it1, success1] = set.insert(obj2);
         CHECK(success);
         CHECK(success1);
-        CHECK(set.size() == 2);
-        CHECK(!set.is_null(0));
+        CHECK_EQUAL(set.size(), 3);
         CHECK(!set.is_null(1));
+        CHECK(!set.is_null(2));
         obj1.invalidate();
-        CHECK(set.is_null(0));
-        CHECK(!set.is_null(1));
+        CHECK(set.is_null(1));
+        CHECK(!set.is_null(2));
         obj2.invalidate();
         // this is the only violation we allow right now, we have ended up with 2 nulls
-        CHECK(set.is_null(0));
         CHECK(set.is_null(1));
+        CHECK(set.is_null(2));
         auto obj3 = t->create_object();
         set.insert(obj3);
-        CHECK(set.size() == 3);
+        CHECK_EQUAL(set.size(), 4);
         // we can now do find_all for nulls (only actual null values will be returned, no unresolved links)
         set.find_all(Mixed{}, [this, &set](size_t index) {
             CHECK(index == 0);
@@ -256,28 +257,28 @@ TEST(Mixed_Set_unresolved_as_null)
         });
         // erase null will erase only nulls (no unresolved)
         set.erase_null();
-        CHECK(set.size() == 1);
+        CHECK_EQUAL(set.size(), 1);
         auto obj4 = t->create_object();
         auto obj5 = t->create_object();
         set.insert(obj4);
         set.insert(obj5);
-        CHECK(set.size() == 3);
+        CHECK_EQUAL(set.size(), 3);
         // erase all the nulls by default
         obj4.invalidate();
         obj5.invalidate();
         set.erase_null();
-        CHECK(set.size() == 1);
+        CHECK_EQUAL(set.size(), 1);
         auto obj6 = t->create_object();
         auto obj7 = t->create_object();
         set.insert(obj6);
         set.insert(obj7);
-        CHECK(set.size() == 3);
+        CHECK_EQUAL(set.size(), 3);
         obj6.invalidate();
         // remove only obj6 (no allowed)
         set.erase(obj6);
-        CHECK(set.size() == 3);
+        CHECK_EQUAL(set.size(), 3);
         obj7.invalidate();
         set.erase(Mixed{});
-        CHECK(set.size() == 1);
+        CHECK_EQUAL(set.size(), 1);
     }
 }
