@@ -165,7 +165,7 @@ TEST(Mixed_List_unresolved_as_null)
     }
 }
 
-TEST(Mixed_Set_unresolved_as_null)
+TEST(Mixed_Set_unresolved_links)
 {
     Group g;
 
@@ -193,8 +193,6 @@ TEST(Mixed_Set_unresolved_as_null)
     }
 
     {
-        // find all mixed nulls or unresolved link should work the same way
-        // there can only be 1 NULL
         int cnt = 0;
         set.find_all(realm::null(), [this, &set, &cnt](size_t pos) {
             CHECK(pos != not_found);
@@ -238,8 +236,9 @@ TEST(Mixed_Set_unresolved_as_null)
         CHECK_EQUAL(set.size(), 2);
         obj1.invalidate();
         obj2.invalidate();
-        CHECK(set.is_null(0));
-        CHECK(set.is_null(1));
+        //this should be treated as null, but for set of mixed we decided to leave unresolved exposed
+        CHECK(!set.is_null(0));
+        CHECK(!set.is_null(1));
         set.insert(Mixed{1});
         CHECK_EQUAL(set.size(), 3);
         set.erase_null();
@@ -297,7 +296,6 @@ TEST(Mixed_Set_unresolved_as_null)
                 unresolved += 1;
         }
         CHECK_EQUAL(null, 1);
-        CHECK_EQUAL(unresolved,
-                    2); // this is a limitation, iterating through the set we can still expose unresolved links
+        CHECK_EQUAL(unresolved,2);
     }
 }

@@ -1641,7 +1641,9 @@ TEST(Unresolved_Mixed_links)
     }
     if (set_mixed.size()) {
         auto link = set_mixed.get(0);
-        CHECK(link.is_null());
+        //set do not hide unresolved links
+        CHECK(!link.is_null());
+        CHECK(link.is_unresolved_link());
     }
 }
 

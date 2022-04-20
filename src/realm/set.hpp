@@ -68,13 +68,11 @@ public:
 
     T get(size_t ndx) const
     {
-        auto value = get_internal(ndx);
-        if constexpr (std::is_same_v<T, Mixed>) {
-            // return a null for mixed unresolved link
-            if (value.is_type(type_TypedLink) && value.is_unresolved_link())
-                return Mixed{};
+        const auto current_size = size();
+        if (ndx >= current_size) {
+            throw std::out_of_range("Index out of range");
         }
-        return value;
+        return m_tree->get(ndx);
     }
 
     iterator begin() const noexcept
@@ -93,7 +91,7 @@ public:
     }
 
     template <class Func>
-    void find_all(const T& value, Func&& func) const
+    void find_all(T value, Func&& func) const
     {
         size_t found = find(value);
         if (found != not_found) {
@@ -273,17 +271,6 @@ private:
     void assign_symmetric_difference(It1, It2);
 
     static std::vector<T> convert_to_set(const CollectionBase& rhs, bool nullable);
-
-    T get_internal(size_t ndx) const
-    {
-        const auto current_size = size();
-        if (ndx >= current_size) {
-            throw std::out_of_range("Index out of range");
-        }
-        return m_tree->get(ndx);
-    }
-    // iterator needs to get access to get_internal in order to avoid to break realm file compatibility
-    friend iterator;
 };
 
 class LnkSet final : public ObjCollectionBase<SetBase> {
@@ -675,9 +662,11 @@ template <class T>
 std::pair<size_t, bool> Set<T>::erase(T value)
 {
     auto it = find_impl(value); // Note: This ends up calling `update_if_needed()`.
+
     if (it == end() || !SetElementEquals<T>{}(*it, value)) {
         return {npos, false};
     }
+
     if (Replication* repl = m_obj.get_replication()) {
         this->erase_repl(repl, it.index(), value);
     }
