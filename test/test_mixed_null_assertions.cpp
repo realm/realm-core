@@ -163,7 +163,7 @@ TEST(Mixed_List_unresolved_as_null)
         CHECK(list.find_any(realm::null()) == npos);
         CHECK(list.size() == 1);
     }
-    
+
     {
         Group g;
         auto t = g.add_table("foo");
@@ -175,7 +175,7 @@ TEST(Mixed_List_unresolved_as_null)
         list.insert(0, obj1);
         list.insert_null(1);
         obj1.invalidate();
-        
+
         auto index_any = list.find_any(realm::null());
         auto index_first = list.find_first(realm::null());
         CHECK_EQUAL(index_any, 0);

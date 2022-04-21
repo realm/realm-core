@@ -687,15 +687,12 @@ inline size_t Lst<T>::find_first(const T& value) const
 {
     if (!update())
         return not_found;
-    
-    if constexpr(std::is_same_v<T, Mixed>)
-    {
-        if(value.is_null())
-        {
+
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (value.is_null()) {
             auto ndx = m_tree->find_first(value);
-            for(size_t i=0; i<ndx && ndx!=not_found; ++i)
-            {
-                if(m_tree->get(i).is_unresolved_link())
+            for (size_t i = 0; i < ndx && ndx != not_found; ++i) {
+                if (m_tree->get(i).is_unresolved_link())
                     return i;
             }
             return ndx;
