@@ -4057,8 +4057,9 @@ TEST(Query_LinkChainSortErrors)
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col, t2_string_col}})),
                       ErrorCodes::InvalidSortDescriptor);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
-        ErrorCodes::InvalidSortDescriptor);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), ErrorCodes::InvalidSortDescriptor);
+                      ErrorCodes::InvalidSortDescriptor);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})),
+                      ErrorCodes::InvalidSortDescriptor);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
 

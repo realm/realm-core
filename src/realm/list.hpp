@@ -653,7 +653,8 @@ inline T Lst<T>::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw OutOfBounds(util::format("Invalid index when getting from list: %1", CollectionBase::get_property_name()));
+        throw OutOfBounds(
+            util::format("Invalid index when getting from list: %1", CollectionBase::get_property_name()));
     }
     return m_tree->get(ndx);
 }
@@ -839,7 +840,8 @@ template <class T>
 T Lst<T>::set(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable, util::format("List: %1", CollectionBase::get_property_name()));
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("List: %1", CollectionBase::get_property_name()));
 
     // get will check for ndx out of bounds
     T old = get(ndx);
@@ -857,7 +859,8 @@ template <class T>
 void Lst<T>::insert(size_t ndx, T value)
 {
     if (value_is_null(value) && !m_nullable)
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable, util::format("List: %1", CollectionBase::get_property_name()));
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("List: %1", CollectionBase::get_property_name()));
 
     auto sz = size();
     if (ndx > sz)
@@ -1065,7 +1068,8 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
 {
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
-        throw IllegalOperation(util::format("Insert not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
+        throw IllegalOperation(
+            util::format("Insert not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
 
     update_if_needed();
     m_list.insert(virtual2real(ndx), value);
@@ -1076,7 +1080,8 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
 {
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
-        throw IllegalOperation(util::format("Setting not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
+        throw IllegalOperation(
+            util::format("Setting not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
 
     update_if_needed();
     ObjKey old = m_list.set(virtual2real(ndx), value);

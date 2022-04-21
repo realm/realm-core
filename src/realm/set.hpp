@@ -70,7 +70,8 @@ public:
     {
         const auto current_size = size();
         if (ndx >= current_size) {
-            throw OutOfBounds(util::format("Invalid index when getting from set: %1", CollectionBase::get_property_name()));
+            throw OutOfBounds(
+                util::format("Invalid index when getting from set: %1", CollectionBase::get_property_name()));
         }
         return m_tree->get(ndx);
     }
@@ -621,7 +622,8 @@ std::pair<size_t, bool> Set<T>::insert(T value)
     update_if_needed();
 
     if (value_is_null(value) && !m_nullable)
-        throw InvalidArgument(ErrorCodes::PropertyNotNullable, util::format("Set: %1", CollectionBase::get_property_name()));
+        throw InvalidArgument(ErrorCodes::PropertyNotNullable,
+                              util::format("Set: %1", CollectionBase::get_property_name()));
 
     ensure_created();
     auto it = find_impl(value);
