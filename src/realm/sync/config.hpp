@@ -202,6 +202,9 @@ struct SyncConfig {
     // Called after each download message is integrated on the sync worker thread. For testing only.
     std::function<void(size_t num_changesets)> on_after_download_integrated;
 
+    // If true, we split the incoming changesets and perform OT on each set.
+    bool split_remote_changesets = false;
+
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);

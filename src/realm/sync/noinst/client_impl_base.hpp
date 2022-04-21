@@ -722,7 +722,8 @@ public:
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
     void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
+                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch,
+                              bool split_changesets);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().

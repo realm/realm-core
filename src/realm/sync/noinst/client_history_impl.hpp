@@ -255,7 +255,8 @@ public:
                                      const RemoteChangeset* changesets, std::size_t num_changesets,
                                      VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
                                      util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
-                                     SyncTransactReporter* transact_reporter = nullptr);
+                                     SyncTransactReporter* transact_reporter = nullptr,
+                                     bool split_changesets = false);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);

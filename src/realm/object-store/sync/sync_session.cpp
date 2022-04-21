@@ -747,6 +747,7 @@ void SyncSession::create_sync_session()
             return hook(anchor, progress, query_version, batch_state);
         };
     }
+    session_config.split_remote_changesets = m_config.split_remote_changesets;
 
     {
         std::string sync_route = m_sync_manager->sync_route();

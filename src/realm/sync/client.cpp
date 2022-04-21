@@ -250,6 +250,8 @@ private:
     std::function<void(const SyncProgress&, int64_t, DownloadBatchState)> m_on_download_message_received_hook;
     std::function<bool(const SyncProgress&, int64_t, DownloadBatchState)> m_on_bootstrap_message_processed_hook;
 
+    const bool m_split_remote_changesets;
+
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
@@ -694,8 +696,8 @@ void SessionImpl::initiate_integrate_changesets(std::uint_fast64_t downloadable_
         if (REALM_LIKELY(!get_client().is_dry_run())) {
             VersionInfo version_info;
             ClientReplication& repl = access_realm(); // Throws
-            integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info,
-                                 batch_state); // Throws
+            integrate_changesets(repl, m_progress, downloadable_bytes, changesets, version_info, batch_state,
+                                 m_wrapper.m_split_remote_changesets); // Throws
             client_version = version_info.realm_version;
         }
         else {
@@ -908,6 +910,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_on_bootstrap_message_processed_hook(config.on_bootstrap_message_processed_hook)
     , m_on_before_download_integrated{config.on_before_download_integrated}
     , m_on_after_download_integrated{config.on_after_download_integrated}
+    , m_split_remote_changesets{config.split_remote_changesets}
     , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);

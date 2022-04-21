@@ -1375,7 +1375,7 @@ void Session::cancel_resumption_delay()
 void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
-                                   DownloadBatchState download_batch_state)
+                                   DownloadBatchState download_batch_state, bool split_changesets)
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
@@ -1389,7 +1389,8 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
+                                        download_batch_state, logger, get_transact_reporter(),
+                                        split_changesets); // Throws
     if (num_changesets == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws

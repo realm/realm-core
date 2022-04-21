@@ -327,6 +327,9 @@ public:
         std::function<void(size_t)> on_before_download_integrated;
         /// Called after each download message is integrated. For testing only.
         std::function<void(size_t)> on_after_download_integrated;
+
+        // If true, we split the incoming changesets and perform OT on each set.
+        bool split_remote_changesets = false;
     };
 
     /// \brief Start a new session for the specified client-side Realm.
