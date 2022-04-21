@@ -104,7 +104,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     // Object Store exceptions:
     catch (const InvalidTransactionException& ex) {
-        populate_error(ex, ErrorCodes::WrongTransactioState);
+        populate_error(ex, ErrorCodes::WrongTransactionState);
     }
     catch (const IncorrectThreadException& ex) {
         populate_error(ex, ErrorCodes::WrongThread);

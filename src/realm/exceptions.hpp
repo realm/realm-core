@@ -310,7 +310,7 @@ public:
 class WrongTransactioState : public LogicError {
 public:
     WrongTransactioState(const std::string& msg)
-        : LogicError(ErrorCodes::WrongTransactioState, msg)
+        : LogicError(ErrorCodes::WrongTransactionState, msg)
     {
     }
 };

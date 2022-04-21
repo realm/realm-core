@@ -74,7 +74,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BrokenPromise:
         case CrossTableLinkTarget:
         case KeyAlreadyUsed:
-        case WrongTransactioState:
+        case WrongTransactionState:
         case SerializationError:
         case IllegalOperation:
         case StaleAccessor:
@@ -142,7 +142,7 @@ std::string_view ErrorCodes::error_string(Error code)
             return "InvalidQueryArg";
         case InvalidQuery:
             return "InvalidQuery";
-        case WrongTransactioState:
+        case WrongTransactionState:
             return "WrongTransactioState";
         case WrongThread:
             return "WrongThread";
@@ -238,7 +238,7 @@ ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
     if (name == std::string_view("InvalidQuery"))
         return InvalidQuery;
     if (name == std::string_view("WrongTransactioState"))
-        return WrongTransactioState;
+        return WrongTransactionState;
     if (name == std::string_view("WrongThread"))
         return WrongThread;
     if (name == std::string_view("InvalidatedObject"))

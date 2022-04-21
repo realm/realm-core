@@ -108,7 +108,7 @@ public:
         SyntaxError = RLM_ERR_INVALID_QUERY_STRING,
         InvalidQueryArg = RLM_ERR_INVALID_QUERY_ARG,
         InvalidQuery = RLM_ERR_INVALID_QUERY,
-        WrongTransactioState = RLM_ERR_WRONG_TRANSACTION_STATE,
+        WrongTransactionState = RLM_ERR_WRONG_TRANSACTION_STATE,
         WrongThread = RLM_ERR_WRONG_THREAD,
         InvalidatedObject = RLM_ERR_INVALIDATED_OBJECT,
         InvalidProperty = RLM_ERR_INVALID_PROPERTY,

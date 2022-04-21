@@ -1084,7 +1084,7 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 // make sure that all possible concurrent session participants
                 // use the same history type for the same Realm file.
                 if (info->history_type != openers_hist_type)
-                    throw RuntimeError(ErrorCodes::IncompatibleSession, "Historuy type not consistent");
+                    throw RuntimeError(ErrorCodes::IncompatibleSession, "History type not consistent");
 
                 // History schema version must be consistent across a
                 // session. An inconsistency is a logic error, as the user is
