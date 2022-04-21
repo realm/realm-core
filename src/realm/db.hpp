@@ -422,7 +422,7 @@ private:
         uint_fast32_t m_reader_idx = 0;
         ref_type m_top_ref = 0;
         size_t m_file_size = 0;
-
+        bool m_is_frozen = false;
         // a little helper
         static std::unique_ptr<ReadLockInfo> make_fake(ref_type top_ref, size_t file_size)
         {
@@ -534,7 +534,7 @@ private:
     ///
     /// As a side effect update memory mapping to ensure that the ringbuffer
     /// entries referenced in the readlock info is accessible.
-    void grab_read_lock(ReadLockInfo&, VersionID);
+    void grab_read_lock(ReadLockInfo&, bool is_frozen, VersionID);
 
     // Release a specific read lock. The read lock MUST have been obtained by a
     // call to grab_read_lock().
@@ -1082,7 +1082,7 @@ template <class O>
 inline bool Transaction::internal_advance_read(O* observer, VersionID version_id, _impl::History& hist, bool writable)
 {
     DB::ReadLockInfo new_read_lock;
-    db->grab_read_lock(new_read_lock, version_id); // Throws
+    db->grab_read_lock(new_read_lock, false, version_id); // Throws
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);

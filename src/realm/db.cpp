@@ -584,10 +584,15 @@ public:
         std::lock_guard lock(m_mutex);
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
-        --r.count_live;
+        if (read_lock.m_is_frozen) {
+            --r.count_frozen;            
+        }
+        else {
+            --r.count_live;
+        }
     }
 
-    void grab_read_lock(ReadLockInfo& read_lock, VersionID version_id = {})
+    void grab_read_lock(ReadLockInfo& read_lock, bool frozen, VersionID version_id = {})
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
@@ -602,7 +607,13 @@ public:
             if (version_id.version != r.version)
                 throw BadVersion();
         }
-        ++r.count_live;
+        if (frozen) {
+            ++r.count_frozen;
+        } 
+        else {
+            ++r.count_live;
+        }
+        read_lock.m_is_frozen = frozen;
         read_lock.m_version = r.version;
         read_lock.m_top_ref = r.current_top;
         read_lock.m_file_size = r.filesize;
@@ -2134,11 +2145,11 @@ void DB::release_read_lock(ReadLockInfo& read_lock) noexcept
 }
 
 
-void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
+void DB::grab_read_lock(ReadLockInfo& read_lock, bool is_frozen, VersionID version_id)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     REALM_ASSERT_RELEASE(is_attached());
-    m_version_manager->grab_read_lock(read_lock, version_id);
+    m_version_manager->grab_read_lock(read_lock, is_frozen, version_id);
 
     m_local_locks_held.emplace_back(read_lock);
     ++m_transaction_count;
@@ -2312,7 +2323,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     VersionID version_id = VersionID(); // Latest available snapshot
     // Grabbing the new lock before releasing the old one prevents m_transaction_count
     // from going shortly to zero
-    db->grab_read_lock(new_read_lock, version_id); // Throws
+    db->grab_read_lock(new_read_lock, false, version_id); // Throws
 
     if (commit_to_disk || m_oldest_version_not_persisted) {
         // Here we are either committing to disk or we are already
@@ -2538,7 +2549,7 @@ TransactionRef DB::start_read(VersionID version_id)
     }
     else {
         ReadLockInfo read_lock;
-        grab_read_lock(read_lock, version_id);
+        grab_read_lock(read_lock, false, version_id);
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Reading);
@@ -2558,7 +2569,7 @@ TransactionRef DB::start_frozen(VersionID version_id)
     }
     else {
         ReadLockInfo read_lock;
-        grab_read_lock(read_lock, version_id);
+        grab_read_lock(read_lock, true, version_id);
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Frozen);
@@ -2714,7 +2725,7 @@ DB::version_type Transaction::commit()
     // and release it again.
     VersionID version_id = VersionID(); // Latest available snapshot
     DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
+    db->grab_read_lock(lock_after_commit, false, version_id);
     db->release_read_lock(lock_after_commit);
 
     db->end_write_on_correct_thread();
@@ -2744,7 +2755,7 @@ void Transaction::commit_and_continue_writing()
     // and release it again.
     VersionID version_id = VersionID(); // Latest available snapshot
     DB::ReadLockInfo lock_after_commit;
-    db->grab_read_lock(lock_after_commit, version_id);
+    db->grab_read_lock(lock_after_commit, false, version_id);
     db->release_read_lock(m_read_lock);
     m_read_lock = lock_after_commit;
     if (Replication* repl = db->get_replication()) {
@@ -2799,7 +2810,7 @@ TransactionRef DB::start_write(bool nonblocking)
     ReadLockInfo read_lock;
     TransactionRef tr;
     try {
-        grab_read_lock(read_lock, VersionID());
+        grab_read_lock(read_lock, false, VersionID());
         ReadLockGuard g(*this, read_lock);
         read_lock.check();
         tr = make_transaction_ref(shared_from_this(), &m_alloc, read_lock, DB::transact_Writing);
@@ -3051,7 +3062,7 @@ void Transaction::complete_async_commit()
     // sync to disk:
     DB::ReadLockInfo read_lock;
     try {
-        db->grab_read_lock(read_lock, VersionID());
+        db->grab_read_lock(read_lock, false, VersionID());
         GroupWriter out(*this);
         out.commit(read_lock.m_top_ref); // Throws
         // we must release the write mutex before the callback, because the callback
