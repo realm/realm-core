@@ -181,6 +181,22 @@ TEST(Mixed_List_unresolved_as_null)
         CHECK_EQUAL(index_any, 0);
         CHECK_EQUAL(index_first, 0);
     }
+    
+    {
+        Group g;
+        auto t = g.add_table("foo");
+        t->add_column_list(type_Mixed, "mixeds");
+        auto obj = t->create_object();
+        auto obj1 = t->create_object();
+        auto list = obj.get_list<Mixed>("mixeds");
+
+        list.insert(0, obj1);
+        obj1.invalidate();
+        auto index_any = list.find_any(realm::null());
+        auto index_first = list.find_first(realm::null());
+        CHECK_EQUAL(index_any, 0);
+        CHECK_EQUAL(index_first, 0);
+    }
 }
 
 TEST(Mixed_Set_unresolved_links)
