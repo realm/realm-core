@@ -2107,80 +2107,79 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
         }
     };
 
-    auto reset_collection = [&](std::vector<CollectionOperation>&& local_ops,
-                                std::vector<CollectionOperation>&& remote_ops,
-                                std::vector<util::Optional<int64_t>>&& expected_recovered_state,
-                                size_t num_expected_nulls = 0) {
-        std::vector<util::Optional<int64_t>> remote_pks;
-        std::vector<util::Optional<int64_t>> local_pks;
-        test_reset
-            ->make_local_changes([&](SharedRealm local_realm) {
-                apply_instructions(local_realm, local_ops);
-                Obj source_obj = get_source_object(local_realm);
-                if (source_obj) {
-                    auto local_links = test_type.get_links(source_obj);
-                    std::transform(local_links.begin(), local_links.end(), std::back_inserter(local_pks),
-                                   [](auto obj) -> util::Optional<int64_t> {
-                                       Mixed pk = obj.get_primary_key();
-                                       return pk.is_null() ? util::none : util::make_optional(pk.get_int());
-                                   });
-                }
-            })
-            ->make_remote_changes([&](SharedRealm remote_realm) {
-                apply_instructions(remote_realm, remote_ops);
-                Obj source_obj = get_source_object(remote_realm);
-                if (source_obj) {
-                    auto remote_links = test_type.get_links(source_obj);
-                    std::transform(remote_links.begin(), remote_links.end(), std::back_inserter(remote_pks),
-                                   [](auto obj) -> util::Optional<int64_t> {
-                                       Mixed pk = obj.get_primary_key();
-                                       return pk.is_null() ? util::none : util::make_optional(pk.get_int());
-                                   });
-                }
-            })
-            ->on_post_local_changes([&](SharedRealm realm) {
-                setup_listeners(realm);
-                REQUIRE_NOTHROW(advance_and_notify(*realm));
-                CHECK(results.size() == 1);
-            })
-            ->on_post_reset([&](SharedRealm realm) {
-                object_changes = {};
-                results_changes = {};
-                REQUIRE_NOTHROW(advance_and_notify(*realm));
-                CHECK(results.size() == 1);
-                CHECK(object.is_valid());
-                auto linked_objects = test_type.get_links(results.get(0));
-                std::vector<util::Optional<int64_t>>& expected_links = remote_pks;
-                if (test_mode == ClientResyncMode::Recover) {
-                    expected_links = expected_recovered_state;
-                    size_t expected_size = expected_links.size();
-                    if (!test_type.will_erase_removed_object_links()) {
-                        // dictionary size will remain the same because the key is preserved with a null value
-                        expected_size += num_expected_nulls;
+    auto reset_collection =
+        [&](std::vector<CollectionOperation>&& local_ops, std::vector<CollectionOperation>&& remote_ops,
+            std::vector<util::Optional<int64_t>>&& expected_recovered_state, size_t num_expected_nulls = 0) {
+            std::vector<util::Optional<int64_t>> remote_pks;
+            std::vector<util::Optional<int64_t>> local_pks;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    apply_instructions(local_realm, local_ops);
+                    Obj source_obj = get_source_object(local_realm);
+                    if (source_obj) {
+                        auto local_links = test_type.get_links(source_obj);
+                        std::transform(local_links.begin(), local_links.end(), std::back_inserter(local_pks),
+                                       [](auto obj) -> util::Optional<int64_t> {
+                                           Mixed pk = obj.get_primary_key();
+                                           return pk.is_null() ? util::none : util::make_optional(pk.get_int());
+                                       });
                     }
-                    CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
-                }
-                if (!test_type_is_array) {
-                    // order should not matter except for lists
-                    std::sort(local_pks.begin(), local_pks.end());
-                    std::sort(expected_links.begin(), expected_links.end());
-                }
-                require_links_to_match_ids(linked_objects, expected_links, !test_type_is_array);
-                if (local_pks == expected_links) {
-                    REQUIRE_INDICES(results_changes.modifications);
-                    REQUIRE_INDICES(object_changes.modifications);
-                }
-                else {
-                    REQUIRE_INDICES(results_changes.modifications, 0);
-                    REQUIRE_INDICES(object_changes.modifications, 0);
-                }
-                REQUIRE_INDICES(results_changes.insertions);
-                REQUIRE_INDICES(results_changes.deletions);
-                REQUIRE_INDICES(object_changes.insertions);
-                REQUIRE_INDICES(object_changes.deletions);
-            })
-            ->run();
-    };
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    apply_instructions(remote_realm, remote_ops);
+                    Obj source_obj = get_source_object(remote_realm);
+                    if (source_obj) {
+                        auto remote_links = test_type.get_links(source_obj);
+                        std::transform(remote_links.begin(), remote_links.end(), std::back_inserter(remote_pks),
+                                       [](auto obj) -> util::Optional<int64_t> {
+                                           Mixed pk = obj.get_primary_key();
+                                           return pk.is_null() ? util::none : util::make_optional(pk.get_int());
+                                       });
+                    }
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    object_changes = {};
+                    results_changes = {};
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                    CHECK(object.is_valid());
+                    auto linked_objects = test_type.get_links(results.get(0));
+                    std::vector<util::Optional<int64_t>>& expected_links = remote_pks;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        expected_links = expected_recovered_state;
+                        size_t expected_size = expected_links.size();
+                        if (!test_type.will_erase_removed_object_links()) {
+                            // dictionary size will remain the same because the key is preserved with a null value
+                            expected_size += num_expected_nulls;
+                        }
+                        CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
+                    }
+                    if (!test_type_is_array) {
+                        // order should not matter except for lists
+                        std::sort(local_pks.begin(), local_pks.end());
+                        std::sort(expected_links.begin(), expected_links.end());
+                    }
+                    require_links_to_match_ids(linked_objects, expected_links, !test_type_is_array);
+                    if (local_pks == expected_links) {
+                        REQUIRE_INDICES(results_changes.modifications);
+                        REQUIRE_INDICES(object_changes.modifications);
+                    }
+                    else {
+                        REQUIRE_INDICES(results_changes.modifications, 0);
+                        REQUIRE_INDICES(object_changes.modifications, 0);
+                    }
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                })
+                ->run();
+        };
 
     auto reset_collection_removing_source_object = [&](std::vector<CollectionOperation>&& local_ops,
                                                        std::vector<CollectionOperation>&& remote_ops) {

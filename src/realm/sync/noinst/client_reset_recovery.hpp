@@ -88,6 +88,7 @@ struct InterningBuffer {
     InternDictKey get_or_add(const std::string_view& str);
     InternDictKey get_interned_key(const std::string_view& str) const; // throws if the str is not found
     std::string print() const;
+
 private:
     std::string m_dict_keys_buffer;
     std::vector<InternDictKey> m_dict_keys;
