@@ -730,6 +730,8 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = sync_config.ssl_verify_callback;
     session_config.proxy_config = sync_config.proxy_config;
     session_config.simulate_integration_error = sync_config.simulate_integration_error;
+    session_config.on_before_download_integrated = m_config.on_before_download_integrated;
+    session_config.on_after_download_integrated = m_config.on_after_download_integrated;
     if (sync_config.on_download_message_received_hook) {
         session_config.on_download_message_received_hook =
             [hook = sync_config.on_download_message_received_hook, anchor = weak_from_this()](
