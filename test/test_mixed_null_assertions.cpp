@@ -181,7 +181,7 @@ TEST(Mixed_List_unresolved_as_null)
         CHECK_EQUAL(index_any, 0);
         CHECK_EQUAL(index_first, 0);
     }
-    
+
     {
         Group g;
         auto t = g.add_table("foo");
