@@ -46,7 +46,8 @@ struct InstructionApplier {
     void end_apply() noexcept;
 
 protected:
-    util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&, const char* instr = "(unspecified)");
+    util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&,
+                                       const std::string_view& instr = "(unspecified)");
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;
@@ -77,7 +78,7 @@ protected:
     using ListCallback = util::UniqueFunction<void(LstBase&, size_t)>;
     void resolve_list(const Instruction::PathInstruction& instr, const char* instr_name, ListCallback&& callback);
     bool check_links_exist(const Instruction::Payload& payload);
-    bool allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name);
+    bool allows_null_links(const Instruction::PathInstruction& instr, const std::string_view& instr_name);
     std::string to_string(const Instruction::PathInstruction& instr) const;
 
 private:
@@ -94,11 +95,12 @@ private:
     util::Optional<Obj> m_last_object;
     std::unique_ptr<LstBase> m_last_list;
 
-    StringData get_table_name(const Instruction::TableInstruction&, const char* instr = "(unspecified)");
-    TableRef get_table(const Instruction::TableInstruction&, const char* instr = "(unspecified)");
+    StringData get_table_name(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
+    TableRef get_table(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
-    ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&, const char* instr = "(unspecified)") const;
+    ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&,
+                          const std::string_view& instr = "(unspecified)") const;
 
     /// Resolve the path of an instruction, and invoke the callback in one of the following ways:
     ///
@@ -109,19 +111,21 @@ private:
     /// - If the path refers to a dictionary, invoke as `callback(Dictionary&)`.
     /// - If the path refers to a dictionary element, invoke as `callback(Dictionary&, Mixed key)`.
     template <class F>
-    void resolve_path(const Instruction::PathInstruction& instr, const char* instr_name, F&& callback);
+    void resolve_path(const Instruction::PathInstruction& instr, const std::string_view& instr_name, F&& callback);
 
     template <class F>
     void resolve_field(Obj& obj, InternString field, Instruction::Path::const_iterator begin,
-                       Instruction::Path::const_iterator end, const char* instr_name, F&& callback);
+                       Instruction::Path::const_iterator end, const std::string_view& instr_name, F&& callback);
 
     template <class F>
     void resolve_list_element(LstBase& list, size_t index, Instruction::Path::const_iterator begin,
-                              Instruction::Path::const_iterator end, const char* instr_name, F&& callback);
+                              Instruction::Path::const_iterator end, const std::string_view& instr_name,
+                              F&& callback);
 
     template <class F>
     void resolve_dictionary_element(Dictionary& dict, InternString key, Instruction::Path::const_iterator begin,
-                                    Instruction::Path::const_iterator end, const char* instr_name, F&& callback);
+                                    Instruction::Path::const_iterator end, const std::string_view& instr_name,
+                                    F&& callback);
 
     template <class F>
     void visit_payload(const Instruction::Payload&, F&& visitor);

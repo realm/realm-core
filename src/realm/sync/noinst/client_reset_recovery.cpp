@@ -76,7 +76,6 @@ void ListTracker::clear()
     // any local operations to a list after a clear are
     // strictly on locally added elements so no need to continue tracking
     m_requires_manual_copy = false;
-    m_did_clear = true;
     m_indices_allowed.clear();
 }
 
@@ -110,11 +109,7 @@ bool ListTracker::move(uint32_t from, uint32_t to, size_t lst_size, uint32_t& re
     REALM_ASSERT_EX(target_from->remote <= lst_size, from, to, target_from->remote, target_to->remote, lst_size);
     REALM_ASSERT_EX(target_to->remote <= lst_size, from, to, target_from->remote, target_to->remote, lst_size);
 
-    if (from == to) {
-        // we shouldn't be generating an instruction for this case, but it is a no-op
-        return true; // LCOV_EXCL_LINE
-    }
-    else if (from < to) {
+    if (from < to) {
         for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
             if (it->local > from && it->local <= to) {
                 REALM_ASSERT(it->local != 0);
@@ -129,7 +124,7 @@ bool ListTracker::move(uint32_t from, uint32_t to, size_t lst_size, uint32_t& re
         target_from->remote = target_to->remote + 1;
         return true;
     }
-    else { // from > to
+    else if (from > to) {
         for (auto it = m_indices_allowed.begin(); it != m_indices_allowed.end(); ++it) {
             if (it->local < from && it->local >= to) {
                 REALM_ASSERT_EX(it->remote + 1 < lst_size, it->remote, lst_size);
@@ -143,8 +138,9 @@ bool ListTracker::move(uint32_t from, uint32_t to, size_t lst_size, uint32_t& re
         target_from->remote = target_to->remote - 1;
         return true;
     }
-    REALM_UNREACHABLE();
-    return false;
+    // from == to
+    // we shouldn't be generating an instruction for this case, but it is a no-op
+    return true; // LCOV_EXCL_LINE
 }
 
 bool ListTracker::remove(uint32_t index, uint32_t& remote_index_out)
@@ -208,7 +204,7 @@ std::unique_ptr<LstBase> get_list_from_path(Obj& obj, ColKey col)
     return list;
 }
 
-StringData InterningBuffer::get_key(const InternDictKey& key) const
+std::string_view InterningBuffer::get_key(const InternDictKey& key) const
 {
     if (key.is_null()) {
         return {};
@@ -218,19 +214,19 @@ StringData InterningBuffer::get_key(const InternDictKey& key) const
     }
     REALM_ASSERT(key.m_pos < m_dict_keys_buffer.size());
     REALM_ASSERT(key.m_pos + key.m_size <= m_dict_keys_buffer.size());
-    return StringData{m_dict_keys_buffer.data() + key.m_pos, key.m_size};
+    return std::string_view{m_dict_keys_buffer.data() + key.m_pos, key.m_size};
 }
 
-InternDictKey InterningBuffer::get_or_add(const StringData& str)
+InternDictKey InterningBuffer::get_or_add(const std::string_view& str)
 {
     for (auto& key : m_dict_keys) {
-        StringData existing = get_key(key);
+        std::string_view existing = get_key(key);
         if (existing == str) {
             return key;
         }
     }
     InternDictKey new_key{};
-    if (str.is_null()) {
+    if (str.data() == nullptr) {
         m_dict_keys.push_back(new_key);
     }
     else {
@@ -243,9 +239,9 @@ InternDictKey InterningBuffer::get_or_add(const StringData& str)
     return new_key;
 }
 
-InternDictKey InterningBuffer::get_interned_key(const StringData& str) const
+InternDictKey InterningBuffer::get_interned_key(const std::string_view& str) const
 {
-    if (str.is_null()) {
+    if (str.data() == nullptr) {
         return {};
     }
     for (auto& key : m_dict_keys) {
@@ -254,7 +250,8 @@ InternDictKey InterningBuffer::get_interned_key(const StringData& str) const
             return key;
         }
     }
-    REALM_UNREACHABLE();
+    throw std::runtime_error(
+        util::format("InterningBuffer::get_interned_key(%1) did not contain the requested key", str));
     return {};
 }
 
@@ -548,8 +545,8 @@ bool RecoverLocalChangesetsHandler::resolve(ListPath& path, util::UniqueFunction
 bool RecoverLocalChangesetsHandler::translate_list_element(LstBase& list, uint32_t index,
                                                            Instruction::Path::iterator begin,
                                                            Instruction::Path::const_iterator end,
-                                                           const char* instr_name, ListPathCallback list_callback,
-                                                           ListPath& path)
+                                                           const std::string_view& instr_name,
+                                                           ListPathCallback list_callback, ListPath& path)
 {
     if (begin == end) {
         return list_callback(list, index, path);
@@ -597,12 +594,15 @@ bool RecoverLocalChangesetsHandler::translate_list_element(LstBase& list, uint32
     return false;
 }
 
-bool RecoverLocalChangesetsHandler::translate_dictionary_element(
-    Dictionary& dict, InternString key, Instruction::Path::iterator begin, Instruction::Path::const_iterator end,
-    const char* instr_name, ListPathCallback list_callback, TranslateUpdateValue update_value, ListPath& path)
+bool RecoverLocalChangesetsHandler::translate_dictionary_element(Dictionary& dict, InternString key,
+                                                                 Instruction::Path::iterator begin,
+                                                                 Instruction::Path::const_iterator end,
+                                                                 const std::string_view& instr_name,
+                                                                 ListPathCallback list_callback,
+                                                                 TranslateUpdateValue update_value, ListPath& path)
 {
     StringData string_key = get_string(key);
-    InternDictKey translated_key = m_intern_keys.get_or_add(string_key);
+    InternDictKey translated_key = m_intern_keys.get_or_add(std::string_view(string_key));
     if (begin == end) {
         if (update_value == TranslateUpdateValue::DeleteDictionaryKey && dict.find(Mixed{string_key}) == dict.end()) {
             return false; // removing a dictionary value on a key that no longer exists is ignored
@@ -647,7 +647,8 @@ bool RecoverLocalChangesetsHandler::translate_dictionary_element(
 }
 
 bool RecoverLocalChangesetsHandler::translate_field(Obj& obj, InternString field, Instruction::Path::iterator begin,
-                                                    Instruction::Path::const_iterator end, const char* instr_name,
+                                                    Instruction::Path::const_iterator end,
+                                                    const std::string_view& instr_name,
                                                     ListPathCallback list_callback, TranslateUpdateValue update_value,
                                                     ListPath& path)
 {
@@ -719,19 +720,16 @@ bool RecoverLocalChangesetsHandler::translate_field(Obj& obj, InternString field
     REALM_UNREACHABLE();
 }
 
-bool RecoverLocalChangesetsHandler::translate_path(instr::PathInstruction& instr, const char* instr_name,
+bool RecoverLocalChangesetsHandler::translate_path(instr::PathInstruction& instr, const std::string_view& instr_name,
                                                    ListPathCallback list_callback, TranslateUpdateValue update_value)
 {
-    Obj obj;
-    if (auto mobj = get_top_object(instr, instr_name)) {
-        obj = std::move(*mobj);
-    }
-    else {
+    util::Optional<Obj> obj = get_top_object(instr, instr_name.data());
+    if (!obj) {
         m_logger.warn("Cannot recover '%1' which operates on a deleted object", instr_name);
         return false;
     }
-    ListPath path(obj.get_table()->get_key(), obj.get_key());
-    return translate_field(obj, instr.field, instr.path.begin(), instr.path.end(), instr_name,
+    ListPath path(obj->get_table()->get_key(), obj->get_key());
+    return translate_field(*obj, instr.field, instr.path.begin(), instr.path.end(), instr_name,
                            std::move(list_callback), update_value, path);
 }
 
@@ -752,7 +750,6 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& inst
 void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseTable& instr)
 {
     // Destructive schema changes are not allowed by the resetting client.
-    static_cast<void>(instr);
     StringData class_name = get_string(instr.table);
     handle_error(util::format("Types cannot be erased during client reset recovery: '%1'", class_name));
 }
@@ -766,10 +763,10 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::CreateObject& 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseObject& instr)
 {
     if (auto obj = get_top_object(instr, "EraseObject")) {
-        // FIXME: The InstructionApplier uses obj->invalidate() rather than remove(). It should have the same net
+        // The InstructionApplier uses obj->invalidate() rather than remove(). It should have the same net
         // effect, but that is not the case. Notably when erasing an object which has links from a Lst<Mixed> the
         // list size does not decrease because there is no hiding the unresolved (null) element.
-        // InstructionApplier::operator()(instr);
+        // To avoid dangling links, just remove the object here rather than using the InstructionApplier.
         obj->remove();
     }
     // if the object doesn't exist, a local delete is a no-op.
@@ -777,7 +774,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseObject& i
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
 {
-    const char* instr_name = "Update";
+    static constexpr std::string_view instr_name("Update");
     Instruction::Update instr_copy = instr;
     TranslateUpdateValue update_value = TranslateUpdateValue::None;
     if (instr.value.type == instr::Payload::Type::Erased) {
@@ -808,10 +805,10 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::AddInteger& instr)
 {
-    const char* instr_name = "AddInteger";
+    static constexpr std::string_view instr_name("AddInteger");
     Instruction::AddInteger instr_copy = instr;
     if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
-            REALM_UNREACHABLE();
+            REALM_UNREACHABLE(); // AddInteger must apply to a property, not a list index
             return true;
         })) {
         InstructionApplier::operator()(instr_copy);
@@ -820,7 +817,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddInteger& in
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::Clear& instr)
 {
-    const char* instr_name = "Clear";
+    static constexpr std::string_view instr_name("Clear");
     Instruction::Clear instr_copy = instr;
     if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t ndx, const ListPath& path) {
             REALM_ASSERT(ndx == uint32_t(-1));
@@ -856,7 +853,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseColumn& i
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& instr)
 {
-    const char* instr_name = "ArrayInsert";
+    static constexpr std::string_view instr_name("ArrayInsert");
     if (!check_links_exist(instr.value)) {
         m_logger.warn("Discarding %1 which links to a deleted object", instr_name);
         return;
@@ -878,7 +875,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& instr)
 {
-    const char* instr_name = "ArrayMove";
+    static constexpr std::string_view instr_name("ArrayMove");
     Instruction::ArrayMove instr_copy = instr;
     if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
             REALM_ASSERT(index != uint32_t(-1));
@@ -899,7 +896,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& ins
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& instr)
 {
-    const char* instr_name = "ArrayErase";
+    static constexpr std::string_view instr_name("ArrayErase");
     Instruction::ArrayErase instr_copy = instr;
     if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
             auto obj = list.get_obj();
@@ -917,7 +914,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& instr)
 {
-    const char* instr_name = "SetInsert";
+    static constexpr std::string_view instr_name("SetInsert");
     if (!check_links_exist(instr.value)) {
         m_logger.warn("Discarding a %1 which links to a deleted object", instr_name);
         return;
@@ -933,7 +930,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& ins
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::SetErase& instr)
 {
-    const char* instr_name = "SetErase";
+    static constexpr std::string_view instr_name("SetErase");
     Instruction::SetErase instr_copy = instr;
     if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
             REALM_UNREACHABLE(); // there is validation before this point

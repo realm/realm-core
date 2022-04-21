@@ -848,10 +848,11 @@ void InstructionApplier::resolve_list(const Instruction::PathInstruction& instr,
                                 }});
 }
 
-bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& instr, const char* instr_name)
+bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& instr,
+                                           const std::string_view& instr_name)
 {
     bool allows_nulls = false;
-    resolve_path(instr, instr_name,
+    resolve_path(instr, instr_name.data(),
                  util::overload{[&](LstBase&, size_t) {}, [&](LstBase&) {}, [&](SetBase&) {},
                                 [&](Dictionary&) {
                                     allows_nulls = true;
@@ -1084,7 +1085,8 @@ void InstructionApplier::operator()(const Instruction::SetErase& instr)
     resolve_path(instr, "SetErase", std::move(callback));
 }
 
-StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr, const char* name)
+StringData InstructionApplier::get_table_name(const Instruction::TableInstruction& instr,
+                                              const std::string_view& name)
 {
     if (auto class_name = m_log->try_get_string(instr.table)) {
         return Group::class_name_to_table_name(*class_name, m_table_name_buffer);
@@ -1094,7 +1096,7 @@ StringData InstructionApplier::get_table_name(const Instruction::TableInstructio
     }
 }
 
-TableRef InstructionApplier::get_table(const Instruction::TableInstruction& instr, const char* name)
+TableRef InstructionApplier::get_table(const Instruction::TableInstruction& instr, const std::string_view& name)
 {
     if (instr.table == m_last_table_name) {
         return m_last_table;
@@ -1115,7 +1117,8 @@ TableRef InstructionApplier::get_table(const Instruction::TableInstruction& inst
     }
 }
 
-util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::ObjectInstruction& instr, const char* name)
+util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::ObjectInstruction& instr,
+                                                       const std::string_view& name)
 {
     if (m_last_table_name == instr.table && m_last_object_key && m_last_object &&
         *m_last_object_key == instr.object) {
@@ -1141,7 +1144,8 @@ util::Optional<Obj> InstructionApplier::get_top_object(const Instruction::Object
 }
 
 template <class F>
-void InstructionApplier::resolve_path(const Instruction::PathInstruction& instr, const char* instr_name, F&& callback)
+void InstructionApplier::resolve_path(const Instruction::PathInstruction& instr, const std::string_view& instr_name,
+                                      F&& callback)
 {
     Obj obj;
     if (auto mobj = get_top_object(instr, instr_name)) {
@@ -1164,7 +1168,8 @@ void InstructionApplier::resolve_path(const Instruction::PathInstruction& instr,
 
 template <class F>
 void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction::Path::const_iterator begin,
-                                       Instruction::Path::const_iterator end, const char* instr_name, F&& callback)
+                                       Instruction::Path::const_iterator end, const std::string_view& instr_name,
+                                       F&& callback)
 {
     auto field_name = get_string(field);
     ColKey col = obj.get_table()->get_column_key(field_name);
@@ -1264,8 +1269,8 @@ void InstructionApplier::resolve_field(Obj& obj, InternString field, Instruction
 
 template <class F>
 void InstructionApplier::resolve_list_element(LstBase& list, size_t index, Instruction::Path::const_iterator begin,
-                                              Instruction::Path::const_iterator end, const char* instr_name,
-                                              F&& callback)
+                                              Instruction::Path::const_iterator end,
+                                              const std::string_view& instr_name, F&& callback)
 {
     if (begin == end) {
         return callback(list, index);
@@ -1307,8 +1312,8 @@ void InstructionApplier::resolve_list_element(LstBase& list, size_t index, Instr
 template <class F>
 void InstructionApplier::resolve_dictionary_element(Dictionary& dict, InternString key,
                                                     Instruction::Path::const_iterator begin,
-                                                    Instruction::Path::const_iterator end, const char* instr_name,
-                                                    F&& callback)
+                                                    Instruction::Path::const_iterator end,
+                                                    const std::string_view& instr_name, F&& callback)
 {
     StringData string_key = get_string(key);
     if (begin == end) {
@@ -1349,7 +1354,7 @@ void InstructionApplier::resolve_dictionary_element(Dictionary& dict, InternStri
 
 
 ObjKey InstructionApplier::get_object_key(Table& table, const Instruction::PrimaryKey& primary_key,
-                                          const char* name) const
+                                          const std::string_view& name) const
 {
     StringData table_name = table.get_name();
     ColKey pk_col = table.get_primary_key_column();

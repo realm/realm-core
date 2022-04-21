@@ -51,7 +51,6 @@ struct ListTracker {
 private:
     std::vector<CrossListIndex> m_indices_allowed;
     bool m_requires_manual_copy = false;
-    bool m_did_clear = false;
 };
 
 struct InternDictKey {
@@ -85,9 +84,9 @@ private:
 };
 
 struct InterningBuffer {
-    StringData get_key(const InternDictKey& key) const;
-    InternDictKey get_or_add(const StringData& str);
-    InternDictKey get_interned_key(const StringData& str) const;
+    std::string_view get_key(const InternDictKey& key) const;
+    InternDictKey get_or_add(const std::string_view& str);
+    InternDictKey get_interned_key(const std::string_view& str) const; // throws if the str is not found
     std::string print() const;
 private:
     std::string m_dict_keys_buffer;
@@ -172,16 +171,17 @@ protected:
                       util::UniqueFunction<void(LstBase&, LstBase&)> callback);
     bool resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback);
     bool translate_list_element(LstBase& list, uint32_t index, Instruction::Path::iterator begin,
-                                Instruction::Path::const_iterator end, const char* instr_name,
+                                Instruction::Path::const_iterator end, const std::string_view& instr_name,
                                 ListPathCallback list_callback, ListPath& path);
     bool translate_dictionary_element(Dictionary& dict, sync::InternString key, Instruction::Path::iterator begin,
-                                      Instruction::Path::const_iterator end, const char* instr_name,
+                                      Instruction::Path::const_iterator end, const std::string_view& instr_name,
                                       ListPathCallback list_callback, TranslateUpdateValue update_value,
                                       ListPath& path);
     bool translate_field(Obj& obj, sync::InternString field, Instruction::Path::iterator begin,
-                         Instruction::Path::const_iterator end, const char* instr_name,
+                         Instruction::Path::const_iterator end, const std::string_view& instr_name,
                          ListPathCallback list_callback, TranslateUpdateValue update_value, ListPath& path);
-    bool translate_path(sync::instr::PathInstruction& instr, const char* instr_name, ListPathCallback list_callback,
+    bool translate_path(sync::instr::PathInstruction& instr, const std::string_view& instr_name,
+                        ListPathCallback list_callback,
                         TranslateUpdateValue update_value = TranslateUpdateValue::None);
 
 #define REALM_DECLARE_INSTRUCTION_HANDLER(X) void operator()(const Instruction::X&) override;
