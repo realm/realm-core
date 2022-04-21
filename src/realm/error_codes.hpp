@@ -145,7 +145,7 @@ public:
         InvalidDatabase = RLM_ERR_INVALID_DATABASE,
         IncompatibleHistories = RLM_ERR_INCOMPATIBLE_HISTORIES,
         DeleteOnOpenRealm = RLM_ERR_DELETE_OPENED_REALM,
-        NotSuported = REALM_ERR_NOT_SUPPORTED,
+        NotSupported = REALM_ERR_NOT_SUPPORTED,
         MaxError
     };
 

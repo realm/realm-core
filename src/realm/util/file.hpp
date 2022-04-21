@@ -1237,7 +1237,7 @@ inline void File::Streambuf::flush()
 inline bool operator==(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw NotImplemented;
+    throw NotImplemented();
 #else // POSIX version
     return lhs.device == rhs.device && lhs.inode == rhs.inode;
 #endif
@@ -1251,7 +1251,7 @@ inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
 inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
 {
 #ifdef _WIN32 // Windows version
-    throw NotImplemented;
+    throw NotImplemented();
 #else // POSIX version
     if (lhs.device < rhs.device)
         return true;

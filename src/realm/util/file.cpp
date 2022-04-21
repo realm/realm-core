@@ -336,9 +336,9 @@ std::string make_temp_dir()
             break;
         }
         catch (const std::filesystem::filesystem_error& ex) {
-            if (ex.code() != std::errc::file_exists)
-                throw FileAccessError(ErrorCodes::FileOperationFailed, "create_directory() failed", path,
-                                      ex.code().value()); // LCOV_EXCL_LINE
+            if (ex.code() != std::errc::file_exists) {
+                throw;
+            }
         }
     }
     return path.string();
@@ -760,7 +760,7 @@ void File::resize(SizeType size)
             std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
             throw OutOfDiskSpace(msg);
         }
-        throw SystemError("SetEndOfFile() failed".int(err));
+        throw SystemError("SetEndOfFile() failed", int(err));
     }
 
     // Restore file position
@@ -1642,7 +1642,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 #else
     static_cast<void>(path);
     static_cast<void>(base_dir);
-    throw NotImplemented;
+    throw NotImplemented();
 #endif
 }
 
@@ -1736,12 +1736,12 @@ std::time_t File::last_write_time(const std::string& path)
                                                      OPEN_EXISTING, nullptr));
 
     if (fileHandle == INVALID_HANDLE_VALUE) {
-        throw SystemError("CreateFileW failed", GetLastError());
+        throw SystemError("CreateFileW failed", int(GetLastError()));
     }
 
     FILETIME mtime = {0};
     if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
-        throw SystemError("GetFileTime failed", GetLastError());
+        throw SystemError("GetFileTime failed", int(GetLastError()));
     }
 
     auto tp = file_time_to_system_clock(mtime);
@@ -1860,10 +1860,10 @@ DirScanner::DirScanner(const std::string& path, bool allow_missing)
     try {
         m_iterator = std::filesystem::directory_iterator(path);
     }
-    catch (const std::filesystem::filesystem_error& e) {
-        if (e.code() != std::errc::no_such_file_or_directory || !allow_missing)
-            throw FileAccessError(ErrorCodes::FileOperationFailed, "directory_iterator() failed", path,
-                                  ex.code().value()); // LCOV_EXCL_LINE
+    catch (const std::filesystem::filesystem_error& ex) {
+        if (ex.code() != std::errc::no_such_file_or_directory || !allow_missing) {
+            throw;
+        }
     }
 }
 

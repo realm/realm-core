@@ -80,7 +80,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case StaleAccessor:
         case ReadOnly:
         case InvalidatedObject:
-        case NotSuported:
+        case NotSupported:
             return ErrorCategory().set(ErrorCategory::logic_error);
         case OK:
         case UnknownError:
