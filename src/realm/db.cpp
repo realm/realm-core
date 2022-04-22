@@ -278,21 +278,37 @@ struct VersionList {
         return freelist == -1;
     }
 
-    void cleanup() noexcept
+    void cleanup(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
+                 VersionVector& unreachable) noexcept
     {
+        // build a map from version nr to top_ref
+        auto it = oldest;
+        while (it != -1) {
+            auto& r = get(it);
+            top_refs[r.version] = r.current_top;
+            it = r.newer;
+        }
         // run through list of versions and reclaim unused entries until a live entry is met
-        auto next = oldest;
-        while (next != -1) {
-            auto& r = get(next);
-            if (r.count_live != 0)
-                break;
-            next = r.newer;
+        // there is always at least one live entry
+        it = oldest;
+        REALM_ASSERT(oldest != -1);
+        for (;;) {
+            auto& r = get(it);
+            if (r.count_live != 0) {
+                oldest_v = get(oldest).version;
+                oldest_live_v = r.version;
+                REALM_ASSERT(oldest_v <= oldest_live_v);
+                return;
+            }
+            it = r.newer;
             if (r.count_frozen == 0) {
-                // destroys r.newer, so need to grab it above ^
+                unreachable.push_back(r.version);
                 r.version = 0;
                 free_entry(index_of(r));
             }
         }
+        REALM_ASSERT(it != -1);
+        REALM_ASSERT(false);
     }
 
     uint32_t entries;
@@ -550,18 +566,12 @@ public:
         REALM_ASSERT(sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry) == size);
     }
 
-    void cleanup_versions()
+    void cleanup_versions(uint64_t& oldest_version, uint64_t& oldest_live_version, TopRefMap& top_refs,
+                          VersionVector& unreachable_versions)
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        r_info->readers.cleanup();
-    }
-
-    version_type get_oldest_version()
-    {
-        std::lock_guard lock(m_mutex);
-        const VersionList::ReadCount& rc = r_info->readers.get_oldest();
-        return rc.version;
+        r_info->readers.cleanup(oldest_version, oldest_live_version, top_refs, unreachable_versions);
     }
 
     version_type get_newest_version()
@@ -585,7 +595,7 @@ public:
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
         if (read_lock.m_is_frozen) {
-            --r.count_frozen;            
+            --r.count_frozen;
         }
         else {
             --r.count_live;
@@ -609,7 +619,7 @@ public:
         }
         if (frozen) {
             ++r.count_frozen;
-        } 
+        }
         else {
             ++r.count_live;
         }
@@ -2397,17 +2407,18 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     // Version of oldest snapshot currently (or recently) bound in a transaction
     // of the current session.
-    uint_fast64_t oldest_version;
+    uint64_t oldest_version = 0, oldest_live_version = 0;
+    TopRefMap top_refs;
+    VersionVector unreachable_versions;
     {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
-        m_version_manager->cleanup_versions();
-        oldest_version = m_version_manager->get_oldest_version();
+        m_version_manager->cleanup_versions(oldest_version, oldest_live_version, top_refs, unreachable_versions);
 
         // Allow for trimming of the history. Some types of histories do not
-        // need store changesets prior to the oldest bound snapshot.
-        if (auto hist = transaction.get_history())
-            hist->set_oldest_bound_version(oldest_version); // Throws
-
+        // need store changesets prior to the oldest *live* bound snapshot.
+        if (auto hist = transaction.get_history()) {
+            hist->set_oldest_bound_version(oldest_live_version); // Throws
+        }
         // Cleanup any stale mappings
         m_alloc.purge_old_mappings(oldest_version, new_version);
     }
@@ -2420,7 +2431,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
 
     // info->readers.dump();
     GroupWriter out(transaction, Durability(info->durability)); // Throws
-    out.set_versions(new_version, oldest_version);
+    out.set_versions(new_version, oldest_version, top_refs, unreachable_versions);
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2458,8 +2469,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // version through the ring buffer. If not, a reader may start updating the allocators
         // mappings while the allocator is in dirty state.
         reset_free_space_tracking();
-        // Update reader info. If this fails in any way, the VersionList may be corrupted.
-        // This can lead to other readers seing invalid data which is likely to cause them
+        // Add the new version. If this fails in any way, the VersionList may be corrupted.
+        // This can lead to readers seing invalid data which is likely to cause them
         // to crash. Other writers *must* be prevented from writing any further updates
         // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
         info->commit_in_critical_phase = 1;

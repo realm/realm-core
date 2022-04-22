@@ -36,6 +36,8 @@ namespace realm {
 class Group;
 class SlabAlloc;
 
+using TopRefMap = std::map<uint64_t, ref_type>;
+using VersionVector = std::vector<uint64_t>;
 
 /// This class is not supposed to be reused for multiple write sessions. In
 /// particular, do not reuse it in case any of the functions throw.
@@ -54,7 +56,7 @@ public:
     GroupWriter(Group&, Durability dura = Durability::Full);
     ~GroupWriter();
 
-    void set_versions(uint64_t current, uint64_t read_lock) noexcept;
+    void set_versions(uint64_t current, uint64_t read_lock, TopRefMap& top_refs, VersionVector& unreachable) noexcept;
 
     /// Write all changed array nodes into free space.
     ///
@@ -187,7 +189,8 @@ private:
 
 // Implementation:
 
-inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noexcept
+inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock, TopRefMap& top_refs,
+                                      VersionVector& unreachable) noexcept
 {
     REALM_ASSERT(read_lock <= current);
     m_current_version = current;
