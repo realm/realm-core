@@ -149,14 +149,15 @@ void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
         }
     }
     else {
+        auto tree = m_tree.get();
         if (ascending) {
-            do_sort(indices, size(), [this](size_t i1, size_t i2) {
-                return m_tree->get(i1) < m_tree->get(i2);
+            do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+                return tree->get(i1) < tree->get(i2);
             });
         }
         else {
-            do_sort(indices, size(), [this](size_t i1, size_t i2) {
-                return m_tree->get(i1) > m_tree->get(i2);
+            do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+                return tree->get(i1) > tree->get(i2);
             });
         }
     }
@@ -175,8 +176,9 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
         });
     }
     else {
-        duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) noexcept {
-            return m_tree->get(i1) == m_tree->get(i2);
+        auto tree = m_tree.get();
+        duplicates = std::unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
+            return tree->get(i1) == tree->get(i2);
         });
     }
 

@@ -94,7 +94,7 @@ TEST(Mixed_List_unresolved_as_null)
     list.insert(2, obj1);
     obj1.invalidate();
 
-    CHECK(list.size() == 3);
+    CHECK_EQUAL(list.size(), 3);
 
     {
         // find all mixed nulls or unresolved link should work the same way
@@ -114,54 +114,49 @@ TEST(Mixed_List_unresolved_as_null)
         list.find_all(realm::null(), [&](size_t pos) {
             found.push_back(pos);
         });
-        CHECK(check_results({0, 2}));
-        found = {};
-        list.find_all(obj1, [&](size_t pos) {
-            found.push_back(pos);
-        });
-        CHECK(check_results({2}));
+        CHECK_EQUAL(check_results({0, 2}), true);
     }
 
     {
         // find null or find unresolved link diverge, different objects should be returned
         auto index = list.find_any(realm::null());
-        CHECK(index == 0);
+        CHECK_EQUAL(index, 0);
         index = list.find_first(obj1);
-        CHECK(index == 2);
+        CHECK_EQUAL(index, 2);
         // but both should look like nulls
-        CHECK(list.is_null(0));
-        CHECK(list.is_null(2));
+        CHECK_EQUAL(list.is_null(0), true);
+        CHECK_EQUAL(list.is_null(2), true);
     }
 
     {
         std::vector<size_t> indices{0, 1, 2};
         list.sort(indices);
-        CHECK(indices.size() == 3);
-        CHECK(indices.at(0) == 0);
-        CHECK(indices.at(1) == 2);
-        CHECK(indices.at(2) == 1);
-        CHECK(list.is_null(indices[0]));
-        CHECK(list.is_null(indices[1]));
-        CHECK(!list.is_null(indices[2]));
+        CHECK_EQUAL(indices.size(), 3);
+        CHECK_EQUAL(indices.at(0), 0);
+        CHECK_EQUAL(indices.at(1), 2);
+        CHECK_EQUAL(indices.at(2), 1);
+        CHECK_EQUAL(list.is_null(indices[0]), true);
+        CHECK_EQUAL(list.is_null(indices[1]), true);
+        CHECK_EQUAL(list.is_null(indices[2]), false);
     }
 
     {
         std::vector<size_t> indices{0, 1, 2};
         list.distinct(indices);
-        CHECK(indices.size() == 2);
-        CHECK(indices.at(0) == 0);
-        CHECK(indices.at(1) == 1);
-        CHECK(list.is_null(indices[0]));
-        CHECK(!list.is_null(indices[1]));
-        CHECK(list.find_any(realm::null()) == 0);
+        CHECK_EQUAL(indices.size(), 2);
+        CHECK_EQUAL(indices.at(0), 0);
+        CHECK_EQUAL(indices.at(1), 1);
+        CHECK_EQUAL(list.is_null(indices[0]), true);
+        CHECK_EQUAL(list.is_null(indices[1]), false);
+        CHECK_EQUAL(list.find_any(realm::null()), 0);
     }
 
     {
         list.remove(0);
-        CHECK(list.find_any(obj1) == 1);
+        CHECK_EQUAL(list.find_any(obj1), 1);
         list.remove(1);
-        CHECK(list.find_any(realm::null()) == npos);
-        CHECK(list.size() == 1);
+        CHECK_EQUAL(list.find_any(realm::null()), npos);
+        CHECK_EQUAL(list.size(), 1);
     }
 
     {
@@ -212,48 +207,48 @@ TEST(Mixed_Set_unresolved_links)
     auto [it, success] = set.insert(Mixed{obj1});
     obj1.invalidate();
 
-    CHECK(success);
+    CHECK_EQUAL(success, true);
     auto [it1, success1] = set.insert(Mixed{"test"});
-    CHECK(success1);
+    CHECK_EQUAL(success1, true);
 
     {
         // null can be inserted in the set
-        CHECK(set.size() == 2);
+        CHECK_EQUAL(set.size(), 2);
         auto [it, success] = set.insert(Mixed{});
-        CHECK(success);
+        CHECK_EQUAL(success, true);
         auto [it1, success1] = set.insert_null();
-        CHECK(!success1);
-        CHECK(set.size() == 3);
+        CHECK_EQUAL(success1, false);
+        CHECK_EQUAL(set.size(), 3);
     }
 
     {
         int cnt = 0;
         set.find_all(realm::null(), [this, &set, &cnt](size_t pos) {
             CHECK(pos != not_found);
-            CHECK(set.is_null(pos));
+            CHECK_EQUAL(set.is_null(pos), true);
             cnt += 1;
         });
-        CHECK(cnt == 1);
+        CHECK_EQUAL(cnt, 1);
     }
 
     {
         auto index = set.find_any(realm::null());
         CHECK(index != not_found);
-        CHECK(set.is_null(index));
+        CHECK_EQUAL(set.is_null(index), true);
     }
 
     {
         auto [it, success] = set.insert(Mixed{obj2});
         obj2.invalidate();
-        CHECK(success);
-        CHECK(set.size() == 4);
+        CHECK_EQUAL(success, true);
+        CHECK_EQUAL(set.size(), 4);
         std::vector<size_t> indices{1, 0, 2, 3};
         set.sort(indices);
-        CHECK(indices.size() == 4);
-        CHECK(indices[0] == 0);
-        CHECK(indices[1] == 1);
-        CHECK(indices[2] == 2);
-        CHECK(indices[3] == 3);
+        CHECK_EQUAL(indices.size(), 4);
+        CHECK_EQUAL(indices[0], 0);
+        CHECK_EQUAL(indices[1], 1);
+        CHECK_EQUAL(indices[2], 2);
+        CHECK_EQUAL(indices[3], 3);
     }
 
     {
@@ -271,8 +266,8 @@ TEST(Mixed_Set_unresolved_links)
         obj1.invalidate();
         obj2.invalidate();
         // this should be treated as null, but for set of mixed we decided to leave unresolved exposed
-        CHECK(!set.is_null(0));
-        CHECK(!set.is_null(1));
+        CHECK_EQUAL(set.is_null(0), false);
+        CHECK_EQUAL(set.is_null(1), false);
         set.insert(Mixed{1});
         CHECK_EQUAL(set.size(), 3);
         set.erase_null();
@@ -298,8 +293,8 @@ TEST(Mixed_Set_unresolved_links)
         obj2.invalidate();
         size_t cnt = 0;
         set.find_all(Mixed{}, [this, &set, &cnt](size_t index) {
-            CHECK(index == 0);
-            CHECK(set.is_null(index));
+            CHECK_EQUAL(index, 0);
+            CHECK_EQUAL(set.is_null(index), true);
             cnt += 1;
         });
         CHECK_EQUAL(cnt, 1);
