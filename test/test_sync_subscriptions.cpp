@@ -363,7 +363,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     sub_set = store->get_mutable_by_version(6);
     sub_set.update_state(SubscriptionSet::State::Complete);
-    std::move(sub_set).commit();
+    auto committed_sub_set = std::move(sub_set).commit();
 
     CHECK_EQUAL(notification_futures[4].get(), SubscriptionSet::State::Superseded);
     CHECK_EQUAL(notification_futures[5].get(), SubscriptionSet::State::Complete);
@@ -376,7 +376,7 @@ TEST(Sync_SubscriptionStoreNotifications)
 
     // Check that asking for a state change that is less than the current state of the sub set gets filled
     // immediately.
-    CHECK_EQUAL(sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
+    CHECK_EQUAL(committed_sub_set.get_state_change_notification(SubscriptionSet::State::Bootstrapping).get(),
                 SubscriptionSet::State::Complete);
 
     // Check that if a subscription set gets updated to a new state and the SubscriptionSet returned by commit() is

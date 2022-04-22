@@ -181,18 +181,21 @@ public:
 
 protected:
     friend class SubscriptionStore;
+    friend class MutableSubscriptionSet;
     struct SupersededTag {
     };
 
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, int64_t version, SupersededTag);
+    explicit SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<SubscriptionStore> mgr);
+    explicit SubscriptionSet(MutableSubscriptionSet&& mut_set);
 
     void load_from_database(TransactionRef tr, Obj obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
-    std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
+    std::shared_ptr<SubscriptionStore> get_flx_subscription_store() const;
 
-    std::weak_ptr<const SubscriptionStore> m_mgr;
+    std::weak_ptr<SubscriptionStore> m_mgr;
 
     DB::version_type m_cur_version = 0;
     int64_t m_version = 0;
@@ -256,7 +259,7 @@ public:
 protected:
     friend class SubscriptionStore;
 
-    MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    MutableSubscriptionSet(std::weak_ptr<SubscriptionStore> mgr, TransactionRef tr, Obj obj);
 
     void insert_sub(const Subscription& sub);
 
@@ -271,8 +274,6 @@ private:
 
     void insert_sub_impl(ObjectId id, Timestamp created_at, Timestamp updated_at, StringData name,
                          StringData object_class_name, StringData query_str);
-
-    void process_notifications();
 
     TransactionRef m_tr;
     Obj m_obj;
@@ -325,8 +326,6 @@ private:
     DBRef m_db;
 
 protected:
-    explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
-
     struct SubscriptionKeys {
         TableKey table;
         ColKey id;
@@ -345,6 +344,10 @@ protected:
         ColKey subscriptions;
     };
 
+    explicit SubscriptionStore(DBRef db, std::unique_ptr<SubscriptionKeys> sub_keys,
+                               std::unique_ptr<SubscriptionSetKeys> sub_set_keys,
+                               util::UniqueFunction<void(int64_t)> on_new_subscription_set);
+
     struct NotificationRequest {
         NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
                             SubscriptionSet::State notify_when)
@@ -359,24 +362,35 @@ protected:
         SubscriptionSet::State notify_when;
     };
 
-    void supercede_prior_to(TransactionRef tr, int64_t version_id) const;
+    void supercede_prior_to(TransactionRef tr, int64_t version_id);
 
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
+    SubscriptionSet post_commit_update_for(SubscriptionSet&& set);
+    util::Future<SubscriptionSet::State> get_notification_future_for(const SubscriptionSet& set,
+                                                                     SubscriptionSet::State notify_when);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;
     friend class SubscriptionSet;
+
+    std::weak_ptr<SubscriptionStore> m_mut_weak_this;
+
+    mutable std::mutex m_live_sub_sets_mutex;
+    SubscriptionSet m_latest_subscription_set;
+    SubscriptionSet m_active_subscription_set;
+    int64_t m_latest_version;
+    int64_t m_active_version;
 
     util::UniqueFunction<void(int64_t)> m_on_new_subscription_set;
     std::unique_ptr<SubscriptionSetKeys> m_sub_set_keys;
     std::unique_ptr<SubscriptionKeys> m_sub_keys;
 
     mutable std::mutex m_pending_notifications_mutex;
-    mutable std::condition_variable m_pending_notifications_cv;
-    mutable int64_t m_outstanding_requests = 0;
-    mutable int64_t m_min_outstanding_version = 0;
-    mutable std::list<NotificationRequest> m_pending_notifications;
+    std::condition_variable m_pending_notifications_cv;
+    int64_t m_outstanding_requests = 0;
+    int64_t m_min_outstanding_version = 0;
+    std::list<NotificationRequest> m_pending_notifications;
 };
 
 } // namespace realm::sync
