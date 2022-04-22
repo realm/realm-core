@@ -396,7 +396,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
-TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
+TEST(Sync_SubscriptionStoreRefreshInvalidSubscriptionStore)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
@@ -408,7 +408,7 @@ TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
     store.reset();
 
     // Throws since the SubscriptionStore is gone.
-    CHECK_THROW(latest->refresh(), std::logic_error);
+    CHECK_THROW(latest->refresh(), std::runtime_error);
 }
 
 } // namespace realm::sync
