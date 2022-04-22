@@ -671,23 +671,22 @@ SubscriptionSet SubscriptionStore::get_by_version(int64_t version_id) const
     return get_by_version_impl(version_id, util::none);
 }
 
-SubscriptionSet SubscriptionStore::post_commit_update_for(SubscriptionSet&& new_set)
+void SubscriptionStore::update_live_sub_sets(const SubscriptionSet& new_set)
 {
-    // Update our cached copies of the latest/active sub sets so that get_latest()/get_active() work.
-    {
-        std::lock_guard<std::mutex> lk(m_live_sub_sets_mutex);
-        if (new_set.state() == SubscriptionSet::State::Complete &&
-            new_set.version() > m_active_subscription_set.version()) {
-            m_active_subscription_set = new_set;
-            m_active_version = m_active_subscription_set.version();
-        }
-        else if (new_set.version() >= m_latest_subscription_set.version()) {
-            m_latest_subscription_set = new_set;
-            m_latest_version = m_latest_subscription_set.version();
-        }
+    std::lock_guard<std::mutex> lk(m_live_sub_sets_mutex);
+    if (new_set.state() == SubscriptionSet::State::Complete &&
+        new_set.version() > m_active_subscription_set.version()) {
+        m_active_subscription_set = new_set;
+        m_active_version = m_active_subscription_set.version();
     }
+    else if (new_set.version() >= m_latest_subscription_set.version()) {
+        m_latest_subscription_set = new_set;
+        m_latest_version = m_latest_subscription_set.version();
+    }
+}
 
-    // Process pending notifications for the sub set.
+void SubscriptionStore::process_notifications_for(const SubscriptionSet& new_set)
+{
     std::list<SubscriptionStore::NotificationRequest> to_finish;
     std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
     m_pending_notifications_cv.wait(lk, [&] {
@@ -724,10 +723,19 @@ SubscriptionSet SubscriptionStore::post_commit_update_for(SubscriptionSet&& new_
             req.promise.emplace_value(set_state);
         }
     }
+}
+
+SubscriptionSet SubscriptionStore::post_commit_update_for(SubscriptionSet&& new_set)
+{
+    // Update our cached copies of the latest/active sub sets so that get_latest()/get_active() work.
+    update_live_sub_sets(new_set);
+
+    // Process pending notifications for the sub set.
+    process_notifications_for(new_set);
 
     // Notify the sync client that there is a new version
-    if (set_state == SubscriptionSet::State::Pending) {
-        m_on_new_subscription_set(set_version);
+    if (new_set.state() == SubscriptionSet::State::Pending) {
+        m_on_new_subscription_set(new_set.version());
     }
 
     // Return the input sub set so it can be sent to the user.

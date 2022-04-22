@@ -363,12 +363,14 @@ protected:
     };
 
     void supercede_prior_to(TransactionRef tr, int64_t version_id);
-
     SubscriptionSet get_by_version_impl(int64_t flx_version, util::Optional<DB::VersionID> version) const;
     MutableSubscriptionSet make_mutable_copy(const SubscriptionSet& set) const;
     SubscriptionSet post_commit_update_for(SubscriptionSet&& set);
     util::Future<SubscriptionSet::State> get_notification_future_for(const SubscriptionSet& set,
                                                                      SubscriptionSet::State notify_when);
+
+    void update_live_sub_sets(const SubscriptionSet& new_set);
+    void process_notifications_for(const SubscriptionSet& new_set);
 
     friend class MutableSubscriptionSet;
     friend class Subscription;
