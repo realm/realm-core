@@ -88,6 +88,8 @@ protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
 
+    virtual void validate_write(const Table*) {}
+
 private:
     bool m_short_circuit = false;
 
@@ -99,9 +101,10 @@ private:
     template <class T>
     void emit(T instruction);
 
+    enum class SelectTableFor { SchemaInstruction, ObjectInstruction };
     // Returns true and populates m_last_table_name if instructions for the
     // table should be emitted.
-    bool select_table(const Table&);
+    bool select_table(const Table&, SelectTableFor mode = SelectTableFor::ObjectInstruction);
 
     REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
 

@@ -257,9 +257,9 @@ public:
                                           std::uint_fast64_t&, std::uint_fast64_t&);
 
     // Overriding member functions in realm::TransformHistory
-    version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override final;
-    ChunkedBinaryData get_reciprocal_transform(version_type, bool&) const override final;
-    void set_reciprocal_transform(version_type, BinaryData) override final;
+    version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;
+    ChunkedBinaryData get_reciprocal_transform(version_type, bool&) const override;
+    void set_reciprocal_transform(version_type, BinaryData) override;
 
 public: // Stuff in this section is only used by CLI tools.
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
@@ -430,13 +430,13 @@ private:
     }
 
     // Overriding member functions in realm::_impl::History
-    void set_group(Group* group, bool updated = false) override final;
-    void update_from_ref_and_version(ref_type ref, version_type version) override final;
-    void update_from_parent(version_type current_version) override final;
-    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override final;
-    void set_oldest_bound_version(version_type) override final;
-    void verify() const override final;
-    bool no_pending_local_changes(version_type version) const final;
+    void set_group(Group* group, bool updated = false) override;
+    void update_from_ref_and_version(ref_type ref, version_type version) override;
+    void update_from_parent(version_type current_version) override;
+    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
+    void set_oldest_bound_version(version_type) override;
+    void verify() const override;
+    bool no_pending_local_changes(version_type version) const override;
 };
 
 class ClientReplication final : public SyncReplication {
@@ -447,12 +447,20 @@ public:
     {
     }
 
+    // A write validator takes a single argument right now - the table name minus the "class_" prefix.
+    // If a write is okay to proceed, then this function should have no side-effects. Otherwise, it should throw.
+    using WriteValidator = void(StringData);
+    void set_write_validator(util::UniqueFunction<WriteValidator> validator)
+    {
+        m_write_validator = std::move(validator);
+    }
+
     // Overriding member functions in realm::Replication
-    void initialize(DB& sg) override final;
-    HistoryType get_history_type() const noexcept override final;
-    int get_history_schema_version() const noexcept override final;
-    bool is_upgradable_history_schema(int) const noexcept override final;
-    void upgrade_history_schema(int) override final;
+    void initialize(DB& sg) override;
+    HistoryType get_history_type() const noexcept override;
+    int get_history_schema_version() const noexcept override;
+    bool is_upgradable_history_schema(int) const noexcept override;
+    void upgrade_history_schema(int) override;
 
     _impl::History* _get_history_write() override
     {
@@ -466,8 +474,8 @@ public:
     }
 
     // Overriding member functions in realm::Replication
-    version_type prepare_changeset(const char*, size_t, version_type) override final;
-    void finalize_changeset() noexcept override final;
+    version_type prepare_changeset(const char*, size_t, version_type) override;
+    void finalize_changeset() noexcept override;
 
     ClientHistory& get_history() noexcept
     {
@@ -483,10 +491,14 @@ public:
     {
         return m_apply_server_changes;
     }
+protected:
+    void validate_write(const Table* table) override;
 
 private:
     ClientHistory m_history;
     const bool m_apply_server_changes;
+    std::mutex m_write_validator_mutex;
+    util::UniqueFunction<WriteValidator> m_write_validator;
 };
 
 

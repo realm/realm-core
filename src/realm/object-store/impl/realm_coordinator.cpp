@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/exceptions.hpp"
+#include "realm/sync/subscriptions.hpp"
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/object-store/impl/collection_notifier.hpp>
@@ -102,6 +104,25 @@ void RealmCoordinator::create_sync_session()
         return;
 
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested) {
+        std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_sync_session->get_flx_subscription_store());
+        sync::ClientReplication& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+        history.set_write_validator([weak_sub_mgr](StringData table_name) {
+            auto sub_mgr = weak_sub_mgr.lock();
+            if (!sub_mgr) {
+                return;
+            }
+
+            auto latest_sub_set = sub_mgr->get_latest();
+            auto it = std::find_if(latest_sub_set.begin(), latest_sub_set.end(), [&](const sync::Subscription& sub) {
+                return sub.object_class_name() == table_name;
+            });
+            if (it == latest_sub_set.end()) {
+                throw NoSubscriptionForWrite(util::format(
+                    "Cannot write to class %1 when no flexible sync subscription has been created.", table_name));
+            }
+        });
+    }
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
