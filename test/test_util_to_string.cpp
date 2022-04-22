@@ -137,7 +137,7 @@ TEST(ToString_DataTypes)
 
 struct StreamableType {
 };
-std::ostream& operator<<(std::ostream& os, StreamableType)
+static std::ostream& operator<<(std::ostream& os, StreamableType)
 {
     return os << "Custom streamable type";
 }
@@ -146,6 +146,8 @@ TEST(ToString_OStreamFallback)
 {
     CHECK_EQUAL(to_string(StreamableType()), "Custom streamable type");
 }
+
+namespace {
 
 struct ImplicitlyConvertibleToPrintable {
     operator util::Printable() const noexcept
@@ -165,10 +167,13 @@ struct ExplicitlyConvertibleToPrintableAndStreamable {
         return "conversion to printable";
     }
 };
+std::ostream& operator<<(std::ostream&, const ExplicitlyConvertibleToPrintableAndStreamable&) REALM_UNUSED;
 std::ostream& operator<<(std::ostream&, const ExplicitlyConvertibleToPrintableAndStreamable&)
 {
     throw std::runtime_error("called stream operator instead of conversion");
 }
+
+} // namespace
 
 TEST(ToString_ConversionsToPrintable)
 {

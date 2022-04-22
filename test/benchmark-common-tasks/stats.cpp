@@ -12,6 +12,8 @@ using namespace realm;
 using ColKey = size_t;
 #endif
 
+namespace {
+
 namespace function {
 
 const static std::string binary = "store_binary";
@@ -103,6 +105,8 @@ void create_realm_with_transactions(std::string file_name,
         tr.commit();
     }
 }
+
+} // namespace
 
 int main(int argc, const char* argv[])
 {

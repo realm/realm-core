@@ -1288,7 +1288,7 @@ TEST(Group_CascadeNotify_TableViewClearWeak)
 
 
 // more levels of cascade delete.... this does not seem to add any additional coverage
-void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int depth)
+static void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int depth)
 {
     if (depth < 4) {
         auto o_l = obj.create_and_set_linked_object(left);

@@ -70,9 +70,19 @@ std::string get_parent_directory(const std::string& path);
         CHECK(util::File::is_dir(macro_path) == true);                                                               \
     } while (0)
 
+#define REQUIRE_DIR_PATH_EXISTS(macro_path)                                                                          \
+    do {                                                                                                             \
+        REQUIRE(util::File::is_dir((macro_path).string()));                                                          \
+    } while (0)
+
 #define REQUIRE_DIR_DOES_NOT_EXIST(macro_path)                                                                       \
     do {                                                                                                             \
         CHECK(util::File::exists(macro_path) == false);                                                              \
+    } while (0)
+
+#define REQUIRE_DIR_PATH_DOES_NOT_EXIST(macro_path)                                                                  \
+    do {                                                                                                             \
+        REQUIRE_FALSE(util::File::exists((macro_path).string()));                                                    \
     } while (0)
 
 #define REQUIRE_REALM_EXISTS(macro_path)                                                                             \

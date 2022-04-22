@@ -185,90 +185,46 @@ add_test(NAME StorageTests COMMAND realm-tests)
 
 if(REALM_ENABLE_SYNC)
 
-    set(TEST_UTIL_SOURCES
-        test_all.cpp
-        util/benchmark_results.cpp
-        util/compare_groups.cpp
-        util/crypt_key.cpp
-        util/demangle.cpp
-        util/dump_changesets.cpp
-        util/misc.cpp
-        util/mock_metrics.cpp
-        util/quote.cpp
-        util/random.cpp
-        util/resource_limits.cpp
-        util/test_only.cpp
-        util/test_path.cpp
-        util/timer.cpp
-        util/unit_test.cpp
-        util/wildcard.cpp
-    )
-
-    set(TEST_UTIL_HEADERS
-        test.hpp
-        test_all.hpp
-        util/benchmark_results.hpp
-        util/check_logic_error.hpp
-        util/check_system_error.hpp
-        util/crypt_key.hpp
-        util/demangle.hpp
-        util/misc.hpp
-        util/mock_metrics.hpp
-        util/number_names.hpp
-        util/quote.hpp
-        util/random.hpp
-        util/resource_limits.hpp
-        util/semaphore.hpp
-        util/super_int.hpp
-        util/test_logger.hpp
-        util/test_only.hpp
-        util/test_path.hpp
-        util/test_types.hpp
-        util/thread_wrapper.hpp
-        util/timer.hpp
-        util/unit_test.hpp
-        util/verified_integer.hpp
-        util/verified_string.hpp
-        util/wildcard.hpp
-    )
-
     set(TEST_MAIN_SOURCES
         main.cpp
     )
 
     set(SYNC_TESTS
+        test_all.cpp
         test_allocation_metrics.cpp
         test_array_sync.cpp
-        test_client_reset.cpp
         test_changeset_encoding.cpp
-        test_crypto.cpp
+        test_client_reset.cpp
         test_compact_changesets.cpp
+        test_crypto.cpp
         test_embedded_objects.cpp
         test_encrypt_fingerprint.cpp
         test_encrypt_transform.cpp
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
-        test_server_history.cpp
+        test_noinst_server_dir.cpp
+        test_noinst_vacuum.cpp
         test_scratch_allocator.cpp
+        test_server_history.cpp
         test_stable_ids.cpp
         test_sync.cpp
         test_sync_auth.cpp
         test_sync_history_migration.cpp
         test_sync_subscriptions.cpp
         test_transform.cpp
-        test_util_circular_buffer.cpp
         test_util_buffer_stream.cpp
+        test_util_circular_buffer.cpp
         test_util_http.cpp
         test_util_json_parser.cpp
         test_util_network.cpp
         test_util_network_ssl.cpp
         test_util_uri.cpp
         test_util_websocket.cpp
-        test_noinst_server_dir.cpp
-        test_noinst_vacuum.cpp
     )
 
     set(TEST_HEADERS
+        test.hpp
+        test_all.hpp
         fuzz_tester.hpp
         peer.hpp
         sync_fixtures.hpp
@@ -291,9 +247,6 @@ if(REALM_ENABLE_SYNC)
         test_all.cpp
     )
 
-    add_library(TestUtils STATIC ${TEST_UTIL_SOURCES} ${TEST_UTIL_HEADERS})
-    target_link_libraries(TestUtils PUBLIC Storage)
-
     if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
         # Embed the manifest on Windows. The manifest allows very long paths (>255).
         list(APPEND SYNC_TESTS test.manifest)
@@ -301,7 +254,7 @@ if(REALM_ENABLE_SYNC)
 
     add_executable(SyncTests ${SYNC_TESTS} ${TEST_MAIN_SOURCES} ${TEST_HEADERS})
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
-    target_link_libraries(SyncTests Sync SyncServer TestUtils)
+    target_link_libraries(SyncTests Sync SyncServer TestUtil)
     add_test(NAME SyncTests COMMAND realm-sync-tests)
 
     if(UNIX AND NOT APPLE)
@@ -311,7 +264,7 @@ if(REALM_ENABLE_SYNC)
 
     add_executable(BenchTransform EXCLUDE_FROM_ALL ${BENCH_TRANSFORM_SOURCES})
     set_target_properties(BenchTransform PROPERTIES OUTPUT_NAME "bench-transform")
-    target_link_libraries(BenchTransform TestUtils Sync)
+    target_link_libraries(BenchTransform TestUtil Sync)
 
     if(REALM_BUILD_DOGLESS)
         add_executable(SyncTestClient ${TEST_CLIENT_SOURCES} ${TEST_CLIENT_HEADERS})

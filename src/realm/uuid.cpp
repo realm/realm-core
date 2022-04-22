@@ -16,14 +16,15 @@
  *
  **************************************************************************/
 
-#include <realm.hpp>
 #include <realm/uuid.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/assert.hpp>
-#include "realm/util/base64.hpp"
+#include <realm/util/base64.hpp>
+
 #include <atomic>
 #include <cctype>
 
+namespace {
 constexpr char hex_digits[] = "0123456789abcdef";
 constexpr size_t size_of_uuid_string = 36;
 constexpr char null_uuid_string[] = "00000000-0000-0000-0000-000000000000";
@@ -39,7 +40,7 @@ constexpr size_t hyphen_pos_2 = 18;
 constexpr size_t hyphen_pos_3 = 23;
 constexpr char hyphen = '-';
 
-inline bool is_hex_digit(unsigned char c)
+bool is_hex_digit(unsigned char c)
 {
     return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 }
@@ -54,6 +55,7 @@ char parse_xdigit(char ch)
         return ch - 'A' + 10;
     return char(-1);
 }
+} // anonymous namespace
 
 namespace realm {
 

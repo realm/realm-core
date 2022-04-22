@@ -111,7 +111,7 @@ std::string encode_fake_jwt(const std::string& in, util::Optional<int64_t> exp, 
     return encoded_prefix + "." + encoded_body + "." + suffix;
 }
 
-bool file_is_on_exfat(const std::string& path)
+static bool file_is_on_exfat(const std::string& path)
 {
 #if REALM_PLATFORM_APPLE
     if (path.empty())

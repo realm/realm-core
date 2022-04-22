@@ -16,6 +16,8 @@
  *
  **************************************************************************/
 
+#include "fuzz_group.hpp"
+
 #include <realm.hpp>
 #include <realm/history.hpp>
 #include <realm/index_string.hpp>
@@ -48,6 +50,8 @@ using namespace realm::util;
     do {                                                                                                             \
     } while (false)
 #endif
+
+namespace {
 
 struct EndOfFile {
 };
@@ -156,22 +160,8 @@ std::pair<int64_t, int32_t> get_timestamp_values(State& s)
     return {seconds, nanoseconds};
 }
 
-// returns random binary blob data in a string, logs to a variable called "blob" if logging is enabled
-std::string construct_binary_payload(State& s, util::Optional<std::ostream&> log)
-{
-    size_t rand_char = get_next(s);
-    size_t blob_size = static_cast<uint64_t>(get_int64(s)) % (ArrayBlob::max_binary_size + 1);
-    std::string buffer(blob_size, static_cast<unsigned char>(rand_char));
-    if (log) {
-        *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n";
-    }
-    return buffer;
-}
-
-namespace {
 int table_index = 0;
 int column_index = 0;
-} // namespace
 
 std::string create_column_name(DataType t)
 {
@@ -238,11 +228,10 @@ std::string get_current_time_stamp()
     return str_buffer;
 }
 
-namespace {
 // You can use this variable to make a conditional breakpoint if you know that
 // a problem occurs after a certain amount of iterations.
-int iteration;
-} // namespace
+int iteration = 0;
+} // anonymous namespace
 
 void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
 {
@@ -748,7 +737,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 }
 
 
-void usage(const char* argv[])
+static void usage(const char* argv[])
 {
     fprintf(stderr,
             "Usage: %s {FILE | --} [--log] [--name NAME] [--prefix PATH]\n"
@@ -762,7 +751,6 @@ void usage(const char* argv[])
             argv[0]);
     exit(1);
 }
-
 
 int run_fuzzy(int argc, const char* argv[])
 {

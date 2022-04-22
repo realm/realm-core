@@ -17,6 +17,7 @@ using namespace realm;
 
 extern "C" int realm_c_api_tests(const char* file);
 
+namespace {
 template <class T>
 T checked(T x)
 {
@@ -215,6 +216,7 @@ CPtr<T> clone_cptr(const T* ptr)
     void* clone = realm_clone(ptr);
     return CPtr<T>{static_cast<T*>(clone)};
 }
+} // anonymous namespace
 
 #define CHECK_ERR(err)                                                                                               \
     do {                                                                                                             \
@@ -442,6 +444,8 @@ TEST_CASE("C API (non-database)") {
     }
 }
 
+namespace {
+
 /// Generate realm_property_info_t for all possible property types.
 std::vector<realm_property_info_t> all_property_types(const char* link_target)
 {
@@ -591,23 +595,10 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     // properties.push_back(mixed);
     // properties.push_back(mixed_list);
 
-    // FIXME: Object Store schema handling does not support TypedLink yet.
-    // realm_property_info_t typed_link{
-    //     "typed_link", "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_NONE,
-    //     "",           "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
-    // };
-    // realm_property_info_t typed_link_list{
-    //     "typed_link_list",   "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_LIST, "", "",
-    //     RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
-    // };
-
-    // properties.push_back(typed_link);
-    // properties.push_back(typed_link_list);
-
     return properties;
 }
 
-static CPtr<realm_schema_t> make_schema()
+CPtr<realm_schema_t> make_schema()
 {
     auto foo_properties = all_property_types("Bar");
 
@@ -726,6 +717,8 @@ bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
     ++userdata->num_compact_on_launch;
     return false;
 }
+
+} // anonymous namespace
 
 TEST_CASE("C API") {
     TestFile test_file;
@@ -3713,11 +3706,11 @@ TEST_CASE("C API") {
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
     using namespace realm::app;
 
-    auto make_schema = []() -> auto
-    {
-        Schema schema{ObjectSchema("Obj", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                           {"name", PropertyType::String | PropertyType::Nullable},
-                                           {"value", PropertyType::Int | PropertyType::Nullable}})};
+    auto make_schema = [] {
+        Schema schema{{"Obj",
+                       {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                        {"name", PropertyType::String | PropertyType::Nullable},
+                        {"value", PropertyType::Int | PropertyType::Nullable}}}};
 
         return FLXSyncTestHarness::ServerSchema{std::move(schema), {"name", "value"}};
     };
@@ -3726,18 +3719,14 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
     auto foo_obj_id = ObjectId::gen();
     auto bar_obj_id = ObjectId::gen();
 
-    harness.load_initial_data([&](SharedRealm realm) {
+    harness.load_initial_data([&](SharedRealm& realm) {
         CppContext c(realm);
-        realm->begin_transaction();
         Object::create(c, realm, "Obj",
                        util::Any(AnyDict{
                            {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
         Object::create(c, realm, "Obj",
                        util::Any(AnyDict{
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
-
-        realm->commit_transaction();
-        wait_for_upload(*realm);
     });
 
     harness.do_with_new_realm([&](SharedRealm realm) {
