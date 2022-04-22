@@ -382,10 +382,6 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         throw std::logic_error("SubscriptionSet is not in a commitable state");
     }
     auto mgr = get_flx_subscription_store(); // Throws
-    if (!mgr) {
-        throw std::runtime_error(
-            "Trying to commit a MutableSubscriptionSet after its SubscriptionStore was destroyed");
-    }
 
     if (m_old_state == State::Uncommitted) {
         if (m_state == State::Uncommitted) {
