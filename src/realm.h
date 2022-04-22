@@ -1087,7 +1087,8 @@ RLM_API bool realm_update_schema_advanced(realm_t* realm, const realm_schema_t* 
  *  @param old_name old name of the property
  *  @param new_name new name of the property
  */
-RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type, const char* old_name, const char* new_name);
+RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type,
+                                          const char* old_name, const char* new_name);
 
 /**
  * Get the `realm::Schema*` pointer for this realm.
