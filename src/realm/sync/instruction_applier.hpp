@@ -81,6 +81,60 @@ protected:
     bool allows_null_links(const Instruction::PathInstruction& instr, const std::string_view& instr_name);
     std::string to_string(const Instruction::PathInstruction& instr) const;
 
+    struct PathResolver {
+        using PropCallbackType = util::UniqueFunction<void(Obj&, ColKey)>;
+        using ListCallbackType = util::UniqueFunction<void(LstBase&)>;
+        using ListIndexCallbackType = util::UniqueFunction<void(LstBase&, size_t)>;
+        using DictionaryCallbackType = util::UniqueFunction<void(Dictionary&)>;
+        using DictionaryKeyCallbackType = util::UniqueFunction<void(Dictionary&, Mixed)>;
+        using SetCallbackType = util::UniqueFunction<void(SetBase&)>;
+        using ErrorCallbackType = util::UniqueFunction<void(const std::string&)>;
+        using ColAdvanceType = util::UniqueFunction<void(ColKey)>;
+        using FinishCallbackType = util::UniqueFunction<void()>;
+        using StringGetterType = util::UniqueFunction<StringData(InternString)>;
+
+        PathResolver(Obj top_obj, const Instruction::PathInstruction& instr, const std::string_view& instr_name,
+                     ErrorCallbackType on_error, StringGetterType string_getter);
+        ~PathResolver();
+        void resolve();
+
+        PathResolver* on_property(PropCallbackType);
+        PathResolver* on_list(ListCallbackType);
+        PathResolver* on_list_index(ListIndexCallbackType);
+        PathResolver* on_dictionary(DictionaryCallbackType);
+        PathResolver* on_dictionary_key(DictionaryKeyCallbackType);
+        PathResolver* on_set(SetCallbackType);
+        PathResolver* on_error(ErrorCallbackType);
+        PathResolver* on_column_advance(ColAdvanceType);
+        PathResolver* on_finish(FinishCallbackType);
+
+    private:
+        void resolve_field(Obj& obj, InternString field, Instruction::Path::const_iterator begin,
+                           Instruction::Path::const_iterator end);
+        void resolve_list_element(LstBase& list, size_t index, Instruction::Path::const_iterator begin,
+                                  Instruction::Path::const_iterator end);
+        void resolve_dictionary_element(Dictionary& dict, InternString key, Instruction::Path::const_iterator begin,
+                                        Instruction::Path::const_iterator end);
+
+        Obj m_top_obj;
+        const Instruction::PathInstruction& m_instr;
+        const std::string_view& m_instr_name;
+
+        PropCallbackType m_on_prop;
+        ListCallbackType m_on_list;
+        ListIndexCallbackType m_on_list_ndx;
+        DictionaryCallbackType m_on_dictionary;
+        DictionaryKeyCallbackType m_on_dictionary_key;
+        SetCallbackType m_on_set;
+        ErrorCallbackType m_on_error;
+        ColAdvanceType m_on_col_advance;
+        FinishCallbackType m_on_finish;
+        StringGetterType m_string_getter;
+    };
+
+    std::unique_ptr<PathResolver> make_resolver(const Instruction::PathInstruction& instr,
+                                                const std::string_view& instr_name);
+
 private:
     const Changeset* m_log = nullptr;
     util::Logger* m_logger = nullptr;
@@ -101,31 +155,6 @@ private:
     // Note: This may return a non-invalid ObjKey if the key is dangling.
     ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&,
                           const std::string_view& instr = "(unspecified)") const;
-
-    /// Resolve the path of an instruction, and invoke the callback in one of the following ways:
-    ///
-    /// - If the path refers to a plain field of an object, invoke as `callback(Obj&, ColKey)`.
-    ///   - Note: This also covers fields where an embedded object is placed.
-    /// - If the path refers to a list, invoke as `callback(LstBase&)`.
-    /// - If the path refers to a list element, invoke as `callback(LstBase&, size_t index)`.
-    /// - If the path refers to a dictionary, invoke as `callback(Dictionary&)`.
-    /// - If the path refers to a dictionary element, invoke as `callback(Dictionary&, Mixed key)`.
-    template <class F>
-    void resolve_path(const Instruction::PathInstruction& instr, const std::string_view& instr_name, F&& callback);
-
-    template <class F>
-    void resolve_field(Obj& obj, InternString field, Instruction::Path::const_iterator begin,
-                       Instruction::Path::const_iterator end, const std::string_view& instr_name, F&& callback);
-
-    template <class F>
-    void resolve_list_element(LstBase& list, size_t index, Instruction::Path::const_iterator begin,
-                              Instruction::Path::const_iterator end, const std::string_view& instr_name,
-                              F&& callback);
-
-    template <class F>
-    void resolve_dictionary_element(Dictionary& dict, InternString key, Instruction::Path::const_iterator begin,
-                                    Instruction::Path::const_iterator end, const std::string_view& instr_name,
-                                    F&& callback);
 
     template <class F>
     void visit_payload(const Instruction::Payload&, F&& visitor);

@@ -154,7 +154,6 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-
     RecoverLocalChangesetsHandler(Transaction& remote_wt, Transaction& local_wt, util::Logger& logger);
     void process_changesets(const std::vector<ChunkedBinaryData>& changesets);
 
