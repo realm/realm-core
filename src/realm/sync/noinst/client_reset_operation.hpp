@@ -33,7 +33,7 @@ public:
     using CallbackBeforeType = util::UniqueFunction<void(std::string)>;
     using CallbackAfterType = util::UniqueFunction<void(std::string, VersionID, bool)>;
 
-    ClientResetOperation(util::Logger& logger, DB& db, DBRef db_fresh, ClientResyncMode mode,
+    ClientResetOperation(util::Logger& logger, DBRef db, DBRef db_fresh, ClientResyncMode mode,
                          CallbackBeforeType notify_before, CallbackAfterType notify_after);
 
     // When the client has received the salted file ident from the server, it
@@ -50,7 +50,7 @@ private:
     void clean_up_state() noexcept;
 
     util::Logger& m_logger;
-    DB& m_db;
+    DBRef m_db;
     DBRef m_db_fresh;
     ClientResyncMode m_mode;
     sync::SaltedFileIdent m_salted_file_ident = {0, 0};

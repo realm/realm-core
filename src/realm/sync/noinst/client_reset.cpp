@@ -803,9 +803,10 @@ void remove_pending_client_resets(TransactionRef wt)
     }
 }
 
-util::Optional<PendingReset> has_pending_reset(Transaction& rt)
+util::Optional<PendingReset> has_pending_reset(TransactionRef rt)
 {
-    ConstTableRef table = rt.get_table(s_meta_reset_table_name);
+    REALM_ASSERT(rt);
+    ConstTableRef table = rt->get_table(s_meta_reset_table_name);
     if (!table || table->size() == 0) {
         return util::none;
     }
@@ -843,13 +844,14 @@ util::Optional<PendingReset> has_pending_reset(Transaction& rt)
     return pending;
 }
 
-void track_reset(Transaction& wt, ClientResyncMode mode)
+void track_reset(TransactionRef wt, ClientResyncMode mode)
 {
+    REALM_ASSERT(wt);
     REALM_ASSERT(mode != ClientResyncMode::Manual);
-    TableRef table = wt.get_table(s_meta_reset_table_name);
+    TableRef table = wt->get_table(s_meta_reset_table_name);
     ColKey version_col, timestamp_col, type_col;
     if (!table) {
-        table = wt.add_table_with_primary_key(s_meta_reset_table_name, type_ObjectId, s_pk_col_name);
+        table = wt->add_table_with_primary_key(s_meta_reset_table_name, type_ObjectId, s_pk_col_name);
         REALM_ASSERT(table);
         version_col = table->add_column(type_Int, s_version_column_name);
         timestamp_col = table->add_column(type_Timestamp, s_timestamp_col_name);
@@ -873,8 +875,9 @@ void track_reset(Transaction& wt, ClientResyncMode mode)
                                            {type_col, mode_val}});
 }
 
-ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, util::Logger& logger)
+ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode mode, util::Logger& logger)
 {
+    REALM_ASSERT(wt);
     if (auto previous_reset = has_pending_reset(wt)) {
         logger.info("A previous reset was detected of type: '%1' at: %2", previous_reset->type, previous_reset->time);
         switch (previous_reset->type) {
@@ -913,16 +916,18 @@ ClientResyncMode reset_precheck_guard(Transaction& wt, ClientResyncMode mode, ut
     return mode;
 }
 
-LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::SaltedFileIdent client_file_ident,
+LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
                                           util::Logger& logger, ClientResyncMode mode, bool* did_recover_out)
 {
+    REALM_ASSERT(db_local);
+    REALM_ASSERT(db_remote);
     logger.info("Client reset, path_local = %1, "
                 "client_file_ident.ident = %2, "
                 "client_file_ident.salt = %3,"
                 "remote = %4, mode = %5",
-                db_local.get_path(), client_file_ident.ident, client_file_ident.salt, db_remote.get_path(), mode);
+                db_local->get_path(), client_file_ident.ident, client_file_ident.salt, db_remote->get_path(), mode);
 
-    auto wt_local = db_local.start_write();
+    auto wt_local = db_local->start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
     REALM_ASSERT(history_local);
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
@@ -931,7 +936,7 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
     BinaryData recovered_changeset;
     std::vector<ChunkedBinaryData> local_changes;
 
-    mode = reset_precheck_guard(*wt_local, mode, logger);
+    mode = reset_precheck_guard(wt_local, mode, logger);
     bool recover_local_changes = (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard);
 
     if (recover_local_changes) {
@@ -941,7 +946,7 @@ LocalVersionIDs perform_client_reset_diff(DB& db_local, DB& db_remote, sync::Sal
 
     sync::SaltedVersion fresh_server_version = {0, 0};
 
-    auto wt_remote = db_remote.start_write();
+    auto wt_remote = db_remote->start_write();
     auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
     REALM_ASSERT(history_remote);
     sync::version_type current_version_remote = wt_remote->get_version();

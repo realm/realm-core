@@ -312,7 +312,7 @@ struct FakeLocalClientReset : public TestClientReset {
             auto local_db = TestHelper::get_db(local_realm);
             auto remote_db = TestHelper::get_db(remote_realm);
             using _impl::client_reset::perform_client_reset_diff;
-            perform_client_reset_diff(*local_db, *remote_db, fake_ident, logger, m_mode, nullptr);
+            perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, nullptr);
 
             remote_realm->close();
             if (m_on_post_reset) {
