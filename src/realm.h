@@ -1080,6 +1080,16 @@ RLM_API bool realm_update_schema_advanced(realm_t* realm, const realm_schema_t* 
                                           void* data_init_func_userdata, bool is_in_transaction);
 
 /**
+ *  Rename a property for the schame  of the open realm.
+ *  @param realm The realm for which the property schema has to be renamed
+ *  @param schema The schema to modifies
+ *  @param object_type type of the object to modify
+ *  @param old_name old name of the property
+ *  @param new_name new name of the property
+ */
+RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type, const char* old_name, const char* new_name);
+
+/**
  * Get the `realm::Schema*` pointer for this realm.
  *
  * This is intended as a migration path for users of the C++ Object Store API.

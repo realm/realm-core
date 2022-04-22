@@ -484,6 +484,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     notify_schema_changed();
 }
 
+void Realm::rename_property(Schema schema, StringData object_type, StringData old_name, StringData new_name)
+{
+    ObjectStore::rename_property(read_group(), schema, object_type, old_name, new_name);
+}
+
 void Realm::add_schema_change_handler()
 {
     if (m_config.immutable())
