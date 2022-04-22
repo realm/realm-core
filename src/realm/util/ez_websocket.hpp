@@ -101,7 +101,7 @@ public:
 
 //    EZSocketFactory(EZSocketFactory&&) = delete;
 
-    std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint);
+    virtual std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint);
 
 private:
     EZConfig m_config;
