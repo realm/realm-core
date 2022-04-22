@@ -3461,7 +3461,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
         std::string pem(pem_data, pem_size);
 
         std::string expected = "-----BEGIN CERTIFICATE-----\n"
-                               "MIIF0zCCA7ugAwIBAgIBBjANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
+                               "MIIF0zCCA7ugAwIBAgIBCDANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
 
         CHECK_EQUAL(expected, pem.substr(0, expected.size()));
 
@@ -3519,7 +3519,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
         else {
             CHECK_EQUAL(pem_size, 1700);
             CHECK_EQUAL(preverify_ok, 1);
-            CHECK_EQUAL(pem_data[1667], 'h');
+            CHECK_EQUAL(pem_data[1667], '2');
             CHECK_EQUAL(pem_data[1698], '-');
             CHECK_EQUAL(pem_data[1699], '\n');
         }

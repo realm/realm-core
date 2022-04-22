@@ -1445,6 +1445,13 @@ RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t
 RLM_API realm_object_t* realm_get_linked_object(realm_object_t*, realm_property_key_t);
 
 /**
+ * Serializes an object to json and returns it as string. Serializes a single level of properties only.
+ *
+ * @return a json-serialized representation of the object.
+ */
+RLM_API char* realm_object_to_string(realm_object_t*);
+
+/**
  * Set the values for several properties.
  *
  * This is provided as an alternative to calling `realm_get_value()` multiple
