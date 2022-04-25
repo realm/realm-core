@@ -428,7 +428,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     // Maximum number of subsets we split the `incoming_changesets` into.
     // We aim that each subset of changesets has the same number of instructions,
     // but this may not always be possible.
-    auto subsets_to_integrate = split_changesets ? std::min(max_number_of_transactions, num_changesets) : 1;
+    int subsets_to_integrate = split_changesets ? std::min(max_number_of_transactions, num_changesets) : 1;
     std::uint_fast64_t instructions_per_subset = static_cast<std::uint_fast64_t>(
         std::ceil(static_cast<double>(incoming_instructions_count) / subsets_to_integrate));
 
