@@ -163,7 +163,6 @@ static_assert(realm_sync_errno_session_e(ProtocolError::diverging_histories) ==
               RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES);
 static_assert(realm_sync_errno_session_e(ProtocolError::bad_changeset) == RLM_SYNC_ERR_SESSION_BAD_CHANGESET);
 static_assert(realm_sync_errno_session_e(ProtocolError::superseded) == RLM_SYNC_ERR_SESSION_SUPERSEDED);
-static_assert(realm_sync_errno_session_e(ProtocolError::disabled_session) == RLM_SYNC_ERR_SESSION_DISABLED_SESSION);
 static_assert(realm_sync_errno_session_e(ProtocolError::partial_sync_disabled) ==
               RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED);
 static_assert(realm_sync_errno_session_e(ProtocolError::unsupported_session_feature) ==
