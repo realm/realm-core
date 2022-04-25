@@ -664,8 +664,8 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
     }
 
     if (!verify_user_present(user)) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "No user has been found."));
+        return completion(
+            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found."));
     }
 
     Request req;
