@@ -602,7 +602,7 @@ CPtr<realm_schema_t> make_schema()
 {
     auto foo_properties = all_property_types("Bar");
 
-    const realm_class_info_t classes[2] = {
+    const realm_class_info_t classes[3] = {
         {
             "Foo",
             "",                    // primary key
@@ -614,14 +614,22 @@ CPtr<realm_schema_t> make_schema()
         {
             "Bar",
             "int", // primary key
-            3,     // properties
+            5,     // properties
             1,     // computed properties,
             RLM_INVALID_CLASS_KEY,
             RLM_CLASS_NORMAL,
         },
+        {
+            "Embedded",
+            "", // primary key
+            1,  // properties
+            0,  // computed properties,
+            RLM_INVALID_CLASS_KEY,
+            RLM_CLASS_EMBEDDED,
+        },
     };
 
-    const realm_property_info_t bar_properties[4] = {
+    const realm_property_info_t bar_properties[6] = {
         {
             "int",
             "",
@@ -653,6 +661,26 @@ CPtr<realm_schema_t> make_schema()
             RLM_PROPERTY_NORMAL,
         },
         {
+            "sub",
+            "",
+            RLM_PROPERTY_TYPE_OBJECT,
+            RLM_COLLECTION_TYPE_NONE,
+            "Embedded",
+            "",
+            RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NULLABLE,
+        },
+        {
+            "sub_list",
+            "",
+            RLM_PROPERTY_TYPE_OBJECT,
+            RLM_COLLECTION_TYPE_LIST,
+            "Embedded",
+            "",
+            RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NORMAL,
+        },
+        {
             "linking_objects",
             "",
             RLM_PROPERTY_TYPE_LINKING_OBJECTS,
@@ -664,9 +692,19 @@ CPtr<realm_schema_t> make_schema()
         },
     };
 
-    const realm_property_info_t* class_properties[2] = {foo_properties.data(), bar_properties};
+    const realm_property_info_t embedded_properties[1] = {{
+        "int",
+        "",
+        RLM_PROPERTY_TYPE_INT,
+        RLM_COLLECTION_TYPE_NONE,
+        "",
+        "",
+        RLM_INVALID_PROPERTY_KEY,
+        RLM_PROPERTY_NORMAL,
+    }};
+    const realm_property_info_t* class_properties[3] = {foo_properties.data(), bar_properties, embedded_properties};
 
-    return cptr(realm_schema_new(classes, 2, class_properties));
+    return cptr(realm_schema_new(classes, 3, class_properties));
 }
 
 CPtr<realm_config_t> make_config(const char* filename, bool set_schema = true)
@@ -822,7 +860,7 @@ TEST_CASE("C API") {
         CHECK(realm_equals(realm, realm));
     }
 
-    CHECK(realm_get_num_classes(realm) == 2);
+    CHECK(realm_get_num_classes(realm) == 3);
 
     SECTION("cached realm") {
         auto config2 = make_config(test_file.path.c_str(), false);
@@ -963,10 +1001,12 @@ TEST_CASE("C API") {
 
     bool found = false;
 
-    realm_class_info_t class_foo, class_bar;
+    realm_class_info_t class_foo, class_bar, class_embedded;
     CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
     REQUIRE(found);
     CHECK(checked(realm_find_class(realm, "Bar", &found, &class_bar)));
+    REQUIRE(found);
+    CHECK(checked(realm_find_class(realm, "Embedded", &found, &class_embedded)));
     REQUIRE(found);
 
     std::map<std::string, realm_property_key_t> foo_properties;
@@ -1069,7 +1109,7 @@ TEST_CASE("C API") {
         CHECK(found);
         CHECK(property.key == foo_properties["string"]);
 
-        CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "i don't exist", &found, &property)));
+        CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "I don't exist", &found, &property)));
         CHECK(!found);
     }
 
@@ -1100,7 +1140,7 @@ TEST_CASE("C API") {
         CHECK(num_found == class_foo.num_properties + class_foo.num_computed_properties);
 
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, ps.data(), ps.size(), &num_found)));
-        CHECK(num_found == 4);
+        CHECK(num_found == 6);
     }
 
     SECTION("realm_get_property()") {
@@ -1127,6 +1167,14 @@ TEST_CASE("C API") {
                 auto p = realm_object_create(realm, class_bar.key);
                 CHECK(!p);
                 CHECK_ERR(RLM_ERR_MISSING_PRIMARY_KEY);
+            });
+        }
+
+        SECTION("embedded object") {
+            write([&]() {
+                auto p = realm_object_create(realm, class_embedded.key);
+                CHECK(!p);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
             });
         }
 
@@ -1482,6 +1530,23 @@ TEST_CASE("C API") {
             CHECK(realm_get_value(obj1.get(), foo_properties["link"], &value));
             CHECK(rlm_val_eq(value, null));
         }
+
+        SECTION("embedded") {
+            realm_property_info_t info;
+            bool found = false;
+            REQUIRE(checked(realm_find_property(realm, class_bar.key, "sub", &found, &info)));
+            REQUIRE(found);
+
+            auto embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
+            CHECK(!embedded);
+            write([&]() {
+                auto embedded = cptr_checked(realm_set_embedded(obj2.get(), info.key));
+                CHECK(embedded);
+            });
+            embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
+            CHECK(embedded);
+        }
+
 
         SECTION("find with primary key") {
             bool found = false;
@@ -2039,6 +2104,7 @@ TEST_CASE("C API") {
 
                 CHECK(realm_list_get(int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
+                CHECK(!realm_list_get_linked_object(int_list.get(), 0));
                 CHECK(realm_list_get(bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
                 CHECK(realm_list_get(string_list.get(), 0, &value));
@@ -2186,6 +2252,22 @@ TEST_CASE("C API") {
                     CHECK(realm_get_num_objects(realm, class_bar.key, &num_bars));
                     CHECK(num_bars == 0);
                 }
+            }
+
+            SECTION("embedded") {
+                CPtr<realm_list_t> subs;
+                realm_property_info_t info;
+                bool found = false;
+                REQUIRE(checked(realm_find_property(realm, class_bar.key, "sub_list", &found, &info)));
+                REQUIRE(found);
+                subs = cptr_checked(realm_get_list(obj2.get(), info.key));
+
+                write([&]() {
+                    auto embedded = cptr_checked(realm_list_insert_embedded(subs.get(), 0));
+                    CHECK(embedded);
+                });
+                auto embedded = cptr_checked(realm_list_get_linked_object(subs.get(), 0));
+                CHECK(embedded);
             }
 
             SECTION("notifications") {

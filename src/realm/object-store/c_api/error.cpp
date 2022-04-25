@@ -134,6 +134,9 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
             case Kind::wrong_transact_state:
                 populate_error(ex, RLM_ERR_NOT_IN_A_TRANSACTION);
                 break;
+            case Kind::wrong_kind_of_table:
+                populate_error(ex, RLM_ERR_ILLEGAL_OPERATION);
+                break;
             default:
                 populate_error(ex, RLM_ERR_LOGIC);
         }

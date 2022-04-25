@@ -315,6 +315,24 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
     });
 }
 
+RLM_API realm_object_t* realm_set_embedded(realm_object_t* obj, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->obj();
+        return new realm_object_t({obj->get_realm(), o.create_and_set_linked_object(ColKey(col))});
+    });
+}
+
+RLM_API realm_object_t* realm_get_linked_object(realm_object_t* obj, realm_property_key_t col)
+{
+    return wrap_err([&]() {
+        obj->verify_attached();
+        auto o = obj->obj().get_linked_object(ColKey(col));
+        return o ? new realm_object_t({obj->get_realm(), o}) : nullptr;
+    });
+}
+
 RLM_API realm_list_t* realm_get_list(realm_object_t* object, realm_property_key_t key)
 {
     return wrap_err([&]() {
