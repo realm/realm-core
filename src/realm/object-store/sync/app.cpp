@@ -697,7 +697,7 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
     }
     if (!verify_user_present(user)) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user was not found. Was it deleted?"));
+                                            "The specified user was not found."));
     }
 
     App::log_in_with_credentials(credentials, user, std::move(completion));
