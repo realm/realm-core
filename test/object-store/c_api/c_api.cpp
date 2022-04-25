@@ -847,8 +847,10 @@ TEST_CASE("C API") {
             realm_config_set_migration_function(config2.get(), migrate_schema_rename_prop, &userdata);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
-            CHECK(realm_equals(realm_get_schema(realm2.get()), new_schema.get()));
+            auto new_db_schema = realm_get_schema(realm2.get());
+            CHECK(realm_equals(new_db_schema, new_schema.get()));
             realm2.reset();
+            realm_release(new_db_schema);
         }
 
         SECTION("migration callback error") {
