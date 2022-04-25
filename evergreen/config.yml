@@ -501,6 +501,14 @@ tasks:
     vars:
       benchmark_name: crud
 
+- name: benchmark-sync
+  exec_timeout_secs: 1800
+  tags: [ "benchmark" ]
+  commands:
+  - func: "run benchmark"
+    vars:
+      benchmark_name: sync
+
 - name: sync-tests
   tags: [ "test_suite", "for_pull_requests" ]
   exec_timeout_secs: 1800
