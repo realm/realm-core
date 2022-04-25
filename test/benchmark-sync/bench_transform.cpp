@@ -147,7 +147,6 @@ void interrupt_transform_transactions(TestContext& test_context)
     Session::Config session_config;
     session_config.split_remote_changesets = true;
     session_config.on_before_download_integrated = [&](size_t num_changesets) {
-        std::cout << "on_before_download_integrated called: " << num_changesets << std::endl;
         if (num_changesets == 0) {
             return;
         }
