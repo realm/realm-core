@@ -656,7 +656,7 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 {
     if (!user) {
         return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "The specified user could not be found. Was it already deleted?"));
+                                   "The specified user could not be found."));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
         return completion(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
@@ -665,7 +665,7 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 
     if (!verify_user_present(user)) {
         return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "No user has been found. Was it already deleted?"));
+                                   "No user has been found."));
     }
 
     Request req;
@@ -689,7 +689,7 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
 {
     if (!user) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user could not be found. Was it deleted?"));
+                                            "The specified user could not be found."));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
