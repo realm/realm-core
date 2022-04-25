@@ -4,6 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add support for embedded objects in the C API. ([#5408](https://github.com/realm/realm-core/issues/5408))
 * Added `realm_object_to_string()` support for c_api. ([#5414](https://github.com/realm/realm-core/issues/5414))
+* Added `ObjectStore::rename_property()` support for c_api. ([#5424]https://github.com/realm/realm-core/issues/5424)
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

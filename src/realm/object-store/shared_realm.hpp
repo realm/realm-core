@@ -210,6 +210,8 @@ public:
     void update_schema(Schema schema, uint64_t version = 0, MigrationFunction migration_function = nullptr,
                        DataInitializationFunction initialization_function = nullptr, bool in_transaction = false);
 
+    void rename_property(Schema schema, StringData object_type, StringData old_name, StringData new_name);
+
     // Set the schema used for this Realm, but do not update the file's schema
     // if it is not compatible (and instead throw an error).
     // Cannot be called multiple times on a single Realm instance or an instance

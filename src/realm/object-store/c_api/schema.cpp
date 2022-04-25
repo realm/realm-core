@@ -71,6 +71,15 @@ RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema)
     });
 }
 
+RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type,
+                                          const char* old_name, const char* new_name)
+{
+    return wrap_err([&]() {
+        realm->get()->rename_property(*schema->ptr, object_type, old_name, new_name);
+        return true;
+    });
+}
+
 RLM_API size_t realm_get_num_classes(const realm_t* realm)
 {
     size_t max = std::numeric_limits<size_t>::max();
