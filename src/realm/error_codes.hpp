@@ -103,7 +103,6 @@ public:
         IllegalOperation = RLM_ERR_ILLEGAL_OPERATION,
         KeyAlreadyUsed = RLM_ERR_KEY_ALREADY_USED,
         SerializationError = RLM_ERR_SERIALIZATION_ERROR,
-        InvalidPath = RLM_ERR_INVALID_PATH_ERROR,
         DuplicatePrimaryKeyValue = RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE,
         SyntaxError = RLM_ERR_INVALID_QUERY_STRING,
         InvalidQueryArg = RLM_ERR_INVALID_QUERY_ARG,

@@ -219,7 +219,7 @@ MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionS
 void MutableSubscriptionSet::check_is_mutable() const
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
-        throw WrongTransactioState("Not a write transaction");
+        throw WrongTransactionState("Not a write transaction");
     }
 }
 

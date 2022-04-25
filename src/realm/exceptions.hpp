@@ -77,26 +77,6 @@ private:
 Status exception_to_status() noexcept;
 
 
-class InvalidTableRef : public Exception {
-public:
-    InvalidTableRef(const char* cause)
-        : Exception(ErrorCodes::InvalidTableRef, cause)
-    {
-    }
-};
-
-
-/// Thrown by various functions to indicate that a specified table name is
-/// already in use.
-class TableNameInUse : public Exception {
-public:
-    TableNameInUse()
-        : Exception(ErrorCodes::TableNameInUse, "The specified table name is already in use")
-    {
-    }
-};
-
-
 /// The UnsupportedFileFormatVersion exception is thrown by DB::open()
 /// constructor when opening a database that uses a deprecated file format
 /// and/or a deprecated history schema which this version of Realm cannot
@@ -114,62 +94,11 @@ public:
 };
 
 
-/// Thrown when a sync agent attempts to join a session in which there is
-/// already a sync agent. A session may only contain one sync agent at any given
-/// time.
-class MultipleSyncAgents : public Exception {
-public:
-    MultipleSyncAgents()
-        : Exception(ErrorCodes::MultipleSyncAgents, "Multiple sync agents attempted to join the same session")
-    {
-    }
-};
-
-
-/// Thrown when memory can no longer be mapped to. When mmap/remap fails.
-class AddressSpaceExhausted : public Exception {
-public:
-    AddressSpaceExhausted(const std::string& msg)
-        : Exception(ErrorCodes::AddressSpaceExhausted, msg)
-    {
-    }
-    /// runtime_error::what() returns the msg provided in the constructor.
-};
-
-/// Thrown when creating references that are too large to be contained in our ref_type (size_t)
-class MaximumFileSizeExceeded : public Exception {
-public:
-    MaximumFileSizeExceeded(const std::string& msg)
-        : Exception(ErrorCodes::MaximumFileSizeExceeded, msg)
-    {
-    }
-    /// runtime_error::what() returns the msg provided in the constructor.
-};
-
-/// Thrown when writing fails because the disk is full.
-class OutOfDiskSpace : public Exception {
-public:
-    OutOfDiskSpace(const std::string& msg)
-        : Exception(ErrorCodes::OutOfDiskSpace, msg)
-    {
-    }
-    /// runtime_error::what() returns the msg provided in the constructor.
-};
-
 /// Thrown when a key is already existing when trying to create a new object
 class KeyAlreadyUsed : public Exception {
 public:
     KeyAlreadyUsed(const std::string& msg)
         : Exception(ErrorCodes::KeyAlreadyUsed, msg)
-    {
-    }
-};
-
-// thrown when a user constructed link path is not a valid input
-class InvalidPathError : public Exception {
-public:
-    InvalidPathError(const std::string& msg)
-        : Exception(ErrorCodes::InvalidPath, msg)
     {
     }
 };
@@ -221,6 +150,48 @@ public:
     }
 };
 
+/// Thrown when creating references that are too large to be contained in our ref_type (size_t)
+class MaximumFileSizeExceeded : public RuntimeError {
+public:
+    MaximumFileSizeExceeded(const std::string& msg)
+        : RuntimeError(ErrorCodes::MaximumFileSizeExceeded, msg)
+    {
+    }
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
+
+/// Thrown when writing fails because the disk is full.
+class OutOfDiskSpace : public RuntimeError {
+public:
+    OutOfDiskSpace(const std::string& msg)
+        : RuntimeError(ErrorCodes::OutOfDiskSpace, msg)
+    {
+    }
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
+
+/// Thrown when a sync agent attempts to join a session in which there is
+/// already a sync agent. A session may only contain one sync agent at any given
+/// time.
+class MultipleSyncAgents : public RuntimeError {
+public:
+    MultipleSyncAgents()
+        : RuntimeError(ErrorCodes::MultipleSyncAgents, "Multiple sync agents attempted to join the same session")
+    {
+    }
+};
+
+
+/// Thrown when memory can no longer be mapped to. When mmap/remap fails.
+class AddressSpaceExhausted : public RuntimeError {
+public:
+    AddressSpaceExhausted(const std::string& msg)
+        : RuntimeError(ErrorCodes::AddressSpaceExhausted, msg)
+    {
+    }
+    /// runtime_error::what() returns the msg provided in the constructor.
+};
+
 class InvalidArgument : public LogicError {
 public:
     InvalidArgument(ErrorCodes::Error code, const std::string& msg)
@@ -252,6 +223,17 @@ public:
     {
     }
 };
+
+/// Thrown by various functions to indicate that a specified table name is
+/// already in use.
+class TableNameInUse : public InvalidArgument {
+public:
+    TableNameInUse()
+        : InvalidArgument(ErrorCodes::TableNameInUse, "The specified table name is already in use")
+    {
+    }
+};
+
 
 /// Thrown when a key can not by found
 class KeyNotFound : public InvalidArgument {
@@ -307,10 +289,18 @@ public:
     }
 };
 
-class WrongTransactioState : public LogicError {
+class WrongTransactionState : public LogicError {
 public:
-    WrongTransactioState(const std::string& msg)
+    WrongTransactionState(const std::string& msg)
         : LogicError(ErrorCodes::WrongTransactionState, msg)
+    {
+    }
+};
+
+class InvalidTableRef : public LogicError {
+public:
+    InvalidTableRef(const char* cause)
+        : LogicError(ErrorCodes::InvalidTableRef, cause)
     {
     }
 };
@@ -355,8 +345,10 @@ public:
 // columns, unless those link columns are part of the table itself.
 class CrossTableLinkTarget : public LogicError {
 public:
-    CrossTableLinkTarget()
-        : LogicError(ErrorCodes::CrossTableLinkTarget, "Multiple sync agents attempted to join the same session")
+    template <class T>
+    CrossTableLinkTarget(T table_name)
+        : LogicError(ErrorCodes::CrossTableLinkTarget,
+                     util::format("Cannot remove %1 that is target of outside links", table_name))
     {
     }
 };

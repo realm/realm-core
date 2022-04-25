@@ -990,7 +990,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // require that a removed table does not contain foreigh origin backlink
     // columns.
     if (table->is_cross_table_link_target())
-        throw CrossTableLinkTarget();
+        throw CrossTableLinkTarget(table->get_name());
 
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that

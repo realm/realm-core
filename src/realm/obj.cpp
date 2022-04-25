@@ -1427,9 +1427,8 @@ Obj& Obj::set<ObjKey>(ColKey col_key, ObjKey target_key, bool is_default)
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
-    if (type != ColumnTypeTraits<ObjKey>::column_id)
-        throw InvalidArgument(ErrorCodes::TypeMismatch,
-                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
+    if (type != col_type_Link)
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a link");
     TableRef target_table = get_target_table(col_key);
     TableKey target_table_key = target_table->get_key();
     if (target_key) {
@@ -1482,9 +1481,8 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
-    if (type != ColumnTypeTraits<ObjLink>::column_id)
-        throw InvalidArgument(ErrorCodes::TypeMismatch,
-                              util::format("Property not a %1", ColumnTypeTraits<int64_t>::column_id));
+    if (type != col_type_TypedLink)
+        throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a typed link");
     m_table->get_parent_group()->validate(target_link);
 
     ObjLink old_link = get<ObjLink>(col_key); // Will update if needed

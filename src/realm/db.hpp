@@ -972,7 +972,7 @@ template <class O>
 inline void Transaction::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw WrongTransactioState("Not a read transaction");
+        throw WrongTransactionState("Not a read transaction");
 
     // It is an error if the new version precedes the currently bound one.
     if (version_id.version < m_read_lock.m_version)
@@ -989,7 +989,7 @@ template <class O>
 inline bool Transaction::promote_to_write(O* observer, bool nonblocking)
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw WrongTransactioState("Not a read transaction");
+        throw WrongTransactionState("Not a read transaction");
 
     if (!holds_write_mutex()) {
         if (nonblocking) {
@@ -1037,7 +1037,7 @@ template <class O>
 inline void Transaction::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != DB::transact_Writing)
-        throw WrongTransactioState("Not a write transaction");
+        throw WrongTransactionState("Not a write transaction");
 
     Replication* repl = db->get_replication();
     if (!repl)

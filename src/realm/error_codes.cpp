@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include "realm/error_codes.hpp"
-#include <iostream>
+#include <map>
 
 namespace realm {
 
@@ -50,6 +50,9 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case OutOfDiskSpace:
         case CallbackFailed:
         case NotCloneable:
+        case MaximumFileSizeExceeded:
+        case BadChangeset:
+        case SubscriptionFailed:
             return ErrorCategory().set(ErrorCategory::runtime_error);
         case InvalidArgument:
         case PropertyNotNullable:
@@ -69,6 +72,8 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case MissingPrimaryKey:
         case MissingPropertyValue:
         case NoSuchTable:
+        case TableNameInUse:
+        case InvalidDictionaryKey:
             return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
         case LogicError:
         case BrokenPromise:
@@ -81,204 +86,101 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ReadOnly:
         case InvalidatedObject:
         case NotSupported:
+        case WrongThread:
+        case InvalidTableRef:
+        case DeleteOnOpenRealm:
             return ErrorCategory().set(ErrorCategory::logic_error);
         case OK:
         case UnknownError:
-            break;
-        default:
+        case GenericError:
+        case MaxError:
             break;
     }
     return {};
 }
 
+static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
+    {"OK", ErrorCodes::OK},
+    {"UnknownError", ErrorCodes::UnknownError},
+    {"GenericError", ErrorCodes::GenericError},
+    {"RuntimeError", ErrorCodes::RuntimeError},
+    {"LogicError", ErrorCodes::LogicError},
+    {"InvalidArgument", ErrorCodes::InvalidArgument},
+    {"BrokenPromise", ErrorCodes::BrokenPromise},
+    {"InvalidName", ErrorCodes::InvalidName},
+    {"OutOfMemory", ErrorCodes::OutOfMemory},
+    {"NoSuchTable", ErrorCodes::NoSuchTable},
+    {"CrossTableLinkTarget", ErrorCodes::CrossTableLinkTarget},
+    {"UnsupportedFileFormatVersion", ErrorCodes::UnsupportedFileFormatVersion},
+    {"FileFormatUpgradeRequired", ErrorCodes::FileFormatUpgradeRequired},
+    {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
+    {"AddressSpaceExhausted", ErrorCodes::AddressSpaceExhausted},
+    {"OutOfDiskSpace", ErrorCodes::OutOfDiskSpace},
+    {"MaximumFileSizeExceeded", ErrorCodes::MaximumFileSizeExceeded},
+    {"KeyNotFound", ErrorCodes::KeyNotFound},
+    {"OutOfBounds", ErrorCodes::OutOfBounds},
+    {"IllegalOperation", ErrorCodes::IllegalOperation},
+    {"KeyAlreadyUsed", ErrorCodes::KeyAlreadyUsed},
+    {"SerializationError", ErrorCodes::SerializationError},
+    {"DuplicatePrimaryKeyValue", ErrorCodes::DuplicatePrimaryKeyValue},
+    {"SyntaxError", ErrorCodes::SyntaxError},
+    {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
+    {"InvalidQuery", ErrorCodes::InvalidQuery},
+    {"WrongTransactionState", ErrorCodes::WrongTransactionState},
+    {"WrongThread", ErrorCodes::WrongThread},
+    {"InvalidatedObject", ErrorCodes::InvalidatedObject},
+    {"InvalidProperty", ErrorCodes::InvalidProperty},
+    {"MissingPrimaryKey", ErrorCodes::MissingPrimaryKey},
+    {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
+    {"ObjectAlreadyExists", ErrorCodes::ObjectAlreadyExists},
+    {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
+    {"ReadOnly", ErrorCodes::ReadOnly},
+    {"PropertyNotNullable", ErrorCodes::PropertyNotNullable},
+    {"TableNameInUse", ErrorCodes::TableNameInUse},
+    {"InvalidTableRef", ErrorCodes::InvalidTableRef},
+    {"BadChangeset", ErrorCodes::BadChangeset},
+    {"InvalidDictionaryKey", ErrorCodes::InvalidDictionaryKey},
+    {"InvalidDictionaryValue", ErrorCodes::InvalidDictionaryValue},
+    {"StaleAccessor", ErrorCodes::StaleAccessor},
+    {"IncompatibleLockFile", ErrorCodes::IncompatibleLockFile},
+    {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
+    {"DecryptionFailed", ErrorCodes::DecryptionFailed},
+    {"IncompatibleSession", ErrorCodes::IncompatibleSession},
+    {"BrokenInvariant", ErrorCodes::BrokenInvariant},
+    {"SubscriptionFailed", ErrorCodes::SubscriptionFailed},
+    {"RangeError", ErrorCodes::RangeError},
+    {"TypeMismatch", ErrorCodes::TypeMismatch},
+    {"LimitExceeded", ErrorCodes::LimitExceeded},
+    {"MissingPropertyValue", ErrorCodes::MissingPropertyValue},
+    {"ReadOnlyProperty", ErrorCodes::ReadOnlyProperty},
+    {"CallbackFailed", ErrorCodes::CallbackFailed},
+    {"NotCloneable", ErrorCodes::NotCloneable},
+    {"PermissionDenied", ErrorCodes::PermissionDenied},
+    {"FileOperationFailed", ErrorCodes::FileOperationFailed},
+    {"FileNotFound", ErrorCodes::FileNotFound},
+    {"FileAlreadyExists", ErrorCodes::FileAlreadyExists},
+    {"SystemError", ErrorCodes::SystemError},
+    {"InvalidDatabase", ErrorCodes::InvalidDatabase},
+    {"IncompatibleHistories", ErrorCodes::IncompatibleHistories},
+    {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
+    {"NotSupported", ErrorCodes::NotSupported}};
+
 std::string_view ErrorCodes::error_string(Error code)
 {
-    static_assert(sizeof(Error) == sizeof(int));
-
-    switch (code) {
-        case OK:
-            return "OK";
-        case UnknownError:
-            return "UnknownError";
-        case RangeError:
-            return "RangeError";
-        case TypeMismatch:
-            return "TypeMismatch";
-        case BrokenPromise:
-            return "BrokenPromise";
-        case InvalidName:
-            return "InvalidName";
-        case OutOfMemory:
-            return "OutOfMemory";
-        case NoSuchTable:
-            return "NoSuchTable";
-        case CrossTableLinkTarget:
-            return "CrossTableLinkTarget";
-        case UnsupportedFileFormatVersion:
-            return "UnsupportedFileFormatVersion";
-        case MultipleSyncAgents:
-            return "MultipleSyncAgents";
-        case AddressSpaceExhausted:
-            return "AddressSpaceExhausted";
-        case OutOfDiskSpace:
-            return "OutOfDiskSpace";
-        case KeyNotFound:
-            return "KeyNotFound";
-        case OutOfBounds:
-            return "OutOfBounds";
-        case IllegalOperation:
-            return "IllegalOperation";
-        case KeyAlreadyUsed:
-            return "KeyAlreadyUsed";
-        case SerializationError:
-            return "SerializationError";
-        case InvalidPath:
-            return "InvalidPath";
-        case DuplicatePrimaryKeyValue:
-            return "DuplicatePrimaryKeyValue";
-        case SyntaxError:
-            return "SyntaxError";
-        case InvalidQueryArg:
-            return "InvalidQueryArg";
-        case InvalidQuery:
-            return "InvalidQuery";
-        case WrongTransactionState:
-            return "WrongTransactioState";
-        case WrongThread:
-            return "WrongThread";
-        case InvalidatedObject:
-            return "InvalidatedObject";
-        case InvalidProperty:
-            return "InvalidProperty";
-        case MissingPrimaryKey:
-            return "MissingPrimaryKey";
-        case UnexpectedPrimaryKey:
-            return "UnexpectedPrimaryKey";
-        case ObjectAlreadyExists:
-            return "ObjectAlreadyExists";
-        case ModifyPrimaryKey:
-            return "ModifyPrimaryKey";
-        case ReadOnly:
-            return "ReadOnly";
-        case PropertyNotNullable:
-            return "PropertyNotNullable";
-        case MaximumFileSizeExceeded:
-            return "MaximumFileSizeExceeded";
-        case TableNameInUse:
-            return "TableNameInUse";
-        case InvalidTableRef:
-            return "InvalidTableRef";
-        case BadChangeset:
-            return "BadChangeset";
-        case InvalidDictionaryKey:
-            return "InvalidDictionaryKey";
-        case InvalidDictionaryValue:
-            return "InvalidDictionaryValue";
-        case StaleAccessor:
-            return "StaleAccessor";
-        case IncompatibleLockFile:
-            return "IncompatibleLockFile";
-        case InvalidSortDescriptor:
-            return "InvalidSortDescriptor";
-        case DecryptionFailed:
-            return "DecryptionFailed";
-        case IncompatibleSession:
-            return "IncompatibleSession";
-        default:
-            return "UnknownError";
+    for (auto it : error_codes_map) {
+        if (it.second == code) {
+            return it.first;
+        }
     }
+    return "unknown";
 }
 
 ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
 {
-    if (name == std::string_view("OK"))
-        return OK;
-    if (name == std::string_view("UnknownError"))
-        return UnknownError;
-    if (name == std::string_view("RangeError"))
-        return RangeError;
-    if (name == std::string_view("TypeMismatch"))
-        return TypeMismatch;
-    if (name == std::string_view("BrokenPromise"))
-        return BrokenPromise;
-    if (name == std::string_view("InvalidName"))
-        return InvalidName;
-    if (name == std::string_view("OutOfMemory"))
-        return OutOfMemory;
-    if (name == std::string_view("NoSuchTable"))
-        return NoSuchTable;
-    if (name == std::string_view("CrossTableLinkTarget"))
-        return CrossTableLinkTarget;
-    if (name == std::string_view("UnsupportedFileFormatVersion"))
-        return UnsupportedFileFormatVersion;
-    if (name == std::string_view("MultipleSyncAgents"))
-        return MultipleSyncAgents;
-    if (name == std::string_view("AddressSpaceExhausted"))
-        return AddressSpaceExhausted;
-    if (name == std::string_view("OutOfDiskSpace"))
-        return OutOfDiskSpace;
-    if (name == std::string_view("KeyNotFound"))
-        return KeyNotFound;
-    if (name == std::string_view("OutOfBounds"))
-        return OutOfBounds;
-    if (name == std::string_view("IllegalOperation"))
-        return IllegalOperation;
-    if (name == std::string_view("KeyAlreadyUsed"))
-        return KeyAlreadyUsed;
-    if (name == std::string_view("SerializationError"))
-        return SerializationError;
-    if (name == std::string_view("InvalidPath"))
-        return InvalidPath;
-    if (name == std::string_view("DuplicatePrimaryKeyValue"))
-        return DuplicatePrimaryKeyValue;
-    if (name == std::string_view("SyntaxError"))
-        return SyntaxError;
-    if (name == std::string_view("InvalidQueryArg"))
-        return InvalidQueryArg;
-    if (name == std::string_view("InvalidQuery"))
-        return InvalidQuery;
-    if (name == std::string_view("WrongTransactioState"))
-        return WrongTransactionState;
-    if (name == std::string_view("WrongThread"))
-        return WrongThread;
-    if (name == std::string_view("InvalidatedObject"))
-        return InvalidatedObject;
-    if (name == std::string_view("InvalidProperty"))
-        return InvalidProperty;
-    if (name == std::string_view("MissingPrimaryKey"))
-        return MissingPrimaryKey;
-    if (name == std::string_view("UnexpectedPrimaryKey"))
-        return UnexpectedPrimaryKey;
-    if (name == std::string_view("ObjectAlreadyExists"))
-        return ObjectAlreadyExists;
-    if (name == std::string_view("ModifyPrimaryKey"))
-        return ModifyPrimaryKey;
-    if (name == std::string_view("ReadOnly"))
-        return ReadOnly;
-    if (name == std::string_view("PropertyNotNullable"))
-        return PropertyNotNullable;
-    if (name == std::string_view("MaximumFileSizeExceeded"))
-        return MaximumFileSizeExceeded;
-    if (name == std::string_view("TableNameInUse"))
-        return TableNameInUse;
-    if (name == std::string_view("InvalidTableRef"))
-        return InvalidTableRef;
-    if (name == std::string_view("BadChangeset"))
-        return BadChangeset;
-    if (name == std::string_view("InvalidDictionaryKey"))
-        return InvalidDictionaryKey;
-    if (name == std::string_view("InvalidDictionaryValue"))
-        return InvalidDictionaryValue;
-    if (name == std::string_view("StaleAccessor"))
-        return StaleAccessor;
-    if (name == std::string_view("IncompatibleLockFile"))
-        return IncompatibleLockFile;
-    if (name == std::string_view("InvalidSortDescriptor"))
-        return InvalidSortDescriptor;
-    if (name == std::string_view("DecryptionFailed"))
-        return DecryptionFailed;
-    if (name == std::string_view("IncompatibleSession"))
-        return IncompatibleSession;
+    auto it = error_codes_map.find(name);
+    if (it != error_codes_map.end()) {
+        return it->second;
+    }
     return UnknownError;
 }
 

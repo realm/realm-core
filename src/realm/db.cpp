@@ -1597,7 +1597,7 @@ void DB::close(bool allow_open_read_transactions)
         {
             std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
             if (!allow_open_read_transactions && m_transaction_count)
-                throw WrongTransactioState("Closing with open read transactions");
+                throw WrongTransactionState("Closing with open read transactions");
         }
         if (m_alloc.is_attached())
             m_alloc.detach();
@@ -1617,9 +1617,9 @@ void DB::close_internal(std::unique_lock<InterprocessMutex> lock, bool allow_ope
     {
         std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
         if (m_write_transaction_open)
-            throw WrongTransactioState("Closing with open write transactions");
+            throw WrongTransactionState("Closing with open write transactions");
         if (!allow_open_read_transactions && m_transaction_count)
-            throw WrongTransactioState("Closing with open read transactions");
+            throw WrongTransactionState("Closing with open read transactions");
     }
     SharedInfo* info = m_file_map.get_addr();
     {
@@ -2327,7 +2327,7 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     if (!is_attached())
         throw StaleAccessor("Stale transaction");
     if (m_transact_stage != DB::transact_Writing)
-        throw WrongTransactioState("Not in writing mode when committing");
+        throw WrongTransactionState("Not in writing mode when committing");
 
     flush_accessors_for_commit();
 
@@ -2699,7 +2699,7 @@ void Transaction::end_read()
     if (m_transact_stage == DB::transact_Ready)
         return;
     if (m_transact_stage == DB::transact_Writing)
-        throw WrongTransactioState("Illegal end_read when in write mode");
+        throw WrongTransactionState("Illegal end_read when in write mode");
     do_end_read();
 }
 
@@ -2731,7 +2731,7 @@ void Transaction::do_end_read() noexcept
 TransactionRef Transaction::freeze()
 {
     if (m_transact_stage != DB::transact_Reading)
-        throw WrongTransactioState("Can only freeze a read transaction");
+        throw WrongTransactionState("Can only freeze a read transaction");
     auto version = VersionID(m_read_lock.m_version, m_read_lock.m_reader_idx);
     return db->start_frozen(version);
 }
@@ -2744,7 +2744,7 @@ TransactionRef Transaction::duplicate()
     if (m_transact_stage == DB::transact_Frozen)
         return db->start_frozen(version);
 
-    throw WrongTransactioState("Can only duplicate a read/frozen transaction");
+    throw WrongTransactionState("Can only duplicate a read/frozen transaction");
     return {};
 }
 
@@ -2782,7 +2782,7 @@ void Transaction::rollback()
         return; // Idempotency
 
     if (m_transact_stage != DB::transact_Writing)
-        throw WrongTransactioState("Not a write transaction");
+        throw WrongTransactionState("Not a write transaction");
     db->reset_free_space_tracking();
     if (!holds_write_mutex())
         db->end_write_on_correct_thread();
@@ -2804,7 +2804,7 @@ DB::version_type Transaction::commit()
     check_attached();
 
     if (m_transact_stage != DB::transact_Writing)
-        throw WrongTransactioState("Not a write transaction");
+        throw WrongTransactionState("Not a write transaction");
 
     REALM_ASSERT(is_attached());
 
@@ -2833,7 +2833,7 @@ void Transaction::commit_and_continue_writing()
 {
     check_attached();
     if (m_transact_stage != DB::transact_Writing)
-        throw WrongTransactioState("Not a write transaction");
+        throw WrongTransactionState("Not a write transaction");
 
     REALM_ASSERT(is_attached());
 

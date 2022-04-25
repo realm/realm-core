@@ -32,27 +32,6 @@ public:
     }
 };
 
-/*
-struct ImmutableException : std::exception {
-    const char* what() const noexcept
-    {
-        return "Immutable object";
-    }
-};
-
-
-struct UnexpectedPrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct DuplicatePrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct InvalidPropertyKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-*/
 class CallbackFailed : public RuntimeError {
 public:
     CallbackFailed()

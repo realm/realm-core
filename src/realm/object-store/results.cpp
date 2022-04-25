@@ -127,7 +127,7 @@ void Results::validate_write() const
 {
     validate_read();
     if (!m_realm || !m_realm->is_in_transaction())
-        throw WrongTransactioState("Must be in a write transaction");
+        throw WrongTransactionState("Must be in a write transaction");
 }
 
 size_t Results::size()

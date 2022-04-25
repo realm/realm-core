@@ -247,18 +247,6 @@ public:
 
     virtual std::unique_ptr<ParentNode> clone() const = 0;
 
-    ColKey _get_column_key(StringData column_name) const
-    {
-        ColKey column_key;
-        if (column_name.size() > 0) {
-            column_key = m_table.unchecked_ptr()->get_column_key(column_name);
-            if (column_key == ColKey()) {
-                // throw LogicError(LogicError::column_does_not_exist);
-            }
-        }
-        return column_key;
-    }
-
     virtual std::string describe(util::serializer::SerialisationState&) const
     {
         return "";
