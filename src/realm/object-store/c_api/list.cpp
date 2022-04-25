@@ -73,6 +73,30 @@ RLM_API bool realm_list_set(realm_list_t* list, size_t index, realm_value_t valu
     });
 }
 
+RLM_API realm_object_t* realm_list_insert_embedded(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        return new realm_object_t({list->get_realm(), list->insert_embedded(index)});
+    });
+}
+
+RLM_API realm_object_t* realm_list_set_embedded(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        list->verify_attached();
+        return new realm_object_t({list->get_realm(), list->set_embedded(index)});
+    });
+}
+
+RLM_API realm_object_t* realm_list_get_linked_object(realm_list_t* list, size_t index)
+{
+    return wrap_err([&]() {
+        list->verify_attached();
+        auto o = list->get_object(index);
+        return o ? new realm_object_t({list->get_realm(), o}) : nullptr;
+    });
+}
+
 RLM_API bool realm_list_erase(realm_list_t* list, size_t index)
 {
     return wrap_err([&]() {

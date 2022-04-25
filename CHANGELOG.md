@@ -3,11 +3,15 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * `App::link_user()` and `App::delete_user()` now correctly report `ClientErrorCode::user_not_found` and `ClientErrorCode::user_not_logged_in` instead of only using `ClientErrorCode::user_not_found` for both error cases. ([#5402](https://github.com/realm/realm-core/issues/5402))
+* Add support for embedded objects in the C API. ([#5408](https://github.com/realm/realm-core/issues/5408))
+* Added `realm_object_to_string()` support for c_api. ([#5414](https://github.com/realm/realm-core/issues/5414))
+* Added `ObjectStore::rename_property()` support for c_api. ([#5424]https://github.com/realm/realm-core/issues/5424)
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
- 
+* Synchronized Realm files which were first created using SDK version released in the second half of August 2020 would be redownloaded instead of using the existing file, possibly resulting in the loss of any unsynchronized data in those files (since v11.6.1).
+
 ### Breaking changes
 * None.
 

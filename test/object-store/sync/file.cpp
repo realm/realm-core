@@ -23,26 +23,10 @@
 #include <realm/object-store/shared_realm.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/util/file.hpp>
-#include <realm/util/hex_dump.hpp>
-#include <realm/util/scope_exit.hpp>
-#include <realm/util/sha_crypto.hpp>
-
-#include <fstream>
 
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
-
-static const std::string base_path =
-    fs::path{util::make_temp_dir() + "/realm_objectstore_sync_file"}.make_preferred().string();
-
-static void prepare_sync_manager_test()
-{
-    // Remove the base directory in /tmp where all test-related file status lives.
-    try_remove_dir_recursive(base_path);
-    util::make_dir(base_path);
-    util::make_dir(fs::path{base_path + "/syncmanager"}.make_preferred().string());
-}
 
 TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
     SECTION("does not encode a string that has no restricted characters") {
@@ -147,24 +131,22 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
 }
 
 TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
+    TestSyncManager tsm;
+
     const std::string identity = "abcdefghi";
     const std::string local_identity = "123456789";
     const std::string app_id = "test_app_id*$#@!%1";
-    const std::string partition = random_string(10);
+    const std::string partition_str = random_string(10);
+    const std::string partition = bson::Bson(partition_str).to_string();
     const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path =
-        fs::path{base_path + "/syncmanager/mongodb-realm/" + expected_clean_app_id}.make_preferred().string();
-    prepare_sync_manager_test();
-    auto cleanup = util::make_scope_exit([=]() noexcept {
-        util::try_remove_dir_recursive(base_path);
-    });
-    std::string manager_base_path = fs::path{base_path + "/syncmanager"}.make_preferred().string();
-    auto manager = SyncFileManager(manager_base_path, app_id);
+    const auto manager_base_path = fs::path{tsm.base_file_path()}.make_preferred() / "file-manager";
+    util::try_make_dir(manager_base_path.string());
+    const auto manager_path = manager_base_path / "mongodb-realm" / expected_clean_app_id;
+    auto manager = SyncFileManager(manager_base_path.string(), app_id);
 
     SECTION("Realm path APIs") {
-        auto relative_path = "realms://r.example.com/~/my/realm/path";
-        ExpectedRealmPaths expected_paths(manager_base_path, app_id, identity, local_identity, partition,
-                                          {relative_path});
+        auto relative_path = "s_" + partition_str;
+        ExpectedRealmPaths expected_paths(manager_base_path.string(), app_id, identity, local_identity, partition);
 
         SECTION("getting a Realm path") {
             auto actual = manager.realm_file_path(identity, local_identity, relative_path, partition);
@@ -191,7 +173,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
 
         SECTION("hashed path is used if it already exists") {
-            util::try_make_dir(manager_path);
+            util::try_make_dir(manager_path.string());
 
             REQUIRE(!File::exists(expected_paths.fallback_hashed_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
@@ -207,8 +189,8 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
 
         SECTION("legacy local identity path is detected and used") {
-            util::try_make_dir(manager_path);
-            util::try_make_dir(fs::path{manager_path + "/" + local_identity}.make_preferred().string());
+            util::try_make_dir(manager_path.string());
+            util::try_make_dir((manager_path / local_identity).string());
             REQUIRE(!File::exists(expected_paths.legacy_local_id_path));
             REQUIRE(!File::exists(expected_paths.current_preferred_path));
             REQUIRE(create_dummy_realm(expected_paths.legacy_local_id_path));
@@ -253,18 +235,17 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     }
 
     SECTION("Utility path APIs") {
-        auto metadata_dir = fs::path{manager_path + "/server-utility/metadata"};
+        const auto metadata_dir = manager_path / "server-utility" / "metadata";
 
         SECTION("getting the metadata path") {
-            auto path = manager.metadata_path();
-            REQUIRE(path == metadata_dir.append("sync_metadata.realm").make_preferred().string());
+            REQUIRE(manager.metadata_path() == metadata_dir / "sync_metadata.realm");
         }
 
         SECTION("removing the metadata Realm") {
             manager.metadata_path();
-            REQUIRE_DIR_EXISTS(metadata_dir.string());
+            REQUIRE_DIR_PATH_EXISTS(metadata_dir);
             manager.remove_metadata_realm();
-            REQUIRE_DIR_DOES_NOT_EXIST(metadata_dir.string());
+            REQUIRE_DIR_PATH_DOES_NOT_EXIST(metadata_dir);
         }
     }
 }

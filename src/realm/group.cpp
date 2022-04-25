@@ -126,6 +126,8 @@ Group::Group(SlabAlloc* alloc) noexcept
     init_array_parents();
 }
 
+namespace {
+
 class TableRecycler : public std::vector<Table*> {
 public:
     ~TableRecycler()
@@ -149,6 +151,8 @@ auto& g_table_recycler_2 = *new TableRecycler;
 // without crashing.
 const static int g_table_recycling_delay = 100;
 auto& g_table_recycler_mutex = *new std::mutex;
+
+} // namespace
 
 TableKeyIterator& TableKeyIterator::operator++()
 {

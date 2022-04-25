@@ -115,7 +115,7 @@ static std::string HMAC_SHA256(std::string_view key, std::string_view data)
 #endif
 }
 
-std::string create_jwt(const std::string appId)
+static std::string create_jwt(const std::string& appId)
 {
     nlohmann::json header = {{"alg", "HS256"}, {"typ", "JWT"}};
     nlohmann::json payload = {{"aud", appId}, {"sub", "someUserId"}, {"exp", 1661896476}};
@@ -162,10 +162,9 @@ std::string create_jwt(const std::string appId)
 
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
     SECTION("login") {
-        auto config = get_integration_config();
-        TestSyncManager sync_manager(config, {});
-        auto app = sync_manager.app();
-        bool processed = false;
+        TestAppSession session;
+        auto app = session.app();
+        app->log_out([](auto) {});
 
         int subscribe_processed = 0;
         auto token = app->subscribe([&subscribe_processed](auto& app) {
@@ -183,6 +182,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         CHECK(!user->device_id().empty());
         CHECK(user->has_device_id());
 
+        bool processed = false;
         app->log_out([&](auto error) {
             REQUIRE_FALSE(error);
             processed = true;
@@ -203,9 +203,8 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     auto email = creds.email;
     auto password = creds.password;
 
-    auto config = get_integration_config();
-    TestSyncManager sync_manager(config, {});
-    auto app = sync_manager.app();
+    TestAppSession session;
+    auto app = session.app();
     auto client = app->provider_client<App::UsernamePasswordProviderClient>();
 
     bool processed = false;
@@ -344,6 +343,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     }
 
     SECTION("log in, remove, log in") {
+        app->remove_user(app->current_user(), [](auto) {});
         CHECK(app->sync_manager()->all_users().size() == 0);
         CHECK(app->sync_manager()->get_current_user() == nullptr);
 
@@ -378,15 +378,14 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 // MARK: - UserAPIKeyProviderClient Tests
 
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
+    TestAppSession session;
+    auto app = session.app();
     auto client = app->provider_client<App::UserAPIKeyProviderClient>();
 
     bool processed = false;
     App::UserAPIKey api_key;
 
     SECTION("api-key") {
-        create_user_and_log_in(app);
         std::shared_ptr<SyncUser> logged_in_user = app->current_user();
         auto api_key_name = util::format("%1", random_string(15));
         client.create_api_key(api_key_name, logged_in_user,
@@ -513,7 +512,6 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     }
 
     SECTION("api-key against the wrong user") {
-        create_user_and_log_in(app);
         std::shared_ptr<SyncUser> first_user = app->current_user();
         create_user_and_log_in(app);
         std::shared_ptr<SyncUser> second_user = app->current_user();
@@ -642,8 +640,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 // MARK: - Auth Providers Function Tests
 
 TEST_CASE("app: auth providers function integration", "[sync][app]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
+    TestAppSession session;
+    auto app = session.app();
 
     SECTION("auth providers function integration") {
         bson::BsonDocument function_params{{"realmCustomAuthFuncUserId", "123456"}};
@@ -656,8 +654,8 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
 // MARK: - Link User Tests
 
 TEST_CASE("app: link_user integration", "[sync][app]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
+    TestAppSession session;
+    auto app = session.app();
 
     SECTION("link_user intergration") {
         AutoVerifiedEmailCredentials creds;
@@ -689,14 +687,14 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
 // MARK: - Delete User Tests
 
 TEST_CASE("app: delete anonymous user integration", "[sync][app]") {
-    TestSyncManager tsm(get_integration_config(), {});
-    auto app = tsm.app();
+    TestAppSession session;
+    auto app = session.app();
 
     SECTION("delete user expect success") {
-        CHECK(app->sync_manager()->all_users().size() == 0);
+        CHECK(app->sync_manager()->all_users().size() == 1);
 
         // Log in user 1
-        auto user_a = log_in(app);
+        auto user_a = app->current_user();
         CHECK(user_a->state() == SyncUser::State::LoggedIn);
         app->delete_user(user_a, [&](Optional<app::AppError> error) {
             REQUIRE_FALSE(error);
@@ -731,8 +729,9 @@ TEST_CASE("app: delete anonymous user integration", "[sync][app]") {
 }
 
 TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
-    TestSyncManager tsm(get_integration_config(), {});
-    auto app = tsm.app();
+    TestAppSession session;
+    auto app = session.app();
+    app->remove_user(app->current_user(), [](auto) {});
 
     SECTION("log in and delete") {
         CHECK(app->sync_manager()->all_users().size() == 0);
@@ -771,10 +770,8 @@ TEST_CASE("app: delete user with credentials integration", "[sync][app]") {
 // MARK: - Call Function Tests
 
 TEST_CASE("app: call function", "[sync][app]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
-
-    create_user_and_log_in(app);
+    TestAppSession session;
+    auto app = session.app();
 
     bson::BsonArray toSum(5);
     std::iota(toSum.begin(), toSum.end(), static_cast<int64_t>(1));
@@ -789,10 +786,8 @@ TEST_CASE("app: call function", "[sync][app]") {
 // MARK: - Remote Mongo Client Tests
 
 TEST_CASE("app: remote mongo client", "[sync][app]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
-
-    create_user_and_log_in(app);
+    TestAppSession session;
+    auto app = session.app();
 
     auto remote_client = app->current_user()->mongo_client("BackingDB");
     auto db = remote_client.db(get_runtime_app_session("").config.mongo_dbname);
@@ -1412,10 +1407,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 // MARK: - Push Notifications Tests
 
 TEST_CASE("app: push notifications", "[sync][app]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
-
-    create_user_and_log_in(app);
+    TestAppSession session;
+    auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
 
     SECTION("register") {
@@ -1496,10 +1489,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
 // MARK: - Token refresh
 
 TEST_CASE("app: token refresh", "[sync][app][token]") {
-    TestSyncManager sync_manager(get_integration_config(), {});
-    auto app = sync_manager.app();
-
-    create_user_and_log_in(app);
+    TestAppSession session;
+    auto app = session.app();
     std::shared_ptr<SyncUser> sync_user = app->current_user();
     sync_user->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
@@ -1549,12 +1540,8 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
 
     auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
     auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
     auto partition = random_string(100);
 
-    auto email = std::string("realm_tests_do_autoverify-test@example.com");
-    auto password = std::string{"password"};
-    auto creds = AppCredentials::username_password(email, password);
     auto obj_id = ObjectId::gen();
     auto target_id = ObjectId::gen();
     auto mixed_list_values = AnyVector{
@@ -1563,14 +1550,8 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
         Mixed{target_id},
     };
     {
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
-                                                                                   [&](Optional<AppError> error) {
-                                                                                       REQUIRE_FALSE(error);
-                                                                                   });
-        log_in(app, creds);
-        SyncTestFile config(app, partition, schema);
+        TestAppSession test_session(app_session, nullptr, DeleteApp{false});
+        SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
         CppContext c(realm);
@@ -1591,11 +1572,8 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
     }
 
     {
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        auto user = log_in(app, creds);
-
-        SyncTestFile config(app, partition, schema);
+        TestAppSession test_session(app_session);
+        SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
         CHECK(!wait_for_download(*realm));
@@ -1631,8 +1609,6 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
 
     /*             Create local realm             */
     TestFile local_config;
-    local_config.cache = true;
-    local_config.schema_version = 1;
     local_config.schema = schema;
     auto local_realm = Realm::get_shared_realm(local_config);
     {
@@ -1651,14 +1627,9 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
 
     /* Create a synced realm and upload some data */
     auto server_app_config = minimal_app_config(base_url, "upgrade_from_local", schema);
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    TestAppSession test_session(create_app(server_app_config));
     auto partition = random_string(100);
-    TestSyncManager sync_manager(app_config, {});
-    auto app = sync_manager.app();
-
-    create_user_and_log_in(app);
-    auto user1 = app->current_user();
+    auto user1 = test_session.app()->current_user();
     SyncTestFile config1(user1, partition, schema);
 
     auto r1 = Realm::get_shared_realm(config1);
@@ -1677,8 +1648,8 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
     CHECK(!wait_for_upload(*r1));
 
     /* Copy local realm data over in a synced one*/
-    create_user_and_log_in(app);
-    auto user2 = app->current_user();
+    create_user_and_log_in(test_session.app());
+    auto user2 = test_session.app()->current_user();
     REQUIRE(user1 != user2);
 
     SyncTestFile config2(user1, partition, schema);
@@ -1743,31 +1714,15 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     };
 
     auto server_app_config = minimal_app_config(base_url, "set_new_embedded_object", schema);
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
+    TestAppSession test_session(create_app(server_app_config));
     auto partition = random_string(100);
 
     auto array_of_objs_id = ObjectId::gen();
     auto embedded_obj_id = ObjectId::gen();
     auto dict_obj_id = ObjectId::gen();
-    auto email = std::string("realm_tests_do_autoverify-test@example.com");
-    auto password = std::string{"password"};
-    auto creds = AppCredentials::username_password(email, password);
 
     {
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        app->provider_client<App::UsernamePasswordProviderClient>().register_email(email, password,
-                                                                                   [&](Optional<AppError> error) {
-                                                                                       REQUIRE_FALSE(error);
-                                                                                   });
-        app->log_in_with_credentials(AppCredentials::username_password(email, password),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                         REQUIRE(user);
-                                         REQUIRE_FALSE(error);
-                                     });
-
-        SyncTestFile config(app, partition, schema);
+        SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
         CppContext c(realm);
@@ -1827,10 +1782,7 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
     }
 
     {
-        TestSyncManager sync_manager(TestSyncManager::Config(app_config), {});
-        auto app = sync_manager.app();
-        log_in(app, creds);
-        SyncTestFile config(app, partition, schema);
+        SyncTestFile config(test_session.app(), partition, schema);
         auto realm = Realm::get_shared_realm(config);
 
         CHECK(!wait_for_download(*realm));
@@ -1869,7 +1821,6 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 }
 
 TEST_CASE("app: make distributable client file", "[sync][app]") {
-    auto config = get_integration_config();
     auto base_path = util::make_temp_dir();
     util::try_remove_dir_recursive(base_path);
     util::try_make_dir(base_path);
@@ -1878,33 +1829,15 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
 
     // Create realm file without client file id
     {
-        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
-        auto app = sync_manager.app();
-        app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                         REQUIRE(!error);
-                                         REQUIRE(user);
-                                     });
+        TestAppSession session;
+        auto app = session.app();
 
-        ThreadSafeReference realm_ref;
-
-        realm::Realm::Config realm_config;
-        realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.schema_version = 1;
-        realm_config.path = base_path + "/orig/default.realm";
-
-        std::mutex mutex;
-        auto task = realm::Realm::get_synchronized_realm(realm_config);
-        task->start([&](ThreadSafeReference ref, std::exception_ptr error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            realm_ref = std::move(ref);
-        });
-        util::EventLoop::main().run_until([&] {
-            std::lock_guard<std::mutex> lock(mutex);
-            return bool(realm_ref);
-        });
-        SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+        Realm::Config config;
+        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+        config.path = base_path + "/orig/default.realm";
+        config.schema = default_app_config("").schema;
+        config.schema_version = 0;
+        SharedRealm realm = Realm::get_shared_realm(std::move(config));
 
         // Write some data
         realm->begin_transaction();
@@ -1932,19 +1865,11 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
     }
     // Starting a new session based on the copy
     {
-        TestSyncManager sync_manager(TestSyncManager::Config(config), {});
-        auto app = sync_manager.app();
-        app->log_in_with_credentials(AppCredentials::anonymous(),
-                                     [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-                                         REQUIRE(!error);
-                                         REQUIRE(user);
-                                     });
-
-        ThreadSafeReference realm_ref;
+        TestAppSession session;
+        auto app = session.app();
 
         realm::Realm::Config realm_config;
         realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.schema_version = 1;
         realm_config.path = base_path + "/copy/default.realm";
 
         SharedRealm realm = realm::Realm::get_shared_realm(realm_config);
@@ -1970,41 +1895,11 @@ constexpr size_t minus_25_percent(size_t val)
 }
 
 TEST_CASE("app: sync integration", "[sync][app]") {
-    const auto schema = Schema{{"Dog",
-                                {{"_id", PropertyType::ObjectId | PropertyType::Nullable, true},
-                                 {"breed", PropertyType::String | PropertyType::Nullable},
-                                 {"name", PropertyType::String}}},
-                               {"Person",
-                                {{"_id", PropertyType::ObjectId | PropertyType::Nullable, true},
-                                 {"age", PropertyType::Int},
-                                 {"dogs", PropertyType::Object | PropertyType::Array, "Dog"},
-                                 {"firstName", PropertyType::String},
-                                 {"lastName", PropertyType::String}}}};
+    const auto schema = default_app_config("").schema;
 
     auto get_dogs = [](SharedRealm r) -> Results {
-        auto& config = r->config();
-        auto session = config.sync_config->user->sync_manager()->get_existing_session(config.path);
-        std::atomic<bool> called{false};
-        session->wait_for_upload_completion([&](std::error_code err) {
-            REQUIRE(err == std::error_code{});
-            called.store(true);
-        });
-        timed_wait_for(
-            [&] {
-                return called.load();
-            },
-            std::chrono::milliseconds(10000));
-        REQUIRE(called);
-        called.store(false);
-        session->wait_for_download_completion([&](std::error_code err) {
-            REQUIRE(err == std::error_code{});
-            called.store(true);
-        });
-        timed_wait_for(
-            [&] {
-                return called.load();
-            },
-            std::chrono::milliseconds(10000));
+        wait_for_upload(*r, std::chrono::seconds(10));
+        wait_for_download(*r, std::chrono::seconds(10));
         return Results(r, r->read_group().get_table("class_Dog"));
     };
 
@@ -2019,15 +1914,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         r->commit_transaction();
     };
 
-    auto app_config = get_integration_config();
+    TestAppSession session;
+    auto app = session.app();
     const auto partition = random_string(100);
 
     // MARK: Add Objects -
     SECTION("Add Objects") {
         {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
 
@@ -2037,8 +1930,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
             create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -2052,9 +1943,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     // MARK: Expired Session Refresh -
     SECTION("Invalid Access Token is Refreshed") {
         {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
             REQUIRE(get_dogs(r).size() == 0);
@@ -2063,8 +1951,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
             create_user_and_log_in(app);
             auto user = app->current_user();
             // set a bad access token. this will trigger a refresh when the sync session opens
@@ -2100,10 +1986,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     SECTION("Fast clock on client") {
         {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            create_user_and_log_in(app);
-            std::shared_ptr<SyncUser> user = app->current_user();
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
 
@@ -2113,11 +1995,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         auto transport = std::make_shared<HookedTransport>();
-        app_config.transport = transport;
-
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        auto creds = create_user_and_log_in(app);
+        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
         REQUIRE(!user->access_token_refresh_required());
@@ -2153,9 +2032,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     SECTION("Expired Tokens") {
         sync::AccessToken token;
         {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            create_user_and_log_in(app);
             std::shared_ptr<SyncUser> user = app->current_user();
             SyncTestFile config(app, partition, schema);
             auto r = Realm::get_shared_realm(config);
@@ -2177,11 +2053,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         auto transport = std::make_shared<HookedTransport>();
-        app_config.transport = transport;
-
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        auto creds = create_user_and_log_in(app);
+        TestAppSession hooked_session(session.app_session(), transport, DeleteApp{false});
+        auto app = hooked_session.app();
         std::shared_ptr<SyncUser> user = app->current_user();
         REQUIRE(user);
         REQUIRE(!user->access_token_refresh_required());
@@ -2288,7 +2161,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("Invalid refresh token") {
-        auto app_session = get_runtime_app_session("");
+        auto& app_session = session.app_session();
         std::mutex mtx;
         auto verify_error_on_sync_with_invalid_refresh_token = [&](std::shared_ptr<SyncUser> user,
                                                                    Realm::Config config) {
@@ -2318,7 +2191,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
                 REQUIRE(error.message == "Unable to refresh the user access token.");
             };
 
-            auto transport = static_cast<SynchronousTestTransport*>(app_config.transport.get());
+            auto transport = static_cast<SynchronousTestTransport*>(session.transport());
             transport->block(); // don't let the token refresh happen until we're ready for it
             auto r = Realm::get_shared_realm(config);
             auto session = user->session_for_on_disk_path(config.path);
@@ -2348,9 +2221,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         };
 
         SECTION("Disabled user results in a sync error") {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            auto creds = create_user_and_log_in(sync_manager.app());
+            auto creds = create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
             auto user = app->current_user();
             REQUIRE(user);
@@ -2381,9 +2252,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         SECTION("Revoked refresh token results in a sync error") {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
-            auto creds = create_user_and_log_in(sync_manager.app());
+            auto creds = create_user_and_log_in(app);
             SyncTestFile config(app, partition, schema);
             auto user = app->current_user();
             REQUIRE(app_session.admin_api.verify_access_token(user->access_token(), app_session.server_app_id));
@@ -2415,8 +2284,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         SECTION("Revoked refresh token on an anonymous user results in a sync error") {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
+            app->current_user()->log_out();
             auto anon_user = log_in(app);
             REQUIRE(app->current_user() == anon_user);
             SyncTestFile config(app, partition, schema);
@@ -2449,8 +2317,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         SECTION("Opening a Realm with a removed email user results produces an exception") {
-            TestSyncManager sync_manager(app_config, {});
-            auto app = sync_manager.app();
             auto creds = create_user_and_log_in(app);
             auto email_user = app->current_user();
             const std::string user_ident = email_user->identity();
@@ -2490,9 +2356,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("large write transactions which would be too large if batched") {
-        TestSyncManager sync_manager(TestSyncManager::Config{app_config});
-        auto app = sync_manager.app();
-        create_user_and_log_in(app);
         SyncTestFile config(app, partition, schema);
 
         std::mutex mutex;
@@ -2531,9 +2394,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("too large sync message error handling") {
-        TestSyncManager sync_manager(TestSyncManager::Config{app_config});
-        auto app = sync_manager.app();
-        create_user_and_log_in(app);
         SyncTestFile config(app, partition, schema);
 
         std::mutex sync_error_mutex;
@@ -2572,9 +2432,6 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     }
 
     SECTION("validation") {
-        TestSyncManager sync_manager(app_config, {});
-        auto app = sync_manager.app();
-        auto creds = create_user_and_log_in(sync_manager.app());
         SyncTestFile config(app, partition, schema);
 
         SECTION("invalid partition error handling") {
@@ -2621,16 +2478,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 }
 
 TEST_CASE("app: custom user data integration tests", "[sync][app]") {
-    auto app_config = get_integration_config();
+    TestAppSession session;
+    auto app = session.app();
+    auto user = app->current_user();
 
     SECTION("custom user data happy path") {
-        TestSyncManager sync_manager(app_config);
-        auto app = sync_manager.app();
-
         bool processed = false;
-
-        std::shared_ptr<SyncUser> user = log_in(app);
-        app->call_function(user, "updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
+        app->call_function("updateUserData", {bson::BsonDocument({{"favorite_color", "green"}})},
                            [&](auto response, auto error) {
                                CHECK(error == none);
                                CHECK(response);
@@ -2649,13 +2503,11 @@ TEST_CASE("app: custom user data integration tests", "[sync][app]") {
 }
 
 TEST_CASE("app: jwt login and metadata tests", "[sync][app]") {
-    auto app_config = get_integration_config();
-    auto jwt = create_jwt(app_config.app_id);
+    TestAppSession session;
+    auto app = session.app();
+    auto jwt = create_jwt(session.app()->config().app_id);
 
     SECTION("jwt happy path") {
-        TestSyncManager sync_manager(app_config);
-        auto app = sync_manager.app();
-
         bool processed = false;
 
         std::shared_ptr<SyncUser> user = log_in(app, AppCredentials::custom(jwt));
@@ -2700,10 +2552,7 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
                           {"realm_id", PropertyType::String | PropertyType::Nullable},
                       }}};
     auto server_app_config = minimal_app_config(base_url, "collections_of_links", schema);
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
-    TestSyncManager sync_manager({app_config, &app_session});
-    auto app = sync_manager.app();
+    TestAppSession test_session(create_app(server_app_config));
 
     auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
         timed_sleeping_wait_for([&]() -> bool {
@@ -2755,12 +2604,12 @@ TEMPLATE_TEST_CASE("app: collections of links integration", "[sync][app][collect
     };
 
     SECTION("integration testing") {
-        create_user_and_log_in(sync_manager.app());
+        auto app = test_session.app();
         SyncTestFile config1(app, partition, schema); // uses the current user created above
         auto r1 = realm::Realm::get_shared_realm(config1);
         Results r1_source_objs = realm::Results(r1, r1->read_group().get_table("class_source"));
 
-        create_user_and_log_in(sync_manager.app());
+        create_user_and_log_in(app);
         SyncTestFile config2(app, partition, schema); // uses the user created above
         auto r2 = realm::Realm::get_shared_realm(config2);
         Results r2_source_objs = realm::Results(r2, r2->read_group().get_table("class_source"));
@@ -2852,10 +2701,8 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
                       }}};
     auto server_app_config = minimal_app_config(base_url, "partition_types_app_name", schema);
     server_app_config.partition_key = partition_property;
-    auto app_session = create_app(server_app_config);
-    auto app_config = get_config(instance_of<SynchronousTestTransport>, app_session);
-    TestSyncManager sync_manager({app_config, &app_session});
-    auto app = sync_manager.app();
+    TestAppSession test_session(create_app(server_app_config));
+    auto app = test_session.app();
 
     auto wait_for_num_objects_to_equal = [](realm::SharedRealm r, const std::string& table_name, size_t count) {
         timed_sleeping_wait_for([&]() -> bool {
@@ -2890,9 +2737,8 @@ TEMPLATE_TEST_CASE("app: partition types", "[sync][app][partition]", cf::Int, cf
 
     SECTION("can round trip an object") {
         auto values = TestType::values();
-        create_user_and_log_in(sync_manager.app());
         auto user1 = app->current_user();
-        create_user_and_log_in(sync_manager.app());
+        create_user_and_log_in(app);
         auto user2 = app->current_user();
         REQUIRE(user1);
         REQUIRE(user2);
@@ -2948,9 +2794,10 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
     };
 
     SECTION("custom code and message is sent back") {
-        TestSyncManager tsm(get_config(std::make_shared<CustomErrorTransport>(1001, "Boom!")), {});
-        auto app = tsm.app();
-        auto error = failed_log_in(app);
+        TestSyncManager::Config config;
+        config.transport = std::make_shared<CustomErrorTransport>(1001, "Boom!");
+        TestSyncManager tsm(config);
+        auto error = failed_log_in(tsm.app());
         CHECK(error.is_custom_error());
         CHECK(error.error_code.value() == 1001);
         CHECK(error.message == "Boom!");
@@ -3045,11 +2892,11 @@ private:
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
         CHECK(nlohmann::json::parse(request.body)["options"] ==
               nlohmann::json({{"device",
-                               {{"appId", "app name"},
+                               {{"appId", "app_id"},
                                 {"appVersion", "A Local App Version"},
-                                {"platform", "Object Store Platform Tests"},
-                                {"platformVersion", "Object Store Platform Version Blah"},
-                                {"sdkVersion", "An sdk version"}}}}));
+                                {"platform", "Object Store Test Platform"},
+                                {"platformVersion", "Object Store Test Platform Version"},
+                                {"sdkVersion", "SDK Version"}}}}));
 
         CHECK(request.timeout_ms == 60000);
 
@@ -3169,7 +3016,7 @@ public:
     }
 };
 
-App::Config get_config()
+static TestSyncManager::Config get_config()
 {
     return get_config(instance_of<UnitTestTransport>);
 }
@@ -3269,16 +3116,14 @@ TEST_CASE("subscribable unit tests", "[sync][app]") {
 }
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
+    auto config = get_config();
+
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
-
-        auto config = get_config();
-        auto base_path = util::make_temp_dir();
+        config.base_path = util::make_temp_dir();
+        config.should_teardown_test_directory = false;
         {
-            auto conf = TestSyncManager::Config(config);
-            conf.should_teardown_test_directory = false;
-            conf.base_path = base_path;
-            TestSyncManager tsm(conf, {});
+            TestSyncManager tsm(config);
             auto app = tsm.app();
 
             auto user = log_in(app);
@@ -3301,9 +3146,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         App::clear_cached_apps();
         // assert everything is stored properly between runs
         {
-            auto conf = TestSyncManager::Config(config);
-            conf.base_path = base_path;
-            TestSyncManager tsm(conf, {});
+            TestSyncManager tsm(config);
             auto app = tsm.app();
             REQUIRE(app->all_users().size() == 1);
             auto user = app->all_users()[0];
@@ -3338,10 +3181,9 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             }
         };
 
-        TestSyncManager tsm(get_config(instance_of<transport>), {});
-        auto app = tsm.app();
-
-        auto error = failed_log_in(app);
+        config.transport = instance_of<transport>;
+        TestSyncManager tsm(config);
+        auto error = failed_log_in(tsm.app());
         CHECK(error.message == std::string("jwt missing parts"));
         CHECK(error.error_code.message() == "bad token");
         CHECK(error.error_code.category() == json_error_category());
@@ -3551,7 +3393,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 
     Response response{200, 0, {{"Content-Type", "application/json"}}, response_body};
 
-    TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)), {});
+    TestSyncManager tsm(get_config(std::make_shared<ErrorCheckingTransport>(&response)));
     auto app = tsm.app();
 
     SECTION("http 404") {
@@ -4275,13 +4117,14 @@ TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
         app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
             REQUIRE_FALSE(error);
         });
+        REQUIRE(app->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
     }
 
     App::clear_cached_apps();
     config.override_sync_route = false;
     config.should_teardown_test_directory = true;
     {
-        TestSyncManager sync_manager(config, {});
+        TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
         REQUIRE(app->sync_manager()->sync_route().rfind(test_ws_hostname, 0) != std::string::npos);
         app->call_function("function", {}, [](auto error, auto) {
@@ -4295,15 +4138,15 @@ TEST_CASE("app: make_streaming_request", "[sync][app]") {
 
     constexpr uint64_t timeout_ms = 60000;
     auto config = get_config();
-    config.default_request_timeout_ms = timeout_ms;
-    TestSyncManager tsm(TestSyncManager::Config(config), {});
+    config.app_config.default_request_timeout_ms = timeout_ms;
+    TestSyncManager tsm(config);
     auto app = tsm.app();
 
     std::shared_ptr<SyncUser> user = log_in(app);
 
     using Headers = decltype(Request().headers);
 
-    const auto url_prefix = "field/api/client/v2.0/app/app name/functions/call?baas_request="sv;
+    const auto url_prefix = "field/api/client/v2.0/app/app_id/functions/call?baas_request="sv;
     const auto get_request_args = [&](const Request& req) {
         REQUIRE(req.url.substr(0, url_prefix.size()) == url_prefix);
         auto args = req.url.substr(url_prefix.size());

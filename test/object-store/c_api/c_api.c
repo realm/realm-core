@@ -29,6 +29,7 @@ static void check_property_info_equal(const realm_property_info_t* lhs, const re
     assert(lhs->flags == rhs->flags);
 }
 
+int realm_c_api_tests(const char* file);
 int realm_c_api_tests(const char* file)
 {
     const realm_class_info_t def_classes[] = {

@@ -190,6 +190,13 @@ SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync
     return app;
 }
 
+SharedApp App::get_uncached_app(const Config& config, const SyncClientConfig& sync_client_config)
+{
+    auto app = std::make_shared<App>(config);
+    app->configure(sync_client_config);
+    return app;
+}
+
 std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);

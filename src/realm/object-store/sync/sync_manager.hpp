@@ -30,7 +30,8 @@
 #include <mutex>
 #include <unordered_map>
 
-struct TestSyncManager;
+class TestAppSession;
+class TestSyncManager;
 
 namespace realm {
 
@@ -89,7 +90,8 @@ struct SyncClientConfig {
 
 class SyncManager : public std::enable_shared_from_this<SyncManager> {
     friend class SyncSession;
-    friend struct ::TestSyncManager;
+    friend class ::TestSyncManager;
+    friend class ::TestAppSession;
 
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;

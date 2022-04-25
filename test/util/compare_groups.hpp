@@ -6,11 +6,7 @@
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 
-namespace realm {
-namespace sync {
-struct TableInfoCache;
-} // namespace sync
-namespace test_util {
+namespace realm::test_util {
 
 bool compare_tables(const Table& table_1, const Table& table_2, util::Logger&);
 
@@ -36,7 +32,6 @@ inline bool compare_groups(const Transaction& group_1, const Transaction& group_
         logger);
 }
 
-} // namespace test_util
-} // namespace realm
+} // namespace realm::test_util
 
 #endif // REALM_TEST_UTIL_COMPARE_GROUPS_HPP

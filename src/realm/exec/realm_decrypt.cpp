@@ -4,6 +4,7 @@
 #include <realm/util/file.hpp>
 #include <realm/util/aes_cryptor.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
+#include "hex_util.hpp"
 
 using namespace realm;
 
@@ -17,8 +18,7 @@ int main(int argc, const char* argv[])
         std::string outfilename = "out.realm";
         for (int curr_arg = 1; curr_arg < argc; curr_arg++) {
             if (strcmp(argv[curr_arg], "--key") == 0) {
-                std::ifstream key_file(argv[curr_arg + 1]);
-                key_file.read(key, sizeof(key));
+                hex_to_bin(argv[curr_arg + 1], key);
                 key_ptr = reinterpret_cast<uint8_t*>(key);
                 curr_arg++;
             }
@@ -27,9 +27,9 @@ int main(int argc, const char* argv[])
                 curr_arg++;
             }
             else {
-                std::cout << "Decrypting " << argv[curr_arg] << " into " << outfilename << std::endl;
-                std::ofstream out(outfilename);
                 const std::string path = argv[curr_arg];
+                std::cout << "Decrypting " << path << " into " << outfilename << std::endl;
+                std::ofstream out(outfilename);
                 util::File file;
                 file.open(path);
                 file.set_encryption_key(key);

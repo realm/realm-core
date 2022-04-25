@@ -354,6 +354,12 @@ util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const 
         return hashed_path;
     }
 
+    // The legacy fallback paths are not applicable to flexible sync
+    if (partition.empty()) {
+        REALM_ASSERT(realm_file_name == "flx_sync_default");
+        return util::none;
+    }
+
     // We used to hash the string value of the partition. For compatibility, check that SHA256
     // hash file name exists, and if it does, continue to use it.
     if (!partition.empty()) {
@@ -370,7 +376,7 @@ util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const 
             return old_path;
         }
         // retain support for legacy local identity paths
-        std::string old_local_identity_path = legacy_local_identity_path(local_user_identity, realm_file_name);
+        std::string old_local_identity_path = legacy_local_identity_path(local_user_identity, partition);
         if (try_file_exists(old_local_identity_path)) {
             return old_local_identity_path;
         }

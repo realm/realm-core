@@ -11,6 +11,8 @@
 
 using namespace realm;
 
+namespace {
+
 sync::Changeset changeset_binary_to_sync_changeset(const std::string& changeset_binary)
 {
     util::SimpleInputStream input_stream{changeset_binary};
@@ -88,6 +90,8 @@ void print_changeset(const std::string& path, bool hex, bool compressed)
     std::cout << "changeset printing is disabled in Release mode, build in Debug mode to use this tool" << std::endl;
 #endif
 }
+
+} // namespace
 
 int main(int argc, char* argv[])
 {
