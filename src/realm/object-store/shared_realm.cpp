@@ -1050,9 +1050,19 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::write_copy(StringData path, BinaryData key)
+void Realm::write_copy(StringData path, BinaryData encryption_key)
 {
-    if (key.data() && key.size() != 64) {
+    convert(path, encryption_key);
+}
+
+void Realm::export_to(const Config& config)
+{
+    convert(config);
+}
+
+void Realm::convert(StringData path, BinaryData encryption_key)
+{
+    if (encryption_key.data() && encryption_key.size() != 64) {
         throw InvalidEncryptionKeyException();
     }
     verify_thread();
@@ -1060,10 +1070,10 @@ void Realm::write_copy(StringData path, BinaryData key)
         Transaction& tr = transaction();
         auto repl = tr.get_replication();
         if (repl && repl->get_history_type() == Replication::hist_SyncClient) {
-            m_coordinator->write_copy(path, key, false);
+            m_coordinator->write_copy(path, encryption_key, false);
         }
         else {
-            tr.write(path, key.data());
+            tr.write(path, encryption_key.data());
         }
     }
     catch (...) {
@@ -1071,7 +1081,7 @@ void Realm::write_copy(StringData path, BinaryData key)
     }
 }
 
-void Realm::export_to(const Config& config)
+void Realm::convert(const Config& config)
 {
     std::string new_location = config.path;
     BinaryData encryption_key(config.encryption_key.data(), config.encryption_key.size());
@@ -1083,16 +1093,20 @@ void Realm::export_to(const Config& config)
         destination_realm->commit_transaction();
     }
     else {
-        write_copy(new_location, encryption_key);
         if (config.sync_config) {
+            write_copy(new_location, encryption_key);
 #if REALM_ENABLE_SYNC
             DBOptions options;
             if (encryption_key.size()) {
                 options.encryption_key = encryption_key.data();
             }
-            auto db = DB::create(make_in_realm_history(), new_location, options);
+            auto init_history = m_config.sync_config ? sync::make_client_replication() : make_in_realm_history();
+            auto db = DB::create(std::move(init_history), new_location, options);
             db->create_new_history(sync::make_client_replication());
 #endif
+        }
+        else {
+            read_group().write(new_location, encryption_key.data());
         }
     }
 }

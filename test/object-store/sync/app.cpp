@@ -1851,7 +1851,16 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
-        realm->write_copy(base_path + "/copy/default.realm", BinaryData());
+        SECTION("copy using the path") {
+            realm->export_to(base_path + "/copy/default.realm", BinaryData());
+        }
+
+        SECTION("copy by passing the config") {
+            Realm::Config config2;
+            config2.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
+            config2.path = base_path + "/copy/default.realm";
+            realm->export_to(config);
+        }
 
         // Write some additional data
         realm->begin_transaction();

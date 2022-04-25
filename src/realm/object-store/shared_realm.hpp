@@ -341,16 +341,32 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    // For synchronized realms, the file written will have the client file ident removed. Furthermore
-    // it is required that all local changes are synchronized with the server before the copy can
-    // be written. This is to be sure that the file can be used as a stating point for a newly
-    // installed application. The function will throw if there are pending uploads.
+    // Deprecated. Use Realm::convert instead.    
     void write_copy(StringData path, BinaryData encryption_key);
+    // Deprecated. Use Realm::convert instead.
     // Will export data to a file that is supposed to be opened with a sync configuration.
     // If the file is already existing, data will be copied over object per object. If the file
     // does not exist, the local realm file will exported to the new location and if the configuration
-    // object contains a sync part, a sync history will be synthesized
+    // object contains a sync part, a sync history will be synthesized    
     void export_to(const Config& config);
+    // The overloaded Realm::convert function offers a way to copy and/or convert a Realm using
+    // either the realm config or the path along with an optional encryption key.
+    // If the file already exists, data will be copied over object per object.
+    // If the file does not exist, the realm file will be exported to the new location and if the
+    // configuration object contains a sync part, a sync history will be synthesized.
+    //
+    // The following options are supported:
+    // local -> local
+    // local -> sync
+    // sync -> local    
+    // sync -> sync
+    // sync -> bundlable sync (client file identifier removed)
+    // 
+    // Note that for bundled realms it is required that all local changes are synchronized with the server
+    // before the copy can be written. This is to be sure that the file can be used as a stating point
+    // for a newly installed application. The function will throw if there are pending uploads.
+    void convert(const Config& config);
+    void convert(StringData path, BinaryData encryption_key);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;
