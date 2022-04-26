@@ -341,14 +341,6 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    // Deprecated. Use Realm::convert instead.
-    void write_copy(StringData path, BinaryData encryption_key);
-    // Deprecated. Use Realm::convert instead.
-    // Will export data to a file that is supposed to be opened with a sync configuration.
-    // If the file is already existing, data will be copied over object per object. If the file
-    // does not exist, the local realm file will exported to the new location and if the configuration
-    // object contains a sync part, a sync history will be synthesized
-    void export_to(const Config& config);
     // The overloaded Realm::convert function offers a way to copy and/or convert a Realm using
     // either the realm config or the path along with an optional encryption key.
     // If the file already exists, data will be copied over object per object.

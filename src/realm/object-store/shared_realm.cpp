@@ -1050,16 +1050,6 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::write_copy(StringData path, BinaryData encryption_key)
-{
-    convert(path, encryption_key);
-}
-
-void Realm::export_to(const Config& config)
-{
-    convert(config);
-}
-
 void Realm::convert(StringData path, BinaryData encryption_key)
 {
     if (encryption_key.data() && encryption_key.size() != 64) {
@@ -1094,7 +1084,7 @@ void Realm::convert(const Config& config)
     }
     else {
         if (config.sync_config) {
-            write_copy(new_location, encryption_key);
+            convert(new_location, encryption_key);
 #if REALM_ENABLE_SYNC
             DBOptions options;
             if (encryption_key.size()) {
