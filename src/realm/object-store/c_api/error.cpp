@@ -102,20 +102,6 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
         populate_error(ex, ex.code());
     }
 
-    // Object Store exceptions:
-    catch (const InvalidTransactionException& ex) {
-        populate_error(ex, ErrorCodes::WrongTransactionState);
-    }
-    catch (const IncorrectThreadException& ex) {
-        populate_error(ex, ErrorCodes::WrongThread);
-    }
-    catch (const DeleteOnOpenRealmException& ex) {
-        populate_error(ex, ErrorCodes::DeleteOnOpenRealm);
-    }
-    catch (const List::InvalidatedException& ex) {
-        populate_error(ex, ErrorCodes::InvalidatedObject);
-    }
-
     // Generic exceptions:
     catch (const std::invalid_argument& ex) {
         populate_error(ex, ErrorCodes::InvalidArgument);

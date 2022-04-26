@@ -47,7 +47,9 @@ using TransactionRef = std::shared_ptr<Transaction>;
 /// process which can't share mutexes with this process
 struct IncompatibleLockFile : RuntimeError {
     IncompatibleLockFile(const std::string& msg)
-        : RuntimeError(ErrorCodes::IncompatibleLockFile, "Incompatible lock file. " + msg)
+        : RuntimeError(
+              ErrorCodes::IncompatibleLockFile,
+              "Realm file is currently open in another process which cannot share access with this process. " + msg)
     {
     }
 };

@@ -211,7 +211,7 @@ public:
 class File::Exists : public FileAccessError {
 public:
     Exists(const std::string& msg, const std::string& path, int err)
-        : FileAccessError(ErrorCodes::FileAlreadyExists, msg, path, err)
+        : FileAccessError(ErrorCodes::FileAlreadyExists, std::string("File already exists. ") + msg, path, err)
     {
     }
 };
@@ -430,7 +430,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string error_prefix = "CreateFile(\"" + path + "\") failed: ";
+    std::string error_prefix = "CreateFile() failed: ";
     std::string msg = get_last_error_msg(error_prefix.c_str(), err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
@@ -487,7 +487,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         *success = false;
         return;
     }
-    std::string error_prefix = "open(\"" + path + "\") failed: ";
+    std::string error_prefix = "open() failed: ";
     std::string msg = get_errno_msg(error_prefix.c_str(), err);
     switch (err) {
         case EACCES:

@@ -383,9 +383,7 @@ std::shared_ptr<Realm> SyncMetadataManager::try_get_realm() const
     try {
         return get_realm();
     }
-    catch (const RealmFileException& e) {
-        if (e.kind() != RealmFileException::Kind::AccessError)
-            throw;
+    catch (const InvalidDatabase&) {
         return nullptr;
     }
 }

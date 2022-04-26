@@ -147,7 +147,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in a client rese
             SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
             config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
 
-            CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(Realm::get_shared_realm(config), ErrorCodes::IllegalCombination);
         });
     }
 
@@ -521,7 +521,7 @@ TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][f
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
     config.sync_config->partition_value = "\"foobar\"";
 
-    CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
+    REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(Realm::get_shared_realm(config), ErrorCodes::IllegalCombination);
 }
 
 TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {

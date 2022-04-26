@@ -72,6 +72,22 @@ public:
 private:
     size_t& m_count;
 };
+
+class InvalidTransactionException : public WrongTransactionState {
+public:
+    InvalidTransactionException(std::string message)
+        : WrongTransactionState(message)
+    {
+    }
+};
+
+class IncorrectThreadException : public LogicError {
+public:
+    IncorrectThreadException()
+        : LogicError(ErrorCodes::WrongThread, "Realm accessed from incorrect thread.")
+    {
+    }
+};
 } // namespace
 
 Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator,
@@ -569,7 +585,7 @@ void Realm::verify_in_write() const
 void Realm::verify_open() const
 {
     if (is_closed()) {
-        throw ClosedRealmException();
+        throw LogicError(ErrorCodes::ClosedRealm, "Cannot access realm that has been closed.");
     }
 }
 
@@ -1053,21 +1069,16 @@ bool Realm::compact()
 void Realm::write_copy(StringData path, BinaryData key)
 {
     if (key.data() && key.size() != 64) {
-        throw InvalidEncryptionKeyException();
+        throw InvalidEncryptionKey();
     }
     verify_thread();
-    try {
-        Transaction& tr = transaction();
-        auto repl = tr.get_replication();
-        if (repl && repl->get_history_type() == Replication::hist_SyncClient) {
-            m_coordinator->write_copy(path, key, false);
-        }
-        else {
-            tr.write(path, key.data());
-        }
+    Transaction& tr = transaction();
+    auto repl = tr.get_replication();
+    if (repl && repl->get_history_type() == Replication::hist_SyncClient) {
+        m_coordinator->write_copy(path, key, false);
     }
-    catch (...) {
-        _impl::translate_file_exception(path);
+    else {
+        tr.write(path, key.data());
     }
 }
 
@@ -1291,7 +1302,9 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
             DB::delete_files(path, did_delete_realm);
         });
         if (!lock_successful) {
-            throw DeleteOnOpenRealmException(realm_file_path);
+            throw LogicError(
+                ErrorCodes::DeleteOnOpenRealm,
+                util::format("Cannot delete files of an open Realm: '%1' is still in use.", realm_file_path));
         }
     }
     catch (const FileAccessError&) {
@@ -1306,14 +1319,4 @@ void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_re
 AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
-}
-
-MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
-    : std::logic_error(util::format(message.data(), path))
-{
-}
-
-MismatchedRealmException::MismatchedRealmException(StringData message)
-    : std::logic_error(message.data())
-{
 }

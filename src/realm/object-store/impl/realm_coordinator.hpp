@@ -259,8 +259,6 @@ private:
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&) REQUIRES(m_notifier_mutex);
 };
 
-void translate_file_exception(StringData path, bool immutable = false);
-
 template <typename Pred>
 util::CheckedUniqueLock RealmCoordinator::wait_for_notifiers(Pred&& wait_predicate)
 {

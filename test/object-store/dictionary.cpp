@@ -20,6 +20,7 @@
 
 #include "collection_fixtures.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include "util/index_helpers.hpp"
 
 #include <realm/object-store/dictionary.hpp>
@@ -169,11 +170,11 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
     SECTION("verify_in_transaction()") {
         object_store::Dictionary unattached;
-        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(unattached.verify_in_transaction(), ErrorCodes::InvalidatedObject);
         REQUIRE_NOTHROW(dict.verify_in_transaction());
         r->commit_transaction();
-        REQUIRE_THROWS_AS(dict.verify_in_transaction(), InvalidTransactionException);
-        REQUIRE_THROWS_AS(unattached.verify_in_transaction(), realm::List::InvalidatedException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(dict.verify_in_transaction(), ErrorCodes::WrongTransactionState);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(unattached.verify_in_transaction(), ErrorCodes::InvalidatedObject);
     }
 
     SECTION("clear()") {

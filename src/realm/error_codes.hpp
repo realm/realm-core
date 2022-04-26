@@ -143,6 +143,10 @@ public:
         SystemError = RLM_ERR_SYSTEM_ERROR,
         InvalidDatabase = RLM_ERR_INVALID_DATABASE,
         IncompatibleHistories = RLM_ERR_INCOMPATIBLE_HISTORIES,
+        InvalidEncryptionKey = RLM_ERR_INVALID_ENCRYPTION_KEY,
+        IllegalCombination = RLM_ERR_ILLEGAL_COMBINATION,
+        MismatchedConfig = RLM_ERR_MISMATCHED_CONFIG,
+        ClosedRealm = RLM_ERR_CLOSED_REALM,
         DeleteOnOpenRealm = RLM_ERR_DELETE_OPENED_REALM,
         NotSupported = REALM_ERR_NOT_SUPPORTED,
         MaxError
