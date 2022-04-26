@@ -654,14 +654,18 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 
 void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    if (!user || user->state() != SyncUser::State::LoggedIn) {
+    if (!user) {
         return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                                   "The specified user could not be found."));
+    }
+    if (user->state() != SyncUser::State::LoggedIn) {
+        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
                                    "User must be logged in to be deleted."));
     }
 
     if (!verify_user_present(user)) {
         return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found."));
     }
 
     Request req;
@@ -683,13 +687,17 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
                     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
-    if (!user || user->state() != SyncUser::State::LoggedIn) {
+    if (!user) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user is not logged in"));
+                                            "The specified user could not be found."));
+    }
+    if (user->state() != SyncUser::State::LoggedIn) {
+        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
+                                            "The specified user is not logged in."));
     }
     if (!verify_user_present(user)) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user was not found"));
+                                            "The specified user was not found."));
     }
 
     App::log_in_with_credentials(credentials, user, std::move(completion));

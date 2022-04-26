@@ -3632,7 +3632,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
 
         bool processed = false;
         app->link_user(sync_user, custom_credentials, [&](std::shared_ptr<SyncUser> user, Optional<AppError> error) {
-            CHECK(error->message == "The specified user is not logged in");
+            CHECK(error->message == "The specified user is not logged in.");
             CHECK(!user);
             processed = true;
         });
