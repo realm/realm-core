@@ -3260,14 +3260,15 @@ realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM
 RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
 
 /**
- * Insert ot update the query contained inside a result object for the subscription set passed as parameter, if successful the index where the query
- * was inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
- * specify a name for the query inserted (optional).
+ * Insert ot update the query contained inside a result object for the subscription set passed as parameter, if
+ * successful the index where the query was inserted or updated is returned along with the info whether a new query
+ * was inserted or not. It is possible to specify a name for the query inserted (optional).
  *  @return true/false if operation was successful
  */
 RLM_API bool realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subscription_set_t*,
-                                                          realm_results_t*, const char* name, size_t* out_index,
-                                                          bool* out_inserted) RLM_API_NOEXCEPT;
+                                                                  realm_results_t*, const char* name,
+                                                                  size_t* out_index,
+                                                                  bool* out_inserted) RLM_API_NOEXCEPT;
 /**
  * Insert ot update a query for the subscription set passed as parameter, if successful the index where the query
  * was inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
@@ -3275,8 +3276,8 @@ RLM_API bool realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync
  *  @return true/false if operation was successful
  */
 RLM_API bool realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscription_set_t*,
-                                                          realm_query_t*, const char* name, size_t* out_index,
-                                                          bool* out_inserted) RLM_API_NOEXCEPT;
+                                                                realm_query_t*, const char* name, size_t* out_index,
+                                                                bool* out_inserted) RLM_API_NOEXCEPT;
 /**
  *  Erase from subscription set by name
  *  @return true/false if operation was successful
