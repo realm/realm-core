@@ -7,6 +7,7 @@
 * Added `realm_object_to_string()` support for c_api. ([#5414](https://github.com/realm/realm-core/issues/5414))
 * Added `ObjectStore::rename_property()` support for c_api. ([#5424]https://github.com/realm/realm-core/issues/5424)
 * Remove deprecated sync protocol errors `disabled_session` and `superseded`. ([#5421]https://github.com/realm/realm-core/issues/5421)
+* Use `realm_results_t` instead of `realm_query_t` for `realm_sync_subscription_set_insert_or_assign` c_api. ([#5431]https://github.com/realm/realm-core/issues/5431) 
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
