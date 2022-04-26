@@ -1,27 +1,33 @@
-if(BISON_FOUND)
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_bison.cpp ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_bison.hpp
-        MAIN_DEPENDENCY query_bison.yy
-        COMMAND ${BISON_EXECUTABLE} --defines=generated/query_bison.hpp -o generated/query_bison.cpp query_bison.yy
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-endif()
-if(FLEX_FOUND)
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_flex.cpp ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_flex.hpp
-        MAIN_DEPENDENCY query_flex.ll
-        COMMAND ${FLEX_EXECUTABLE} --noline --header-file=generated/query_flex.hpp -ogenerated/query_flex.cpp query_flex.ll
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
-endif()
+if(NOT REALM_CORE_SUBMODULE_BUILD)
+    find_package(BISON 3.8.2 EXACT)
+    find_package(FLEX 2.6.4 EXACT)
 
-if(BISON_FOUND AND FLEX_FOUND)
-    add_custom_target(GenerateParserSources
-        COMMAND ${FLEX_EXECUTABLE} --noline --header-file=generated/query_flex.hpp -ogenerated/query_flex.cpp query_flex.ll
-        COMMAND ${BISON_EXECUTABLE} --defines=generated/query_bison.hpp -o generated/query_bison.cpp query_bison.yy
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS query_bison.yy query_flex.ll
-    )
+    # Only run Flex and Bison if we're building Realm Core directly, not as a submodule
+    if(BISON_FOUND)
+        add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_bison.cpp ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_bison.hpp
+            MAIN_DEPENDENCY query_bison.yy
+            COMMAND ${BISON_EXECUTABLE} --defines=generated/query_bison.hpp -o generated/query_bison.cpp query_bison.yy
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    endif()
+    if(FLEX_FOUND)
+        add_custom_command(
+            OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_flex.cpp ${CMAKE_CURRENT_SOURCE_DIR}/generated/query_flex.hpp
+            MAIN_DEPENDENCY query_flex.ll
+            COMMAND ${FLEX_EXECUTABLE} --noline --header-file=generated/query_flex.hpp -ogenerated/query_flex.cpp query_flex.ll
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+    endif()
+
+    if(BISON_FOUND AND FLEX_FOUND)
+        add_custom_target(GenerateParserSources
+            COMMAND ${FLEX_EXECUTABLE} --noline --header-file=generated/query_flex.hpp -ogenerated/query_flex.cpp query_flex.ll
+            COMMAND ${BISON_EXECUTABLE} --defines=generated/query_bison.hpp -o generated/query_bison.cpp query_bison.yy
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            DEPENDS query_bison.yy query_flex.ll
+        )
+    endif()
 endif()
 
 set(REALM_PARSER_SOURCES

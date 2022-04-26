@@ -1,16 +1,13 @@
 # NEXT RELEASE
 
 ### Enhancements
-* Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
-* Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Added `realm_object_to_string()` support for c_api. ([#5414](https://github.com/realm/realm-core/issues/5414))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Added auth code and id token support for google c_api ([#5347]https://github.com/realm/realm-core/issues/5347)
-* Fixed various corruption bugs when encryption is used. Issues were caused by a missing "flush" of pending changes. Since v11.8.0. Fixes meta-issue https://github.com/realm/realm-core/issues/5360: (https://github.com/realm/realm-core/issues/5332, https://github.com/realm/realm-swift/issues/7659, https://github.com/realm/realm-core/issues/5230, https://github.com/realm/realm-core/issues/5190, https://github.com/realm/realm-swift/issues/7640, https://github.com/realm/realm-js/issues/4428, https://github.com/realm/realm-java/issues/7652, https://github.com/realm/realm-js/issues/4358)
-* Added AppCredentials::serialize_as_json() support for c_api ([#5348]https://github.com/realm/realm-core/issues/5348)
-* Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data (since 11.13.0).
-
+* Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
+ 
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
 
@@ -20,7 +17,25 @@
 -----------
 
 ### Internals
-* None.
+* The Xcode toolchain no longer explicitly sets `CMAKE_OSX_ARCHITECTURES`. This was a problem with the latest Xcode release complaining about explicit mentions of `i386`.
+* The query parser build will no longer attempt to run Bison or Flex when building realm-core as a submodule.
+
+----------------------------------------------
+
+# 11.14.0 Release notes
+
+### Enhancements
+* Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
+* Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
+* Added AppCredentials::serialize_as_json() support for c_api ([#5348](https://github.com/realm/realm-core/issues/5348))
+
+### Fixed
+* Fixed potential future bug in how async write/commit used encryption ([#5369](https://github.com/realm/realm-core/pull/5369))
+* Fixed various corruption bugs when encryption is used. Issues caused by not locking a mutex when needed. Since v11.8.0. Fixes meta-issue https://github.com/realm/realm-core/issues/5360: (https://github.com/realm/realm-core/issues/5332, https://github.com/realm/realm-swift/issues/7659, https://github.com/realm/realm-core/issues/5230, https://github.com/realm/realm-core/issues/5190, https://github.com/realm/realm-swift/issues/7640, https://github.com/realm/realm-js/issues/4428, https://github.com/realm/realm-java/issues/7652, https://github.com/realm/realm-js/issues/4358)
+* Changeset upload batching did not calculate the accumulated size correctly, resulting in "error reading body failed to read: read limited at 16777217 bytes" errors from the server when writing large amounts of data ([#5373](https://github.com/realm/realm-core/pull/5373), since 11.13.0).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 

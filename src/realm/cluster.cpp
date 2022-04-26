@@ -810,7 +810,7 @@ size_t Cluster::erase(ObjKey key, CascadeState& state)
                         dict.remove_backlinks(state);
                     }
                 }
-                else if (col_type == col_type_LinkList) {
+                else if (col_type == col_type_LinkList || col_type == col_type_Link) {
                     BPlusTree<ObjKey> links(m_alloc);
                     links.init_from_ref(ref);
                     if (links.size() > 0) {

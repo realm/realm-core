@@ -1373,6 +1373,13 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Serializes an object to json and returns it as string. Serializes a single level of properties only.
+ *
+ * @return a json-serialized representation of the object.
+ */
+RLM_API char* realm_object_to_string(realm_object_t*);
+
+/**
  * Set the values for several properties.
  *
  * This is provided as an alternative to calling `realm_get_value()` multiple

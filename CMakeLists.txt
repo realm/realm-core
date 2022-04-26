@@ -5,6 +5,11 @@ project(RealmCore)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake")
 
+if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+    # Realm Core is being built as part of another project, likely an SDK
+    set(REALM_CORE_SUBMODULE_BUILD ON)
+endif()
+
 # Include general CMake modules
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
@@ -206,8 +211,6 @@ set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-find_package(BISON 3.8.2 EXACT)
-find_package(FLEX 2.6.4 EXACT)
 
 if(REALM_ENABLE_SYNC)
     option(REALM_FORCE_OPENSSL "Always use OpenSSL for SSL needs, regardless of target platform." OFF)
@@ -320,7 +323,7 @@ endif()
 install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 
 # Only prepare test/install/package targets if we're not a submodule
-if(NOT CMAKE_SOURCE_DIR STREQUAL ${CMAKE_CURRENT_SOURCE_DIR})
+if(REALM_CORE_SUBMODULE_BUILD)
     return()
 endif()
 
