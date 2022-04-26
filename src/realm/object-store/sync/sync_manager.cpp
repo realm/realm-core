@@ -735,3 +735,20 @@ util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
     }
     return m_metadata_manager->get_app_metadata();
 }
+
+void SyncManager::close_all_sessions()
+{
+    // log_out() will call unregister_session(), which requires m_session_mutex,
+    // so we need to iterate over them without holding the lock.
+    decltype(m_sessions) sessions;
+    {
+        util::CheckedLockGuard lk(m_session_mutex);
+        m_sessions.swap(sessions);
+    }
+
+    for (auto& [_, session] : sessions) {
+        session->log_out();
+    }
+
+    get_sync_client().wait_for_session_terminations();
+}

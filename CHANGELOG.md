@@ -32,6 +32,7 @@
 * Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
 * Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
 * Added AppCredentials::serialize_as_json() support for c_api ([#5348](https://github.com/realm/realm-core/issues/5348))
+* Added `App::close_all_sync_sessions` static method and `SyncManager::close_all_sessions` method ([#5411](https://github.com/realm/realm-core/pull/5411))
 
 ### Fixed
 * Fixed potential future bug in how async write/commit used encryption ([#5369](https://github.com/realm/realm-core/pull/5369))
