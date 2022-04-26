@@ -228,8 +228,6 @@ enum class ProtocolError {
     bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
     diverging_histories          = 211, // Diverging histories (IDENT)
     bad_changeset                = 212, // Bad changeset (UPLOAD)
-    superseded                   = 213, // Superseded by new session for same client-side file (deprecated)
-    disabled_session             = 213, // Alias for `superseded` (deprecated)
     partial_sync_disabled        = 214, // Partial sync disabled (BIND)
     unsupported_session_feature  = 215, // Unsupported session-level feature
     bad_origin_file_ident        = 216, // Bad origin file identifier (UPLOAD)
