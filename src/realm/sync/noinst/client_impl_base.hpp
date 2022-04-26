@@ -156,7 +156,7 @@ private:
     const std::string m_user_agent_string;
     util::network::Service m_service;
     std::mt19937_64 m_random;
-    util::websocket::EZSocketFactory m_socket_factory;
+    std::unique_ptr<util::websocket::EZSocketFactory> m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 

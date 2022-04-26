@@ -59,7 +59,7 @@ struct SyncClient {
             if (config.timeouts.fast_reconnect_limit > 1000)
                 c.fast_reconnect_limit = config.timeouts.fast_reconnect_limit;
 
-            c.socket_factory = config.socket_factory;
+            c.socket_factory_builder = config.socket_factory_builder;
             return c;
         }())
         , m_logger(std::move(logger))
