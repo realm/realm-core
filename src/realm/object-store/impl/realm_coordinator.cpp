@@ -767,11 +767,11 @@ void RealmCoordinator::commit_write(Realm& realm, bool commit_to_disk)
             return notifier->is_for_realm(realm) && notifier->have_callbacks();
         });
         if (have_notifiers) {
-            REALM_ASSERT(!m_notifier_skip_version.version);
+            REALM_ASSERT(!m_notifier_skip_version);
             REALM_ASSERT(m_notifier_sg);
             REALM_ASSERT_3(m_notifier_sg->get_transact_stage(), ==, DB::transact_Reading);
             REALM_ASSERT_3(m_notifier_sg->get_version() + 1, ==, new_version.version);
-            m_notifier_skip_version = new_version;
+            m_notifier_skip_version = tr.duplicate();
         }
     }
 
@@ -843,7 +843,7 @@ void RealmCoordinator::clean_up_dead_notifiers()
 
     if (swap_remove(m_notifiers) && m_notifiers.empty()) {
         m_notifier_sg = nullptr;
-        m_notifier_skip_version = {0, 0};
+        m_notifier_skip_version.reset();
     }
     swap_remove(m_new_notifiers);
 }
@@ -973,14 +973,14 @@ void RealmCoordinator::run_async_notifiers()
     clean_up_dead_notifiers();
 
     if (m_notifiers.empty() && m_new_notifiers.empty()) {
-        REALM_ASSERT(!m_notifier_skip_version.version);
+        REALM_ASSERT(!m_notifier_skip_version);
         m_notifier_cv.notify_all();
         return;
     }
 
     if (!m_notifier_sg) {
         REALM_ASSERT(m_notifiers.empty());
-        REALM_ASSERT(!m_notifier_skip_version.version);
+        REALM_ASSERT(!m_notifier_skip_version);
         m_notifier_sg = m_db->start_read();
     }
 
@@ -995,8 +995,7 @@ void RealmCoordinator::run_async_notifiers()
     // as otherwise if a commit is made while new notifiers are being advanced
     // we could end up advancing over the skip version.
     VersionID version = m_db->get_version_id_of_latest_snapshot();
-    auto skip_version = m_notifier_skip_version;
-    m_notifier_skip_version = {0, 0};
+    auto skip_version = std::move(m_notifier_skip_version);
 
     // Make a copy of the notifiers vector and then release the lock to avoid
     // blocking other threads trying to register or unregister notifiers while we run them
@@ -1019,7 +1018,7 @@ void RealmCoordinator::run_async_notifiers()
         notifiers = m_notifiers;
     }
     else {
-        REALM_ASSERT(!skip_version.version);
+        REALM_ASSERT(!skip_version);
     }
 
     auto new_notifiers = std::move(m_new_notifiers);
@@ -1057,7 +1056,7 @@ void RealmCoordinator::run_async_notifiers()
     else {
         if (version == m_notifier_sg->get_version_of_current_transaction()) {
             // We were spuriously woken up and there isn't actually anything to do
-            REALM_ASSERT(!skip_version.version);
+            REALM_ASSERT(!skip_version);
             m_notifier_cv.notify_all();
             return;
         }
@@ -1072,13 +1071,13 @@ void RealmCoordinator::run_async_notifiers()
     // versions after it, we just want to process with normal processing. See
     // the above note about spurious wakeups for why this is required for
     // correctness and not just a very minor optimization.
-    if (skip_version.version && skip_version != version) {
+    if (skip_version && skip_version->get_version_of_current_transaction() != version) {
         REALM_ASSERT(!notifiers.empty());
-        REALM_ASSERT(version >= skip_version);
+        REALM_ASSERT(version >= skip_version->get_version_of_current_transaction());
         IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
         for (auto& notifier : notifiers)
             notifier->add_required_change_info(change_info.current());
-        change_info.advance_to_final(skip_version);
+        change_info.advance_to_final(skip_version->get_version_of_current_transaction());
 
         for (auto& notifier : notifiers)
             notifier->run();

@@ -606,15 +606,17 @@ public:
     {
         std::lock_guard lock(m_mutex);
         ensure_full_reader_mapping();
-        if (version_id.version == std::numeric_limits<version_type>::max()) {
-            read_lock.m_reader_idx = r_info->readers.newest;
-        }
-        else {
-            read_lock.m_reader_idx = version_id.index;
-        }
+        bool pick_specific = version_id.version != std::numeric_limits<version_type>::max();
+        read_lock.m_reader_idx = pick_specific ? version_id.index : r_info->readers.newest;
+        bool picked_newest = read_lock.m_reader_idx == r_info->readers.newest;
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
-        if (version_id.version != std::numeric_limits<version_type>::max()) {
-            if (version_id.version != r.version)
+        if (pick_specific && version_id.version != r.version)
+            throw BadVersion();
+
+        if (!picked_newest) {
+            if (frozen && r.count_frozen == 0 && r.count_live == 0)
+                throw BadVersion();
+            if (!frozen && r.count_live == 0)
                 throw BadVersion();
         }
         if (frozen) {
@@ -627,7 +629,6 @@ public:
         read_lock.m_version = r.version;
         read_lock.m_top_ref = r.current_top;
         read_lock.m_file_size = r.filesize;
-        return;
     }
 
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)

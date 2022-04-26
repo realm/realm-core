@@ -340,8 +340,8 @@ public:
         m_changesets[m_incoming_version].changes = std::move(m_incoming_changeset);
         m_changesets[m_incoming_version].finalized = true;
     }
-    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
-        noexcept override
+    void get_changesets(version_type begin_version, version_type end_version,
+                        BinaryIterator* buffer) const noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i < n; ++i) {
@@ -4783,6 +4783,7 @@ TEST(LangBindHelper_VersionControl)
     const int num_versions = 10;
     const int num_random_tests = 100;
     DB::VersionID versions[num_versions];
+    std::vector<TransactionRef> trs;
     SHARED_GROUP_TEST_PATH(path);
     {
         // Create a new shared db
@@ -4805,6 +4806,7 @@ TEST(LangBindHelper_VersionControl)
             }
             {
                 auto rt = sg->start_read();
+                trs.push_back(rt->duplicate());
                 versions[i] = rt->get_version_of_current_transaction();
             }
         }
@@ -4878,6 +4880,7 @@ TEST(LangBindHelper_VersionControl)
             }
             old_version = new_version;
         }
+        trs.clear();
         g->end_read();
         // release the first readlock and commit something to force a cleanup
         // we need to commit twice, because cleanup is done before the actual

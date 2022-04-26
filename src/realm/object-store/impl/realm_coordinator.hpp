@@ -227,7 +227,7 @@ private:
     std::condition_variable m_notifier_cv GUARDED_BY(m_notifier_mutex);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_new_notifiers GUARDED_BY(m_notifier_mutex);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_notifiers GUARDED_BY(m_notifier_mutex);
-    VersionID m_notifier_skip_version GUARDED_BY(m_notifier_mutex) = {0, 0};
+    TransactionRef m_notifier_skip_version GUARDED_BY(m_notifier_mutex);
 
     // Transaction used for actually running async notifiers
     // Will have a read transaction iff m_notifiers is non-empty
