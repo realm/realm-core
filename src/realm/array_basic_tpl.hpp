@@ -24,7 +24,7 @@
 #include <stdexcept>
 #include <iomanip>
 
-#include <realm/impl/destroy_guard.hpp>
+#include <realm/node.hpp>
 
 namespace realm {
 
@@ -40,7 +40,7 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
     size_t byte_size_0 = calc_aligned_byte_size(init_size); // Throws
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    size_t byte_size = std::max(byte_size_0, Array::initial_capacity + 0); // Throws
+    size_t byte_size = std::max(byte_size_0, Node::initial_capacity + 0); // Throws
 
     MemRef mem = allocator.alloc(byte_size); // Throws
 
@@ -56,9 +56,9 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
 
 
 template <class T>
-inline void BasicArray<T>::create(Array::Type type, bool context_flag)
+inline void BasicArray<T>::create(NodeHeader::Type type, bool context_flag)
 {
-    REALM_ASSERT(type == Array::type_Normal);
+    REALM_ASSERT(type == NodeHeader::type_Normal);
     REALM_ASSERT(!context_flag);
     size_t length = 0;
     MemRef mem = create_array(length, get_alloc()); // Throws

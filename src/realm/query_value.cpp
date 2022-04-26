@@ -72,7 +72,7 @@ TypeOfValue::Attribute get_single_from(std::string str)
                             [](const std::string& s, const auto& it) {
                                 return s + ", " + it.first;
                             });
-        throw std::runtime_error(util::format(
+        throw query_parser::InvalidQueryArgError(util::format(
             "Unable to parse the type attribute string '%1', supported case insensitive values are: [%2]", str,
             all_keys));
     }
@@ -91,7 +91,8 @@ TypeOfValue::Attribute attribute_from(DataType type)
         case DataType::Type::Binary:
             return TypeOfValue::Attribute::Binary;
         case DataType::Type::Mixed:
-            throw std::runtime_error("Cannot construct a strongly typed 'TypeOfValue' from ambiguous 'mixed'");
+            throw query_parser::InvalidQueryArgError(
+                "Cannot construct a strongly typed 'TypeOfValue' from ambiguous 'mixed'");
         case DataType::Type::Timestamp:
             return TypeOfValue::Attribute::Timestamp;
         case DataType::Type::Float:
@@ -111,7 +112,8 @@ TypeOfValue::Attribute attribute_from(DataType type)
         case DataType::Type::LinkList:
             break;
     }
-    throw std::runtime_error(util::format("Invalid value '%1' cannot be converted to 'TypeOfValue'", type));
+    throw query_parser::InvalidQueryArgError(
+        util::format("Invalid value '%1' cannot be converted to 'TypeOfValue'", type));
 }
 
 namespace realm {
@@ -120,7 +122,8 @@ TypeOfValue::TypeOfValue(int64_t attributes)
     : m_attributes(attributes)
 {
     if (m_attributes == 0) {
-        throw std::runtime_error("Invalid value 0 found when converting to TypeOfValue; a type must be specified");
+        throw query_parser::InvalidQueryArgError(
+            "Invalid value 0 found when converting to TypeOfValue; a type must be specified");
     }
 }
 

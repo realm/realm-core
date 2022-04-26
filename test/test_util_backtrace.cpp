@@ -7,16 +7,16 @@
 using namespace realm;
 using namespace realm::util;
 
-REALM_NOINLINE void throw_logic_error(LogicError::ErrorKind kind)
+REALM_NOINLINE void throw_logic_error(ErrorCodes::Error kind)
 {
-    throw LogicError{kind};
+    throw LogicError{kind, "Some error"};
 }
 
 // FIXME: Disabled because this suddenly stopped working on Linux
 TEST_IF(Backtrace_LogicError, false)
 {
     try {
-        throw_logic_error(LogicError::string_too_big);
+        throw_logic_error(ErrorCodes::RangeError);
     }
     catch (const LogicError& err) {
         // arm requires -funwind-tables to make backtraces, and that increases binary size.

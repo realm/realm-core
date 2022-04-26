@@ -219,7 +219,7 @@ MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionS
 void MutableSubscriptionSet::check_is_mutable() const
 {
     if (m_tr->get_transact_stage() != DB::transact_Writing) {
-        throw LogicError(LogicError::wrong_transact_state);
+        throw WrongTransactionState("Not a write transaction");
     }
 }
 
@@ -390,7 +390,7 @@ util::Future<SubscriptionSet::State> SubscriptionSet::get_state_change_notificat
     // If we've already reached the desired state, or if the subscription is in an error state,
     // we can return a ready future immediately.
     if (cur_state == State::Error) {
-        return util::Future<State>::make_ready(Status{ErrorCodes::RuntimeError, err_str});
+        return util::Future<State>::make_ready(Status{ErrorCodes::SubscriptionFailed, err_str});
     }
     else if (cur_state >= notify_when) {
         return util::Future<State>::make_ready(cur_state);
@@ -434,7 +434,7 @@ void MutableSubscriptionSet::process_notifications()
 
     for (auto& req : to_finish) {
         if (new_state == State::Error && req.version == my_version) {
-            req.promise.set_error({ErrorCodes::RuntimeError, error_str()});
+            req.promise.set_error({ErrorCodes::SubscriptionFailed, std::string_view(error_str())});
         }
         else if (req.version < my_version) {
             req.promise.emplace_value(State::Superseded);

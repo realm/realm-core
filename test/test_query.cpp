@@ -939,7 +939,7 @@ TEST(Query_Not)
 
     // applying not to an empty query is forbidden
     realm::Query q4 = table.where();
-    CHECK_THROW(!q4, std::runtime_error);
+    CHECK_THROW(!q4, realm::Exception);
 }
 
 
@@ -4055,11 +4055,12 @@ TEST(Query_LinkChainSortErrors)
     // Disallow invalid column ids, linklists, other non-link column types.
     ColKey backlink_ndx(ColKey::Idx{2}, col_type_Link, ColumnAttrMask{}, 0);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col, t2_string_col}})),
-                      LogicError::type_mismatch);
+                      ErrorCodes::InvalidSortDescriptor);
     CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{backlink_ndx, t2_string_col}})),
-                      LogicError::column_does_not_exist);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})), LogicError::type_mismatch);
-    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), LogicError::type_mismatch);
+                      ErrorCodes::InvalidSortDescriptor);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_int_col, t2_string_col}})),
+                      ErrorCodes::InvalidSortDescriptor);
+    CHECK_LOGIC_ERROR(t1->get_sorted_view(SortDescriptor({{t1_linklist_col}})), ErrorCodes::InvalidSortDescriptor);
 }
 
 

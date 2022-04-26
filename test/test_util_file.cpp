@@ -63,7 +63,8 @@ TEST(Utils_File_dir)
     try {
         make_dir(dir_name);
     }
-    catch (const File::Exists& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileAlreadyExists);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = File::is_dir(dir_name);
     }
@@ -74,7 +75,7 @@ TEST(Utils_File_dir)
     try {
         make_dir("/foobar");
     }
-    catch (const File::AccessError& e) {
+    catch (const FileAccessError& e) {
         CHECK_EQUAL(e.get_path(), "/foobar");
         perm_denied = true;
     }
@@ -84,7 +85,7 @@ TEST(Utils_File_dir)
     try {
         remove_dir("/usr");
     }
-    catch (const File::AccessError& e) {
+    catch (const FileAccessError& e) {
         CHECK_EQUAL(e.get_path(), "/usr");
         perm_denied = true;
     }
@@ -96,7 +97,8 @@ TEST(Utils_File_dir)
     try {
         remove_dir(dir_name);
     }
-    catch (const File::NotFound& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileNotFound);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = false;
     }
@@ -126,7 +128,8 @@ TEST(Utils_File_dir_unicode)
     try {
         make_dir(dir_name);
     }
-    catch (const File::Exists& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileAlreadyExists);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = File::is_dir(dir_name);
     }
@@ -137,7 +140,8 @@ TEST(Utils_File_dir_unicode)
     try {
         remove_dir(dir_name);
     }
-    catch (const File::NotFound& e) {
+    catch (const FileAccessError& e) {
+        CHECK_EQUAL(e.code(), ErrorCodes::FileNotFound);
         CHECK_EQUAL(e.get_path(), dir_name);
         dir_exists = false;
     }

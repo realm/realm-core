@@ -224,7 +224,8 @@ RLM_API bool realm_get_property(const realm_t* realm, realm_class_key_t class_ke
             }
         }
 
-        throw InvalidPropertyKeyException{"Invalid property key for this class"};
+        auto& shared_realm = *realm;
+        throw InvalidColumnKey{shared_realm->read_group().get_class_name(TableKey(class_key))};
     });
 }
 

@@ -5274,7 +5274,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history();
-        CHECK_LOGIC_ERROR(DB::create(*hist, path, DBOptions(crypt_key())), LogicError::mixed_history_type);
+        CHECK_RUNTIME_ERROR(DB::create(*hist, path, DBOptions(crypt_key())), ErrorCodes::IncompatibleSession);
     }
 }
 
@@ -5758,7 +5758,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
         try {
             DBRef sg_encrypt = DB::create(*hist_encrypt, path, DBOptions(key));
         }
-        catch (std::runtime_error&) {
+        catch (std::exception&) {
             is_okay = true;
         }
         CHECK(is_okay);

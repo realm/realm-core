@@ -562,7 +562,8 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
             break;
     }
     if (REALM_UNLIKELY(!file_format_ok))
-        throw FileFormatUpgradeRequired("Realm file needs upgrade before opening in RO mode", path);
+        throw FileAccessError(ErrorCodes::FileFormatUpgradeRequired,
+                              "Realm file needs upgrade before opening in RO mode", path, 0);
     return file_format_version;
 }
 
@@ -833,8 +834,7 @@ Table* Group::do_get_table(StringData name)
 
 TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     check_table_name_uniqueness(name);
 
     auto table = do_add_table(name, false, false);
@@ -856,7 +856,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 {
     if (!m_is_writable)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw LogicError(ErrorCodes::ReadOnly, "Database not writable");
 
     // get new key and index
     // find first empty spot:
@@ -872,7 +872,7 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
     TableKey key = TableKey((tag << 16) | j);
 
     if (REALM_UNLIKELY(name.size() > max_table_name_length))
-        throw LogicError(LogicError::table_name_too_long);
+        throw InvalidArgument(ErrorCodes::InvalidName, util::format("Name too long: %1", name));
 
     using namespace _impl;
     size_t table_ndx = key2ndx(key);
@@ -957,8 +957,7 @@ void Group::recycle_table_accessor(Table* to_be_recycled)
 
 void Group::remove_table(StringData name)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -969,8 +968,7 @@ void Group::remove_table(StringData name)
 
 void Group::remove_table(TableKey key)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
 
     size_t table_ndx = key2ndx_checked(key);
     remove_table(table_ndx, key);
@@ -980,10 +978,9 @@ void Group::remove_table(TableKey key)
 void Group::remove_table(size_t table_ndx, TableKey key)
 {
     if (!m_is_writable)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw LogicError(ErrorCodes::ReadOnly, "Database not writable");
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    if (table_ndx >= m_tables.size())
-        throw LogicError(LogicError::table_index_out_of_range);
+    REALM_ASSERT(table_ndx < m_tables.size());
     TableRef table = get_table(key);
 
     // In principle we could remove a table even if it is the target of link
@@ -993,7 +990,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
     // require that a removed table does not contain foreigh origin backlink
     // columns.
     if (table->is_cross_table_link_target())
-        throw CrossTableLinkTarget();
+        throw CrossTableLinkTarget(table->get_name());
 
     // There is no easy way for Group::TransactAdvancer to handle removal of
     // tables that contain foreign target table link columns, because that
@@ -1037,8 +1034,7 @@ void Group::remove_table(size_t table_ndx, TableKey key)
 
 void Group::rename_table(StringData name, StringData new_name, bool require_unique_name)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     size_t table_ndx = m_table_names.find_first(name);
     if (table_ndx == not_found)
         throw NoSuchTable();
@@ -1048,10 +1044,9 @@ void Group::rename_table(StringData name, StringData new_name, bool require_uniq
 
 void Group::rename_table(TableKey key, StringData new_name, bool require_unique_name)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
     if (!m_is_writable)
-        throw LogicError(LogicError::wrong_transact_state);
+        throw LogicError(ErrorCodes::ReadOnly, "Database not writable");
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
@@ -1077,10 +1072,10 @@ void Group::validate(ObjLink link) const
         const ClusterTree* ct =
             target_key.is_unresolved() ? target_table->m_tombstones.get() : &target_table->m_clusters;
         if (!ct->is_valid(target_key)) {
-            throw LogicError(LogicError::target_row_index_out_of_range);
+            throw InvalidArgument(ErrorCodes::KeyNotFound, "Target object not found");
         }
         if (target_table->is_embedded()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation("Cannot link to embedded object");
         }
     }
 }
@@ -1181,7 +1176,7 @@ BinaryData Group::write_to_mem() const
 
     auto buffer = std::unique_ptr<char[]>(new (std::nothrow) char[max_size]);
     if (!buffer)
-        throw util::bad_alloc();
+        throw Exception(ErrorCodes::OutOfMemory, "Could not allocate memory while dumping to memory");
     MemoryOutputStream out; // Throws
     out.set_buffer(buffer.get(), buffer.get() + max_size);
     write(out); // Throws
@@ -1357,8 +1352,7 @@ bool Group::operator==(const Group& g) const
 }
 void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>* opt_renames) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
 
     std::map<std::string, std::string> renames;
     if (opt_renames) {
@@ -1385,8 +1379,7 @@ void Group::schema_to_json(std::ostream& out, std::map<std::string, std::string>
 void Group::to_json(std::ostream& out, size_t link_depth, std::map<std::string, std::string>* opt_renames,
                     JSONOutputMode output_mode) const
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
+    check_attached();
 
     std::map<std::string, std::string> renames;
     if (opt_renames) {

@@ -162,7 +162,7 @@ public:
     void check_column(ColKey col_key) const
     {
         if (REALM_UNLIKELY(!valid_column(col_key)))
-            throw LogicError(LogicError::column_does_not_exist);
+            throw InvalidColumnKey();
     }
     // Change the embedded property of a table. If switching to being embedded, the table must
     // not have a primary key and all objects must have exactly 1 backlink.
@@ -312,11 +312,11 @@ public:
     // - turns the object into a tombstone if links exist
     // - otherwise works just as remove_object()
     ObjKey invalidate_object(ObjKey key);
-    Obj get_tombstone(ObjKey key) const
+    Obj try_get_tombstone(ObjKey key) const
     {
         REALM_ASSERT(key.is_unresolved());
         REALM_ASSERT(m_tombstones);
-        return m_tombstones->get(key);
+        return m_tombstones->try_get_obj(key);
     }
 
     void clear();
@@ -512,7 +512,7 @@ private:
     void change_nullability(ColKey from, ColKey to, bool throw_on_null);
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
-    Obj create_linked_object(GlobalKey = {});
+    Obj create_linked_object();
     /// Changes embeddedness unconditionally. Called only from Group::do_get_or_add_table()
     void do_set_embedded(bool embedded);
 
@@ -782,9 +782,6 @@ private:
     void nullify_links(CascadeState&);
     void remove_recursive(CascadeState&);
 
-    /// Used by query. Follows chain of link columns and returns final target table
-    const Table* get_link_chain_target(const std::vector<ColKey>&) const;
-
     Replication* get_repl() const noexcept;
 
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
@@ -991,11 +988,13 @@ public:
             ct = col_type_Link;
         if constexpr (std::is_same_v<T, Dictionary>) {
             if (!col_key.is_dictionary())
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch, "Not a dictionary");
         }
         else {
             if (ct != ColumnTypeTraits<T>::column_id)
-                throw LogicError(LogicError::type_mismatch);
+                throw LogicError(ErrorCodes::TypeMismatch,
+                                 util::format("Expected %1 to be a %2", m_current_table->get_column_name(col_key),
+                                              ColumnTypeTraits<T>::column_id));
         }
 
         if (std::is_same<T, Link>::value || std::is_same<T, LnkLst>::value || std::is_same<T, BackLink>::value) {
@@ -1367,11 +1366,6 @@ public:
     static void batch_erase_rows(Table& table, const KeyColumn& keys)
     {
         table.batch_erase_rows(keys); // Throws
-    }
-    // Temporary hack
-    static Obj create_linked_object(Table& table, GlobalKey id)
-    {
-        return table.create_linked_object(id);
     }
     static ObjKey global_to_local_object_id_hashed(const Table& table, GlobalKey global_id)
     {

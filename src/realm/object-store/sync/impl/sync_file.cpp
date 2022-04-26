@@ -274,7 +274,7 @@ bool SyncFileManager::remove_realm(const std::string& absolute_path) const
         constexpr bool delete_lockfile = true;
         realm::DB::delete_files(absolute_path, &success, delete_lockfile);
     }
-    catch (File::AccessError const&) {
+    catch (FileAccessError const&) {
         success = false;
     }
     return success;
@@ -289,10 +289,7 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
         }
         File::copy(old_path, new_path);
     }
-    catch (File::NotFound const&) {
-        return false;
-    }
-    catch (File::AccessError const&) {
+    catch (FileAccessError const&) {
         return false;
     }
     return true;
@@ -401,7 +398,7 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity, c
         util::File f(test_path, util::File::Mode::mode_Write);
         // if the test file succeeds, delete it and return the preferred location
     }
-    catch (const File::AccessError&) {
+    catch (const FileAccessError&) {
         // the preferred test failed, test the hashed path
         std::string hashed_name = fallback_hashed_realm_file_path(preferred_name);
         std::string hashed_path = hashed_name + c_realm_file_suffix;
@@ -414,7 +411,7 @@ std::string SyncFileManager::realm_file_path(const std::string& user_identity, c
             // at this point the create succeeded, clean up the test file and return the hashed path
             return hashed_path;
         }
-        catch (const File::AccessError& e_hashed) {
+        catch (const FileAccessError& e_hashed) {
             // hashed test path also failed, give up and report error to user.
             throw std::logic_error(util::format("A valid realm path cannot be created for the "
                                                 "Realm identity '%1' at neither '%2' nor '%3'. %4",
@@ -442,7 +439,7 @@ bool SyncFileManager::remove_metadata_realm() const
         util::try_remove_dir_recursive(dir_path);
         return true;
     }
-    catch (File::AccessError const&) {
+    catch (FileAccessError const&) {
         return false;
     }
 }

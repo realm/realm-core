@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <realm/error_codes.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 
@@ -189,71 +190,12 @@ typedef struct realm_version_id {
 
 /* Error types */
 typedef struct realm_async_error realm_async_error_t;
-typedef enum realm_errno {
-    RLM_ERR_NONE = 0,
-    RLM_ERR_UNKNOWN,
-    RLM_ERR_OTHER_EXCEPTION,
-    RLM_ERR_OUT_OF_MEMORY,
-    RLM_ERR_NOT_CLONABLE,
-
-    RLM_ERR_NOT_IN_A_TRANSACTION,
-    RLM_ERR_WRONG_THREAD,
-
-    RLM_ERR_INVALIDATED_OBJECT,
-    RLM_ERR_INVALID_PROPERTY,
-    RLM_ERR_MISSING_PROPERTY_VALUE,
-    RLM_ERR_PROPERTY_TYPE_MISMATCH,
-    RLM_ERR_MISSING_PRIMARY_KEY,
-    RLM_ERR_UNEXPECTED_PRIMARY_KEY,
-    RLM_ERR_WRONG_PRIMARY_KEY_TYPE,
-    RLM_ERR_MODIFY_PRIMARY_KEY,
-    RLM_ERR_READ_ONLY_PROPERTY,
-    RLM_ERR_PROPERTY_NOT_NULLABLE,
-    RLM_ERR_INVALID_ARGUMENT,
-
-    RLM_ERR_LOGIC,
-    RLM_ERR_NO_SUCH_TABLE,
-    RLM_ERR_NO_SUCH_OBJECT,
-    RLM_ERR_CROSS_TABLE_LINK_TARGET,
-    RLM_ERR_UNSUPPORTED_FILE_FORMAT_VERSION,
-    RLM_ERR_MULTIPLE_SYNC_AGENTS,
-    RLM_ERR_ADDRESS_SPACE_EXHAUSTED,
-    RLM_ERR_MAXIMUM_FILE_SIZE_EXCEEDED,
-    RLM_ERR_OUT_OF_DISK_SPACE,
-    RLM_ERR_KEY_NOT_FOUND,
-    RLM_ERR_COLUMN_NOT_FOUND,
-    RLM_ERR_COLUMN_ALREADY_EXISTS,
-    RLM_ERR_KEY_ALREADY_USED,
-    RLM_ERR_SERIALIZATION_ERROR,
-    RLM_ERR_INVALID_PATH_ERROR,
-    RLM_ERR_DUPLICATE_PRIMARY_KEY_VALUE,
-
-    RLM_ERR_INDEX_OUT_OF_BOUNDS,
-
-    RLM_ERR_INVALID_QUERY_STRING,
-    RLM_ERR_INVALID_QUERY,
-
-    RLM_ERR_FILE_ACCESS_ERROR,
-    RLM_ERR_FILE_PERMISSION_DENIED,
-
-    RLM_ERR_DELETE_OPENED_REALM,
-
-    RLM_ERR_CALLBACK = 1000000, /**< A user-provided callback failed. */
-} realm_errno_e;
-
-typedef enum realm_logic_error_kind {
-    RLM_LOGIC_ERR_NONE = 0,
-    RLM_LOGIC_ERR_STRING_TOO_BIG,
-    // ...
-} realm_logic_error_kind_e;
+typedef unsigned realm_error_category;
 
 typedef struct realm_error {
     realm_errno_e error;
+    realm_error_category categories;
     const char* message;
-    union {
-        int code;
-        realm_logic_error_kind_e logic_error_kind;
-    } kind;
 } realm_error_t;
 
 /* Schema types */

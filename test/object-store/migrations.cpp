@@ -1476,7 +1476,7 @@ TEST_CASE("migration: Automatic") {
                 // shoud not be able to create a new object with the same PK
                 Object::create(ctx, new_realm, "all types", values);
             };
-            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), std::logic_error);
+            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), DuplicatePrimaryKeyValue);
             REQUIRE(get_table(realm, "all types")->size() == 1);
 
             auto good_migration = [&](auto, auto new_realm, Schema&) {

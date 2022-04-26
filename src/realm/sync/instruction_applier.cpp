@@ -135,7 +135,9 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 
                 log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
                     pk_field, nullable);
-                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable);
+                if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable)) {
+                    bad_transaction_log("AddTable: The existing table '%1' has different properties", table_name);
+                }
             }
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {

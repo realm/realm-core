@@ -254,7 +254,7 @@ std::vector<ObjKey> LinkMap::get_origin_ndxs(ObjKey key, size_t column) const
 ColumnDictionaryKey Columns<Dictionary>::key(const Mixed& key_value)
 {
     if (m_key_type != type_Mixed && key_value.get_type() != m_key_type) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidArgument(ErrorCodes::TypeMismatch, util::format("Key not a %1", m_key_type));
     }
 
     return ColumnDictionaryKey(key_value, *this);

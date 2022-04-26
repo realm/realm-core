@@ -22,121 +22,86 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
     bool bool_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_BOOL) {
-            return m_args[i].boolean;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_BOOL);
+        return m_args[i].boolean;
     }
 
     long long long_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_INT) {
-            return m_args[i].integer;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_INT);
+        return m_args[i].integer;
     }
 
     float float_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_FLOAT) {
-            return m_args[i].fnum;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_FLOAT);
+        return m_args[i].fnum;
     }
 
     double double_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_DOUBLE) {
-            return m_args[i].dnum;
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_DOUBLE);
+        return m_args[i].dnum;
     }
 
     StringData string_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_STRING) {
-            return from_capi(m_args[i].string);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_STRING);
+        return from_capi(m_args[i].string);
     }
 
     BinaryData binary_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_BINARY) {
-            return from_capi(m_args[i].binary);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_BINARY);
+        return from_capi(m_args[i].binary);
     }
 
     Timestamp timestamp_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_TIMESTAMP) {
-            return from_capi(m_args[i].timestamp);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_TIMESTAMP);
+        return from_capi(m_args[i].timestamp);
     }
 
     ObjKey object_index_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_LINK) {
-            // FIXME: Somehow check the target table type?
-            return from_capi(m_args[i].link).get_obj_key();
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_LINK);
+        // FIXME: Somehow check the target table type?
+        return from_capi(m_args[i].link).get_obj_key();
     }
 
     ObjectId objectid_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_OBJECT_ID) {
-            return from_capi(m_args[i].object_id);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_OBJECT_ID);
+        return from_capi(m_args[i].object_id);
     }
 
     Decimal128 decimal128_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_DECIMAL128) {
-            return from_capi(m_args[i].decimal128);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_DECIMAL128);
+        return from_capi(m_args[i].decimal128);
     }
 
     UUID uuid_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_UUID) {
-            return from_capi(m_args[i].uuid);
-        }
-        // Note: Unreachable.
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_UUID);
+        return from_capi(m_args[i].uuid);
     }
 
     ObjLink objlink_for_argument(size_t i) final
     {
         verify_ndx(i);
-        if (m_args[i].type == RLM_TYPE_LINK) {
-            return from_capi(m_args[i].link);
-        }
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        REALM_ASSERT(m_args[i].type == RLM_TYPE_LINK);
+        return from_capi(m_args[i].link);
     }
 
     bool is_argument_null(size_t i) final
@@ -174,7 +139,8 @@ struct QueryArgumentsAdapter : query_parser::Arguments {
             case RLM_TYPE_UUID:
                 return type_UUID;
         }
-        throw LogicError{LogicError::type_mismatch}; // LCOV_EXCL_LINE
+        throw LogicError{ErrorCodes::TypeMismatch, "Unsupported type"}; // LCOV_EXCL_LINE
+        return type_Int;
     }
 };
 } // namespace

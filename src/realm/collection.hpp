@@ -119,6 +119,11 @@ public:
         return ndx;
     }
 
+    StringData get_property_name() const
+    {
+        return get_table()->get_column_name(get_col_key());
+    }
+
 protected:
     friend class Transaction;
     CollectionBase() noexcept = default;
@@ -133,7 +138,7 @@ template <class T>
 inline void check_column_type(ColKey col)
 {
     if (col && col.get_type() != ColumnTypeTraits<T>::column_id) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -141,7 +146,7 @@ template <>
 inline void check_column_type<Int>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -149,7 +154,7 @@ template <>
 inline void check_column_type<util::Optional<Int>>(ColKey col)
 {
     if (col && (col.get_type() != col_type_Int || !col.get_attrs().test(col_attr_Nullable))) {
-        throw LogicError(LogicError::collection_type_mismatch);
+        throw InvalidColumnKey();
     }
 }
 
@@ -160,7 +165,7 @@ inline void check_column_type<ObjKey>(ColKey col)
         bool is_link_list = (col.get_type() == col_type_LinkList);
         bool is_link_set = (col.is_set() && col.get_type() == col_type_Link);
         if (!(is_link_list || is_link_set))
-            throw LogicError(LogicError::collection_type_mismatch);
+            throw InvalidArgument(ErrorCodes::TypeMismatch, "Property not a list or set");
     }
 }
 

@@ -1,3 +1,21 @@
+/*************************************************************************
+ *
+ * Copyright 2021 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
+
 #include "realm/parser/driver.hpp"
 #include "realm/parser/keypath_mapping.hpp"
 #include "realm/parser/query_parser.hpp"
@@ -713,7 +731,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
         }
         return subexpr;
     }
-    catch (const std::runtime_error& e) {
+    catch (const InvalidQueryError&) {
         // Is 'identifier' perhaps length operator?
         if (!post_op && is_length_suffix(identifier) && path->path_elems.size() > 0) {
             // If 'length' is the operator, the last id in the path must be the name
@@ -726,7 +744,7 @@ std::unique_ptr<Subexpr> PropNode::visit(ParserDriver* drv)
                     return length_expr;
             }
         }
-        throw InvalidQueryError(e.what());
+        throw;
     }
     REALM_UNREACHABLE();
     return {};
@@ -980,12 +998,7 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                     break;
                 default:
                     if (hint == type_TypeOfValue) {
-                        try {
-                            ret = std::make_unique<Value<TypeOfValue>>(TypeOfValue(str));
-                        }
-                        catch (const std::runtime_error& e) {
-                            throw InvalidQueryArgError(e.what());
-                        }
+                        ret = std::make_unique<Value<TypeOfValue>>(TypeOfValue(str));
                     }
                     else {
                         ret = std::make_unique<ConstantStringValue>(str);

@@ -17,24 +17,178 @@
  **************************************************************************/
 
 #include "realm/error_codes.hpp"
+#include <string_view>
+#include <ostream>
+#include <map>
 
 namespace realm {
 
-StringData ErrorCodes::error_string(Error code)
+ErrorCategory ErrorCodes::error_categories(Error code)
 {
     switch (code) {
-        case ErrorCodes::OK:
-            return "OK";
-        case ErrorCodes::RuntimeError:
-            return "RuntimeError";
-        case ErrorCodes::LogicError:
-            return "LogicError";
-        case ErrorCodes::BrokenPromise:
-            return "BrokenPromise";
-        case ErrorCodes::UnknownError:
-        default:
-            return "UnknownError";
+        case FileOperationFailed:
+        case PermissionDenied:
+        case FileNotFound:
+        case FileAlreadyExists:
+        case InvalidDatabase:
+        case DecryptionFailed:
+        case IncompatibleHistories:
+        case FileFormatUpgradeRequired:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::file_access);
+        case SystemError:
+            return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::system_error);
+        case RuntimeError:
+        case RangeError:
+        case IncompatibleSession:
+        case IncompatibleLockFile:
+        case InvalidQuery:
+        case BrokenInvariant:
+        case DuplicatePrimaryKeyValue:
+        case OutOfMemory:
+        case UnsupportedFileFormatVersion:
+        case MultipleSyncAgents:
+        case AddressSpaceExhausted:
+        case ObjectAlreadyExists:
+        case OutOfDiskSpace:
+        case CallbackFailed:
+        case NotCloneable:
+        case MaximumFileSizeExceeded:
+        case BadChangeset:
+        case SubscriptionFailed:
+            return ErrorCategory().set(ErrorCategory::runtime_error);
+        case InvalidArgument:
+        case PropertyNotNullable:
+        case InvalidProperty:
+        case InvalidName:
+        case InvalidDictionaryValue:
+        case InvalidSortDescriptor:
+        case SyntaxError:
+        case InvalidQueryArg:
+        case KeyNotFound:
+        case OutOfBounds:
+        case LimitExceeded:
+        case UnexpectedPrimaryKey:
+        case ModifyPrimaryKey:
+        case ReadOnlyProperty:
+        case TypeMismatch:
+        case MissingPrimaryKey:
+        case MissingPropertyValue:
+        case NoSuchTable:
+        case TableNameInUse:
+        case InvalidDictionaryKey:
+            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
+        case LogicError:
+        case BrokenPromise:
+        case CrossTableLinkTarget:
+        case KeyAlreadyUsed:
+        case WrongTransactionState:
+        case SerializationError:
+        case IllegalOperation:
+        case StaleAccessor:
+        case ReadOnly:
+        case InvalidatedObject:
+        case NotSupported:
+        case WrongThread:
+        case InvalidTableRef:
+        case DeleteOnOpenRealm:
+            return ErrorCategory().set(ErrorCategory::logic_error);
+        case OK:
+        case UnknownError:
+        case GenericError:
+        case MaxError:
+            break;
     }
+    return {};
+}
+
+static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
+    {"OK", ErrorCodes::OK},
+    {"UnknownError", ErrorCodes::UnknownError},
+    {"GenericError", ErrorCodes::GenericError},
+    {"RuntimeError", ErrorCodes::RuntimeError},
+    {"LogicError", ErrorCodes::LogicError},
+    {"InvalidArgument", ErrorCodes::InvalidArgument},
+    {"BrokenPromise", ErrorCodes::BrokenPromise},
+    {"InvalidName", ErrorCodes::InvalidName},
+    {"OutOfMemory", ErrorCodes::OutOfMemory},
+    {"NoSuchTable", ErrorCodes::NoSuchTable},
+    {"CrossTableLinkTarget", ErrorCodes::CrossTableLinkTarget},
+    {"UnsupportedFileFormatVersion", ErrorCodes::UnsupportedFileFormatVersion},
+    {"FileFormatUpgradeRequired", ErrorCodes::FileFormatUpgradeRequired},
+    {"MultipleSyncAgents", ErrorCodes::MultipleSyncAgents},
+    {"AddressSpaceExhausted", ErrorCodes::AddressSpaceExhausted},
+    {"OutOfDiskSpace", ErrorCodes::OutOfDiskSpace},
+    {"MaximumFileSizeExceeded", ErrorCodes::MaximumFileSizeExceeded},
+    {"KeyNotFound", ErrorCodes::KeyNotFound},
+    {"OutOfBounds", ErrorCodes::OutOfBounds},
+    {"IllegalOperation", ErrorCodes::IllegalOperation},
+    {"KeyAlreadyUsed", ErrorCodes::KeyAlreadyUsed},
+    {"SerializationError", ErrorCodes::SerializationError},
+    {"DuplicatePrimaryKeyValue", ErrorCodes::DuplicatePrimaryKeyValue},
+    {"SyntaxError", ErrorCodes::SyntaxError},
+    {"InvalidQueryArg", ErrorCodes::InvalidQueryArg},
+    {"InvalidQuery", ErrorCodes::InvalidQuery},
+    {"WrongTransactionState", ErrorCodes::WrongTransactionState},
+    {"WrongThread", ErrorCodes::WrongThread},
+    {"InvalidatedObject", ErrorCodes::InvalidatedObject},
+    {"InvalidProperty", ErrorCodes::InvalidProperty},
+    {"MissingPrimaryKey", ErrorCodes::MissingPrimaryKey},
+    {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
+    {"ObjectAlreadyExists", ErrorCodes::ObjectAlreadyExists},
+    {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
+    {"ReadOnly", ErrorCodes::ReadOnly},
+    {"PropertyNotNullable", ErrorCodes::PropertyNotNullable},
+    {"TableNameInUse", ErrorCodes::TableNameInUse},
+    {"InvalidTableRef", ErrorCodes::InvalidTableRef},
+    {"BadChangeset", ErrorCodes::BadChangeset},
+    {"InvalidDictionaryKey", ErrorCodes::InvalidDictionaryKey},
+    {"InvalidDictionaryValue", ErrorCodes::InvalidDictionaryValue},
+    {"StaleAccessor", ErrorCodes::StaleAccessor},
+    {"IncompatibleLockFile", ErrorCodes::IncompatibleLockFile},
+    {"InvalidSortDescriptor", ErrorCodes::InvalidSortDescriptor},
+    {"DecryptionFailed", ErrorCodes::DecryptionFailed},
+    {"IncompatibleSession", ErrorCodes::IncompatibleSession},
+    {"BrokenInvariant", ErrorCodes::BrokenInvariant},
+    {"SubscriptionFailed", ErrorCodes::SubscriptionFailed},
+    {"RangeError", ErrorCodes::RangeError},
+    {"TypeMismatch", ErrorCodes::TypeMismatch},
+    {"LimitExceeded", ErrorCodes::LimitExceeded},
+    {"MissingPropertyValue", ErrorCodes::MissingPropertyValue},
+    {"ReadOnlyProperty", ErrorCodes::ReadOnlyProperty},
+    {"CallbackFailed", ErrorCodes::CallbackFailed},
+    {"NotCloneable", ErrorCodes::NotCloneable},
+    {"PermissionDenied", ErrorCodes::PermissionDenied},
+    {"FileOperationFailed", ErrorCodes::FileOperationFailed},
+    {"FileNotFound", ErrorCodes::FileNotFound},
+    {"FileAlreadyExists", ErrorCodes::FileAlreadyExists},
+    {"SystemError", ErrorCodes::SystemError},
+    {"InvalidDatabase", ErrorCodes::InvalidDatabase},
+    {"IncompatibleHistories", ErrorCodes::IncompatibleHistories},
+    {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
+    {"NotSupported", ErrorCodes::NotSupported}};
+
+std::string_view ErrorCodes::error_string(Error code)
+{
+    for (auto it : error_codes_map) {
+        if (it.second == code) {
+            return it.first;
+        }
+    }
+    return "unknown";
+}
+
+ErrorCodes::Error ErrorCodes::from_string(std::string_view name)
+{
+    auto it = error_codes_map.find(name);
+    if (it != error_codes_map.end()) {
+        return it->second;
+    }
+    return UnknownError;
+}
+
+std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code)
+{
+    return stream << ErrorCodes::error_string(code);
 }
 
 } // namespace realm

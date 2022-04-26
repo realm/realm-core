@@ -130,8 +130,6 @@ public:
 
     /// Check if the object is still alive
     bool is_valid() const noexcept;
-    /// Will throw if object is not valid
-    void check_valid() const;
     /// Delete object from table. Object is invalid afterwards.
     void remove();
     /// Invalidate

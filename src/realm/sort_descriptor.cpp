@@ -162,8 +162,11 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         auto sz = columns.size();
         REALM_ASSERT_EX(!columns.empty(), i);
 
+        if (columns.empty()) {
+            throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Missing property");
+        }
         if (columns.empty() || columns.back().is_collection()) {
-            throw LogicError(LogicError::type_mismatch);
+            throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Cannot sort on a collection property");
         }
 
         if (sz == 1) { // no link chain
@@ -174,10 +177,12 @@ BaseDescriptor::Sorter::Sorter(std::vector<std::vector<ColKey>> const& column_li
         std::vector<const Table*> tables = {&root_table};
         tables.resize(sz);
         for (size_t j = 0; j + 1 < sz; ++j) {
-            tables[j]->check_column(columns[j]);
+            if (!tables[j]->valid_column(columns[j])) {
+                throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "Invalid property");
+            }
             if (columns[j].get_type() != col_type_Link) {
                 // Only last column in link chain is allowed to be non-link
-                throw LogicError(LogicError::type_mismatch);
+                throw InvalidArgument(ErrorCodes::InvalidSortDescriptor, "All but last property must be a link");
             }
             tables[j + 1] = tables[j]->get_link_target(columns[j]).unchecked_ptr();
         }

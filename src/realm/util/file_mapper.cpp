@@ -794,9 +794,9 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
                                         " offset: " + util::to_string(offset));
         }
 
-        throw std::system_error(err, std::system_category(),
-                                std::string("mmap() failed (size: ") + util::to_string(size) +
-                                    ", offset: " + util::to_string(offset));
+        throw SystemError(std::string("mmap() failed (size: ") + util::to_string(size) +
+                              ", offset: " + util::to_string(offset),
+                          err);
 
 #else
         // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
@@ -820,7 +820,7 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
                                         " size: " + util::to_string(size) + " offset: " + util::to_string(offset));
 
         if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
-            throw util::overflow_error("Map offset is too large");
+            throw RuntimeError(ErrorCodes::RangeError, "Map offset is too large");
 
         SIZE_T _size = size;
         void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);

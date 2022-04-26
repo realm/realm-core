@@ -508,7 +508,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     obj.add_int(col, value);
                                 }
                                 catch (const LogicError& le) {
-                                    if (le.kind() != LogicError::illegal_combination) {
+                                    if (le.code() != ErrorCodes::IllegalOperation) {
                                         throw;
                                     }
                                 }

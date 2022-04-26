@@ -23,6 +23,7 @@
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/schema.hpp>
 #include <realm/object-store/shared_realm.hpp>
+#include <realm/exceptions.hpp>
 
 namespace {
 using namespace realm;
@@ -57,7 +58,7 @@ ConstTableRef List::get_table() const
     verify_attached();
     if (m_type == PropertyType::Object)
         return list_base().get_target_table();
-    throw std::runtime_error("not implemented");
+    throw NotImplemented();
 }
 
 template <typename T>
@@ -100,7 +101,7 @@ size_t List::find(Query&& q) const
         ObjKey key = get_query().and_query(std::move(q)).find();
         return key ? as<Obj>().find_first(key) : not_found;
     }
-    throw std::runtime_error("not implemented");
+    throw NotImplemented();
 }
 
 template <typename T>

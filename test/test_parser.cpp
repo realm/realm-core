@@ -504,13 +504,13 @@ TEST(Parser_ConstrainedQuery)
     CHECK_EQUAL(q.count(), 1);
     q.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q.count(), 1);
-    CHECK_THROW(q.get_description(), SerialisationError);
+    CHECK_THROW(q.get_description(), SerializationError);
 
     Query q2(t, list_0);
     CHECK_EQUAL(q2.count(), 2);
     q2.and_query(t->column<Int>(int_col) <= 0);
     CHECK_EQUAL(q2.count(), 1);
-    CHECK_THROW(q2.get_description(), SerialisationError);
+    CHECK_THROW(q2.get_description(), SerializationError);
 }
 
 TEST(Parser_basic_serialisation)
@@ -627,7 +627,7 @@ TEST(Parser_basic_serialisation)
     verify_query(test_context, t, "age > 2 AND !TRUEPREDICATE", 0);
 
     CHECK_THROW_EX(
-        verify_query(test_context, t, "buddy.age > $0", 0), std::out_of_range,
+        verify_query(test_context, t, "buddy.age > $0", 0), query_parser::InvalidQueryArgError,
         CHECK_EQUAL(std::string(e.what()), "Attempt to retreive an argument when no arguments were given"));
     CHECK_THROW_EX(verify_query(test_context, t, "age == infinity", 0), query_parser::InvalidQueryError,
                    CHECK_EQUAL(std::string(e.what()), "Infinity not supported for int"));
@@ -1453,14 +1453,11 @@ TEST(Parser_substitution)
     verify_query_sub(test_context, t, "(age > $0 || fees == $1) && age == $0", args, num_args, 1);
 
     // negative index
-    // FIXME: Should the error be std::out_of_range or SyntaxError?
-    CHECK_THROW(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0), std::runtime_error);
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $-1", args, num_args, 0), query_parser::InvalidQueryError);
     // missing index
-    // FIXME: Should the error be SyntaxError?
-    CHECK_THROW(verify_query_sub(test_context, t, "age > $", args, num_args, 0), std::runtime_error);
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $", args, num_args, 0), query_parser::InvalidQueryError);
     // non-numerical index
-    // FIXME: Should the error be SyntaxError?
-    CHECK_THROW(verify_query_sub(test_context, t, "age > $age", args, num_args, 0), std::runtime_error);
+    CHECK_THROW(verify_query_sub(test_context, t, "age > $age", args, num_args, 0), query_parser::InvalidQueryError);
     // leading zero index
     verify_query_sub(test_context, t, "name CONTAINS[c] $002", args, num_args, 2);
     // double digit index

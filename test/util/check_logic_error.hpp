@@ -23,6 +23,8 @@
 
 #include "unit_test.hpp"
 
-#define CHECK_LOGIC_ERROR(expr, error_kind) CHECK_THROW_EX(expr, realm::LogicError, e.kind() == error_kind)
+#define CHECK_LOGIC_ERROR(expr, error_kind) CHECK_THROW_EX(expr, realm::LogicError, e.code() == error_kind)
+
+#define CHECK_RUNTIME_ERROR(expr, error_kind) CHECK_THROW_EX(expr, realm::RuntimeError, e.code() == error_kind)
 
 #endif // REALM_TEST_UTIL_CHECK_LOGIC_ERROR_HPP

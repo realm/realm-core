@@ -27,7 +27,7 @@ void CopyReplication::add_class(TableKey, StringData name, bool is_embedded)
 {
     if (auto existing_table = m_tr->get_table(name)) {
         if (existing_table->is_embedded() != is_embedded)
-            throw std::runtime_error(util::format("Incompatible class: %1", name));
+            throw LogicError(ErrorCodes::TypeMismatch, util::format("Incompatible class: %1", name));
         return;
     }
     if (is_embedded) {
@@ -44,7 +44,7 @@ void CopyReplication::add_class_with_primary_key(TableKey, StringData name, Data
     if (auto existing_table = m_tr->get_table(name)) {
         auto pk_col = existing_table->get_primary_key_column();
         if (DataType(pk_col.get_type()) != type || existing_table->get_column_name(pk_col) != pk_name)
-            throw std::runtime_error(util::format("Incompatible class: %1", name));
+            throw LogicError(ErrorCodes::TypeMismatch, util::format("Incompatible class: %1", name));
         return;
     }
     m_tr->add_table_with_primary_key(name, type, pk_name, nullable);
@@ -56,7 +56,8 @@ void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType typ
     auto table = get_table_in_destination_realm();
     if (ColKey existing_key = table->get_column_key(name)) {
         if (existing_key.get_type() != col_key.get_type() || existing_key.get_attrs() != col_key.get_attrs())
-            throw std::runtime_error(util::format("Incompatible property: %1::%2", t->get_name(), name));
+            throw LogicError(ErrorCodes::TypeMismatch,
+                             util::format("Incompatible property: %1::%2", t->get_name(), name));
         return;
     }
     if (dest) {

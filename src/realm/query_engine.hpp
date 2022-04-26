@@ -247,18 +247,6 @@ public:
 
     virtual std::unique_ptr<ParentNode> clone() const = 0;
 
-    ColKey get_column_key(StringData column_name) const
-    {
-        ColKey column_key;
-        if (column_name.size() > 0) {
-            column_key = m_table.unchecked_ptr()->get_column_key(column_name);
-            if (column_key == ColKey()) {
-                throw LogicError(LogicError::column_does_not_exist);
-            }
-        }
-        return column_key;
-    }
-
     virtual std::string describe(util::serializer::SerialisationState&) const
     {
         return "";
@@ -2267,18 +2255,19 @@ public:
         m_dT = 100.0;
         m_condition_column_key1 = column1;
         m_condition_column_key2 = column2;
+        if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
+            throw Exception(ErrorCodes::InvalidQuery,
+                            util::format("queries comparing two properties are not yet supported for "
+                                         "collections (list/set/dictionary) (%1 and %2)",
+                                         ParentNode::m_table->get_column_name(m_condition_column_key1),
+                                         ParentNode::m_table->get_column_name(m_condition_column_key2)));
+        }
     }
 
     ~TwoColumnsNodeBase() noexcept override {}
     void table_changed() override
     {
         if (this->m_table) {
-            if (m_condition_column_key1.is_collection() || m_condition_column_key2.is_collection()) {
-                throw std::runtime_error(util::format("queries comparing two properties are not yet supported for "
-                                                      "collections (list/set/dictionary) (%1 and %2)",
-                                                      ParentNode::m_table->get_column_name(m_condition_column_key1),
-                                                      ParentNode::m_table->get_column_name(m_condition_column_key2)));
-            }
             ParentNode::m_table->check_column(m_condition_column_key1);
             ParentNode::m_table->check_column(m_condition_column_key2);
         }
@@ -2416,7 +2405,7 @@ public:
     {
         REALM_ASSERT(m_condition_column_key);
         if (m_target_keys.size() > 1)
-            throw SerialisationError("Serializing a query which links to multiple objects is currently unsupported.");
+            throw SerializationError("Serializing a query which links to multiple objects is currently unsupported.");
         return state.describe_column(ParentNode::m_table, m_condition_column_key) + " " + describe_condition() + " " +
                util::serializer::print_value(m_target_keys[0]);
     }

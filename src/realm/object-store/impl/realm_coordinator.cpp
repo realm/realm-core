@@ -400,48 +400,53 @@ REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
     try {
         throw;
     }
-    catch (util::File::PermissionDenied const& ex) {
-        throw RealmFileException(
-            RealmFileException::Kind::PermissionDenied, ex.get_path(),
-            util::format("Unable to open a realm at path '%1'. Please use a path where your app has %2 permissions.",
-                         ex.get_path(), immutable ? "read" : "read-write"),
-            ex.what());
-    }
-    catch (util::File::Exists const& ex) {
-        throw RealmFileException(RealmFileException::Kind::Exists, ex.get_path(),
-                                 util::format("File at path '%1' already exists.", ex.get_path()), ex.what());
-    }
-    catch (util::File::NotFound const& ex) {
-        throw RealmFileException(
-            RealmFileException::Kind::NotFound, ex.get_path(),
-            util::format("%1 at path '%2' does not exist.", immutable ? "File" : "Directory", ex.get_path()),
-            ex.what());
-    }
-    catch (FileFormatUpgradeRequired const& ex) {
-        throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
-                                 "The Realm file format must be allowed to be upgraded "
-                                 "in order to proceed.",
-                                 ex.what());
-    }
-    catch (IncompatibleHistories const& ex) {
-        RealmFileException::Kind error_kind = RealmFileException::Kind::BadHistoryError;
-        throw RealmFileException(error_kind, ex.get_path(), util::format("Unable to open realm: %1.", ex.what()),
-                                 ex.what());
-    }
-    catch (util::File::AccessError const& ex) {
+    catch (const FileAccessError& ex) {
         // Errors for `open()` include the path, but other errors don't. We
         // don't want two copies of the path in the error, so strip it out if it
         // appears, and then include it in our prefix.
         std::string underlying = ex.what();
-        RealmFileException::Kind error_kind = RealmFileException::Kind::AccessError;
+        auto& path = ex.get_path();
         auto pos = underlying.find(ex.get_path());
         if (pos != std::string::npos && pos > 0) {
             // One extra char at each end for the quotes
             underlying.replace(pos - 1, ex.get_path().size() + 2, "");
         }
-        throw RealmFileException(error_kind, ex.get_path(),
-                                 util::format("Unable to open a realm at path '%1': %2.", ex.get_path(), underlying),
-                                 ex.what());
+        switch (ex.code()) {
+            case ErrorCodes::PermissionDenied:
+                throw RealmFileException(
+                    RealmFileException::Kind::PermissionDenied, path,
+                    util::format(
+                        "Unable to open a realm at path '%1'. Please use a path where your app has %2 permissions.",
+                        ex.get_path(), immutable ? "read" : "read-write"),
+                    underlying);
+                break;
+            case ErrorCodes::FileAlreadyExists:
+                throw RealmFileException(RealmFileException::Kind::Exists, path,
+                                         util::format("File at path '%1' already exists.", ex.get_path()),
+                                         underlying);
+                break;
+            case ErrorCodes::FileNotFound:
+                throw RealmFileException(
+                    RealmFileException::Kind::NotFound, path,
+                    util::format("%1 at path '%2' does not exist.", immutable ? "File" : "Directory", ex.get_path()),
+                    underlying);
+                break;
+            case ErrorCodes::IncompatibleHistories:
+                throw RealmFileException(RealmFileException::Kind::BadHistoryError, path,
+                                         util::format("Unable to open realm: %1.", ex.what()), underlying);
+                break;
+            case ErrorCodes::FileFormatUpgradeRequired:
+                throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
+                                         "The Realm file format must be allowed to be upgraded "
+                                         "in order to proceed.",
+                                         "");
+                break;
+            default:
+                throw RealmFileException(
+                    RealmFileException::Kind::AccessError, path,
+                    util::format("Unable to open a realm at path '%1': %2.", ex.get_path(), underlying), underlying);
+                break;
+        }
     }
     catch (IncompatibleLockFile const& ex) {
         throw RealmFileException(RealmFileException::Kind::IncompatibleLockFile, path,

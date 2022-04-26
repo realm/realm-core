@@ -731,7 +731,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     if (cfg.encryption_key && size == 0 && physical_file_size != 0) {
         // The opened file holds data, but is so small it cannot have
         // been created with encryption
-        throw std::runtime_error("Attempt to open unencrypted file with encryption key");
+        throw RuntimeError(ErrorCodes::DecryptionFailed, "Attempt to open unencrypted file with encryption key");
     }
     if (size == 0 || cfg.clear_file) {
         if (REALM_UNLIKELY(cfg.read_only))

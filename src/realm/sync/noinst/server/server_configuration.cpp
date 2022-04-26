@@ -272,7 +272,7 @@ void parse_arguments(int argc, char* argv[], Configuration& configuration)
                     std::memcpy(key.data(), buf, 64);
                     configuration.encryption_key = key;
                 }
-                catch (util::File::AccessError& e) {
+                catch (FileAccessError& e) {
                     std::cerr << "The encryption key file could not be read: " << e.what() << "\n";
                     std::exit(EXIT_FAILURE);
                 }
@@ -377,7 +377,7 @@ void create_directory(const std::string& path, const char* description, util::Lo
         }
     }
 
-    catch (const util::File::AccessError& e) {
+    catch (const FileAccessError& e) {
         logger.fatal("Unable to create a required directory (`%1'): %2", e.get_path(), e.what());
         std::exit(EXIT_FAILURE);
     }
@@ -396,7 +396,7 @@ void verify_encryption_key_fingerprint(const std::string& root_dir,
         file.read(buf.get(), size);
         file_content = std::string{buf.get(), size};
     }
-    catch (const util::File::NotFound&) {
+    catch (const FileAccessError&) {
         file_exist = false;
     }
 
@@ -789,10 +789,11 @@ sync::ServerWorkdirLock::ServerWorkdirLock(const std::string& lockfile_path)
     // attempt to read what is available
     std::this_thread::sleep_for(std::chrono::seconds(5));
     std::string debug_info = load_workdir_locking_debug_info(lockfile_path); // Throws
-    throw util::File::AccessError("Server's working directory is already in use "
-                                  "(" +
-                                      debug_info + ")",
-                                  lockfile_path);
+    throw FileAccessError(ErrorCodes::FileOperationFailed,
+                          "Server's working directory is already in use "
+                          "(" +
+                              debug_info + ")",
+                          lockfile_path, 0);
 }
 
 
@@ -875,7 +876,7 @@ auto sync::load_client_file_blacklists(const config::Configuration& config, util
                 throw std::runtime_error("Failed to parse 'client file blacklists' file");
             found_file = true;
         }
-        catch (util::File::NotFound&) {
+        catch (FileAccessError&) {
         }
     }
     if (found_file) {

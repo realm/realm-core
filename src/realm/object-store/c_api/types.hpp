@@ -24,81 +24,28 @@
 #include <string>
 
 namespace realm::c_api {
-
-struct NotClonableException : std::exception {
-    const char* what() const noexcept
+class NotClonable : public RuntimeError {
+public:
+    NotClonable()
+        : RuntimeError(ErrorCodes::NotCloneable, "Not clonable")
     {
-        return "Not clonable";
     }
 };
 
-struct ImmutableException : std::exception {
-    const char* what() const noexcept
-    {
-        return "Immutable object";
-    }
-};
-
-
-struct UnexpectedPrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct DuplicatePrimaryKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-
-struct InvalidPropertyKeyException : std::logic_error {
-    using std::logic_error::logic_error;
-};
-struct CallbackFailed : std::runtime_error {
+class CallbackFailed : public RuntimeError {
+public:
     CallbackFailed()
-        : std::runtime_error("User-provided callback failed")
+        : RuntimeError(ErrorCodes::CallbackFailed, "User-provided callback failed")
     {
     }
 };
-
-//// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
-
-struct WrongPrimaryKeyTypeException : std::logic_error {
-    WrongPrimaryKeyTypeException(const std::string& object_type)
-        : std::logic_error(util::format("Wrong primary key type for '%1'", object_type))
-        , object_type(object_type)
-    {
-    }
-    const std::string object_type;
-};
-
-struct NotNullableException : std::logic_error {
-    NotNullableException(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Property '%2' of class '%1' cannot be NULL", object_type, property_name))
-        , object_type(object_type)
-        , property_name(property_name)
-    {
-    }
-    const std::string object_type;
-    const std::string property_name;
-};
-
-struct PropertyTypeMismatch : std::logic_error {
-    PropertyTypeMismatch(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Type mismatch for property '%2' of class '%1'", object_type, property_name))
-        , object_type(object_type)
-        , property_name(property_name)
-    {
-    }
-    const std::string object_type;
-    const std::string property_name;
-};
-
-//// FIXME: END EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
 
 struct WrapC {
     virtual ~WrapC() {}
 
     virtual WrapC* clone() const
     {
-        throw NotClonableException();
+        throw NotClonable();
     }
 
     virtual bool is_frozen() const

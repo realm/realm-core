@@ -161,7 +161,7 @@ TEST(Group_Permissions)
         auto group_open = [&] {
             Group group(path, crypt_key());
         };
-        CHECK_THROW(group_open(), File::PermissionDenied);
+        CHECK_THROW_EX(group_open(), FileAccessError, e.code() == ErrorCodes::PermissionDenied);
     }
 }
 #endif
@@ -274,7 +274,7 @@ TEST(Group_TableNameTooLong)
     Group group;
     size_t buf_len = 64;
     std::unique_ptr<char[]> buf(new char[buf_len]);
-    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), LogicError::table_name_too_long);
+    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), ErrorCodes::InvalidName);
     group.add_table(StringData(buf.get(), buf_len - 1));
 }
 
@@ -650,7 +650,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group(path, crypt_key()), File::NotFound);
+    CHECK_THROW_EX(Group(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileNotFound);
 }
 
 TEST(Group_Invalid2)
@@ -666,11 +666,11 @@ TEST(Group_Overwrite)
     {
         Group g;
         g.write(path, crypt_key());
-        CHECK_THROW(g.write(path, crypt_key()), File::Exists);
+        CHECK_THROW_EX(g.write(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileAlreadyExists);
     }
     {
         Group g(path, crypt_key());
-        CHECK_THROW(g.write(path, crypt_key()), File::Exists);
+        CHECK_THROW_EX(g.write(path, crypt_key()), FileAccessError, e.code() == ErrorCodes::FileAlreadyExists);
     }
     {
         Group g;
@@ -1702,9 +1702,9 @@ TEST(Group_SetColumnWithDuplicateValuesToPrimaryKey)
     std::vector<ObjKey> keys;
     table->create_objects(2, keys);
 
-    CHECK_THROW(table->set_primary_key_column(string_col), DuplicatePrimaryKeyValueException);
+    CHECK_THROW(table->set_primary_key_column(string_col), DuplicatePrimaryKeyValue);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
-    CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValueException);
+    CHECK_THROW(table->set_primary_key_column(int_col), DuplicatePrimaryKeyValue);
     CHECK_EQUAL(table->get_primary_key_column(), ColKey());
 }
 
