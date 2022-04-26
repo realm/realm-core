@@ -18,6 +18,8 @@
 
 #include <realm/object-store/results.hpp>
 #include <realm/object-store/sectioned_results.hpp>
+#include <realm/object-store/thread_safe_reference.hpp>
+
 namespace realm {
 
 // This method will run in the following scenarios:
@@ -37,7 +39,7 @@ static std::vector<SectionRange> calculate_sections(Results& results,
         Mixed section_key = callback(snapshot.get_any(i), snapshot.get_realm());
         // Disallow links as section keys. It would be uncommon to use them to begin with
         // and if the object acting as the key was deleted bad things would happen.
-        if (section_key.get_type() == type_Link) {
+        if (!section_key.is_null() && section_key.get_type() == type_Link) {
             throw std::logic_error("Links are not supported as section keys.");
         }
         if (sections.find(section_key) == sections.end()) {
@@ -185,6 +187,7 @@ auto ResultsSection::get(Context& ctx, size_t row_ndx)
 size_t ResultsSection::size()
 {
     m_parent->calculate_sections_if_required();
+    REALM_ASSERT(m_parent->m_offset_ranges.size() > m_index);
     auto range = m_parent->m_offset_ranges[m_index];
     return range.indices.size();
 }
@@ -249,6 +252,11 @@ NotificationToken SectionedResults::add_notification_callback_for_section(
 {
     return m_results.add_notification_callback(
         SectionedResultsNotificationHandler(*this, std::move(callback), section_index), key_path_array);
+}
+
+realm::ThreadSafeReference SectionedResults::thread_safe_reference()
+{
+    return m_results;
 }
 
 } // namespace realm

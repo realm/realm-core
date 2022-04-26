@@ -107,6 +107,8 @@ public:
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 
+    realm::ThreadSafeReference thread_safe_reference();
+
 private:
     friend class Results;
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.
