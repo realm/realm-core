@@ -17,6 +17,8 @@
  **************************************************************************/
 
 #include "realm/error_codes.hpp"
+#include <string_view>
+#include <ostream>
 #include <map>
 
 namespace realm {
