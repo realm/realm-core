@@ -3260,7 +3260,7 @@ realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM
 RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
 
 /**
- *  Insert ot update a query for the subscription set passed as parameter, if successful the index where the query was
+ *  Insert ot update a result for the subscription set passed as parameter, if successful the index where the query was
  * inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
  * specify a name for the query inserted (optional).
  *  @return true/false if operation was successful
