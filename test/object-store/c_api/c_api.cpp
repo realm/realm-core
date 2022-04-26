@@ -3915,9 +3915,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto new_subs = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
             bool inserted = false;
-            auto results = realm_query_find_all(c_wrap_query_foo);
             // realm_results_t
-            auto res = realm_sync_subscription_set_insert_or_assign(new_subs, results, nullptr, &index, &inserted);
+            auto res = realm_sync_subscription_set_insert_or_assign_query(new_subs, c_wrap_query_foo, nullptr, &index,
+                                                                          &inserted);
             CHECK(inserted == true);
             CHECK(index == 0);
             CHECK(res);
@@ -3928,7 +3928,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             realm_release(sub);
             realm_release(new_subs);
             realm_release(subs);
-            realm_release(results);
         }
 
         wait_for_download(*realm);
@@ -3950,8 +3949,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
             bool inserted = false;
-            auto results = realm_query_find_all(c_wrap_query_bar);
-            realm_sync_subscription_set_insert_or_assign(mut_sub, results, nullptr, &index, &inserted);
+            realm_sync_subscription_set_insert_or_assign_query(mut_sub, c_wrap_query_bar, nullptr, &index, &inserted);
             CHECK(inserted);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
@@ -3960,7 +3958,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);
-            realm_release(results);
         }
 
         {
@@ -3983,7 +3980,8 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             std::size_t index = -1;
             bool inserted = false;
             auto results = realm_query_find_all(c_wrap_new_query_bar);
-            bool updated = realm_sync_subscription_set_insert_or_assign(mut_sub, results, nullptr, &index, &inserted);
+            bool updated =
+                realm_sync_subscription_set_insert_or_assign_results(mut_sub, results, nullptr, &index, &inserted);
             CHECK(!inserted);
             CHECK(updated);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
@@ -4041,7 +4039,8 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             std::size_t index = -1;
             bool inserted = false;
             auto results = realm_query_find_all(c_wrap_new_query_bar);
-            bool success = realm_sync_subscription_set_insert_or_assign(mut_sub, results, "bar", &index, &inserted);
+            bool success =
+                realm_sync_subscription_set_insert_or_assign_results(mut_sub, results, "bar", &index, &inserted);
             CHECK(inserted);
             CHECK(success);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
@@ -4093,7 +4092,8 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             std::size_t index = -1;
             bool inserted = false;
             auto results = realm_query_find_all(c_wrap_query_bar);
-            bool success = realm_sync_subscription_set_insert_or_assign(mut_sub, results, nullptr, &index, &inserted);
+            bool success =
+                realm_sync_subscription_set_insert_or_assign_results(mut_sub, results, nullptr, &index, &inserted);
             CHECK(inserted);
             CHECK(success);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);

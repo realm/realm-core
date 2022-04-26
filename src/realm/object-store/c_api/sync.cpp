@@ -544,14 +544,30 @@ RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscripti
     });
 }
 
-RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t* subscription_set,
-                                                          realm_results_t* results, const char* name, size_t* index,
-                                                          bool* inserted) noexcept
+RLM_API bool
+realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+                                                     realm_results_t* results, const char* name, size_t* index,
+                                                     bool* inserted) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr && results != nullptr);
     return wrap_err([&]() {
         const auto [it, successful] = name ? subscription_set->insert_or_assign(name, results->get_query())
                                            : subscription_set->insert_or_assign(results->get_query());
+        *index = std::distance(subscription_set->begin(), it);
+        *inserted = successful;
+        return true;
+    });
+}
+
+RLM_API bool
+realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscription_set_t* subscription_set,
+                                                   realm_query_t* query, const char* name, size_t* index,
+                                                   bool* inserted) noexcept
+{
+    REALM_ASSERT(subscription_set != nullptr && query != nullptr);
+    return wrap_err([&]() {
+        const auto [it, successful] = name ? subscription_set->insert_or_assign(name, query->get_query())
+                                           : subscription_set->insert_or_assign(query->get_query());
         *index = std::distance(subscription_set->begin(), it);
         *inserted = successful;
         return true;
