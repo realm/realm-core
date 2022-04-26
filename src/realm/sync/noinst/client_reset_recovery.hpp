@@ -155,6 +155,7 @@ private:
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
     RecoverLocalChangesetsHandler(Transaction& remote_wt, Transaction& local_wt, util::Logger& logger);
+    virtual ~RecoverLocalChangesetsHandler();
     void process_changesets(const std::vector<ChunkedBinaryData>& changesets);
 
 protected:
@@ -165,24 +166,24 @@ protected:
         DeleteDictionaryKey,
     };
 
+    struct RecoveryResolver : public InstructionApplier::PathResolver {
+        RecoveryResolver(Obj top_obj, Instruction::PathInstruction& instr, const std::string_view& instr_name,
+                         ErrorCallbackType on_error, StringGetterType string_getter);
+        virtual ~RecoveryResolver();
+        ListPath& list_path();
+        void set_last_path_index(uint32_t ndx);
+
+    private:
+        ListPath m_list_path;
+        Instruction::PathInstruction& m_mutable_instr;
+    };
+
     REALM_NORETURN void handle_error(const std::string& message) const;
     void copy_lists_with_unrecoverable_changes();
+
     bool resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,
                       util::UniqueFunction<void(LstBase&, LstBase&)> callback);
     bool resolve(ListPath& path, util::UniqueFunction<void(LstBase&, LstBase&)> callback);
-    bool translate_list_element(LstBase& list, uint32_t index, Instruction::Path::iterator begin,
-                                Instruction::Path::const_iterator end, const std::string_view& instr_name,
-                                ListPathCallback list_callback, ListPath& path);
-    bool translate_dictionary_element(Dictionary& dict, sync::InternString key, Instruction::Path::iterator begin,
-                                      Instruction::Path::const_iterator end, const std::string_view& instr_name,
-                                      ListPathCallback list_callback, TranslateUpdateValue update_value,
-                                      ListPath& path);
-    bool translate_field(Obj& obj, sync::InternString field, Instruction::Path::iterator begin,
-                         Instruction::Path::const_iterator end, const std::string_view& instr_name,
-                         ListPathCallback list_callback, TranslateUpdateValue update_value, ListPath& path);
-    bool translate_path(sync::instr::PathInstruction& instr, const std::string_view& instr_name,
-                        ListPathCallback list_callback,
-                        TranslateUpdateValue update_value = TranslateUpdateValue::None);
 
 #define REALM_DECLARE_INSTRUCTION_HANDLER(X) void operator()(const Instruction::X&) override;
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_DECLARE_INSTRUCTION_HANDLER)
@@ -197,6 +198,9 @@ private:
     // Track any recovered operations on lists to make sure that they are allowed.
     // If not, the lists here will be copied verbatim from the local state to the remote.
     util::FlatMap<ListPath, ListTracker> m_lists;
+
+    std::unique_ptr<RecoverLocalChangesetsHandler::RecoveryResolver>
+    make_resolver(Instruction::PathInstruction& instr, const std::string_view& instr_name);
 };
 
 } // namespace client_reset

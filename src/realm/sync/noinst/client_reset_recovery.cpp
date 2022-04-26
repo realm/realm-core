@@ -181,29 +181,6 @@ void ListTracker::queue_for_manual_copy()
     m_indices_allowed.clear();
 }
 
-std::unique_ptr<LstBase> get_list_from_path(Obj& obj, ColKey col)
-{
-    // For link columns, `Obj::get_listbase_ptr()` always returns an instance whose concrete type is
-    // `LnkLst`, which uses condensed indexes. However, we are interested in using non-condensed
-    // indexes, so we need to manually construct a `Lst<ObjKey>` instead for lists of non-embedded
-    // links.
-    REALM_ASSERT(col.is_list());
-    std::unique_ptr<LstBase> list;
-    if (col.get_type() == col_type_Link || col.get_type() == col_type_LinkList) {
-        auto table = obj.get_table();
-        if (!table->get_link_target(col)->is_embedded()) {
-            list = obj.get_list_ptr<ObjKey>(col);
-        }
-        else {
-            list = obj.get_listbase_ptr(col);
-        }
-    }
-    else {
-        list = obj.get_listbase_ptr(col);
-    }
-    return list;
-}
-
 std::string_view InterningBuffer::get_key(const InternDictKey& key) const
 {
     if (key.is_null()) {
@@ -384,6 +361,8 @@ RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& remote
 {
 }
 
+RecoverLocalChangesetsHandler::~RecoverLocalChangesetsHandler() {}
+
 REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::string& message) const
 {
     std::string full_message =
@@ -542,195 +521,115 @@ bool RecoverLocalChangesetsHandler::resolve(ListPath& path, util::UniqueFunction
     return resolve_path(path, remote_obj, local_table->get_object(local_obj_key), std::move(callback));
 }
 
-bool RecoverLocalChangesetsHandler::translate_list_element(LstBase& list, uint32_t index,
-                                                           Instruction::Path::iterator begin,
-                                                           Instruction::Path::const_iterator end,
-                                                           const std::string_view& instr_name,
-                                                           ListPathCallback list_callback, ListPath& path)
+RecoverLocalChangesetsHandler::RecoveryResolver::RecoveryResolver(Obj top_obj, Instruction::PathInstruction& instr,
+                                                                  const std::string_view& instr_name,
+                                                                  ErrorCallbackType on_error,
+                                                                  StringGetterType string_getter)
+    : InstructionApplier::PathResolver(top_obj, instr, instr_name, std::move(on_error), std::move(string_getter))
+    , m_list_path((top_obj ? top_obj.get_table()->get_key() : TableKey{}), (top_obj ? top_obj.get_key() : ObjKey{}))
+    , m_mutable_instr(instr)
 {
-    if (begin == end) {
-        return list_callback(list, index, path);
-    }
-
-    auto col = list.get_col_key();
-    auto field_name = list.get_table()->get_column_name(col);
-
-    if (col.get_type() == col_type_LinkList) {
-        auto target = list.get_table()->get_link_target(col);
-        if (!target->is_embedded()) {
-            handle_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", instr_name,
-                                      field_name, list.get_table()->get_name(), index));
-        }
-
-        REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
-        auto& link_list = static_cast<LnkLst&>(list);
-        auto obj = link_list.get_obj();
-        if (m_lists.count(path) != 0) {
-            auto& list_tracker = m_lists[path];
-            auto cross_ndx = list_tracker.update(index);
-            if (!cross_ndx) {
-                return false; // not allowed to modify this list item
-            }
-            REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
-            REALM_ASSERT_EX(cross_ndx->remote < link_list.size(), cross_ndx->remote, link_list.size());
-            *(begin - 1) = cross_ndx->remote; // translate the index of the path
-            // At this point, the first part of an embedded object path has been allowed.
-            // This implies that all parts of the rest of the path are also allowed so the index translation is
-            // not necessary because instructions are operating on local only operations.
-            return true;
-        }
-        else {
-            // no record of this base list so far, track it for verbatim copy
-            m_lists[path].queue_for_manual_copy();
-            return false;
-        }
-    }
-    else {
-        handle_error(util::format(
-            "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
-            instr_name, field_name, list.get_table()->get_name(), col.get_type()));
-    }
-    REALM_UNREACHABLE();
-    return false;
 }
 
-bool RecoverLocalChangesetsHandler::translate_dictionary_element(Dictionary& dict, InternString key,
-                                                                 Instruction::Path::iterator begin,
-                                                                 Instruction::Path::const_iterator end,
-                                                                 const std::string_view& instr_name,
-                                                                 ListPathCallback list_callback,
-                                                                 TranslateUpdateValue update_value, ListPath& path)
+ListPath& RecoverLocalChangesetsHandler::RecoveryResolver::list_path()
 {
-    StringData string_key = get_string(key);
-    InternDictKey translated_key = m_intern_keys.get_or_add(std::string_view(string_key));
-    if (begin == end) {
-        if (update_value == TranslateUpdateValue::DeleteDictionaryKey && dict.find(Mixed{string_key}) == dict.end()) {
-            return false; // removing a dictionary value on a key that no longer exists is ignored
-        }
-        return true;
-    }
-
-    path.append(ListPath::Element(translated_key));
-    auto col = dict.get_col_key();
-    auto table = dict.get_table();
-    auto field_name = table->get_column_name(col);
-
-    if (col.get_type() == col_type_Link) {
-        auto target = dict.get_target_table();
-        if (!target->is_embedded()) {
-            handle_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", instr_name,
-                                      field_name, table->get_name(), string_key));
-        }
-
-        auto embedded_object = dict.get_object(string_key);
-        if (!embedded_object) {
-            m_logger.warn("Discarding a local %1 made to an embedded object which no longer exists through "
-                          "dictionary key '%2.%3[%4]'",
-                          instr_name, table->get_name(), table->get_column_name(col), string_key);
-            return false; // discard this instruction as it operates over a non-existant link
-        }
-
-        if (auto pfield = mpark::get_if<InternString>(&*begin)) {
-            ++begin;
-            return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
-                                   update_value, path);
-        }
-        else {
-            handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
-        }
-    }
-    else {
-        handle_error(
-            util::format("%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
-                         instr_name, field_name, table->get_name(), col.get_type()));
-    }
+    return m_list_path;
 }
 
-bool RecoverLocalChangesetsHandler::translate_field(Obj& obj, InternString field, Instruction::Path::iterator begin,
-                                                    Instruction::Path::const_iterator end,
-                                                    const std::string_view& instr_name,
-                                                    ListPathCallback list_callback, TranslateUpdateValue update_value,
-                                                    ListPath& path)
+void RecoverLocalChangesetsHandler::RecoveryResolver::set_last_path_index(uint32_t ndx)
 {
-    auto field_name = get_string(field);
-    ColKey col = obj.get_table()->get_column_key(field_name);
-    if (!col) {
-        handle_error(util::format("%1 instruction for path '%2.%3' could not be found", instr_name,
-                                  obj.get_table()->get_name(), field_name));
-    }
-    path.append(ListPath::Element(col));
-    if (begin == end) {
-        if (col.is_list()) {
-            auto list = obj.get_listbase_ptr(col);
-            return list_callback(*list, uint32_t(-1), path); // Array Clear does not have an index
-        }
-        return true;
-    }
-
-    if (col.is_list()) {
-        if (auto pindex = mpark::get_if<uint32_t>(&*begin)) {
-            std::unique_ptr<LstBase> list = get_list_from_path(obj, col);
-            ++begin;
-            return translate_list_element(*list, *pindex, begin, end, instr_name, std::move(list_callback), path);
-        }
-        else {
-            handle_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", instr_name,
-                                      field_name, obj.get_table()->get_name()));
-        }
-    }
-    else if (col.is_dictionary()) {
-        if (auto pkey = mpark::get_if<InternString>(&*begin)) {
-            auto dict = obj.get_dictionary(col);
-            ++begin;
-            return translate_dictionary_element(dict, *pkey, begin, end, instr_name, std::move(list_callback),
-                                                update_value, path);
-        }
-        else {
-            handle_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'", instr_name,
-                                      field_name, obj.get_table()->get_name()));
-        }
-    }
-    else if (col.get_type() == col_type_Link) {
-        auto target = obj.get_table()->get_link_target(col);
-        if (!target->is_embedded()) {
-            handle_error(util::format("%1: Reference through non-embedded link in field '%2' in class '%3'",
-                                      instr_name, field_name, obj.get_table()->get_name()));
-        }
-        if (obj.is_null(col)) {
-            m_logger.warn(
-                "Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'",
-                instr_name, obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-            return false; // discard this instruction as it operates over a null link
-        }
-
-        auto embedded_object = obj.get_linked_object(col);
-        if (auto pfield = mpark::get_if<InternString>(&*begin)) {
-            ++begin;
-            return translate_field(embedded_object, *pfield, begin, end, instr_name, std::move(list_callback),
-                                   update_value, path);
-        }
-        else {
-            handle_error(util::format("%1: Embedded object field reference is not a string", instr_name));
-        }
-    }
-    else {
-        handle_error(util::format("%1: Resolving path through unstructured field '%3.%2' of type %4", instr_name,
-                                  field_name, obj.get_table()->get_name(), col.get_type()));
-    }
-    REALM_UNREACHABLE();
+    REALM_ASSERT(m_it_begin != m_instr.path.begin());
+    size_t distance = (m_it_begin - m_instr.path.begin()) - 1;
+    REALM_ASSERT_EX(distance < m_instr.path.size(), distance, m_instr.path.size());
+    REALM_ASSERT(mpark::holds_alternative<uint32_t>(m_instr.path[distance]));
+    m_mutable_instr.path[distance] = ndx;
 }
 
-bool RecoverLocalChangesetsHandler::translate_path(instr::PathInstruction& instr, const std::string_view& instr_name,
-                                                   ListPathCallback list_callback, TranslateUpdateValue update_value)
+RecoverLocalChangesetsHandler::RecoveryResolver::~RecoveryResolver() {}
+
+std::unique_ptr<RecoverLocalChangesetsHandler::RecoveryResolver>
+RecoverLocalChangesetsHandler::make_resolver(Instruction::PathInstruction& instr, const std::string_view& instr_name)
 {
     util::Optional<Obj> obj = get_top_object(instr, instr_name.data());
     if (!obj) {
         m_logger.warn("Cannot recover '%1' which operates on a deleted object", instr_name);
-        return false;
+        auto resolver = std::make_unique<RecoverLocalChangesetsHandler::RecoveryResolver>(
+            Obj{}, instr, instr_name, [](const std::string&) {},
+            [](InternString) {
+                return StringData();
+            });
+        resolver->do_not_resolve();
+        return resolver;
     }
-    ListPath path(obj->get_table()->get_key(), obj->get_key());
-    return translate_field(*obj, instr.field, instr.path.begin(), instr.path.end(), instr_name,
-                           std::move(list_callback), update_value, path);
+    auto resolver = std::make_unique<RecoverLocalChangesetsHandler::RecoveryResolver>(
+        *obj, instr, instr_name,
+        [&](const std::string& err_msg) {
+            handle_error(err_msg);
+        },
+        [&](InternString intern) -> StringData {
+            return get_string(intern);
+        });
+
+    resolver
+        ->on_column_advance([](PathResolver* res, ColKey col) {
+            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+            REALM_ASSERT(recovery_resolver);
+            recovery_resolver->list_path().append(ListPath::Element(col));
+        })
+        ->on_dict_key_advance([intern_keys = &m_intern_keys](PathResolver* res, StringData string_key) {
+            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+            REALM_ASSERT(recovery_resolver);
+            InternDictKey translated_key = intern_keys->get_or_add(std::string_view(string_key));
+            recovery_resolver->list_path().append(ListPath::Element(translated_key));
+        })
+        ->on_list_index_advance([lists = &m_lists](PathResolver* res, uint32_t index) {
+            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+            REALM_ASSERT(recovery_resolver);
+            if (lists->count(recovery_resolver->list_path()) != 0) {
+                auto& list_tracker = lists->at(recovery_resolver->list_path());
+                auto cross_ndx = list_tracker.update(index);
+                if (!cross_ndx) {
+                    recovery_resolver->do_not_resolve(); // not allowed to modify this list item
+                    return;
+                }
+                REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
+
+                recovery_resolver->set_last_path_index(cross_ndx->remote); // translate the index of the path
+
+                // At this point, the first part of an embedded object path has been allowed.
+                // This implies that all parts of the rest of the path are also allowed so the index translation is
+                // not necessary because instructions are operating on local only operations.
+                recovery_resolver->preempt_success();
+                return;
+            }
+            // no record of this base list so far, track it for verbatim copy
+            lists->at(recovery_resolver->list_path()).queue_for_manual_copy();
+            recovery_resolver->do_not_resolve();
+        })
+        ->on_null_link_advance([logger = &m_logger](PathResolver* res, StringData table_name, StringData link_name) {
+            logger->warn("Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'",
+                         res->instruction_name(), table_name, link_name);
+            res->do_not_resolve(); // discard this instruction as it operates over a null link
+        })
+        ->on_property([&](PathResolver* res, Obj&, ColKey) {
+            handle_error(util::format("Invalid path for %1 (object, column)", res->instruction_name()));
+        })
+        ->on_list_index([&](PathResolver* res, LstBase&, size_t) {
+            handle_error(util::format("Invalid path for %1 (list, index)", res->instruction_name()));
+        })
+        ->on_list([&](PathResolver* res, LstBase&) {
+            handle_error(util::format("Invalid path for %1 (list)", res->instruction_name()));
+        })
+        ->on_dictionary_key([&](PathResolver* res, Dictionary&, Mixed) {
+            handle_error(util::format("Invalid path for %1 (dictionary, key)", res->instruction_name()));
+        })
+        ->on_dictionary([&](PathResolver* res, Dictionary&) {
+            handle_error(util::format("Invalid path for %1 (dictionary, key)", res->instruction_name()));
+        })
+        ->on_set([&](PathResolver* res, SetBase&) {
+            handle_error(util::format("Invalid path for %1 (set)", res->instruction_name()));
+        });
+    return resolver;
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& instr)
@@ -776,22 +675,29 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
 {
     static constexpr std::string_view instr_name("Update");
     Instruction::Update instr_copy = instr;
-    TranslateUpdateValue update_value = TranslateUpdateValue::None;
-    if (instr.value.type == instr::Payload::Type::Erased) {
-        update_value = TranslateUpdateValue::DeleteDictionaryKey;
-    }
-    if (translate_path(
-            instr_copy, instr_name,
-            [&](LstBase& list, uint32_t index, const ListPath& path) {
-                util::Optional<ListTracker::CrossListIndex> cross_index;
-                cross_index = m_lists[path].update(index);
-                if (cross_index) {
-                    instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                    instr_copy.path.back() = cross_index->remote;
-                }
-                return bool(cross_index);
-            },
-            update_value)) {
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver
+        ->on_dictionary_key([&instr](PathResolver* res, Dictionary& dict, Mixed key) {
+            if (instr.value.type == instr::Payload::Type::Erased && dict.find(key) == dict.end()) {
+                // removing a dictionary value on a key that no longer exists is ignored
+                res->do_not_resolve();
+            }
+        })
+        ->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
+            util::Optional<ListTracker::CrossListIndex> cross_index;
+            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+            cross_index = lists->at(recovery_resolver->list_path()).update(index);
+            if (cross_index) {
+                instr_copy.prior_size = static_cast<uint32_t>(list.size());
+                instr_copy.path.back() = cross_index->remote;
+            }
+            else {
+                res->do_not_resolve();
+            }
+        })
+        ->on_property([](PathResolver*, Obj&, ColKey) {});
+
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         if (!check_links_exist(instr_copy.value)) {
             if (!allows_null_links(instr_copy, instr_name)) {
                 m_logger.warn("Discarding an update which links to a deleted object");
@@ -807,10 +713,9 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::AddInteger& in
 {
     static constexpr std::string_view instr_name("AddInteger");
     Instruction::AddInteger instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
-            REALM_UNREACHABLE(); // AddInteger must apply to a property, not a list index
-            return true;
-        })) {
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver->on_property([](PathResolver*, Obj&, ColKey) {}); // AddInteger only applies to a property
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
@@ -819,12 +724,16 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Clear& instr)
 {
     static constexpr std::string_view instr_name("Clear");
     Instruction::Clear instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t ndx, const ListPath& path) {
-            REALM_ASSERT(ndx == uint32_t(-1));
-            m_lists[path].clear();
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver
+        ->on_list([lists = &m_lists](PathResolver* res, LstBase&) {
+            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+            lists->at(recovery_resolver->list_path()).clear();
             // Clear.prior_size is ignored and always zero
-            return true;
-        })) {
+        })
+        ->on_set([](PathResolver*, SetBase&) {})
+        ->on_dictionary([](PathResolver*, Dictionary&) {});
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
@@ -859,16 +768,21 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
         return;
     }
     Instruction::ArrayInsert instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
-            REALM_ASSERT(index != uint32_t(-1));
-            size_t list_size = list.size();
-            auto cross_index = m_lists[path].insert(index, list_size);
-            if (cross_index) {
-                instr_copy.path.back() = cross_index->remote;
-                instr_copy.prior_size = static_cast<uint32_t>(list_size);
-            }
-            return bool(cross_index);
-        })) {
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
+        auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+        REALM_ASSERT(index != uint32_t(-1));
+        size_t list_size = list.size();
+        auto cross_index = lists->at(recovery_resolver->list_path()).insert(index, list_size);
+        if (cross_index) {
+            instr_copy.path.back() = cross_index->remote;
+            instr_copy.prior_size = static_cast<uint32_t>(list_size);
+        }
+        else {
+            recovery_resolver->do_not_resolve();
+        }
+    });
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
@@ -877,19 +791,25 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& ins
 {
     static constexpr std::string_view instr_name("ArrayMove");
     Instruction::ArrayMove instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
-            REALM_ASSERT(index != uint32_t(-1));
-            size_t lst_size = list.size();
-            uint32_t translated_from, translated_to;
-            bool allowed_to_move = m_lists[path].move(static_cast<uint32_t>(index), instr.ndx_2, lst_size,
-                                                      translated_from, translated_to);
-            if (allowed_to_move) {
-                instr_copy.prior_size = static_cast<uint32_t>(lst_size);
-                instr_copy.path.back() = translated_from;
-                instr_copy.ndx_2 = translated_to;
-            }
-            return allowed_to_move;
-        })) {
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
+        auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+        REALM_ASSERT(index != uint32_t(-1));
+        size_t lst_size = list.size();
+        uint32_t translated_from, translated_to;
+        bool allowed_to_move =
+            lists->at(recovery_resolver->list_path())
+                .move(static_cast<uint32_t>(index), instr_copy.ndx_2, lst_size, translated_from, translated_to);
+        if (allowed_to_move) {
+            instr_copy.prior_size = static_cast<uint32_t>(lst_size);
+            instr_copy.path.back() = translated_from;
+            instr_copy.ndx_2 = translated_to;
+        }
+        else {
+            recovery_resolver->do_not_resolve();
+        }
+    });
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
@@ -898,16 +818,22 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
 {
     static constexpr std::string_view instr_name("ArrayErase");
     Instruction::ArrayErase instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase& list, uint32_t index, const ListPath& path) {
-            auto obj = list.get_obj();
-            uint32_t translated_index;
-            bool allowed_to_delete = m_lists[path].remove(static_cast<uint32_t>(index), translated_index);
-            if (allowed_to_delete) {
-                instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                instr_copy.path.back() = translated_index;
-            }
-            return allowed_to_delete;
-        })) {
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
+        auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
+        auto obj = list.get_obj();
+        uint32_t translated_index;
+        bool allowed_to_delete =
+            lists->at(recovery_resolver->list_path()).remove(static_cast<uint32_t>(index), translated_index);
+        if (allowed_to_delete) {
+            instr_copy.prior_size = static_cast<uint32_t>(list.size());
+            instr_copy.path.back() = translated_index;
+        }
+        else {
+            recovery_resolver->do_not_resolve();
+        }
+    });
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
@@ -920,22 +846,19 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& ins
         return;
     }
     Instruction::SetInsert instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
-            REALM_UNREACHABLE(); // there is validation before this point
-            return false;
-        })) {
+    auto resolver = make_resolver(instr_copy, instr_name);
+    resolver->on_set([](PathResolver*, SetBase&) {});
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::SetErase& instr)
 {
-    static constexpr std::string_view instr_name("SetErase");
     Instruction::SetErase instr_copy = instr;
-    if (translate_path(instr_copy, instr_name, [&](LstBase&, uint32_t, const ListPath&) {
-            REALM_UNREACHABLE(); // there is validation before this point
-            return false;
-        })) {
+    auto resolver = make_resolver(instr_copy, "SetErase");
+    resolver->on_set([](PathResolver*, SetBase&) {});
+    if (resolver->resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
