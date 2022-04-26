@@ -299,7 +299,7 @@ TEST(File_SetEncryptionKey)
 #if REALM_ENABLE_ENCRYPTION
     f.set_encryption_key(key); // should not throw
 #else
-    CHECK_THROW(f.set_encryption_key(key), std::runtime_error);
+    CHECK_THROW_EX(f.set_encryption_key(key), Exception, (e.code() == ErrorCodes::NotSupported));
 #endif
 }
 
