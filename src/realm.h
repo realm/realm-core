@@ -3265,7 +3265,7 @@ RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscripti
  * specify a name for the query inserted (optional).
  *  @return true/false if operation was successful
  */
-RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t*, realm_query_t*,
+RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t*, realm_results_t*,
                                                           const char* name, size_t* out_index,
                                                           bool* out_inserted) RLM_API_NOEXCEPT;
 /**
