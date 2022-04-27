@@ -3128,6 +3128,7 @@ typedef struct realm_sync_error {
     const char* detailed_message;
     bool is_fatal;
     bool is_unrecognized_by_client;
+    bool is_client_reset_requested;
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
@@ -3143,6 +3144,8 @@ typedef void (*realm_sync_progress_func_t)(void* userdata, uint64_t transferred_
 typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_session_t*, const realm_sync_error_t);
 typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
+typedef void (*realm_sync_before_client_reset_func_t)(void* userdata, realm_t* before_realm);
+typedef void (*realm_sync_after_client_reset_func_t)(void* userdata, realm_t* before_realm, realm_t* after_realm);
 
 typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
 typedef struct realm_flx_sync_subscription_set realm_flx_sync_subscription_set_t;
@@ -3172,6 +3175,12 @@ typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
 typedef void (*realm_async_open_task_completion_func_t)(void* userdata, realm_thread_safe_reference_t* realm,
                                                         const realm_async_error_t* error);
 
+/**
+ * Get sync client path in case manual reset is needed.
+ * @param: sync_user_error ptr to to the error struct represeting a sync error
+ * @return: a string represeting the path where the sync files are.
+ */
+RLM_API char* realm_sync_client_get_path(realm_sync_error_t* sync_user_error) RLM_API_NOEXCEPT;
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
@@ -3202,8 +3211,6 @@ RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const ch
 RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*,
                                                        realm_sync_session_stop_policy_e) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, realm_sync_error_handler_func_t,
-                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
@@ -3215,6 +3222,10 @@ RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, cons
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
                                                realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t*, realm_sync_before_client_reset_func_t,
+                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_sync_after_client_reset_func_t,
+                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 
 /**
  * Get latest subscription set
@@ -3402,6 +3413,16 @@ RLM_API void realm_sync_session_pause(realm_sync_session_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
 
 /**
+ * In case manual reset is needed, run this function in order to reset sync client files.
+ * The sync_path is going to be returned by realm_sync_client_get_path, if manual reset is needed.
+ * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is needed
+ * @param realm_app ptr to realm app.
+ * @param sync_path path where the sync files are.
+ * @return true if operation was succesful
+ */
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path) RLM_API_NOEXCEPT;
+
+/**
  * Register a callback that will be invoked every time the session's connection state changes.
  *
  * @return A token value that can be used to unregiser the callback.
@@ -3443,6 +3464,5 @@ realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_syn
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*, realm_sync_upload_completion_func_t,
                                                            void* userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
-
 
 #endif // REALM_H
