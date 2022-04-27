@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <algorithm>
+#include <set>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -301,6 +302,60 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 
 #define REALM_ALLOC_DEBUG 0
 
+void GroupWriter::backdate()
+{
+    struct FreeListArrays {
+        Array positions;
+        Array lengths;
+        Array versions;
+    };
+    struct FreeList {
+        int search_start;
+        ref_type top_ref;
+        std::optional<FreeListArrays> arrays;
+    };
+    std::set<int> unreachables;
+    for (auto unreachable : m_unreachable_versions) {
+        unreachables.insert(unreachable);
+    }
+    using FreeListMap = std::map<uint64_t, FreeList>;
+    FreeListMap old_still_valid_freelists;
+    for (auto& entry : m_top_ref_map) {
+        if (unreachables.find(entry.first) != unreachables.end()) {
+            continue;
+        }
+        auto& info = old_still_valid_freelists[entry.first];
+        info.search_start = 0;
+        info.top_ref = entry.second;
+    }
+
+    auto get_earlier = [&](int version) -> FreeListMap::iterator {
+        return old_still_valid_freelists.end();
+    };
+
+    auto find_cover_for = [&](FreeSpaceEntry& entry, FreeListMap::iterator it) -> uint64_t {
+        return entry.released_at_version;
+    };
+
+    int limit = m_not_free_in_file.size();
+    for (int index = 0; index < limit; ++index) {
+        auto& entry = m_not_free_in_file[index];
+        if (unreachables.find(entry.released_at_version) != unreachables.end()) {
+            // the block at 'index' was released by a version becoming unreachable
+            auto earlier_it = get_earlier(entry.released_at_version);
+            // if no earlier versions than that exists, we're done
+            if (earlier_it == old_still_valid_freelists.end()) {
+                continue;
+            }
+            // earlier versions exist, we need to examine the freelist for it
+            auto covering_blocks_released_at = find_cover_for(entry, earlier_it);
+            if (covering_blocks_released_at != entry.released_at_version) {
+                entry.released_at_version = covering_blocks_released_at;
+            }
+        }
+    }
+}
+
 ref_type GroupWriter::write_group()
 {
 #if REALM_METRICS
@@ -354,6 +409,9 @@ ref_type GroupWriter::write_group()
 #if REALM_ALLOC_DEBUG
     std::cout << "    Freelist size after allocations: " << m_size_map.size() << std::endl;
 #endif
+    // We now back-date (if possbible) any blocks freed in versions which 
+    // are becoming unreachable.
+    backdate();
 
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
@@ -517,7 +575,7 @@ void GroupWriter::read_in_freelist()
     REALM_ASSERT_RELEASE_EX(m_free_versions.size() == limit, limit, m_free_versions.size());
 
     if (limit) {
-        auto limit_version = m_readlock_version;
+        auto limit_version = m_oldest_reachable_version;
         for (size_t idx = 0; idx < limit; ++idx) {
             size_t ref = size_t(m_free_positions.get(idx));
             size_t size = size_t(m_free_lengths.get(idx));
@@ -935,7 +993,7 @@ void GroupWriter::dump()
 {
     size_t count = m_free_lengths.size();
     std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
-              << "version >= " << m_readlock_version << "\n";
+              << "version >= " << m_oldest_reachable_version << "\n";
     for (size_t i = 0; i < count; ++i) {
         std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << " - "
                   << m_free_versions.get(i) << "\n";

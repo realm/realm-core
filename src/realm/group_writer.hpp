@@ -98,7 +98,9 @@ private:
     Array m_free_lengths;   // 5th slot in Group::m_top
     Array m_free_versions;  // 6th slot in Group::m_top
     uint64_t m_current_version = 0;
-    uint64_t m_readlock_version;
+    uint64_t m_oldest_reachable_version;
+    TopRefMap m_top_ref_map;
+    VersionVector m_unreachable_versions;
     size_t m_window_alignment;
     size_t m_free_space_size = 0;
     size_t m_locked_space_size = 0;
@@ -184,6 +186,11 @@ private:
 
     void write_array_at(MapWindow* window, ref_type, const char* data, size_t size);
     FreeListElement split_freelist_chunk(FreeListElement, size_t alloc_pos);
+
+    /// Backdate (if possible) any blocks in the freelist belonging to 
+    /// a version currently becomming unreachable. The effect of backdating
+    /// is that many blocks can be freed earlier.
+    void backdate();
 };
 
 
@@ -194,7 +201,9 @@ inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock, TopR
 {
     REALM_ASSERT(read_lock <= current);
     m_current_version = current;
-    m_readlock_version = read_lock;
+    m_oldest_reachable_version = read_lock; // oldest reachable version
+    m_unreachable_versions = std::move(unreachable);
+    m_top_ref_map = std::move(top_refs);
 }
 
 } // namespace realm

@@ -608,7 +608,8 @@ public:
         ensure_full_reader_mapping();
         bool pick_specific = version_id.version != std::numeric_limits<version_type>::max();
         read_lock.m_reader_idx = pick_specific ? version_id.index : r_info->readers.newest;
-        bool picked_newest = read_lock.m_reader_idx == r_info->readers.newest;
+        REALM_ASSERT(r_info->readers.newest >= 0);
+        bool picked_newest = read_lock.m_reader_idx == (unsigned)r_info->readers.newest;
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
             throw BadVersion();
