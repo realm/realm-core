@@ -1050,7 +1050,7 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::convert(StringData path, BinaryData encryption_key)
+void Realm::convert(const std::string& path, BinaryData encryption_key)
 {
     if (encryption_key.data() && encryption_key.size() != 64) {
         throw InvalidEncryptionKeyException();

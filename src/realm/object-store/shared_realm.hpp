@@ -341,24 +341,41 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    // The overloaded Realm::convert function offers a way to copy and/or convert a Realm using
-    // either the realm config or the path along with an optional encryption key.
-    // If the file already exists, data will be copied over object per object.
-    // If the file does not exist, the realm file will be exported to the new location and if the
-    // configuration object contains a sync part, a sync history will be synthesized.
-    //
-    // The following options are supported:
-    // local -> local
-    // local -> sync
-    // sync -> local
-    // sync -> sync
-    // sync -> bundlable sync (client file identifier removed)
-    //
-    // Note that for bundled realms it is required that all local changes are synchronized with the server
-    // before the copy can be written. This is to be sure that the file can be used as a stating point
-    // for a newly installed application. The function will throw if there are pending uploads.
+    /**
+     * The overloaded Realm::convert function offers a way to copy and/or convert a Realm using
+     * either the realm config or the path along with an optional encryption key.
+     *
+     * If the file already exists, data will be copied over object per object.
+     * If the file does not exist, the realm file will be exported to the new location and if the
+     * configuration object contains a sync part, a sync history will be synthesized.
+     *
+     * The following options are supported:
+     * - local -> local
+     * - local -> sync
+     * - sync -> local
+     * - sync -> sync
+     * - sync -> bundlable sync (client file identifier removed)
+     *
+     * Note that for bundled realms it is required that all local changes are synchronized with the
+     * server before the copy can be written. This is to be sure that the file can be used as a
+     * stating point for a newly installed application. The function will throw if there are
+     * pending uploads.
+     */
+    /**
+     * Copy or convert a Realm using a config.
+     *
+     * @param config The realm configuration that should be used to create a copy.
+     *               This can be a local or a synced Realm, encrypted or not.
+     */
     void convert(const Config& config);
-    void convert(StringData path, BinaryData encryption_key);
+    /**
+     * Copy a Realm using a config.
+     *
+     * @param path The path the realm should be copied to. Local realms will remain local, synced
+     *             realms will remain synced realms.
+     * @param encryption_key The optional encryption key for the new realm.
+     */
+    void convert(const std::string& path, BinaryData encryption_key);
     OwnedBinaryData write_copy();
 
     void verify_thread() const;

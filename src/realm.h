@@ -866,6 +866,42 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
 RLM_API realm_t* realm_open(const realm_config_t* config);
 
 /**
+ * The overloaded Realm::convert function offers a way to copy and/or convert a Realm using
+ * either the realm config or the path along with an optional encryption key.
+ *
+ * If the file already exists, data will be copied over object per object.
+ * If the file does not exist, the realm file will be exported to the new location and if the
+ * configuration object contains a sync part, a sync history will be synthesized.
+ *
+ * The following options are supported:
+ * - local -> local
+ * - local -> sync
+ * - sync -> local
+ * - sync -> sync
+ * - sync -> bundlable sync (client file identifier removed)
+ *
+ * Note that for bundled realms it is required that all local changes are synchronized with the
+ * server before the copy can be written. This is to be sure that the file can be used as a
+ * stating point for a newly installed application. The function will throw if there are
+ * pending uploads.
+ */
+/**
+ * Copy or convert a Realm using a config.
+ *
+ * @param config The realm configuration that should be used to create a copy.
+ *               This can be a local or a synced Realm, encrypted or not.
+ */
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config);
+/**
+ * Copy a Realm using a config.
+ *
+ * @param path The path the realm should be copied to. Local realms will remain local, synced
+ *             realms will remain synced realms.
+ * @param encryption_key The optional encryption key for the new realm.
+ */
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t key);
+
+/**
  * Deletes the following files for the given `realm_file_path` if they exist:
  * - the Realm file itself
  * - the .management folder
