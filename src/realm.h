@@ -2949,6 +2949,19 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
  */
 RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
+/**
+ * Return the access token associated with the user.
+ * @return a string that rapresents the access token
+ */
+RLM_API char* realm_user_get_access_token(const realm_user_t*);
+
+/**
+ * Return the refresh token associated with the user.
+ * @return a string that represents the refresh token
+ */
+RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
+
 /* Sync */
 typedef enum realm_sync_client_metadata_mode {
     RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
