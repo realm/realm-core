@@ -899,7 +899,7 @@ RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_
  *             realms will remain synced realms.
  * @param encryption_key The optional encryption key for the new realm.
  */
-RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t key);
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key);
 
 /**
  * Deletes the following files for the given `realm_file_path` if they exist:

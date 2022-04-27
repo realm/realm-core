@@ -76,10 +76,10 @@ RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_
     });
 }
 
-RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t key)
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key)
 {
     return wrap_err([&]() {
-        (*realm)->convert(path, from_capi(key));
+        (*realm)->convert(path, from_capi(encryption_key));
         return true;
     });
 }
