@@ -2814,7 +2814,7 @@ public:
     }
 };
 
-TestTableView get_table_view(TestTableView val)
+static TestTableView get_table_view(TestTableView val)
 {
     return val;
 }

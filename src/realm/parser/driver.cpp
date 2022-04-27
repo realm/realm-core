@@ -234,6 +234,16 @@ private:
     const std::vector<Mixed>& m_args;
 };
 
+Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
+{
+    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+    if (both_non_negative || both_non_positive) {
+        return Timestamp(seconds, nanoseconds);
+    }
+    throw SyntaxError("Invalid timestamp format");
+}
+
 } // namespace
 
 namespace realm {
@@ -245,16 +255,6 @@ query_parser::KeyPathMapping ParserDriver::s_default_mapping;
 using util::serializer::get_printable_table_name;
 
 Arguments::~Arguments() {}
-
-Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
-{
-    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
-    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
-    if (both_non_negative || both_non_positive) {
-        return Timestamp(seconds, nanoseconds);
-    }
-    throw SyntaxError("Invalid timestamp format");
-}
 
 ParserNode::~ParserNode() {}
 
@@ -290,7 +290,7 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
-void verify_only_string_types(DataType type, const std::string& op_string)
+static void verify_only_string_types(DataType type, const std::string& op_string)
 {
     if (type != type_String && type != type_Binary && type != type_Mixed) {
         throw InvalidQueryError(util::format(
@@ -1288,7 +1288,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
 }
 
 // If one of the expresions is constant, it should be right
-void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::SerialisationState& state)
+static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::SerialisationState& state)
 {
     if (dynamic_cast<ColumnListBase*>(left) && dynamic_cast<ColumnListBase*>(right)) {
         throw InvalidQueryError(

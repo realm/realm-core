@@ -231,6 +231,7 @@ public:
     };
 
     static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
+    static SharedApp get_uncached_app(const Config& config, const SyncClientConfig& sync_client_config);
     static std::shared_ptr<App> get_cached_app(const std::string& app_id);
 
     /// Log in a user and asynchronously retrieve a user object.
@@ -349,6 +350,11 @@ public:
     PushClient push_notification_client(const std::string& service_name);
 
     static void clear_cached_apps();
+
+    // Immediately close all open sync sessions for all cached apps.
+    // Used by JS SDK to ensure no sync clients remain open when a developer
+    // reloads an app (#5411).
+    static void close_all_sync_sessions();
 
 private:
     friend class Internal;

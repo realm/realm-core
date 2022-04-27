@@ -334,7 +334,7 @@ auto ChangesetIndex::erase_instruction(RangeIterator pos) -> RangeIterator
 }
 
 #if REALM_DEBUG
-std::ostream& operator<<(std::ostream& os, GlobalID gid)
+static std::ostream& operator<<(std::ostream& os, GlobalID gid)
 {
     return os << gid.table_name << "/" << format_pk(gid.object_id);
 }

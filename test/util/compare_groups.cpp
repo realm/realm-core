@@ -275,10 +275,6 @@ ObjKey row_for_primary_key(const Table& table, sync::PrimaryKey key)
     return {};
 }
 
-} // unnamed namespace
-
-namespace realm::test_util {
-
 bool compare_objects(const Obj& obj_1, const Obj& obj_2, const std::vector<Column>& columns, util::Logger& logger);
 bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& table_2,
                      const std::vector<Column>& columns, util::Logger& logger);
@@ -965,6 +961,10 @@ bool compare_objects(sync::PrimaryKey& oid, const Table& table_1, const Table& t
     const Obj obj_2 = table_2.get_object(row_2);
     return compare_objects(obj_1, obj_2, columns, logger);
 }
+
+} // anonymous namespace
+
+namespace realm::test_util {
 
 bool compare_tables(const Table& table_1, const Table& table_2)
 {

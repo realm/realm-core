@@ -195,7 +195,7 @@ TEST(Metrics_QueryTypes)
     CHECK_EQUAL(queries->at(16).get_type(), QueryInfo::type_Minimum);
 }
 
-size_t find_count(std::string haystack, std::string needle)
+static size_t find_count(std::string haystack, std::string needle)
 {
     size_t find_pos = 0;
     size_t count = 0;
@@ -209,7 +209,7 @@ size_t find_count(std::string haystack, std::string needle)
     return count;
 }
 
-void populate(DBRef sg)
+static void populate(DBRef sg)
 {
     auto wt = sg->start_write();
     auto person = wt->add_table("person");

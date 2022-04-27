@@ -541,35 +541,24 @@ struct UnsupportedBsonPartition : public std::logic_error {
 
 static std::string string_from_partition(const std::string& partition)
 {
-    try {
-        bson::Bson partition_value = bson::parse(partition);
-        switch (partition_value.type()) {
-            case bson::Bson::Type::Int32:
-                return util::format("i_%1", static_cast<int32_t>(partition_value));
-            case bson::Bson::Type::Int64:
-                return util::format("l_%1", static_cast<int64_t>(partition_value));
-            case bson::Bson::Type::String:
-                return util::format("s_%1", static_cast<std::string>(partition_value));
-            case bson::Bson::Type::ObjectId:
-                return util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
-            case bson::Bson::Type::Uuid:
-                return util::format("u_%1", static_cast<UUID>(partition_value).to_string());
-            case bson::Bson::Type::Null:
-                return "null";
-            default:
-                throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string "
-                                                            "UUID and ObjectId types are currently supported.",
-                                                            partition_value.to_string()));
-        }
-    }
-    catch (const UnsupportedBsonPartition&) {
-        throw;
-    }
-    catch (...) {
-        // FIXME: the partition wasn't a bson formatted string, this can happen when using the
-        // test sync server which only accepts filesystem type paths, in this case return the raw partition.
-        // Once we migrate away from using the sync server in tests, this code path should not be necessary.
-        return partition;
+    bson::Bson partition_value = bson::parse(partition);
+    switch (partition_value.type()) {
+        case bson::Bson::Type::Int32:
+            return util::format("i_%1", static_cast<int32_t>(partition_value));
+        case bson::Bson::Type::Int64:
+            return util::format("l_%1", static_cast<int64_t>(partition_value));
+        case bson::Bson::Type::String:
+            return util::format("s_%1", static_cast<std::string>(partition_value));
+        case bson::Bson::Type::ObjectId:
+            return util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
+        case bson::Bson::Type::Uuid:
+            return util::format("u_%1", static_cast<UUID>(partition_value).to_string());
+        case bson::Bson::Type::Null:
+            return "null";
+        default:
+            throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string "
+                                                        "UUID and ObjectId types are currently supported.",
+                                                        partition_value.to_string()));
     }
 }
 
@@ -745,4 +734,21 @@ util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
         return util::none;
     }
     return m_metadata_manager->get_app_metadata();
+}
+
+void SyncManager::close_all_sessions()
+{
+    // log_out() will call unregister_session(), which requires m_session_mutex,
+    // so we need to iterate over them without holding the lock.
+    decltype(m_sessions) sessions;
+    {
+        util::CheckedLockGuard lk(m_session_mutex);
+        m_sessions.swap(sessions);
+    }
+
+    for (auto& [_, session] : sessions) {
+        session->log_out();
+    }
+
+    get_sync_client().wait_for_session_terminations();
 }

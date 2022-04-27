@@ -23,7 +23,7 @@ using realm::DBOptions;
 
 namespace compatibility {
 
-DBOptions::Durability durability(RealmDurability level)
+static DBOptions::Durability durability(RealmDurability level)
 {
     switch (level) {
     case RealmDurability::Full:

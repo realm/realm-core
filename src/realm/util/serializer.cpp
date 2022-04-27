@@ -87,7 +87,7 @@ std::string print_value<>(realm::null)
     return "NULL";
 }
 
-bool contains_invalids(StringData data)
+static bool contains_invalids(StringData data)
 {
     // the custom whitelist is different from std::isprint because it doesn't include quotations
     const static std::string whitelist = " {|}~:;<=>?@!#$%&()*+,-./[]^_`";
