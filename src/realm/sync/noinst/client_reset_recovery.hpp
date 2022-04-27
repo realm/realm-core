@@ -166,18 +166,18 @@ protected:
         RecoveryResolver(RecoverLocalChangesetsHandler* applier, Instruction::PathInstruction& instr,
                          const std::string_view& instr_name);
         virtual ~RecoveryResolver();
-        virtual Status resolve() override;
         virtual void on_property(Obj&, ColKey) override;
         virtual void on_list(LstBase&) override;
-        virtual void on_list_index(LstBase&, uint32_t) override;
+        virtual Status on_list_index(LstBase&, uint32_t) override;
         virtual void on_dictionary(Dictionary&) override;
-        virtual void on_dictionary_key(Dictionary&, Mixed) override;
+        virtual Status on_dictionary_key(Dictionary&, Mixed) override;
         virtual void on_set(SetBase&) override;
         virtual void on_error(const std::string&) override;
         virtual void on_column_advance(ColKey) override;
         virtual void on_dict_key_advance(StringData) override;
-        virtual void on_list_index_advance(uint32_t) override;
-        virtual void on_null_link_advance(StringData, StringData) override;
+        virtual Status on_list_index_advance(uint32_t) override;
+        virtual Status on_null_link_advance(StringData, StringData) override;
+        virtual Status on_begin(const util::Optional<Obj>&) override;
         virtual void on_finish() override;
 
         ListPath& list_path();

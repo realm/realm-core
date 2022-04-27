@@ -531,19 +531,6 @@ RecoverLocalChangesetsHandler::RecoveryResolver::RecoveryResolver(RecoverLocalCh
 {
 }
 
-RecoverLocalChangesetsHandler::RecoveryResolver::Status RecoverLocalChangesetsHandler::RecoveryResolver::resolve()
-{
-    util::Optional<Obj> obj = m_recovery_applier->get_top_object(m_path_instr, m_instr_name);
-    if (!obj) {
-        m_recovery_applier->m_logger.warn("Cannot recover '%1' which operates on a deleted object", m_instr_name);
-        m_status = Status::DidNotResolve;
-        return m_status;
-    }
-    m_list_path = ListPath(obj->get_table()->get_key(), obj->get_key());
-    // FIXME: don't get the top obj twice
-    return PathResolver::resolve();
-}
-
 void RecoverLocalChangesetsHandler::RecoveryResolver::on_property(Obj&, ColKey)
 {
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (object, column)", m_instr_name));
@@ -554,9 +541,11 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::on_list(LstBase&)
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (list)", m_instr_name));
 }
 
-void RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index(LstBase&, uint32_t)
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index(LstBase&, uint32_t)
 {
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (list, index)", m_instr_name));
+    return Status::DidNotResolve;
 }
 
 void RecoverLocalChangesetsHandler::RecoveryResolver::on_dictionary(Dictionary&)
@@ -564,9 +553,11 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::on_dictionary(Dictionary&)
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (dictionary)", m_instr_name));
 }
 
-void RecoverLocalChangesetsHandler::RecoveryResolver::on_dictionary_key(Dictionary&, Mixed)
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_dictionary_key(Dictionary&, Mixed)
 {
     m_recovery_applier->handle_error(util::format("Invalid path for %1 (dictionary, key)", m_instr_name));
+    return Status::DidNotResolve;
 }
 
 void RecoverLocalChangesetsHandler::RecoveryResolver::on_set(SetBase&)
@@ -590,14 +581,14 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::on_dict_key_advance(String
     m_list_path.append(ListPath::Element(translated_key));
 }
 
-void RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index_advance(uint32_t index)
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index_advance(uint32_t index)
 {
     if (m_recovery_applier->m_lists.count(m_list_path) != 0) {
         auto& list_tracker = m_recovery_applier->m_lists.at(m_list_path);
         auto cross_ndx = list_tracker.update(index);
         if (!cross_ndx) {
-            do_not_resolve(); // not allowed to modify this list item
-            return;
+            return Status::DidNotResolve; // not allowed to modify this list item
         }
         REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
 
@@ -606,21 +597,31 @@ void RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index_advance(uint
         // At this point, the first part of an embedded object path has been allowed.
         // This implies that all parts of the rest of the path are also allowed so the index translation is
         // not necessary because instructions are operating on local only operations.
-        preempt_success();
-        return;
+        return Status::Success;
     }
     // no record of this base list so far, track it for verbatim copy
     m_recovery_applier->m_lists.at(m_list_path).queue_for_manual_copy();
-    do_not_resolve();
+    return Status::DidNotResolve;
 }
 
-void RecoverLocalChangesetsHandler::RecoveryResolver::on_null_link_advance(StringData table_name,
-                                                                           StringData link_name)
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_null_link_advance(StringData table_name, StringData link_name)
 {
     m_recovery_applier->m_logger.warn(
         "Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'", m_instr_name,
         table_name, link_name);
-    do_not_resolve(); // discard this instruction as it operates over a null link
+    return Status::DidNotResolve; // discard this instruction as it operates over a null link
+}
+
+RecoverLocalChangesetsHandler::RecoveryResolver::Status
+RecoverLocalChangesetsHandler::RecoveryResolver::on_begin(const util::Optional<Obj>& obj)
+{
+    if (!obj) {
+        m_recovery_applier->m_logger.warn("Cannot recover '%1' which operates on a deleted object", m_instr_name);
+        return Status::DidNotResolve;
+    }
+    m_list_path = ListPath(obj->get_table()->get_key(), obj->get_key());
+    return Status::Pending;
 }
 
 void RecoverLocalChangesetsHandler::RecoveryResolver::on_finish() {}
@@ -689,14 +690,15 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
             , m_instr(instr)
         {
         }
-        void on_dictionary_key(Dictionary& dict, Mixed key) override
+        Status on_dictionary_key(Dictionary& dict, Mixed key) override
         {
             if (m_instr.value.type == instr::Payload::Type::Erased && dict.find(key) == dict.end()) {
                 // removing a dictionary value on a key that no longer exists is ignored
-                do_not_resolve();
+                return Status::DidNotResolve;
             }
+            return Status::Pending;
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             util::Optional<ListTracker::CrossListIndex> cross_index;
             cross_index = m_recovery_applier->m_lists.at(m_list_path).update(index);
@@ -705,8 +707,9 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
                 m_instr.path.back() = cross_index->remote;
             }
             else {
-                do_not_resolve();
+                return Status::DidNotResolve;
             }
+            return Status::Pending;
         }
         void on_property(Obj&, ColKey) override {}
 
@@ -798,7 +801,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
             , m_instr(instr)
         {
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             REALM_ASSERT(index != uint32_t(-1));
             size_t list_size = list.size();
@@ -806,10 +809,9 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& i
             if (cross_index) {
                 m_instr.path.back() = cross_index->remote;
                 m_instr.prior_size = static_cast<uint32_t>(list_size);
+                return Status::Pending;
             }
-            else {
-                do_not_resolve();
-            }
+            return Status::DidNotResolve;
         }
 
     private:
@@ -835,7 +837,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& ins
             , m_instr(instr)
         {
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             REALM_ASSERT(index != uint32_t(-1));
             size_t lst_size = list.size();
@@ -847,10 +849,9 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& ins
                 m_instr.prior_size = static_cast<uint32_t>(lst_size);
                 m_instr.path.back() = translated_from;
                 m_instr.ndx_2 = translated_to;
+                return Status::Pending;
             }
-            else {
-                do_not_resolve();
-            }
+            return Status::DidNotResolve;
         }
 
     private:
@@ -870,7 +871,7 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
             , m_instr(instr)
         {
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             auto obj = list.get_obj();
             uint32_t translated_index;
@@ -879,10 +880,9 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
             if (allowed_to_delete) {
                 m_instr.prior_size = static_cast<uint32_t>(list.size());
                 m_instr.path.back() = translated_index;
+                return Status::Pending;
             }
-            else {
-                do_not_resolve();
-            }
+            return Status::DidNotResolve;
         }
 
     private:

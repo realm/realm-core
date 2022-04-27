@@ -362,58 +362,56 @@ int InterRealmValueConverter::cmp_src_to_dst(Mixed src, Mixed dst, ConversionRes
         converted_src = src;
         cmp = src.compare(dst);
     }
-    else {
-        if (m_opposite_of_src) {
-            ObjKey src_link_key = src.get<ObjKey>();
-            if (m_is_embedded_link) {
-                Obj src_embedded = m_opposite_of_src->get_object(src_link_key);
-                REALM_ASSERT_DEBUG(src_embedded.is_valid());
-                if (dst.is_type(type_Link, type_TypedLink)) {
-                    cmp = 0; // no need to set this link, there is already an embedded object here
-                    Obj dst_embedded = m_opposite_of_dst->get_object(dst.get<ObjKey>());
-                    REALM_ASSERT_DEBUG(dst_embedded.is_valid());
-                    converted_src = dst_embedded.get_key();
-                    track_new_embedded(src_embedded, dst_embedded);
-                }
-                else {
-                    cmp = src.compare(dst);
-                    if (converted_src_out) {
-                        converted_src_out->requires_new_embedded_object = true;
-                        converted_src_out->src_embedded_to_check = src_embedded;
-                    }
-                }
+    else if (m_opposite_of_src) {
+        ObjKey src_link_key = src.get<ObjKey>();
+        if (m_is_embedded_link) {
+            Obj src_embedded = m_opposite_of_src->get_object(src_link_key);
+            REALM_ASSERT_DEBUG(src_embedded.is_valid());
+            if (dst.is_type(type_Link, type_TypedLink)) {
+                cmp = 0; // no need to set this link, there is already an embedded object here
+                Obj dst_embedded = m_opposite_of_dst->get_object(dst.get<ObjKey>());
+                REALM_ASSERT_DEBUG(dst_embedded.is_valid());
+                converted_src = dst_embedded.get_key();
+                track_new_embedded(src_embedded, dst_embedded);
             }
             else {
-                Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
-                Obj dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
-                converted_src = dst_link.get_key();
-                if (dst.is_type(type_TypedLink)) {
-                    cmp = converted_src.compare(dst.get<ObjKey>());
-                }
-                else {
-                    cmp = converted_src.compare(dst);
+                cmp = src.compare(dst);
+                if (converted_src_out) {
+                    converted_src_out->requires_new_embedded_object = true;
+                    converted_src_out->src_embedded_to_check = src_embedded;
                 }
             }
         }
         else {
-            ObjLink src_link = src.get<ObjLink>();
-            if (src_link.is_unresolved()) {
-                converted_src = Mixed{}; // no need to transfer over unresolved links
-                cmp = converted_src.compare(dst);
+            Mixed src_link_pk = m_opposite_of_src->get_primary_key(src_link_key);
+            Obj dst_link = m_opposite_of_dst->create_object_with_primary_key(src_link_pk, did_update_out);
+            converted_src = dst_link.get_key();
+            if (dst.is_type(type_TypedLink)) {
+                cmp = converted_src.compare(dst.get<ObjKey>());
             }
             else {
-                TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
-                REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
-                TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
-                REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
-                // embedded tables should always be covered by the m_opposite_of_src case above.
-                REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
-                // regular table, convert by pk
-                Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
-                Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
-                converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
                 cmp = converted_src.compare(dst);
             }
+        }
+    }
+    else {
+        ObjLink src_link = src.get<ObjLink>();
+        if (src_link.is_unresolved()) {
+            converted_src = Mixed{}; // no need to transfer over unresolved links
+            cmp = converted_src.compare(dst);
+        }
+        else {
+            TableRef src_link_table = m_src_table->get_parent_group()->get_table(src_link.get_table_key());
+            REALM_ASSERT_EX(src_link_table, src_link.get_table_key());
+            TableRef dst_link_table = m_dst_table->get_parent_group()->get_table(src_link_table->get_name());
+            REALM_ASSERT_EX(dst_link_table, src_link_table->get_name());
+            // embedded tables should always be covered by the m_opposite_of_src case above.
+            REALM_ASSERT_EX(!src_link_table->is_embedded(), src_link_table->get_name());
+            // regular table, convert by pk
+            Mixed src_pk = src_link_table->get_primary_key(src_link.get_obj_key());
+            Obj dst_link = dst_link_table->create_object_with_primary_key(src_pk, did_update_out);
+            converted_src = ObjLink{dst_link_table->get_key(), dst_link.get_key()};
+            cmp = converted_src.compare(dst);
         }
     }
     if (converted_src_out) {

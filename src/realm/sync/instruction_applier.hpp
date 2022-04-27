@@ -89,33 +89,31 @@ protected:
 
         virtual void on_property(Obj&, ColKey);
         virtual void on_list(LstBase&);
-        virtual void on_list_index(LstBase&, uint32_t);
+        [[nodiscard]] virtual Status on_list_index(LstBase&, uint32_t);
         virtual void on_dictionary(Dictionary&);
-        virtual void on_dictionary_key(Dictionary&, Mixed);
+        [[nodiscard]] virtual Status on_dictionary_key(Dictionary&, Mixed);
         virtual void on_set(SetBase&);
         virtual void on_error(const std::string&);
         virtual void on_column_advance(ColKey);
         virtual void on_dict_key_advance(StringData);
-        virtual void on_list_index_advance(uint32_t);
-        virtual void on_null_link_advance(StringData, StringData);
+        [[nodiscard]] virtual Status on_list_index_advance(uint32_t);
+        [[nodiscard]] virtual Status on_null_link_advance(StringData, StringData);
+        [[nodiscard]] virtual Status on_begin(const util::Optional<Obj>& obj);
         virtual void on_finish();
         virtual StringData get_string(InternString);
-        void do_not_resolve();
-        void preempt_success();
         const std::string_view& instruction_name() const noexcept
         {
             return m_instr_name;
         }
 
     protected:
-        void resolve_field(Obj& obj, InternString field);
-        void resolve_list_element(LstBase& list, uint32_t index);
-        void resolve_dictionary_element(Dictionary& dict, InternString key);
+        [[nodiscard]] Status resolve_field(Obj& obj, InternString field);
+        [[nodiscard]] Status resolve_list_element(LstBase& list, uint32_t index);
+        [[nodiscard]] Status resolve_dictionary_element(Dictionary& dict, InternString key);
 
         InstructionApplier* m_applier;
         const Instruction::PathInstruction& m_path_instr;
         std::string_view m_instr_name;
-        Status m_status;
         Instruction::Path::const_iterator m_it_begin;
         Instruction::Path::const_iterator m_it_end;
     };

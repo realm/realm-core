@@ -384,7 +384,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
 
             m_applier->visit_payload(m_instr.value, visitor);
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             // Update of list element.
 
@@ -455,8 +455,9 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
+            return Status::Pending;
         }
-        void on_dictionary_key(Dictionary& dict, Mixed key) override
+        Status on_dictionary_key(Dictionary& dict, Mixed key) override
         {
             // Update (insert) of dictionary element.
 
@@ -483,6 +484,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
             };
 
             m_applier->visit_payload(m_instr.value, visitor);
+            return Status::Pending;
         }
 
     private:
@@ -660,7 +662,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             , m_instr(instr)
         {
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             auto col = list.get_col_key();
             auto data_type = DataType(col.get_type());
@@ -763,6 +765,7 @@ void InstructionApplier::operator()(const Instruction::ArrayInsert& instr)
             };
 
             m_applier->visit_payload(m_instr.value, inserter);
+            return Status::Pending;
         }
 
     private:
@@ -779,7 +782,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
             , m_instr(instr)
         {
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             if (index >= list.size()) {
                 m_applier->bad_transaction_log("ArrayMove from out of bounds (%1 >= %2)", m_instr.index(),
@@ -797,6 +800,7 @@ void InstructionApplier::operator()(const Instruction::ArrayMove& instr)
                                                list.size(), m_instr.prior_size);
             }
             list.move(index, m_instr.ndx_2);
+            return Status::Pending;
         }
 
     private:
@@ -813,7 +817,7 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
             , m_instr(instr)
         {
         }
-        void on_list_index(LstBase& list, uint32_t index) override
+        Status on_list_index(LstBase& list, uint32_t index) override
         {
             if (index >= m_instr.prior_size) {
                 m_applier->bad_transaction_log("ArrayErase: Invalid index (index = %1, prior_size = %2)", index,
@@ -827,6 +831,7 @@ void InstructionApplier::operator()(const Instruction::ArrayErase& instr)
                                                list.size(), m_instr.prior_size);
             }
             list.remove(index, index + 1);
+            return Status::Pending;
         }
 
     private:
@@ -868,16 +873,20 @@ bool InstructionApplier::allows_null_links(const Instruction::PathInstruction& i
             , m_allows_nulls(false)
         {
         }
-        void on_list_index(LstBase&, uint32_t) override {}
+        Status on_list_index(LstBase&, uint32_t) override
+        {
+            return Status::Pending;
+        }
         void on_list(LstBase&) override {}
         void on_set(SetBase&) override {}
         void on_dictionary(Dictionary&) override
         {
             m_allows_nulls = true;
         }
-        void on_dictionary_key(Dictionary&, Mixed) override
+        Status on_dictionary_key(Dictionary&, Mixed) override
         {
             m_allows_nulls = true;
+            return Status::Pending;
         }
         void on_property(Obj&, ColKey) override
         {
@@ -931,7 +940,8 @@ bool InstructionApplier::check_links_exist(const Instruction::Payload& payload)
                                         [&](GlobalKey) {
                                             bad_transaction_log(
                                                 "Unexpected link to embedded object while validating a primary key");
-                                            return Mixed{};
+                                            return Mixed{}; // appease the compiler; visitors must have a single
+                                                            // return type
                                         },
                                         [&](ObjectId pk) {
                                             return Mixed{pk};
@@ -1196,13 +1206,12 @@ InstructionApplier::PathResolver::PathResolver(InstructionApplier* applier, cons
     : m_applier(applier)
     , m_path_instr(instr)
     , m_instr_name(instr_name)
-    , m_status(Status::Pending)
 {
 }
 
 InstructionApplier::PathResolver::~PathResolver()
 {
-    on_finish(); // FIXME: maybe move this?
+    on_finish();
 }
 
 void InstructionApplier::PathResolver::on_property(Obj&, ColKey)
@@ -1215,9 +1224,10 @@ void InstructionApplier::PathResolver::on_list(LstBase&)
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (list)", m_instr_name));
 }
 
-void InstructionApplier::PathResolver::on_list_index(LstBase&, uint32_t)
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_list_index(LstBase&, uint32_t)
 {
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (list, index)", m_instr_name));
+    return Status::DidNotResolve;
 }
 
 void InstructionApplier::PathResolver::on_dictionary(Dictionary&)
@@ -1225,9 +1235,10 @@ void InstructionApplier::PathResolver::on_dictionary(Dictionary&)
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (dictionary, key)", m_instr_name));
 }
 
-void InstructionApplier::PathResolver::on_dictionary_key(Dictionary&, Mixed)
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_dictionary_key(Dictionary&, Mixed)
 {
     m_applier->bad_transaction_log(util::format("Invalid path for %1 (dictionary, key)", m_instr_name));
+    return Status::DidNotResolve;
 }
 
 void InstructionApplier::PathResolver::on_set(SetBase&)
@@ -1247,9 +1258,23 @@ void InstructionApplier::PathResolver::on_column_advance(ColKey col)
 
 void InstructionApplier::PathResolver::on_dict_key_advance(StringData) {}
 
-void InstructionApplier::PathResolver::on_list_index_advance(uint32_t) {}
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_list_index_advance(uint32_t)
+{
+    return Status::Pending;
+}
 
-void InstructionApplier::PathResolver::on_null_link_advance(StringData, StringData) {}
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_null_link_advance(StringData,
+                                                                                                StringData)
+{
+    return Status::Pending;
+}
+
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::on_begin(const util::Optional<Obj>&)
+{
+    m_applier->m_current_path = m_path_instr.path;
+    m_applier->m_last_field_name = m_path_instr.field;
+    return Status::Pending;
+}
 
 void InstructionApplier::PathResolver::on_finish()
 {
@@ -1263,26 +1288,13 @@ StringData InstructionApplier::PathResolver::get_string(InternString interned)
     return m_applier->get_string(interned);
 }
 
-void InstructionApplier::PathResolver::do_not_resolve()
-{
-    m_status = Status::DidNotResolve;
-}
-
-void InstructionApplier::PathResolver::preempt_success()
-{
-    m_status = Status::Success;
-}
-
 InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve()
 {
-    if (m_status == Status::DidNotResolve) {
-        return Status::DidNotResolve;
-    }
-    // FIXME: check callsite
-    m_applier->m_current_path = m_path_instr.path;
-    m_applier->m_last_field_name = m_path_instr.field;
-
     util::Optional<Obj> obj = m_applier->get_top_object(m_path_instr, m_instr_name);
+    Status begin_status = on_begin(obj);
+    if (begin_status != Status::Pending) {
+        return begin_status;
+    }
     if (!obj) {
         m_applier->bad_transaction_log("%1: No such object: %3 in class '%2'", m_instr_name,
                                        format_pk(m_applier->m_log->get_key(m_path_instr.object)),
@@ -1291,31 +1303,29 @@ InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resol
 
     m_it_begin = m_path_instr.path.begin();
     m_it_end = m_path_instr.path.end();
-    resolve_field(*obj, m_path_instr.field);
-    if (m_status == Status::Pending) {
-        m_status = Status::Success;
-    }
-    return m_status;
+    Status status = resolve_field(*obj, m_path_instr.field);
+    return status == Status::Pending ? Status::Success : status;
 }
 
-void InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString field)
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString field)
 {
     auto field_name = get_string(field);
     ColKey col = obj.get_table()->get_column_key(field_name);
     if (!col) {
-        return on_error(util::format("%1: No such field: '%2' in class '%3'", m_instr_name, field_name,
-                                     obj.get_table()->get_name()));
+        on_error(util::format("%1: No such field: '%2' in class '%3'", m_instr_name, field_name,
+                              obj.get_table()->get_name()));
+        return Status::DidNotResolve;
     }
     on_column_advance(col);
 
     if (m_it_begin == m_it_end) {
         if (col.is_list()) {
             auto list = obj.get_listbase_ptr(col);
-            return on_list(*list);
+            on_list(*list);
         }
         else if (col.is_dictionary()) {
             auto dict = obj.get_dictionary(col);
-            return on_dictionary(dict);
+            on_dictionary(dict);
         }
         else if (col.is_set()) {
             SetBasePtr set;
@@ -1326,9 +1336,12 @@ void InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString fiel
             else {
                 set = obj.get_setbase_ptr(col);
             }
-            return on_set(*set);
+            on_set(*set);
         }
-        return on_property(obj, col);
+        else {
+            on_property(obj, col);
+        }
+        return Status::Pending;
     }
 
     if (col.is_list()) {
@@ -1337,10 +1350,8 @@ void InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString fiel
             ++m_it_begin;
             return resolve_list_element(*list, *pindex);
         }
-        else {
-            return on_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", m_instr_name,
-                                         field_name, obj.get_table()->get_name()));
-        }
+        on_error(util::format("%1: List index is not an integer on field '%2' in class '%3'", m_instr_name,
+                              field_name, obj.get_table()->get_name()));
     }
     else if (col.is_dictionary()) {
         if (auto pkey = mpark::get_if<InternString>(&*m_it_begin)) {
@@ -1348,42 +1359,42 @@ void InstructionApplier::PathResolver::resolve_field(Obj& obj, InternString fiel
             ++m_it_begin;
             return resolve_dictionary_element(dict, *pkey);
         }
-        else {
-            return on_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'",
-                                         m_instr_name, field_name, obj.get_table()->get_name()));
-        }
+        on_error(util::format("%1: Dictionary key is not a string on field '%2' in class '%3'", m_instr_name,
+                              field_name, obj.get_table()->get_name()));
     }
     else if (col.get_type() == col_type_Link) {
         auto target = obj.get_table()->get_link_target(col);
         if (!target->is_embedded()) {
-            return on_error(util::format("%1: Reference through non-embedded link in field '%2' in class '%3'",
-                                         m_instr_name, field_name, obj.get_table()->get_name()));
+            on_error(util::format("%1: Reference through non-embedded link in field '%2' in class '%3'", m_instr_name,
+                                  field_name, obj.get_table()->get_name()));
         }
-        if (obj.is_null(col)) {
-            on_null_link_advance(obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
-            if (m_status != Status::Pending) {
-                return;
+        else if (obj.is_null(col)) {
+            Status null_status =
+                on_null_link_advance(obj.get_table()->get_name(), obj.get_table()->get_column_name(col));
+            if (null_status != Status::Pending) {
+                return null_status;
             }
-            return on_error(util::format("%1: Reference through NULL embedded link in field '%2' in class '%3'",
-                                         m_instr_name, field_name, obj.get_table()->get_name()));
+            on_error(util::format("%1: Reference through NULL embedded link in field '%2' in class '%3'",
+                                  m_instr_name, field_name, obj.get_table()->get_name()));
         }
-
-        auto embedded_object = obj.get_linked_object(col);
-        if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+        else if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+            auto embedded_object = obj.get_linked_object(col);
             ++m_it_begin;
             return resolve_field(embedded_object, *pfield);
         }
         else {
-            return on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
+            on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
         }
     }
     else {
-        return on_error(util::format("%1: Resolving path through unstructured field '%3.%2' of type %4", m_instr_name,
-                                     field_name, obj.get_table()->get_name(), col.get_type()));
+        on_error(util::format("%1: Resolving path through unstructured field '%3.%2' of type %4", m_instr_name,
+                              field_name, obj.get_table()->get_name(), col.get_type()));
     }
+    return Status::DidNotResolve;
 }
 
-void InstructionApplier::PathResolver::resolve_list_element(LstBase& list, uint32_t index)
+InstructionApplier::PathResolver::Status InstructionApplier::PathResolver::resolve_list_element(LstBase& list,
+                                                                                                uint32_t index)
 {
     if (m_it_begin == m_it_end) {
         return on_list_index(list, index);
@@ -1395,46 +1406,45 @@ void InstructionApplier::PathResolver::resolve_list_element(LstBase& list, uint3
     if (col.get_type() == col_type_LinkList) {
         auto target = list.get_table()->get_link_target(col);
         if (!target->is_embedded()) {
-            return on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name,
-                                         field_name, list.get_table()->get_name(), index));
+            on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,
+                                  list.get_table()->get_name(), index));
+            return Status::DidNotResolve;
         }
 
-        on_list_index_advance(index);
-        if (m_status != Status::Pending) {
-            return;
+        Status list_status = on_list_index_advance(index);
+        if (list_status != Status::Pending) {
+            return list_status;
         }
 
         REALM_ASSERT(dynamic_cast<LnkLst*>(&list));
         auto& link_list = static_cast<LnkLst&>(list);
         if (index >= link_list.size()) {
-            return on_error(util::format("%1: Out-of-bounds index through list at '%3.%2[%4]'", m_instr_name,
-                                         field_name, list.get_table()->get_name(), index));
+            on_error(util::format("%1: Out-of-bounds index through list at '%3.%2[%4]'", m_instr_name, field_name,
+                                  list.get_table()->get_name(), index));
         }
-        auto embedded_object = link_list.get_object(index);
-
-        if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+        else if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+            auto embedded_object = link_list.get_object(index);
             ++m_it_begin;
             return resolve_field(embedded_object, *pfield);
         }
-        else {
-            return on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
-        }
+        on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
     }
     else {
-        return on_error(util::format(
+        on_error(util::format(
             "%1: Resolving path through unstructured list element on '%3.%2', which is a list of type '%4'",
             m_instr_name, field_name, list.get_table()->get_name(), col.get_type()));
     }
+    return Status::DidNotResolve;
 }
 
-void InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, InternString key)
+InstructionApplier::PathResolver::Status
+InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& dict, InternString key)
 {
     StringData string_key = get_string(key);
     if (m_it_begin == m_it_end) {
         return on_dictionary_key(dict, Mixed{string_key});
     }
 
-    // FIXME: maybe move this up?
     on_dict_key_advance(string_key);
 
     auto col = dict.get_col_key();
@@ -1444,33 +1454,34 @@ void InstructionApplier::PathResolver::resolve_dictionary_element(Dictionary& di
     if (col.get_type() == col_type_Link) {
         auto target = dict.get_target_table();
         if (!target->is_embedded()) {
-            return on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name,
-                                         field_name, table->get_name(), string_key));
+            on_error(util::format("%1: Reference through non-embedded link at '%3.%2[%4]'", m_instr_name, field_name,
+                                  table->get_name(), string_key));
+            return Status::DidNotResolve;
         }
 
         auto embedded_object = dict.get_object(string_key);
         if (!embedded_object) {
-            on_null_link_advance(table->get_name(), string_key);
-            if (m_status != Status::Pending) {
-                return;
+            Status null_link_status = on_null_link_advance(table->get_name(), string_key);
+            if (null_link_status != Status::Pending) {
+                return null_link_status;
             }
-            return on_error(util::format("%1: Unmatched key through dictionary at '%3.%2[%4]'", m_instr_name,
-                                         field_name, table->get_name(), string_key));
+            on_error(util::format("%1: Unmatched key through dictionary at '%3.%2[%4]'", m_instr_name, field_name,
+                                  table->get_name(), string_key));
         }
-
-        if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
+        else if (auto pfield = mpark::get_if<InternString>(&*m_it_begin)) {
             ++m_it_begin;
             return resolve_field(embedded_object, *pfield);
         }
         else {
-            return on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
+            on_error(util::format("%1: Embedded object field reference is not a string", m_instr_name));
         }
     }
     else {
-        return on_error(
+        on_error(
             util::format("%1: Resolving path through non link element on '%3.%2', which is a dictionary of type '%4'",
                          m_instr_name, field_name, table->get_name(), col.get_type()));
     }
+    return Status::DidNotResolve;
 }
 
 

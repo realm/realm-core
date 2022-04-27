@@ -148,7 +148,6 @@ struct Path {
     }
 
     using const_iterator = typename std::vector<Element>::const_iterator;
-    using iterator = typename std::vector<Element>::iterator;
     const_iterator begin() const noexcept
     {
         return m_path.begin();
@@ -156,10 +155,6 @@ struct Path {
     const_iterator end() const noexcept
     {
         return m_path.end();
-    }
-    iterator begin() noexcept
-    {
-        return m_path.begin();
     }
 };
 
