@@ -100,8 +100,6 @@ const char* get_protocol_error_message(int error_code) noexcept
             return "The server sent a changeset that could not be integrated (Bad changeset (UPLOAD)). This is "
                    "likely due to corruption of the client-side file. Please restore the file on the client by "
                    "wiping it and resuming synchronization";
-        case ProtocolError::superseded:
-            return "The server sent an obsolete error code (Superseded by new session for same client-side file)";
         case ProtocolError::partial_sync_disabled:
             return "Query-based sync is disabled";
         case ProtocolError::unsupported_session_feature:

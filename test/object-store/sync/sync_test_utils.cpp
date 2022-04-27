@@ -96,85 +96,52 @@ auto do_hash = [](const std::string& name) -> std::string {
 
 ExpectedRealmPaths::ExpectedRealmPaths(const std::string& base_path, const std::string& app_id,
                                        const std::string& identity, const std::string& local_identity,
-                                       const std::string& partition, util::Optional<std::string> name)
+                                       const std::string& partition)
 {
     // This is copied from SyncManager.cpp string_from_partition() in order to prevent
     // us changing that function and therefore breaking user's existing paths unknowingly.
-    std::string cleaned_partition = partition;
-    try {
-        bson::Bson partition_value = bson::parse(partition);
-        switch (partition_value.type()) {
-            case bson::Bson::Type::Int32:
-                cleaned_partition = util::format("i_%1", static_cast<int32_t>(partition_value));
-                break;
-            case bson::Bson::Type::Int64:
-                cleaned_partition = util::format("l_%1", static_cast<int64_t>(partition_value));
-                break;
-            case bson::Bson::Type::String:
-                cleaned_partition = util::format("s_%1", static_cast<std::string>(partition_value));
-                break;
-            case bson::Bson::Type::ObjectId:
-                cleaned_partition = util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
-                break;
-            case bson::Bson::Type::Uuid:
-                cleaned_partition = util::format("u_%1", static_cast<UUID>(partition_value).to_string());
-                break;
-            case bson::Bson::Type::Null:
-                cleaned_partition = "null";
-                break;
-            default:
-                REALM_ASSERT(false);
-        }
+    std::string cleaned_partition;
+    bson::Bson partition_value = bson::parse(partition);
+    switch (partition_value.type()) {
+        case bson::Bson::Type::Int32:
+            cleaned_partition = util::format("i_%1", static_cast<int32_t>(partition_value));
+            break;
+        case bson::Bson::Type::Int64:
+            cleaned_partition = util::format("l_%1", static_cast<int64_t>(partition_value));
+            break;
+        case bson::Bson::Type::String:
+            cleaned_partition = util::format("s_%1", static_cast<std::string>(partition_value));
+            break;
+        case bson::Bson::Type::ObjectId:
+            cleaned_partition = util::format("o_%1", static_cast<ObjectId>(partition_value).to_string());
+            break;
+        case bson::Bson::Type::Uuid:
+            cleaned_partition = util::format("u_%1", static_cast<UUID>(partition_value).to_string());
+            break;
+        case bson::Bson::Type::Null:
+            cleaned_partition = "null";
+            break;
+        default:
+            REALM_ASSERT(false);
     }
-    catch (...) {
-        // if the partition is not a bson string then it was from old sync tests and is a server path.
-    }
-    std::string clean_name = name ? util::make_percent_encoded_string(*name) : cleaned_partition;
+
+    std::string clean_name = cleaned_partition;
     std::string cleaned_app_id = util::make_percent_encoded_string(app_id);
-    std::string manager_path = fs::path{base_path + "/mongodb-realm/" + cleaned_app_id}.make_preferred().string();
-    std::string preferred_name = fs::path{manager_path + "/" + identity + "/" + clean_name}.make_preferred().string();
-    current_preferred_path = fs::path{preferred_name + ".realm"}.make_preferred().string();
-    fallback_hashed_path =
-        fs::path{manager_path + "/" + do_hash(preferred_name) + ".realm"}.make_preferred().string();
-    legacy_sync_directories_to_make.push_back(
-        fs::path{manager_path + "/" + local_identity}.make_preferred().string());
+    const auto manager_path = fs::path{base_path}.make_preferred() / "mongodb-realm" / cleaned_app_id;
+    const auto preferred_name = manager_path / identity / clean_name;
+    current_preferred_path = preferred_name.string() + ".realm";
+    fallback_hashed_path = (manager_path / do_hash(preferred_name.string())).string() + ".realm";
+    legacy_sync_directories_to_make.push_back((manager_path / local_identity).string());
     std::string encoded_partition = util::make_percent_encoded_string(partition);
-    legacy_local_id_path = fs::path{manager_path + "/" + local_identity + "/" +
-                                    (name ? util::make_percent_encoded_string(*name) : encoded_partition) + ".realm"}
-                               .make_preferred()
-                               .string();
-    auto dir_builder = fs::path{manager_path + "/realm-object-server"}.make_preferred().string();
-    legacy_sync_directories_to_make.push_back(dir_builder);
-    dir_builder = fs::path{dir_builder + "/" + local_identity}.make_preferred().string();
-    legacy_sync_directories_to_make.push_back(dir_builder);
-    legacy_sync_path =
-        fs::path{dir_builder + "/" + (name ? util::make_percent_encoded_string(*name) : cleaned_partition)}
-            .make_preferred()
-            .string();
+    legacy_local_id_path = (manager_path / local_identity / encoded_partition).concat(".realm").string();
+    auto dir_builder = manager_path / "realm-object-server";
+    legacy_sync_directories_to_make.push_back(dir_builder.string());
+    dir_builder /= local_identity;
+    legacy_sync_directories_to_make.push_back(dir_builder.string());
+    legacy_sync_path = (dir_builder / cleaned_partition).string();
 }
 
 #if REALM_ENABLE_SYNC
-
-void wait_for_sync_changes(std::shared_ptr<SyncSession> session)
-{
-    std::atomic<bool> called{false};
-    session->wait_for_upload_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-    REQUIRE(called);
-    called.store(false);
-    session->wait_for_download_completion([&](std::error_code err) {
-        REQUIRE(err == std::error_code{});
-        called.store(true);
-    });
-    REQUIRE_NOTHROW(timed_wait_for([&] {
-        return called.load();
-    }));
-}
 
 #if REALM_ENABLE_AUTH_TESTS
 
@@ -207,12 +174,12 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
     AutoVerifiedEmailCredentials creds;
     app->provider_client<app::App::UsernamePasswordProviderClient>().register_email(
         creds.email, creds.password, [&](util::Optional<app::AppError> error) {
-            CHECK(!error);
+            REQUIRE(!error);
         });
     app->log_in_with_credentials(realm::app::AppCredentials::username_password(creds.email, creds.password),
                                  [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
                                      REQUIRE(user);
-                                     CHECK(!error);
+                                     REQUIRE(!error);
                                  });
     return creds;
 }
@@ -221,6 +188,7 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app)
 #endif // REALM_ENABLE_SYNC
 
 namespace reset_utils {
+namespace {
 
 struct Partition {
     std::string property_name;
@@ -323,6 +291,7 @@ struct FakeLocalClientReset : public TestClientReset {
         }
     }
 };
+} // anonymous namespace
 
 #if REALM_ENABLE_SYNC
 
@@ -330,23 +299,22 @@ struct FakeLocalClientReset : public TestClientReset {
 
 struct BaasClientReset : public TestClientReset {
     BaasClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
-                    TestSyncManager& test_sync_manager)
+                    TestAppSession& test_app_session)
         : TestClientReset(local_config, remote_config)
-        , m_test_sync_manager(test_sync_manager)
+        , m_test_app_session(test_app_session)
     {
     }
 
     void run() override
     {
         m_did_run = true;
-        AppSession* app_session = m_test_sync_manager.app_session();
-        REALM_ASSERT(app_session);
-        auto sync_manager = m_test_sync_manager.app()->sync_manager();
+        const AppSession& app_session = m_test_app_session.app_session();
+        auto sync_manager = m_test_app_session.app()->sync_manager();
         std::string partition_value = m_local_config.sync_config->partition_value;
         REALM_ASSERT(partition_value.size() > 2 && *partition_value.begin() == '"' &&
                      *(partition_value.end() - 1) == '"');
         partition_value = partition_value.substr(1, partition_value.size() - 2);
-        Partition partition = {app_session->config.partition_key.name, partition_value};
+        Partition partition = {app_session.config.partition_key.name, partition_value};
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
@@ -378,7 +346,7 @@ struct BaasClientReset : public TestClientReset {
             // the meaning of "upload complete" to include writing to atlas then this would
             // not be necessary.
             app::MongoClient remote_client = m_local_config.sync_config->user->mongo_client("BackingDB");
-            app::MongoDatabase db = remote_client.db(app_session->config.mongo_dbname);
+            app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
             app::MongoCollection object_coll = db[object_schema_name];
             uint64_t count_external = 0;
 
@@ -409,15 +377,15 @@ struct BaasClientReset : public TestClientReset {
 
         // cause a client reset by restarting the sync service
         // this causes the server's sync history to be resynthesized
-        auto baas_sync_service = app_session->admin_api.get_sync_service(app_session->server_app_id);
-        auto baas_sync_config = app_session->admin_api.get_config(app_session->server_app_id, baas_sync_service);
-        REQUIRE(app_session->admin_api.is_sync_enabled(app_session->server_app_id));
-        app_session->admin_api.disable_sync(app_session->server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(!app_session->admin_api.is_sync_enabled(app_session->server_app_id));
-        app_session->admin_api.enable_sync(app_session->server_app_id, baas_sync_service.id, baas_sync_config);
-        REQUIRE(app_session->admin_api.is_sync_enabled(app_session->server_app_id));
-        if (app_session->config.dev_mode_enabled) { // dev mode is not sticky across a reset
-            app_session->admin_api.set_development_mode_to(app_session->server_app_id, true);
+        auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+        auto baas_sync_config = app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.disable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(!app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+        REQUIRE(app_session.admin_api.is_sync_enabled(app_session.server_app_id));
+        if (app_session.config.dev_mode_enabled) { // dev mode is not sticky across a reset
+            app_session.admin_api.set_development_mode_to(app_session.server_app_id, true);
         }
 
         {
@@ -471,14 +439,14 @@ struct BaasClientReset : public TestClientReset {
     }
 
 private:
-    TestSyncManager& m_test_sync_manager;
+    TestAppSession& m_test_app_session;
 };
 
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
-                                                        TestSyncManager& test_sync_manager)
+                                                        TestAppSession& test_app_session)
 {
-    return std::make_unique<BaasClientReset>(local_config, remote_config, test_sync_manager);
+    return std::make_unique<BaasClientReset>(local_config, remote_config, test_app_session);
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS

@@ -39,9 +39,10 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        sync/sync_test_utils.hpp
         sync/flx_sync_harness.hpp
         sync/session/session_util.hpp
+        sync/sync_test_utils.hpp
+        util/baas_admin_api.hpp
     )
     list(APPEND SOURCES
         bson.cpp

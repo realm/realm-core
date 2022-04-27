@@ -204,6 +204,11 @@ inline constexpr bool is_nullable(PropertyType a)
     return to_underlying(a & PropertyType::Nullable) == to_underlying(PropertyType::Nullable);
 }
 
+inline constexpr bool is_mixed(PropertyType a)
+{
+    return to_underlying(a & PropertyType::Mixed) == to_underlying(PropertyType::Mixed);
+}
+
 // Some of the places we use switch_on_type() the Obj version isn't instantiatable
 // or reachable, so we want to map it to a valid type to let the unreachable code compile
 template <typename T>

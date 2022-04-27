@@ -25,11 +25,10 @@
 #include <cstring>
 #include <stdexcept>
 
+namespace realm {
+
 namespace {
 constexpr int DECIMAL_EXPONENT_BIAS_128 = 6176;
-} // namespace
-
-namespace realm {
 
 Decimal128 to_decimal128(const BID_UINT128& val)
 {
@@ -44,6 +43,8 @@ BID_UINT128 to_BID_UINT128(const Decimal128& val)
     memcpy(&ret, val.raw(), sizeof(BID_UINT128));
     return ret;
 }
+
+} // namespace
 
 Decimal128::Decimal128()
 {
@@ -1576,7 +1577,7 @@ bool Decimal128::operator>=(const Decimal128& rhs) const
     return compare(rhs) >= 0;
 }
 
-Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul)
+static Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul)
 {
     unsigned flags = 0;
     BID_UINT128 res;
@@ -1611,7 +1612,7 @@ Decimal128 Decimal128::operator*(Decimal128 mul) const
     return do_multiply(x, y);
 }
 
-Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)
+static Decimal128 do_divide(BID_UINT128 x, BID_UINT128 div)
 {
     unsigned flags = 0;
     BID_UINT128 res;

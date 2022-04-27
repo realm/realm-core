@@ -2,14 +2,38 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Added `realm_object_to_string()` support for c_api. ([#5414](https://github.com/realm/realm-core/issues/5414))
+* None.
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
+* None.
  
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
+# 11.15.0 Release notes
+
+### Enhancements
+* `App::link_user()` and `App::delete_user()` now correctly report `ClientErrorCode::user_not_found` and `ClientErrorCode::user_not_logged_in` instead of only using `ClientErrorCode::user_not_found` for both error cases. ([#5402](https://github.com/realm/realm-core/issues/5402))
+* Avoid leaking unresolved mixed links for Lst<Mixed>. ([#5418](https://github.com/realm/realm-core/pull/5418))
+* Add support for embedded objects in the C API. ([#5408](https://github.com/realm/realm-core/issues/5408))
+* Added `realm_object_to_string()` support for c_api. ([#5414](https://github.com/realm/realm-core/issues/5414))
+* Added `ObjectStore::rename_property()` support for c_api. ([#5424]https://github.com/realm/realm-core/issues/5424)
+* Remove deprecated sync protocol errors `disabled_session` and `superseded`. ([#5421]https://github.com/realm/realm-core/issues/5421)
+
+### Fixed
+* Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
+* Synchronized Realm files which were first created using SDK version released in the second half of August 2020 would be redownloaded instead of using the existing file, possibly resulting in the loss of any unsynchronized data in those files (since v11.6.1).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -28,6 +52,7 @@
 * Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
 * Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
 * Added AppCredentials::serialize_as_json() support for c_api ([#5348](https://github.com/realm/realm-core/issues/5348))
+* Added `App::close_all_sync_sessions` static method and `SyncManager::close_all_sessions` method ([#5411](https://github.com/realm/realm-core/pull/5411))
 
 ### Fixed
 * Fixed potential future bug in how async write/commit used encryption ([#5369](https://github.com/realm/realm-core/pull/5369))

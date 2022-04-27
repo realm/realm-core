@@ -5,7 +5,8 @@
 
 #include <realm/sync/noinst/client_history_impl.hpp>
 
-namespace realm {
+namespace {
+using namespace realm;
 
 void print_tables(const Group& group)
 {
@@ -43,13 +44,12 @@ void inspect_client_realm(const std::string& path)
     std::cout << "\n\n";
 }
 
-} // namespace realm
-
 void usage(char* prog)
 {
     std::cerr << "Synopsis: " << prog << " PATH\n";
 }
 
+} // namespace
 int main(int argc, char* argv[])
 {
     if (argc != 2) {
@@ -59,7 +59,7 @@ int main(int argc, char* argv[])
 
     const std::string path = argv[1];
 
-    realm::inspect_client_realm(path);
+    inspect_client_realm(path);
 
     return 0;
 }

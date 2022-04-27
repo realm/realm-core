@@ -396,8 +396,8 @@ TEST(Parser_invalid_queries)
     }
 }
 
-Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                   size_t num_results, query_parser::KeyPathMapping mapping = {})
+static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                          size_t num_results, query_parser::KeyPathMapping mapping = {})
 {
     realm::query_parser::NoArguments args;
     Query q = t->query(query_string, args, mapping);
@@ -416,8 +416,8 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     return q2;
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      const util::Any* arg_list, size_t num_args, size_t num_results)
+static void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                             const util::Any* arg_list, size_t num_args, size_t num_results)
 {
     query_parser::AnyContext ctx;
     realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
@@ -437,8 +437,8 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     }
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      std::vector<Mixed> args, size_t num_results)
+static void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                             std::vector<Mixed> args, size_t num_results)
 {
     Query q = t->query(query_string, args, {});
     size_t q_count = q.count();
@@ -2592,7 +2592,7 @@ TEST(Parser_SortAndDistinctSerialisation)
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);
 }
 
-TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
+static TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
 {
     Query q = t->query(query_string, {}, mapping);
     std::string query_description = q.get_description(mapping.get_backlink_class_prefix());

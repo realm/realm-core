@@ -1022,6 +1022,17 @@ RLM_API bool realm_update_schema_advanced(realm_t* realm, const realm_schema_t* 
                                           void* data_init_func_userdata, bool is_in_transaction);
 
 /**
+ *  Rename a property for the schame  of the open realm.
+ *  @param realm The realm for which the property schema has to be renamed
+ *  @param schema The schema to modifies
+ *  @param object_type type of the object to modify
+ *  @param old_name old name of the property
+ *  @param new_name new name of the property
+ */
+RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type,
+                                          const char* old_name, const char* new_name);
+
+/**
  * Get the `realm::Schema*` pointer for this realm.
  *
  * This is intended as a migration path for users of the C++ Object Store API.
@@ -1373,6 +1384,19 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
 
 /**
+ * Create an embedded object in a given property.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t);
+
+/** Return the object linked by the given property
+ *
+ * @return A non-NULL pointer if an object is found.
+ */
+RLM_API realm_object_t* realm_get_linked_object(realm_object_t*, realm_property_key_t);
+
+/**
  * Serializes an object to json and returns it as string. Serializes a single level of properties only.
  *
  * @return a json-serialized representation of the object.
@@ -1497,6 +1521,27 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
  * @return True if no exception occurred.
  */
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
+
+/**
+ * Insert an embedded object at a given position.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_list_insert_embedded(realm_list_t*, size_t index);
+
+/**
+ * Create an embedded object at a given position.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_list_set_embedded(realm_list_t*, size_t index);
+
+/**
+ * Get object identified at index
+ *
+ * @return A non-NULL pointer if value is an object.
+ */
+RLM_API realm_object_t* realm_list_get_linked_object(realm_list_t*, size_t index);
 
 /**
  * Erase the element at @a index.
@@ -1929,6 +1974,20 @@ RLM_API bool realm_dictionary_get(const realm_dictionary_t*, size_t index, realm
  */
 RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, realm_value_t value, size_t* out_index,
                                      bool* out_inserted);
+
+/**
+ * Insert an embedded object.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
+
+/**
+ * Get object identified by key
+ *
+ * @return A non-NULL pointer if the value associated with key is an object.
+ */
+RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t*, realm_value_t key);
 
 /**
  * Erase a dictionary element.
@@ -2920,8 +2979,6 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_BAD_CLIENT_VERSION = 210,
     RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES = 211,
     RLM_SYNC_ERR_SESSION_BAD_CHANGESET = 212,
-    RLM_SYNC_ERR_SESSION_SUPERSEDED = 213,
-    RLM_SYNC_ERR_SESSION_DISABLED_SESSION = 213,
     RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED = 214,
     RLM_SYNC_ERR_SESSION_UNSUPPORTED_SESSION_FEATURE = 215,
     RLM_SYNC_ERR_SESSION_BAD_ORIGIN_FILE_IDENT = 216,

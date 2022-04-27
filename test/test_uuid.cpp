@@ -25,6 +25,8 @@
 
 using namespace realm;
 
+namespace {
+
 struct WithIndex {
     constexpr static bool do_add_index = true;
 };
@@ -55,6 +57,8 @@ util::Optional<UUID> generate_random_nullable_uuid()
     }
     return util::Optional<UUID>(generate_random_uuid());
 }
+
+} // namespace
 
 TEST(UUID_Basics)
 {

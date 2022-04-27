@@ -17,6 +17,7 @@ using namespace realm;
 
 extern "C" int realm_c_api_tests(const char* file);
 
+namespace {
 template <class T>
 T checked(T x)
 {
@@ -215,6 +216,7 @@ CPtr<T> clone_cptr(const T* ptr)
     void* clone = realm_clone(ptr);
     return CPtr<T>{static_cast<T*>(clone)};
 }
+} // anonymous namespace
 
 #define CHECK_ERR(err)                                                                                               \
     do {                                                                                                             \
@@ -442,6 +444,8 @@ TEST_CASE("C API (non-database)") {
     }
 }
 
+namespace {
+
 /// Generate realm_property_info_t for all possible property types.
 std::vector<realm_property_info_t> all_property_types(const char* link_target)
 {
@@ -591,27 +595,14 @@ std::vector<realm_property_info_t> all_property_types(const char* link_target)
     // properties.push_back(mixed);
     // properties.push_back(mixed_list);
 
-    // FIXME: Object Store schema handling does not support TypedLink yet.
-    // realm_property_info_t typed_link{
-    //     "typed_link", "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_NONE,
-    //     "",           "", RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NULLABLE,
-    // };
-    // realm_property_info_t typed_link_list{
-    //     "typed_link_list",   "", RLM_PROPERTY_TYPE_OBJECT, RLM_COLLECTION_TYPE_LIST, "", "",
-    //     RLM_INVALID_PROPERTY_KEY, RLM_PROPERTY_NORMAL,
-    // };
-
-    // properties.push_back(typed_link);
-    // properties.push_back(typed_link_list);
-
     return properties;
 }
 
-static CPtr<realm_schema_t> make_schema()
+CPtr<realm_schema_t> make_schema()
 {
     auto foo_properties = all_property_types("Bar");
 
-    const realm_class_info_t classes[2] = {
+    const realm_class_info_t classes[3] = {
         {
             "Foo",
             "",                    // primary key
@@ -623,14 +614,22 @@ static CPtr<realm_schema_t> make_schema()
         {
             "Bar",
             "int", // primary key
-            3,     // properties
+            5,     // properties
             1,     // computed properties,
             RLM_INVALID_CLASS_KEY,
             RLM_CLASS_NORMAL,
         },
+        {
+            "Embedded",
+            "", // primary key
+            1,  // properties
+            0,  // computed properties,
+            RLM_INVALID_CLASS_KEY,
+            RLM_CLASS_EMBEDDED,
+        },
     };
 
-    const realm_property_info_t bar_properties[4] = {
+    const realm_property_info_t bar_properties[6] = {
         {
             "int",
             "",
@@ -662,6 +661,26 @@ static CPtr<realm_schema_t> make_schema()
             RLM_PROPERTY_NORMAL,
         },
         {
+            "sub",
+            "",
+            RLM_PROPERTY_TYPE_OBJECT,
+            RLM_COLLECTION_TYPE_NONE,
+            "Embedded",
+            "",
+            RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NULLABLE,
+        },
+        {
+            "sub_list",
+            "",
+            RLM_PROPERTY_TYPE_OBJECT,
+            RLM_COLLECTION_TYPE_LIST,
+            "Embedded",
+            "",
+            RLM_INVALID_PROPERTY_KEY,
+            RLM_PROPERTY_NORMAL,
+        },
+        {
             "linking_objects",
             "",
             RLM_PROPERTY_TYPE_LINKING_OBJECTS,
@@ -673,9 +692,19 @@ static CPtr<realm_schema_t> make_schema()
         },
     };
 
-    const realm_property_info_t* class_properties[2] = {foo_properties.data(), bar_properties};
+    const realm_property_info_t embedded_properties[1] = {{
+        "int",
+        "",
+        RLM_PROPERTY_TYPE_INT,
+        RLM_COLLECTION_TYPE_NONE,
+        "",
+        "",
+        RLM_INVALID_PROPERTY_KEY,
+        RLM_PROPERTY_NORMAL,
+    }};
+    const realm_property_info_t* class_properties[3] = {foo_properties.data(), bar_properties, embedded_properties};
 
-    return cptr(realm_schema_new(classes, 2, class_properties));
+    return cptr(realm_schema_new(classes, 3, class_properties));
 }
 
 CPtr<realm_config_t> make_config(const char* filename, bool set_schema = true)
@@ -720,12 +749,24 @@ bool migrate_schema(void* userdata_p, realm_t* old, realm_t* new_, const realm_s
     return true;
 }
 
+bool migrate_schema_rename_prop(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t* schema)
+{
+    auto userdata = static_cast<ConfigUserdata*>(userdata_p);
+    static_cast<void>(old);
+    static_cast<void>(new_);
+    ++userdata->num_migrations;
+    CHECK(realm_schema_rename_property(new_, (realm_schema_t*)schema, "Foo", "int", "int_new"));
+    return true;
+}
+
 bool should_compact_on_launch(void* userdata_p, uint64_t, uint64_t)
 {
     auto userdata = static_cast<ConfigUserdata*>(userdata_p);
     ++userdata->num_compact_on_launch;
     return false;
 }
+
+} // anonymous namespace
 
 TEST_CASE("C API") {
     TestFile test_file;
@@ -779,6 +820,77 @@ TEST_CASE("C API") {
             CHECK(userdata.num_migrations == 1);
         }
 
+        SECTION("migration callback rename property") {
+            TestFile test_file_3;
+            ConfigUserdata userdata;
+
+            realm_config_set_migration_function(config.get(), migrate_schema_rename_prop, &userdata);
+
+            const realm_class_info_t foo_class[1] = {{
+                "Foo",
+                "int",
+                1,
+                0,
+                RLM_INVALID_CLASS_KEY,
+                RLM_CLASS_NORMAL,
+            }};
+            const realm_property_info_t foo_properties[1] = {
+                {
+                    "int",
+                    "",
+                    RLM_PROPERTY_TYPE_INT,
+                    RLM_COLLECTION_TYPE_NONE,
+                    "",
+                    "",
+                    RLM_INVALID_PROPERTY_KEY,
+                    RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
+                },
+            };
+            const realm_property_info_t foo_properties_new[1] = {
+                {
+                    "int_new",
+                    "",
+                    RLM_PROPERTY_TYPE_INT,
+                    RLM_COLLECTION_TYPE_NONE,
+                    "",
+                    "",
+                    RLM_INVALID_PROPERTY_KEY,
+                    RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
+                },
+            };
+            const realm_property_info_t* props[1] = {foo_properties};
+            const realm_property_info_t* props_new[1] = {foo_properties_new};
+
+            auto schema = cptr(realm_schema_new(foo_class, 1, props));
+            auto new_schema = cptr(realm_schema_new(foo_class, 1, props_new));
+            CHECK(checked(schema.get()));
+            CHECK(checked(new_schema.get()));
+            REQUIRE(checked(realm_schema_validate(schema.get(), RLM_SCHEMA_VALIDATION_BASIC)));
+            REQUIRE(checked(realm_schema_validate(new_schema.get(), RLM_SCHEMA_VALIDATION_BASIC)));
+            // realm with schema
+            auto config = cptr(realm_config_new());
+            realm_config_set_path(config.get(), test_file_3.path.c_str());
+            realm_config_set_schema_mode(config.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config.get(), 0);
+            realm_config_set_schema(config.get(), schema.get());
+            auto realm = cptr_checked(realm_open(config.get()));
+            CHECK(userdata.num_migrations == 0);
+            realm.reset();
+            // realm with new schema
+            auto config2 = cptr(realm_config_new());
+            realm_config_set_path(config2.get(), test_file_3.path.c_str());
+            realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config2.get(), 999);
+            realm_config_set_schema(config2.get(), new_schema.get());
+            realm_config_set_migration_function(config2.get(), migrate_schema_rename_prop, &userdata);
+            auto realm2 = cptr_checked(realm_open(config2.get()));
+            CHECK(userdata.num_migrations == 1);
+            auto new_db_schema = realm_get_schema(realm2.get());
+            CHECK(realm_equals(new_db_schema, new_schema.get()));
+            realm2.reset();
+            realm_release(new_db_schema);
+        }
+
         SECTION("migration callback error") {
             ConfigUserdata userdata;
             auto realm = cptr_checked(realm_open(config.get()));
@@ -829,7 +941,7 @@ TEST_CASE("C API") {
         CHECK(realm_equals(realm, realm));
     }
 
-    CHECK(realm_get_num_classes(realm) == 2);
+    CHECK(realm_get_num_classes(realm) == 3);
 
     SECTION("cached realm") {
         auto config2 = make_config(test_file.path.c_str(), false);
@@ -970,10 +1082,12 @@ TEST_CASE("C API") {
 
     bool found = false;
 
-    realm_class_info_t class_foo, class_bar;
+    realm_class_info_t class_foo, class_bar, class_embedded;
     CHECK(checked(realm_find_class(realm, "Foo", &found, &class_foo)));
     REQUIRE(found);
     CHECK(checked(realm_find_class(realm, "Bar", &found, &class_bar)));
+    REQUIRE(found);
+    CHECK(checked(realm_find_class(realm, "Embedded", &found, &class_embedded)));
     REQUIRE(found);
 
     std::map<std::string, realm_property_key_t> foo_properties;
@@ -1076,7 +1190,7 @@ TEST_CASE("C API") {
         CHECK(found);
         CHECK(property.key == foo_properties["string"]);
 
-        CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "i don't exist", &found, &property)));
+        CHECK(checked(realm_find_property_by_public_name(realm, class_foo.key, "I don't exist", &found, &property)));
         CHECK(!found);
     }
 
@@ -1107,7 +1221,7 @@ TEST_CASE("C API") {
         CHECK(num_found == class_foo.num_properties + class_foo.num_computed_properties);
 
         CHECK(checked(realm_get_property_keys(realm, class_bar.key, ps.data(), ps.size(), &num_found)));
-        CHECK(num_found == 4);
+        CHECK(num_found == 6);
     }
 
     SECTION("realm_get_property()") {
@@ -1134,6 +1248,14 @@ TEST_CASE("C API") {
                 auto p = realm_object_create(realm, class_bar.key);
                 CHECK(!p);
                 CHECK_ERR(RLM_ERR_MISSING_PRIMARY_KEY);
+            });
+        }
+
+        SECTION("embedded object") {
+            write([&]() {
+                auto p = realm_object_create(realm, class_embedded.key);
+                CHECK(!p);
+                CHECK_ERR(RLM_ERR_ILLEGAL_OPERATION);
             });
         }
 
@@ -1489,6 +1611,23 @@ TEST_CASE("C API") {
             CHECK(realm_get_value(obj1.get(), foo_properties["link"], &value));
             CHECK(rlm_val_eq(value, null));
         }
+
+        SECTION("embedded") {
+            realm_property_info_t info;
+            bool found = false;
+            REQUIRE(checked(realm_find_property(realm, class_bar.key, "sub", &found, &info)));
+            REQUIRE(found);
+
+            auto embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
+            CHECK(!embedded);
+            write([&]() {
+                auto embedded = cptr_checked(realm_set_embedded(obj2.get(), info.key));
+                CHECK(embedded);
+            });
+            embedded = cptr_checked(realm_get_linked_object(obj2.get(), info.key));
+            CHECK(embedded);
+        }
+
 
         SECTION("find with primary key") {
             bool found = false;
@@ -2046,6 +2185,7 @@ TEST_CASE("C API") {
 
                 CHECK(realm_list_get(int_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, integer));
+                CHECK(!realm_list_get_linked_object(int_list.get(), 0));
                 CHECK(realm_list_get(bool_list.get(), 0, &value));
                 CHECK(rlm_val_eq(value, boolean));
                 CHECK(realm_list_get(string_list.get(), 0, &value));
@@ -2193,6 +2333,22 @@ TEST_CASE("C API") {
                     CHECK(realm_get_num_objects(realm, class_bar.key, &num_bars));
                     CHECK(num_bars == 0);
                 }
+            }
+
+            SECTION("embedded") {
+                CPtr<realm_list_t> subs;
+                realm_property_info_t info;
+                bool found = false;
+                REQUIRE(checked(realm_find_property(realm, class_bar.key, "sub_list", &found, &info)));
+                REQUIRE(found);
+                subs = cptr_checked(realm_get_list(obj2.get(), info.key));
+
+                write([&]() {
+                    auto embedded = cptr_checked(realm_list_insert_embedded(subs.get(), 0));
+                    CHECK(embedded);
+                });
+                auto embedded = cptr_checked(realm_list_get_linked_object(subs.get(), 0));
+                CHECK(embedded);
             }
 
             SECTION("notifications") {
@@ -3713,11 +3869,11 @@ TEST_CASE("C API") {
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
     using namespace realm::app;
 
-    auto make_schema = []() -> auto
-    {
-        Schema schema{ObjectSchema("Obj", {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                                           {"name", PropertyType::String | PropertyType::Nullable},
-                                           {"value", PropertyType::Int | PropertyType::Nullable}})};
+    auto make_schema = [] {
+        Schema schema{{"Obj",
+                       {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                        {"name", PropertyType::String | PropertyType::Nullable},
+                        {"value", PropertyType::Int | PropertyType::Nullable}}}};
 
         return FLXSyncTestHarness::ServerSchema{std::move(schema), {"name", "value"}};
     };
@@ -3726,18 +3882,14 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
     auto foo_obj_id = ObjectId::gen();
     auto bar_obj_id = ObjectId::gen();
 
-    harness.load_initial_data([&](SharedRealm realm) {
+    harness.load_initial_data([&](SharedRealm& realm) {
         CppContext c(realm);
-        realm->begin_transaction();
         Object::create(c, realm, "Obj",
                        util::Any(AnyDict{
                            {"_id", foo_obj_id}, {"name", std::string{"foo"}}, {"value", static_cast<int64_t>(5)}}));
         Object::create(c, realm, "Obj",
                        util::Any(AnyDict{
                            {"_id", bar_obj_id}, {"name", std::string{"bar"}}, {"value", static_cast<int64_t>(10)}}));
-
-        realm->commit_transaction();
-        wait_for_upload(*realm);
     });
 
     harness.do_with_new_realm([&](SharedRealm realm) {

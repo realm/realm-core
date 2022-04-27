@@ -241,6 +241,14 @@ Obj List::insert_embedded(size_t list_ndx)
     return as<Obj>().create_and_insert_linked_object(list_ndx);
 }
 
+Obj List::get_object(size_t list_ndx)
+{
+    verify_valid_row(list_ndx, true);
+    if (m_type == PropertyType::Object) {
+        return as<Obj>().get_object(list_ndx);
+    }
+    return {};
+}
 
 void List::swap(size_t ndx1, size_t ndx2)
 {

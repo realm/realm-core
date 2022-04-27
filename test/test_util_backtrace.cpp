@@ -7,7 +7,7 @@
 using namespace realm;
 using namespace realm::util;
 
-REALM_NOINLINE void throw_logic_error(ErrorCodes::Error kind)
+REALM_NOINLINE static void throw_logic_error(ErrorCodes::Error kind)
 {
     throw LogicError{kind, "Some error"};
 }

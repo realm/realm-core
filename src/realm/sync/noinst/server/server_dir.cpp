@@ -24,7 +24,7 @@ bool valid_virt_path_segment(const std::string& seg)
     for (char ch : seg) {
         if (std::isalnum(ch, c_loc)) // A-Za-z0-9
             continue;
-        if (ch == '_' || ch == '-' || ch == '.')
+        if (ch == '_' || ch == '-' || ch == '.' || ch == '"')
             continue;
         return false;
     }
@@ -37,11 +37,15 @@ bool valid_virt_path_segment(const std::string& seg)
 _impl::VirtualPathComponents _impl::parse_virtual_path(const std::string& root_path, const std::string& virt_path)
 {
     VirtualPathComponents result;
-    if (virt_path.empty() || virt_path.front() != '/')
+    if (virt_path.empty())
         return result;
 
     std::string real_path = root_path;
     size_t prev_pos = 0;
+    if (virt_path.front() != '/') {
+        --prev_pos;
+        real_path += '/';
+    }
     for (;;) {
         ++prev_pos; // Skip previous slash
         size_t pos = virt_path.find('/', prev_pos);
@@ -49,6 +53,9 @@ _impl::VirtualPathComponents _impl::parse_virtual_path(const std::string& root_p
         if (last)
             pos = virt_path.size();
         std::string segment = virt_path.substr(prev_pos, pos - prev_pos);
+        // Parition key style paths will be surrounded in quotes, which Windows
+        // doesn't allow in paths.
+        segment.erase(std::remove(segment.begin(), segment.end(), '"'), segment.end());
 
         if (!valid_virt_path_segment(segment))
             return result;
@@ -90,9 +97,13 @@ bool _impl::map_partial_to_reference_virt_path(const std::string& partial_path, 
 
 void _impl::make_dirs(const std::string& root_path, const std::string& virt_path)
 {
-    REALM_ASSERT(!virt_path.empty() && virt_path.front() == '/');
+    REALM_ASSERT(!virt_path.empty());
     size_t prev_pos = 0;
     std::string real_path = root_path;
+    if (virt_path.front() != '/') {
+        real_path += '/';
+        --prev_pos;
+    }
     for (;;) {
         ++prev_pos; // Skip previous slash
         size_t pos = virt_path.find('/', prev_pos);

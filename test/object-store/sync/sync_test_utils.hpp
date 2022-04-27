@@ -54,8 +54,7 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
 
 struct ExpectedRealmPaths {
     ExpectedRealmPaths(const std::string& base_path, const std::string& app_id, const std::string& user_identity,
-                       const std::string& local_identity, const std::string& partition,
-                       util::Optional<std::string> name = util::none);
+                       const std::string& local_identity, const std::string& partition);
     std::string current_preferred_path;
     std::string fallback_hashed_path;
     std::string legacy_local_id_path;
@@ -65,25 +64,17 @@ struct ExpectedRealmPaths {
 
 #if REALM_ENABLE_SYNC
 
-void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
-
 template <typename Transport>
 const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
-template <typename Factory>
-app::App::Config get_config(Factory factory)
+template <typename Transport>
+TestSyncManager::Config get_config(Transport&& transport)
 {
-    return {"app name",
-            factory,
-            util::none,
-            util::none,
-            util::Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
+    TestSyncManager::Config config;
+    config.transport = transport;
+    return config;
 }
 
 #if REALM_ENABLE_AUTH_TESTS
@@ -135,7 +126,7 @@ protected:
 #if REALM_ENABLE_AUTH_TESTS
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
-                                                        TestSyncManager& test_sync_manager);
+                                                        TestAppSession& test_app_session);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC

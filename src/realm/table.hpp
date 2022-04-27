@@ -625,12 +625,6 @@ public:
     ColKey get_opposite_column(ColKey col_key) const;
     ColKey find_opposite_column(ColKey col_key) const;
 
-protected:
-    /// Compare the objects of two tables under the assumption that the two tables
-    /// have the same number of columns, and the same data type at each column
-    /// index (as expressed through the DataType enum).
-    bool compare_objects(const Table&) const;
-
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,

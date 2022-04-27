@@ -135,23 +135,6 @@ std::string KeyPathMapping::translate(LinkChain& link_chain, const std::string& 
     return translate(table, identifier);
 }
 
-
-// This may be premature optimisation, but it'll be super fast and it doesn't
-// bother dragging in anything locale specific for case insensitive comparisons.
-bool is_backlinks_prefix(const std::string& s)
-{
-    return s.size() == 6 && s[0] == '@' && (s[1] == 'l' || s[1] == 'L') && (s[2] == 'i' || s[2] == 'I') &&
-           (s[3] == 'n' || s[3] == 'N') && (s[4] == 'k' || s[4] == 'K') && (s[5] == 's' || s[5] == 'S');
-}
-
-bool is_length_suffix(const std::string& s)
-{
-    return s.size() == 6 && (s[0] == 'l' || s[0] == 'L') && (s[1] == 'e' || s[1] == 'E') &&
-           (s[2] == 'n' || s[2] == 'N') && (s[3] == 'g' || s[3] == 'G') && (s[4] == 't' || s[4] == 'T') &&
-           (s[5] == 'h' || s[5] == 'H');
-}
-
-
 void KeyPathMapping::set_backlink_class_prefix(std::string prefix)
 {
     m_backlink_class_prefix = prefix;

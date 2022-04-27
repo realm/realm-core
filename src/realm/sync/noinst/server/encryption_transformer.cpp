@@ -66,9 +66,6 @@ private:
     IntegrationReporter m_integration_reporter;
 };
 
-} // unnamed namespace
-
-
 Replication::HistoryType peek_history_type(const std::string& file_name, const char* read_key)
 {
     Group group{file_name, read_key};
@@ -149,6 +146,8 @@ void parallel_transform(const std::vector<std::string>& paths, const char* read_
         thread.join();
     }
 }
+
+} // unnamed namespace
 
 size_t encryption_transformer::encrypt_transform(const encryption_transformer::Configuration& config)
 {

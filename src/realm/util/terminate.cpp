@@ -123,13 +123,6 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
     please_report_this_issue_in_github_realm_realm_core();
 }
 
-REALM_NORETURN void terminate(const char* message, const char* file, long line) noexcept
-{
-    std::stringstream ss;
-    ss << file << ":" << line << ": " REALM_VER_CHUNK " " << message << '\n';
-    terminate_internal(ss);
-}
-
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
                               std::initializer_list<Printable>&& values) noexcept
 {

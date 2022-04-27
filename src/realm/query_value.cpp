@@ -16,14 +16,17 @@
  *
  **************************************************************************/
 
-#include <numeric>
-#include <unordered_map>
-#include <algorithm>
-
 #include <realm/query_value.hpp>
+
 #include <realm/mixed.hpp>
 
+#include <algorithm>
+#include <numeric>
+#include <unordered_map>
+
 using namespace realm;
+
+namespace {
 
 // These keys must be stored as lowercase. Some naming comes from MongoDB's conventions
 // see https://docs.mongodb.com/manual/reference/operator/query/type/
@@ -115,6 +118,7 @@ TypeOfValue::Attribute attribute_from(DataType type)
     throw query_parser::InvalidQueryArgError(
         util::format("Invalid value '%1' cannot be converted to 'TypeOfValue'", type));
 }
+} // anonymous namespace
 
 namespace realm {
 
@@ -164,14 +168,14 @@ bool TypeOfValue::matches(const class Mixed& value) const
     return matches(TypeOfValue(value));
 }
 
-util::Optional<std::string> get_attribute_name_of(int64_t att)
+static const std::string* get_attribute_name_of(int64_t att)
 {
     for (const auto& it : attribute_map) {
         if (it.second == att) {
-            return it.first;
+            return &it.first;
         }
     }
-    return util::none;
+    return nullptr;
 }
 
 std::string TypeOfValue::to_string() const

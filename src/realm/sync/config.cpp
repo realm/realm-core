@@ -123,7 +123,6 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         // Session errors
         case ProtocolError::session_closed:
         case ProtocolError::other_session_error:
-        case ProtocolError::disabled_session:
         case ProtocolError::initial_sync_not_completed:
             // The binding doesn't need to be aware of these because they are strictly informational, and do not
             // represent actual errors.

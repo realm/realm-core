@@ -3091,12 +3091,12 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #if !REALM_ANDROID && !REALM_IOS
 
-std::stringstream ss;
-void signal_handler(int signal)
+static std::stringstream s_ss;
+static void signal_handler(int signal)
 {
     std::cout << "signal handler: " << signal << std::endl;
-    util::Backtrace::capture().print(ss);
-    std::cout << "trace: " << ss.str() << std::endl;
+    util::Backtrace::capture().print(s_ss);
+    std::cout << "trace: " << s_ss.str() << std::endl;
     exit(signal);
 }
 

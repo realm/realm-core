@@ -45,12 +45,12 @@ version_time_list_t BackupHandler::delete_versions_{
 
 
 // helper functions
-std::string backup_name(std::string prefix, int version)
+static std::string backup_name(const std::string& prefix, int version)
 {
-    return prefix + "v" + std::to_string(version) + ".backup.realm";
+    return util::format("%1v%2.backup.realm", prefix, version);
 }
 
-bool backup_exists(std::string prefix, int version)
+static bool backup_exists(const std::string& prefix, int version)
 {
     std::string fname = backup_name(prefix, version);
     return util::File::exists(fname);
