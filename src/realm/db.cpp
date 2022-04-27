@@ -612,13 +612,14 @@ public:
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
         if (pick_specific && version_id.version != r.version)
             throw BadVersion();
-
+        /*** enable this when we can reclaim all intermediate versions
         if (!picked_newest) {
             if (frozen && r.count_frozen == 0 && r.count_live == 0)
                 throw BadVersion();
             if (!frozen && r.count_live == 0)
                 throw BadVersion();
         }
+        */
         if (frozen) {
             ++r.count_frozen;
         }
