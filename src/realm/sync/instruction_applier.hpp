@@ -76,45 +76,30 @@ protected:
         }
     }
 
-    using ListCallback = util::UniqueFunction<void(LstBase&, size_t)>;
-    void resolve_list(const Instruction::PathInstruction& instr, const char* instr_name, ListCallback&& callback);
     bool check_links_exist(const Instruction::Payload& payload);
     bool allows_null_links(const Instruction::PathInstruction& instr, const std::string_view& instr_name);
     std::string to_string(const Instruction::PathInstruction& instr) const;
 
     struct PathResolver {
         enum class Status { Pending, Success, DidNotResolve };
-        using PropCallbackType = util::UniqueFunction<void(PathResolver*, Obj&, ColKey)>;
-        using ListCallbackType = util::UniqueFunction<void(PathResolver*, LstBase&)>;
-        using ListIndexCallbackType = util::UniqueFunction<void(PathResolver*, LstBase&, uint32_t)>;
-        using DictionaryCallbackType = util::UniqueFunction<void(PathResolver*, Dictionary&)>;
-        using DictionaryKeyCallbackType = util::UniqueFunction<void(PathResolver*, Dictionary&, Mixed)>;
-        using SetCallbackType = util::UniqueFunction<void(PathResolver*, SetBase&)>;
-        using ErrorCallbackType = util::UniqueFunction<void(const std::string&)>;
-        using ColAdvanceType = util::UniqueFunction<void(PathResolver*, ColKey)>;
-        using DictKeyAdvanceType = util::UniqueFunction<void(PathResolver*, StringData)>;
-        using ListIndexAdvanceType = util::UniqueFunction<void(PathResolver*, uint32_t)>;
-        using NullLinkAdvanceType = util::UniqueFunction<void(PathResolver*, StringData, StringData)>;
-        using FinishCallbackType = util::UniqueFunction<void()>;
-        using StringGetterType = util::UniqueFunction<StringData(InternString)>;
-
-        PathResolver(Obj top_obj, const Instruction::PathInstruction& instr, const std::string_view& instr_name,
-                     ErrorCallbackType on_error, StringGetterType string_getter);
+        PathResolver(InstructionApplier* applier, const Instruction::PathInstruction& instr,
+                     const std::string_view& instr_name);
         virtual ~PathResolver();
         virtual Status resolve();
 
-        PathResolver* on_property(PropCallbackType);
-        PathResolver* on_list(ListCallbackType);
-        PathResolver* on_list_index(ListIndexCallbackType);
-        PathResolver* on_dictionary(DictionaryCallbackType);
-        PathResolver* on_dictionary_key(DictionaryKeyCallbackType);
-        PathResolver* on_set(SetCallbackType);
-        PathResolver* on_error(ErrorCallbackType);
-        PathResolver* on_column_advance(ColAdvanceType);
-        PathResolver* on_dict_key_advance(DictKeyAdvanceType);
-        PathResolver* on_list_index_advance(ListIndexAdvanceType);
-        PathResolver* on_null_link_advance(NullLinkAdvanceType);
-        PathResolver* on_finish(FinishCallbackType);
+        virtual void on_property(Obj&, ColKey);
+        virtual void on_list(LstBase&);
+        virtual void on_list_index(LstBase&, uint32_t);
+        virtual void on_dictionary(Dictionary&);
+        virtual void on_dictionary_key(Dictionary&, Mixed);
+        virtual void on_set(SetBase&);
+        virtual void on_error(const std::string&);
+        virtual void on_column_advance(ColKey);
+        virtual void on_dict_key_advance(StringData);
+        virtual void on_list_index_advance(uint32_t);
+        virtual void on_null_link_advance(StringData, StringData);
+        virtual void on_finish();
+        virtual StringData get_string(InternString);
         void do_not_resolve();
         void preempt_success();
         const std::string_view& instruction_name() const noexcept
@@ -127,27 +112,14 @@ protected:
         void resolve_list_element(LstBase& list, uint32_t index);
         void resolve_dictionary_element(Dictionary& dict, InternString key);
 
-        Obj m_top_obj;
-        const Instruction::PathInstruction& m_instr;
+        InstructionApplier* m_applier;
+        const Instruction::PathInstruction& m_path_instr;
         std::string_view m_instr_name;
         Status m_status;
         Instruction::Path::const_iterator m_it_begin;
         Instruction::Path::const_iterator m_it_end;
-
-        PropCallbackType m_on_prop;
-        ListCallbackType m_on_list;
-        ListIndexCallbackType m_on_list_ndx;
-        DictionaryCallbackType m_on_dictionary;
-        DictionaryKeyCallbackType m_on_dictionary_key;
-        SetCallbackType m_on_set;
-        ErrorCallbackType m_on_error;
-        ColAdvanceType m_on_col_advance;
-        DictKeyAdvanceType m_on_dict_key_advance;
-        ListIndexAdvanceType m_on_list_advance;
-        NullLinkAdvanceType m_on_null_link;
-        FinishCallbackType m_on_finish;
-        StringGetterType m_string_getter;
     };
+    friend struct PathResolver;
 
 private:
     const Changeset* m_log = nullptr;
@@ -169,8 +141,6 @@ private:
     // Note: This may return a non-invalid ObjKey if the key is dangling.
     ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&,
                           const std::string_view& instr = "(unspecified)") const;
-    std::unique_ptr<PathResolver> make_resolver(const Instruction::PathInstruction& instr,
-                                                const std::string_view& instr_name);
 
     template <class F>
     void visit_payload(const Instruction::Payload&, F&& visitor);

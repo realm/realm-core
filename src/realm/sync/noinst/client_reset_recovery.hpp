@@ -161,22 +161,34 @@ struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
 protected:
     using Instruction = sync::Instruction;
     using ListPathCallback = util::UniqueFunction<bool(LstBase&, uint32_t, const ListPath&)>;
-    enum class TranslateUpdateValue {
-        None,
-        DeleteDictionaryKey,
-    };
 
     struct RecoveryResolver : public InstructionApplier::PathResolver {
-        RecoveryResolver(Obj top_obj, Instruction::PathInstruction& instr, const std::string_view& instr_name,
-                         ErrorCallbackType on_error, StringGetterType string_getter);
+        RecoveryResolver(RecoverLocalChangesetsHandler* applier, Instruction::PathInstruction& instr,
+                         const std::string_view& instr_name);
         virtual ~RecoveryResolver();
+        virtual Status resolve() override;
+        virtual void on_property(Obj&, ColKey) override;
+        virtual void on_list(LstBase&) override;
+        virtual void on_list_index(LstBase&, uint32_t) override;
+        virtual void on_dictionary(Dictionary&) override;
+        virtual void on_dictionary_key(Dictionary&, Mixed) override;
+        virtual void on_set(SetBase&) override;
+        virtual void on_error(const std::string&) override;
+        virtual void on_column_advance(ColKey) override;
+        virtual void on_dict_key_advance(StringData) override;
+        virtual void on_list_index_advance(uint32_t) override;
+        virtual void on_null_link_advance(StringData, StringData) override;
+        virtual void on_finish() override;
+
         ListPath& list_path();
         void set_last_path_index(uint32_t ndx);
 
-    private:
+    protected:
         ListPath m_list_path;
         Instruction::PathInstruction& m_mutable_instr;
+        RecoverLocalChangesetsHandler* m_recovery_applier;
     };
+    friend struct RecoveryResolver;
 
     REALM_NORETURN void handle_error(const std::string& message) const;
     void copy_lists_with_unrecoverable_changes();
@@ -198,9 +210,6 @@ private:
     // Track any recovered operations on lists to make sure that they are allowed.
     // If not, the lists here will be copied verbatim from the local state to the remote.
     util::FlatMap<ListPath, ListTracker> m_lists;
-
-    std::unique_ptr<RecoverLocalChangesetsHandler::RecoveryResolver>
-    make_resolver(Instruction::PathInstruction& instr, const std::string_view& instr_name);
 };
 
 } // namespace client_reset

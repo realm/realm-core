@@ -521,15 +521,109 @@ bool RecoverLocalChangesetsHandler::resolve(ListPath& path, util::UniqueFunction
     return resolve_path(path, remote_obj, local_table->get_object(local_obj_key), std::move(callback));
 }
 
-RecoverLocalChangesetsHandler::RecoveryResolver::RecoveryResolver(Obj top_obj, Instruction::PathInstruction& instr,
-                                                                  const std::string_view& instr_name,
-                                                                  ErrorCallbackType on_error,
-                                                                  StringGetterType string_getter)
-    : InstructionApplier::PathResolver(top_obj, instr, instr_name, std::move(on_error), std::move(string_getter))
-    , m_list_path((top_obj ? top_obj.get_table()->get_key() : TableKey{}), (top_obj ? top_obj.get_key() : ObjKey{}))
+RecoverLocalChangesetsHandler::RecoveryResolver::RecoveryResolver(RecoverLocalChangesetsHandler* applier,
+                                                                  Instruction::PathInstruction& instr,
+                                                                  const std::string_view& instr_name)
+    : InstructionApplier::PathResolver(applier, instr, instr_name)
+    , m_list_path(TableKey{}, ObjKey{})
     , m_mutable_instr(instr)
+    , m_recovery_applier(applier)
 {
 }
+
+RecoverLocalChangesetsHandler::RecoveryResolver::Status RecoverLocalChangesetsHandler::RecoveryResolver::resolve()
+{
+    util::Optional<Obj> obj = m_recovery_applier->get_top_object(m_path_instr, m_instr_name);
+    if (!obj) {
+        m_recovery_applier->m_logger.warn("Cannot recover '%1' which operates on a deleted object", m_instr_name);
+        m_status = Status::DidNotResolve;
+        return m_status;
+    }
+    m_list_path = ListPath(obj->get_table()->get_key(), obj->get_key());
+    // FIXME: don't get the top obj twice
+    return PathResolver::resolve();
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_property(Obj&, ColKey)
+{
+    m_recovery_applier->handle_error(util::format("Invalid path for %1 (object, column)", m_instr_name));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_list(LstBase&)
+{
+    m_recovery_applier->handle_error(util::format("Invalid path for %1 (list)", m_instr_name));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index(LstBase&, uint32_t)
+{
+    m_recovery_applier->handle_error(util::format("Invalid path for %1 (list, index)", m_instr_name));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_dictionary(Dictionary&)
+{
+    m_recovery_applier->handle_error(util::format("Invalid path for %1 (dictionary)", m_instr_name));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_dictionary_key(Dictionary&, Mixed)
+{
+    m_recovery_applier->handle_error(util::format("Invalid path for %1 (dictionary, key)", m_instr_name));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_set(SetBase&)
+{
+    m_recovery_applier->handle_error(util::format("Invalid path for %1 (set)", m_instr_name));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_error(const std::string& err_msg)
+{
+    m_recovery_applier->handle_error(err_msg);
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_column_advance(ColKey col)
+{
+    m_list_path.append(ListPath::Element(col));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_dict_key_advance(StringData string_key)
+{
+    InternDictKey translated_key = m_recovery_applier->m_intern_keys.get_or_add(std::string_view(string_key));
+    m_list_path.append(ListPath::Element(translated_key));
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_list_index_advance(uint32_t index)
+{
+    if (m_recovery_applier->m_lists.count(m_list_path) != 0) {
+        auto& list_tracker = m_recovery_applier->m_lists.at(m_list_path);
+        auto cross_ndx = list_tracker.update(index);
+        if (!cross_ndx) {
+            do_not_resolve(); // not allowed to modify this list item
+            return;
+        }
+        REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
+
+        set_last_path_index(cross_ndx->remote); // translate the index of the path
+
+        // At this point, the first part of an embedded object path has been allowed.
+        // This implies that all parts of the rest of the path are also allowed so the index translation is
+        // not necessary because instructions are operating on local only operations.
+        preempt_success();
+        return;
+    }
+    // no record of this base list so far, track it for verbatim copy
+    m_recovery_applier->m_lists.at(m_list_path).queue_for_manual_copy();
+    do_not_resolve();
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_null_link_advance(StringData table_name,
+                                                                           StringData link_name)
+{
+    m_recovery_applier->m_logger.warn(
+        "Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'", m_instr_name,
+        table_name, link_name);
+    do_not_resolve(); // discard this instruction as it operates over a null link
+}
+
+void RecoverLocalChangesetsHandler::RecoveryResolver::on_finish() {}
 
 ListPath& RecoverLocalChangesetsHandler::RecoveryResolver::list_path()
 {
@@ -538,99 +632,14 @@ ListPath& RecoverLocalChangesetsHandler::RecoveryResolver::list_path()
 
 void RecoverLocalChangesetsHandler::RecoveryResolver::set_last_path_index(uint32_t ndx)
 {
-    REALM_ASSERT(m_it_begin != m_instr.path.begin());
-    size_t distance = (m_it_begin - m_instr.path.begin()) - 1;
-    REALM_ASSERT_EX(distance < m_instr.path.size(), distance, m_instr.path.size());
-    REALM_ASSERT(mpark::holds_alternative<uint32_t>(m_instr.path[distance]));
+    REALM_ASSERT(m_it_begin != m_path_instr.path.begin());
+    size_t distance = (m_it_begin - m_path_instr.path.begin()) - 1;
+    REALM_ASSERT_EX(distance < m_path_instr.path.size(), distance, m_path_instr.path.size());
+    REALM_ASSERT(mpark::holds_alternative<uint32_t>(m_path_instr.path[distance]));
     m_mutable_instr.path[distance] = ndx;
 }
 
 RecoverLocalChangesetsHandler::RecoveryResolver::~RecoveryResolver() {}
-
-std::unique_ptr<RecoverLocalChangesetsHandler::RecoveryResolver>
-RecoverLocalChangesetsHandler::make_resolver(Instruction::PathInstruction& instr, const std::string_view& instr_name)
-{
-    util::Optional<Obj> obj = get_top_object(instr, instr_name.data());
-    if (!obj) {
-        m_logger.warn("Cannot recover '%1' which operates on a deleted object", instr_name);
-        auto resolver = std::make_unique<RecoverLocalChangesetsHandler::RecoveryResolver>(
-            Obj{}, instr, instr_name, [](const std::string&) {},
-            [](InternString) {
-                return StringData();
-            });
-        resolver->do_not_resolve();
-        return resolver;
-    }
-    auto resolver = std::make_unique<RecoverLocalChangesetsHandler::RecoveryResolver>(
-        *obj, instr, instr_name,
-        [&](const std::string& err_msg) {
-            handle_error(err_msg);
-        },
-        [&](InternString intern) -> StringData {
-            return get_string(intern);
-        });
-
-    resolver
-        ->on_column_advance([](PathResolver* res, ColKey col) {
-            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-            REALM_ASSERT(recovery_resolver);
-            recovery_resolver->list_path().append(ListPath::Element(col));
-        })
-        ->on_dict_key_advance([intern_keys = &m_intern_keys](PathResolver* res, StringData string_key) {
-            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-            REALM_ASSERT(recovery_resolver);
-            InternDictKey translated_key = intern_keys->get_or_add(std::string_view(string_key));
-            recovery_resolver->list_path().append(ListPath::Element(translated_key));
-        })
-        ->on_list_index_advance([lists = &m_lists](PathResolver* res, uint32_t index) {
-            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-            REALM_ASSERT(recovery_resolver);
-            if (lists->count(recovery_resolver->list_path()) != 0) {
-                auto& list_tracker = lists->at(recovery_resolver->list_path());
-                auto cross_ndx = list_tracker.update(index);
-                if (!cross_ndx) {
-                    recovery_resolver->do_not_resolve(); // not allowed to modify this list item
-                    return;
-                }
-                REALM_ASSERT(cross_ndx->remote != uint32_t(-1));
-
-                recovery_resolver->set_last_path_index(cross_ndx->remote); // translate the index of the path
-
-                // At this point, the first part of an embedded object path has been allowed.
-                // This implies that all parts of the rest of the path are also allowed so the index translation is
-                // not necessary because instructions are operating on local only operations.
-                recovery_resolver->preempt_success();
-                return;
-            }
-            // no record of this base list so far, track it for verbatim copy
-            lists->at(recovery_resolver->list_path()).queue_for_manual_copy();
-            recovery_resolver->do_not_resolve();
-        })
-        ->on_null_link_advance([logger = &m_logger](PathResolver* res, StringData table_name, StringData link_name) {
-            logger->warn("Discarding a local %1 made to an embedded object which no longer exists along path '%2.%3'",
-                         res->instruction_name(), table_name, link_name);
-            res->do_not_resolve(); // discard this instruction as it operates over a null link
-        })
-        ->on_property([&](PathResolver* res, Obj&, ColKey) {
-            handle_error(util::format("Invalid path for %1 (object, column)", res->instruction_name()));
-        })
-        ->on_list_index([&](PathResolver* res, LstBase&, size_t) {
-            handle_error(util::format("Invalid path for %1 (list, index)", res->instruction_name()));
-        })
-        ->on_list([&](PathResolver* res, LstBase&) {
-            handle_error(util::format("Invalid path for %1 (list)", res->instruction_name()));
-        })
-        ->on_dictionary_key([&](PathResolver* res, Dictionary&, Mixed) {
-            handle_error(util::format("Invalid path for %1 (dictionary, key)", res->instruction_name()));
-        })
-        ->on_dictionary([&](PathResolver* res, Dictionary&) {
-            handle_error(util::format("Invalid path for %1 (dictionary, key)", res->instruction_name()));
-        })
-        ->on_set([&](PathResolver* res, SetBase&) {
-            handle_error(util::format("Invalid path for %1 (set)", res->instruction_name()));
-        });
-    return resolver;
-}
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::AddTable& instr)
 {
@@ -673,31 +682,41 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseObject& i
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
 {
-    static constexpr std::string_view instr_name("Update");
-    Instruction::Update instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver
-        ->on_dictionary_key([&instr](PathResolver* res, Dictionary& dict, Mixed key) {
-            if (instr.value.type == instr::Payload::Type::Erased && dict.find(key) == dict.end()) {
+    struct UpdateResolver : public RecoveryResolver {
+        UpdateResolver(RecoverLocalChangesetsHandler* applier, Instruction::Update& instr,
+                       const std::string_view& instr_name)
+            : RecoveryResolver(applier, instr, instr_name)
+            , m_instr(instr)
+        {
+        }
+        void on_dictionary_key(Dictionary& dict, Mixed key) override
+        {
+            if (m_instr.value.type == instr::Payload::Type::Erased && dict.find(key) == dict.end()) {
                 // removing a dictionary value on a key that no longer exists is ignored
-                res->do_not_resolve();
+                do_not_resolve();
             }
-        })
-        ->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
+        }
+        void on_list_index(LstBase& list, uint32_t index) override
+        {
             util::Optional<ListTracker::CrossListIndex> cross_index;
-            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-            cross_index = lists->at(recovery_resolver->list_path()).update(index);
+            cross_index = m_recovery_applier->m_lists.at(m_list_path).update(index);
             if (cross_index) {
-                instr_copy.prior_size = static_cast<uint32_t>(list.size());
-                instr_copy.path.back() = cross_index->remote;
+                m_instr.prior_size = static_cast<uint32_t>(list.size());
+                m_instr.path.back() = cross_index->remote;
             }
             else {
-                res->do_not_resolve();
+                do_not_resolve();
             }
-        })
-        ->on_property([](PathResolver*, Obj&, ColKey) {});
+        }
+        void on_property(Obj&, ColKey) override {}
 
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    private:
+        Instruction::Update& m_instr;
+    };
+    static constexpr std::string_view instr_name("Update");
+    Instruction::Update instr_copy = instr;
+
+    if (UpdateResolver(this, instr_copy, instr_name).resolve() == RecoveryResolver::Status::Success) {
         if (!check_links_exist(instr_copy.value)) {
             if (!allows_null_links(instr_copy, instr_name)) {
                 m_logger.warn("Discarding an update which links to a deleted object");
@@ -711,29 +730,39 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::Update& instr)
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::AddInteger& instr)
 {
-    static constexpr std::string_view instr_name("AddInteger");
+    struct AddIntegerResolver : public RecoveryResolver {
+        AddIntegerResolver(RecoverLocalChangesetsHandler* applier, Instruction::AddInteger& instr)
+            : RecoveryResolver(applier, instr, "AddInteger")
+        {
+        }
+        void on_property(Obj&, ColKey) override
+        {
+            // AddInteger only applies to a property
+        }
+    };
     Instruction::AddInteger instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver->on_property([](PathResolver*, Obj&, ColKey) {}); // AddInteger only applies to a property
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    if (AddIntegerResolver(this, instr_copy).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::Clear& instr)
 {
-    static constexpr std::string_view instr_name("Clear");
-    Instruction::Clear instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver
-        ->on_list([lists = &m_lists](PathResolver* res, LstBase&) {
-            auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-            lists->at(recovery_resolver->list_path()).clear();
+    struct ClearResolver : public RecoveryResolver {
+        ClearResolver(RecoverLocalChangesetsHandler* applier, Instruction::Clear& instr)
+            : RecoveryResolver(applier, instr, "Clear")
+        {
+        }
+        void on_list(LstBase&) override
+        {
+            m_recovery_applier->m_lists.at(m_list_path).clear();
             // Clear.prior_size is ignored and always zero
-        })
-        ->on_set([](PathResolver*, SetBase&) {})
-        ->on_dictionary([](PathResolver*, Dictionary&) {});
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+        }
+        void on_set(SetBase&) override {}
+        void on_dictionary(Dictionary&) override {}
+    };
+    Instruction::Clear instr_copy = instr;
+    if (ClearResolver(this, instr_copy).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
@@ -762,103 +791,141 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::EraseColumn& i
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayInsert& instr)
 {
+    struct ArrayInsertResolver : public RecoveryResolver {
+        ArrayInsertResolver(RecoverLocalChangesetsHandler* applier, Instruction::ArrayInsert& instr,
+                            const std::string_view& instr_name)
+            : RecoveryResolver(applier, instr, instr_name)
+            , m_instr(instr)
+        {
+        }
+        void on_list_index(LstBase& list, uint32_t index) override
+        {
+            REALM_ASSERT(index != uint32_t(-1));
+            size_t list_size = list.size();
+            auto cross_index = m_recovery_applier->m_lists.at(m_list_path).insert(index, list_size);
+            if (cross_index) {
+                m_instr.path.back() = cross_index->remote;
+                m_instr.prior_size = static_cast<uint32_t>(list_size);
+            }
+            else {
+                do_not_resolve();
+            }
+        }
+
+    private:
+        Instruction::ArrayInsert& m_instr;
+    };
+
     static constexpr std::string_view instr_name("ArrayInsert");
     if (!check_links_exist(instr.value)) {
         m_logger.warn("Discarding %1 which links to a deleted object", instr_name);
         return;
     }
     Instruction::ArrayInsert instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
-        auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-        REALM_ASSERT(index != uint32_t(-1));
-        size_t list_size = list.size();
-        auto cross_index = lists->at(recovery_resolver->list_path()).insert(index, list_size);
-        if (cross_index) {
-            instr_copy.path.back() = cross_index->remote;
-            instr_copy.prior_size = static_cast<uint32_t>(list_size);
-        }
-        else {
-            recovery_resolver->do_not_resolve();
-        }
-    });
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    if (ArrayInsertResolver(this, instr_copy, instr_name).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayMove& instr)
 {
-    static constexpr std::string_view instr_name("ArrayMove");
+    struct ArrayMoveResolver : public RecoveryResolver {
+        ArrayMoveResolver(RecoverLocalChangesetsHandler* applier, Instruction::ArrayMove& instr)
+            : RecoveryResolver(applier, instr, "ArrayMove")
+            , m_instr(instr)
+        {
+        }
+        void on_list_index(LstBase& list, uint32_t index) override
+        {
+            REALM_ASSERT(index != uint32_t(-1));
+            size_t lst_size = list.size();
+            uint32_t translated_from, translated_to;
+            bool allowed_to_move =
+                m_recovery_applier->m_lists.at(m_list_path)
+                    .move(static_cast<uint32_t>(index), m_instr.ndx_2, lst_size, translated_from, translated_to);
+            if (allowed_to_move) {
+                m_instr.prior_size = static_cast<uint32_t>(lst_size);
+                m_instr.path.back() = translated_from;
+                m_instr.ndx_2 = translated_to;
+            }
+            else {
+                do_not_resolve();
+            }
+        }
+
+    private:
+        Instruction::ArrayMove& m_instr;
+    };
     Instruction::ArrayMove instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
-        auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-        REALM_ASSERT(index != uint32_t(-1));
-        size_t lst_size = list.size();
-        uint32_t translated_from, translated_to;
-        bool allowed_to_move =
-            lists->at(recovery_resolver->list_path())
-                .move(static_cast<uint32_t>(index), instr_copy.ndx_2, lst_size, translated_from, translated_to);
-        if (allowed_to_move) {
-            instr_copy.prior_size = static_cast<uint32_t>(lst_size);
-            instr_copy.path.back() = translated_from;
-            instr_copy.ndx_2 = translated_to;
-        }
-        else {
-            recovery_resolver->do_not_resolve();
-        }
-    });
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    if (ArrayMoveResolver(this, instr_copy).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& instr)
 {
-    static constexpr std::string_view instr_name("ArrayErase");
+    struct ArrayEraseResolver : public RecoveryResolver {
+        ArrayEraseResolver(RecoverLocalChangesetsHandler* applier, Instruction::ArrayErase& instr)
+            : RecoveryResolver(applier, instr, "ArrayErase")
+            , m_instr(instr)
+        {
+        }
+        void on_list_index(LstBase& list, uint32_t index) override
+        {
+            auto obj = list.get_obj();
+            uint32_t translated_index;
+            bool allowed_to_delete =
+                m_recovery_applier->m_lists.at(m_list_path).remove(static_cast<uint32_t>(index), translated_index);
+            if (allowed_to_delete) {
+                m_instr.prior_size = static_cast<uint32_t>(list.size());
+                m_instr.path.back() = translated_index;
+            }
+            else {
+                do_not_resolve();
+            }
+        }
+
+    private:
+        Instruction::ArrayErase& m_instr;
+    };
     Instruction::ArrayErase instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver->on_list_index([lists = &m_lists, &instr_copy](PathResolver* res, LstBase& list, uint32_t index) {
-        auto recovery_resolver = dynamic_cast<RecoverLocalChangesetsHandler::RecoveryResolver*>(res);
-        auto obj = list.get_obj();
-        uint32_t translated_index;
-        bool allowed_to_delete =
-            lists->at(recovery_resolver->list_path()).remove(static_cast<uint32_t>(index), translated_index);
-        if (allowed_to_delete) {
-            instr_copy.prior_size = static_cast<uint32_t>(list.size());
-            instr_copy.path.back() = translated_index;
-        }
-        else {
-            recovery_resolver->do_not_resolve();
-        }
-    });
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    if (ArrayEraseResolver(this, instr_copy).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::SetInsert& instr)
 {
+    struct SetInsertResolver : public RecoveryResolver {
+        SetInsertResolver(RecoverLocalChangesetsHandler* applier, Instruction::SetInsert& instr,
+                          const std::string_view& instr_name)
+            : RecoveryResolver(applier, instr, instr_name)
+        {
+        }
+        void on_set(SetBase&) {}
+    };
     static constexpr std::string_view instr_name("SetInsert");
     if (!check_links_exist(instr.value)) {
         m_logger.warn("Discarding a %1 which links to a deleted object", instr_name);
         return;
     }
     Instruction::SetInsert instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, instr_name);
-    resolver->on_set([](PathResolver*, SetBase&) {});
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    if (SetInsertResolver(this, instr_copy, instr_name).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
 
 void RecoverLocalChangesetsHandler::operator()(const Instruction::SetErase& instr)
 {
+    struct SetEraseResolver : public RecoveryResolver {
+        SetEraseResolver(RecoverLocalChangesetsHandler* applier, Instruction::SetErase& instr)
+            : RecoveryResolver(applier, instr, "SetErase")
+        {
+        }
+        void on_set(SetBase&) override {}
+    };
     Instruction::SetErase instr_copy = instr;
-    auto resolver = make_resolver(instr_copy, "SetErase");
-    resolver->on_set([](PathResolver*, SetBase&) {});
-    if (resolver->resolve() == RecoveryResolver::Status::Success) {
+    if (SetEraseResolver(this, instr_copy).resolve() == RecoveryResolver::Status::Success) {
         InstructionApplier::operator()(instr_copy);
     }
 }
