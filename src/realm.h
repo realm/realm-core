@@ -3222,10 +3222,12 @@ RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, cons
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
                                                realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t*, realm_sync_before_client_reset_func_t,
-                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_sync_after_client_reset_func_t,
-                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t*,
+                                                               realm_sync_before_client_reset_func_t, void* userdata,
+                                                               realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*,
+                                                              realm_sync_after_client_reset_func_t, void* userdata,
+                                                              realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 
 /**
  * Get latest subscription set
@@ -3415,7 +3417,8 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
 /**
  * In case manual reset is needed, run this function in order to reset sync client files.
  * The sync_path is going to be returned by realm_sync_client_get_path, if manual reset is needed.
- * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is needed
+ * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is
+ * needed
  * @param realm_app ptr to realm app.
  * @param sync_path path where the sync files are.
  * @return true if operation was succesful
