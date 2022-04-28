@@ -101,6 +101,16 @@ std::string get_parent_directory(const std::string& path);
 
 #define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
+#define REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(expr, err)                                                               \
+    do {                                                                                                             \
+        try {                                                                                                        \
+            expr;                                                                                                    \
+        }                                                                                                            \
+        catch (const LogicError& e) {                                                                                \
+            REQUIRE(e.code() == err);                                                                                \
+        }                                                                                                            \
+    } while (0)
+
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 
 #endif // REALM_TEST_UTILS_HPP

@@ -273,6 +273,14 @@ public:
     }
 };
 
+class InvalidEncryptionKey : public InvalidArgument {
+public:
+    InvalidEncryptionKey()
+        : InvalidArgument(ErrorCodes::InvalidEncryptionKey, "Encryption key must be 64 bytes.")
+    {
+    }
+};
+
 class StaleAccessor : public LogicError {
 public:
     StaleAccessor(const std::string& msg)
@@ -353,12 +361,19 @@ public:
     }
 };
 
+
 /// Used for any I/O related exception. Note the derived exception
 /// types that are used for various specific types of errors.
 class FileAccessError : public RuntimeError {
 public:
     FileAccessError(ErrorCodes::Error code, const std::string& msg, const std::string& path, int err)
-        : RuntimeError(code, msg + ", path: '" + path + "'")
+        : RuntimeError(code,
+                       [&] {
+                           if (path.empty())
+                               return msg;
+                           else
+                               return msg + ", path: '" + path + "'";
+                       }())
         , m_path(path)
         , m_errno(err)
     {

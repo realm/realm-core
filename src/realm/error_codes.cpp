@@ -76,6 +76,8 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case NoSuchTable:
         case TableNameInUse:
         case InvalidDictionaryKey:
+        case InvalidEncryptionKey:
+        case IllegalCombination:
             return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
         case LogicError:
         case BrokenPromise:
@@ -91,6 +93,8 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case WrongThread:
         case InvalidTableRef:
         case DeleteOnOpenRealm:
+        case MismatchedConfig:
+        case ClosedRealm:
             return ErrorCategory().set(ErrorCategory::logic_error);
         case OK:
         case UnknownError:
@@ -164,6 +168,10 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"SystemError", ErrorCodes::SystemError},
     {"InvalidDatabase", ErrorCodes::InvalidDatabase},
     {"IncompatibleHistories", ErrorCodes::IncompatibleHistories},
+    {"InvalidEncryptionKey", ErrorCodes::InvalidEncryptionKey},
+    {"InvalidCombination", ErrorCodes::IllegalCombination},
+    {"MismatchedConfig", ErrorCodes::MismatchedConfig},
+    {"ClosedRealm", ErrorCodes::ClosedRealm},
     {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
     {"NotSupported", ErrorCodes::NotSupported}};
 

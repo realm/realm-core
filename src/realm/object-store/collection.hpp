@@ -44,23 +44,6 @@ public:
     Collection(std::shared_ptr<Realm> r, const CollectionBase& coll);
     Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll);
 
-    // The Collection object has been invalidated (due to the Realm being invalidated,
-    // or the containing object being deleted)
-    // All non-noexcept functions can throw this
-    struct InvalidatedException : public std::logic_error {
-        InvalidatedException(const std::string& msg)
-            : std::logic_error(msg)
-        {
-        }
-    };
-
-    // The input index parameter was out of bounds
-    struct OutOfBoundsIndexException : public std::out_of_range {
-        OutOfBoundsIndexException(size_t r, size_t c);
-        size_t requested;
-        size_t valid_count;
-    };
-
     const std::shared_ptr<Realm>& get_realm() const
     {
         return m_realm;

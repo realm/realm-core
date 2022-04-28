@@ -115,32 +115,40 @@ void RealmCoordinator::create_sync_session()
 void RealmCoordinator::set_config(const Realm::Config& config)
 {
     if (config.encryption_key.data() && config.encryption_key.size() != 64)
-        throw InvalidEncryptionKeyException();
+        throw InvalidEncryptionKey();
     if (config.schema_mode == SchemaMode::Immutable && config.sync_config)
-        throw std::logic_error("Synchronized Realms cannot be opened in immutable mode");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "Synchronized Realms cannot be opened in immutable mode");
     if ((config.schema_mode == SchemaMode::AdditiveDiscovered ||
          config.schema_mode == SchemaMode::AdditiveExplicit) &&
         config.migration_function)
-        throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.migration_function)
-        throw std::logic_error("Realms opened in immutable mode do not use a migration function");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "Realms opened in immutable mode do not use a migration function");
     if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
-        throw std::logic_error("Realms opened in read-only mode do not use a migration function");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "Realms opened in read-only mode do not use a migration function");
     if (config.schema_mode == SchemaMode::Immutable && config.initialization_function)
-        throw std::logic_error("Realms opened in immutable mode do not use an initialization function");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "Realms opened in immutable mode do not use an initialization function");
     if (config.schema_mode == SchemaMode::ReadOnly && config.initialization_function)
-        throw std::logic_error("Realms opened in read-only mode do not use an initialization function");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "Realms opened in read-only mode do not use an initialization function");
     if (config.schema && config.schema_version == ObjectStore::NotVersioned)
-        throw std::logic_error("A schema version must be specified when the schema is specified");
+        throw InvalidArgument(ErrorCodes::IllegalCombination,
+                              "A schema version must be specified when the schema is specified");
     if (!config.realm_data.is_null() && (!config.immutable() || !config.in_memory))
-        throw std::logic_error(
+        throw InvalidArgument(
+            ErrorCodes::IllegalCombination,
             "In-memory realms initialized from memory buffers can only be opened in read-only mode");
     if (!config.realm_data.is_null() && !config.path.empty())
-        throw std::logic_error("Specifying both memory buffer and path is invalid");
+        throw InvalidArgument(ErrorCodes::IllegalCombination, "Specifying both memory buffer and path is invalid");
     if (!config.realm_data.is_null() && !config.encryption_key.empty())
-        throw std::logic_error("Memory buffers do not support encryption");
+        throw InvalidArgument(ErrorCodes::IllegalCombination, "Memory buffers do not support encryption");
     if (config.in_memory && !config.encryption_key.empty()) {
-        throw std::logic_error("Encryption is not supported for in-memory realms");
+        throw InvalidArgument(ErrorCodes::IllegalCombination, "Encryption is not supported for in-memory realms");
     }
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
@@ -148,13 +156,15 @@ void RealmCoordinator::set_config(const Realm::Config& config)
 #if REALM_ENABLE_SYNC
     if (config.sync_config) {
         if (config.sync_config->flx_sync_requested && !config.sync_config->partition_value.empty()) {
-            throw std::logic_error("Cannot specify a partition value when flexible sync is enabled");
+            throw InvalidArgument(ErrorCodes::IllegalCombination,
+                                  "Cannot specify a partition value when flexible sync is enabled");
         }
         // TODO(RCORE-912) we definitely do want to support this, but until its implemented we should prevent users
         // from using something that is currently broken.
         if (config.sync_config->flx_sync_requested &&
             config.sync_config->client_resync_mode != ClientResyncMode::Manual) {
-            throw std::logic_error("Only manual client resets are supported with flexible sync");
+            throw InvalidArgument(ErrorCodes::IllegalCombination,
+                                  "Only manual client resets are supported with flexible sync");
         }
     }
 #endif
@@ -169,46 +179,55 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
     else {
         if (m_config.immutable() != config.immutable()) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different read permissions.",
-                                            config.path);
+            throw LogicError(
+                ErrorCodes::MismatchedConfig,
+                util::format("Realm at path '%1' already opened with different read permissions.", config.path));
         }
         if (m_config.in_memory != config.in_memory) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different inMemory settings.",
-                                            config.path);
+            throw LogicError(
+                ErrorCodes::MismatchedConfig,
+                util::format("Realm at path '%1' already opened with different inMemory settings.", config.path));
         }
         if (m_config.encryption_key != config.encryption_key) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with a different encryption key.",
-                                            config.path);
+            throw LogicError(
+                ErrorCodes::MismatchedConfig,
+                util::format("Realm at path '%1' already opened with a different encryption key.", config.path));
         }
         if (m_config.schema_mode != config.schema_mode) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with a different schema mode.",
-                                            config.path);
+            throw LogicError(
+                ErrorCodes::MismatchedConfig,
+                util::format("Realm at path '%1' already opened with a different schema mode.", config.path));
         }
         util::CheckedLockGuard lock(m_schema_cache_mutex);
         if (config.schema && m_schema_version != ObjectStore::NotVersioned &&
             m_schema_version != config.schema_version) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.",
-                                            config.path);
+            throw LogicError(
+                ErrorCodes::MismatchedConfig,
+                util::format("Realm at path '%1' already opened with different schema version.", config.path));
         }
 
 #if REALM_ENABLE_SYNC
         if (bool(m_config.sync_config) != bool(config.sync_config)) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different sync configurations.",
-                                            config.path);
+            throw LogicError(
+                ErrorCodes::MismatchedConfig,
+                util::format("Realm at path '%1' already opened with different sync configurations.", config.path));
         }
 
         if (config.sync_config) {
             if (m_config.sync_config->user != config.sync_config->user) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.",
-                                                config.path);
+                throw LogicError(
+                    ErrorCodes::MismatchedConfig,
+                    util::format("Realm at path '%1' already opened with different sync user.", config.path));
             }
             if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.",
-                                                config.path);
+                throw LogicError(
+                    ErrorCodes::MismatchedConfig,
+                    util::format("Realm at path '%1' already opened with different partition value.", config.path));
             }
             if (m_config.sync_config->flx_sync_requested != config.sync_config->flx_sync_requested) {
-                throw MismatchedConfigException(
-                    "Realm at path '%1' already opened in a different synchronization mode", config.path);
+                throw LogicError(ErrorCodes::MismatchedConfig,
+                                 util::format("Realm at path '%1' already opened in a different synchronization mode",
+                                              config.path));
             }
         }
 #endif
@@ -256,8 +275,10 @@ std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const
             // match (even having the same properties but in different
             // orders isn't good enough)
             if (config.schema && realm->schema() != *config.schema)
-                throw MismatchedConfigException(
-                    "Realm at path '%1' already opened on current thread with different schema.", config.path);
+                throw LogicError(
+                    ErrorCodes::MismatchedConfig,
+                    util::format("Realm at path '%1' already opened on current thread with different schema.",
+                                 config.path));
 
             return realm;
         }
@@ -331,7 +352,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
             notifier = std::make_unique<ExternalCommitHelper>(*this);
         }
         catch (std::system_error const& ex) {
-            throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
+            throw FileAccessError(ErrorCodes::FileOperationFailed, ex.what(), get_path(), ex.code().value());
         }
         realm_lock.lock_unchecked();
         if (!m_notifier)
@@ -375,7 +396,8 @@ void RealmCoordinator::bind_to_context(Realm& realm)
 std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
 {
     if (!config.sync_config)
-        throw std::logic_error("This method is only available for fully synchronized Realms.");
+        throw LogicError(ErrorCodes::IllegalOperation,
+                         "This method is only available for fully synchronized Realms.");
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
@@ -392,79 +414,6 @@ void RealmCoordinator::create_session(const Realm::Config& config)
 }
 
 #endif
-
-namespace realm {
-namespace _impl {
-REALM_NOINLINE void translate_file_exception(StringData path, bool immutable)
-{
-    try {
-        throw;
-    }
-    catch (const FileAccessError& ex) {
-        // Errors for `open()` include the path, but other errors don't. We
-        // don't want two copies of the path in the error, so strip it out if it
-        // appears, and then include it in our prefix.
-        std::string underlying = ex.what();
-        auto& path = ex.get_path();
-        auto pos = underlying.find(ex.get_path());
-        if (pos != std::string::npos && pos > 0) {
-            // One extra char at each end for the quotes
-            underlying.replace(pos - 1, ex.get_path().size() + 2, "");
-        }
-        switch (ex.code()) {
-            case ErrorCodes::PermissionDenied:
-                throw RealmFileException(
-                    RealmFileException::Kind::PermissionDenied, path,
-                    util::format(
-                        "Unable to open a realm at path '%1'. Please use a path where your app has %2 permissions.",
-                        ex.get_path(), immutable ? "read" : "read-write"),
-                    underlying);
-                break;
-            case ErrorCodes::FileAlreadyExists:
-                throw RealmFileException(RealmFileException::Kind::Exists, path,
-                                         util::format("File at path '%1' already exists.", ex.get_path()),
-                                         underlying);
-                break;
-            case ErrorCodes::FileNotFound:
-                throw RealmFileException(
-                    RealmFileException::Kind::NotFound, path,
-                    util::format("%1 at path '%2' does not exist.", immutable ? "File" : "Directory", ex.get_path()),
-                    underlying);
-                break;
-            case ErrorCodes::IncompatibleHistories:
-                throw RealmFileException(RealmFileException::Kind::BadHistoryError, path,
-                                         util::format("Unable to open realm: %1.", ex.what()), underlying);
-                break;
-            case ErrorCodes::FileFormatUpgradeRequired:
-                throw RealmFileException(RealmFileException::Kind::FormatUpgradeRequired, path,
-                                         "The Realm file format must be allowed to be upgraded "
-                                         "in order to proceed.",
-                                         "");
-                break;
-            default:
-                throw RealmFileException(
-                    RealmFileException::Kind::AccessError, path,
-                    util::format("Unable to open a realm at path '%1': %2.", ex.get_path(), underlying), underlying);
-                break;
-        }
-    }
-    catch (IncompatibleLockFile const& ex) {
-        throw RealmFileException(RealmFileException::Kind::IncompatibleLockFile, path,
-                                 "Realm file is currently open in another process "
-                                 "which cannot share access with this process. "
-                                 "All processes sharing a single file must be the same architecture.",
-                                 ex.what());
-    }
-    catch (UnsupportedFileFormatVersion const& ex) {
-        throw RealmFileException(
-            RealmFileException::Kind::FormatUpgradeRequired, path,
-            util::format("Opening Realm files of format version %1 is not supported by this version of Realm",
-                         ex.source_version),
-            ex.what());
-    }
-}
-} // namespace _impl
-} // namespace realm
 
 void RealmCoordinator::open_db()
 {
@@ -526,25 +475,45 @@ void RealmCoordinator::open_db()
     }
     catch (realm::FileFormatUpgradeRequired const&) {
         if (!schema_mode_reset_file) {
-            translate_file_exception(m_config.path, m_config.immutable());
+            throw;
         }
         util::File::remove(m_config.path);
         return open_db();
     }
     catch (UnsupportedFileFormatVersion const&) {
         if (!schema_mode_reset_file) {
-            translate_file_exception(m_config.path, m_config.immutable());
+            throw;
         }
         util::File::remove(m_config.path);
         return open_db();
     }
-#if REALM_ENABLE_SYNC
-    catch (IncompatibleHistories const&) {
-        translate_file_exception(m_config.path, m_config.immutable()); // Throws
-    }
-#endif // REALM_ENABLE_SYNC
-    catch (...) {
-        translate_file_exception(m_config.path, m_config.immutable());
+    catch (const FileAccessError& ex) {
+        // Errors for `open()` include the path, but other errors don't. We
+        // don't want two copies of the path in the error, so strip it out if it
+        // appears, and then include it in our prefix.
+        std::string underlying = ex.what();
+        auto& path = ex.get_path();
+        auto pos = underlying.find(", path:");
+        if (pos != std::string::npos && pos > 0) {
+            underlying.erase(pos);
+        }
+        switch (ex.code()) {
+            case ErrorCodes::PermissionDenied:
+                throw FileAccessError(ex.code(),
+                                      util::format("Please use a path where your app has %1 permissions. %2",
+                                                   m_config.immutable() ? "read" : "read-write", underlying),
+                                      path, ex.get_errno());
+                break;
+            case ErrorCodes::FileNotFound:
+                throw FileAccessError(
+                    ex.code(),
+                    util::format("%1 does not exist. %2", m_config.immutable() ? "File" : "Directory", underlying),
+                    path, ex.get_errno());
+                break;
+            default:
+                throw;
+                break;
+        }
     }
 
     if (!m_config.should_compact_on_launch_function)

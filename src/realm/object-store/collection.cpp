@@ -26,13 +26,6 @@
 
 namespace realm::object_store {
 
-Collection::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-    : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
-    , requested(r)
-    , valid_count(c)
-{
-}
-
 Collection::Collection(PropertyType type) noexcept
     : m_type(type)
 {
@@ -131,7 +124,7 @@ void Collection::verify_attached() const
             coll_type = "Dictionary";
         else if (is_set(m_type))
             coll_type = "Set";
-        throw InvalidatedException(util::format("Access to invalidated %1 object", coll_type));
+        throw LogicError(ErrorCodes::InvalidatedObject, util::format("Access to invalidated %1 object", coll_type));
     }
 }
 
@@ -151,7 +144,7 @@ void Collection::verify_valid_row(size_t row_ndx, bool insertion) const
 {
     size_t s = size();
     if (row_ndx > s || (!insertion && row_ndx == s)) {
-        throw OutOfBoundsIndexException{row_ndx, s + insertion};
+        throw OutOfBounds{util::format("Requested index %1 greater than max %2", row_ndx, s + insertion - 1)};
     }
 }
 

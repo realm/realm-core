@@ -461,7 +461,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     SECTION("should detect use of Realm on incorrect thread") {
         auto realm = Realm::get_shared_realm(config);
         std::thread([&] {
-            REQUIRE_THROWS_AS(realm->verify_thread(), IncorrectThreadException);
+            REQUIRE_THROWS_MATCHES(realm->verify_thread(), LogicError,
+                                   Catch::Message("Realm accessed from incorrect thread."));
         }).join();
     }
 
@@ -2242,15 +2243,15 @@ TEST_CASE("SharedRealm: close()") {
 
         REQUIRE(realm->is_closed());
 
-        REQUIRE_THROWS_AS(realm->read_group(), ClosedRealmException);
-        REQUIRE_THROWS_AS(realm->begin_transaction(), ClosedRealmException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->read_group(), ErrorCodes::ClosedRealm);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->begin_transaction(), ErrorCodes::ClosedRealm);
         REQUIRE(!realm->is_in_transaction());
-        REQUIRE_THROWS_AS(realm->commit_transaction(), InvalidTransactionException);
-        REQUIRE_THROWS_AS(realm->cancel_transaction(), InvalidTransactionException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->commit_transaction(), ErrorCodes::WrongTransactionState);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->cancel_transaction(), ErrorCodes::WrongTransactionState);
 
-        REQUIRE_THROWS_AS(realm->refresh(), ClosedRealmException);
-        REQUIRE_THROWS_AS(realm->invalidate(), ClosedRealmException);
-        REQUIRE_THROWS_AS(realm->compact(), ClosedRealmException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->refresh(), ErrorCodes::ClosedRealm);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->invalidate(), ErrorCodes::ClosedRealm);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->compact(), ErrorCodes::ClosedRealm);
     }
 
     SECTION("fully closes database file even with live notifiers") {
@@ -2306,7 +2307,7 @@ TEST_CASE("Realm::delete_files()") {
     }
 
     SECTION("Trying to delete files of an open Realm fails.") {
-        REQUIRE_THROWS_AS(Realm::delete_files(path), DeleteOnOpenRealmException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(Realm::delete_files(path), ErrorCodes::DeleteOnOpenRealm);
         REQUIRE(util::File::exists(path + ".lock"));
         REQUIRE(util::File::exists(path));
         REQUIRE(util::File::exists(path + ".management"));
