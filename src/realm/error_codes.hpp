@@ -157,4 +157,6 @@ public:
     static Error from_string(std::string_view str);
 };
 
+std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);
+
 } // namespace realm
