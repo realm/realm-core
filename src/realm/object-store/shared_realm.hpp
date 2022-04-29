@@ -342,18 +342,13 @@ public:
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
     /**
-     * The overloaded Realm::convert function offers a way to copy and/or convert a Realm using
-     * either the realm config or the path along with an optional encryption key.
-     *
-     * If the file already exists, data will be copied over object per object.
-     * If the file does not exist, the realm file will be exported to the new location and if the
-     * configuration object contains a sync part, a sync history will be synthesized.
+     * The overloaded Realm::convert function offers a way to copy and/or convert a realm.
      *
      * The following options are supported:
-     * - local -> local
-     * - local -> sync
-     * - sync -> local
-     * - sync -> sync
+     * - local -> local (config or path)
+     * - local -> sync (config only)
+     * - sync -> local (config only)
+     * - sync -> sync  (config or path)
      * - sync -> bundlable sync (client file identifier removed)
      *
      * Note that for bundled realms it is required that all local changes are synchronized with the
@@ -363,6 +358,10 @@ public:
      */
     /**
      * Copy or convert a Realm using a config.
+     *
+     * If the file already exists, data will be copied over object per object.
+     * If the file does not exist, the realm file will be exported to the new location and if the
+     * configuration object contains a sync part, a sync history will be synthesized.
      *
      * @param config The realm configuration that should be used to create a copy.
      *               This can be a local or a synced Realm, encrypted or not.
