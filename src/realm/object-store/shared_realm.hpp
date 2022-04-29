@@ -369,7 +369,7 @@ public:
      */
     void convert(const Config& config);
     /**
-     * Copy a Realm using a config.
+     * Copy a Realm using a path.
      *
      * @param path The path the realm should be copied to. Local realms will remain local, synced
      *             realms will remain synced realms.
