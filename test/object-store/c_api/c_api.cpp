@@ -4097,6 +4097,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                 std::mutex m_mutex;
                 std::condition_variable m_cv;
                 realm_flx_sync_subscription_set_state m_state{RLM_SYNC_SUBSCRIPTION_UNCOMMITTED};
+                void* m_userdata;
 
                 static SyncObject& create()
                 {
@@ -4104,11 +4105,12 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                     return sync_object;
                 }
 
-                void set_state_and_notify(realm_flx_sync_subscription_set_state state)
+                void set_state_and_notify(void* userdata, realm_flx_sync_subscription_set_state state)
                 {
                     {
                         std::lock_guard<std::mutex> guard{m_mutex};
                         m_state = state;
+                        m_userdata = userdata;
                     }
                     m_cv.notify_one();
                 }
@@ -4118,17 +4120,19 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                     using namespace std::chrono_literals;
                     std::unique_lock<std::mutex> lock{m_mutex};
                     m_cv.wait_for(lock, 300ms, [this]() {
-                        return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE;
+                        return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE && m_userdata != nullptr;
                     });
                     return m_state;
                 }
             };
 
-            auto callback = [](auto, realm_flx_sync_subscription_set_state_e sub_state) {
-                SyncObject::create().set_state_and_notify(sub_state);
+            auto callback = [](void* userdata, realm_flx_sync_subscription_set_state_e sub_state) {
+                SyncObject::create().set_state_and_notify(userdata, sub_state);
             };
+            int userdata = 0;
             realm_sync_on_subscription_set_state_change_async(
-                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE, callback);
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE, callback, &userdata,
+                nullptr);
             CHECK(SyncObject::create().wait_state() ==
                   realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
 
