@@ -112,6 +112,12 @@ public:
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                       SaltedVersion server_version, BinaryData uploadable_changeset);
 
+    /// get_local_changes returns a list of changes which have not been uploaded yet
+    /// 'current_version' is the version that the history should be updated to.
+    ///
+    /// The history must be in a transaction when this function is called.
+    std::vector<ChunkedBinaryData> get_local_changes(version_type current_version) const;
+
     /// Get the version of the latest snapshot of the associated Realm, as well
     /// as the client file identifier and the synchronization progress as they
     /// are stored in that snapshot.

@@ -1,6 +1,7 @@
 # NEXT RELEASE
 
 ### Enhancements
+* Adding recovery mode to new automatic client reset handling. In this mode, local unsynced changes which would otherwise be lost during a client reset are replayed on the seamlessly reset Realm. ([#5323](https://github.com/realm/realm-core/pull/5323))
 * Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432]https://github.com/realm/realm-core/pull/5432)
 
 ### Fixed

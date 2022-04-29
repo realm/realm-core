@@ -88,6 +88,36 @@ void ClientHistory::set_client_reset_adjustments(version_type current_version, S
     m_client_reset_changeset = uploadable_changeset; // Picked up by prepare_changeset()
 }
 
+std::vector<ChunkedBinaryData> ClientHistory::get_local_changes(version_type current_version) const
+{
+    ensure_updated(current_version); // Throws
+    std::vector<ChunkedBinaryData> changesets;
+    if (!m_arrays || m_arrays->changesets.is_empty())
+        return changesets;
+
+    sync::version_type begin_version = 0;
+    {
+        sync::version_type local_version;
+        SaltedFileIdent local_ident;
+        SyncProgress local_progress;
+        get_status(local_version, local_ident, local_progress);
+        begin_version = local_progress.upload.client_version;
+    }
+
+    version_type end_version = m_sync_history_base_version + sync_history_size();
+    if (begin_version < m_sync_history_base_version)
+        begin_version = m_sync_history_base_version;
+
+    for (version_type version = begin_version; version < end_version; ++version) {
+        std::size_t ndx = std::size_t(version - m_sync_history_base_version);
+        std::int_fast64_t origin_file_ident = m_arrays->origin_file_idents.get(ndx);
+        bool not_from_server = (origin_file_ident == 0);
+        if (not_from_server) {
+            changesets.push_back(m_arrays->changesets.get(ndx));
+        }
+    }
+    return changesets;
+}
 
 void ClientHistory::set_local_origin_timestamp_source(util::UniqueFunction<timestamp_type()> source_fn)
 {
