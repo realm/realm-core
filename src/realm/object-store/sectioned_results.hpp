@@ -114,9 +114,10 @@ private:
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.
     SectionedResults(Results results, ComparisonFunc comparison_func);
     SectionedResults(Results results, Results::SectionedResultsOperator op, util::Optional<StringData> prop_name);
+    uint_fast64_t get_content_version();
 
     friend struct SectionedResultsNotificationHandler;
-    void calculate_sections_if_required(Results::EvaluateMode mode = Results::EvaluateMode::Count);
+    void calculate_sections_if_required();
 
     NotificationToken add_notification_callback_for_section(size_t section_index,
                                                             SectionedResultsNotificatonCallback callback,
@@ -126,6 +127,7 @@ private:
     Results m_results;
     std::vector<SectionRange> m_offset_ranges;
     ComparisonFunc m_callback;
+    uint_fast64_t m_previous_content_version;
 };
 
 struct SectionedResultsChangeSet {
