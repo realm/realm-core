@@ -167,6 +167,34 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
         threads[j].join();
 }
 
+TEST(Transactions_ReclaimFrozen)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history());
+    DBRef db = DB::create(*hist_w, path);
+    // TransactionRef frozen[256];
+
+    auto wt = db->start_write();
+    auto tbl = wt->add_table("TestTable");
+    auto col = tbl->add_column(type_Int, "IntCol");
+    Obj o;
+    for (int j = 0; j < 200; ++j) {
+        o = tbl->create_object(ObjKey(j));
+        o.set(col, 10000000000 + j);
+    }
+    wt->commit_and_continue_as_read();
+    // auto frozen = wt->duplicate();
+    auto frozen = wt->freeze();
+    for (int j = 0; j < 1000; ++j) {
+        wt->promote_to_write();
+        o.set(col, o.get<Int>(col) + 42);
+        wt->commit_and_continue_as_read();
+    }
+    frozen.reset();
+    wt->promote_to_write();
+    wt->commit();
+    // frozen = wt->freeze();
+}
 
 TEST(Transactions_ConcurrentFrozenTableGetByKey)
 {

@@ -36,7 +36,13 @@ namespace realm {
 class Group;
 class SlabAlloc;
 
-using TopRefMap = std::map<uint64_t, ref_type>;
+class VersionInfo {
+public:
+    ref_type top_ref;
+    ref_type logical_file_size;
+};
+
+using TopRefMap = std::map<uint64_t, VersionInfo>;
 using VersionVector = std::vector<uint64_t>;
 
 /// This class is not supposed to be reused for multiple write sessions. In
@@ -187,7 +193,7 @@ private:
     void write_array_at(MapWindow* window, ref_type, const char* data, size_t size);
     FreeListElement split_freelist_chunk(FreeListElement, size_t alloc_pos);
 
-    /// Backdate (if possible) any blocks in the freelist belonging to 
+    /// Backdate (if possible) any blocks in the freelist belonging to
     /// a version currently becomming unreachable. The effect of backdating
     /// is that many blocks can be freed earlier.
     void backdate();

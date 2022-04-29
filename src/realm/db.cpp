@@ -84,40 +84,6 @@ namespace {
 // 12      New impl of VersionList and added mutex for it (former RingBuffer)
 const uint_fast16_t g_shared_info_version = 12;
 
-template <typename T>
-bool atomic_double_inc_if_even(std::atomic<T>& counter)
-{
-    T oldval = counter.fetch_add(2, std::memory_order_acquire);
-    if (oldval & 1) {
-        // oooops! was odd, adjust
-        counter.fetch_sub(2, std::memory_order_relaxed);
-        return false;
-    }
-    return true;
-}
-
-template <typename T>
-inline void atomic_double_dec(std::atomic<T>& counter)
-{
-    counter.fetch_sub(2, std::memory_order_release);
-}
-
-template <typename T>
-bool atomic_one_if_zero(std::atomic<T>& counter)
-{
-    T old_val = counter.fetch_add(1, std::memory_order_acquire);
-    if (old_val != 0) {
-        counter.fetch_sub(1, std::memory_order_relaxed);
-        return false;
-    }
-    return true;
-}
-
-template <typename T>
-void atomic_dec(std::atomic<T>& counter)
-{
-    counter.fetch_sub(1, std::memory_order_release);
-}
 
 // VersionList
 struct VersionList {
@@ -285,7 +251,7 @@ struct VersionList {
         auto it = oldest;
         while (it != -1) {
             auto& r = get(it);
-            top_refs[r.version] = r.current_top;
+            top_refs[r.version] = {r.current_top, r.filesize};
             it = r.newer;
         }
         // run through list of versions and reclaim unused entries until a live entry is met
