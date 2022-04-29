@@ -523,7 +523,15 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync]") {
         out_path.append(util::format("sync-metadata-v%1.realm", schema_version));
 
         // Write a compacted copy of the metadata realm to the test directory
-        realm->write_copy(out_path, BinaryData());
+        SECTION("copy using the path") {
+            realm->convert(out_path, BinaryData());
+        }
+        SECTION("copy by passing the config") {
+            Realm::Config out_config;
+            out_config.path = out_path;
+            realm->convert(out_config);
+        }
+
         std::cout << "Wrote metadata realm to: " << out_path << "\n";
         return;
     }

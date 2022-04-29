@@ -1656,14 +1656,14 @@ TEST_CASE("app: upgrade from local to synced realm", "[sync][app]") {
 
     SharedRealm r2;
     SECTION("Copy before connecting to server") {
-        local_realm->export_to(config2);
+        local_realm->convert(config2);
         r2 = Realm::get_shared_realm(config2);
     }
 
     SECTION("Open synced realm first") {
         r2 = Realm::get_shared_realm(config2);
         CHECK(!wait_for_download(*r2));
-        local_realm->export_to(config2);
+        local_realm->convert(config2);
         CHECK(!wait_for_upload(*r2));
     }
 
@@ -1851,7 +1851,17 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
-        realm->write_copy(base_path + "/copy/default.realm", BinaryData());
+        SECTION("copy using the path") {
+            realm->convert(base_path + "/copy/default.realm", BinaryData());
+        }
+
+        SECTION("copy by passing the config") {
+            TestSyncManager tsm;
+            SyncTestFile copy_config(tsm.app(), "default");
+            copy_config.schema = config.schema;
+            copy_config.cache = false;
+            realm->convert(copy_config);
+        }
 
         // Write some additional data
         realm->begin_transaction();

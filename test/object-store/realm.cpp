@@ -667,7 +667,13 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
             wait_for_download(*realm);
             client_file_id = realm->read_group().get_sync_file_id();
-            realm->write_copy(config3.path, BinaryData());
+
+            SECTION("copy using the path") {
+                realm->convert(config3.path, BinaryData());
+            }
+            SECTION("copy using the config") {
+                realm->convert(config3);
+            }
         }
 
         // Create some more content on the server
@@ -695,6 +701,119 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         wait_for_download(*origin);
         origin->refresh();
         REQUIRE(origin->read_group().get_table("class_object")->size() == 4);
+    }
+
+    SECTION("can copy a synced realm to a synced realm") {
+        SyncTestFile sync_realm_config1(init_sync_manager.app(), "default");
+        sync_realm_config1.schema = config.schema;
+        sync_realm_config1.cache = false;
+
+        // Create some content
+        auto sync_realm1 = Realm::get_shared_realm(sync_realm_config1);
+        sync_realm1->begin_transaction();
+        sync_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        sync_realm1->commit_transaction();
+        wait_for_upload(*sync_realm1);
+        wait_for_download(*sync_realm1);
+
+        // Copy to a new sync config
+        SyncTestFile sync_realm_config2(init_sync_manager.app(), "default");
+        sync_realm_config2.schema = config.schema;
+        sync_realm_config2.cache = false;
+
+
+        SECTION("copy using the path") {
+            sync_realm1->convert(sync_realm_config2.path, BinaryData());
+        }
+        SECTION("copy using the config") {
+            sync_realm1->convert(sync_realm_config2);
+        }
+
+        auto sync_realm2 = Realm::get_shared_realm(sync_realm_config2);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(sync_realm2->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("can convert a synced realm to a local realm") {
+        SyncTestFile sync_realm_config(init_sync_manager.app(), "default");
+        sync_realm_config.schema = config.schema;
+        sync_realm_config.cache = false;
+
+        // Create some content
+        auto sync_realm = Realm::get_shared_realm(sync_realm_config);
+        sync_realm->begin_transaction();
+        sync_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        sync_realm->commit_transaction();
+        wait_for_upload(*sync_realm);
+        wait_for_download(*sync_realm);
+
+        // Copy to a new sync config
+        TestFile local_realm_config;
+        local_realm_config.schema = config.schema;
+        local_realm_config.cache = false;
+
+        sync_realm->convert(local_realm_config);
+
+        auto local_realm = Realm::get_shared_realm(local_realm_config);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(local_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+    SECTION("can convert a local realm to a synced realm") {
+        TestFile local_realm_config;
+        local_realm_config.schema = config.schema;
+        local_realm_config.cache = false;
+
+        // Create some content
+        auto local_realm = Realm::get_shared_realm(local_realm_config);
+        local_realm->begin_transaction();
+        local_realm->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        local_realm->commit_transaction();
+
+        // Copy to a new sync config
+        SyncTestFile sync_realm_config(init_sync_manager.app(), "default");
+        sync_realm_config.schema = config.schema;
+        sync_realm_config.cache = false;
+
+        local_realm->convert(sync_realm_config);
+
+        auto sync_realm = Realm::get_shared_realm(sync_realm_config);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(sync_realm->read_group().get_table("class_object")->size() == 1);
+    }
+
+
+    SECTION("can copy a local realm to a local realm") {
+        TestFile local_realm_config1;
+        local_realm_config1.schema = config.schema;
+        local_realm_config1.cache = false;
+
+        // Create some content
+        auto local_realm1 = Realm::get_shared_realm(local_realm_config1);
+        local_realm1->begin_transaction();
+        local_realm1->read_group().get_table("class_object")->create_object_with_primary_key(0);
+        local_realm1->commit_transaction();
+
+        // Copy to a new sync config
+        TestFile local_realm_config2;
+        local_realm_config2.schema = config.schema;
+        local_realm_config2.cache = false;
+
+
+        SECTION("copy using the path") {
+            local_realm1->convert(local_realm_config2.path, BinaryData());
+        }
+        SECTION("copy using the config") {
+            local_realm1->convert(local_realm_config2);
+        }
+
+        auto local_realm2 = Realm::get_shared_realm(local_realm_config2);
+
+        // Check that the data also exists in the new realm
+        REQUIRE(local_realm2->read_group().get_table("class_object")->size() == 1);
     }
 
     SECTION("downloads Realms which exist on the server") {
