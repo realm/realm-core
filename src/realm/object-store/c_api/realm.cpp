@@ -68,6 +68,22 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
     });
 }
 
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config)
+{
+    return wrap_err([&]() {
+        (*realm)->convert(*config);
+        return true;
+    });
+}
+
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key)
+{
+    return wrap_err([&]() {
+        (*realm)->convert(path, from_capi(encryption_key));
+        return true;
+    });
+}
+
 RLM_API bool realm_delete_files(const char* realm_file_path, bool* did_delete_realm)
 {
     return wrap_err([&]() {
