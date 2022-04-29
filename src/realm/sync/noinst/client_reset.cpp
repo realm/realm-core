@@ -875,7 +875,7 @@ void track_reset(TransactionRef wt, ClientResyncMode mode)
                                            {type_col, mode_val}});
 }
 
-ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode mode, util::Logger& logger)
+static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode mode, util::Logger& logger)
 {
     REALM_ASSERT(wt);
     if (auto previous_reset = has_pending_reset(wt)) {
