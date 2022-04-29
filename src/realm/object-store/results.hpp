@@ -401,8 +401,7 @@ private:
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
     enum class EvaluateMode { Count, Snapshot, Normal };
-    bool ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
-    friend class realm::SectionedResults;
+    void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
 
     // Shared logic between freezing and thawing Results as the Core API is the same.
     Results import_copy_into_realm(std::shared_ptr<Realm> const& realm) REQUIRES(!m_mutex);

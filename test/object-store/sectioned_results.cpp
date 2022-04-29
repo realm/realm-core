@@ -660,19 +660,21 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
     Results results(r, table);
     auto sorted = results.sort({{"name_col", true}});
-    auto sectioned_results = sorted.sectioned_results([r](Mixed value, SharedRealm realm) {
+    int algo_run_count = 0;
+    auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm realm) {
+        algo_run_count++;
         auto obj = Object(realm, value.get_link());
         auto v = obj.get_column_value<StringData>("name_col");
         return v.prefix(1);
     });
+    REQUIRE(algo_run_count == 5);
 
     SECTION("sorts results correctly") {
         REQUIRE(sectioned_results.size() == 3);
         REQUIRE(sectioned_results[0].size() == 3);
         REQUIRE(sectioned_results[1].size() == 1);
         REQUIRE(sectioned_results[2].size() == 1);
-
-
+        REQUIRE(algo_run_count == 5);
         std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
 
         int count = 0;
@@ -684,7 +686,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
                 count++;
             }
         }
-
+        REQUIRE(algo_run_count == 5);
         REQUIRE(count == 5);
     }
 
@@ -693,6 +695,9 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sectioned_results[0].size() == 3);
         REQUIRE(sectioned_results[1].size() == 1);
         REQUIRE(sectioned_results[2].size() == 1);
+        REQUIRE(algo_run_count == 5);
+        // reset the callback count as it will need to run once we add new objects;
+        algo_run_count = 0;
 
         coordinator->on_change();
         r->begin_transaction();
@@ -704,6 +709,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->commit_transaction();
 
         REQUIRE(sectioned_results.size() == 6);
+        REQUIRE(algo_run_count == 10);
         std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "cake",
                                           "car",   "mail",   "orange",  "safari", "stocks"};
 
@@ -716,7 +722,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
                 count++;
             }
         }
-
+        REQUIRE(algo_run_count == 10);
         REQUIRE(count == 10);
     }
 
@@ -748,6 +754,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section_count == 3);
         REQUIRE(element_count == 5);
 
+        algo_run_count = 0;
         // Insert empty string
         coordinator->on_change();
         r->begin_transaction();
@@ -844,6 +851,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
             });
 
         coordinator->on_change();
+        REQUIRE(algo_run_count == 5);
+        algo_run_count = 0;
 
         // Insertions
         r->begin_transaction();
@@ -855,6 +864,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto o6 = table->create_object().set(name_col, "any");
         r->commit_transaction();
         advance_and_notify(*r);
+        REQUIRE(algo_run_count == 11);
 
         REQUIRE(changes.insertions.size() == 4);
         // Section 0 is 'A'
@@ -874,6 +884,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(changes.modifications.empty());
         REQUIRE(changes.deletions.empty());
 
+        algo_run_count = 0;
         // Modifications
         r->begin_transaction();
         o4.set(name_col, "stocksss");
@@ -883,7 +894,9 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(changes.modifications[5][0] == 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.deletions.empty());
+        REQUIRE(algo_run_count == 11);
 
+        algo_run_count = 0;
         // Deletions
         r->begin_transaction();
         table->remove_object(o3.get_key());
@@ -893,6 +906,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(changes.deletions[2][0] == 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.modifications.empty());
+        REQUIRE(algo_run_count == 10);
     }
 
     SECTION("notifications on section") {
@@ -915,12 +929,15 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         });
 
         coordinator->on_change();
+        REQUIRE(algo_run_count == 5);
+        algo_run_count = 0;
 
         // Insertions
         r->begin_transaction();
         auto o1 = table->create_object().set(name_col, "any");
         r->commit_transaction();
         advance_and_notify(*r);
+        REQUIRE(algo_run_count == 6);
 
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 0);
@@ -929,6 +946,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_changes.insertions[0][0] == 0);
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(section1_changes.deletions.empty());
+        algo_run_count = 0;
 
         r->begin_transaction();
         auto o2 = table->create_object().set(name_col, "box");
@@ -941,6 +959,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section2_changes.insertions[1][0] == 1);
         REQUIRE(section2_changes.modifications.empty());
         REQUIRE(section2_changes.deletions.empty());
+        REQUIRE(algo_run_count == 7);
+        algo_run_count = 0;
 
         // Modifications
         r->begin_transaction();
@@ -953,6 +973,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_changes.modifications[0][0] == 0);
         REQUIRE(section1_changes.insertions.empty());
         REQUIRE(section1_changes.deletions.empty());
+        REQUIRE(algo_run_count == 7);
+        algo_run_count = 0;
 
         // Deletions
         r->begin_transaction();
@@ -965,6 +987,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section2_changes.deletions[1][0] == 1);
         REQUIRE(section2_changes.insertions.empty());
         REQUIRE(section2_changes.modifications.empty());
+        REQUIRE(algo_run_count == 6);
+        algo_run_count = 0;
 
         r->begin_transaction();
         table->remove_object(o5.get_key());
@@ -976,6 +1000,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_changes.deletions[0][0] == 2);
         REQUIRE(section1_changes.insertions.empty());
         REQUIRE(section1_changes.modifications.empty());
+        REQUIRE(algo_run_count == 5);
     }
 }
 
@@ -1019,9 +1044,11 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
     r->commit_transaction();
     List lst(r, o, array_col);
     auto results = lst.as_results();
+    auto algo_run_count = 0;
 
     SECTION("primitives section correctly unsorted") {
-        auto sectioned_results = results.sectioned_results([r](Mixed value, SharedRealm) -> Mixed {
+        auto sectioned_results = results.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
             return TestType::comparison_value(value);
         });
         REQUIRE(sectioned_results.size() == TestType::expected_size());
@@ -1036,11 +1063,13 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
                 results_idx++;
             }
         }
+        REQUIRE(algo_run_count == (int)exp_values.size());
     }
 
     SECTION("primitives section correctly with sort ascending") {
         auto sorted = results.sort({{"self", true}});
-        auto sectioned_results = sorted.sectioned_results([r](Mixed value, SharedRealm) -> Mixed {
+        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
             return TestType::comparison_value(value);
         });
         REQUIRE(sectioned_results.size() == TestType::expected_size());
@@ -1056,11 +1085,13 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
                 results_idx++;
             }
         }
+        REQUIRE(algo_run_count == (int)exp_values.size());
     }
 
     SECTION("primitives section correctly with sort decending") {
         auto sorted = results.sort({{"self", false}});
-        auto sectioned_results = sorted.sectioned_results([r](Mixed value, SharedRealm) -> Mixed {
+        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
             return TestType::comparison_value(value);
         });
         std::reverse(exp_values_sorted.begin(), exp_values_sorted.end());
@@ -1078,5 +1109,6 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
                 results_idx++;
             }
         }
+        REQUIRE(algo_run_count == (int)exp_values.size());
     }
 }

@@ -198,10 +198,23 @@ NotificationToken ResultsSection::add_notification_callback(SectionedResultsNoti
     return m_parent->add_notification_callback_for_section(m_index, std::move(callback), key_path_array);
 }
 
+inline uint_fast64_t SectionedResults::get_content_version()
+{
+    // TODO: Can results have a simple mode which tells us what table to use?
+    if (m_results.get_collection() != nullptr) {
+        return m_results.get_collection()->get_table()->get_content_version();
+    }
+    else if (m_results.get_table() != nullptr) {
+        return m_results.get_table()->get_content_version();
+    }
+    throw std::logic_error("Unsupported table.");
+}
+
 SectionedResults::SectionedResults(Results results, ComparisonFunc comparison_func)
     : m_results(results)
     , m_callback(std::move(comparison_func))
 {
+    m_previous_content_version = get_content_version();
     m_offset_ranges = calculate_sections(m_results, m_callback);
 }
 
@@ -210,22 +223,18 @@ SectionedResults::SectionedResults(Results results, Results::SectionedResultsOpe
     : m_results(results)
     , m_callback(builtin_comparison(results, op, prop_name))
 {
+    m_previous_content_version = get_content_version();
     m_offset_ranges = calculate_sections(m_results, m_callback);
 }
 
-void SectionedResults::calculate_sections_if_required(Results::EvaluateMode mode)
+void SectionedResults::calculate_sections_if_required()
 {
-    util::CheckedUniqueLock lock(m_results.m_mutex);
-    // m_results.ensure_up_to_date may indicate that the underlying collection has not changed
-    // even though it may have changed. To solve this, query the collection directly with
-    // `m_results.get_collection()->has_changed()` to get the actual source of truth.
-    if ((m_results.get_collection() != nullptr) && !m_results.get_collection()->has_changed()) {
-        return;
-    }
-    else if ((m_results.get_collection() == nullptr) && m_results.ensure_up_to_date(mode)) {
+    auto current_content_version = get_content_version();
+    if (m_previous_content_version == current_content_version) {
         return;
     }
 
+    m_previous_content_version = current_content_version;
     m_offset_ranges = calculate_sections(m_results, m_callback);
 }
 
