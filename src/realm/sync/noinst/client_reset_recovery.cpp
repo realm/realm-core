@@ -385,7 +385,6 @@ void RecoverLocalChangesetsHandler::process_changesets(const std::vector<Chunked
 
         sync::Changeset parsed_changeset;
         sync::parse_changeset(*decompressed, parsed_changeset); // Throws
-        // parsed_changeset.print(); // view the changes to be recovered in stdout for debugging
 
         InstructionApplier::begin_apply(parsed_changeset, &m_logger);
         for (auto instr : parsed_changeset) {
