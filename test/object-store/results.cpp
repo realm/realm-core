@@ -21,6 +21,7 @@
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
@@ -3504,7 +3505,7 @@ TEST_CASE("results: error messages") {
     r->commit_transaction();
 
     SECTION("out of bounds access") {
-        REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 greater than max 0");
+        REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 calling get() on Results when max is 0");
     }
 
     SECTION("unsupported aggregate operation") {
@@ -4370,7 +4371,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
 #ifndef _WIN32
     SECTION("no objects") {
         SECTION("get()") {
-            CHECK_THROWS_WITH(empty_results.get(ctx, 0), "Requested index 0 in empty Results");
+            CHECK_THROWS_WITH(empty_results.get(ctx, 0), "Requested index 0 calling get() on Results when empty");
         }
         SECTION("first()") {
             CHECK_FALSE(empty_results.first(ctx));
@@ -4393,7 +4394,7 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
     SECTION("get()") {
         for (int i = 0; i < 10; ++i)
             CHECK(any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
-        CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 greater than max 9");
+        CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 calling get() on Results when max is 9");
     }
 
     SECTION("first()") {
@@ -4556,14 +4557,14 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.average(col_int) == 1.0);
             REQUIRE(results.average(col_float) == 1.0);
             REQUIRE(results.average(col_double) == 1.0);
-            REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
         }
 
         SECTION("sum") {
             REQUIRE(results.sum(col_int)->get_int() == 2);
             REQUIRE(results.sum(col_float)->get_double() == 2.0);
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
-            REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
         }
     }
 
@@ -4598,14 +4599,14 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(!results.average(col_int));
             REQUIRE(!results.average(col_float));
             REQUIRE(!results.average(col_double));
-            REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
         }
 
         SECTION("sum") {
             REQUIRE(results.sum(col_int)->get_int() == 0);
             REQUIRE(results.sum(col_float)->get_double() == 0.0);
             REQUIRE(results.sum(col_double)->get_double() == 0.0);
-            REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
         }
     }
 
@@ -4630,14 +4631,14 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(!results.average(col_int));
             REQUIRE(!results.average(col_float));
             REQUIRE(!results.average(col_double));
-            REQUIRE_THROWS_AS(results.average(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
         }
 
         SECTION("sum") {
             REQUIRE(results.sum(col_int)->get_int() == 0);
             REQUIRE(results.sum(col_float)->get_double() == 0.0);
             REQUIRE(results.sum(col_double)->get_double() == 0.0);
-            REQUIRE_THROWS_AS(results.sum(col_date), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
         }
     }
 }
@@ -4719,20 +4720,22 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     SECTION("non-existing property name") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)),
-                          Results::InvalidPropertyException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(r.set_property_value(ctx, "i dont exist", util::Any(false)),
+                                            ErrorCodes::InvalidProperty);
         realm->cancel_transaction();
     }
 
     SECTION("readonly property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), ReadOnlyPropertyException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(r.set_property_value(ctx, "parents", util::Any(false)),
+                                            ErrorCodes::ReadOnlyProperty);
         realm->cancel_transaction();
     }
 
     SECTION("primarykey property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), ModifyPrimaryKeyException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(r.set_property_value(ctx, "pk", util::Any(1)),
+                                            ErrorCodes::ModifyPrimaryKey);
         realm->cancel_transaction();
     }
 
@@ -5050,7 +5053,7 @@ TEST_CASE("results: limit", "[limit]") {
 
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
-        REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(limited.filter(table->where()), ErrorCodes::IllegalOperation);
     }
 }
 

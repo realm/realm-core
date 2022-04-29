@@ -229,60 +229,6 @@ public:
     // Is this Results associated with a Realm that has not been invalidated?
     bool is_valid() const;
 
-    // The Results object has been invalidated (due to the Realm being invalidated)
-    // All non-noexcept functions can throw this
-    struct InvalidatedException : public std::logic_error {
-        InvalidatedException()
-            : std::logic_error("Access to invalidated Results objects")
-        {
-        }
-    };
-
-    // The input index parameter was out of bounds
-    struct OutOfBoundsIndexException : public std::out_of_range {
-        OutOfBoundsIndexException(size_t r, size_t c);
-        const size_t requested;
-        const size_t valid_count;
-    };
-
-    // The input Row object is not attached
-    struct DetatchedAccessorException : public std::logic_error {
-        DetatchedAccessorException()
-            : std::logic_error("Attempting to access an invalid object")
-        {
-        }
-    };
-
-    // The input Row object belongs to a different table
-    struct IncorrectTableException : public std::logic_error {
-        IncorrectTableException(StringData e, StringData a);
-        const StringData expected;
-        const StringData actual;
-    };
-
-    // The requested aggregate operation is not supported for the column type
-    struct UnsupportedColumnTypeException : public std::logic_error {
-        ColKey column_key;
-        StringData column_name;
-        PropertyType property_type;
-
-        UnsupportedColumnTypeException(ColKey column, Table const& table, const char* operation);
-        UnsupportedColumnTypeException(ColKey column, ConstTableRef table, const char* operation);
-        UnsupportedColumnTypeException(ColKey column, TableView const& tv, const char* operation);
-    };
-
-    // The property request does not exist in the schema
-    struct InvalidPropertyException : public std::logic_error {
-        InvalidPropertyException(StringData object_type, StringData property_name);
-        const std::string object_type;
-        const std::string property_name;
-    };
-
-    // The requested operation is valid, but has not yet been implemented
-    struct UnimplementedOperationException : public std::logic_error {
-        UnimplementedOperationException(const char* message);
-    };
-
     /**
      * Create an async query from this Results
      * The query will be run on a background thread and delivered to the callback,

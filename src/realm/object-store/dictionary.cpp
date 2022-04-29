@@ -217,7 +217,6 @@ Mixed Dictionary::get_any(StringData key)
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
-    verify_valid_row(ndx);
     return dict().get_any(ndx);
 }
 
@@ -228,7 +227,6 @@ util::Optional<Mixed> Dictionary::try_get_any(StringData key) const
 
 std::pair<StringData, Mixed> Dictionary::get_pair(size_t ndx) const
 {
-    verify_valid_row(ndx);
     auto pair = dict().get_pair(ndx);
     return {pair.first.get_string(), pair.second};
 }

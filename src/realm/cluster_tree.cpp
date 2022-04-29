@@ -1102,7 +1102,7 @@ void ClusterTree::Iterator::go(size_t abs_pos)
 {
     size_t sz = m_tree.size();
     if (abs_pos >= sz) {
-        throw OutOfBounds("Invalied iterator index");
+        throw OutOfBounds("go() on Iterator", abs_pos, sz);
     }
 
     m_position = abs_pos;

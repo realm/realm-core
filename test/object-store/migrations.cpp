@@ -19,6 +19,7 @@
 #include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -2763,6 +2764,6 @@ TEST_CASE("migration: Manual") {
 
     SECTION("null migration callback should throw SchemaMismatchException") {
         Schema new_schema = remove_property(schema, "object", "value");
-        REQUIRE_THROWS_AS(realm->update_schema(new_schema, 1, nullptr), SchemaMismatchException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(realm->update_schema(new_schema, 1, nullptr), ErrorCodes::SchemaMismatch);
     }
 }

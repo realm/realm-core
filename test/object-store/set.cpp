@@ -2,6 +2,7 @@
 
 #include "collection_fixtures.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include "util/index_helpers.hpp"
 
 #include <realm/object-store/binding_context.hpp>
@@ -226,8 +227,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
         }
         SECTION("min()") {
             if (!Test::can_minmax()) {
-                REQUIRE_THROWS_AS(set().min(), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().min(), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().min(), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().min(), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(Mixed(Test::min()) == set().min());
@@ -240,8 +241,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
         }
         SECTION("max()") {
             if (!Test::can_minmax()) {
-                REQUIRE_THROWS_AS(set().max(), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().max(), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().max(), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().max(), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(Mixed(Test::max()) == set().max());
@@ -254,8 +255,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
         }
         SECTION("sum()") {
             if (!Test::can_sum()) {
-                REQUIRE_THROWS_AS(set().sum(), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().sum(), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().sum(), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().sum(), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(cf::get<W>(set().sum()) == Test::sum());
@@ -268,8 +269,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set all types", "[set]", (CreateNewSet, ReuseSet),
         }
         SECTION("average()") {
             if (!Test::can_average()) {
-                REQUIRE_THROWS_AS(set().average(), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().average(), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().average(), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().average(), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(cf::get<typename Test::AvgType>(*set().average()) == Test::average());
@@ -425,8 +426,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         }
         SECTION("min()") {
             if (!Test::can_minmax()) {
-                REQUIRE_THROWS_AS(set().min(target_col), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().min(target_col), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().min(target_col), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().min(target_col), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(Mixed(Test::min()) == set().min(target_col));
@@ -439,8 +440,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         }
         SECTION("max()") {
             if (!Test::can_minmax()) {
-                REQUIRE_THROWS_AS(set().max(target_col), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().max(target_col), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().max(target_col), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().max(target_col), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(Mixed(Test::max()) == set().max(target_col));
@@ -453,8 +454,8 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         }
         SECTION("sum()") {
             if (!Test::can_sum()) {
-                REQUIRE_THROWS_AS(set().sum(target_col), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().sum(target_col), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().sum(target_col), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().sum(target_col), ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(cf::get<W>(set().sum(target_col)) == Test::sum());
@@ -467,8 +468,9 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         }
         SECTION("average()") {
             if (!Test::can_average()) {
-                REQUIRE_THROWS_AS(set().average(target_col), Results::UnsupportedColumnTypeException);
-                REQUIRE_THROWS_AS(set_as_results().average(target_col), Results::UnsupportedColumnTypeException);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set().average(target_col), ErrorCodes::IllegalOperation);
+                REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(set_as_results().average(target_col),
+                                                    ErrorCodes::IllegalOperation);
                 return;
             }
             REQUIRE(cf::get<typename Test::AvgType>(*set().average(target_col)) == Test::average());

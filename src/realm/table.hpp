@@ -103,6 +103,9 @@ public:
     /// string.
     StringData get_name() const noexcept;
 
+    // Get table name with class prefix removed
+    std::string get_class_name() const noexcept;
+
     const char* get_state() const noexcept;
 
     /// If this table is a group-level table, the parent group is returned,

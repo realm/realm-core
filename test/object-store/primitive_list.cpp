@@ -22,6 +22,7 @@
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/list.hpp>
@@ -494,8 +495,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(list.min(), Results::UnsupportedColumnTypeException);
-            REQUIRE_THROWS_AS(results.min(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.min(), ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(), ErrorCodes::IllegalOperation);
             return;
         }
 
@@ -508,8 +509,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(list.max(), Results::UnsupportedColumnTypeException);
-            REQUIRE_THROWS_AS(results.max(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.max(), ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(), ErrorCodes::IllegalOperation);
             return;
         }
 
@@ -522,7 +523,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
-            REQUIRE_THROWS_AS(list.sum(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.sum(), ErrorCodes::IllegalOperation);
             return;
         }
 
@@ -535,7 +536,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
     SECTION("average()") {
         if (!TestType::can_average()) {
-            REQUIRE_THROWS_AS(list.average(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.average(), ErrorCodes::IllegalOperation);
             return;
         }
 

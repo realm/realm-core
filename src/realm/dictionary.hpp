@@ -195,8 +195,8 @@ private:
     inline void check_index(size_t ndx) const
     {
         if (ndx >= size()) {
-            throw OutOfBounds(
-                util::format("Invalid index when accessing dictionary: %1", CollectionBase::get_property_name()));
+            throw OutOfBounds(util::format("get() on dictionary: %1", CollectionBase::get_property_name()), ndx,
+                              size());
         }
     }
 };

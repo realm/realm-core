@@ -64,14 +64,12 @@ ConstTableRef List::get_table() const
 template <typename T>
 T List::get(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
     return as<T>().get(row_ndx);
 }
 
 template <>
 Obj List::get(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
     auto& list = as<Obj>();
     return list.get_target_table()->get_object(list.get(row_ndx));
 }
@@ -115,8 +113,6 @@ template <>
 void List::add(Obj o)
 {
     verify_in_transaction();
-    if (m_is_embedded)
-        throw InvalidEmbeddedOperationException();
     validate(o);
     as<Obj>().add(o.get_key());
 }
@@ -125,7 +121,6 @@ template <typename T>
 void List::insert(size_t row_ndx, T value)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx, true);
     as<T>().insert(row_ndx, value);
 }
 
@@ -133,28 +128,19 @@ template <>
 void List::insert(size_t row_ndx, Obj o)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx, true);
     validate(o);
-    if (m_is_embedded)
-        throw InvalidEmbeddedOperationException();
     as<Obj>().insert(row_ndx, o.get_key());
 }
 
 void List::move(size_t source_ndx, size_t dest_ndx)
 {
     verify_in_transaction();
-    verify_valid_row(source_ndx);
-    verify_valid_row(dest_ndx); // Can't be one past end due to removing one earlier
-    if (source_ndx == dest_ndx)
-        return;
-
     list_base().move(source_ndx, dest_ndx);
 }
 
 void List::remove(size_t row_ndx)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx);
     list_base().remove(row_ndx, row_ndx + 1);
 }
 
@@ -168,7 +154,6 @@ template <typename T>
 void List::set(size_t row_ndx, T value)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx);
     //    validate(row);
     as<T>().set(row_ndx, value);
 }
@@ -176,20 +161,17 @@ void List::set(size_t row_ndx, T value)
 void List::insert_any(size_t row_ndx, Mixed value)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx, true);
     list_base().insert_any(row_ndx, value);
 }
 
 void List::set_any(size_t row_ndx, Mixed value)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx);
     list_base().set_any(row_ndx, value);
 }
 
 Mixed List::get_any(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
     return list_base().get_any(row_ndx);
 }
 
@@ -202,10 +184,7 @@ template <>
 void List::set(size_t row_ndx, Obj o)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx);
     validate(o);
-    if (m_is_embedded)
-        throw InvalidEmbeddedOperationException();
     as<Obj>().set(row_ndx, o.get_key());
 }
 
@@ -214,7 +193,7 @@ Obj List::add_embedded()
     verify_in_transaction();
 
     if (!m_is_embedded)
-        throw InvalidEmbeddedOperationException();
+        throw IllegalOperation("Not a list of embedded objects");
 
     return as<Obj>().create_and_insert_linked_object(size());
 }
@@ -222,10 +201,9 @@ Obj List::add_embedded()
 Obj List::set_embedded(size_t list_ndx)
 {
     verify_in_transaction();
-    verify_valid_row(list_ndx);
 
     if (!m_is_embedded)
-        throw InvalidEmbeddedOperationException();
+        throw IllegalOperation("Not a list of embedded objects");
 
     return as<Obj>().create_and_set_linked_object(list_ndx);
 }
@@ -233,17 +211,15 @@ Obj List::set_embedded(size_t list_ndx)
 Obj List::insert_embedded(size_t list_ndx)
 {
     verify_in_transaction();
-    verify_valid_row(list_ndx, true);
 
     if (!m_is_embedded)
-        throw InvalidEmbeddedOperationException();
+        throw IllegalOperation("Not a list of embedded objects");
 
     return as<Obj>().create_and_insert_linked_object(list_ndx);
 }
 
 Obj List::get_object(size_t list_ndx)
 {
-    verify_valid_row(list_ndx, true);
     if (m_type == PropertyType::Object) {
         return as<Obj>().get_object(list_ndx);
     }
@@ -253,15 +229,12 @@ Obj List::get_object(size_t list_ndx)
 void List::swap(size_t ndx1, size_t ndx2)
 {
     verify_in_transaction();
-    verify_valid_row(ndx1);
-    verify_valid_row(ndx2);
     list_base().swap(ndx1, ndx2);
 }
 
 void List::delete_at(size_t row_ndx)
 {
     verify_in_transaction();
-    verify_valid_row(row_ndx);
     if (m_type == PropertyType::Object)
         as<Obj>().remove_target_row(row_ndx);
     else
@@ -337,7 +310,7 @@ util::Optional<Mixed> List::max(ColKey col) const
     size_t out_ndx = not_found;
     auto result = list_base().max(&out_ndx);
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "max");
+        not_supported("max");
     }
     return out_ndx == not_found ? none : result;
 }
@@ -350,7 +323,7 @@ util::Optional<Mixed> List::min(ColKey col) const
     size_t out_ndx = not_found;
     auto result = list_base().min(&out_ndx);
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "min");
+        not_supported("min");
     }
     return out_ndx == not_found ? none : result;
 }
@@ -362,7 +335,7 @@ Mixed List::sum(ColKey col) const
 
     auto result = list_base().sum();
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "sum");
+        not_supported("sum");
     }
     return *result;
 }
@@ -374,7 +347,7 @@ util::Optional<Mixed> List::average(ColKey col) const
     size_t count = 0;
     auto result = list_base().avg(&count);
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(list_base().get_col_key(), list_base().get_table(), "average");
+        not_supported("average");
     }
     return count == 0 ? none : result;
 }

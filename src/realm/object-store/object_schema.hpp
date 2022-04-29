@@ -32,7 +32,9 @@ class Group;
 class Schema;
 class Table;
 enum class PropertyType : unsigned short;
+namespace schema {
 struct ObjectSchemaValidationException;
+}
 struct Property;
 
 class ObjectSchema {
@@ -79,7 +81,7 @@ public:
     }
     bool property_is_computed(Property const& property) const noexcept;
 
-    void validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions,
+    void validate(Schema const& schema, std::vector<schema::ObjectSchemaValidationException>& exceptions,
                   bool for_sync) const;
 
     friend bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept;
