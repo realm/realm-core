@@ -1500,6 +1500,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
     } // end cycle detection
     SECTION("The server can prohibit recovery") {
+        const realm::AppSession& app_session = test_app_session.app_session();
         auto sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
         auto sync_config = app_session.admin_api.get_config(app_session.server_app_id, sync_service);
         REQUIRE(!sync_config.recovery_is_disabled);
