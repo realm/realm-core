@@ -407,7 +407,7 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(HistoryEntry);
-    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes);
+    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);

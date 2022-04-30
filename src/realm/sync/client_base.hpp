@@ -4,6 +4,7 @@
 #include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {
@@ -58,10 +59,11 @@ class SessionWrapper;
 /// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
 /// bool wait_for_download_complete_or_client_stopped().
 struct ClientReset {
-    bool discard_local = false;
+    realm::ClientResyncMode mode;
     DBRef fresh_copy;
     util::UniqueFunction<void(std::string path)> notify_before_client_reset;
-    util::UniqueFunction<void(std::string path, VersionID before_version)> notify_after_client_reset;
+    util::UniqueFunction<void(std::string path, VersionID before_version, bool did_recover)>
+        notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.

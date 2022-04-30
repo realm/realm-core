@@ -643,9 +643,9 @@ const std::string& SessionImpl::get_realm_path() const noexcept
     return m_wrapper.m_db->get_path();
 }
 
-DB& SessionImpl::get_db() const noexcept
+DBRef SessionImpl::get_db() const noexcept
 {
-    return *m_wrapper.m_db;
+    return m_wrapper.m_db;
 }
 
 SyncTransactReporter* SessionImpl::get_transact_reporter() noexcept

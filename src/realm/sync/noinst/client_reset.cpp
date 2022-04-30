@@ -18,6 +18,7 @@
 
 #include <realm/db.hpp>
 #include <realm/dictionary.hpp>
+#include <realm/table_view.hpp>
 #include <realm/set.hpp>
 
 #include <realm/sync/history.hpp>
@@ -31,11 +32,36 @@
 #include <realm/util/flat_map.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <vector>
 
 using namespace realm;
 using namespace _impl;
 using namespace sync;
+
+namespace realm {
+
+std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode)
+{
+    switch (mode) {
+        case ClientResyncMode::Manual:
+            os << "Manual";
+            break;
+        case ClientResyncMode::DiscardLocal:
+            os << "DiscardLocal";
+            break;
+        case ClientResyncMode::Recover:
+            os << "Recover";
+            break;
+        case ClientResyncMode::RecoverOrDiscard:
+            os << "RecoveOrDiscard";
+            break;
+    }
+    return os;
+}
+
+} // namespace realm
+
 
 namespace realm::_impl::client_reset::converters {
 
@@ -456,7 +482,9 @@ void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_
 } // namespace realm::_impl::client_reset::converters
 
 
-void client_reset::transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
+namespace realm::_impl::client_reset {
+
+void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
     logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
 
@@ -757,19 +785,149 @@ void client_reset::transfer_group(const Transaction& group_src, Transaction& gro
     }
 }
 
-client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_local, DBRef db_remote,
-                                                                      sync::SaltedFileIdent client_file_ident,
-                                                                      util::Logger& logger,
-                                                                      bool recover_local_changes)
+// A table without a "class_" prefix will not generate sync instructions.
+constexpr static std::string_view s_meta_reset_table_name("client_reset_metadata");
+constexpr static std::string_view s_pk_col_name("id");
+constexpr static std::string_view s_version_column_name("version");
+constexpr static std::string_view s_timestamp_col_name("event_time");
+constexpr static std::string_view s_reset_type_col_name("type_of_reset");
+constexpr int64_t metadata_version = 1;
+
+void remove_pending_client_resets(TransactionRef wt)
 {
+    REALM_ASSERT(wt);
+    if (auto table = wt->get_table(s_meta_reset_table_name)) {
+        if (table->size()) {
+            table->clear();
+        }
+    }
+}
+
+util::Optional<PendingReset> has_pending_reset(TransactionRef rt)
+{
+    REALM_ASSERT(rt);
+    ConstTableRef table = rt->get_table(s_meta_reset_table_name);
+    if (!table || table->size() == 0) {
+        return util::none;
+    }
+    ColKey timestamp_col = table->get_column_key(s_timestamp_col_name);
+    ColKey type_col = table->get_column_key(s_reset_type_col_name);
+    ColKey version_col = table->get_column_key(s_version_column_name);
+    REALM_ASSERT(timestamp_col);
+    REALM_ASSERT(type_col);
+    REALM_ASSERT(version_col);
+    if (table->size() > 1) {
+        // this may happen if a future version of this code changes the format and expectations around reset metadata.
+        throw ClientResetFailed(
+            util::format("Previous client resets detected (%1) but only one is expected.", table->size()));
+    }
+    Obj first = *table->begin();
+    REALM_ASSERT(first);
+    PendingReset pending;
+    int64_t version = first.get<int64_t>(version_col);
+    pending.time = first.get<Timestamp>(timestamp_col);
+    if (version > metadata_version) {
+        throw ClientResetFailed(util::format("Unsupported client reset metadata version: %1 vs %2, from %3", version,
+                                             metadata_version, pending.time));
+    }
+    int64_t type = first.get<int64_t>(type_col);
+    if (type == 0) {
+        pending.type = ClientResyncMode::DiscardLocal;
+    }
+    else if (type == 1) {
+        pending.type = ClientResyncMode::Recover;
+    }
+    else {
+        throw ClientResetFailed(
+            util::format("Unsupported client reset metadata type: %1 from %2", type, pending.time));
+    }
+    return pending;
+}
+
+void track_reset(TransactionRef wt, ClientResyncMode mode)
+{
+    REALM_ASSERT(wt);
+    REALM_ASSERT(mode != ClientResyncMode::Manual);
+    TableRef table = wt->get_table(s_meta_reset_table_name);
+    ColKey version_col, timestamp_col, type_col;
+    if (!table) {
+        table = wt->add_table_with_primary_key(s_meta_reset_table_name, type_ObjectId, s_pk_col_name);
+        REALM_ASSERT(table);
+        version_col = table->add_column(type_Int, s_version_column_name);
+        timestamp_col = table->add_column(type_Timestamp, s_timestamp_col_name);
+        type_col = table->add_column(type_Int, s_reset_type_col_name);
+    }
+    else {
+        version_col = table->get_column_key(s_version_column_name);
+        timestamp_col = table->get_column_key(s_timestamp_col_name);
+        type_col = table->get_column_key(s_reset_type_col_name);
+    }
+    REALM_ASSERT(version_col);
+    REALM_ASSERT(timestamp_col);
+    REALM_ASSERT(type_col);
+    int64_t mode_val = 0; // Discard
+    if (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard) {
+        mode_val = 1; // Recover
+    }
+    table->create_object_with_primary_key(ObjectId::gen(),
+                                          {{version_col, metadata_version},
+                                           {timestamp_col, Timestamp(std::chrono::system_clock::now())},
+                                           {type_col, mode_val}});
+}
+
+static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode mode, util::Logger& logger)
+{
+    REALM_ASSERT(wt);
+    if (auto previous_reset = has_pending_reset(wt)) {
+        logger.info("A previous reset was detected of type: '%1' at: %2", previous_reset->type, previous_reset->time);
+        switch (previous_reset->type) {
+            case ClientResyncMode::Manual:
+                REALM_UNREACHABLE();
+                break;
+            case ClientResyncMode::DiscardLocal:
+                throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                                     "giving up on '%3' mode to prevent a cycle",
+                                                     previous_reset->type, previous_reset->time, mode));
+            case ClientResyncMode::Recover:
+                if (mode == ClientResyncMode::Recover) {
+                    throw ClientResetFailed(util::format("A previous '%1' mode reset from %2 did not succeed, "
+                                                         "giving up on '%3' mode to prevent a cycle",
+                                                         previous_reset->type, previous_reset->time, mode));
+                }
+                else if (mode == ClientResyncMode::RecoverOrDiscard) {
+                    mode = ClientResyncMode::DiscardLocal;
+                    logger.info("A previous '%1' mode reset from %2 downgrades this mode ('%3') to DiscardLocal",
+                                previous_reset->type, previous_reset->time, mode);
+                }
+                else if (mode == ClientResyncMode::DiscardLocal) {
+                    // previous mode Recover and this mode is Discard, this is not a cycle yet
+                }
+                else {
+                    REALM_UNREACHABLE();
+                }
+                break;
+            case ClientResyncMode::RecoverOrDiscard:
+                throw ClientResetFailed(util::format("Unexpected previous '%1' mode reset from %2 did not "
+                                                     "succeed, giving up on '%3' mode to prevent a cycle",
+                                                     previous_reset->type, previous_reset->time, mode));
+        }
+    }
+    track_reset(wt, mode);
+    return mode;
+}
+
+LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
+                                          util::Logger& logger, ClientResyncMode mode, bool* did_recover_out)
+{
+    REALM_ASSERT(db_local);
+    REALM_ASSERT(db_remote);
     logger.info("Client reset, path_local = %1, "
                 "client_file_ident.ident = %2, "
                 "client_file_ident.salt = %3,"
                 "remote = %4, mode = %5",
-                db_local.get_path(), client_file_ident.ident, client_file_ident.salt,
-                (db_remote ? db_remote->get_path() : "<none>"), recover_local_changes ? "recover" : "discardLocal");
+                db_local->get_path(), client_file_ident.ident, client_file_ident.salt, db_remote->get_path(), mode);
 
-    auto wt_local = db_local.start_write();
+    auto wt_local = db_local->start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
     REALM_ASSERT(history_local);
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
@@ -778,6 +936,9 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
     BinaryData recovered_changeset;
     std::vector<ChunkedBinaryData> local_changes;
 
+    mode = reset_precheck_guard(wt_local, mode, logger);
+    bool recover_local_changes = (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard);
+
     if (recover_local_changes) {
         local_changes = history_local->get_local_changes(current_version_local);
         logger.info("Local changesets to recover: %1", local_changes.size());
@@ -785,38 +946,39 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
 
     sync::SaltedVersion fresh_server_version = {0, 0};
 
-    if (db_remote) {
-        auto wt_remote = db_remote->start_write();
-        auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
-        REALM_ASSERT(history_remote);
-        sync::version_type current_version_remote = wt_remote->get_version();
-        history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
-        history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
+    auto wt_remote = db_remote->start_write();
+    auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
+    REALM_ASSERT(history_remote);
+    sync::version_type current_version_remote = wt_remote->get_version();
+    history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
+    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
 
-        sync::version_type remote_version;
-        SaltedFileIdent remote_ident;
-        SyncProgress remote_progress;
-        history_remote->get_status(remote_version, remote_ident, remote_progress);
-        fresh_server_version = remote_progress.latest_server_version;
+    sync::version_type remote_version;
+    SaltedFileIdent remote_ident;
+    SyncProgress remote_progress;
+    history_remote->get_status(remote_version, remote_ident, remote_progress);
+    fresh_server_version = remote_progress.latest_server_version;
 
-        if (recover_local_changes) {
-            RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
-            handler.process_changesets(local_changes); // throws on error
-            ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
-            REALM_ASSERT_RELEASE(client_repl);
-            ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
-            const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
-            recovered_changeset = {buffer.data(), buffer.size()};
-        }
-
-        transfer_group(*wt_remote, *wt_local, logger);
+    if (recover_local_changes) {
+        RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
+        handler.process_changesets(local_changes); // throws on error
+        ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
+        REALM_ASSERT_RELEASE(client_repl);
+        ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
+        const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
+        recovered_changeset = {buffer.data(), buffer.size()};
     }
+
+    transfer_group(*wt_remote, *wt_local, logger);
 
     history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
                                                 recovered_changeset);
 
     // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
     wt_local->commit_and_continue_as_read();
+    if (did_recover_out) {
+        *did_recover_out = recover_local_changes;
+    }
     VersionID new_version_local = wt_local->get_version_of_current_transaction();
     logger.info("perform_client_reset_diff is done, old_version.version = %1, "
                 "old_version.index = %2, new_version.version = %3, "
@@ -826,3 +988,5 @@ client_reset::LocalVersionIDs client_reset::perform_client_reset_diff(DB& db_loc
 
     return LocalVersionIDs{old_version_local, new_version_local};
 }
+
+} // namespace realm::_impl::client_reset
