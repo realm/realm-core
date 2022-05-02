@@ -341,40 +341,40 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
+
     /**
-     * The overloaded Realm::convert function offers a way to copy and/or convert a realm.
+     * Copy this Realm's data into another Realm file.
      *
-     * The following options are supported:
-     * - local -> local (config or path)
-     * - local -> sync (config only)
-     * - sync -> local (config only)
-     * - sync -> sync  (config or path)
-     * - sync -> bundlable sync (client file identifier removed)
+     * If the file at `config.path` already exists and \a merge_into_existing
+     * is true, the contents of this Realm will be copied into the existing
+     * Realm at that path. If \a merge_into_existing is false, an exception
+     * will be thrown instead.
      *
-     * Note that for bundled realms it is required that all local changes are synchronized with the
-     * server before the copy can be written. This is to be sure that the file can be used as a
-     * stating point for a newly installed application. The function will throw if there are
-     * pending uploads.
+     * If the destination file does not exist, the action performed depends on
+     * the type of the source and destimation files. If the destination
+     * configuration is a non-sync local Realm configuration, a compacted copy
+     * of the current Transaction's data (which includes uncommitted changes if
+     * applicable!) is written in streaming form, with no history.
+     *
+     * If the target configuration is a sync configuration and the source Realm
+     * is a local Realm, a sync Realm with no file identifier is created and
+     * sync history is synthesized for all of the current objects in the Realm.
+     *
+     * If the target configuration is a sync configuration and the source Realm
+     * is also a sync Realm, a sync Realm with no file identifier is created,
+     * but the existing history is retained instead of synthesizing new
+     * history. This mode requires that the source Realm does not have any
+     * unuploaded changesets, and will thrown an exception if that is not the
+     * case.
+     *
+     * @param config The realm configuration that specifies what file should be
+     *               produced. This can be a local or a synced Realm, encrypted or not.
+     * @param merge_into_existing If true, converting into an existing file
+     *                            will write this Realm's data into that file
+     *                            rather than throwing an exception.
      */
-    /**
-     * Copy or convert a Realm using a config.
-     *
-     * If the file already exists, data will be copied over object per object.
-     * If the file does not exist, the realm file will be exported to the new location and if the
-     * configuration object contains a sync part, a sync history will be synthesized.
-     *
-     * @param config The realm configuration that should be used to create a copy.
-     *               This can be a local or a synced Realm, encrypted or not.
-     */
-    void convert(const Config& config);
-    /**
-     * Copy a Realm using a path.
-     *
-     * @param path The path the realm should be copied to. Local realms will remain local, synced
-     *             realms will remain synced realms.
-     * @param encryption_key The optional encryption key for the new realm.
-     */
-    void convert(const std::string& path, BinaryData encryption_key);
+    void convert(const Config& config, bool merge_into_existing = true);
+
     OwnedBinaryData write_copy();
 
     void verify_thread() const;

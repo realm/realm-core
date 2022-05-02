@@ -300,8 +300,7 @@ public:
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
     bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
 
-    void write_copy(StringData path, util::Optional<const char*> output_encryption_key = util::none,
-                    bool allow_overwrite = false);
+    void write_copy(StringData path, const char* output_encryption_key);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();
