@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
@@ -408,6 +409,66 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
                                                realm_sync_session_resync_mode_e mode) noexcept
 {
     config->client_resync_mode = ClientResyncMode(mode);
+}
+
+RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return to_capi(subscription->id());
+    });
+}
+
+RLM_API bool realm_flx_sync_subscription_has_name(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return subscription->has_name();
+    });
+}
+
+RLM_API const char* realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return subscription->name().data();
+    });
+}
+
+RLM_API const char*
+realm_flx_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return subscription->object_class_name().data();
+    });
+}
+
+RLM_API const char*
+realm_flx_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return subscription->query_string().data();
+    });
+}
+
+RLM_API realm_timestamp_t
+realm_flx_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return to_capi(subscription->created_at());
+    });
+}
+
+RLM_API realm_timestamp_t
+realm_flx_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return wrap_err([&]() {
+        return to_capi(subscription->updated_at());
+    });
 }
 
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t* realm) noexcept
