@@ -257,24 +257,24 @@ struct VersionList {
         // run through list of versions and reclaim unused entries until a live entry is met
         // there is always at least one live entry
         it = oldest;
+        bool looking_for_oldest_live = true;
         REALM_ASSERT(oldest != -1);
-        for (;;) {
+        while (it != -1) {
             auto& r = get(it);
-            if (r.count_live != 0) {
+            if (looking_for_oldest_live && r.count_live != 0) {
+                looking_for_oldest_live = false;
                 oldest_v = get(oldest).version;
                 oldest_live_v = r.version;
                 REALM_ASSERT(oldest_v <= oldest_live_v);
-                return;
+                // return;
             }
             it = r.newer;
-            if (r.count_frozen == 0) {
+            if (r.count_frozen == 0 && r.count_live == 0) {
                 unreachable.push_back(r.version);
                 r.version = 0;
                 free_entry(index_of(r));
             }
         }
-        REALM_ASSERT(it != -1);
-        REALM_ASSERT(false);
     }
 
     uint32_t entries;

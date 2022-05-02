@@ -167,14 +167,14 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
         threads[j].join();
 }
 
-TEST(Transactions_ReclaimFrozen)
+ONLY(Transactions_ReclaimFrozen)
 {
     struct Entry {
         TransactionRef frozen;
         Obj o;
         int64_t value;
     };
-    int num_pending_transactions = 64;
+    int num_pending_transactions = 100;
     int num_transactions_created = 1000;
     int num_objects = 200;
     int num_checks_pr_trans = 10;
