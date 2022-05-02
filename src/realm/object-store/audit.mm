@@ -992,6 +992,11 @@ AuditContext::AuditContext(std::shared_ptr<DB> source_db, RealmConfig const& par
     if (!audit_user)
         audit_user = parent_sync_config.user;
 
+    if (parent_sync_config.flx_sync_requested && audit_user == parent_sync_config.user) {
+        throw std::logic_error("Auditing a flexible sync realm requires setting the audit user to a user associated "
+                               "with a partition-based sync app.");
+    }
+
     if (!m_logger)
         m_logger = audit_user->sync_manager()->make_logger();
     if (!m_serializer)

@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "sync/flx_sync_harness.hpp"
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
@@ -1641,6 +1642,37 @@ TEST_CASE("audit integration tests") {
                 generate_event(realm, i);
                 update_one();
             }
+        }
+    }
+
+    SECTION("flexible sync") {
+        app::FLXSyncTestHarness harness("audit");
+        create_user_and_log_in(harness.app());
+
+        SECTION("auditing a flexible sync realm without specifying an audit user throws an exception") {
+            SyncTestFile config(harness.app()->current_user(), {}, SyncConfig::FLXSyncEnabled{});
+            config.audit_config = std::make_shared<AuditConfig>();
+            REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "partition-based sync");
+        }
+
+        SECTION("auditing with a flexible sync user reports a sync error") {
+            config.audit_config->audit_user = harness.app()->current_user();
+            auto error = expect_error(config, generate_event);
+            REQUIRE(error.message.find(
+                        "client connected using partition based sync when app is using flexible sync") == 0);
+            REQUIRE(error.is_fatal);
+        }
+
+        SECTION("auditing a flexible sync realm with a pbs audit user works") {
+            config.audit_config->audit_user = config.sync_config->user;
+            config.sync_config->user = harness.app()->current_user();
+            config.sync_config->flx_sync_requested = true;
+            config.sync_config->partition_value.clear();
+
+            auto realm = Realm::get_shared_realm(config);
+            realm->sync_session()->log_out();
+            generate_event(realm, 0);
+            get_audit_events_from_baas(session, *config.audit_config->audit_user, 1);
         }
     }
 
