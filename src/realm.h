@@ -3142,7 +3142,7 @@ typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_ERROR,
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
-typedef void (*realm_sync_on_subscription_state_changed)(const realm_flx_sync_subscription_set_t* subscription,
+typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
                                                          realm_flx_sync_subscription_set_state_e state);
 
 /**
@@ -3215,7 +3215,7 @@ RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_se
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
 
 /**
- * Wait uptill subscripton set state is equal to the state passed as parameter.
+ * Wait until subscripton set state is equal to the state passed as parameter.
  * This is a blocking operation.
  * @return the current subscription state
  */
@@ -3228,9 +3228,10 @@ RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_s
  * @return true/false if the handler was registered correctly
  */
 RLM_API bool
-realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t*,
-                                                  realm_flx_sync_subscription_set_state_e,
-                                                  realm_sync_on_subscription_state_changed) RLM_API_NOEXCEPT;
+realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t* subscription_set,
+                                                  realm_flx_sync_subscription_set_state_e notify_when,
+                                                  realm_sync_on_subscription_state_changed callback, void* userdata,
+                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 /**
  *  Retrieve version for the subscription set passed as parameter
