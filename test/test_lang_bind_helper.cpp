@@ -169,28 +169,54 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
 
 TEST(Transactions_ReclaimFrozen)
 {
+    struct Entry {
+        TransactionRef frozen;
+        Obj o;
+        int64_t value;
+    };
+    int num_pending_transactions = 64;
+    int num_transactions_created = 1000;
+    int num_objects = 200;
+    int num_checks_pr_trans = 10;
+
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_in_realm_history());
     DBRef db = DB::create(*hist_w, path);
-    // TransactionRef frozen[256];
+    std::vector<Entry> refs;
+    refs.resize(num_pending_transactions);
+    Random random(random_int<unsigned long>());
 
     auto wt = db->start_write();
     auto tbl = wt->add_table("TestTable");
     auto col = tbl->add_column(type_Int, "IntCol");
     Obj o;
-    for (int j = 0; j < 200; ++j) {
+    for (int j = 0; j < num_objects; ++j) {
         o = tbl->create_object(ObjKey(j));
         o.set(col, 10000000000 + j);
     }
     wt->commit_and_continue_as_read();
-    // auto frozen = wt->duplicate();
-    auto frozen = wt->freeze();
-    for (int j = 0; j < 1000; ++j) {
+    for (int j = 0; j < num_transactions_created; ++j) {
+        int trans_number = random.draw_int_mod(num_pending_transactions);
+        auto frozen = wt->freeze();
+        //auto frozen = wt->duplicate();
+        refs[trans_number].frozen = frozen;
+        refs[trans_number].o = frozen->import_copy_of(o);
+        refs[trans_number].value = o.get<Int>(col);
         wt->promote_to_write();
+        int key = random.draw_int_mod(num_objects);
+        o = tbl->get_object(ObjKey(key));
         o.set(col, o.get<Int>(col) + 42);
         wt->commit_and_continue_as_read();
+        for (int k = 0; k < num_checks_pr_trans; ++k) {
+            int selected_trans = random.draw_int_mod(num_pending_transactions);
+            if (refs[selected_trans].frozen) {
+                CHECK(refs[selected_trans].value == refs[selected_trans].o.get<Int>(col));
+            }
+        }
     }
-    frozen.reset();
+    for (auto& e : refs) {
+        e.frozen.reset();
+    }
     wt->promote_to_write();
     wt->commit();
     // frozen = wt->freeze();
