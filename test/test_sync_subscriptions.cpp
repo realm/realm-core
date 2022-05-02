@@ -1,4 +1,6 @@
 #include "realm/exceptions.hpp"
+#include "realm/object_id.hpp"
+#include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/sync/subscriptions.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 
@@ -409,6 +411,79 @@ TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
 
     // Throws since the SubscriptionStore is gone.
     CHECK_THROW(latest->refresh(), std::logic_error);
+}
+
+TEST(Sync_SubscriptionStoreInternalSchemaMigration)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+
+    // Create a DB that contains the old subscription schema version table and FLX subscription store.
+    auto test_sub_id = ObjectId::gen();
+    {
+        auto prep_db = DB::create(make_client_replication(), sub_store_path);
+        auto tr = prep_db->start_write();
+        auto schema_metadata = tr->add_table("flx_metadata");
+        auto version_col = schema_metadata->add_column(type_Int, "schema_version");
+        schema_metadata->create_object().set(version_col, int64_t(2));
+
+        auto sub_sets_table = tr->add_table_with_primary_key("flx_subscription_sets", type_Int, "version");
+        auto subs_table = tr->add_embedded_table("flx_subscriptions");
+        auto sub_id = subs_table->add_column(type_ObjectId, "id");
+        auto sub_created_at = subs_table->add_column(type_Timestamp, "created_at");
+        auto sub_updated_at = subs_table->add_column(type_Timestamp, "updated_at");
+        subs_table->add_column(type_String, "name", true);
+        auto sub_object_class = subs_table->add_column(type_String, "object_class");
+        auto sub_query = subs_table->add_column(type_String, "query");
+
+        auto sub_set_state = sub_sets_table->add_column(type_Int, "state");
+        auto sub_set_snapshot_version = sub_sets_table->add_column(type_Int, "snapshot_version");
+        sub_sets_table->add_column(type_String, "error", true);
+        auto sub_sets_subscriptions = sub_sets_table->add_column_list(*subs_table, "subscriptions");
+
+        auto zero_sub = sub_sets_table->create_object_with_primary_key(Mixed{int64_t(0)});
+        zero_sub.set(sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete));
+        zero_sub.set(sub_set_snapshot_version, tr->get_version());
+        tr->commit_and_continue_as_read();
+
+        tr->promote_to_write();
+        auto one_sub = sub_sets_table->create_object_with_primary_key(Mixed{int64_t(1)});
+        one_sub.set(sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending));
+        one_sub.set(sub_set_snapshot_version, tr->get_version());
+        auto sub_obj = one_sub.get_linklist(sub_sets_subscriptions).create_and_insert_linked_object(0);
+        sub_obj.set(sub_id, test_sub_id);
+        sub_obj.set(sub_created_at, Timestamp(std::chrono::system_clock::now()));
+        sub_obj.set(sub_updated_at, Timestamp(std::chrono::system_clock::now()));
+        sub_obj.set(sub_object_class, StringData("class_a"));
+        sub_obj.set(sub_query, StringData("(bar > 10)"));
+        tr->commit();
+    }
+
+    {
+        SubscriptionStoreFixture fixture(sub_store_path);
+        auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+        auto [active_version, latest_version] = store->get_active_and_latest_versions();
+        CHECK_EQUAL(active_version, 0);
+        CHECK_EQUAL(latest_version, 1);
+        auto sub_active = store->get_active();
+        CHECK_EQUAL(sub_active.state(), SubscriptionSet::State::Complete);
+        CHECK_EQUAL(sub_active.size(), 0);
+        auto sub_latest = store->get_latest();
+        CHECK_EQUAL(sub_latest.state(), SubscriptionSet::State::Pending);
+        CHECK_EQUAL(sub_latest.size(), 1);
+        CHECK_EQUAL(sub_latest.begin()->id(), test_sub_id);
+        CHECK_EQUAL(sub_latest.begin()->object_class_name(), "class_a");
+        CHECK_EQUAL(sub_latest.begin()->query_string(), "(bar > 10)");
+
+
+        auto tr = fixture.db->start_read();
+        SyncMetadataSchemaVersions versions(tr);
+        auto flx_sub_store_version =
+            versions.get_version_for(tr, sync::internal_table_groups::c_flx_subscription_store);
+        CHECK(flx_sub_store_version);
+        CHECK_EQUAL(*flx_sub_store_version, 2);
+
+        CHECK(!versions.get_version_for(tr, "non_existent_table"));
+    }
 }
 
 } // namespace realm::sync
