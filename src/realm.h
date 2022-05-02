@@ -643,7 +643,8 @@ RLM_API void realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
  *
  * This function cannot fail.
  */
-RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata);
+RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata,
+                                                 realm_free_userdata_func_t callback);
 
 /**
  * Set the data initialization function.
@@ -656,7 +657,7 @@ RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migratio
  * This function cannot fail.
  */
 RLM_API void realm_config_set_data_initialization_function(realm_config_t*, realm_data_initialization_func_t,
-                                                           void* userdata);
+                                                           void* userdata, realm_free_userdata_func_t callback);
 
 /**
  * Set the should-compact-on-launch callback.
@@ -669,8 +670,8 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t*, real
  * This function cannot fail.
  */
 RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
-                                                                realm_should_compact_on_launch_func_t,
-                                                                void* userdata);
+                                                                realm_should_compact_on_launch_func_t, void* userdata,
+                                                                realm_free_userdata_func_t callback);
 
 /**
  * True if file format upgrades on open are disabled.
