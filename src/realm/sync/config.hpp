@@ -59,6 +59,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError {
 
+    enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
+
     std::error_code error_code;
     std::string message;
     bool is_fatal;
@@ -69,7 +71,7 @@ struct SyncError {
     bool is_unrecognized_by_client = false;
     // the server may explicitly send down "IsClientReset" as part of an error
     // if this is set, it overrides the clients interpretation of the error
-    util::Optional<bool> server_requests_client_reset = util::none;
+    util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
 
     SyncError(std::error_code error_code, std::string message, bool is_fatal)
         : error_code(std::move(error_code))

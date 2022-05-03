@@ -133,7 +133,7 @@ TEST(Sync_BadVirtualPath)
     int nerrors = 0;
 
     using ErrorInfo = Session::ErrorInfo;
-    auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
@@ -545,7 +545,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         ClientServerFixture fixture(dir, test_context);
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -758,7 +758,7 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -810,7 +810,7 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -864,7 +864,7 @@ TEST(Sync_DetectSchemaMismatch_Links)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -916,7 +916,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -964,7 +964,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -1014,7 +1014,7 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
         bool error_did_occur = false;
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -5411,13 +5411,13 @@ TEST(Sync_ConnectionStateChange)
         fixture.start();
 
         BowlOfStonesSemaphore bowl_1, bowl_2;
-        auto listener_1 = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener_1 = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             CHECK_EQUAL(state == ConnectionState::disconnected, bool(error_info));
             states_1.push_back(state);
             if (state == ConnectionState::disconnected)
                 bowl_1.add_stone();
         };
-        auto listener_2 = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener_2 = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             CHECK_EQUAL(state == ConnectionState::disconnected, bool(error_info));
             states_2.push_back(state);
             if (state == ConnectionState::disconnected)
@@ -6320,7 +6320,7 @@ TEST(Sync_ClientFileBlacklisting)
         fixture.start();
         using ConnectionState = ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -6418,7 +6418,7 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     bool failed_twice = false;
     using ConnectionState = ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
-    auto listener = [&](ConnectionState state, const util::Optional<ErrorInfo>& error_info) {
+    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);

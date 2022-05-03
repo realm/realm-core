@@ -459,7 +459,7 @@ public:
     void set_progress_handler(util::UniqueFunction<ProgressHandler>);
 
 
-    using ConnectionStateChangeListener = void(ConnectionState, const util::Optional<SessionErrorInfo>);
+    using ConnectionStateChangeListener = void(ConnectionState, util::Optional<SessionErrorInfo>);
 
     /// \brief Install a connection state change listener.
     ///

@@ -586,8 +586,7 @@ public:
     void set_client_side_error_handler(int client_index, std::function<ErrorHandler> handler)
     {
         using ErrorInfo = Session::ErrorInfo;
-        auto handler_2 = [handler = std::move(handler)](ConnectionState state,
-                                                        const util::Optional<ErrorInfo> error_info) {
+        auto handler_2 = [handler = std::move(handler)](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -653,7 +652,7 @@ public:
         }
         else {
             using ErrorInfo = Session::ErrorInfo;
-            auto fallback_listener = [this](ConnectionState state, const util::Optional<ErrorInfo>& error) {
+            auto fallback_listener = [this](ConnectionState state, util::Optional<ErrorInfo> error) {
                 if (state != ConnectionState::disconnected)
                     return;
                 REALM_ASSERT(error);
