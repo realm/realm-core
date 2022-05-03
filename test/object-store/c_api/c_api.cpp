@@ -740,6 +740,16 @@ bool initialize_data(void* userdata_p, realm_t*)
     return true;
 }
 
+void free_data(void* userdata_p)
+{
+    free(userdata_p);
+}
+
+void delete_data(void* userdata_p)
+{
+    delete static_cast<ConfigUserdata*>(userdata_p);
+}
+
 bool migrate_schema(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t*)
 {
     auto userdata = static_cast<ConfigUserdata*>(userdata_p);
@@ -785,26 +795,26 @@ TEST_CASE("C API") {
 
         SECTION("data initialization callback") {
             ConfigUserdata userdata;
-            realm_config_set_data_initialization_function(config.get(), initialize_data, &userdata);
+            realm_config_set_data_initialization_function(config.get(), initialize_data, &userdata, nullptr);
             auto realm = cptr_checked(realm_open(config.get()));
             CHECK(userdata.num_initializations == 1);
         }
 
         SECTION("data initialization callback error") {
-            ConfigUserdata userdata;
+            ConfigUserdata* userdata = new ConfigUserdata();
             realm_config_set_data_initialization_function(
                 config.get(),
                 [](void*, realm_t*) {
                     return false;
                 },
-                &userdata);
+                userdata, delete_data);
             CHECK(!realm_open(config.get()));
             CHECK_ERR(RLM_ERR_CALLBACK);
         }
 
         SECTION("migration callback") {
             ConfigUserdata userdata;
-            realm_config_set_migration_function(config.get(), migrate_schema, &userdata);
+            realm_config_set_migration_function(config.get(), migrate_schema, &userdata, nullptr);
             auto realm = cptr_checked(realm_open(config.get()));
             CHECK(userdata.num_migrations == 0);
             realm.reset();
@@ -815,7 +825,7 @@ TEST_CASE("C API") {
             realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
             realm_config_set_schema_version(config2.get(), 999);
             realm_config_set_schema(config2.get(), empty_schema.get());
-            realm_config_set_migration_function(config2.get(), migrate_schema, &userdata);
+            realm_config_set_migration_function(config2.get(), migrate_schema, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
         }
@@ -824,7 +834,7 @@ TEST_CASE("C API") {
             TestFile test_file_3;
             ConfigUserdata userdata;
 
-            realm_config_set_migration_function(config.get(), migrate_schema_rename_prop, &userdata);
+            realm_config_set_migration_function(config.get(), migrate_schema_rename_prop, &userdata, nullptr);
 
             const realm_class_info_t foo_class[1] = {{
                 "Foo",
@@ -882,7 +892,7 @@ TEST_CASE("C API") {
             realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
             realm_config_set_schema_version(config2.get(), 999);
             realm_config_set_schema(config2.get(), new_schema.get());
-            realm_config_set_migration_function(config2.get(), migrate_schema_rename_prop, &userdata);
+            realm_config_set_migration_function(config2.get(), migrate_schema_rename_prop, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
             auto new_db_schema = realm_get_schema(realm2.get());
@@ -908,16 +918,29 @@ TEST_CASE("C API") {
                 [](void*, realm_t*, realm_t*, const realm_schema_t*) {
                     return false;
                 },
-                &userdata);
+                &userdata, nullptr);
             CHECK(!realm_open(config2.get()));
             CHECK_ERR(RLM_ERR_CALLBACK);
         }
 
         SECTION("should compact on launch callback") {
-            ConfigUserdata userdata;
-            realm_config_set_should_compact_on_launch_function(config.get(), should_compact_on_launch, &userdata);
+            void* userdata_p = malloc(sizeof(ConfigUserdata));
+            memset(userdata_p, 0, sizeof(ConfigUserdata));
+            realm_config_set_should_compact_on_launch_function(config.get(), should_compact_on_launch, userdata_p,
+                                                               free_data);
             auto realm = cptr_checked(realm_open(config.get()));
-            CHECK(userdata.num_compact_on_launch == 1);
+            CHECK(static_cast<ConfigUserdata*>(userdata_p)->num_compact_on_launch == 1);
+        }
+
+        SECTION("should compact on launch and initialization callback") {
+            ConfigUserdata* userdata = new ConfigUserdata();
+            realm_config_set_should_compact_on_launch_function(config.get(), should_compact_on_launch, userdata,
+                                                               delete_data);
+            realm_config_set_data_initialization_function(config.get(), initialize_data, userdata,
+                                                          free_data); // should not update free function
+            auto realm = cptr_checked(realm_open(config.get()));
+            CHECK(userdata->num_initializations == 1);
+            CHECK(userdata->num_compact_on_launch == 1);
         }
     }
 

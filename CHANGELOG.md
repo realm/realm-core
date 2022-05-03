@@ -5,13 +5,14 @@
 * Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432]https://github.com/realm/realm-core/pull/5432)
 * Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async`
 ([#5446](https://github.com/realm/realm-core/pull/5446))
+* Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * None.
  
 ### Breaking changes
-* None.
+* Extra `realm_free_userdata_func_t` parameter added on some realm_config_set_... functions in the C API. The userdata will be freed when the config object is freed.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
