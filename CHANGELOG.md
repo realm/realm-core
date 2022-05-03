@@ -2,7 +2,7 @@
 
 ### Enhancements
 * Adding recovery mode to new automatic client reset handling. In this mode, local unsynced changes which would otherwise be lost during a client reset are replayed on the seamlessly reset Realm. ([#5323](https://github.com/realm/realm-core/pull/5323))
-
+* Client reset in recovery mode is controlled by the server's protocol 4 json error format. ([#5382](https://github.com/realm/realm-core/pull/5382))
 * Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432](https://github.com/realm/realm-core/pull/5432))
 * Expose client reset functionalities for C API. ([#5425](https://github.com/realm/realm-core/issues/5425))
 * Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async` ([#5438](https://github.com/realm/realm-core/pull/5438))
@@ -21,7 +21,7 @@
 -----------
 
 ### Internals
-* None.
+* Sync protocol version bumped to 4.
 
 ----------------------------------------------
 
