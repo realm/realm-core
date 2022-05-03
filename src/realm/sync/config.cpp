@@ -33,37 +33,37 @@ using ProtocolError = realm::sync::ProtocolError;
 
 bool SyncError::is_client_error() const
 {
-    return error_code.category() == realm::sync::client_error_category();
+    return get_category() == realm::sync::client_error_category();
 }
 
 /// The error is a protocol error, which may either be connection-level or session-level.
 bool SyncError::is_connection_level_protocol_error() const
 {
-    if (error_code.category() != realm::sync::protocol_error_category()) {
+    if (get_category() != realm::sync::protocol_error_category()) {
         return false;
     }
-    return !realm::sync::is_session_level_error(static_cast<ProtocolError>(error_code.value()));
+    return !realm::sync::is_session_level_error(static_cast<ProtocolError>(get_system_error().value()));
 }
 
 /// The error is a connection-level protocol error.
 bool SyncError::is_session_level_protocol_error() const
 {
-    if (error_code.category() != realm::sync::protocol_error_category()) {
+    if (get_category() != realm::sync::protocol_error_category()) {
         return false;
     }
-    return realm::sync::is_session_level_error(static_cast<ProtocolError>(error_code.value()));
+    return realm::sync::is_session_level_error(static_cast<ProtocolError>(get_system_error().value()));
 }
 
 /// The error indicates a client reset situation.
 bool SyncError::is_client_reset_requested() const
 {
-    if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
+    if (get_system_error() == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
         return true;
     }
-    if (error_code.category() != realm::sync::protocol_error_category()) {
+    if (get_category() != realm::sync::protocol_error_category()) {
         return false;
     }
-    return get_simplified_error(static_cast<sync::ProtocolError>(error_code.value())) ==
+    return get_simplified_error(static_cast<sync::ProtocolError>(get_system_error().value())) ==
            SimplifiedProtocolError::ClientResetRequested;
 }
 

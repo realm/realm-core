@@ -19,6 +19,7 @@
 #ifndef REALM_SYNC_CONFIG_HPP
 #define REALM_SYNC_CONFIG_HPP
 
+#include <realm/exceptions.hpp>
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
@@ -28,7 +29,6 @@
 #include <memory>
 #include <string>
 #include <map>
-#include <system_error>
 #include <unordered_map>
 
 namespace realm {
@@ -57,10 +57,7 @@ enum class ProtocolError;
 
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
-struct SyncError {
-
-    std::error_code error_code;
-    std::string message;
+struct SyncError : public SystemError {
     bool is_fatal;
     std::unordered_map<std::string, std::string> user_info;
     /// The sync server may send down an error that the client does not recognize,
@@ -69,8 +66,7 @@ struct SyncError {
     bool is_unrecognized_by_client = false;
 
     SyncError(std::error_code error_code, std::string message, bool is_fatal)
-        : error_code(std::move(error_code))
-        , message(std::move(message))
+        : SystemError(std::move(error_code), std::move(message))
         , is_fatal(is_fatal)
     {
     }

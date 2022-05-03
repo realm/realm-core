@@ -412,6 +412,11 @@ public:
         return m_error;
     }
 
+    const std::error_category& get_category() const
+    {
+        return m_error.category();
+    }
+
 private:
     std::error_code m_error;
 };

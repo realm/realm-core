@@ -2106,8 +2106,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             std::atomic<bool> sync_error_handler_called{false};
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 sync_error_handler_called.store(true);
-                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.message == "Unable to refresh the user access token.");
+                REQUIRE(error.get_system_error() ==
+                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
             auto r = Realm::get_shared_realm(config);
             timed_wait_for([&] {
@@ -2193,8 +2194,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 std::lock_guard<std::mutex> lock(mtx);
                 sync_error_handler_called.store(true);
-                REQUIRE(error.error_code == sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
-                REQUIRE(error.message == "Unable to refresh the user access token.");
+                REQUIRE(error.get_system_error() ==
+                        sync::make_error_code(realm::sync::ProtocolError::bad_authentication));
+                REQUIRE(error.reason() == "Unable to refresh the user access token.");
             };
 
             auto transport = static_cast<SynchronousTestTransport*>(session.transport());
@@ -2405,12 +2407,12 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         std::mutex sync_error_mutex;
         bool done = false;
         config.sync_config->error_handler = [&](auto, SyncError error) {
-            if (error.error_code.category() != util::websocket::websocket_close_status_category())
+            if (error.get_system_error().category() != util::websocket::websocket_close_status_category())
                 return;
             std::lock_guard<std::mutex> lk(sync_error_mutex);
             done = true;
-            REQUIRE(error.error_code.value() == 1009);
-            REQUIRE(error.message == "read limited at 16777217 bytes");
+            REQUIRE(error.get_system_error().value() == 1009);
+            REQUIRE(error.reason() == "read limited at 16777217 bytes");
         };
         auto r = Realm::get_shared_realm(config);
 
@@ -2444,8 +2446,8 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             config.sync_config->partition_value = "not a bson serialized string";
             std::atomic<bool> error_did_occur = false;
             config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-                CHECK(error.message.find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
-                                         "string' is invalid") != std::string::npos);
+                CHECK(error.reason().find("Illegal Realm path (BIND): serialized partition 'not a bson serialized "
+                                          "string' is invalid") != std::string::npos);
                 error_did_occur.store(true);
             };
             auto r = Realm::get_shared_realm(config);
@@ -4062,7 +4064,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         realm_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), bson::Bson("foo"));
         realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
         realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cout << error.message << std::endl;
+            std::cout << error.what() << std::endl;
         };
         realm_config.schema_version = 1;
         realm_config.path =

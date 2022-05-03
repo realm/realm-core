@@ -77,8 +77,8 @@ struct StringMaker<ThreadSafeSyncError> {
         if (!value) {
             return "No SyncError";
         }
-        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->error_code,
-                                   value->is_fatal, value->message);
+        return realm::util::format("SyncError(%1), is_fatal: %2, with message: '%3'", value->get_system_error(),
+                                   value->is_fatal, value->reason());
     }
 };
 } // namespace Catch
@@ -216,7 +216,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(!util::File::exists(orig_path));
         REQUIRE(util::File::exists(recovery_path));
         local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-            CAPTURE(err.message);
+            CAPTURE(err.reason());
             CAPTURE(local_config.path);
             FAIL("Error handler should not have been called");
         };
@@ -226,7 +226,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     }
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
-        CAPTURE(err.message);
+        CAPTURE(err.reason());
         CAPTURE(local_config.path);
         FAIL("Error handler should not have been called");
     };

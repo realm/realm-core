@@ -121,7 +121,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
+                                  error.what())
                   << std::endl;
         abort();
     };
@@ -135,7 +135,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson par
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
+                                  error.what())
                   << std::endl;
         abort();
     };
@@ -151,7 +151,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
+                                  error.what())
                   << std::endl;
         abort();
     };
@@ -166,7 +166,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, bson::Bson partition, 
     sync_config = std::make_shared<SyncConfig>(app->current_user(), partition);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, auto err) {
-        fprintf(stderr, "Unexpected sync error: %s\n", err.message.c_str());
+        fprintf(stderr, "Unexpected sync error: %s\n", err.what());
         abort();
     };
     schema_mode = SchemaMode::AdditiveExplicit;

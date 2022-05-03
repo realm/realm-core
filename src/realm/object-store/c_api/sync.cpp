@@ -341,8 +341,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        c_error.error_code = to_capi(error.error_code, error_code_message);
-        c_error.detailed_message = error.message.c_str();
+        c_error.error_code = to_capi(error.get_system_error(), error_code_message);
+        c_error.detailed_message = error.what();
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
 

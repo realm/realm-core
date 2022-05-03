@@ -400,7 +400,7 @@ void SyncSession::handle_error(SyncError error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.error_code;
+    auto error_code = error.get_system_error();
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
 
@@ -523,15 +523,15 @@ void SyncSession::handle_error(SyncError error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                cancel_pending_waits(std::move(lock), error.error_code); // unlocks the mutex
+                cancel_pending_waits(std::move(lock), error.get_system_error()); // unlocks the mutex
             }
             break;
         case NextStateAfterError::inactive: {
-            become_inactive(std::move(lock), error.error_code);
+            become_inactive(std::move(lock), error.get_system_error());
             break;
         }
         case NextStateAfterError::error: {
-            cancel_pending_waits(std::move(lock), error.error_code);
+            cancel_pending_waits(std::move(lock), error.get_system_error());
             break;
         }
     }
