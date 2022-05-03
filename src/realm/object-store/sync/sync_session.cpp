@@ -333,14 +333,17 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
     }
 
     std::shared_ptr<SyncSession> sync_session;
-    {
-        util::CheckedLockGuard state_lock(m_state_mutex);
-        util::CheckedLockGuard config_lock(m_config_mutex);
-        SyncConfig config = m_config;
-        config.stop_policy = SyncSessionStopPolicy::Immediately;
-        config.client_resync_mode = ClientResyncMode::Manual;
-        sync_session = create(m_client, db, config, m_sync_manager);
+
+    util::CheckedLockGuard state_lock(m_state_mutex);
+    if (m_state != State::Active) {
+        return;
     }
+    util::CheckedLockGuard config_lock(m_config_mutex);
+    SyncConfig config = m_config;
+    config.stop_policy = SyncSessionStopPolicy::Immediately;
+    config.client_resync_mode = ClientResyncMode::Manual;
+    sync_session = create(m_client, db, config, m_sync_manager);
+
     sync_session->assert_mutex_unlocked();
     sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
         // Keep the sync session alive while it's downloading, but then close
