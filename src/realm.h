@@ -3178,8 +3178,8 @@ typedef void (*realm_async_open_task_completion_func_t)(void* userdata, realm_th
 
 /**
  * Get sync client path in case manual reset is needed.
- * @param: sync_user_error ptr to to the error struct represeting a sync error
- * @return: a string represeting the path where the sync files are.
+ * @param sync_user_error ptr to to the error struct represeting a sync error
+ * @return a string represeting the path where the sync files are.
  */
 RLM_API char* realm_sync_client_get_path(realm_sync_error_t* sync_user_error) RLM_API_NOEXCEPT;
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
