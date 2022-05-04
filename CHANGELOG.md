@@ -8,6 +8,7 @@
 * Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async` ([#5438](https://github.com/realm/realm-core/pull/5438))
 * Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
 * Expose Subscription properties on C API. ([#5454](https://github.com/realm/realm-core/pull/5454))
+* Added in the C API the possibility for SDKs to catch user code callback excpetions, store them in core and retrieve via `realm_get_last_error()` ([#5406]https://github.com/realm/realm-core/issues/5406)
 * Erase Subscription by id for C API. ([#5475]https://github.com/realm/realm-core/issues/5475)
 * Erase and Find Subscription by Results for C API. ([#5470](https://github.com/realm/realm-core/issues/5470))
 
