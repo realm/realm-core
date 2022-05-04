@@ -18,7 +18,6 @@
 
 #include <realm/object-store/list.hpp>
 
-#include <realm/object-store/audit.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
@@ -69,13 +68,21 @@ T List::get(size_t row_ndx) const
 }
 
 template <>
+Mixed List::get(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    auto value = as<Mixed>().get(row_ndx);
+    record_audit_read(value);
+    return value;
+}
+
+template <>
 Obj List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     auto& list = as<Obj>();
     auto obj = list.get_target_table()->get_object(list.get(row_ndx));
-    if (auto audit = m_realm->audit_context())
-        audit->record_read(m_realm->read_transaction_version(), obj, list.get_obj(), list.get_col_key());
+    record_audit_read(obj);
     return obj;
 }
 
@@ -193,7 +200,9 @@ void List::set_any(size_t row_ndx, Mixed value)
 Mixed List::get_any(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return list_base().get_any(row_ndx);
+    auto value = list_base().get_any(row_ndx);
+    record_audit_read(value);
+    return value;
 }
 
 size_t List::find_any(Mixed value) const
@@ -405,13 +414,17 @@ REALM_PRIMITIVE_LIST_TYPE(ObjKey)
 REALM_PRIMITIVE_LIST_TYPE(ObjectId)
 REALM_PRIMITIVE_LIST_TYPE(Decimal)
 REALM_PRIMITIVE_LIST_TYPE(UUID)
-REALM_PRIMITIVE_LIST_TYPE(Mixed)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<ObjectId>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<UUID>)
+
+template size_t List::find<Mixed>(Mixed const&) const;
+template void List::add<Mixed>(Mixed);
+template void List::insert<Mixed>(size_t, Mixed);
+template void List::set<Mixed>(size_t, Mixed);
 
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm

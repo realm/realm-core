@@ -18,7 +18,6 @@
 
 #include <realm/object-store/dictionary.hpp>
 
-#include <realm/object-store/audit.hpp>
 #include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
 
@@ -211,31 +210,38 @@ Obj Dictionary::get_object(StringData key)
 {
     auto& dictionary = dict();
     auto obj = dictionary.get_object(key);
-    if (auto audit = m_realm->audit_context())
-        audit->record_read(m_realm->read_transaction_version(), obj, dictionary.get_obj(), dictionary.get_col_key());
+    record_audit_read(obj);
     return obj;
 }
 
 Mixed Dictionary::get_any(StringData key)
 {
-    return dict().get(key);
+    auto value = dict().get(key);
+    record_audit_read(value);
+    return value;
 }
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
     verify_valid_row(ndx);
-    return dict().get_any(ndx);
+    auto value = dict().get_any(ndx);
+    record_audit_read(value);
+    return value;
 }
 
 util::Optional<Mixed> Dictionary::try_get_any(StringData key) const
 {
-    return dict().try_get(key);
+    auto value = dict().try_get(key);
+    if (value)
+        record_audit_read(*value);
+    return value;
 }
 
 std::pair<StringData, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     verify_valid_row(ndx);
     auto pair = dict().get_pair(ndx);
+    record_audit_read(pair.second);
     return {pair.first.get_string(), pair.second};
 }
 

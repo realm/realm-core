@@ -815,30 +815,101 @@ TEST_CASE("audit object serialization") {
             REQUIRE(value["object dictionary"] == json({{"a", 9}, {"b", 10}, {"c", 11}}));
         }
 
-        SECTION("accessing any value from a collection serializes full objects for the entire collection") {
+        SECTION("instantiating a collection accessor does not count as a read") {
             audit->begin_scope("scope");
             Object object(realm, obj);
-            auto list = util::any_cast<List>(object.get_property_value<util::Any>(context, "object list"));
-            list.get(1);
-            auto set = util::any_cast<object_store::Set>(object.get_property_value<util::Any>(context, "object set"));
-            set.get(1);
-            auto dict = util::any_cast<object_store::Dictionary>(
+            util::any_cast<List>(object.get_property_value<util::Any>(context, "object list"));
+            util::any_cast<object_store::Set>(object.get_property_value<util::Any>(context, "object set"));
+            util::any_cast<object_store::Dictionary>(
                 object.get_property_value<util::Any>(context, "object dictionary"));
-            dict.get_object("b");
             audit->end_scope(assert_no_error);
             audit->wait_for_completion();
 
             auto events = get_audit_events(test_session);
-            REQUIRE(events.size() == 4);
+            REQUIRE(events.size() == 1);
             auto& value = events[0].data["value"][0];
-            REQUIRE(value["object list"] ==
+            REQUIRE(value["object list"] == json({3, 4, 5}));
+            REQUIRE_SET_EQUAL(value["object set"], {6, 7, 8});
+            REQUIRE(value["object dictionary"] == json({{"a", 9}, {"b", 10}, {"c", 11}}));
+        }
+
+        SECTION("accessing any value from a collection serializes full objects for the entire collection") {
+            SECTION("list") {
+                audit->begin_scope("scope");
+                Object object(realm, obj);
+                auto list = util::any_cast<List>(object.get_property_value<util::Any>(context, "object list"));
+                SECTION("get()") {
+                    list.get(1);
+                }
+                SECTION("get_any()") {
+                    list.get_any(1);
+                }
+                audit->end_scope(assert_no_error);
+                audit->wait_for_completion();
+
+                auto events = get_audit_events(test_session);
+                REQUIRE(events.size() == 2);
+                auto& value = events[0].data["value"][0];
+                REQUIRE(
+                    value["object list"] ==
                     json({{{"_id", 3}, {"value", 10}}, {{"_id", 4}, {"value", 20}}, {{"_id", 5}, {"value", 30}}}));
-            REQUIRE_SET_EQUAL(
-                value["object set"],
-                json({{{"_id", 6}, {"value", 40}}, {{"_id", 7}, {"value", 50}}, {{"_id", 8}, {"value", 60}}}));
-            REQUIRE(value["object dictionary"] == json({{"a", {{"_id", 9}, {"value", 90}}},
-                                                        {"b", {{"_id", 10}, {"value", 100}}},
-                                                        {"c", {{"_id", 11}, {"value", 110}}}}));
+                REQUIRE_SET_EQUAL(value["object set"], {6, 7, 8});
+                REQUIRE(value["object dictionary"] == json({{"a", 9}, {"b", 10}, {"c", 11}}));
+            }
+
+            SECTION("set") {
+                audit->begin_scope("scope");
+                Object object(realm, obj);
+                auto set =
+                    util::any_cast<object_store::Set>(object.get_property_value<util::Any>(context, "object set"));
+                SECTION("get()") {
+                    set.get(1);
+                }
+                SECTION("get_any()") {
+                    set.get_any(1);
+                }
+                audit->end_scope(assert_no_error);
+                audit->wait_for_completion();
+
+                auto events = get_audit_events(test_session);
+                REQUIRE(events.size() == 2);
+                auto& value = events[0].data["value"][0];
+                REQUIRE_SET_EQUAL(
+                    value["object set"],
+                    json({{{"_id", 6}, {"value", 40}}, {{"_id", 7}, {"value", 50}}, {{"_id", 8}, {"value", 60}}}));
+                REQUIRE(value["object list"] == json({3, 4, 5}));
+                REQUIRE(value["object dictionary"] == json({{"a", 9}, {"b", 10}, {"c", 11}}));
+            }
+
+            SECTION("dictionary") {
+                audit->begin_scope("scope");
+                Object object(realm, obj);
+                auto dict = util::any_cast<object_store::Dictionary>(
+                    object.get_property_value<util::Any>(context, "object dictionary"));
+                SECTION("get_object()") {
+                    dict.get_object("b");
+                }
+                SECTION("get_any(string)") {
+                    dict.get_any("b");
+                }
+                SECTION("get_any(index)") {
+                    const_cast<const object_store::Dictionary&>(dict).get_any(size_t(1));
+                }
+                SECTION("try_get_any()") {
+                    dict.try_get_any("b");
+                }
+                audit->end_scope(assert_no_error);
+                audit->wait_for_completion();
+
+                auto events = get_audit_events(test_session);
+                REQUIRE(events.size() == 2);
+                auto& value = events[0].data["value"][0];
+                REQUIRE(value["object list"] == json({3, 4, 5}));
+                REQUIRE_SET_EQUAL(value["object set"], {6, 7, 8});
+                REQUIRE(value["object dictionary"] == json({{"a", {{"_id", 9}, {"value", 90}}},
+                                                            {"b", {{"_id", 10}, {"value", 100}}},
+                                                            {"c", {{"_id", 11}, {"value", 110}}}}));
+            }
         }
 
         SECTION(
@@ -873,6 +944,40 @@ TEST_CASE("audit object serialization") {
             REQUIRE(events[1].activity == "scope 2");
             REQUIRE(events[1].data["type"] == "target");
             REQUIRE(events[0].data["value"][0]["object"] == 1);
+        }
+
+        SECTION("link access tracking is reset between scopes") {
+            audit->begin_scope("scope 1");
+            Object object(realm, obj);
+            object.get_property_value<util::Any>(context, "object");
+            audit->end_scope(assert_no_error);
+
+            audit->begin_scope("scope 2");
+            // Perform two unrelated events so that the read on `obj` is at
+            // an event index after the link access in the previous scope
+            Object(realm, target_table->get_object(obj_set.get(0)));
+            Object(realm, target_table->get_object(obj_set.get(1)));
+            Object(realm, obj);
+            audit->end_scope(assert_no_error);
+            audit->wait_for_completion();
+
+            auto events = get_audit_events(test_session);
+            REQUIRE(events.size() == 5);
+            REQUIRE(events[0].activity == "scope 1");
+            REQUIRE(events[1].activity == "scope 1");
+            REQUIRE(events[2].activity == "scope 2");
+            REQUIRE(events[3].activity == "scope 2");
+            REQUIRE(events[4].activity == "scope 2");
+
+            REQUIRE(events[0].data["type"] == "object");
+            REQUIRE(events[1].data["type"] == "target");
+            REQUIRE(events[2].data["type"] == "target");
+            REQUIRE(events[3].data["type"] == "target");
+            REQUIRE(events[4].data["type"] == "object");
+
+            // First link should be expanded, second, should not
+            REQUIRE(events[0].data["value"][0]["object"] == json({{"_id", 1}, {"value", 1}}));
+            REQUIRE(events[4].data["value"][0]["object"] == 1);
         }
 
         SECTION("read on the parent after the link access do not expand the linked object") {
