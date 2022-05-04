@@ -733,7 +733,8 @@ void SyncSession::create_sync_session()
             lock.unlock();
             self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
             if (error) {
-                SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal()};
+                SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal(),
+                                     error->logURL};
                 if (error->should_client_reset) {
                     if (*error->should_client_reset) {
                         sync_error.server_requests_client_reset =

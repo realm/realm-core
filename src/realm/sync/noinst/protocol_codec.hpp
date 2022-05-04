@@ -269,7 +269,8 @@ public:
                     auto json = nlohmann::json::parse(json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
-                    info.message = util::format("%1 Logs: %2", json["message"], json["logURL"]);
+                    info.message = json["message"];
+                    info.logURL = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
                 }
                 catch (const nlohmann::json::exception& e) {

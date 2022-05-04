@@ -201,6 +201,7 @@ struct ProtocolErrorInfo {
     bool try_again = false;
     bool client_reset_recovery_is_disabled = false;
     util::Optional<bool> should_client_reset;
+    util::Optional<std::string> logURL = util::none;
 
     bool is_fatal() const
     {

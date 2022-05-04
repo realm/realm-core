@@ -31,6 +31,24 @@ static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type
 
 using ProtocolError = realm::sync::ProtocolError;
 
+SyncError::SyncError(std::error_code error_code, std::string msg, bool is_fatal,
+                     util::Optional<std::string> serverLog)
+    : error_code(std::move(error_code))
+    , is_fatal(is_fatal)
+    , message(std::move(msg))
+{
+    if (serverLog) {
+        size_t msg_length = message.size();
+        static constexpr std::string_view middle(" Logs: ");
+        message = util::format("%1%2%3", message, middle, *serverLog);
+        simple_message = std::string_view(message.data(), msg_length);
+        logURL = std::string_view(message.data() + msg_length + middle.size(), serverLog->size());
+    }
+    else {
+        simple_message = message;
+    }
+}
+
 bool SyncError::is_client_error() const
 {
     return error_code.category() == realm::sync::client_error_category();
