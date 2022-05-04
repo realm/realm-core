@@ -267,10 +267,7 @@ public:
 
 class OutOfBounds : public InvalidArgument {
 public:
-    OutOfBounds(const std::string& msg)
-        : InvalidArgument(ErrorCodes::OutOfBounds, msg)
-    {
-    }
+    OutOfBounds(const std::string& msg, size_t idx, size_t sz);
 };
 
 class InvalidEncryptionKey : public InvalidArgument {

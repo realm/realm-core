@@ -36,6 +36,7 @@
 #include <unordered_set>
 
 using namespace realm;
+using namespace realm::schema;
 
 constexpr uint64_t ObjectStore::NotVersioned;
 
@@ -780,8 +781,8 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         {
             if (!initial_schema.empty() &&
                 !initial_schema.find(op.object->name)->property_for_name(op.property->name))
-                throw std::logic_error(
-                    util::format("Renamed property '%1.%2' does not exist.", op.object->name, op.property->name));
+                throw LogicError(ErrorCodes::InvalidProperty, util::format("Renamed property '%1.%2' does not exist.",
+                                                                           op.object->name, op.property->name));
             auto table = table_for_object_schema(group, *op.object);
             table->remove_column(op.property->column_key);
         }
@@ -953,18 +954,22 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
 {
     TableRef table = table_for_object_type(group, object_type);
     if (!table) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::NoSuchTable,
             util::format("Cannot rename properties for type '%1' because it does not exist.", object_type));
     }
 
     auto target_object_schema = target_schema.find(object_type);
     if (target_object_schema == target_schema.end()) {
-        throw std::logic_error(util::format(
-            "Cannot rename properties for type '%1' because it has been removed from the Realm.", object_type));
+        throw LogicError(
+            ErrorCodes::NoSuchTable,
+            util::format("Cannot rename properties for type '%1' because it has been removed from the Realm.",
+                         object_type));
     }
 
     if (target_object_schema->property_for_name(old_name)) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
             util::format("Cannot rename property '%1.%2' to '%3' because the source property still exists.",
                          object_type, old_name, new_name));
     }
@@ -972,7 +977,8 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     ObjectSchema table_object_schema(group, object_type, table->get_key());
     Property* old_property = table_object_schema.property_for_name(old_name);
     if (!old_property) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::InvalidProperty,
             util::format("Cannot rename property '%1.%2' because it does not exist.", object_type, old_name));
     }
 
@@ -987,13 +993,15 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 
     if (old_property->type != new_property->type || old_property->object_type != new_property->object_type) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
             util::format("Cannot rename property '%1.%2' to '%3' because it would change from type '%4' to '%5'.",
                          object_type, old_name, new_name, old_property->type_string(), new_property->type_string()));
     }
 
     if (is_nullable(old_property->type) && !is_nullable(new_property->type)) {
-        throw std::logic_error(
+        throw LogicError(
+            ErrorCodes::IllegalOperation,
             util::format("Cannot rename property '%1.%2' to '%3' because it would change from optional to required.",
                          object_type, old_name, new_name));
     }
@@ -1014,7 +1022,8 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
 }
 
 InvalidSchemaVersionException::InvalidSchemaVersionException(uint64_t old_version, uint64_t new_version)
-    : logic_error(
+    : LogicError(
+          ErrorCodes::InvalidSchemaVersion,
           util::format("Provided schema version %1 is less than last set version %2.", new_version, old_version))
     , m_old_version(old_version)
     , m_new_version(new_version)
@@ -1025,12 +1034,12 @@ static void append_errors(std::string& message, std::vector<ObjectSchemaValidati
 {
     for (auto const& error : errors) {
         message += "\n- ";
-        message += error.what();
+        message += error.m_message;
     }
 }
 
 SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::SchemaValidationFailed, [&] {
         std::string message = "Schema validation failed due to the following errors:";
         append_errors(message, errors);
         return message;
@@ -1039,7 +1048,7 @@ SchemaValidationException::SchemaValidationException(std::vector<ObjectSchemaVal
 }
 
 SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::SchemaMismatch, [&] {
         std::string message = "Migration is required due to the following errors:";
         append_errors(message, errors);
         return message;
@@ -1049,7 +1058,7 @@ SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidat
 
 InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::InvalidReadOnlySchemaChange, [&] {
         std::string message = "The following changes cannot be made in read-only schema mode:";
         append_errors(message, errors);
         return message;
@@ -1059,7 +1068,7 @@ InvalidReadOnlySchemaChangeException::InvalidReadOnlySchemaChangeException(
 
 InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::InvalidAdditiveSchemaChange, [&] {
         std::string message = "The following changes cannot be made in additive-only schema mode:";
         append_errors(message, errors);
         return message;
@@ -1069,7 +1078,7 @@ InvalidAdditiveSchemaChangeException::InvalidAdditiveSchemaChangeException(
 
 InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(
     std::vector<ObjectSchemaValidationException> const& errors)
-    : std::logic_error([&] {
+    : LogicError(ErrorCodes::InvalidExternalSchemaChange, [&] {
         std::string message = "Unsupported schema changes were made by another client or process. For a "
                               "synchronized Realm, this may be due to the server reverting schema changes which "
                               "the local user did not have permission to make.";

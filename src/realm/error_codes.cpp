@@ -71,6 +71,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ModifyPrimaryKey:
         case ReadOnlyProperty:
         case TypeMismatch:
+        case ObjectTypeMismatch:
         case MissingPrimaryKey:
         case MissingPropertyValue:
         case NoSuchTable:
@@ -95,6 +96,12 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case DeleteOnOpenRealm:
         case MismatchedConfig:
         case ClosedRealm:
+        case InvalidSchemaVersion:
+        case SchemaValidationFailed:
+        case SchemaMismatch:
+        case InvalidAdditiveSchemaChange:
+        case InvalidReadOnlySchemaChange:
+        case InvalidExternalSchemaChange:
             return ErrorCategory().set(ErrorCategory::logic_error);
         case OK:
         case UnknownError:
@@ -156,6 +163,7 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"SubscriptionFailed", ErrorCodes::SubscriptionFailed},
     {"RangeError", ErrorCodes::RangeError},
     {"TypeMismatch", ErrorCodes::TypeMismatch},
+    {"ObjectTypeMismatch", ErrorCodes::ObjectTypeMismatch},
     {"LimitExceeded", ErrorCodes::LimitExceeded},
     {"MissingPropertyValue", ErrorCodes::MissingPropertyValue},
     {"ReadOnlyProperty", ErrorCodes::ReadOnlyProperty},
@@ -172,6 +180,12 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"InvalidCombination", ErrorCodes::IllegalCombination},
     {"MismatchedConfig", ErrorCodes::MismatchedConfig},
     {"ClosedRealm", ErrorCodes::ClosedRealm},
+    {"InvalidSchemaVersion", ErrorCodes::InvalidSchemaVersion},
+    {"SchemaValidationFailed", ErrorCodes::SchemaValidationFailed},
+    {"SchemaMismatch", ErrorCodes::SchemaMismatch},
+    {"InvalidAdditiveSchemaChange", ErrorCodes::InvalidAdditiveSchemaChange},
+    {"InvalidReadOnlySchemaChange", ErrorCodes::InvalidReadOnlySchemaChange},
+    {"InvalidExternalSchemaChange", ErrorCodes::InvalidExternalSchemaChange},
     {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
     {"NotSupported", ErrorCodes::NotSupported}};
 

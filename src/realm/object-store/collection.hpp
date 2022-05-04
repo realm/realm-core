@@ -98,14 +98,6 @@ public:
     NotificationToken add_notification_callback(CollectionChangeCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 
-    // The object being added to the collection is already a managed embedded object
-    struct InvalidEmbeddedOperationException : public std::logic_error {
-        InvalidEmbeddedOperationException()
-            : std::logic_error("Cannot add an existing managed embedded object to a List.")
-        {
-        }
-    };
-
     const CollectionBase& get_impl() const
     {
         return *m_coll_base;
@@ -124,8 +116,8 @@ protected:
     Collection(Collection&&);
     Collection& operator=(Collection&&);
 
-    void verify_valid_row(size_t row_ndx, bool insertion = false) const;
     void validate(const Obj&) const;
+    void not_supported(const char* operation) const;
 
     template <typename T, typename Context>
     void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
@@ -137,7 +129,7 @@ template <typename T, typename Context>
 void Collection::validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const
 {
     if (!policy.copy && ctx.template unbox<Obj>(value, CreatePolicy::Skip).is_valid())
-        throw InvalidEmbeddedOperationException();
+        throw IllegalOperation("Cannot add an existing managed embedded object to a List.");
 }
 
 } // namespace object_store

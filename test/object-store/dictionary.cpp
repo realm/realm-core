@@ -487,7 +487,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(values_as_results.min(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.min(), ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(Mixed(TestType::min()) == values_as_results.min());
@@ -497,7 +497,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(values_as_results.max(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.max(), ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(Mixed(TestType::max()) == values_as_results.max());
@@ -507,7 +507,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
-            REQUIRE_THROWS_AS(values_as_results.sum(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.sum(), ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(cf::get<W>(*values_as_results.sum()) == TestType::sum());
@@ -517,7 +517,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
 
     SECTION("average()") {
         if (!TestType::can_average()) {
-            REQUIRE_THROWS_AS(values_as_results.average(), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.average(), ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average()) == TestType::average());
@@ -881,10 +881,10 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
         r->begin_transaction();
 
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(target->get_object(5))),
-                              List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(Object(r, target->get_object(5)))),
-                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(dict.insert(ctx, "foo", util::Any(target->get_object(5))),
+                                                ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(dict.insert(ctx, "foo", util::Any(Object(r, target->get_object(5)))),
+                                                ErrorCodes::IllegalOperation);
         }
 
         SECTION("creates new object for dictionary") {
@@ -942,7 +942,8 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
     SECTION("min()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(values_as_results.min(col_target_value), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.min(col_target_value),
+                                                ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(Mixed(TestType::min()) == values_as_results.min(col_target_value));
@@ -952,7 +953,8 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
     SECTION("max()") {
         if (!TestType::can_minmax()) {
-            REQUIRE_THROWS_AS(values_as_results.max(col_target_value), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.max(col_target_value),
+                                                ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(Mixed(TestType::max()) == values_as_results.max(col_target_value));
@@ -962,7 +964,8 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
     SECTION("sum()") {
         if (!TestType::can_sum()) {
-            REQUIRE_THROWS_AS(values_as_results.sum(col_target_value), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.sum(col_target_value),
+                                                ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(cf::get<W>(*values_as_results.sum(col_target_value)) == TestType::sum());
@@ -972,7 +975,8 @@ TEMPLATE_TEST_CASE("dictionary of objects", "[dictionary][links]", cf::MixedVal,
 
     SECTION("average()") {
         if (!TestType::can_average()) {
-            REQUIRE_THROWS_AS(values_as_results.average(col_target_value), Results::UnsupportedColumnTypeException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(values_as_results.average(col_target_value),
+                                                ErrorCodes::IllegalOperation);
             return;
         }
         REQUIRE(cf::get<typename TestType::AvgType>(*values_as_results.average(col_target_value)) ==

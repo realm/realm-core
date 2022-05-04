@@ -28,6 +28,7 @@
 #include <realm/table.hpp>
 
 using namespace realm;
+using namespace realm::schema;
 
 ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;

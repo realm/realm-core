@@ -31,6 +31,25 @@
 
 namespace realm {
 
+static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
+{
+    auto type = ObjectSchema::from_core_type(column);
+    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
+    if (is_array(type))
+        return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
+    if (is_set(type))
+        return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
+    if (is_dictionary(type))
+        return util::format("Cannot %1 '%2' dictionary: operation not supported", operation, column_type);
+    return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
+                        table.get_column_name(column), column_type);
+}
+
+static inline std::string unsupported_operation_msg(ColKey column, TableView const& tv, const char* operation)
+{
+    return unsupported_operation_msg(column, *tv.get_target_table(), operation);
+}
+
 Results::Results() = default;
 Results::~Results() = default;
 
@@ -120,7 +139,7 @@ void Results::validate_read() const
 {
     // is_valid ensures that we're on the correct thread.
     if (!is_valid())
-        throw InvalidatedException();
+        throw StaleAccessor("Access to invalidated Results objects");
 }
 
 void Results::validate_write() const
@@ -416,7 +435,7 @@ Mixed Results::get_any(size_t ndx)
             return Mixed(ObjLink(m_table->get_key(), obj_key));
         }
     }
-    throw OutOfBoundsIndexException{ndx, do_size()};
+    throw OutOfBounds{"get_any() on Results", ndx, do_size()};
 }
 
 std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
@@ -431,7 +450,7 @@ std::pair<StringData, Mixed> Results::get_dictionary_element(size_t ndx)
         auto val = dict.get_pair(ndx);
         return {val.first.get_string(), val.second};
     }
-    throw OutOfBoundsIndexException{ndx, dict.size()};
+    throw OutOfBounds{"get_dictionary_element() on Results", ndx, dict.size()};
 }
 
 template <typename T>
@@ -441,7 +460,7 @@ T Results::get(size_t row_ndx)
     if (auto row = try_get<T>(row_ndx)) {
         return *row;
     }
-    throw OutOfBoundsIndexException{row_ndx, do_size()};
+    throw OutOfBounds{"get() on Results", row_ndx, do_size()};
 }
 
 template <typename T>
@@ -469,28 +488,29 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
 }
 
 template <>
-size_t Results::index_of(Obj const& row)
+size_t Results::index_of(Obj const& obj)
 {
     util::CheckedUniqueLock lock(m_mutex);
     validate_read();
     ensure_up_to_date();
-    if (!row.is_valid()) {
-        throw DetatchedAccessorException{};
+    if (!obj.is_valid()) {
+        throw StaleAccessor{"Attempting to access an invalid object"};
     }
-    if (m_table && row.get_table() != m_table) {
-        throw IncorrectTableException(ObjectStore::object_type_for_table_name(m_table->get_name()),
-                                      ObjectStore::object_type_for_table_name(row.get_table()->get_name()));
+    if (m_table && obj.get_table() != m_table) {
+        throw InvalidArgument(ErrorCodes::ObjectTypeMismatch,
+                              util::format("Object of type '%1' does not match Results type '%2'",
+                                           obj.get_table()->get_class_name(), m_table->get_class_name()));
     }
 
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
-            return m_table->get_object_ndx(row.get_key());
+            return m_table->get_object_ndx(obj.get_key());
         case Mode::Collection:
-            return m_collection->find_any(row.get_key());
+            return m_collection->find_any(obj.get_key());
         case Mode::Query:
         case Mode::TableView:
-            return m_table_view.find_by_source_ndx(row.get_key());
+            return m_table_view.find_by_source_ndx(obj.get_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
@@ -560,10 +580,11 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
             break;
         default:
             if (m_mode == Mode::Collection) {
-                throw UnsupportedColumnTypeException(m_collection->get_col_key(), m_collection->get_table(), name);
+                throw IllegalOperation{
+                    unsupported_operation_msg(m_collection->get_col_key(), *m_collection->get_table(), name)};
             }
             else {
-                throw UnsupportedColumnTypeException{column, *m_table, name};
+                throw IllegalOperation{unsupported_operation_msg(column, *m_table, name)};
             }
     }
     return type;
@@ -649,11 +670,11 @@ struct AggregateHelper<Timestamp, Table> {
     }
     Mixed sum(ColKey col)
     {
-        throw Results::UnsupportedColumnTypeException{col, table, "sum"};
+        throw IllegalOperation{unsupported_operation_msg(col, table, "sum")};
     }
     Mixed avg(ColKey col, size_t*)
     {
-        throw Results::UnsupportedColumnTypeException{col, table, "avg"};
+        throw IllegalOperation{unsupported_operation_msg(col, table, "avg")};
     }
 };
 
@@ -757,11 +778,11 @@ struct AggregateHelper<Timestamp, CollectionBase&> : ListAggregateHelper {
     }
     Mixed sum(ColKey)
     {
-        throw Results::UnsupportedColumnTypeException{list.get_col_key(), *list.get_table(), "sum"};
+        throw IllegalOperation{unsupported_operation_msg(list.get_col_key(), *list.get_table(), "sum")};
     }
     Mixed avg(ColKey, size_t*)
     {
-        throw Results::UnsupportedColumnTypeException{list.get_col_key(), *list.get_table(), "avg"};
+        throw IllegalOperation{unsupported_operation_msg(list.get_col_key(), *list.get_table(), "avg")};
     }
 };
 
@@ -1089,7 +1110,7 @@ Results Results::sort(SortDescriptor&& sort) const
 Results Results::filter(Query&& q) const
 {
     if (m_descriptor_ordering.will_apply_limit())
-        throw UnimplementedOperationException("Filtering a Results with a limit is not yet implemented");
+        throw IllegalOperation("Filtering a Results with a limit is not yet implemented");
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
@@ -1302,69 +1323,6 @@ Results Results::freeze(std::shared_ptr<Realm> const& frozen_realm)
 bool Results::is_frozen() const
 {
     return !m_realm || m_realm->is_frozen();
-}
-
-Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-    : std::out_of_range(c == 0 ? util::format("Requested index %1 in empty Results", r)
-                               : util::format("Requested index %1 greater than max %2", r, c - 1))
-    , requested(r)
-    , valid_count(c)
-{
-}
-
-Results::IncorrectTableException::IncorrectTableException(StringData e, StringData a)
-    : std::logic_error(util::format("Object of type '%1' does not match Results type '%2'", a, e))
-    , expected(e)
-    , actual(a)
-{
-}
-
-static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
-{
-    auto type = ObjectSchema::from_core_type(column);
-    const char* column_type = string_for_property_type(type & ~PropertyType::Collection);
-    if (is_array(type))
-        return util::format("Cannot %1 '%2' array: operation not supported", operation, column_type);
-    if (is_set(type))
-        return util::format("Cannot %1 '%2' set: operation not supported", operation, column_type);
-    if (is_dictionary(type))
-        return util::format("Cannot %1 '%2' dictionary: operation not supported", operation, column_type);
-    return util::format("Cannot %1 property '%2': operation not supported for '%3' properties", operation,
-                        table.get_column_name(column), column_type);
-}
-
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
-                                                                        const char* operation)
-    : std::logic_error(unsupported_operation_msg(column, table, operation))
-    , column_key(column)
-    , column_name(table.get_column_name(column))
-    , property_type(ObjectSchema::from_core_type(column) & ~PropertyType::Collection)
-{
-}
-
-
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, ConstTableRef table,
-                                                                        const char* operation)
-    : UnsupportedColumnTypeException(column, *table, operation)
-{
-}
-
-Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
-                                                                        const char* operation)
-    : UnsupportedColumnTypeException(column, *tv.get_target_table(), operation)
-{
-}
-
-Results::InvalidPropertyException::InvalidPropertyException(StringData object_type, StringData property_name)
-    : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
-    , object_type(object_type)
-    , property_name(property_name)
-{
-}
-
-Results::UnimplementedOperationException::UnimplementedOperationException(const char* msg)
-    : std::logic_error(msg)
-{
 }
 
 } // namespace realm

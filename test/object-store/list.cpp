@@ -19,6 +19,7 @@
 #include <catch2/catch.hpp>
 
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 
@@ -861,14 +862,14 @@ TEST_CASE("list") {
         results = list.sort({{{col_target_value}}, {false}});
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[9 - i]);
-        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 calling get() on Results when max is 9");
         REQUIRE(results.get_mode() == Results::Mode::TableView);
 
         // Zero sort columns should leave it in Collection mode
         results = list.sort(SortDescriptor());
         for (size_t i = 0; i < 10; ++i)
             REQUIRE(results.get(i).get_key() == target_keys[i]);
-        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+        REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 calling get() on Results when max is 9");
         REQUIRE(results.get_mode() == Results::Mode::Collection);
     }
 
@@ -896,7 +897,7 @@ TEST_CASE("list") {
         SECTION("get()") {
             for (size_t i = 0; i < 5; ++i)
                 REQUIRE(results.get(i).get_key() == target_keys[i * 2]);
-            REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 greater than max 4");
+            REQUIRE_THROWS_WITH(results.get(5), "Requested index 5 calling get() on Results when max is 4");
             REQUIRE(results.get_mode() == Results::Mode::TableView);
         }
 
@@ -919,7 +920,7 @@ TEST_CASE("list") {
             results = list.as_results().distinct(DistinctDescriptor());
             for (size_t i = 0; i < 10; ++i)
                 REQUIRE(results.get(i).get_key() == target_keys[i]);
-            REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 greater than max 9");
+            REQUIRE_THROWS_WITH(results.get(10), "Requested index 10 calling get() on Results when max is 9");
             REQUIRE(results.get_mode() == Results::Mode::Collection);
         }
     }
@@ -1490,9 +1491,9 @@ TEST_CASE("embedded List") {
     SECTION("add(), insert(), and set() to existing object is not allowed") {
         List list(r, *lv);
         r->begin_transaction();
-        REQUIRE_THROWS_AS(list.add(target->get_object(0)), List::InvalidEmbeddedOperationException);
-        REQUIRE_THROWS_AS(list.insert(0, target->get_object(0)), List::InvalidEmbeddedOperationException);
-        REQUIRE_THROWS_AS(list.set(0, target->get_object(0)), List::InvalidEmbeddedOperationException);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.add(target->get_object(0)), ErrorCodes::IllegalOperation);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.insert(0, target->get_object(0)), ErrorCodes::IllegalOperation);
+        REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.set(0, target->get_object(0)), ErrorCodes::IllegalOperation);
         r->cancel_transaction();
     }
 
@@ -1517,7 +1518,7 @@ TEST_CASE("embedded List") {
             r->begin_transaction();
             list.remove(1);
             REQUIRE(list.find(obj1) == npos);
-            REQUIRE_THROWS_AS(list.as_results().index_of(obj1), Results::DetatchedAccessorException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.as_results().index_of(obj1), ErrorCodes::StaleAccessor);
             r->cancel_transaction();
         }
 
@@ -1553,10 +1554,10 @@ TEST_CASE("embedded List") {
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(list.add(ctx, util::Any(target->get_object(5))),
-                              List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(list.add(ctx, util::Any(Object(r, target->get_object(5)))),
-                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.add(ctx, util::Any(target->get_object(5))),
+                                                ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.add(ctx, util::Any(Object(r, target->get_object(5)))),
+                                                ErrorCodes::IllegalOperation);
         }
 
         SECTION("creates new object for dictionary") {
@@ -1576,10 +1577,10 @@ TEST_CASE("embedded List") {
 
         auto initial_target_size = target->size();
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(target->get_object(5))),
-                              List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(list.set(ctx, 0, util::Any(Object(r, target->get_object(5)))),
-                              List::InvalidEmbeddedOperationException);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.set(ctx, 0, util::Any(target->get_object(5))),
+                                                ErrorCodes::IllegalOperation);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(list.set(ctx, 0, util::Any(Object(r, target->get_object(5)))),
+                                                ErrorCodes::IllegalOperation);
         }
 
         SECTION("creates new object for update mode All") {

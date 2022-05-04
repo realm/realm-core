@@ -114,6 +114,21 @@ void Collection::validate(const Obj& obj) const
                                                  object_name(*obj.get_table()), object_name(*target)));
 }
 
+void Collection::not_supported(const char* operation) const
+{
+    auto col_key = m_coll_base->get_col_key();
+    const char* type_name = get_data_type_name(DataType(col_key.get_type()));
+    if (col_key.is_list())
+        throw IllegalOperation(util::format("Cannot %1 '%2' array: operation not supported", operation, type_name));
+    else if (col_key.is_dictionary())
+        throw IllegalOperation(
+            util::format("Cannot %1 '%2' dictionary: operation not supported", operation, type_name));
+    else if (col_key.is_set())
+        throw IllegalOperation(util::format("Cannot %1 '%2' set: operation not supported", operation, type_name));
+
+    throw LogicError(ErrorCodes::BrokenInvariant, "Unexpected collection type");
+}
+
 void Collection::verify_attached() const
 {
     if (!is_valid()) {
@@ -138,14 +153,6 @@ size_t Collection::size() const
 {
     verify_attached();
     return m_coll_base->size();
-}
-
-void Collection::verify_valid_row(size_t row_ndx, bool insertion) const
-{
-    size_t s = size();
-    if (row_ndx > s || (!insertion && row_ndx == s)) {
-        throw OutOfBounds{util::format("Requested index %1 greater than max %2", row_ndx, s + insertion - 1)};
-    }
 }
 
 const ObjectSchema& Collection::get_object_schema() const

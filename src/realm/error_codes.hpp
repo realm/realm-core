@@ -131,6 +131,7 @@ public:
         SubscriptionFailed = RLM_ERR_SUBSCRIPTION_FAILED,
         RangeError = RLM_ERR_RANGE_ERROR,
         TypeMismatch = RLM_ERR_PROPERTY_TYPE_MISMATCH,
+        ObjectTypeMismatch = RLM_ERR_OBJECT_TYPE_MISMATCH,
         LimitExceeded = RLM_ERR_LIMIT_EXCEEDED,
         MissingPropertyValue = RLM_ERR_MISSING_PROPERTY_VALUE,
         ReadOnlyProperty = RLM_ERR_READ_ONLY_PROPERTY,
@@ -148,6 +149,12 @@ public:
         MismatchedConfig = RLM_ERR_MISMATCHED_CONFIG,
         ClosedRealm = RLM_ERR_CLOSED_REALM,
         DeleteOnOpenRealm = RLM_ERR_DELETE_OPENED_REALM,
+        InvalidSchemaVersion = RLM_ERR_INVALID_SCHEMA_VERSION,
+        SchemaValidationFailed = RLM_ERR_SCHEMA_VALIDATION_FAILED,
+        SchemaMismatch = RLM_ERR_SCHEMA_MISMATCH,
+        InvalidAdditiveSchemaChange = RLM_ERR_INVALID_ADDITIVE_SCHEMA_CHANGE,
+        InvalidReadOnlySchemaChange = RLM_ERR_INVALID_READ_ONLY_SCHEMA_CHANGE,
+        InvalidExternalSchemaChange = RLM_ERR_INVALID_EXTERNAL_SCHEMA_CHANGE,
         NotSupported = REALM_ERR_NOT_SUPPORTED,
         MaxError
     };

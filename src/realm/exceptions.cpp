@@ -40,6 +40,12 @@ Status exception_to_status() noexcept
     }
 }
 
+OutOfBounds::OutOfBounds(const std::string& msg, size_t idx, size_t sz)
+    : InvalidArgument(ErrorCodes::OutOfBounds,
+                      sz == 0 ? util::format("Requested index %1 calling %2 when empty", idx, msg)
+                              : util::format("Requested index %1 calling %2 when max is %3", idx, msg, sz - 1))
+{
+}
 
 // LCOV_EXCL_START (LogicError is not a part of the public API, so code may never
 // rely on the contents of these strings, as they are deliberately unspecified.)

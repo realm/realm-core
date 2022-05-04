@@ -67,7 +67,6 @@ size_t Set::find(Query&& q) const
 template <typename T>
 T Set::get(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
     return as<T>().get(row_ndx);
 }
 
@@ -92,7 +91,7 @@ util::Optional<Mixed> Set::max(ColKey col) const
     size_t out_ndx = not_found;
     auto result = set_base().max(&out_ndx);
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "max");
+        not_supported("max");
     }
     return out_ndx == not_found ? none : result;
 }
@@ -105,7 +104,7 @@ util::Optional<Mixed> Set::min(ColKey col) const
     size_t out_ndx = not_found;
     auto result = set_base().min(&out_ndx);
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "min");
+        not_supported("min");
     }
     return out_ndx == not_found ? none : result;
 }
@@ -117,7 +116,7 @@ Mixed Set::sum(ColKey col) const
 
     auto result = set_base().sum();
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "sum");
+        not_supported("sum");
     }
     return *result;
 }
@@ -129,7 +128,7 @@ util::Optional<Mixed> Set::average(ColKey col) const
     size_t count = 0;
     auto result = set_base().avg(&count);
     if (!result) {
-        throw Results::UnsupportedColumnTypeException(set_base().get_col_key(), set_base().get_table(), "average");
+        not_supported("average");
     }
     return count == 0 ? none : result;
 }
@@ -205,7 +204,7 @@ std::pair<size_t, bool> Set::insert_any(Mixed value)
 
 Mixed Set::get_any(size_t ndx) const
 {
-    verify_valid_row(ndx);
+    verify_attached();
     return set_base().get_any(ndx);
 }
 
@@ -217,6 +216,7 @@ std::pair<size_t, bool> Set::remove_any(Mixed value)
 
 size_t Set::find_any(Mixed value) const
 {
+    verify_attached();
     return set_base().find_any(value);
 }
 
@@ -244,7 +244,7 @@ size_t Set::find<int>(const int& value) const
 template <>
 Obj Set::get<Obj>(size_t row_ndx) const
 {
-    verify_valid_row(row_ndx);
+    verify_attached();
     auto& set = as<Obj>();
     return set.get_object(row_ndx);
 }

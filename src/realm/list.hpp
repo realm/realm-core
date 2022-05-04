@@ -670,8 +670,7 @@ inline T Lst<T>::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw OutOfBounds(
-            util::format("Invalid index when getting from list: %1", CollectionBase::get_property_name()));
+        throw OutOfBounds(util::format("get() on %1", CollectionBase::get_property_name()), ndx, current_size);
     }
 
     auto value = m_tree->get(ndx);
@@ -830,7 +829,8 @@ void Lst<T>::move(size_t from, size_t to)
 {
     auto sz = size();
     if (from >= sz || to >= sz) {
-        throw OutOfBounds("Invalid list index");
+        throw OutOfBounds(util::format("move() on %1", CollectionBase::get_property_name()), from >= sz ? from : to,
+                          sz);
     }
 
     if (from != to) {
@@ -860,7 +860,8 @@ void Lst<T>::swap(size_t ndx1, size_t ndx2)
 {
     auto sz = size();
     if (ndx1 >= sz || ndx2 >= sz) {
-        throw OutOfBounds(util::format("Invalid index into list: %1", CollectionBase::get_property_name()));
+        throw OutOfBounds(util::format("swap() on %1", CollectionBase::get_property_name()), ndx1 >= sz ? ndx1 : ndx2,
+                          sz);
     }
 
     if (ndx1 != ndx2) {
@@ -900,7 +901,7 @@ void Lst<T>::insert(size_t ndx, T value)
 
     auto sz = size();
     if (ndx > sz)
-        throw OutOfBounds(util::format("Invalid index into list: %1", CollectionBase::get_property_name()));
+        throw OutOfBounds(util::format("insert() on %1", CollectionBase::get_property_name()), ndx, sz + 1);
 
     ensure_created();
 
@@ -1082,7 +1083,7 @@ inline ObjKey LnkLst::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw OutOfBounds(util::format("Invalid index into list: %1", CollectionBase::get_property_name()));
+        throw OutOfBounds(util::format("get() on %1", CollectionBase::get_property_name()), ndx, current_size);
     }
     return m_list.m_tree->get(virtual2real(ndx));
 }
@@ -1105,7 +1106,8 @@ inline void LnkLst::insert(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw IllegalOperation(
-            util::format("Insert not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
+            util::format("Cannot insert an already managed object into a list of embedded objects: %1",
+                         CollectionBase::get_property_name()));
 
     update_if_needed();
     m_list.insert(virtual2real(ndx), value);
@@ -1117,7 +1119,7 @@ inline ObjKey LnkLst::set(size_t ndx, ObjKey value)
     REALM_ASSERT(!value.is_unresolved());
     if (get_target_table()->is_embedded() && value != ObjKey())
         throw IllegalOperation(
-            util::format("Setting not allowed on list of embedded objects: %1", CollectionBase::get_property_name()));
+            util::format("Cannot replace embedded object: %1", CollectionBase::get_property_name()));
 
     update_if_needed();
     ObjKey old = m_list.set(virtual2real(ndx), value);

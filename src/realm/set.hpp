@@ -70,8 +70,7 @@ public:
     {
         const auto current_size = size();
         if (ndx >= current_size) {
-            throw OutOfBounds(
-                util::format("Invalid index when getting from set: %1", CollectionBase::get_property_name()));
+            throw OutOfBounds(util::format("get() on %1", CollectionBase::get_property_name()), ndx, current_size);
         }
         return m_tree->get(ndx);
     }
@@ -1032,7 +1031,8 @@ inline ObjKey LnkSet::get(size_t ndx) const
 {
     const auto current_size = size();
     if (ndx >= current_size) {
-        throw OutOfBounds(util::format("Invalid index into set: %1", CollectionBase::get_property_name()));
+        throw OutOfBounds(util::format("Invalid index into set: %1", CollectionBase::get_property_name()), ndx,
+                          current_size);
     }
     return m_set.m_tree->get(virtual2real(ndx));
 }

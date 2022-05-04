@@ -1824,6 +1824,11 @@ StringData Table::get_name() const noexcept
     return static_cast<Group*>(parent)->get_table_name(get_key());
 }
 
+std::string Table::get_class_name() const noexcept
+{
+    return Group::table_name_to_class_name(get_name());
+}
+
 const char* Table::get_state() const noexcept
 {
     switch (m_cookie) {
