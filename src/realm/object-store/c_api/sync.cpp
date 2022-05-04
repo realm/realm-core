@@ -417,14 +417,6 @@ RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_su
     return to_capi(subscription->id());
 }
 
-RLM_API bool realm_flx_sync_subscription_has_name(const realm_flx_sync_subscription_t* subscription) noexcept
-{
-    REALM_ASSERT(subscription != nullptr);
-    return wrap_err([&]() {
-        return subscription->has_name();
-    });
-}
-
 RLM_API const char* realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);

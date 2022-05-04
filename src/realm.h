@@ -3219,8 +3219,6 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
 RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_subscription_t* subscription)
     RLM_API_NOEXCEPT;
 
-RLM_API bool realm_flx_sync_subscription_has_name(const realm_flx_sync_subscription_t* subscription) RLM_API_NOEXCEPT;
-
 RLM_API const char*
 realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) RLM_API_NOEXCEPT;
 
