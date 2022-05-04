@@ -371,7 +371,7 @@ void GroupWriter::backdate()
                 ref_type start_pos = it->second->positions.get(index);
                 if (start_pos <= entry.ref && start_pos + it->second->lengths.get(index) >= entry.ref + entry.size) {
                     // found a fully covering entry!
-                    auto found_version = it->second->versions.get(index);
+                    uint64_t found_version = it->second->versions.get(index);
                     REALM_ASSERT(found_version <= entry.released_at_version);
 #if REALM_ALLOC_DEBUG
                     std::cout << "  backdating [" << entry.ref << ", " << entry.size
