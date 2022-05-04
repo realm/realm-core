@@ -3126,6 +3126,8 @@ typedef struct realm_sync_error_user_info {
 typedef struct realm_sync_error {
     realm_sync_error_code_t error_code;
     const char* detailed_message;
+    const char* c_original_file_path_key;
+    const char* c_recovery_file_path_key;
     bool is_fatal;
     bool is_unrecognized_by_client;
     bool is_client_reset_requested;
@@ -3176,12 +3178,6 @@ typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
 typedef void (*realm_async_open_task_completion_func_t)(void* userdata, realm_thread_safe_reference_t* realm,
                                                         const realm_async_error_t* error);
 
-/**
- * Get sync client path in case manual reset is needed.
- * @param sync_user_error ptr to to the error struct represeting a sync error
- * @return a string represeting the path where the sync files are.
- */
-RLM_API char* realm_sync_client_get_path(realm_sync_error_t* sync_user_error) RLM_API_NOEXCEPT;
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_base_file_path(realm_sync_client_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config_t*,
@@ -3419,7 +3415,7 @@ RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
 
 /**
  * In case manual reset is needed, run this function in order to reset sync client files.
- * The sync_path is going to be returned by realm_sync_client_get_path, if manual reset is needed.
+ * The sync_path is going to passed into realm_sync_error_handler_func_t, if manual reset is needed.
  * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is
  * needed
  * @param realm_app ptr to realm app.

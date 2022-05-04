@@ -223,19 +223,6 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     return ret;
 }
 
-RLM_API char* realm_sync_client_get_path(realm_sync_error_t* sync_user_error) noexcept
-{
-    if (sync_user_error->is_client_reset_requested) {
-        for (size_t i = 0; i < sync_user_error->user_info_length; ++i) {
-            const auto& user_error = sync_user_error->user_info_map[i];
-            if (user_error.key == SyncError::c_original_file_path_key) {
-                duplicate_string(user_error.value);
-            }
-        }
-    }
-    return duplicate_string("");
-}
-
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
 {
     return new realm_sync_client_config_t;
@@ -359,6 +346,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
         c_error.is_client_reset_requested = error.is_client_reset_requested();
+        c_error.c_original_file_path_key = error.c_original_file_path_key;
+        c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         for (auto& info : error.user_info) {
