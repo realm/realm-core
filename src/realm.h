@@ -3145,7 +3145,7 @@ typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_sessi
 typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
 typedef void (*realm_sync_before_client_reset_func_t)(void* userdata, realm_t* before_realm);
-typedef void (*realm_sync_after_client_reset_func_t)(void* userdata, realm_t* before_realm, realm_t* after_realm);
+typedef void (*realm_sync_after_client_reset_func_t)(void* userdata, realm_t* before_realm, realm_t* after_realm, bool did_recover);
 
 typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
 typedef struct realm_flx_sync_subscription_set realm_flx_sync_subscription_set_t;
@@ -3211,6 +3211,8 @@ RLM_API realm_sync_config_t* realm_sync_config_new(const realm_user_t*, const ch
 RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*,
                                                        realm_sync_session_stop_policy_e) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, realm_sync_error_handler_func_t,
+                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
