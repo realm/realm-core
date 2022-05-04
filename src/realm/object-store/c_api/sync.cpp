@@ -417,24 +417,24 @@ RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_su
     return to_capi(subscription->id());
 }
 
-RLM_API const char* realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
+RLM_API realm_string_t realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return subscription->name().data();
+    return to_capi(subscription->name());
 }
 
-RLM_API const char*
+RLM_API realm_string_t
 realm_flx_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return subscription->object_class_name().data();
+    return to_capi(subscription->object_class_name());
 }
 
-RLM_API const char*
+RLM_API realm_string_t
 realm_flx_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return subscription->query_string().data();
+    return to_capi(subscription->query_string());
 }
 
 RLM_API realm_timestamp_t
