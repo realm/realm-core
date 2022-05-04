@@ -41,7 +41,7 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
     m_session->revive_if_needed();
 
     std::shared_ptr<AsyncOpenTask> self(shared_from_this());
-    m_session->wait_for_download_completion([callback = std::move(callback), self, this](std::error_code ec) {
+    m_session->wait_for_download_completion([callback = std::move(callback), self, this](Status status) {
         std::shared_ptr<_impl::RealmCoordinator> coordinator;
         {
             util::CheckedLockGuard lock(m_mutex);
@@ -56,8 +56,8 @@ void AsyncOpenTask::start(util::UniqueFunction<void(ThreadSafeReference, std::ex
             coordinator = std::move(m_coordinator);
         }
 
-        if (ec)
-            return callback({}, std::make_exception_ptr(std::system_error(ec)));
+        if (!status.is_ok())
+            return callback({}, std::make_exception_ptr(Exception(status)));
 
         ThreadSafeReference realm;
         try {

@@ -53,7 +53,7 @@ static std::vector<std::string> split_token(const std::string& jwt)
     parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
-        throw app::AppError(make_error_code(app::JSONErrorCode::bad_token), "jwt missing parts");
+        throw app::AppError(ErrorCodes::BadToken, "jwt missing parts");
     }
 
     return parts;
@@ -500,12 +500,12 @@ void SyncUser::refresh_custom_data(util::UniqueFunction<void(util::Optional<app:
     }
     if (!user) {
         completion_block(app::AppError(
-            app::make_client_error_code(app::ClientErrorCode::user_not_found),
+            ErrorCodes::ClientUserNotFound,
             util::format("Cannot initiate a refresh on user '%1' because the user has been removed", m_identity)));
     }
     else if (!app) {
         completion_block(app::AppError(
-            app::make_client_error_code(app::ClientErrorCode::app_deallocated),
+            ErrorCodes::ClientAppDeallocated,
             util::format("Cannot initiate a refresh on user '%1' because the app has been deallocated", m_identity)));
     }
     else {

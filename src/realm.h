@@ -2434,102 +2434,6 @@ typedef enum realm_user_state {
     RLM_USER_STATE_REMOVED
 } realm_user_state_e;
 
-/**
- * Possible error categories the realm_app_error_t error code can fall in.
- */
-typedef enum realm_app_error_category {
-    /**
-     * Error category for HTTP-related errors. The error code value can be interpreted as a HTTP status code.
-     */
-    RLM_APP_ERROR_CATEGORY_HTTP,
-    /**
-     * JSON response parsing related errors. The error code is a member of realm_app_errno_json_e.
-     */
-    RLM_APP_ERROR_CATEGORY_JSON,
-    /**
-     * Client-side related errors. The error code is a member of realm_app_errno_client_e.
-     */
-    RLM_APP_ERROR_CATEGORY_CLIENT,
-    /**
-     * Errors reported by the backend. The error code is a member of realm_app_errno_service_e.
-     */
-    RLM_APP_ERROR_CATEGORY_SERVICE,
-    /**
-     * Custom error code was set in realm_http_response_t.custom_status_code.
-     * The error code is the custom_status_code value.
-     */
-    RLM_APP_ERROR_CATEGORY_CUSTOM,
-} realm_app_error_category_e;
-
-typedef enum realm_app_errno_json {
-    RLM_APP_ERR_JSON_BAD_TOKEN = 1,
-    RLM_APP_ERR_JSON_MALFORMED_JSON = 2,
-    RLM_APP_ERR_JSON_MISSING_JSON_KEY = 3,
-    RLM_APP_ERR_JSON_BAD_BSON_PARSE = 4
-} realm_app_errno_json_e;
-
-typedef enum realm_app_errno_client {
-    RLM_APP_ERR_CLIENT_USER_NOT_FOUND = 1,
-    RLM_APP_ERR_CLIENT_USER_NOT_LOGGED_IN = 2,
-    RLM_APP_ERR_CLIENT_APP_DEALLOCATED = 3
-} realm_app_errno_client_e;
-
-typedef enum realm_app_errno_service {
-    RLM_APP_ERR_SERVICE_MISSING_AUTH_REQ = 1,
-    RLM_APP_ERR_SERVICE_INVALID_SESSION = 2,
-    RLM_APP_ERR_SERVICE_USER_APP_DOMAIN_MISMATCH = 3,
-    RLM_APP_ERR_SERVICE_DOMAIN_NOT_ALLOWED = 4,
-    RLM_APP_ERR_SERVICE_READ_SIZE_LIMIT_EXCEEDED = 5,
-    RLM_APP_ERR_SERVICE_INVALID_PARAMETER = 6,
-    RLM_APP_ERR_SERVICE_MISSING_PARAMETER = 7,
-    RLM_APP_ERR_SERVICE_TWILIO_ERROR = 8,
-    RLM_APP_ERR_SERVICE_GCM_ERROR = 9,
-    RLM_APP_ERR_SERVICE_HTTP_ERROR = 10,
-    RLM_APP_ERR_SERVICE_AWS_ERROR = 11,
-    RLM_APP_ERR_SERVICE_MONGODB_ERROR = 12,
-    RLM_APP_ERR_SERVICE_ARGUMENTS_NOT_ALLOWED = 13,
-    RLM_APP_ERR_SERVICE_FUNCTION_EXECUTION_ERROR = 14,
-    RLM_APP_ERR_SERVICE_NO_MATCHING_RULE_FOUND = 15,
-    RLM_APP_ERR_SERVICE_INTERNAL_SERVER_ERROR = 16,
-    RLM_APP_ERR_SERVICE_AUTH_PROVIDER_NOT_FOUND = 17,
-    RLM_APP_ERR_SERVICE_AUTH_PROVIDER_ALREADY_EXISTS = 18,
-    RLM_APP_ERR_SERVICE_SERVICE_NOT_FOUND = 19,
-    RLM_APP_ERR_SERVICE_SERVICE_TYPE_NOT_FOUND = 20,
-    RLM_APP_ERR_SERVICE_SERVICE_ALREADY_EXISTS = 21,
-    RLM_APP_ERR_SERVICE_SERVICE_COMMAND_NOT_FOUND = 22,
-    RLM_APP_ERR_SERVICE_VALUE_NOT_FOUND = 23,
-    RLM_APP_ERR_SERVICE_VALUE_ALREADY_EXISTS = 24,
-    RLM_APP_ERR_SERVICE_VALUE_DUPLICATE_NAME = 25,
-    RLM_APP_ERR_SERVICE_FUNCTION_NOT_FOUND = 26,
-    RLM_APP_ERR_SERVICE_FUNCTION_ALREADY_EXISTS = 27,
-    RLM_APP_ERR_SERVICE_FUNCTION_DUPLICATE_NAME = 28,
-    RLM_APP_ERR_SERVICE_FUNCTION_SYNTAX_ERROR = 29,
-    RLM_APP_ERR_SERVICE_FUNCTION_INVALID = 30,
-    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_NOT_FOUND = 31,
-    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_ALREADY_EXISTS = 32,
-    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_DUPLICATE_NAME = 33,
-    RLM_APP_ERR_SERVICE_RULE_NOT_FOUND = 34,
-    RLM_APP_ERR_SERVICE_API_KEY_NOT_FOUND = 35,
-    RLM_APP_ERR_SERVICE_RULE_ALREADY_EXISTS = 36,
-    RLM_APP_ERR_SERVICE_RULE_DUPLICATE_NAME = 37,
-    RLM_APP_ERR_SERVICE_AUTH_PROVIDER_DUPLICATE_NAME = 38,
-    RLM_APP_ERR_SERVICE_RESTRICTED_HOST = 39,
-    RLM_APP_ERR_SERVICE_API_KEY_ALREADY_EXISTS = 40,
-    RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_AUTH_FAILED = 41,
-    RLM_APP_ERR_SERVICE_EXECUTION_TIME_LIMIT_EXCEEDED = 42,
-    RLM_APP_ERR_SERVICE_NOT_CALLABLE = 43,
-    RLM_APP_ERR_SERVICE_USER_ALREADY_CONFIRMED = 44,
-    RLM_APP_ERR_SERVICE_USER_NOT_FOUND = 45,
-    RLM_APP_ERR_SERVICE_USER_DISABLED = 46,
-    RLM_APP_ERR_SERVICE_AUTH_ERROR = 47,
-    RLM_APP_ERR_SERVICE_BAD_REQUEST = 48,
-    RLM_APP_ERR_SERVICE_ACCOUNT_NAME_IN_USE = 49,
-    RLM_APP_ERR_SERVICE_INVALID_EMAIL_PASSWORD = 50,
-
-    RLM_APP_ERR_SERVICE_UNKNOWN = -1,
-    RLM_APP_ERR_SERVICE_NONE = 0
-} realm_app_errno_service_e;
-
 typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_ANONYMOUS,
     RLM_AUTH_PROVIDER_FACEBOOK,
@@ -2554,16 +2458,15 @@ typedef struct realm_app_user_apikey {
 // Pointers to this struct and its pointer members are only valid inside the scope
 // of the callback they were passed to.
 typedef struct realm_app_error {
-    realm_app_error_category_e error_category;
-    int error_code;
+    realm_errno_e error;
+    realm_error_category categories;
+    const char* message;
 
     /**
      * The underlying HTTP status code returned by the server,
      * otherwise zero.
      */
     int http_status_code;
-
-    const char* message;
 
     /**
      * A link to MongoDB Realm server logs related to the error,

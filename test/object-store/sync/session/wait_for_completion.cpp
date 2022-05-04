@@ -101,8 +101,8 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         std::error_code code =
             std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
         // Register the download-completion notification
-        session->wait_for_download_completion([&](std::error_code error) {
-            REQUIRE(error == code);
+        session->wait_for_download_completion([&](Status status) {
+            REQUIRE(status.get_std_error_code() == code);
             handler_called = true;
         });
         REQUIRE(handler_called == false);

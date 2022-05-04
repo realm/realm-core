@@ -398,8 +398,8 @@ class SystemError : public RuntimeError {
 public:
     SystemError(std::error_code err, const std::string& msg)
         : RuntimeError(ErrorCodes::SystemError, msg)
-        , m_error(err)
     {
+        const_cast<Status&>(to_status()).set_std_error_code(err);
     }
 
     SystemError(int err_no, const std::string& msg)
@@ -409,16 +409,13 @@ public:
 
     std::error_code get_system_error() const
     {
-        return m_error;
+        return to_status().get_std_error_code();
     }
 
     const std::error_category& get_category() const
     {
-        return m_error.category();
+        return get_system_error().category();
     }
-
-private:
-    std::error_code m_error;
 };
 
 namespace query_parser {

@@ -49,7 +49,7 @@ ResponseHandler<util::Optional<Bson>> get_delete_count_handler(ResponseHandler<u
                 return completion(get<int32_t>(document, "deletedCount").value_or(0), std::move(error));
             }
             catch (const std::exception& e) {
-                return completion(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+                return completion(0, AppError(ErrorCodes::BadBsonParse, e.what()));
             }
         }
 
@@ -72,7 +72,7 @@ ResponseHandler<util::Optional<Bson>> get_update_handler(ResponseHandler<MongoCo
                               std::move(error));
         }
         catch (const std::exception& e) {
-            return completion({}, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+            return completion({}, AppError(ErrorCodes::BadBsonParse, e.what()));
         }
     };
 }
@@ -301,7 +301,7 @@ try {
     call_function("find", base_args, std::move(completion));
 }
 catch (const std::exception& e) {
-    return completion(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+    return completion(util::none, AppError(ErrorCodes::MalformedJson, e.what()));
 }
 
 void MongoCollection::find_one_bson(const BsonDocument& filter_bson, const FindOptions& options,
@@ -313,7 +313,7 @@ try {
     call_function("findOne", base_args, std::move(completion));
 }
 catch (const std::exception& e) {
-    return completion(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+    return completion(util::none, AppError(ErrorCodes::MalformedJson, e.what()));
 }
 
 void MongoCollection::insert_one_bson(const BsonDocument& value_bson,
@@ -555,14 +555,14 @@ void WatchStream::feed_sse(ServerSentEvent sse)
             // fallthrough to same handling as for non-document value.
         }
         m_state = HAVE_ERROR;
-        m_error = std::make_unique<AppError>(app::make_error_code(JSONErrorCode::bad_bson_parse),
+        m_error = std::make_unique<AppError>(ErrorCodes::BadBsonParse,
                                              "server returned malformed event: " + std::string(sse.data));
     }
     else if (sse.eventType == "error") {
         m_state = HAVE_ERROR;
 
         // default error message if we have issues parsing the reply.
-        m_error = std::make_unique<AppError>(app::make_error_code(ServiceErrorCode::unknown), std::string(sse.data));
+        m_error = std::make_unique<AppError>(ErrorCodes::UnknownError, std::string(sse.data));
         try {
             auto parsed = parse(sse.data);
             if (parsed.type() != Bson::Type::Document)
@@ -574,9 +574,8 @@ void WatchStream::feed_sse(ServerSentEvent sse)
                 return;
             if (msg.type() != Bson::Type::String)
                 return;
-            m_error = std::make_unique<AppError>(
-                app::make_error_code(app::service_error_code_from_string(static_cast<const std::string&>(code))),
-                std::move(static_cast<std::string&>(msg)));
+            m_error = std::make_unique<AppError>(ErrorCodes::from_string(static_cast<const std::string&>(code)),
+                                                 std::move(static_cast<std::string&>(msg)));
         }
         catch (...) {
             return; // Use the default state.

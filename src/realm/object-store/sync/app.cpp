@@ -39,9 +39,9 @@ namespace {
 REALM_COLD
 REALM_NOINLINE
 REALM_NORETURN
-void throw_json_error(JSONErrorCode ec, std::string_view message)
+void throw_json_error(ErrorCodes::Error ec, std::string_view message)
 {
-    throw AppError(make_error_code(ec), std::string(message));
+    throw AppError(ec, std::string(message));
 }
 
 template <typename T>
@@ -50,7 +50,7 @@ T as(const Bson& bson)
     if (holds_alternative<T>(bson)) {
         return static_cast<T>(bson);
     }
-    throw_json_error(JSONErrorCode::malformed_json, "?");
+    throw_json_error(ErrorCodes::MalformedJson, "?");
 }
 
 template <typename T>
@@ -60,7 +60,8 @@ T get(const BsonDocument& doc, const std::string& key)
     if (auto it = raw.find(key); it != raw.end()) {
         return as<T>(it->second);
     }
-    throw_json_error(JSONErrorCode::missing_json_key, key);
+    throw_json_error(ErrorCodes::MissingJsonKey, key);
+    return {};
 }
 
 template <typename T>
@@ -71,7 +72,7 @@ void read_field(const BsonDocument& data, const std::string& key, T& value)
         value = as<T>(it->second);
     }
     else {
-        throw_json_error(JSONErrorCode::missing_json_key, key);
+        throw_json_error(ErrorCodes::MissingJsonKey, key);
     }
 }
 
@@ -97,7 +98,7 @@ T parse(std::string_view str)
         return as<T>(bson::parse(str));
     }
     catch (const std::exception& e) {
-        throw_json_error(JSONErrorCode::malformed_json, e.what());
+        throw_json_error(ErrorCodes::MalformedJson, e.what());
     }
 }
 
@@ -621,15 +622,14 @@ bool App::verify_user_present(const std::shared_ptr<SyncUser>& user) const
 std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user) const
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
-        throw AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                       "User is no longer valid or is logged out");
+        throw AppError(ErrorCodes::ClientUserNotLoggedIn, "User is no longer valid or is logged out");
     }
 
     auto users = m_sync_manager->all_users();
     auto it = std::find(users.begin(), users.end(), user);
 
     if (it == users.end()) {
-        throw AppError(make_client_error_code(ClientErrorCode::user_not_found), "User does not exist");
+        throw AppError(ErrorCodes::ClientUserNotFound, "User does not exist");
     }
 
     m_sync_manager->set_current_user(user->identity());
@@ -640,12 +640,10 @@ std::shared_ptr<SyncUser> App::switch_user(const std::shared_ptr<SyncUser>& user
 void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!user || user->state() == SyncUser::State::Removed) {
-        return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "User has already been removed"));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "User has already been removed"));
     }
     if (!verify_user_present(user)) {
-        return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "No user has been found"));
     }
 
     if (user->is_logged_in()) {
@@ -663,17 +661,14 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!user) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                   "The specified user could not be found."));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "The specified user could not be found."));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
-        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                                   "User must be logged in to be deleted."));
+        return completion(AppError(ErrorCodes::ClientUserNotLoggedIn, "User must be logged in to be deleted."));
     }
 
     if (!verify_user_present(user)) {
-        return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found."));
+        return completion(AppError(ErrorCodes::ClientUserNotFound, "No user has been found."));
     }
 
     Request req;
@@ -696,16 +691,15 @@ void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials&
                     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
     if (!user) {
-        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user could not be found."));
+        return completion(nullptr,
+                          AppError(ErrorCodes::ClientUserNotFound, "The specified user could not be found."));
     }
     if (user->state() != SyncUser::State::LoggedIn) {
-        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
-                                            "The specified user is not logged in."));
+        return completion(nullptr,
+                          AppError(ErrorCodes::ClientUserNotLoggedIn, "The specified user is not logged in."));
     }
     if (!verify_user_present(user)) {
-        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user was not found."));
+        return completion(nullptr, AppError(ErrorCodes::ClientUserNotFound, "The specified user was not found."));
     }
 
     App::log_in_with_credentials(credentials, user, std::move(completion));
@@ -828,7 +822,7 @@ void App::handle_auth_failure(const AppError& error, const Response& response, R
                               util::UniqueFunction<void(const Response&)>&& completion)
 {
     // Only handle auth failures
-    if (*error.http_status_code == 401) {
+    if (*error.additional_status_code == 401) {
         if (request.uses_refresh_token) {
             if (sync_user && sync_user->is_logged_in()) {
                 sync_user->log_out();
@@ -862,13 +856,12 @@ void App::refresh_access_token(const std::shared_ptr<SyncUser>& sync_user,
                                util::UniqueFunction<void(Optional<AppError>)>&& completion)
 {
     if (!sync_user) {
-        completion(AppError(make_client_error_code(ClientErrorCode::user_not_found), "No current user exists"));
+        completion(AppError(ErrorCodes::ClientUserNotFound, "No current user exists"));
         return;
     }
 
     if (!sync_user->is_logged_in()) {
-        completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_logged_in), "The user is not logged in"));
+        completion(AppError(ErrorCodes::ClientUserNotLoggedIn, "The user is not logged in"));
         return;
     }
 
@@ -916,7 +909,7 @@ void App::call_function(const std::shared_ptr<SyncUser>& user, const std::string
             body_as_bson = bson::parse(response.body);
         }
         catch (const std::exception& e) {
-            return completion(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
+            return completion(util::none, AppError(ErrorCodes::BadBsonParse, e.what()));
         };
         completion(std::move(body_as_bson), util::none);
     };

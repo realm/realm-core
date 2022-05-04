@@ -45,6 +45,20 @@ public:
     {
     }
 
+    template <typename Reason, std::enable_if_t<std::is_constructible_v<std::string_view, Reason>, int> = 0>
+    Status(std::error_code code, Reason&& reason)
+    {
+        if (code) {
+            m_error = ErrorInfo::create(ErrorCodes::SystemError, std::string_view{reason});
+            m_error->m_std_error_code = code;
+        }
+    }
+
+    std::error_code get_std_error_code() const
+    {
+        return m_error ? m_error->m_std_error_code : std::error_code{};
+    }
+
     /*
      * Copying a Status is just copying an intrusive pointer - i.e. very cheap. Moving them is similarly cheap.
      */
@@ -66,12 +80,21 @@ public:
     void ignore() const noexcept {}
 
 private:
+    friend class SystemError;
+    void set_std_error_code(std::error_code code)
+    {
+        m_error->m_std_error_code = code;
+    }
+
     Status() = default;
 
     struct ErrorInfo {
         mutable std::atomic<uint32_t> m_refs;
         const ErrorCodes::Error m_code;
         const std::string m_reason;
+        // The addition of this system error code may be temporary if we ever get all use of
+        // std::error_code migrated to the unified exception system
+        std::error_code m_std_error_code;
 
         static util::bind_ptr<ErrorInfo> create(ErrorCodes::Error code, std::string_view reason);
 
