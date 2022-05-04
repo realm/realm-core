@@ -112,6 +112,12 @@ public:
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                       SaltedVersion server_version, BinaryData uploadable_changeset);
 
+    /// get_local_changes returns a list of changes which have not been uploaded yet
+    /// 'current_version' is the version that the history should be updated to.
+    ///
+    /// The history must be in a transaction when this function is called.
+    std::vector<ChunkedBinaryData> get_local_changes(version_type current_version) const;
+
     /// Get the version of the latest snapshot of the associated Realm, as well
     /// as the client file identifier and the synchronization progress as they
     /// are stored in that snapshot.
@@ -401,7 +407,7 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(HistoryEntry);
-    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes);
+    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);

@@ -801,4 +801,18 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t* user) noexcept
     return nullptr;
 }
 
+RLM_API char* realm_user_get_access_token(const realm_user_t* user)
+{
+    return wrap_err([&] {
+        return duplicate_string((*user)->access_token());
+    });
+}
+
+RLM_API char* realm_user_get_refresh_token(const realm_user_t* user)
+{
+    return wrap_err([&] {
+        return duplicate_string((*user)->refresh_token());
+    });
+}
+
 } // namespace realm::c_api

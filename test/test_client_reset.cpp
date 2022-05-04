@@ -4,6 +4,7 @@
 #include <realm/util/random.hpp>
 #include <realm/db.hpp>
 #include <realm/list.hpp>
+#include <realm/table_view.hpp>
 
 #include "test.hpp"
 #include "sync_fixtures.hpp"
@@ -148,7 +149,7 @@ TEST(ClientReset_NoLocalChanges)
             Session::Config session_config;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.discard_local = true;
+                client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.fresh_copy = std::move(sg_fresh);
                 session_config.client_reset_config = std::move(client_reset_config);
             }
@@ -221,7 +222,7 @@ TEST(ClientReset_InitialLocalChanges)
     Session::Config session_config_2;
     {
         Session::Config::ClientReset client_reset_config;
-        client_reset_config.discard_local = true;
+        client_reset_config.mode = ClientResyncMode::DiscardLocal;
         client_reset_config.fresh_copy = std::move(sg_fresh);
         session_config_2.client_reset_config = std::move(client_reset_config);
     }
@@ -284,12 +285,12 @@ TEST(ClientReset_InitialLocalChanges)
     }
 }
 
-TEST(ClientReset_LocalChangesWhenOffline)
+TEST_TYPES(ClientReset_LocalChangesWhenOffline, std::true_type, std::false_type)
 {
+    constexpr bool recover = TEST_TYPE::value;
     TEST_DIR(dir);
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
-    ColKey col_int;
 
     const std::string server_path = "/data";
 
@@ -300,17 +301,15 @@ TEST(ClientReset_LocalChangesWhenOffline)
 
     // First we make a changeset and upload it
     {
-        // We force an async open. This will have the effect that the state file will be empty
+        // Download a new Realm. The state is empty.
         Session::Config session_config_1;
-        session_config_1.client_reset_config = Session::Config::ClientReset{};
         Session session_1 = fixture.make_session(sg, std::move(session_config_1));
         fixture.bind_session(session_1, server_path);
         session_1.wait_for_download_complete_or_client_stopped();
 
         WriteTransaction wt{sg};
-        TableRef table = wt.add_table("class_table");
-        col_int = table->add_column(type_Int, "int");
-        table->create_object().set(col_int, 123);
+        TableRef table = ((Transaction&)wt).add_table_with_primary_key("class_table", type_Int, "_id");
+        table->create_object_with_primary_key(123);
         session_1.nonsync_transact_notify(wt.commit());
         session_1.wait_for_upload_complete_or_client_stopped();
         session_1.wait_for_download_complete_or_client_stopped();
@@ -335,12 +334,23 @@ TEST(ClientReset_LocalChangesWhenOffline)
     {
         WriteTransaction wt{sg};
         TableRef table = wt.get_table("class_table");
-        table->create_object().set(col_int, 456);
+        table->create_object_with_primary_key(456);
         wt.commit();
     }
 
+    // get a fresh copy from the server to reset against
+    SHARED_GROUP_TEST_PATH(path_fresh1);
+    {
+        Session session4 = fixture.make_session(path_fresh1);
+        fixture.bind_session(session4, server_path);
+        session4.wait_for_download_complete_or_client_stopped();
+    }
+    DBRef sg_fresh1 = DB::create(make_client_replication(), path_fresh1);
+
     Session::Config session_config_3;
     session_config_3.client_reset_config = Session::Config::ClientReset{};
+    session_config_3.client_reset_config->mode = recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal;
+    session_config_3.client_reset_config->fresh_copy = std::move(sg_fresh1);
     Session session_3 = fixture.make_session(sg, std::move(session_config_3));
     fixture.bind_session(session_3, server_path);
     session_3.wait_for_upload_complete_or_client_stopped();
@@ -354,8 +364,18 @@ TEST(ClientReset_LocalChangesWhenOffline)
         auto table = rt.get_table("class_table");
         CHECK(table);
         if (table) {
-            CHECK_EQUAL(table->size(), 1);
-            CHECK_EQUAL(table->begin()->get<Int>(col_int), 123);
+            if (recover) {
+                CHECK_EQUAL(table->size(), 2);
+                TableView sorted = table->get_sorted_view(table->get_primary_key_column());
+                CHECK_EQUAL(sorted.size(), 2);
+                CHECK_EQUAL(sorted.get_object(0).get_primary_key().get_int(), 123);
+                CHECK_EQUAL(sorted.get_object(1).get_primary_key().get_int(), 456);
+            }
+            else {
+                // discard local changes
+                CHECK_EQUAL(table->size(), 1);
+                CHECK_EQUAL(table->begin()->get_primary_key().get_int(), 123);
+            }
         }
     }
 }
@@ -573,14 +593,14 @@ TEST(ClientReset_ThreeClients)
             Session::Config session_config_1;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.discard_local = true;
+                client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.fresh_copy = std::move(sg_fresh1);
                 session_config_1.client_reset_config = std::move(client_reset_config);
             }
             Session::Config session_config_2;
             {
                 Session::Config::ClientReset client_reset_config;
-                client_reset_config.discard_local = true;
+                client_reset_config.mode = ClientResyncMode::DiscardLocal;
                 client_reset_config.fresh_copy = std::move(sg_fresh2);
                 session_config_2.client_reset_config = std::move(client_reset_config);
             }
@@ -624,10 +644,9 @@ TEST(ClientReset_ThreeClients)
 
         std::this_thread::sleep_for(std::chrono::milliseconds{1000});
 
-        // A third client makes async open
+        // A third client downloads the state
         {
             Session::Config session_config;
-            session_config.client_reset_config = Session::Config::ClientReset{};
             Session session = fixture.make_session(path_3, std::move(session_config));
             fixture.bind_session(session, server_path);
             session.wait_for_download_complete_or_client_stopped();
@@ -700,7 +719,7 @@ TEST(ClientReset_DoNotRecoverSchema)
         Session::Config session_config;
         {
             Session::Config::ClientReset client_reset_config;
-            client_reset_config.discard_local = true;
+            client_reset_config.mode = ClientResyncMode::DiscardLocal;
             client_reset_config.fresh_copy = std::move(sg_fresh1);
             session_config.client_reset_config = std::move(client_reset_config);
         }
@@ -754,9 +773,8 @@ TEST(ClientReset_PinnedVersion)
     // Create and upload the initial version
     {
         WriteTransaction wt{sg};
-        TableRef table = wt.add_table(table_name);
-        table->add_column(type_Float, "float");
-        table->create_object();
+        TableRef table = ((Transaction&)wt).add_table_with_primary_key(table_name, type_Int, "_id");
+        table->create_object_with_primary_key(123);
         wt.commit();
 
         Session session = fixture.make_bound_session(sg, server_path_1);
@@ -769,15 +787,29 @@ TEST(ClientReset_PinnedVersion)
     // Add another version locally
     {
         WriteTransaction wt{sg};
-        wt.get_table(table_name)->create_object();
+        wt.get_table(table_name)->create_object_with_primary_key(456);
         wt.commit();
     }
 
-    // Trigger a client reset by syncing with a different server URL
+    // Trigger a client reset
     {
+        // get a fresh copy from the server to reset against
+        SHARED_GROUP_TEST_PATH(path_fresh);
+        {
+            Session session_fresh = fixture.make_session(path_fresh);
+            fixture.bind_session(session_fresh, server_path_1);
+            session_fresh.wait_for_download_complete_or_client_stopped();
+        }
+        DBRef sg_fresh = DB::create(make_client_replication(), path_fresh);
+
         Session::Config session_config;
-        session_config.client_reset_config = Session::Config::ClientReset{};
-        Session session = fixture.make_bound_session(sg, server_path_2, std::move(session_config));
+        {
+            session_config.client_reset_config = Session::Config::ClientReset{};
+            session_config.client_reset_config->mode = ClientResyncMode::DiscardLocal;
+            session_config.client_reset_config->fresh_copy = std::move(sg_fresh);
+        }
+
+        Session session = fixture.make_bound_session(sg, server_path_1, std::move(session_config));
         session.wait_for_download_complete_or_client_stopped();
     }
 }

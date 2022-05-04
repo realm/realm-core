@@ -1516,10 +1516,9 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
-void DB::write_copy(StringData path, util::Optional<const char*> output_encryption_key, bool allow_overwrite)
+void DB::write_copy(StringData path, const char* output_encryption_key)
 {
     SharedInfo* info = m_file_map.get_addr();
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
 
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
@@ -1544,10 +1543,10 @@ void DB::write_copy(StringData path, util::Optional<const char*> output_encrypti
     } writer;
 
     File file;
-    file.open(path, File::access_ReadWrite, allow_overwrite ? File::create_Auto : File::create_Must, 0);
+    file.open(path, File::access_ReadWrite, File::create_Must, 0);
     file.resize(0);
 
-    tr->write(file, write_key, info->latest_version_number, writer);
+    tr->write(file, output_encryption_key, info->latest_version_number, writer);
 }
 
 uint_fast64_t DB::get_number_of_versions()

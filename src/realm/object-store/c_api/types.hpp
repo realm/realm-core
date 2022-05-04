@@ -102,6 +102,13 @@ protected:
 
 struct realm_config : realm::c_api::WrapC, realm::Realm::Config {
     using Config::Config;
+    std::map<void*, realm_free_userdata_func_t> free_functions;
+    ~realm_config()
+    {
+        for (auto& f : free_functions) {
+            f.second(f.first);
+        }
+    }
 };
 
 // LCOV_EXCL_START

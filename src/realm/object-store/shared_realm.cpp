@@ -1066,45 +1066,42 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::write_copy(StringData path, BinaryData key)
+void Realm::convert(const Config& config, bool merge_into_existing)
 {
-    if (key.data() && key.size() != 64) {
-        throw InvalidEncryptionKey();
-    }
     verify_thread();
-    Transaction& tr = transaction();
-    auto repl = tr.get_replication();
-    if (repl && repl->get_history_type() == Replication::hist_SyncClient) {
-        m_coordinator->write_copy(path, key, false);
-    }
-    else {
-        tr.write(path, key.data());
-    }
-}
-
-void Realm::export_to(const Config& config)
-{
-    std::string new_location = config.path;
-    BinaryData encryption_key(config.encryption_key.data(), config.encryption_key.size());
-    if (util::File::exists(new_location)) {
+    if (merge_into_existing && util::File::exists(config.path)) {
         auto destination_realm = Realm::get_shared_realm(config);
         destination_realm->begin_transaction();
         auto destination = destination_realm->transaction_ref();
         m_transaction->copy_to(destination);
         destination_realm->commit_transaction();
+        return;
     }
-    else {
-        write_copy(new_location, encryption_key);
-        if (config.sync_config) {
+
+    if (config.encryption_key.size() && config.encryption_key.size() != 64) {
+        throw InvalidEncryptionKey();
+    }
+
+    auto& tr = transaction();
+    auto repl = tr.get_replication();
+    bool src_is_sync = repl && repl->get_history_type() == Replication::hist_SyncClient;
+    bool dst_is_sync = config.sync_config || config.force_sync_history;
+
+    if (dst_is_sync) {
+        m_coordinator->write_copy(config.path, config.encryption_key.data());
+        if (!src_is_sync) {
 #if REALM_ENABLE_SYNC
             DBOptions options;
-            if (encryption_key.size()) {
-                options.encryption_key = encryption_key.data();
+            if (config.encryption_key.size()) {
+                options.encryption_key = config.encryption_key.data();
             }
-            auto db = DB::create(make_in_realm_history(), new_location, options);
+            auto db = DB::create(make_in_realm_history(), config.path, options);
             db->create_new_history(sync::make_client_replication());
 #endif
         }
+    }
+    else {
+        tr.write(config.path, config.encryption_key.data());
     }
 }
 

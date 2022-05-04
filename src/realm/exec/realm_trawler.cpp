@@ -456,7 +456,7 @@ void Table::print_columns(const Group& group) const
     if (m_is_embedded)
         std::cout << "        <embedded>" << std::endl;
     for (unsigned i = 0; i < m_column_names.size(); i++) {
-        auto type = realm::ColumnType(m_column_types.get_val(i));
+        auto type = realm::ColumnType(m_column_types.get_val(i) & 0xFFFF);
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));
         std::string type_str;
         realm::ColKey col_key;
@@ -467,7 +467,6 @@ void Table::print_columns(const Group& group) const
 
         if (type == realm::col_type_Link || type == realm::col_type_LinkList) {
             size_t target_table_ndx;
-            type_str = "->";
             if (col_key) {
                 // core6
                 realm::TableKey opposite_table_key(uint32_t(m_opposite_table.get_val(col_key.get_index().val)));
@@ -477,20 +476,27 @@ void Table::print_columns(const Group& group) const
                 target_table_ndx = size_t(m_column_subspecs.get_val(get_subspec_ndx_after(i)));
             }
             type_str += group.get_table_name(target_table_ndx);
-            if (type == realm::col_type_LinkList) {
+            if (!col_key && type == realm::col_type_LinkList) {
                 type_str += "[]";
             }
         }
         else {
             type_str = get_data_type_name(realm::DataType(type));
-            if (col_key && col_key.get_attrs().test(realm::col_attr_List)) {
-                type_str += "[]";
-            }
-            if (attr & realm::col_attr_Nullable)
-                type_str += "?";
-            if (attr & realm::col_attr_Indexed)
-                type_str += " (indexed)";
         }
+        if (col_key) {
+            if (col_key.is_list())
+                type_str += "[]";
+            if (col_key.is_set())
+                type_str += "{}";
+            if (col_key.is_dictionary()) {
+                auto key_type = realm::DataType(m_column_types.get_val(i) >> 16);
+                type_str = std::string("{") + get_data_type_name(key_type) + ", " + type_str + "}";
+            }
+        }
+        if (attr & realm::col_attr_Nullable)
+            type_str += "?";
+        if (attr & realm::col_attr_Indexed)
+            type_str += " (indexed)";
         std::string star = (m_pk_col && (m_pk_col == col_key)) ? "*" : "";
         std::cout << "        " << i << ": " << star << m_column_names.get_string(i) << ": " << type_str << std::endl;
     }

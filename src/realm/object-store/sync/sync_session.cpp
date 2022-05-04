@@ -437,10 +437,13 @@ void SyncSession::handle_error(SyncError error)
                         next_state = NextStateAfterError::inactive;
                         delete_file = ShouldBackup::yes;
                         break;
-                    case ClientResyncMode::DiscardLocal: {
+                    case ClientResyncMode::DiscardLocal:
+                        [[fallthrough]];
+                    case ClientResyncMode::RecoverOrDiscard:
+                        [[fallthrough]];
+                    case ClientResyncMode::Recover:
                         download_fresh_realm();
                         return; // do not propgate the error to the user at this point
-                    }
                 }
                 break;
         }
@@ -563,25 +566,26 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy)
 {
     sync::Session::Config::ClientReset config;
-    config.discard_local = (session_config.client_resync_mode == ClientResyncMode::DiscardLocal);
-    config.notify_after_client_reset =
-        [notify = session_config.notify_after_client_reset](std::string local_path, VersionID previous_version) {
-            REALM_ASSERT(!local_path.empty());
-            SharedRealm frozen_before, active_after;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                auto local_config = local_coordinator->get_config();
-                active_after = local_coordinator->get_realm(local_config, util::none);
-                local_config.scheduler = nullptr;
-                frozen_before = local_coordinator->get_realm(local_config, previous_version);
-                REALM_ASSERT(active_after);
-                REALM_ASSERT(!active_after->is_frozen());
-                REALM_ASSERT(frozen_before);
-                REALM_ASSERT(frozen_before->is_frozen());
-            }
-            if (notify) {
-                notify(frozen_before, active_after);
-            }
-        };
+    REALM_ASSERT(session_config.client_resync_mode != ClientResyncMode::Manual);
+    config.mode = session_config.client_resync_mode;
+    config.notify_after_client_reset = [notify = session_config.notify_after_client_reset](
+                                           std::string local_path, VersionID previous_version, bool did_recover) {
+        REALM_ASSERT(!local_path.empty());
+        SharedRealm frozen_before, active_after;
+        if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            auto local_config = local_coordinator->get_config();
+            active_after = local_coordinator->get_realm(local_config, util::none);
+            local_config.scheduler = nullptr;
+            frozen_before = local_coordinator->get_realm(local_config, previous_version);
+            REALM_ASSERT(active_after);
+            REALM_ASSERT(!active_after->is_frozen());
+            REALM_ASSERT(frozen_before);
+            REALM_ASSERT(frozen_before->is_frozen());
+        }
+        if (notify) {
+            notify(frozen_before, active_after, did_recover);
+        }
+    };
     config.notify_before_client_reset = [notify = session_config.notify_before_client_reset](std::string local_path) {
         REALM_ASSERT(!local_path.empty());
         SharedRealm frozen_local;

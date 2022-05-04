@@ -27,6 +27,7 @@
 #include "util/test_utils.hpp"
 
 #include <realm/sync/noinst/client_reset_operation.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
@@ -37,7 +38,12 @@
 #include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
+#include <realm/util/flat_map.hpp>
+#include <realm/util/overload.hpp>
 
+#include <external/mpark/variant.hpp>
+
+#include <algorithm>
 #include <iostream>
 
 struct ThreadSafeSyncError {
@@ -79,6 +85,16 @@ struct StringMaker<ThreadSafeSyncError> {
 
 using namespace realm;
 
+namespace realm {
+class TestHelper {
+public:
+    static DBRef& get_db(SharedRealm const& shared_realm)
+    {
+        return Realm::Internal::get_db(*shared_realm);
+    }
+};
+} // namespace realm
+
 namespace {
 TableRef get_table(Realm& realm, StringData object_type)
 {
@@ -103,7 +119,10 @@ Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
     FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }
+
 } // anonymous namespace
+
+namespace cf = realm::collection_fixtures;
 
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
@@ -212,62 +231,374 @@ TEST_CASE("sync: client reset", "[client reset]") {
         FAIL("Error handler should not have been called");
     };
 
-    SECTION("discard local") {
-        local_config.cache = false;
-        local_config.automatic_change_notifications = false;
-        local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-        const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
-        size_t before_callback_invoctions = 0;
-        size_t after_callback_invocations = 0;
-        std::mutex mtx;
-        local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
-            std::lock_guard<std::mutex> lock(mtx);
-            ++before_callback_invoctions;
-            REQUIRE(before);
-            REQUIRE(before->is_frozen());
-            REQUIRE(before->read_group().get_table("class_object"));
-            REQUIRE(before->config().path == local_config.path);
-            REQUIRE(util::File::exists(local_config.path));
-        };
-        local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after) {
-            std::lock_guard<std::mutex> lock(mtx);
-            ++after_callback_invocations;
-            REQUIRE(before);
-            REQUIRE(before->is_frozen());
-            REQUIRE(before->read_group().get_table("class_object"));
-            REQUIRE(before->config().path == local_config.path);
-            REQUIRE(after);
-            REQUIRE(!after->is_frozen());
-            REQUIRE(after->read_group().get_table("class_object"));
-            REQUIRE(after->config().path == local_config.path);
-            REQUIRE(after->current_transaction_version() > before->current_transaction_version());
-        };
+    local_config.cache = false;
+    local_config.automatic_change_notifications = false;
+    const std::string fresh_path = realm::_impl::ClientResetOperation::get_fresh_path_for(local_config.path);
+    size_t before_callback_invoctions = 0;
+    size_t after_callback_invocations = 0;
+    std::mutex mtx;
+    local_config.sync_config->notify_before_client_reset = [&](SharedRealm before) {
+        std::lock_guard<std::mutex> lock(mtx);
+        ++before_callback_invoctions;
+        REQUIRE(before);
+        REQUIRE(before->is_frozen());
+        REQUIRE(before->read_group().get_table("class_object"));
+        REQUIRE(before->config().path == local_config.path);
+        REQUIRE(util::File::exists(local_config.path));
+    };
+    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after, bool) {
+        std::lock_guard<std::mutex> lock(mtx);
+        ++after_callback_invocations;
+        REQUIRE(before);
+        REQUIRE(before->is_frozen());
+        REQUIRE(before->read_group().get_table("class_object"));
+        REQUIRE(before->config().path == local_config.path);
+        REQUIRE(after);
+        REQUIRE(!after->is_frozen());
+        REQUIRE(after->read_group().get_table("class_object"));
+        REQUIRE(after->config().path == local_config.path);
+        REQUIRE(after->current_transaction_version() > before->current_transaction_version());
+    };
 
-        Results results;
-        Object object;
-        CollectionChangeSet object_changes, results_changes;
-        NotificationToken object_token, results_token;
-        auto setup_listeners = [&](SharedRealm realm) {
-            results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"))
-                          .sort({{{"value", true}}});
-            if (results.size() >= 1) {
-                REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
+    Results results;
+    Object object;
+    CollectionChangeSet object_changes, results_changes;
+    NotificationToken object_token, results_token;
+    auto setup_listeners = [&](SharedRealm realm) {
+        results = Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object"))
+                      .sort({{{"value", true}}});
+        if (results.size() >= 1) {
+            REQUIRE(results.get<Obj>(0).get<Int>("value") == 4);
 
-                auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "object")->begin();
-                REQUIRE(obj.get<Int>("value") == 4);
-                object = Object(realm, obj);
-                object_token =
-                    object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                        REQUIRE_FALSE(err);
-                        object_changes = std::move(changes);
+            auto obj = results.get<Obj>(0);
+            REQUIRE(obj.get<Int>("value") == 4);
+            object = Object(realm, obj);
+            object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                object_changes = std::move(changes);
+            });
+        }
+        results_token = results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            results_changes = std::move(changes);
+        });
+    };
+
+    SECTION("recovery") {
+        local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
+        SECTION("modify an existing object") {
+            test_reset
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(object.obj().get<Int>("value") == 4);
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.modifications);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(local_config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+        SECTION("modify a deleted object") {
+            constexpr int64_t pk = -1;
+            test_reset
+                ->setup([&](SharedRealm realm) {
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    auto obj = create_object(*realm, "object", partition, {pk});
+                    auto col = obj.get_table()->get_column_key("value");
+                    obj.set(col, 100);
+                })
+                ->make_local_changes([&](SharedRealm realm) {
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 2);
+                    ObjKey key = table->get_objkey_from_primary_key(pk);
+                    REQUIRE(key);
+                    Obj obj = table->get_object(key);
+                    obj.set("value", 200);
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    auto table = get_table(*remote, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 2);
+                    ObjKey key = table->get_objkey_from_primary_key(pk);
+                    REQUIRE(key);
+                    table->remove_object(key);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 2);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(results.get<Obj>(1).get<Int>("value") == 200);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
+                    CHECK(results.size() == 1);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(object.obj().get<Int>("value") == 4);
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions, 1); // the deletion "wins"
+                    REQUIRE_INDICES(object_changes.modifications);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(local_config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+        SECTION("insert") {
+            int64_t new_value = 42;
+            test_reset
+                ->make_local_changes([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    int64_t different_pk = table->begin()->get_primary_key().get_int() + 1;
+                    auto obj = create_object(*realm, "object", partition, {different_pk});
+                    auto col = obj.get_table()->get_column_key("value");
+                    obj.set(col, new_value);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 2);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(before_callback_invoctions == 1);
+                    CHECK(after_callback_invocations == 1);
+                    CHECK(results.size() == 2);
+                    CHECK(results.get<Obj>(0).get<Int>("value") == 4);
+                    CHECK(results.get<Obj>(1).get<Int>("value") == new_value);
+                    CHECK(object.obj().get<Int>("value") == 4);
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                    REQUIRE_INDICES(object_changes.modifications);
+                    REQUIRE_INDICES(object_changes.insertions);
+                    REQUIRE_INDICES(object_changes.deletions);
+                    // make sure that the reset operation has cleaned up after itself
+                    REQUIRE(util::File::exists(local_config.path));
+                    REQUIRE_FALSE(util::File::exists(fresh_path));
+                })
+                ->run();
+        }
+
+        SECTION("delete") {
+            test_reset
+                ->make_local_changes([&](SharedRealm local) {
+                    auto table = get_table(*local, "object");
+                    REQUIRE(table);
+                    REQUIRE(table->size() == 1);
+                    table->clear();
+                    REQUIRE(table->size() == 0);
+                })
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    setup_listeners(realm);
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 0);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    REQUIRE_NOTHROW(advance_and_notify(*realm));
+                    CHECK(results.size() == 0);
+                    CHECK(!object.is_valid());
+                    REQUIRE_INDICES(results_changes.modifications);
+                    REQUIRE_INDICES(results_changes.insertions);
+                    REQUIRE_INDICES(results_changes.deletions);
+                })
+                ->run();
+        }
+
+        SECTION("Simultaneous compatible schema changes are allowed") {
+            const std::string new_table_name = "same new table name";
+            const std::string existing_table_name = "preexisting table name";
+            const std::string locally_added_table_name = "locally added table";
+            const std::string remotely_added_table_name = "remotely added table";
+            const Property pk_id = {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}};
+            const Property shared_added_property = {"added identical property",
+                                                    PropertyType::UUID | PropertyType::Nullable};
+            const Property locally_added_property = {"locally added property", PropertyType::ObjectId};
+            const Property remotely_added_property = {"remotely added property",
+                                                      PropertyType::Float | PropertyType::Nullable};
+            auto verify_changes = [&](SharedRealm realm) {
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                std::vector<std::string> tables_to_check = {existing_table_name, new_table_name,
+                                                            locally_added_table_name, remotely_added_table_name};
+                for (auto& table_name : tables_to_check) {
+                    CAPTURE(table_name);
+                    auto table = get_table(*realm, table_name);
+                    REQUIRE(table);
+                    REQUIRE(table->get_column_key(shared_added_property.name));
+                    REQUIRE(table->get_column_key(locally_added_property.name));
+                    REQUIRE(table->get_column_key(remotely_added_property.name));
+                    auto sorted_results = table->get_sorted_view(table->get_column_key(pk_id.name));
+                    REQUIRE(sorted_results.size() == 2);
+                    REQUIRE(sorted_results.get_object(0).get_primary_key().get_int() == 1);
+                    REQUIRE(sorted_results.get_object(1).get_primary_key().get_int() == 2);
+                }
+            };
+            make_reset(local_config, remote_config)
+                ->setup([&](SharedRealm before) {
+                    before->update_schema(
+                        {
+                            {existing_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                })
+                ->make_local_changes([&](SharedRealm local) {
+                    local->update_schema(
+                        {
+                            {new_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 locally_added_property,
+                                 shared_added_property,
+                             }},
+                            {existing_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 locally_added_property,
+                                 shared_added_property,
+                             }},
+                            {locally_added_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 locally_added_property,
+                                 shared_added_property,
+                                 remotely_added_property,
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+
+                    create_object(*local, new_table_name, partition, {1});
+                    create_object(*local, existing_table_name, partition, {1});
+                    create_object(*local, locally_added_table_name, partition, {1});
+                    create_object(*local, locally_added_table_name, partition, {2});
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    remote->update_schema(
+                        {
+                            {new_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 remotely_added_property,
+                                 shared_added_property,
+                             }},
+                            {existing_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 remotely_added_property,
+                                 shared_added_property,
+                             }},
+                            {remotely_added_table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 remotely_added_property,
+                                 locally_added_property,
+                                 shared_added_property,
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+
+                    create_object(*remote, new_table_name, partition, {2});
+                    create_object(*remote, existing_table_name, partition, {2});
+                    create_object(*remote, remotely_added_table_name, partition, {1});
+                    create_object(*remote, remotely_added_table_name, partition, {2});
+                })
+                ->on_post_reset([&](SharedRealm local) {
+                    verify_changes(local);
+                })
+                ->run();
+            auto remote = Realm::get_shared_realm(remote_config);
+            wait_for_upload(*remote);
+            wait_for_download(*remote);
+            verify_changes(remote);
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
+        }
+
+        SECTION("incompatible property changes are rejected") {
+            const Property pk_id = {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}};
+            const std::string table_name = "new table";
+            const std::string prop_name = "new_property";
+            ThreadSafeSyncError err;
+            local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                err = error;
+            };
+            make_reset(local_config, remote_config)
+                ->make_local_changes([&](SharedRealm local) {
+                    local->update_schema(
+                        {
+                            {table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 {prop_name, PropertyType::Float},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                })
+                ->make_remote_changes([&](SharedRealm remote) {
+                    remote->update_schema(
+                        {
+                            {table_name,
+                             {
+                                 pk_id,
+                                 partition_prop,
+                                 {prop_name, PropertyType::Int},
+                             }},
+                        },
+                        0, nullptr, nullptr, true);
+                })
+                ->on_post_reset([&](SharedRealm realm) {
+                    util::EventLoop::main().run_until([&] {
+                        return bool(err);
                     });
-            }
-            results_token =
-                results.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
-                    REQUIRE_FALSE(err);
-                    results_changes = std::move(changes);
-                });
-        };
+                    REQUIRE_NOTHROW(realm->refresh());
+                })
+                ->run();
+            REQUIRE(err);
+            REQUIRE(err.value()->is_client_reset_requested());
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 0);
+        }
+    } // end recovery section
+
+    SECTION("discard local") {
+        local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         std::unique_ptr<reset_utils::TestClientReset> test_reset = make_reset(local_config, remote_config);
 
         SECTION("modify") {
@@ -372,7 +703,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions_2;
                 };
-                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm) {
+                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm, bool) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++after_callback_invocations_2;
                 };
@@ -386,7 +717,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 };
 
                 auto realm = Realm::get_shared_realm(temp_config);
-                wait_for_download(*realm);
+                wait_for_upload(*realm);
 
                 session = test_app_session.app()->sync_manager()->get_existing_session(temp_config.path);
                 REQUIRE(session);
@@ -1023,13 +1354,158 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 })
                 ->run();
         }
-    }
+    } // end discard local section
+
+    SECTION("cycle detection") {
+        auto has_reset_cycle_flag = [](SharedRealm realm) -> util::Optional<_impl::client_reset::PendingReset> {
+            auto db = TestHelper::get_db(realm);
+            auto rt = db->start_read();
+            return _impl::client_reset::has_pending_reset(rt);
+        };
+        ThreadSafeSyncError err;
+        local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+            err = error;
+        };
+        auto make_fake_previous_reset = [&local_config](ClientResyncMode type) {
+            local_config.sync_config->notify_before_client_reset = [previous_type = type](SharedRealm realm) {
+                auto db = TestHelper::get_db(realm);
+                auto wt = db->start_write();
+                _impl::client_reset::track_reset(wt, previous_type);
+                wt->commit();
+            };
+        };
+        SECTION("a normal reset adds and removes a cycle detection flag") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+            local_config.sync_config->notify_before_client_reset = [&](SharedRealm realm) {
+                auto flag = has_reset_cycle_flag(realm);
+                REQUIRE(!flag);
+                std::lock_guard<std::mutex> lock(mtx);
+                ++before_callback_invoctions;
+            };
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, SharedRealm realm,
+                                                                      bool did_recover) {
+                auto flag = has_reset_cycle_flag(realm);
+                REQUIRE(bool(flag));
+                REQUIRE(flag->type == ClientResyncMode::Recover);
+                REQUIRE(did_recover);
+                std::lock_guard<std::mutex> lock(mtx);
+                ++after_callback_invocations;
+            };
+            make_reset(local_config, remote_config)
+                ->on_post_local_changes([&](SharedRealm realm) {
+                    auto flag = has_reset_cycle_flag(realm);
+                    REQUIRE(!flag);
+                })
+                ->run();
+            REQUIRE(!err);
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
+        }
+        SECTION("In DiscardLocal mode: a previous failed discard reset is detected and generates an error") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
+            make_reset(local_config, remote_config)->run();
+            timed_sleeping_wait_for([&]() -> bool {
+                return !!err;
+            });
+            REQUIRE(err.value()->is_client_reset_requested());
+        }
+        SECTION("In Recover mode: a previous failed recover reset is detected and generates an error") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            make_fake_previous_reset(ClientResyncMode::Recover);
+            make_reset(local_config, remote_config)->run();
+            timed_sleeping_wait_for([&]() -> bool {
+                return !!err;
+            });
+            REQUIRE(err.value()->is_client_reset_requested());
+        }
+        SECTION("In Recover mode: a previous failed discard reset is detected and generates an error") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
+            make_reset(local_config, remote_config)->run();
+            timed_sleeping_wait_for([&]() -> bool {
+                return !!err;
+            });
+            REQUIRE(err.value()->is_client_reset_requested());
+        }
+        SECTION("In RecoverOrDiscard mode: a previous failed discard reset is detected and generates an error") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+            make_fake_previous_reset(ClientResyncMode::DiscardLocal);
+            make_reset(local_config, remote_config)->run();
+            timed_sleeping_wait_for([&]() -> bool {
+                return !!err;
+            });
+            REQUIRE(err.value()->is_client_reset_requested());
+        }
+        const int64_t added_pk = 12345;
+        auto has_added_object = [&](SharedRealm realm) -> bool {
+            REQUIRE_NOTHROW(realm->refresh());
+            auto table = get_table(*realm, "object");
+            REQUIRE(table);
+            ObjKey key = table->find_primary_key(added_pk);
+            return !!key;
+        };
+        SECTION(
+            "In RecoverOrDiscard mode: a previous failed recovery is detected and triggers a DiscardLocal reset") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+            make_fake_previous_reset(ClientResyncMode::Recover);
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+                                                                      bool did_recover) {
+                REQUIRE(!did_recover);
+                REQUIRE(has_added_object(before));
+                REQUIRE(!has_added_object(after)); // discarded insert due to fallback to DiscardLocal mode
+                std::lock_guard<std::mutex> lock(mtx);
+                ++after_callback_invocations;
+            };
+            make_reset(local_config, remote_config)
+                ->make_local_changes([&](SharedRealm realm) {
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    create_object(*realm, "object", partition, {added_pk});
+                })
+                ->run();
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return after_callback_invocations > 0 || err;
+                },
+                std::chrono::seconds(120));
+            REQUIRE(!err);
+        }
+        SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
+            local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+            make_fake_previous_reset(ClientResyncMode::Recover);
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+                                                                      bool did_recover) {
+                REQUIRE(!did_recover);
+                REQUIRE(has_added_object(before));
+                REQUIRE(!has_added_object(after)); // not recovered
+                std::lock_guard<std::mutex> lock(mtx);
+                ++after_callback_invocations;
+            };
+            make_reset(local_config, remote_config)
+                ->make_local_changes([&](SharedRealm realm) {
+                    auto table = get_table(*realm, "object");
+                    REQUIRE(table);
+                    create_object(*realm, "object", partition, {added_pk});
+                })
+                ->run();
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return after_callback_invocations > 0 || err;
+                },
+                std::chrono::seconds(120));
+            REQUIRE(!err);
+        }
+
+    } // end cycle detection
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
 namespace cf = realm::collection_fixtures;
-TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
+TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, cf::Int, cf::Bool, cf::Float,
                    cf::Double, cf::String, cf::Binary, cf::Date, cf::OID, cf::Decimal, cf::UUID,
                    cf::BoxedOptional<cf::Int>, cf::BoxedOptional<cf::Bool>, cf::BoxedOptional<cf::Float>,
                    cf::BoxedOptional<cf::Double>, cf::BoxedOptional<cf::OID>, cf::BoxedOptional<cf::UUID>,
@@ -1046,7 +1522,9 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
+    config.sync_config->client_resync_mode = test_mode;
     config.schema = Schema{
         {"object",
          {
@@ -1085,29 +1563,30 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
         });
     };
 
-    auto check_list = [&](Obj obj, std::vector<T> expected) {
+    auto check_list = [&](Obj obj, std::vector<T>& expected) {
         ColKey col = obj.get_table()->get_column_key("list");
         auto actual = obj.get_list_values<T>(col);
         REQUIRE(actual == expected);
     };
 
-    auto check_dictionary = [&](Obj obj, std::vector<std::pair<std::string, Mixed>> expected) {
+    auto check_dictionary = [&](Obj obj, std::map<std::string, Mixed>& expected) {
         ColKey col = obj.get_table()->get_column_key("dictionary");
         Dictionary dict = obj.get_dictionary(col);
         REQUIRE(dict.size() == expected.size());
-        for (auto pair : expected) {
+        for (auto& pair : expected) {
             auto it = dict.find(pair.first);
             REQUIRE(it != dict.end());
             REQUIRE((*it).second == pair.second);
         }
     };
 
-    auto check_set = [&](Obj obj, std::vector<Mixed> expected) {
+    auto check_set = [&](Obj obj, std::set<Mixed>& expected) {
         ColKey col = obj.get_table()->get_column_key("set");
         SetBasePtr set = obj.get_setbase_ptr(col);
         REQUIRE(set->size() == expected.size());
-        for (auto value : expected) {
+        for (auto& value : expected) {
             auto ndx = set->find_any(value);
+            CAPTURE(value);
             REQUIRE(ndx != realm::not_found);
         }
     };
@@ -1163,9 +1642,10 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_value(results.get<Obj>(0), remote_state);
-                    check_value(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    T expected_state = (test_mode == ClientResyncMode::DiscardLocal) ? remote_state : local_state;
+                    check_value(results.get<Obj>(0), expected_state);
+                    check_value(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1210,7 +1690,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             obj.template set_list_values<T>(col, {initial_list_value});
         });
 
-        auto reset_list = [&](std::vector<T> local_state, std::vector<T> remote_state) {
+        auto reset_list = [&](std::vector<T>&& local_state, std::vector<T>&& remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1240,9 +1720,13 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_list(results.get<Obj>(0), remote_state);
-                    check_list(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    std::vector<T>& expected_state = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        expected_state = local_state;
+                    }
+                    check_list(results.get<Obj>(0), expected_state);
+                    check_list(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1301,8 +1785,8 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             dict.insert(dict_key, Mixed{values[0]});
         });
 
-        auto reset_dictionary = [&](std::vector<std::pair<std::string, Mixed>> local_state,
-                                    std::vector<std::pair<std::string, Mixed>> remote_state) {
+        auto reset_dictionary = [&](std::map<std::string, Mixed>&& local_state,
+                                    std::map<std::string, Mixed>&& remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1310,7 +1794,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("dictionary");
                     Dictionary dict = table->begin()->get_dictionary(col);
-                    for (auto pair : local_state) {
+                    for (auto& pair : local_state) {
                         dict.insert(pair.first, pair.second);
                     }
                     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -1328,7 +1812,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE(table->size() == 1);
                     ColKey col = table->get_column_key("dictionary");
                     Dictionary dict = table->begin()->get_dictionary(col);
-                    for (auto pair : remote_state) {
+                    for (auto& pair : remote_state) {
                         dict.insert(pair.first, pair.second);
                     }
                     for (auto it = dict.begin(); it != dict.end(); ++it) {
@@ -1353,9 +1837,19 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_dictionary(results.get<Obj>(0), remote_state);
-                    check_dictionary(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+
+                    auto& expected_state = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        for (auto it : local_state) {
+                            expected_state[it.first] = it.second;
+                        }
+                        if (local_state.find(dict_key) == local_state.end()) {
+                            expected_state.erase(dict_key); // explict erasure of initial state occured
+                        }
+                    }
+                    check_dictionary(results.get<Obj>(0), expected_state);
+                    check_dictionary(object.obj(), expected_state);
+                    if (local_state == expected_state) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1378,19 +1872,19 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {{dict_key, Mixed{values[0]}}});
         }
         SECTION("modify complex") {
-            std::vector<std::pair<std::string, Mixed>> local;
-            local.emplace_back("adam", Mixed(values[0]));
-            local.emplace_back("bernie", Mixed(values[0]));
-            local.emplace_back("david", Mixed(values[0]));
-            local.emplace_back("eric", Mixed(values[0]));
-            local.emplace_back("frank", Mixed(values[1]));
-            std::vector<std::pair<std::string, Mixed>> remote;
-            remote.emplace_back("adam", Mixed(values[0]));
-            remote.emplace_back("bernie", Mixed(values[1]));
-            remote.emplace_back("carl", Mixed(values[0]));
-            remote.emplace_back("david", Mixed(values[1]));
-            remote.emplace_back("frank", Mixed(values[0]));
-            reset_dictionary(local, remote);
+            std::map<std::string, Mixed> local;
+            local.emplace(std::make_pair("adam", Mixed(values[0])));
+            local.emplace(std::make_pair("bernie", Mixed(values[0])));
+            local.emplace(std::make_pair("david", Mixed(values[0])));
+            local.emplace(std::make_pair("eric", Mixed(values[0])));
+            local.emplace(std::make_pair("frank", Mixed(values[1])));
+            std::map<std::string, Mixed> remote;
+            remote.emplace(std::make_pair("adam", Mixed(values[0])));
+            remote.emplace(std::make_pair("bernie", Mixed(values[1])));
+            remote.emplace(std::make_pair("carl", Mixed(values[0])));
+            remote.emplace(std::make_pair("david", Mixed(values[1])));
+            remote.emplace(std::make_pair("frank", Mixed(values[0])));
+            reset_dictionary(std::move(local), std::move(remote));
         }
         SECTION("empty remote") {
             reset_dictionary({{dict_key, Mixed{values[1]}}}, {});
@@ -1409,7 +1903,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     SECTION("set") {
         int64_t pk_val = 0;
 
-        auto reset_set = [&](std::vector<Mixed> local_state, std::vector<Mixed> remote_state) {
+        auto reset_set = [&](std::set<Mixed> local_state, std::set<Mixed> remote_state) {
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
                     auto table = get_table(*local_realm, "test type");
@@ -1418,7 +1912,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     SetBasePtr set = table->begin()->get_setbase_ptr(col);
                     for (size_t i = set->size(); i > 0; --i) {
                         Mixed si = set->get_any(i - 1);
-                        if (std::find(local_state.begin(), local_state.end(), si) == local_state.end()) {
+                        if (local_state.find(si) == local_state.end()) {
                             set->erase_any(si);
                         }
                     }
@@ -1433,7 +1927,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     SetBasePtr set = table->begin()->get_setbase_ptr(col);
                     for (size_t i = set->size(); i > 0; --i) {
                         Mixed si = set->get_any(i - 1);
-                        if (std::find(remote_state.begin(), remote_state.end(), si) == remote_state.end()) {
+                        if (remote_state.find(si) == remote_state.end()) {
                             set->erase_any(si);
                         }
                     }
@@ -1454,9 +1948,20 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
-                    check_set(results.get<Obj>(0), remote_state);
-                    check_set(object.obj(), remote_state);
-                    if (local_state == remote_state) {
+                    std::set<Mixed>& expected = remote_state;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        bool do_erase_initial = remote_state.find(Mixed{values[0]}) == remote_state.end() ||
+                                                local_state.find(Mixed{values[0]}) == local_state.end();
+                        for (auto& e : local_state) {
+                            expected.insert(e);
+                        }
+                        if (do_erase_initial) {
+                            expected.erase(Mixed{values[0]}); // explicit erase of initial element occured
+                        }
+                    }
+                    check_set(results.get<Obj>(0), expected);
+                    check_set(object.obj(), expected);
+                    if (local_state == expected) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1510,17 +2015,145 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][discard local]", cf::Mi
     }
 }
 
-TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard local][collections]",
+namespace test_instructions {
+
+struct Add {
+    Add(util::Optional<int64_t> key)
+        : pk(key)
+    {
+    }
+    util::Optional<int64_t> pk;
+};
+
+struct Remove {
+    Remove(util::Optional<int64_t> key)
+        : pk(key)
+    {
+    }
+    util::Optional<int64_t> pk;
+};
+
+struct Clear {
+};
+
+struct RemoveObject {
+    RemoveObject(std::string_view name, util::Optional<int64_t> key)
+        : pk(key)
+        , class_name(name)
+    {
+    }
+    util::Optional<int64_t> pk;
+    std::string_view class_name;
+};
+
+struct CreateObject {
+    CreateObject(std::string_view name, util::Optional<int64_t> key)
+        : pk(key)
+        , class_name(name)
+    {
+    }
+    util::Optional<int64_t> pk;
+    std::string_view class_name;
+};
+
+struct Move {
+    Move(size_t from_ndx, size_t to_ndx)
+        : from(from_ndx)
+        , to(to_ndx)
+    {
+    }
+    size_t from;
+    size_t to;
+};
+
+struct CollectionOperation {
+    CollectionOperation(Add op)
+        : m_op(op)
+    {
+    }
+    CollectionOperation(Remove op)
+        : m_op(op)
+    {
+    }
+    CollectionOperation(RemoveObject op)
+        : m_op(op)
+    {
+    }
+    CollectionOperation(CreateObject op)
+        : m_op(op)
+    {
+    }
+    CollectionOperation(Clear op)
+        : m_op(op)
+    {
+    }
+    CollectionOperation(Move op)
+        : m_op(op)
+    {
+    }
+    void apply(collection_fixtures::LinkedCollectionBase* collection, Obj src_obj, TableRef dst_table)
+    {
+        mpark::visit(
+            util::overload{
+                [&](Add add_link) {
+                    Mixed pk_to_add = add_link.pk ? Mixed{add_link.pk} : Mixed{};
+                    ObjKey dst_key = dst_table->find_primary_key(pk_to_add);
+                    REALM_ASSERT(dst_key);
+                    collection->add_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                },
+                [&](Remove remove_link) {
+                    Mixed pk_to_remove = remove_link.pk ? Mixed{remove_link.pk} : Mixed{};
+                    ObjKey dst_key = dst_table->find_primary_key(pk_to_remove);
+                    REALM_ASSERT(dst_key);
+                    bool did_remove = collection->remove_link(src_obj, ObjLink{dst_table->get_key(), dst_key});
+                    REALM_ASSERT(did_remove);
+                },
+                [&](RemoveObject remove_object) {
+                    Group* group = dst_table->get_parent_group();
+                    Group::TableNameBuffer buffer;
+                    TableRef table =
+                        group->get_table(Group::class_name_to_table_name(remove_object.class_name, buffer));
+                    REALM_ASSERT(table);
+                    ObjKey dst_key = table->find_primary_key(Mixed{remove_object.pk});
+                    REALM_ASSERT(dst_key);
+                    table->remove_object(dst_key);
+                },
+                [&](CreateObject create_object) {
+                    Group* group = dst_table->get_parent_group();
+                    Group::TableNameBuffer buffer;
+                    TableRef table =
+                        group->get_table(Group::class_name_to_table_name(create_object.class_name, buffer));
+                    REALM_ASSERT(table);
+                    table->create_object_with_primary_key(Mixed{create_object.pk});
+                },
+                [&](Clear) {
+                    collection->clear_collection(src_obj);
+                },
+                [&](Move move) {
+                    collection->move(src_obj, move.from, move.to);
+                }},
+            m_op);
+    }
+
+private:
+    mpark::variant<Add, Remove, Clear, RemoveObject, CreateObject, Move> m_op;
+};
+
+} // namespace test_instructions
+
+TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][links][collections]",
                    cf::ListOfObjects, cf::ListOfMixedLinks, cf::SetOfObjects, cf::SetOfMixedLinks,
                    cf::DictionaryOfObjects, cf::DictionaryOfMixedLinks)
 {
     if (!util::EventLoop::has_implementation())
         return;
 
+    using namespace test_instructions;
     const std::string valid_pk_name = "_id";
     const auto partition = random_string(100);
     const std::string collection_prop_name = "collection";
     TestType test_type(collection_prop_name, "dest");
+    constexpr bool test_type_is_array = realm::is_any_v<TestType, cf::ListOfObjects, cf::ListOfMixedLinks>;
     Schema schema = {
         {"source",
          {{valid_pk_name, PropertyType::Int | PropertyType::Nullable, true},
@@ -1544,7 +2177,9 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
+    config.sync_config->client_resync_mode = test_mode;
 
     SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = schema;
@@ -1564,34 +2199,52 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
         }
     };
 
-    auto create_one_dest_object = [&](realm::SharedRealm r, int64_t val) -> ObjLink {
+    auto create_one_dest_object = [&](realm::SharedRealm r, util::Optional<int64_t> val) -> ObjLink {
+        util::Any v;
+        if (val) {
+            v = util::Any(*val);
+        }
         auto obj = Object::create(
             c, r, "dest",
-            util::Any(realm::AnyDict{{valid_pk_name, util::Any(val)}, {"realm_id", std::string(partition)}}),
+            util::Any(realm::AnyDict{{valid_pk_name, std::move(v)}, {"realm_id", std::string(partition)}}),
             CreatePolicy::ForceCreate);
         return ObjLink{obj.obj().get_table()->get_key(), obj.obj().get_key()};
     };
 
-    auto require_links_to_match_ids = [&](std::vector<Obj> links, std::vector<int64_t> expected) {
-        std::vector<int64_t> actual;
+    auto require_links_to_match_ids = [&](std::vector<Obj>& links, std::vector<util::Optional<int64_t>>& expected,
+                                          bool sorted) {
+        std::vector<util::Optional<int64_t>> actual;
         for (auto obj : links) {
-            actual.push_back(obj.get<Int>(valid_pk_name));
+            if (obj.is_null(valid_pk_name)) {
+                actual.push_back(util::none);
+            }
+            else {
+                actual.push_back(obj.get<Int>(valid_pk_name));
+            }
         }
-        std::sort(actual.begin(), actual.end());
-        std::sort(expected.begin(), expected.end());
+        if (sorted) {
+            std::sort(actual.begin(), actual.end());
+        }
         REQUIRE(actual == expected);
     };
+
+    constexpr int64_t source_pk = 0;
+    constexpr util::Optional<int64_t> dest_pk_1 = 1;
+    constexpr util::Optional<int64_t> dest_pk_2 = 2;
+    constexpr util::Optional<int64_t> dest_pk_3 = 3;
+    constexpr util::Optional<int64_t> dest_pk_4 = 4;
+    constexpr util::Optional<int64_t> dest_pk_5 = 5;
 
     Results results;
     Object object;
     CollectionChangeSet object_changes, results_changes;
     NotificationToken object_token, results_token;
     auto setup_listeners = [&](SharedRealm realm) {
-        results =
-            Results(realm, ObjectStore::table_for_object_type(realm->read_group(), "source")).sort({{{"_id", true}}});
-        if (results.size() >= 1) {
-            auto obj = *ObjectStore::table_for_object_type(realm->read_group(), "source")->begin();
-            object = Object(realm, obj);
+        TableRef source_table = get_table(*realm, "source");
+        ColKey id_col = source_table->get_column_key("_id");
+        results = Results(realm, source_table->where().equal(id_col, source_pk));
+        if (auto obj = results.first()) {
+            object = Object(realm, *obj);
             object_token = object.add_notification_callback([&](CollectionChangeSet changes, std::exception_ptr err) {
                 REQUIRE_FALSE(err);
                 object_changes = std::move(changes);
@@ -1602,61 +2255,53 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
             results_changes = std::move(changes);
         });
     };
-    auto set_links = [&](SharedRealm realm, std::vector<int64_t>& link_pks) {
+
+    auto get_source_object = [&](SharedRealm realm) -> Obj {
         TableRef src_table = get_table(*realm, "source");
-        REQUIRE(src_table->size() == 1);
+        return src_table->try_get_object(src_table->find_primary_key(Mixed{source_pk}));
+    };
+    auto apply_instructions = [&](SharedRealm realm, std::vector<CollectionOperation>& instructions) {
         TableRef dst_table = get_table(*realm, "dest");
-        std::vector<Obj> linked_objects = test_type.get_links(*src_table->begin());
-        if (is_array(test_type.property().type)) {
-            // order matters for lists, leave it be if they are identical,
-            // otherwise clear and add everything in the correct order
-            bool equal = std::equal(linked_objects.begin(), linked_objects.end(), link_pks.begin(), link_pks.end(),
-                                    [&](const Obj& obj, const int64_t& pk) {
-                                        return obj.get_primary_key().template get<int64_t>() == pk;
-                                    });
-            if (!equal) {
-                test_type.clear_collection(*src_table->begin());
-                for (size_t i = 0; i < link_pks.size(); ++i) {
-                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{link_pks[i]});
-                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
-                }
-            }
-        }
-        else {
-            for (auto lnk : linked_objects) {
-                int64_t lnk_pk = lnk.get_primary_key().get<int64_t>();
-                if (std::find(link_pks.begin(), link_pks.end(), lnk_pk) == link_pks.end()) {
-                    test_type.remove_link(*src_table->begin(), ObjLink{lnk.get_table()->get_key(), lnk.get_key()});
-                }
-            }
-            REQUIRE(dst_table);
-            for (int64_t lnk_pk : link_pks) {
-                if (std::find_if(linked_objects.begin(), linked_objects.end(), [lnk_pk](auto& lnk) {
-                        return lnk.get_primary_key().template get<int64_t>() == lnk_pk;
-                    }) == linked_objects.end()) {
-                    ObjKey dst_key = dst_table->get_objkey_from_primary_key(Mixed{lnk_pk});
-                    REQUIRE(dst_key);
-                    test_type.add_link(*src_table->begin(), ObjLink{dst_table->get_key(), dst_key});
-                }
-            }
+        for (auto& instruction : instructions) {
+            Obj src_obj = get_source_object(realm);
+            instruction.apply(&test_type, src_obj, dst_table);
         }
     };
 
-    SECTION("integration testing") {
-        auto reset_collection = [&](std::vector<int64_t> local_pk_links, std::vector<int64_t> remote_pk_links) {
+    auto reset_collection =
+        [&](std::vector<CollectionOperation>&& local_ops, std::vector<CollectionOperation>&& remote_ops,
+            std::vector<util::Optional<int64_t>>&& expected_recovered_state, size_t num_expected_nulls = 0) {
+            std::vector<util::Optional<int64_t>> remote_pks;
+            std::vector<util::Optional<int64_t>> local_pks;
             test_reset
                 ->make_local_changes([&](SharedRealm local_realm) {
-                    set_links(local_realm, local_pk_links);
+                    apply_instructions(local_realm, local_ops);
+                    Obj source_obj = get_source_object(local_realm);
+                    if (source_obj) {
+                        auto local_links = test_type.get_links(source_obj);
+                        std::transform(local_links.begin(), local_links.end(), std::back_inserter(local_pks),
+                                       [](auto obj) -> util::Optional<int64_t> {
+                                           Mixed pk = obj.get_primary_key();
+                                           return pk.is_null() ? util::none : util::make_optional(pk.get_int());
+                                       });
+                    }
                 })
                 ->make_remote_changes([&](SharedRealm remote_realm) {
-                    set_links(remote_realm, remote_pk_links);
+                    apply_instructions(remote_realm, remote_ops);
+                    Obj source_obj = get_source_object(remote_realm);
+                    if (source_obj) {
+                        auto remote_links = test_type.get_links(source_obj);
+                        std::transform(remote_links.begin(), remote_links.end(), std::back_inserter(remote_pks),
+                                       [](auto obj) -> util::Optional<int64_t> {
+                                           Mixed pk = obj.get_primary_key();
+                                           return pk.is_null() ? util::none : util::make_optional(pk.get_int());
+                                       });
+                    }
                 })
                 ->on_post_local_changes([&](SharedRealm realm) {
                     setup_listeners(realm);
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 1);
-                    auto linked_objects = test_type.get_links(results.get(0));
-                    require_links_to_match_ids(linked_objects, local_pk_links);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     object_changes = {};
@@ -1665,13 +2310,23 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
                     CHECK(results.size() == 1);
                     CHECK(object.is_valid());
                     auto linked_objects = test_type.get_links(results.get(0));
-                    require_links_to_match_ids(linked_objects, remote_pk_links);
-                    if (!is_array(test_type.property().type)) {
-                        // order should not matter except for lists
-                        std::sort(local_pk_links.begin(), local_pk_links.end());
-                        std::sort(remote_pk_links.begin(), remote_pk_links.end());
+                    std::vector<util::Optional<int64_t>>& expected_links = remote_pks;
+                    if (test_mode == ClientResyncMode::Recover) {
+                        expected_links = expected_recovered_state;
+                        size_t expected_size = expected_links.size();
+                        if (!test_type.will_erase_removed_object_links()) {
+                            // dictionary size will remain the same because the key is preserved with a null value
+                            expected_size += num_expected_nulls;
+                        }
+                        CHECK(test_type.size_of_collection(results.get(0)) == expected_size);
                     }
-                    if (local_pk_links == remote_pk_links) {
+                    if (!test_type_is_array) {
+                        // order should not matter except for lists
+                        std::sort(local_pks.begin(), local_pks.end());
+                        std::sort(expected_links.begin(), expected_links.end());
+                    }
+                    require_links_to_match_ids(linked_objects, expected_links, !test_type_is_array);
+                    if (local_pks == expected_links) {
                         REQUIRE_INDICES(results_changes.modifications);
                         REQUIRE_INDICES(object_changes.modifications);
                     }
@@ -1687,62 +2342,232 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][discard 
                 ->run();
         };
 
-        constexpr int64_t source_pk = 0;
-        constexpr int64_t dest_pk_1 = 1;
-        constexpr int64_t dest_pk_2 = 2;
-        constexpr int64_t dest_pk_3 = 3;
+    auto reset_collection_removing_source_object = [&](std::vector<CollectionOperation>&& local_ops,
+                                                       std::vector<CollectionOperation>&& remote_ops) {
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                apply_instructions(local_realm, local_ops);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                apply_instructions(remote_realm, remote_ops);
+            })
+            ->on_post_reset([&](SharedRealm realm) {
+                REQUIRE_NOTHROW(advance_and_notify(*realm));
+                TableRef table = realm->read_group().get_table("class_source");
+                REQUIRE(!table->find_primary_key(Mixed{source_pk}));
+            })
+            ->run();
+    };
+
+    test_reset->setup([&](SharedRealm realm) {
+        test_type.reset_test_state();
+        // add a container collection with three valid links
+        ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
+        ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
+        ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
+        create_one_dest_object(realm, dest_pk_4);
+        create_one_dest_object(realm, dest_pk_5);
+        create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+    });
+
+    SECTION("no changes") {
+        reset_collection({}, {}, {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    SECTION("remote removes all") {
+        reset_collection({}, {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
+    }
+    SECTION("local removes all") { // local client state wins
+        reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {}, {});
+    }
+    SECTION("both remove all links") { // local client state wins
+        reset_collection({{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}},
+                         {{Remove{dest_pk_3}}, {Remove{dest_pk_2}}, {Remove{dest_pk_1}}}, {});
+    }
+    SECTION("local removes first link") { // local client state wins
+        reset_collection({{Remove{dest_pk_1}}}, {}, {dest_pk_2, dest_pk_3});
+    }
+    SECTION("local removes middle link") { // local client state wins
+        reset_collection({{Remove{dest_pk_2}}}, {}, {dest_pk_1, dest_pk_3});
+    }
+    SECTION("local removes last link") { // local client state wins
+        reset_collection({{Remove{dest_pk_3}}}, {}, {dest_pk_1, dest_pk_2});
+    }
+    SECTION("remote removes first link") {
+        reset_collection({}, {{Remove{dest_pk_1}}}, {dest_pk_2, dest_pk_3});
+    }
+    SECTION("remote removes middle link") {
+        reset_collection({}, {{Remove{dest_pk_2}}}, {dest_pk_1, dest_pk_3});
+    }
+    SECTION("remote removes last link") {
+        reset_collection({}, {{Remove{dest_pk_3}}}, {dest_pk_1, dest_pk_2});
+    }
+    SECTION("local adds a link with a null pk value") {
         test_reset->setup([&](SharedRealm realm) {
             test_type.reset_test_state();
-            // add a container collection with three valid links
-            ObjLink dest1 = create_one_dest_object(realm, dest_pk_1);
-            ObjLink dest2 = create_one_dest_object(realm, dest_pk_2);
-            ObjLink dest3 = create_one_dest_object(realm, dest_pk_3);
-            create_one_source_object(realm, source_pk, {dest1, dest2, dest3});
+            create_one_dest_object(realm, util::none);
+            create_one_source_object(realm, source_pk, {});
         });
-
-        SECTION("both empty") {
-            reset_collection({}, {});
+        reset_collection({Add{util::none}}, {}, {util::none});
+    }
+    SECTION("removal of different links") {
+        std::vector<util::Optional<int64_t>> expected = {dest_pk_2};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_2, dest_pk_3}; // local client state wins
         }
-        SECTION("remove all") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {});
+        reset_collection({Remove{dest_pk_1}}, {Remove{dest_pk_3}}, std::move(expected));
+    }
+    SECTION("local addition") {
+        reset_collection({Add{dest_pk_4}}, {}, {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("remote addition") {
+        reset_collection({}, {Add{dest_pk_4}}, {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("both addition of different items") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_5});
+    }
+    SECTION("both addition of same items") {
+        std::vector<util::Optional<int64_t>> expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4, dest_pk_4};
         }
-        SECTION("no change") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        // dictionary has added the new link to the same key on both sides
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}}, std::move(expected));
+    }
+    SECTION("local add/delete, remote add/delete/add different") {
+        reset_collection({Add{dest_pk_4}, Remove{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5});
+    }
+    SECTION("remote add/delete, local add") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_5}, Remove{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_4});
+    }
+    SECTION("local remove, remote add") {
+        std::vector<util::Optional<int64_t>> expected = {dest_pk_1, dest_pk_3, dest_pk_4, dest_pk_5};
+        if constexpr (test_type_is_array) {
+            expected = {dest_pk_1, dest_pk_3}; // local client state wins
         }
-        SECTION("remove middle link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_3});
+        reset_collection({Remove{dest_pk_2}}, {Add{dest_pk_4}, Add{dest_pk_5}}, std::move(expected));
+    }
+    SECTION("local adds link to remotely deleted object") {
+        reset_collection({Add{dest_pk_4}}, {RemoveObject{"dest", dest_pk_4}}, {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
+    }
+    SECTION("local clear") {
+        reset_collection({Clear{}}, {}, {});
+    }
+    SECTION("remote clear") {
+        reset_collection({}, {Clear{}}, {});
+    }
+    SECTION("both clear") {
+        reset_collection({Clear{}}, {Clear{}}, {});
+    }
+    SECTION("both clear and add") {
+        reset_collection({Clear{}, Add{dest_pk_1}}, {Clear{}, Add{dest_pk_2}}, {dest_pk_1});
+    }
+    SECTION("both clear and add/remove/add/add") {
+        reset_collection({Clear{}, Add{dest_pk_1}, Remove{dest_pk_1}, Add{dest_pk_2}, Add{dest_pk_3}},
+                         {Clear{}, Add{dest_pk_1}, Remove{dest_pk_1}, Add{dest_pk_2}, Add{dest_pk_3}},
+                         {dest_pk_2, dest_pk_3});
+    }
+    SECTION("local add to remotely deleted object") {
+        reset_collection({Add{dest_pk_4}}, {Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3}, 1);
+    }
+    SECTION("remote adds link to locally deleted object with link") {
+        reset_collection({Add{dest_pk_4}, RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
+    }
+    SECTION("remote adds link to locally deleted object without link") {
+        reset_collection({RemoveObject{"dest", dest_pk_4}}, {Add{dest_pk_4}, Add{dest_pk_5}},
+                         {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
+    }
+    if (test_mode == ClientResyncMode::Recover) {
+        SECTION("local removes source object, remote modifies list") {
+            reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
+                                                    {Add{dest_pk_5}});
         }
-        SECTION("remove first link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2, dest_pk_3});
+        SECTION("remote removes source object, recover local modifications") {
+            reset_collection_removing_source_object({Add{dest_pk_4}, Clear{}}, {RemoveObject{"source", source_pk}});
         }
-        SECTION("remove last link") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2});
+        SECTION("remote removes source object, local attempts to ccpy over list state") {
+            reset_collection_removing_source_object({Remove{dest_pk_1}}, {RemoveObject{"source", source_pk}});
         }
-        SECTION("remove outside links") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_2});
+        SECTION("remote removes source object, local adds it back and modifies it") {
+            reset_collection({Add{dest_pk_4}, RemoveObject{"source", source_pk}, CreateObject{"source", source_pk},
+                              Add{dest_pk_1}},
+                             {RemoveObject{"source", source_pk}}, {dest_pk_1});
         }
-        SECTION("additive") {
-            reset_collection({}, {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    else if (test_mode == ClientResyncMode::DiscardLocal) {
+        SECTION("remote removes source object") {
+            reset_collection_removing_source_object({Add{dest_pk_4}}, {RemoveObject{"source", source_pk}});
         }
-        SECTION("add middle") {
-            reset_collection({dest_pk_1, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+    }
+    if constexpr (test_type_is_array) {
+        SECTION("local moves on non-added elements causes a diff which overrides server changes") {
+            reset_collection({Move{0, 1}, Add{dest_pk_5}}, {Add{dest_pk_4}},
+                             {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5});
         }
-        SECTION("add first") {
-            reset_collection({dest_pk_2, dest_pk_3}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        SECTION("local moves on added elements can be merged with remote moves") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Move{0, 1}},
+                             {dest_pk_2, dest_pk_1, dest_pk_3, dest_pk_5, dest_pk_4});
         }
-        SECTION("add last") {
-            reset_collection({dest_pk_1, dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        SECTION("local moves on added elements can be merged with remote additions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Add{dest_pk_1}, Add{dest_pk_2}},
+                             {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5, dest_pk_4, dest_pk_1, dest_pk_2});
         }
-        SECTION("add outside") {
-            reset_collection({dest_pk_2}, {dest_pk_1, dest_pk_2, dest_pk_3});
+        SECTION("local moves on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}}, {Remove{dest_pk_1}, Remove{dest_pk_2}},
+                             {dest_pk_3, dest_pk_5, dest_pk_4});
         }
-        SECTION("reversed order") {
-            reset_collection({dest_pk_1, dest_pk_2, dest_pk_3}, {dest_pk_3, dest_pk_2, dest_pk_1});
+        SECTION("local move (down) on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}}, {Remove{dest_pk_1}, Remove{dest_pk_2}},
+                             {dest_pk_3, dest_pk_5, dest_pk_4});
+        }
+        SECTION("local move with delete on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{3, 4}, Remove{dest_pk_5}},
+                             {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
+        }
+        SECTION("local move (down) with delete on added elements can be merged with remote deletions") {
+            reset_collection({Add{dest_pk_4}, Add{dest_pk_5}, Move{4, 3}, Remove{dest_pk_5}},
+                             {Remove{dest_pk_1}, Remove{dest_pk_2}}, {dest_pk_3, dest_pk_4});
         }
     }
 }
 
-TEST_CASE("client reset with embedded object", "[client reset][discard local][embedded objects]") {
+template <typename T>
+void set_embedded_list(const std::vector<T>& array_values, LnkLst& list)
+{
+    for (size_t i = 0; i < array_values.size(); ++i) {
+        Obj link;
+        if (i >= list.size()) {
+            link = list.create_and_insert_linked_object(list.size());
+        }
+        else {
+            link = list.get_object(i);
+        }
+        array_values[i].assign_to(link);
+    }
+    if (list.size() > array_values.size()) {
+        if (array_values.size() == 0) {
+            list.clear();
+        }
+        else {
+            list.remove(array_values.size(), list.size());
+        }
+    }
+}
+
+template <typename T>
+void combine_array_values(std::vector<T>& from, const std::vector<T>& to)
+{
+    auto it = from.begin();
+    for (auto val : to) {
+        it = ++from.insert(it, val);
+    }
+}
+
+TEST_CASE("client reset with embedded object", "[client reset][local][embedded objects]") {
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -1750,7 +2575,9 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;
     config.automatic_change_notifications = false;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+    ClientResyncMode test_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    CAPTURE(test_mode);
+    config.sync_config->client_resync_mode = test_mode;
 
     ObjectSchema shared_class = {"object",
                                  {
@@ -1774,31 +2601,315 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
              {"array", PropertyType::Int | PropertyType::Array},
              {"name", PropertyType::String | PropertyType::Nullable},
              {"link_to_embedded_object2", PropertyType::Object | PropertyType::Nullable, "EmbeddedObject2"},
+             {"array_of_seconds", PropertyType::Object | PropertyType::Array, "EmbeddedObject2"},
+             {"int_value", PropertyType::Int},
          }},
         {"EmbeddedObject2",
          ObjectSchema::IsEmbedded{true},
          {
              {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
+             {"set_of_ids", PropertyType::Set | PropertyType::ObjectId | PropertyType::Nullable},
              {"date", PropertyType::Date},
              {"top_level_link", PropertyType::Object | PropertyType::Nullable, "TopLevel"},
          }},
     };
     struct SecondLevelEmbeddedContent {
-        std::vector<std::pair<std::string, std::string>> dict_values = {{"key A", random_string(10)},
-                                                                        {"key B", random_string(10)}};
+        using DictType = util::FlatMap<std::string, std::string>;
+        DictType dict_values = DictType::container_type{{"key A", random_string(10)}, {"key B", random_string(10)}};
+        std::set<ObjectId> set_of_objects = {ObjectId::gen(), ObjectId::gen()};
         Timestamp datetime = Timestamp{random_int(), 0};
         util::Optional<Mixed> pk_of_linked_object;
+        void apply_recovery_from(const SecondLevelEmbeddedContent& other)
+        {
+            datetime = other.datetime;
+            pk_of_linked_object = other.pk_of_linked_object;
+            for (auto it : other.dict_values) {
+                dict_values[it.first] = it.second;
+            }
+            for (auto oid : other.set_of_objects) {
+                set_of_objects.insert(oid);
+            }
+        }
+        void test(const SecondLevelEmbeddedContent& other) const
+        {
+            REQUIRE(datetime == other.datetime);
+            REQUIRE(pk_of_linked_object == other.pk_of_linked_object);
+            REQUIRE(set_of_objects == other.set_of_objects);
+            REQUIRE(dict_values.size() == other.dict_values.size());
+            for (auto kv : dict_values) {
+                INFO("dict_value: (" << kv.first << ", " << kv.second << ")");
+                auto it = other.dict_values.find(kv.first);
+                REQUIRE(it != other.dict_values.end());
+                REQUIRE(it->second == kv.second);
+            }
+        }
+        static SecondLevelEmbeddedContent get_from(Obj second)
+        {
+            REALM_ASSERT(second.is_valid());
+            SecondLevelEmbeddedContent content{};
+            content.datetime = second.get<Timestamp>("date");
+            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+            ObjKey actual_link = second.get<ObjKey>(top_link_col);
+            if (actual_link) {
+                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                Obj actual_top_obj = top_table->get_object(actual_link);
+                content.pk_of_linked_object = Mixed{actual_top_obj.get_primary_key()};
+            }
+            Dictionary dict = second.get_dictionary("notes");
+            content.dict_values.clear();
+            for (auto it : dict) {
+                content.dict_values.insert({it.first.get_string(), it.second.get_string()});
+            }
+            Set<ObjectId> set = second.get_set<ObjectId>("set_of_ids");
+            content.set_of_objects.clear();
+            for (auto oid : set) {
+                content.set_of_objects.insert(oid);
+            }
+            return content;
+        }
+        void assign_to(Obj second) const
+        {
+            if (second.get<Timestamp>("date") != datetime) {
+                second.set("date", datetime);
+            }
+            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
+            if (pk_of_linked_object) {
+                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
+                ObjKey top_link = top_table->find_primary_key(*(pk_of_linked_object));
+                second.set(top_link_col, top_link);
+            }
+            else {
+                if (!second.is_null(top_link_col)) {
+                    second.set_null(top_link_col);
+                }
+            }
+            Dictionary dict = second.get_dictionary("notes");
+            for (auto it = dict.begin(); it != dict.end(); ++it) {
+                if (std::find_if(dict_values.begin(), dict_values.end(), [&](auto& pair) {
+                        return pair.first == (*it).first.get_string();
+                    }) == dict_values.end()) {
+                    dict.erase(it);
+                }
+            }
+            for (auto& it : dict_values) {
+                auto existing = dict.find(it.first);
+                if (existing == dict.end() || (*existing).second.get_string() != it.second) {
+                    dict.insert(it.first, it.second);
+                }
+            }
+            Set<ObjectId> set = second.get_set<ObjectId>("set_of_ids");
+            if (set_of_objects.empty()) {
+                set.clear();
+            }
+            else {
+                std::vector<size_t> indices, to_remove;
+                set.sort(indices);
+                for (size_t ndx : indices) {
+                    if (set_of_objects.count(set.get(ndx)) == 0) {
+                        to_remove.push_back(ndx);
+                    }
+                }
+                std::sort(to_remove.rbegin(), to_remove.rend());
+                for (auto ndx : to_remove) {
+                    set.erase(set.get(ndx));
+                }
+                for (auto oid : set_of_objects) {
+                    if (set.find(oid) == realm::npos) {
+                        set.insert(oid);
+                    }
+                }
+            }
+        }
     };
+
     struct EmbeddedContent {
         std::string name = random_string(10);
+        int64_t int_value = random_int();
         std::vector<Int> array_vals = {random_int(), random_int(), random_int()};
         util::Optional<SecondLevelEmbeddedContent> second_level = SecondLevelEmbeddedContent();
+        std::vector<SecondLevelEmbeddedContent> array_of_seconds = {};
+        void apply_recovery_from(const EmbeddedContent& other)
+        {
+            name = other.name;
+            int_value = other.int_value;
+            combine_array_values(array_vals, other.array_vals);
+            if (second_level && other.second_level) {
+                second_level->apply_recovery_from(*other.second_level);
+            }
+            else {
+                second_level = other.second_level;
+            }
+        }
+        void test(const EmbeddedContent& other) const
+        {
+            INFO("Checking EmbeddedContent" << name);
+            REQUIRE(name == other.name);
+            REQUIRE(int_value == other.int_value);
+            REQUIRE(array_vals == other.array_vals);
+            REQUIRE(array_of_seconds.size() == other.array_of_seconds.size());
+            for (size_t i = 0; i < array_of_seconds.size(); ++i) {
+                array_of_seconds[i].test(other.array_of_seconds[i]);
+            }
+            if (!second_level) {
+                REQUIRE(!other.second_level);
+            }
+            else {
+                REQUIRE(!!other.second_level);
+                second_level->test(*other.second_level);
+            }
+        }
+        static util::Optional<EmbeddedContent> get_from(Obj embedded)
+        {
+            util::Optional<EmbeddedContent> value;
+            if (embedded.is_valid()) {
+                value = EmbeddedContent{};
+                value->name = embedded.get_any("name").get<StringData>();
+                value->int_value = embedded.get_any("int_value").get<Int>();
+                ColKey list_col = embedded.get_table()->get_column_key("array");
+                value->array_vals = embedded.get_list_values<Int>(list_col);
+
+                ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+                Obj second = embedded.get_linked_object(link2_col);
+                value->second_level = util::none;
+                if (second.is_valid()) {
+                    value->second_level = SecondLevelEmbeddedContent::get_from(second);
+                }
+                auto list = embedded.get_linklist("array_of_seconds");
+                for (size_t i = 0; i < list.size(); ++i) {
+                    value->array_of_seconds.push_back(SecondLevelEmbeddedContent::get_from(list.get_object(i)));
+                }
+            }
+            return value;
+        }
+        void assign_to(Obj embedded) const
+        {
+            if (embedded.get<StringData>("name") != name) {
+                embedded.set<StringData>("name", name);
+            }
+            if (embedded.get<Int>("int_value") != int_value) {
+                embedded.set<Int>("int_value", int_value);
+            }
+            ColKey list_col = embedded.get_table()->get_column_key("array");
+            if (embedded.get_list_values<Int>(list_col) != array_vals) {
+                embedded.set_list_values<Int>(list_col, array_vals);
+            }
+            ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
+            if (second_level) {
+                Obj second = embedded.get_linked_object(link2_col);
+                if (!second) {
+                    second = embedded.create_and_set_linked_object(link2_col);
+                }
+                second_level->assign_to(second);
+            }
+            else {
+                embedded.set_null(link2_col);
+            }
+            auto list = embedded.get_linklist("array_of_seconds");
+            set_embedded_list(array_of_seconds, list);
+        }
     };
     struct TopLevelContent {
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
-        std::vector<std::pair<std::string, util::Optional<EmbeddedContent>>> dict_values = {
-            {"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
+        DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        void apply_recovery_from(const TopLevelContent& other)
+        {
+            combine_array_values(array_values, other.array_values);
+            for (auto it : other.dict_values) {
+                dict_values[it.first] = it.second;
+            }
+            if (link_value && other.link_value) {
+                link_value->apply_recovery_from(*other.link_value);
+            }
+            else if (link_value) {
+                link_value = other.link_value;
+            }
+            // assuming starting from an initial value, if the link_value is null, then it was intentionally deleted.
+        }
+        void test(const TopLevelContent& other) const
+        {
+            if (link_value) {
+                INFO("checking TopLevelContent.link_value");
+                REQUIRE(!!other.link_value);
+                link_value->test(*other.link_value);
+            }
+            else {
+                REQUIRE(!other.link_value);
+            }
+            REQUIRE(array_values.size() == other.array_values.size());
+            for (size_t i = 0; i < array_values.size(); ++i) {
+                INFO("checking array_values: " << i);
+                array_values[i].test(other.array_values[i]);
+            }
+            REQUIRE(dict_values.size() == other.dict_values.size());
+            for (auto it : dict_values) {
+                INFO("checking dict_values: " << it.first);
+                auto found = other.dict_values.find(it.first);
+                REQUIRE(found != other.dict_values.end());
+                if (it.second) {
+                    REQUIRE(!!found->second);
+                    it.second->test(*found->second);
+                }
+                else {
+                    REQUIRE(!found->second);
+                }
+            }
+        }
+        static TopLevelContent get_from(Obj obj)
+        {
+            TopLevelContent content;
+            Obj embedded_link = obj.get_linked_object("embedded_obj");
+            content.link_value = EmbeddedContent::get_from(embedded_link);
+            auto list = obj.get_linklist("array_of_objs");
+            content.array_values.clear();
+
+            for (size_t i = 0; i < list.size(); ++i) {
+                Obj link = list.get_object(i);
+                content.array_values.push_back(*EmbeddedContent::get_from(link));
+            }
+            auto dict = obj.get_dictionary("embedded_dict");
+            content.dict_values.clear();
+            for (auto it : dict) {
+                Obj link = dict.get_object(it.first.get_string());
+                content.dict_values.insert({it.first.get_string(), EmbeddedContent::get_from(link)});
+            }
+            return content;
+        }
+        void assign_to(Obj obj) const
+        {
+            ColKey link_col = obj.get_table()->get_column_key("embedded_obj");
+            if (!link_value) {
+                obj.set_null(link_col);
+            }
+            else {
+                Obj embedded_link = obj.get_linked_object(link_col);
+                if (!embedded_link) {
+                    embedded_link = obj.create_and_set_linked_object(link_col);
+                }
+                link_value->assign_to(embedded_link);
+            }
+            auto list = obj.get_linklist("array_of_objs");
+            set_embedded_list(array_values, list);
+            auto dict = obj.get_dictionary("embedded_dict");
+            for (auto it = dict.begin(); it != dict.end(); ++it) {
+                if (dict_values.find((*it).first.get_string()) == dict_values.end()) {
+                    dict.erase(it);
+                }
+            }
+            for (auto it : dict_values) {
+                if (it.second) {
+                    auto embedded = dict.get_object(it.first);
+                    if (!embedded) {
+                        embedded = dict.create_and_insert_linked_object(it.first);
+                    }
+                    it.second->assign_to(embedded);
+                }
+                else {
+                    dict.insert(it.first, Mixed{});
+                }
+            }
+        }
     };
 
     SyncTestFile config2(init_sync_manager.app(), "default");
@@ -1807,166 +2918,43 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
     std::unique_ptr<reset_utils::TestClientReset> test_reset =
         reset_utils::make_fake_local_client_reset(config, config2);
 
-    auto set_embedded = [](Obj embedded, const EmbeddedContent& value) {
-        embedded.set<StringData>("name", value.name);
-        ColKey list_col = embedded.get_table()->get_column_key("array");
-        embedded.set_list_values<Int>(list_col, value.array_vals);
-        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
-        if (value.second_level) {
-            Obj second = embedded.get_linked_object(link2_col);
-            if (!second) {
-                second = embedded.create_and_set_linked_object(link2_col);
-            }
-            second.set("date", value.second_level->datetime);
-            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
-            if (value.second_level->pk_of_linked_object) {
-                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
-                ObjKey top_link = top_table->find_primary_key(*(value.second_level->pk_of_linked_object));
-                second.set(top_link_col, top_link);
-            }
-            else {
-                second.set_null(top_link_col);
-            }
-            Dictionary dict = second.get_dictionary("notes");
-            for (auto it = dict.begin(); it != dict.end(); ++it) {
-                if (std::find_if(value.second_level->dict_values.begin(), value.second_level->dict_values.end(),
-                                 [&](auto& pair) {
-                                     return pair.first == (*it).first.get_string();
-                                 }) == value.second_level->dict_values.end()) {
-                    dict.erase(it);
-                }
-            }
-            for (auto& it : value.second_level->dict_values) {
-                dict.insert(it.first, it.second);
-            }
-        }
-        else {
-            embedded.set_null(link2_col);
-        }
+    auto get_top_object = [](SharedRealm realm) {
+        advance_and_notify(*realm);
+        TableRef table = get_table(*realm, "TopLevel");
+        REQUIRE(table->size() == 1);
+        Obj obj = *table->begin();
+        return obj;
     };
 
-    auto check_embedded = [](Obj embedded, const EmbeddedContent& value) {
-        REQUIRE(embedded.get_any("name").get<StringData>() == value.name);
-        ColKey list_col = embedded.get_table()->get_column_key("array");
-        REQUIRE(embedded.get_list_values<Int>(list_col) == value.array_vals);
-
-        ColKey link2_col = embedded.get_table()->get_column_key("link_to_embedded_object2");
-        Obj second = embedded.get_linked_object(link2_col);
-        if (value.second_level) {
-            REQUIRE(second);
-            REQUIRE(second.get<Timestamp>("date") == value.second_level->datetime);
-            ColKey top_link_col = second.get_table()->get_column_key("top_level_link");
-            ObjKey actual_link = second.get<ObjKey>(top_link_col);
-            if (!value.second_level->pk_of_linked_object) {
-                REQUIRE(!actual_link);
-            }
-            else {
-                REQUIRE(actual_link);
-                TableRef top_table = second.get_table()->get_opposite_table(top_link_col);
-                Obj actual_top_obj = top_table->get_object(actual_link);
-                REQUIRE(actual_top_obj.get_primary_key() == *(value.second_level->pk_of_linked_object));
-            }
-            Dictionary dict = second.get_dictionary("notes");
-            REQUIRE(dict.size() == value.second_level->dict_values.size());
-            for (auto& pair : value.second_level->dict_values) {
-                util::Optional<Mixed> actual = dict.try_get(pair.first);
-                REQUIRE(actual);
-                REQUIRE(actual->get_string() == pair.second);
-            }
-        }
-        else {
-            REQUIRE(!second);
-        }
-    };
-
-    auto set_content = [&](Obj obj, const TopLevelContent& content) {
-        ColKey link_col = obj.get_table()->get_column_key("embedded_obj");
-        if (!content.link_value) {
-            obj.set_null(link_col);
-        }
-        else {
-            Obj embedded_link = obj.get_linked_object(link_col);
-            if (!embedded_link) {
-                embedded_link = obj.create_and_set_linked_object(link_col);
-            }
-            set_embedded(embedded_link, *content.link_value);
-        }
-        auto list = obj.get_linklist("array_of_objs");
-        for (size_t i = 0; i < content.array_values.size(); ++i) {
-            Obj link;
-            if (i >= list.size()) {
-                link = list.create_and_insert_linked_object(list.size());
-            }
-            else {
-                link = list.get_object(i);
-            }
-            set_embedded(link, content.array_values[i]);
-        }
-        auto dict = obj.get_dictionary("embedded_dict");
-        for (auto it = dict.begin(); it != dict.end(); ++it) {
-            if (std::find_if(content.dict_values.begin(), content.dict_values.end(), [&](auto& dict_val) {
-                    return (*it).first == dict_val.first;
-                }) != content.dict_values.end()) {
-                dict.erase(it);
-            }
-        }
-        for (size_t i = 0; i < content.dict_values.size(); ++i) {
-            if (content.dict_values[i].second) {
-                Obj embedded = dict.create_and_insert_linked_object(content.dict_values[i].first);
-                set_embedded(embedded, *(content.dict_values[i].second));
-            }
-            else {
-                dict.insert(content.dict_values[i].first, Mixed{});
-            }
-        }
-    };
-    auto check_content = [&](Obj obj, const TopLevelContent& content) {
-        Obj embedded_link = obj.get_linked_object("embedded_obj");
-        if (content.link_value) {
-            REQUIRE(embedded_link);
-            check_embedded(embedded_link, *content.link_value);
-        }
-        else {
-            REQUIRE(!embedded_link);
-        }
-        auto list = obj.get_linklist("array_of_objs");
-        REQUIRE(list.size() == content.array_values.size());
-        for (size_t i = 0; i < content.array_values.size(); ++i) {
-            Obj link = list.get_object(i);
-            check_embedded(link, content.array_values[i]);
-        }
-        auto dict = obj.get_dictionary("embedded_dict");
-        REQUIRE(dict.size() == content.dict_values.size());
-        for (auto& val : content.dict_values) {
-            Obj embedded = dict.get_object(val.first);
-            if (val.second) {
-                check_embedded(embedded, *val.second);
-            }
-            else {
-                REQUIRE(!embedded);
-            }
-        }
-    };
-
-    auto reset_embedded_object = [&](TopLevelContent local_content, TopLevelContent remote_content) {
+    using StateList = std::vector<TopLevelContent>;
+    auto reset_embedded_object = [&](StateList local_content, StateList remote_content,
+                                     TopLevelContent expected_recovered) {
         test_reset
-            ->make_local_changes([&](SharedRealm local) {
-                TableRef table = get_table(*local, "TopLevel");
-                REQUIRE(table->size() == 1);
-                Obj obj = *table->begin();
-                set_content(obj, local_content);
+            ->make_local_changes([&](SharedRealm local_realm) {
+                Obj obj = get_top_object(local_realm);
+                for (auto& s : local_content) {
+                    s.assign_to(obj);
+                }
             })
-            ->make_remote_changes([&](SharedRealm remote) {
-                TableRef table = get_table(*remote, "TopLevel");
-                REQUIRE(table->size() == 1);
-                Obj obj = *table->begin();
-                set_content(obj, remote_content);
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                Obj obj = get_top_object(remote_realm);
+                for (auto& s : remote_content) {
+                    s.assign_to(obj);
+                }
             })
-            ->on_post_reset([&](SharedRealm local) {
-                TableRef table = get_table(*local, "TopLevel");
-                REQUIRE(table->size() == 1);
-                Obj obj = *table->begin();
-                check_content(obj, remote_content);
+            ->on_post_reset([&](SharedRealm local_realm) {
+                Obj obj = get_top_object(local_realm);
+                TopLevelContent actual = TopLevelContent::get_from(obj);
+                if (test_mode == ClientResyncMode::Recover) {
+                    actual.test(expected_recovered);
+                }
+                else if (test_mode == ClientResyncMode::DiscardLocal) {
+                    REQUIRE(remote_content.size() > 0);
+                    actual.test(remote_content.back());
+                }
+                else {
+                    REALM_UNREACHABLE();
+                }
             })
             ->run();
     };
@@ -1980,15 +2968,19 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
         embedded_link.set<String>("name", "initial name");
     });
 
-    SECTION("no change") {
+    SECTION("identical changes") {
         TopLevelContent state;
-        reset_embedded_object(state, state);
+        TopLevelContent expected_recovered = state;
+        expected_recovered.apply_recovery_from(state);
+        reset_embedded_object({state}, {state}, expected_recovered);
     }
     SECTION("modify every embedded property") {
         TopLevelContent local, remote;
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("nullify embedded links") {
+    SECTION("remote nullifies embedded links") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.link_value.reset();
@@ -1996,9 +2988,11 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             val.second.reset();
         }
         remote.array_values.clear();
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("populate embedded links") {
+    SECTION("local nullifies embedded links") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.link_value.reset();
@@ -2006,41 +3000,694 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             val.second.reset();
         }
         local.array_values.clear();
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("add additional embedded objects") {
+    SECTION("remote adds embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
-        remote.dict_values.push_back({"new key1", {EmbeddedContent{}}});
-        remote.dict_values.push_back({"new key2", {EmbeddedContent{}}});
-        remote.dict_values.push_back({"new key3", {}});
+        remote.dict_values["new key1"] = {EmbeddedContent{}};
+        remote.dict_values["new key2"] = {EmbeddedContent{}};
+        remote.dict_values["new key3"] = {};
         remote.array_values.push_back({EmbeddedContent{}});
         remote.array_values.push_back({});
         remote.array_values.push_back({EmbeddedContent{}});
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("remove some embedded objects") {
+    SECTION("local adds some embedded objects") {
         TopLevelContent local;
         TopLevelContent remote = local;
-        local.dict_values.push_back({"new key1", {EmbeddedContent{}}});
-        local.dict_values.push_back({"new key2", {EmbeddedContent{}}});
-        local.dict_values.push_back({"new key3", {}});
+        local.dict_values["new key1"] = {EmbeddedContent{}};
+        local.dict_values["new key2"] = {EmbeddedContent{}};
+        local.dict_values["new key3"] = {};
         local.array_values.push_back({EmbeddedContent{}});
         local.array_values.push_back({});
         local.array_values.push_back({EmbeddedContent{}});
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("add a top level link cycle") {
+    SECTION("both add conflicting embedded objects") {
+        TopLevelContent local;
+        TopLevelContent remote = local;
+        local.dict_values["new key1"] = {EmbeddedContent{}};
+        local.dict_values["new key2"] = {EmbeddedContent{}};
+        local.dict_values["new key3"] = {};
+        local.array_values.push_back({EmbeddedContent{}});
+        local.array_values.push_back({});
+        local.array_values.push_back({EmbeddedContent{}});
+        remote.dict_values["new key1"] = {EmbeddedContent{}};
+        remote.dict_values["new key2"] = {EmbeddedContent{}};
+        remote.dict_values["new key3"] = {};
+        remote.array_values.push_back({EmbeddedContent{}});
+        remote.array_values.push_back({});
+        remote.array_values.push_back({EmbeddedContent{}});
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies an embedded object which is removed by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->name = "modified value";
+        remote.link_value = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies a deep embedded object which is removed by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->second_level->datetime = Timestamp{1, 1};
+        remote.link_value = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("local modifies a deep embedded object which is removed at the second level by the remote") {
+        TopLevelContent local, remote;
+        local.link_value->second_level->datetime = Timestamp{1, 1};
+        remote.link_value->second_level = util::none;
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
+    }
+    SECTION("with shared initial state") {
+        TopLevelContent initial;
+        initial.link_value = util::none;
+        test_reset->setup([&](SharedRealm realm) {
+            auto table = get_table(*realm, "TopLevel");
+            REQUIRE(table);
+            auto obj = table->create_object_with_primary_key(pk_val);
+            initial.assign_to(obj);
+        });
+        TopLevelContent local = initial;
+        TopLevelContent remote = initial;
+
+        SECTION("local modifications to an embedded object through a dictionary which is removed by the remote are "
+                "ignored") {
+            local.dict_values["foo"]->name = "modified";
+            local.dict_values["foo"]->second_level->datetime = Timestamp{1, 1};
+            local.dict_values["foo"]->array_vals.push_back(random_int());
+            local.dict_values["foo"]->array_vals.erase(local.dict_values["foo"]->array_vals.begin());
+            local.dict_values["foo"]->second_level->dict_values.erase(
+                local.dict_values["foo"]->second_level->dict_values.begin());
+            local.dict_values["foo"]->second_level->set_of_objects.clear();
+            remote.dict_values["foo"] = util::none;
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local modifications to an embedded object through a linklist element which is removed by the remote "
+                "triggers a list copy") {
+            local.array_values.begin()->name = "modified";
+            local.array_values.begin()->second_level->datetime = Timestamp{1, 1};
+            local.array_values.begin()->array_vals.push_back(random_int());
+            local.array_values.begin()->array_vals.erase(local.array_values.begin()->array_vals.begin());
+            local.array_values.begin()->second_level->dict_values.erase(
+                local.array_values.begin()->second_level->dict_values.begin());
+            local.array_values.begin()->second_level->set_of_objects.clear();
+            remote.array_values.erase(remote.array_values.begin());
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local modifications to an embedded object through a linklist cleared by the remote triggers a list "
+                "copy") {
+            local.array_values.begin()->name = "modified";
+            local.array_values.begin()->second_level->datetime = Timestamp{1, 1};
+            local.array_values.begin()->array_vals.push_back(random_int());
+            local.array_values.begin()->array_vals.erase(local.array_values.begin()->array_vals.begin());
+            local.array_values.begin()->second_level->dict_values.erase(
+                local.array_values.begin()->second_level->dict_values.begin());
+            local.array_values.begin()->second_level->set_of_objects.clear();
+            remote.array_values.clear();
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("moving preexisting list items triggers a list copy") {
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    REQUIRE(list.size() == 3);
+                    list.move(0, 1);
+                    list.move(1, 2);
+                    list.move(1, 0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // any change here is lost
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        TopLevelContent expected_recovered = local;
+                        std::iter_swap(expected_recovered.array_values.begin(),
+                                       expected_recovered.array_values.begin() + 1);
+                        std::iter_swap(expected_recovered.array_values.begin() + 1,
+                                       expected_recovered.array_values.begin() + 2);
+                        std::iter_swap(expected_recovered.array_values.begin() + 1,
+                                       expected_recovered.array_values.begin());
+                        actual.test(expected_recovered);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("inserting new embedded objects into a list which has indices modified by the remote are recovered") {
+            EmbeddedContent new_element1, new_element2;
+            local.array_values.insert(local.array_values.end(), new_element1);
+            local.array_values.insert(local.array_values.begin(), new_element2);
+            remote.array_values.erase(remote.array_values.begin());
+            remote.array_values.erase(remote.array_values.begin());
+            test_reset
+                ->make_local_changes([&](SharedRealm local) {
+                    Obj obj = get_top_object(local);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(3);
+                    new_element1.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(0);
+                    new_element2.assign_to(embedded);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size() - 1);
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        TopLevelContent expected_recovered = remote;
+                        expected_recovered.array_values.insert(expected_recovered.array_values.end(), new_element1);
+                        expected_recovered.array_values.insert(expected_recovered.array_values.begin(), new_element2);
+                        actual.test(expected_recovered);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("local list clear removes remotely inserted objects") {
+            EmbeddedContent new_element_local, new_element_remote;
+            local.array_values.clear();
+            TopLevelContent local2 = local;
+            local2.array_values.push_back(new_element_local);
+            remote.array_values.erase(remote.array_values.begin());
+            remote.array_values.push_back(new_element_remote); // lost via local.clear()
+            TopLevelContent expected_recovered = local2;
+            reset_embedded_object({local, local2}, {remote}, expected_recovered);
+        }
+        SECTION("local modification of a dictionary value which is removed by the remote") {
+            local.dict_values["foo"] = EmbeddedContent{};
+            remote.dict_values.erase("foo");
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local delete of a dictionary value which is removed by the remote") {
+            local.dict_values.erase("foo");
+            remote.dict_values.erase("foo");
+            TopLevelContent expected_recovered = remote;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("local delete of a dictionary value which is modified by the remote") {
+            local.dict_values.erase("foo");
+            remote.dict_values["foo"] = EmbeddedContent{};
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        SECTION("both modify a dictionary value") {
+            EmbeddedContent new_local, new_remote;
+            local.dict_values["foo"] = new_local;
+            remote.dict_values["foo"] = new_remote;
+            TopLevelContent expected_recovered = remote;
+            expected_recovered.dict_values["foo"]->apply_recovery_from(*local.dict_values["foo"]);
+            // a verbatim list copy is triggered by modifications to items which were not just inserted
+            expected_recovered.dict_values["foo"]->array_vals = local.dict_values["foo"]->array_vals;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+        std::vector<std::string> keys = {"new key", "", "\0"};
+        for (auto key : keys) {
+            SECTION(util::format("both add the same dictionary key: '%1'", key)) {
+                EmbeddedContent new_local, new_remote;
+                local.dict_values[key] = new_local;
+                remote.dict_values[key] = new_remote;
+                TopLevelContent expected_recovered = remote;
+                expected_recovered.dict_values[key]->apply_recovery_from(*local.dict_values[key]);
+                // a verbatim list copy is triggered by modifications to items which were not just inserted
+                expected_recovered.dict_values[key]->array_vals = local.dict_values[key]->array_vals;
+                expected_recovered.dict_values[key]->second_level = local.dict_values[key]->second_level;
+                reset_embedded_object({local}, {remote}, expected_recovered);
+            }
+        }
+        SECTION("deep modifications to inserted and swaped list items are recovered") {
+            EmbeddedContent local_added_at_begin, local_added_at_end, local_added_before_end, remote_added;
+            size_t list_end = initial.array_values.size();
+            test_reset
+                ->make_local_changes([&](SharedRealm local) {
+                    Obj obj = get_top_object(local);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(list_end - 1);
+                    local_added_before_end.assign_to(embedded); // this item is needed here so that move does not
+                                                                // trigger a copy of the list
+                    embedded = list.create_and_insert_linked_object(list_end);
+                    local_added_at_end.assign_to(embedded);
+                    local->commit_transaction();
+                    local->begin_transaction();
+                    list.swap(0,
+                              list_end); // generates two move instructions, move(0, list_end), move(list_end - 1, 0)
+                    local->commit_transaction();
+                    local->begin_transaction();
+                    local_added_at_end.name = "should be at begin now";
+                    local_added_at_begin.name = "should be at end now";
+                    local_added_at_end.assign_to(list.get_object(0));
+                    local_added_at_begin.assign_to(list.get_object(list_end));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_added.name = "remote added at zero, should end up in the middle of the list";
+                    remote_added.assign_to(list.create_and_insert_linked_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 4);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        EmbeddedContent embedded_3 = *EmbeddedContent::get_from(list.get_object(3));
+                        embedded_0.test(local_added_at_end); // local added at end, moved to 0
+                        embedded_1.test(remote_added); // remote added at 0, bumped to 1 by recovered insert at 0
+                        embedded_2.test(local_added_before_end); // local added at 2, not moved
+                        embedded_3.test(local_added_at_begin);   // local added at 0, moved to end
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("deep modifications to inserted and moved list items are recovered") {
+            EmbeddedContent local_added_at_begin, local_added_at_end, remote_added;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(list.size());
+                    local_added_at_end.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    advance_and_notify(*local_realm);
+                    local_realm->begin_transaction();
+                    list.move(list.size() - 1, 0);
+                    local_realm->commit_transaction();
+                    advance_and_notify(*local_realm);
+                    local_realm->begin_transaction();
+                    local_added_at_end.name = "added at end, moved to 0";
+                    local_added_at_begin.name = "added at 0, bumped to 1";
+                    local_added_at_end.assign_to(list.get_object(0));
+                    local_added_at_begin.assign_to(list.get_object(1));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_added.name = "remote added at zero, should end up at the end of the list";
+                    remote_added.assign_to(list.create_and_insert_linked_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 3);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        embedded_0.test(local_added_at_end);   // local added at end, moved to 0
+                        embedded_1.test(local_added_at_begin); // local added at begin, bumped up by move
+                        embedded_2.test(
+                            remote_added); // remote added at 0, bumped to 2 by recovered insert at 0 and move to 0
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("removing an added list item does not trigger a list copy") {
+            EmbeddedContent local_added_and_removed, local_added;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_and_removed.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(1);
+                    local_added.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    list.remove(0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        TopLevelContent expected_recovered = remote;
+                        expected_recovered.array_values.insert(expected_recovered.array_values.begin(), local_added);
+                        actual.test(expected_recovered);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("removing a preexisting list item triggers a list copy") {
+            EmbeddedContent remote_updated_item_0, local_added;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0);
+                    list.remove(0);
+                    auto embedded = list.create_and_insert_linked_object(1);
+                    local_added.assign_to(embedded);
+                    local = TopLevelContent::get_from(obj);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(1, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_updated_item_0.assign_to(list.get_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    TopLevelContent actual = TopLevelContent::get_from(obj);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        actual.test(local);
+                    }
+                    else {
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("adding and removing a list item when the remote removes the base object has no effect") {
+            EmbeddedContent local_added_at_begin;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_begin.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    list.remove(0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    obj.remove();
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    advance_and_notify(*local_realm);
+                    TableRef table = get_table(*local_realm, "TopLevel");
+                    REQUIRE(table->size() == 0);
+                })
+                ->run();
+        }
+        SECTION("removing a preexisting list item when the remote removes the base object has no effect") {
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    obj.remove();
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    advance_and_notify(*local_realm);
+                    TableRef table = get_table(*local_realm, "TopLevel");
+                    REQUIRE(table->size() == 0);
+                })
+                ->run();
+        }
+        SECTION("modifications to an embedded object are ignored when the base object is removed") {
+            EmbeddedContent local_modifications;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    local_modifications.assign_to(list.get_object(0));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    // any change made to the list here is overwritten by the list copy
+                    Obj obj = get_top_object(remote_realm);
+                    obj.remove();
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    advance_and_notify(*local_realm);
+                    TableRef table = get_table(*local_realm, "TopLevel");
+                    REQUIRE(table->size() == 0);
+                })
+                ->run();
+        }
+        SECTION("changes made through two layers of embedded lists can be recovered") {
+            EmbeddedContent local_added_at_0, local_added_at_1, remote_added;
+            local_added_at_0.name = "added at 0, moved to 1";
+            local_added_at_0.array_of_seconds = {{}, {}};
+            local_added_at_1.name = "added at 1, bumped to 0";
+            local_added_at_1.array_of_seconds = {{}, {}, {}};
+            remote_added.array_of_seconds = {{}, {}};
+            SecondLevelEmbeddedContent modified, inserted;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    auto embedded = list.create_and_insert_linked_object(0);
+                    local_added_at_0.assign_to(embedded);
+                    embedded = list.create_and_insert_linked_object(1);
+                    local_added_at_1.assign_to(embedded);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    auto list_of_seconds = embedded.get_linklist("array_of_seconds");
+                    list_of_seconds.move(0, 1);
+                    std::iter_swap(local_added_at_1.array_of_seconds.begin(),
+                                   local_added_at_1.array_of_seconds.begin() + 1);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    list.move(0, 1);
+                    local_realm->commit_transaction();
+                    local_realm->begin_transaction();
+                    modified.assign_to(list_of_seconds.get_object(0));
+                    auto new_second = list_of_seconds.create_and_insert_linked_object(0);
+                    inserted.assign_to(new_second);
+                    local_added_at_1.array_of_seconds[0] = modified;
+                    local_added_at_1.array_of_seconds.insert(local_added_at_1.array_of_seconds.begin(), inserted);
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    list.remove(0, list.size()); // individual ArrayErase instructions, not a clear.
+                    remote_added.name = "remote added at zero, should end up at the end of the list";
+                    remote_added.assign_to(list.create_and_insert_linked_object(0));
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 3);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        embedded_0.test(local_added_at_1); // local added at end, moved to 0
+                        embedded_1.test(local_added_at_0); // local added at begin, bumped up by move
+                        embedded_2.test(remote_added);     // remote added at 0, bumped to 2 by recovered
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+        SECTION("insertions to a preexisting object through two layers of embedded lists triggers a list copy") {
+            SecondLevelEmbeddedContent local_added, remote_added;
+            test_reset
+                ->make_local_changes([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    local_added.assign_to(
+                        list.get_object(0).get_linklist("array_of_seconds").create_and_insert_linked_object(0));
+                })
+                ->make_remote_changes([&](SharedRealm remote_realm) {
+                    Obj obj = get_top_object(remote_realm);
+                    auto list = obj.get_linklist("array_of_objs");
+                    remote_added.assign_to(
+                        list.get_object(0).get_linklist("array_of_seconds").create_and_insert_linked_object(0));
+                    list.move(0, 1);
+                    remote = TopLevelContent::get_from(obj);
+                })
+                ->on_post_reset([&](SharedRealm local_realm) {
+                    Obj obj = get_top_object(local_realm);
+                    if (test_mode == ClientResyncMode::Recover) {
+                        auto list = obj.get_linklist("array_of_objs");
+                        REQUIRE(list.size() == 3);
+                        EmbeddedContent embedded_0 = *EmbeddedContent::get_from(list.get_object(0));
+                        EmbeddedContent embedded_1 = *EmbeddedContent::get_from(list.get_object(1));
+                        EmbeddedContent embedded_2 = *EmbeddedContent::get_from(list.get_object(2));
+                        REQUIRE(embedded_0.array_of_seconds.size() == 1);
+                        embedded_0.array_of_seconds[0].test(local_added);
+                        REQUIRE(embedded_1.array_of_seconds.size() ==
+                                0); // remote changes overwritten by local list copy
+                        REQUIRE(embedded_2.array_of_seconds.size() == 0);
+                    }
+                    else {
+                        TopLevelContent actual = TopLevelContent::get_from(obj);
+                        actual.test(remote);
+                    }
+                })
+                ->run();
+        }
+
+        SECTION("modifications to a preexisting object through two layers of embedded lists triggers a list copy") {
+            SecondLevelEmbeddedContent preexisting_item, local_modified, remote_added;
+            initial.array_values[0].array_of_seconds.push_back(preexisting_item);
+            const size_t initial_item_pos = initial.array_values[0].array_of_seconds.size() - 1;
+            local = initial;
+            remote = initial;
+            local.array_values[0].array_of_seconds[initial_item_pos] = local_modified;
+            remote.array_values[0].array_of_seconds.push_back(remote_added); // overwritten by local!
+            TopLevelContent expected_recovered = local;
+            reset_embedded_object({local}, {remote}, expected_recovered);
+        }
+
+        SECTION("add int") {
+            auto add_to_dict_item = [&](SharedRealm realm, std::string key, int64_t addition) {
+                Obj obj = get_top_object(realm);
+                auto dict = obj.get_dictionary("embedded_dict");
+                auto embedded = dict.get_object(key);
+                REQUIRE(!!embedded);
+                embedded.add_int("int_value", addition);
+                return TopLevelContent::get_from(obj);
+            };
+            TopLevelContent expected_recovered;
+            const std::string existing_key = "foo";
+
+            test_reset->on_post_reset([&](SharedRealm local_realm) {
+                Obj obj = get_top_object(local_realm);
+                TopLevelContent actual = TopLevelContent::get_from(obj);
+                actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
+            });
+            int64_t initial_value = initial.dict_values[existing_key]->int_value;
+            int64_t addition = random_int();
+            SECTION("local add_int to an existing dictionary item") {
+                INFO("adding " << initial_value << " with " << addition);
+                expected_recovered = initial;
+                expected_recovered.dict_values[existing_key]->int_value += addition;
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->run();
+            }
+            SECTION("local and remote both create the same dictionary item and add to it") {
+                int64_t remote_addition = random_int();
+                INFO("adding " << initial_value << " with local " << addition << " and remote " << remote_addition);
+                expected_recovered = initial;
+                expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote) {
+                        initial = add_to_dict_item(remote, existing_key, remote_addition);
+                    })
+                    ->run();
+            }
+            SECTION("local add_int on a dictionary item which the remote removed is ignored") {
+                INFO("adding " << initial_value << " with " << addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote_realm) {
+                        Obj obj = get_top_object(remote_realm);
+                        auto dict = obj.get_dictionary("embedded_dict");
+                        dict.erase(Mixed{existing_key});
+                        initial = TopLevelContent::get_from(obj);
+                        expected_recovered = initial;
+                    })
+                    ->run();
+            }
+            SECTION("local add_int on a dictionary item when the entire root object is removed by the remote removed "
+                    "is ignored") {
+                INFO("adding " << initial_value << " with " << addition);
+                test_reset
+                    ->make_local_changes([&](SharedRealm local) {
+                        add_to_dict_item(local, existing_key, addition);
+                    })
+                    ->make_remote_changes([&](SharedRealm remote_realm) {
+                        Obj obj = get_top_object(remote_realm);
+                        TableRef table = obj.get_table();
+                        obj.remove();
+                        REQUIRE(table->size() == 0);
+                    })
+                    ->on_post_reset([&](SharedRealm local_realm) {
+                        advance_and_notify(*local_realm);
+                        TableRef table = get_table(*local_realm, "TopLevel");
+                        REQUIRE(table->size() == 0);
+                    })
+                    ->run();
+            }
+        }
+    }
+    SECTION("remote adds a top level link cycle") {
         TopLevelContent local;
         TopLevelContent remote = local;
         remote.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        // the remote change exists because no local instruction set the value to anything (default)
+        expected_recovered.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
-    SECTION("remove a top level link cycle") {
+    SECTION("local adds a top level link cycle") {
         TopLevelContent local;
         TopLevelContent remote = local;
         local.link_value->second_level->pk_of_linked_object = Mixed{pk_val};
-        reset_embedded_object(local, remote);
+        TopLevelContent expected_recovered = remote;
+        expected_recovered.apply_recovery_from(local);
+        reset_embedded_object({local}, {remote}, expected_recovered);
     }
     SECTION("server adds embedded object classes") {
         SyncTestFile config2(init_sync_manager.app(), "default");
@@ -2051,16 +3698,19 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
 
         test_reset
             ->make_remote_changes([&](SharedRealm remote) {
+                advance_and_notify(*remote);
                 TableRef table = get_table(*remote, "TopLevel");
                 auto obj = table->create_object_with_primary_key(pk_val);
                 REQUIRE(table->size() == 1);
-                set_content(obj, remote_content);
+                remote_content.assign_to(obj);
             })
             ->on_post_reset([&](SharedRealm local) {
+                advance_and_notify(*local);
                 TableRef table = get_table(*local, "TopLevel");
                 REQUIRE(table->size() == 1);
                 Obj obj = *table->begin();
-                check_content(obj, remote_content);
+                TopLevelContent actual = TopLevelContent::get_from(obj);
+                actual.test(remote_content);
             })
             ->run();
     }
@@ -2073,9 +3723,22 @@ TEST_CASE("client reset with embedded object", "[client reset][discard local][em
             TableRef table = get_table(*local, "TopLevel");
             auto obj = table->create_object_with_primary_key(pk_val);
             REQUIRE(table->size() == 1);
-            set_content(obj, local_content);
+            local_content.assign_to(obj);
         });
-        REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
-                                               "{EmbeddedObject, EmbeddedObject2, TopLevel}");
+        if (test_mode == ClientResyncMode::DiscardLocal) {
+            REQUIRE_THROWS_WITH(test_reset->run(), "Client reset cannot recover when classes have been removed: "
+                                                   "{EmbeddedObject, EmbeddedObject2, TopLevel}");
+        }
+        else {
+            // In recovery mode, AddTable should succeed if the server is in dev mode, and fail
+            // if the server is in production which in that case the changes will be rejected.
+            // Since this is a fake reset, it always succeeds here.
+            test_reset
+                ->on_post_reset([&](SharedRealm local) {
+                    TableRef table = get_table(*local, "TopLevel");
+                    REQUIRE(table->size() == 1);
+                })
+                ->run();
+        }
     }
 }

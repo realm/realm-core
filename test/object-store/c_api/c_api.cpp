@@ -740,6 +740,16 @@ bool initialize_data(void* userdata_p, realm_t*)
     return true;
 }
 
+void free_data(void* userdata_p)
+{
+    free(userdata_p);
+}
+
+void delete_data(void* userdata_p)
+{
+    delete static_cast<ConfigUserdata*>(userdata_p);
+}
+
 bool migrate_schema(void* userdata_p, realm_t* old, realm_t* new_, const realm_schema_t*)
 {
     auto userdata = static_cast<ConfigUserdata*>(userdata_p);
@@ -785,26 +795,26 @@ TEST_CASE("C API") {
 
         SECTION("data initialization callback") {
             ConfigUserdata userdata;
-            realm_config_set_data_initialization_function(config.get(), initialize_data, &userdata);
+            realm_config_set_data_initialization_function(config.get(), initialize_data, &userdata, nullptr);
             auto realm = cptr_checked(realm_open(config.get()));
             CHECK(userdata.num_initializations == 1);
         }
 
         SECTION("data initialization callback error") {
-            ConfigUserdata userdata;
+            ConfigUserdata* userdata = new ConfigUserdata();
             realm_config_set_data_initialization_function(
                 config.get(),
                 [](void*, realm_t*) {
                     return false;
                 },
-                &userdata);
+                userdata, delete_data);
             CHECK(!realm_open(config.get()));
             CHECK_ERR(RLM_ERR_CALLBACK);
         }
 
         SECTION("migration callback") {
             ConfigUserdata userdata;
-            realm_config_set_migration_function(config.get(), migrate_schema, &userdata);
+            realm_config_set_migration_function(config.get(), migrate_schema, &userdata, nullptr);
             auto realm = cptr_checked(realm_open(config.get()));
             CHECK(userdata.num_migrations == 0);
             realm.reset();
@@ -815,7 +825,7 @@ TEST_CASE("C API") {
             realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
             realm_config_set_schema_version(config2.get(), 999);
             realm_config_set_schema(config2.get(), empty_schema.get());
-            realm_config_set_migration_function(config2.get(), migrate_schema, &userdata);
+            realm_config_set_migration_function(config2.get(), migrate_schema, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
         }
@@ -824,7 +834,7 @@ TEST_CASE("C API") {
             TestFile test_file_3;
             ConfigUserdata userdata;
 
-            realm_config_set_migration_function(config.get(), migrate_schema_rename_prop, &userdata);
+            realm_config_set_migration_function(config.get(), migrate_schema_rename_prop, &userdata, nullptr);
 
             const realm_class_info_t foo_class[1] = {{
                 "Foo",
@@ -882,7 +892,7 @@ TEST_CASE("C API") {
             realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
             realm_config_set_schema_version(config2.get(), 999);
             realm_config_set_schema(config2.get(), new_schema.get());
-            realm_config_set_migration_function(config2.get(), migrate_schema_rename_prop, &userdata);
+            realm_config_set_migration_function(config2.get(), migrate_schema_rename_prop, &userdata, nullptr);
             auto realm2 = cptr_checked(realm_open(config2.get()));
             CHECK(userdata.num_migrations == 1);
             auto new_db_schema = realm_get_schema(realm2.get());
@@ -908,16 +918,29 @@ TEST_CASE("C API") {
                 [](void*, realm_t*, realm_t*, const realm_schema_t*) {
                     return false;
                 },
-                &userdata);
+                &userdata, nullptr);
             CHECK(!realm_open(config2.get()));
             CHECK_ERR(RLM_ERR_CALLBACK);
         }
 
         SECTION("should compact on launch callback") {
-            ConfigUserdata userdata;
-            realm_config_set_should_compact_on_launch_function(config.get(), should_compact_on_launch, &userdata);
+            void* userdata_p = malloc(sizeof(ConfigUserdata));
+            memset(userdata_p, 0, sizeof(ConfigUserdata));
+            realm_config_set_should_compact_on_launch_function(config.get(), should_compact_on_launch, userdata_p,
+                                                               free_data);
             auto realm = cptr_checked(realm_open(config.get()));
-            CHECK(userdata.num_compact_on_launch == 1);
+            CHECK(static_cast<ConfigUserdata*>(userdata_p)->num_compact_on_launch == 1);
+        }
+
+        SECTION("should compact on launch and initialization callback") {
+            ConfigUserdata* userdata = new ConfigUserdata();
+            realm_config_set_should_compact_on_launch_function(config.get(), should_compact_on_launch, userdata,
+                                                               delete_data);
+            realm_config_set_data_initialization_function(config.get(), initialize_data, userdata,
+                                                          free_data); // should not update free function
+            auto realm = cptr_checked(realm_open(config.get()));
+            CHECK(userdata->num_initializations == 1);
+            CHECK(userdata->num_compact_on_launch == 1);
         }
     }
 
@@ -3915,8 +3938,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto new_subs = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
             bool inserted = false;
-            auto res =
-                realm_sync_subscription_set_insert_or_assign(new_subs, c_wrap_query_foo, nullptr, &index, &inserted);
+            // realm_results_t
+            auto res = realm_sync_subscription_set_insert_or_assign_query(new_subs, c_wrap_query_foo, nullptr, &index,
+                                                                          &inserted);
             CHECK(inserted == true);
             CHECK(index == 0);
             CHECK(res);
@@ -3948,7 +3972,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
             bool inserted = false;
-            realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index, &inserted);
+            realm_sync_subscription_set_insert_or_assign_query(mut_sub, c_wrap_query_bar, nullptr, &index, &inserted);
             CHECK(inserted);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
             auto state = realm_sync_on_subscription_set_state_change_wait(
@@ -3978,8 +4002,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto c_wrap_new_query_bar = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
             std::size_t index = -1;
             bool inserted = false;
-            bool updated = realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, nullptr,
-                                                                        &index, &inserted);
+            auto results = realm_query_find_all(c_wrap_new_query_bar);
+            bool updated =
+                realm_sync_subscription_set_insert_or_assign_results(mut_sub, results, nullptr, &index, &inserted);
             CHECK(!inserted);
             CHECK(updated);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
@@ -3990,6 +4015,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);
+            realm_release(results);
             realm_release(c_wrap_new_query_bar);
         }
 
@@ -4035,8 +4061,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
             bool inserted = false;
+            auto results = realm_query_find_all(c_wrap_new_query_bar);
             bool success =
-                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_new_query_bar, "bar", &index, &inserted);
+                realm_sync_subscription_set_insert_or_assign_results(mut_sub, results, "bar", &index, &inserted);
             CHECK(inserted);
             CHECK(success);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
@@ -4046,6 +4073,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);
+            realm_release(results);
             realm_release(c_wrap_new_query_bar);
         }
 
@@ -4086,8 +4114,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
             bool inserted = false;
+            auto results = realm_query_find_all(c_wrap_query_bar);
             bool success =
-                realm_sync_subscription_set_insert_or_assign(mut_sub, c_wrap_query_bar, nullptr, &index, &inserted);
+                realm_sync_subscription_set_insert_or_assign_results(mut_sub, results, nullptr, &index, &inserted);
             CHECK(inserted);
             CHECK(success);
             auto sub_c = realm_sync_subscription_set_commit(mut_sub);
@@ -4097,6 +4126,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                 std::mutex m_mutex;
                 std::condition_variable m_cv;
                 realm_flx_sync_subscription_set_state m_state{RLM_SYNC_SUBSCRIPTION_UNCOMMITTED};
+                void* m_userdata;
 
                 static SyncObject& create()
                 {
@@ -4104,11 +4134,12 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                     return sync_object;
                 }
 
-                void set_state_and_notify(realm_flx_sync_subscription_set_state state)
+                void set_state_and_notify(void* userdata, realm_flx_sync_subscription_set_state state)
                 {
                     {
                         std::lock_guard<std::mutex> guard{m_mutex};
                         m_state = state;
+                        m_userdata = userdata;
                     }
                     m_cv.notify_one();
                 }
@@ -4118,23 +4149,26 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][syc]") {
                     using namespace std::chrono_literals;
                     std::unique_lock<std::mutex> lock{m_mutex};
                     m_cv.wait_for(lock, 300ms, [this]() {
-                        return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE;
+                        return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE && m_userdata != nullptr;
                     });
                     return m_state;
                 }
             };
 
-            auto callback = [](auto, realm_flx_sync_subscription_set_state_e sub_state) {
-                SyncObject::create().set_state_and_notify(sub_state);
+            auto callback = [](void* userdata, realm_flx_sync_subscription_set_state_e sub_state) {
+                SyncObject::create().set_state_and_notify(userdata, sub_state);
             };
+            int userdata = 0;
             realm_sync_on_subscription_set_state_change_async(
-                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE, callback);
+                sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE, callback, &userdata,
+                nullptr);
             CHECK(SyncObject::create().wait_state() ==
                   realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
 
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);
+            realm_release(results);
             realm_release(test_query);
         }
         realm_release(c_wrap_query_foo);

@@ -762,7 +762,7 @@ private:
     const std::string& get_virt_path() const noexcept;
 
     const std::string& get_realm_path() const noexcept;
-    DB& get_db() const noexcept;
+    DBRef get_db() const noexcept;
     SyncTransactReporter* get_transact_reporter() noexcept;
 
     /// The implementation need only ensure that the returned reference stays valid

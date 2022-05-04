@@ -584,7 +584,8 @@ RLM_API void realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
  *
  * This function cannot fail.
  */
-RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata);
+RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata,
+                                                 realm_free_userdata_func_t callback);
 
 /**
  * Set the data initialization function.
@@ -597,7 +598,7 @@ RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migratio
  * This function cannot fail.
  */
 RLM_API void realm_config_set_data_initialization_function(realm_config_t*, realm_data_initialization_func_t,
-                                                           void* userdata);
+                                                           void* userdata, realm_free_userdata_func_t callback);
 
 /**
  * Set the should-compact-on-launch callback.
@@ -610,8 +611,8 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t*, real
  * This function cannot fail.
  */
 RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
-                                                                realm_should_compact_on_launch_func_t,
-                                                                void* userdata);
+                                                                realm_should_compact_on_launch_func_t, void* userdata,
+                                                                realm_free_userdata_func_t callback);
 
 /**
  * True if file format upgrades on open are disabled.
@@ -805,6 +806,41 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
  * @return If successful, the Realm object. Otherwise, NULL.
  */
 RLM_API realm_t* realm_open(const realm_config_t* config);
+
+/**
+ * The overloaded Realm::convert function offers a way to copy and/or convert a realm.
+ *
+ * The following options are supported:
+ * - local -> local (config or path)
+ * - local -> sync (config only)
+ * - sync -> local (config only)
+ * - sync -> sync  (config or path)
+ * - sync -> bundlable sync (client file identifier removed)
+ *
+ * Note that for bundled realms it is required that all local changes are synchronized with the
+ * server before the copy can be written. This is to be sure that the file can be used as a
+ * stating point for a newly installed application. The function will throw if there are
+ * pending uploads.
+ */
+/**
+ * Copy or convert a Realm using a config.
+ *
+ * If the file already exists, data will be copied over object per object.
+ * If the file does not exist, the realm file will be exported to the new location and if the
+ * configuration object contains a sync part, a sync history will be synthesized.
+ *
+ * @param config The realm configuration that should be used to create a copy.
+ *               This can be a local or a synced Realm, encrypted or not.
+ */
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config);
+/**
+ * Copy a Realm using a path.
+ *
+ * @param path The path the realm should be copied to. Local realms will remain local, synced
+ *             realms will remain synced realms.
+ * @param encryption_key The optional encryption key for the new realm.
+ */
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key);
 
 /**
  * Deletes the following files for the given `realm_file_path` if they exist:
@@ -2854,6 +2890,19 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
  */
 RLM_API char* realm_user_get_profile_data(const realm_user_t*);
 
+/**
+ * Return the access token associated with the user.
+ * @return a string that rapresents the access token
+ */
+RLM_API char* realm_user_get_access_token(const realm_user_t*);
+
+/**
+ * Return the refresh token associated with the user.
+ * @return a string that represents the refresh token
+ */
+RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
+
 /* Sync */
 typedef enum realm_sync_client_metadata_mode {
     RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT,
@@ -3048,7 +3097,7 @@ typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_ERROR,
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
-typedef void (*realm_sync_on_subscription_state_changed)(const realm_flx_sync_subscription_set_t* subscription,
+typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
                                                          realm_flx_sync_subscription_set_state_e state);
 
 /**
@@ -3121,7 +3170,7 @@ RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_se
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
 
 /**
- * Wait uptill subscripton set state is equal to the state passed as parameter.
+ * Wait until subscripton set state is equal to the state passed as parameter.
  * This is a blocking operation.
  * @return the current subscription state
  */
@@ -3134,9 +3183,10 @@ RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_s
  * @return true/false if the handler was registered correctly
  */
 RLM_API bool
-realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t*,
-                                                  realm_flx_sync_subscription_set_state_e,
-                                                  realm_sync_on_subscription_state_changed) RLM_API_NOEXCEPT;
+realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t* subscription_set,
+                                                  realm_flx_sync_subscription_set_state_e notify_when,
+                                                  realm_sync_on_subscription_state_changed callback, void* userdata,
+                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 /**
  *  Retrieve version for the subscription set passed as parameter
@@ -3201,14 +3251,24 @@ realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM
 RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
 
 /**
- *  Insert ot update a query for the subscription set passed as parameter, if successful the index where the query was
- * inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
+ * Insert ot update the query contained inside a result object for the subscription set passed as parameter, if
+ * successful the index where the query was inserted or updated is returned along with the info whether a new query
+ * was inserted or not. It is possible to specify a name for the query inserted (optional).
+ *  @return true/false if operation was successful
+ */
+RLM_API bool realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subscription_set_t*,
+                                                                  realm_results_t*, const char* name,
+                                                                  size_t* out_index,
+                                                                  bool* out_inserted) RLM_API_NOEXCEPT;
+/**
+ * Insert ot update a query for the subscription set passed as parameter, if successful the index where the query
+ * was inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
  * specify a name for the query inserted (optional).
  *  @return true/false if operation was successful
  */
-RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t*, realm_query_t*,
-                                                          const char* name, size_t* out_index,
-                                                          bool* out_inserted) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscription_set_t*,
+                                                                realm_query_t*, const char* name, size_t* out_index,
+                                                                bool* out_inserted) RLM_API_NOEXCEPT;
 /**
  *  Erase from subscription set by name
  *  @return true/false if operation was successful

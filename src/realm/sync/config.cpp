@@ -22,6 +22,8 @@
 #include <realm/object-store/util/bson/bson.hpp>
 #include <realm/util/network.hpp>
 
+#include <ostream>
+
 namespace realm {
 
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.

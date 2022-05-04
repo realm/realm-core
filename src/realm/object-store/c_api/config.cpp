@@ -82,7 +82,8 @@ RLM_API void realm_config_set_schema_mode(realm_config_t* config, realm_schema_m
     config->schema_mode = from_capi(mode);
 }
 
-RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_migration_func_t func, void* userdata)
+RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_migration_func_t func, void* userdata,
+                                                 realm_free_userdata_func_t callback)
 {
     if (func) {
         auto migration_func = [=](SharedRealm old_realm, SharedRealm new_realm, Schema& schema) {
@@ -98,10 +99,14 @@ RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_m
     else {
         config->migration_function = Realm::MigrationFunction{};
     }
+    if (callback) {
+        config->free_functions.emplace(userdata, callback);
+    }
 }
 
 RLM_API void realm_config_set_data_initialization_function(realm_config_t* config,
-                                                           realm_data_initialization_func_t func, void* userdata)
+                                                           realm_data_initialization_func_t func, void* userdata,
+                                                           realm_free_userdata_func_t callback)
 {
     if (func) {
         auto init_func = [=](SharedRealm realm) {
@@ -115,11 +120,14 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t* confi
     else {
         config->initialization_function = Realm::DataInitializationFunction{};
     }
+    if (callback) {
+        config->free_functions.emplace(userdata, callback);
+    }
 }
 
 RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* config,
                                                                 realm_should_compact_on_launch_func_t func,
-                                                                void* userdata)
+                                                                void* userdata, realm_free_userdata_func_t callback)
 {
     if (func) {
         auto should_func = [=](uint64_t total_bytes, uint64_t used_bytes) -> bool {
@@ -129,6 +137,9 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* 
     }
     else {
         config->should_compact_on_launch_function = Realm::ShouldCompactOnLaunchFunction{};
+    }
+    if (callback) {
+        config->free_functions.emplace(userdata, callback);
     }
 }
 
