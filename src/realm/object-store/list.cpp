@@ -64,12 +64,14 @@ ConstTableRef List::get_table() const
 template <typename T>
 T List::get(size_t row_ndx) const
 {
+    verify_attached();
     return as<T>().get(row_ndx);
 }
 
 template <>
 Obj List::get(size_t row_ndx) const
 {
+    verify_attached();
     auto& list = as<Obj>();
     return list.get_target_table()->get_object(list.get(row_ndx));
 }
@@ -172,11 +174,13 @@ void List::set_any(size_t row_ndx, Mixed value)
 
 Mixed List::get_any(size_t row_ndx) const
 {
+    verify_attached();
     return list_base().get_any(row_ndx);
 }
 
 size_t List::find_any(Mixed value) const
 {
+    verify_attached();
     return list_base().find_any(value);
 }
 
@@ -220,6 +224,7 @@ Obj List::insert_embedded(size_t list_ndx)
 
 Obj List::get_object(size_t list_ndx)
 {
+    verify_attached();
     if (m_type == PropertyType::Object) {
         return as<Obj>().get_object(list_ndx);
     }

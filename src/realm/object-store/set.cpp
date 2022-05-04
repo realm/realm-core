@@ -204,6 +204,7 @@ std::pair<size_t, bool> Set::insert_any(Mixed value)
 
 Mixed Set::get_any(size_t ndx) const
 {
+    verify_attached();
     return set_base().get_any(ndx);
 }
 
@@ -215,6 +216,7 @@ std::pair<size_t, bool> Set::remove_any(Mixed value)
 
 size_t Set::find_any(Mixed value) const
 {
+    verify_attached();
     return set_base().find_any(value);
 }
 
@@ -242,6 +244,7 @@ size_t Set::find<int>(const int& value) const
 template <>
 Obj Set::get<Obj>(size_t row_ndx) const
 {
+    verify_attached();
     auto& set = as<Obj>();
     return set.get_object(row_ndx);
 }
