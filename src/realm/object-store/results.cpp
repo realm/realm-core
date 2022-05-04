@@ -1156,9 +1156,9 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     return distinct({std::move(column_keys)});
 }
 
-SectionedResults Results::sectioned_results(SectionedResults::ComparisonFunc comparison_func)
+SectionedResults Results::sectioned_results(SectionedResults::SectionKeyFunc section_key_func) REQUIRES(m_mutex)
 {
-    return SectionedResults(*this, std::move(comparison_func));
+    return SectionedResults(*this, std::move(section_key_func));
 }
 
 SectionedResults Results::sectioned_results(SectionedResultsOperator op, util::Optional<StringData> prop_name)

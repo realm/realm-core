@@ -336,21 +336,23 @@ public:
         m_update_policy = policy;
     }
 
-    /** Creates a SectionedResults object by using a user defined sectioning algorithm to project the key for each
+    /**
+     * Creates a SectionedResults object by using a user defined sectioning algorithm to project the key for each
      * section.
      *
-     * @param comparison_func The callback to be itterated on each value in the underlying Results.
+     * @param section_key_func The callback to be itterated on each value in the underlying Results.
      * This callback must return a value which defines the section key
      *
      * @return A SectionedResults object using a user defined sectioning algoritm.
      */
     SectionedResults
-    sectioned_results(util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)> comparison_func);
+    sectioned_results(util::UniqueFunction<Mixed(Mixed value, std::shared_ptr<Realm> realm)> section_key_func);
     enum class SectionedResultsOperator {
         FirstLetter // Section by the first letter of each string element. Note that col must be a string.
     };
 
-    /** Creates a SectionedResults object by using a built in sectioning algorithm to help with efficiency and reduce
+    /**
+     * Creates a SectionedResults object by using a built in sectioning algorithm to help with efficiency and reduce
      * overhead from the SDK level.
      *
      * @param op The `SectionedResultsOperator` operator to use
@@ -375,6 +377,7 @@ private:
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifierBase> m_notifier;
 
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
+    friend class SectionedResults;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
 
     void validate_read() const;

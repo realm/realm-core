@@ -1002,6 +1002,48 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(algo_run_count == 5);
     }
+
+    SECTION("snapshot") {
+        auto sr_snapshot = sectioned_results.snapshot();
+
+        REQUIRE(sr_snapshot.size() == 3);
+        REQUIRE(sr_snapshot[0].size() == 3);
+        REQUIRE(sr_snapshot[1].size() == 1);
+        REQUIRE(sr_snapshot[2].size() == 1);
+        REQUIRE(algo_run_count == 5);
+        std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
+
+        int count = 0;
+        for (size_t i = 0; i < sr_snapshot.size(); i++) {
+            auto section = sr_snapshot[i];
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                REQUIRE(expected[count] == val);
+                count++;
+            }
+        }
+        REQUIRE(algo_run_count == 5);
+        REQUIRE(count == 5);
+
+        r->begin_transaction();
+        table->create_object().set(name_col, "any");
+        table->create_object().set(name_col, "zebra");
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        // results should stay the same.
+        count = 0;
+        for (size_t i = 0; i < sr_snapshot.size(); i++) {
+            auto section = sr_snapshot[i];
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                REQUIRE(expected[count] == val);
+                count++;
+            }
+        }
+        REQUIRE(algo_run_count == 5);
+        REQUIRE(count == 5);
+    }
 }
 
 namespace cf = realm::sectioned_results_fixtures;
