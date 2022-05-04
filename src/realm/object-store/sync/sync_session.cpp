@@ -332,17 +332,18 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
         return;
     }
 
-    std::shared_ptr<SyncSession> sync_session;
-
     util::CheckedLockGuard state_lock(m_state_mutex);
     if (m_state != State::Active) {
         return;
     }
-    util::CheckedLockGuard config_lock(m_config_mutex);
-    SyncConfig config = m_config;
-    config.stop_policy = SyncSessionStopPolicy::Immediately;
-    config.client_resync_mode = ClientResyncMode::Manual;
-    sync_session = create(m_client, db, config, m_sync_manager);
+    std::shared_ptr<SyncSession> sync_session;
+    {
+        util::CheckedLockGuard config_lock(m_config_mutex);
+        SyncConfig config = m_config;
+        config.stop_policy = SyncSessionStopPolicy::Immediately;
+        config.client_resync_mode = ClientResyncMode::Manual;
+        sync_session = create(m_client, db, config, m_sync_manager);
+    }
 
     sync_session->assert_mutex_unlocked();
     sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
@@ -390,7 +391,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // that moving to the inactive state doesn't clear them - they will be
     // re-registered when the session becomes active again.
     {
-        m_force_client_reset = allowed_mode ? allowed_mode : SyncError::ClientResetModeAllowed::RecoveryPermitted;
+        m_force_client_reset = allowed_mode.value_or(SyncError::ClientResetModeAllowed::RecoveryPermitted);
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
         std::swap(m_completion_callbacks, callbacks);
