@@ -3920,14 +3920,13 @@ TEST(Shared_WriteCopy)
         t->add_column(type_Int, "value");
         tr->commit();
 
-        db->write_copy(path2.c_str());
-        CHECK_THROW_ANY(db->write_copy(path2.c_str())); // Not allowed to overwrite
-        db->write_copy(path2.c_str(), {}, true);        // Overwrite allowed
+        db->write_copy(path2.c_str(), nullptr);
+        CHECK_THROW_ANY(db->write_copy(path2.c_str(), nullptr)); // Not allowed to overwrite
     }
     {
         auto hist = make_in_realm_history();
         DBRef db = DB::create(*hist, path2);
-        db->write_copy(path3.c_str());
+        db->write_copy(path3.c_str(), nullptr);
     }
     auto hist = make_in_realm_history();
     DBRef db = DB::create(*hist, path3);

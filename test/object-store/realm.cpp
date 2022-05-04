@@ -108,13 +108,13 @@ private:
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
     TestFile config;
-    config.cache = true;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}}},
     };
 
     SECTION("should return the same instance when caching is enabled") {
+        config.cache = true;
         auto realm1 = Realm::get_shared_realm(config);
         auto realm2 = Realm::get_shared_realm(config);
         REQUIRE(realm1.get() == realm2.get());
@@ -181,12 +181,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should reject mismatched config") {
-        SECTION("cached") {
-        }
-        SECTION("uncached") {
-            config.cache = false;
-        }
-
         SECTION("schema version") {
             auto realm = Realm::get_shared_realm(config);
             config.schema_version = 2;
@@ -334,7 +328,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         Realm::get_shared_realm(config);
 
         config.schema = util::none;
-        config.cache = false;
         config.schema_mode = SchemaMode::AdditiveExplicit;
         config.schema_version = 0;
 
@@ -406,7 +399,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should support using different table subsets on different threads") {
-        config.cache = false;
         auto realm1 = Realm::get_shared_realm(config);
 
         config.schema = Schema{
@@ -451,6 +443,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 #endif
 
     SECTION("should get different instances on different threads") {
+        config.cache = true;
         auto realm1 = Realm::get_shared_realm(config);
         std::thread([&] {
             auto realm2 = Realm::get_shared_realm(config);
@@ -494,6 +487,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     };
 
     SECTION("should get different instances for different explicitly different schedulers") {
+        config.cache = true;
         config.scheduler = std::make_shared<SimpleScheduler>(1);
         auto realm1 = Realm::get_shared_realm(config);
         config.scheduler = std::make_shared<SimpleScheduler>(2);
@@ -507,6 +501,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("can use Realm with explicit scheduler on different thread") {
+        config.cache = true;
         config.scheduler = std::make_shared<SimpleScheduler>(1);
         auto realm = Realm::get_shared_realm(config);
         std::thread([&] {
@@ -515,6 +510,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should get same instance for same explicit execution context on different thread") {
+        config.cache = true;
         config.scheduler = std::make_shared<SimpleScheduler>(1);
         auto realm1 = Realm::get_shared_realm(config);
         std::thread([&] {
@@ -524,6 +520,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should not modify the schema when fetching from the cache") {
+        config.cache = true;
         auto realm = Realm::get_shared_realm(config);
         auto object_schema = &*realm->schema().find("object");
         Realm::get_shared_realm(config);
@@ -531,6 +528,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should not use cached frozen Realm if versions don't match") {
+        config.cache = true;
         auto realm = Realm::get_shared_realm(config);
         realm->read_group();
         auto frozen1 = realm->freeze();
@@ -612,7 +610,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     config.schema = Schema{object_schema};
     SyncTestFile config2(init_sync_manager.app(), "default");
     config2.schema = config.schema;
-    config2.cache = false;
 
     std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
@@ -637,7 +634,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         ThreadSafeReference realm_ref;
         SyncTestFile config3(init_sync_manager.app(), "default");
         config3.schema = config.schema;
-        config3.cache = false;
         uint64_t client_file_id;
 
         // Create some content
@@ -668,12 +664,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_download(*realm);
             client_file_id = realm->read_group().get_sync_file_id();
 
-            SECTION("copy using the path") {
-                realm->convert(config3.path, BinaryData());
-            }
-            SECTION("copy using the config") {
-                realm->convert(config3);
-            }
+            realm->convert(config3);
         }
 
         // Create some more content on the server
@@ -706,7 +697,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SECTION("can copy a synced realm to a synced realm") {
         SyncTestFile sync_realm_config1(init_sync_manager.app(), "default");
         sync_realm_config1.schema = config.schema;
-        sync_realm_config1.cache = false;
 
         // Create some content
         auto sync_realm1 = Realm::get_shared_realm(sync_realm_config1);
@@ -719,26 +709,29 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Copy to a new sync config
         SyncTestFile sync_realm_config2(init_sync_manager.app(), "default");
         sync_realm_config2.schema = config.schema;
-        sync_realm_config2.cache = false;
 
-
-        SECTION("copy using the path") {
-            sync_realm1->convert(sync_realm_config2.path, BinaryData());
-        }
-        SECTION("copy using the config") {
-            sync_realm1->convert(sync_realm_config2);
-        }
+        sync_realm1->convert(sync_realm_config2);
 
         auto sync_realm2 = Realm::get_shared_realm(sync_realm_config2);
 
         // Check that the data also exists in the new realm
         REQUIRE(sync_realm2->read_group().get_table("class_object")->size() == 1);
+
+        // Verify that sync works and objects created in the new copy will get
+        // synchronized to the old copy
+        sync_realm2->begin_transaction();
+        sync_realm2->read_group().get_table("class_object")->create_object_with_primary_key(1);
+        sync_realm2->commit_transaction();
+        wait_for_upload(*sync_realm2);
+        wait_for_download(*sync_realm1);
+
+        sync_realm1->refresh();
+        REQUIRE(sync_realm1->read_group().get_table("class_object")->size() == 2);
     }
 
     SECTION("can convert a synced realm to a local realm") {
         SyncTestFile sync_realm_config(init_sync_manager.app(), "default");
         sync_realm_config.schema = config.schema;
-        sync_realm_config.cache = false;
 
         // Create some content
         auto sync_realm = Realm::get_shared_realm(sync_realm_config);
@@ -751,7 +744,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Copy to a new sync config
         TestFile local_realm_config;
         local_realm_config.schema = config.schema;
-        local_realm_config.cache = false;
+        local_realm_config.schema_version = sync_realm_config.schema_version;
 
         sync_realm->convert(local_realm_config);
 
@@ -764,7 +757,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SECTION("can convert a local realm to a synced realm") {
         TestFile local_realm_config;
         local_realm_config.schema = config.schema;
-        local_realm_config.cache = false;
 
         // Create some content
         auto local_realm = Realm::get_shared_realm(local_realm_config);
@@ -789,7 +781,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     SECTION("can copy a local realm to a local realm") {
         TestFile local_realm_config1;
         local_realm_config1.schema = config.schema;
-        local_realm_config1.cache = false;
 
         // Create some content
         auto local_realm1 = Realm::get_shared_realm(local_realm_config1);
@@ -800,15 +791,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         // Copy to a new sync config
         TestFile local_realm_config2;
         local_realm_config2.schema = config.schema;
-        local_realm_config2.cache = false;
 
 
-        SECTION("copy using the path") {
-            local_realm1->convert(local_realm_config2.path, BinaryData());
-        }
-        SECTION("copy using the config") {
-            local_realm1->convert(local_realm_config2);
-        }
+        local_realm1->convert(local_realm_config2);
 
         auto local_realm2 = Realm::get_shared_realm(local_realm_config2);
 
@@ -1061,7 +1046,6 @@ TEST_CASE("SharedRealm: async writes") {
         return;
 
     TestFile config;
-    config.cache = false;
     config.schema_version = 0;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}, {"ints", PropertyType::Array | PropertyType::Int}}},
@@ -2128,7 +2112,6 @@ TEST_CASE("SharedRealm: notifications") {
         return;
 
     TestFile config;
-    config.cache = false;
     config.schema_version = 0;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}}},
@@ -2511,7 +2494,6 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
 TEST_CASE("ShareRealm: realm closed in did_change callback") {
     TestFile config;
     config.schema_version = 1;
-    config.cache = false;
     config.schema = Schema{
         {"object", {{"value", PropertyType::Int}}},
     };
@@ -2971,7 +2953,6 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     size_t schema_changed_called = 0;
     Schema changed_fixed_schema;
     TestFile config;
-    config.cache = false;
     auto dynamic_config = config;
 
     config.schema = Schema{{"object1",
@@ -3590,7 +3571,6 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
 
 TEST_CASE("KeyPathMapping generation") {
     TestFile config;
-    config.cache = true;
     realm::query_parser::KeyPathMapping mapping;
 
     SECTION("class aliasing") {

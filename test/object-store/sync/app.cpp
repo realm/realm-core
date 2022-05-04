@@ -1821,23 +1821,17 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 }
 
 TEST_CASE("app: make distributable client file", "[sync][app]") {
-    auto base_path = util::make_temp_dir();
-    util::try_remove_dir_recursive(base_path);
-    util::try_make_dir(base_path);
-    util::try_make_dir(base_path + "/orig");
-    util::try_make_dir(base_path + "/copy");
+    TestAppSession session;
+    auto app = session.app();
+
+    auto schema = default_app_config("").schema;
+    SyncTestFile original_config(app, bson::Bson("foo"), schema);
+    create_user_and_log_in(app);
+    SyncTestFile target_config(app, bson::Bson("foo"), schema);
 
     // Create realm file without client file id
     {
-        TestAppSession session;
-        auto app = session.app();
-
-        Realm::Config config;
-        config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
-        config.path = base_path + "/orig/default.realm";
-        config.schema = default_app_config("").schema;
-        config.schema_version = 0;
-        SharedRealm realm = Realm::get_shared_realm(std::move(config));
+        auto realm = Realm::get_shared_realm(original_config);
 
         // Write some data
         realm->begin_transaction();
@@ -1851,17 +1845,7 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
-        SECTION("copy using the path") {
-            realm->convert(base_path + "/copy/default.realm", BinaryData());
-        }
-
-        SECTION("copy by passing the config") {
-            TestSyncManager tsm;
-            SyncTestFile copy_config(tsm.app(), "default");
-            copy_config.schema = config.schema;
-            copy_config.cache = false;
-            realm->convert(copy_config);
-        }
+        realm->convert(target_config);
 
         // Write some additional data
         realm->begin_transaction();
@@ -1875,15 +1859,16 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
     }
     // Starting a new session based on the copy
     {
-        TestAppSession session;
-        auto app = session.app();
+        auto realm = Realm::get_shared_realm(target_config);
+        REQUIRE(realm->read_group().get_table("class_Person")->size() == 1);
+        REQUIRE(realm->read_group().get_table("class_Dog")->size() == 0);
 
-        realm::Realm::Config realm_config;
-        realm_config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.path = base_path + "/copy/default.realm";
-
-        SharedRealm realm = realm::Realm::get_shared_realm(realm_config);
+        // Should be able to download the object created in the source Realm
+        // after writing the copy
         wait_for_download(*realm);
+        realm->refresh();
+        REQUIRE(realm->read_group().get_table("class_Person")->size() == 1);
+        REQUIRE(realm->read_group().get_table("class_Dog")->size() == 1);
 
         // Check that we can continue committing to this realm
         realm->begin_transaction();
@@ -1895,6 +1880,17 @@ TEST_CASE("app: make distributable client file", "[sync][app]") {
                                                 {"realm_id", std::string("foo")}}));
         realm->commit_transaction();
         wait_for_upload(*realm);
+    }
+    // Original Realm should be able to read the object which was written to the copy
+    {
+        auto realm = Realm::get_shared_realm(original_config);
+        REQUIRE(realm->read_group().get_table("class_Person")->size() == 1);
+        REQUIRE(realm->read_group().get_table("class_Dog")->size() == 1);
+
+        wait_for_download(*realm);
+        realm->refresh();
+        REQUIRE(realm->read_group().get_table("class_Person")->size() == 1);
+        REQUIRE(realm->read_group().get_table("class_Dog")->size() == 2);
     }
 }
 

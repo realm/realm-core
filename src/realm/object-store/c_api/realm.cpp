@@ -79,7 +79,12 @@ RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_
 RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key)
 {
     return wrap_err([&]() {
-        (*realm)->convert(path, from_capi(encryption_key));
+        Realm::Config config;
+        config.path = path;
+        if (encryption_key.data) {
+            config.encryption_key.assign(encryption_key.data, encryption_key.data + encryption_key.size);
+        }
+        (*realm)->convert(config);
         return true;
     });
 }
