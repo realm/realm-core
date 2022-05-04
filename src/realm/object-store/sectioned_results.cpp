@@ -26,7 +26,7 @@ namespace realm {
 // - SectionedResults is freshly created from Results
 // - The underlying Table in the Results collection has changed
 static std::vector<SectionRange> calculate_sections(Results& results,
-                                                    const SectionedResults::ComparisonFunc& callback)
+                                                    const SectionedResults::SectionKeyFunc& callback)
 {
     auto sections = std::map<Mixed, SectionRange>();
     auto offset_ranges = std::vector<SectionRange>();
@@ -73,7 +73,7 @@ static std::vector<SectionRange> calculate_sections(Results& results,
     return offset_ranges;
 }
 
-static SectionedResults::ComparisonFunc builtin_comparison(Results& results, Results::SectionedResultsOperator op,
+static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Results::SectionedResultsOperator op,
                                                            util::Optional<StringData> prop_name)
 {
     switch (op) {
@@ -92,6 +92,8 @@ static SectionedResults::ComparisonFunc builtin_comparison(Results& results, Res
                 };
             }
     }
+
+    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 /// Returns the section of an element for the index of that element in the underlying Results.
@@ -210,9 +212,9 @@ inline uint_fast64_t SectionedResults::get_content_version()
     throw std::logic_error("Unsupported table.");
 }
 
-SectionedResults::SectionedResults(Results results, ComparisonFunc comparison_func)
+SectionedResults::SectionedResults(Results results, SectionKeyFunc section_key_func)
     : m_results(results)
-    , m_callback(std::move(comparison_func))
+    , m_callback(std::move(section_key_func))
 {
     m_previous_content_version = get_content_version();
     m_offset_ranges = calculate_sections(m_results, m_callback);
@@ -229,10 +231,11 @@ SectionedResults::SectionedResults(Results results, Results::SectionedResultsOpe
 
 void SectionedResults::calculate_sections_if_required()
 {
-    auto current_content_version = get_content_version();
-    if (m_previous_content_version == current_content_version) {
+    if (m_results.m_update_policy == Results::UpdatePolicy::Never)
         return;
-    }
+    auto current_content_version = get_content_version();
+    if (m_previous_content_version == current_content_version)
+        return;
 
     m_previous_content_version = current_content_version;
     m_offset_ranges = calculate_sections(m_results, m_callback);
@@ -266,6 +269,17 @@ NotificationToken SectionedResults::add_notification_callback_for_section(
 realm::ThreadSafeReference SectionedResults::thread_safe_reference()
 {
     return m_results;
+}
+
+SectionedResults SectionedResults::snapshot()
+{
+    calculate_sections_if_required();
+    // m_callback will never be run when using a snapshot so we do
+    // not need to set it.
+    SectionedResults sr;
+    sr.m_results = m_results.snapshot();
+    sr.m_offset_ranges = m_offset_ranges;
+    return sr;
 }
 
 } // namespace realm

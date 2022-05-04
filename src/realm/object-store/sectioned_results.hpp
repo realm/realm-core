@@ -85,7 +85,7 @@ class SectionedResults {
 public:
     SectionedResults() = default;
 
-    using ComparisonFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
+    using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
 
     ResultsSection operator[](size_t idx);
     /// The total amount of Sections.
@@ -108,11 +108,14 @@ public:
                                                 KeyPathArray key_path_array = {}) &;
 
     realm::ThreadSafeReference thread_safe_reference();
+    /// Return a new instance SectionedResults that uses a snapshot of the underlying `Results`.
+    /// The section key callback parameter will never be invoked.
+    SectionedResults snapshot();
 
 private:
     friend class Results;
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.
-    SectionedResults(Results results, ComparisonFunc comparison_func);
+    SectionedResults(Results results, SectionKeyFunc section_key_func);
     SectionedResults(Results results, Results::SectionedResultsOperator op, util::Optional<StringData> prop_name);
     uint_fast64_t get_content_version();
 
@@ -126,16 +129,16 @@ private:
     friend class realm::ResultsSection;
     Results m_results;
     std::vector<SectionRange> m_offset_ranges;
-    ComparisonFunc m_callback;
+    SectionKeyFunc m_callback;
     uint_fast64_t m_previous_content_version;
 };
 
 struct SectionedResultsChangeSet {
-    // Sections and indices in the _new_ collection which are new insertions
+    /// Sections and indices in the _new_ collection which are new insertions
     std::map<size_t, std::vector<size_t>> insertions;
-    // Sections and indices of objects in the _old_ collection which were modified
+    /// Sections and indices of objects in the _old_ collection which were modified
     std::map<size_t, std::vector<size_t>> modifications;
-    // Sections and indices which were removed from the _old_ collection
+    /// Sections and indices which were removed from the _old_ collection
     std::map<size_t, std::vector<size_t>> deletions;
 };
 
