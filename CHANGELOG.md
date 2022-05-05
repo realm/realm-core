@@ -22,7 +22,8 @@
 -----------
 
 ### Internals
-* Sync protocol version bumped to 4.
+* Sync protocol version bumped to 4. ([#5382](https://github.com/realm/realm-core/pull/5382))
+* Internal sync metadata tables were abstracted into a new schema management framework and their schema versions are now tracked in the `sync_internal_schemas` table. ([#5455](https://github.com/realm/realm-core/pull/5455)) 
 
 ----------------------------------------------
 
