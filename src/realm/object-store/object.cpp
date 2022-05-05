@@ -106,17 +106,19 @@ static const ObjectSchema* find_object_schema(Realm& realm, Obj const& o)
     return &*object_schema;
 }
 
-Object::Object(std::shared_ptr<Realm> r, const ObjectSchema* s, Obj const& o)
+Object::Object(std::shared_ptr<Realm> r, const ObjectSchema* s, Obj const& o, Obj const& parent,
+               ColKey incoming_column)
     : m_realm(std::move(r))
     , m_obj(o)
     , m_object_schema(s)
 {
     if (auto audit = m_realm->audit_context())
-        audit->record_read(m_realm->read_transaction_version(), m_obj, Obj(), ColKey{});
+        audit->record_read(m_realm->read_transaction_version(), m_obj, parent, incoming_column);
 }
 
-Object::Object(const std::shared_ptr<Realm>& r, ObjectSchema const& s, Obj const& o)
-    : Object(r, &s, o)
+Object::Object(const std::shared_ptr<Realm>& r, ObjectSchema const& s, Obj const& o, Obj const& parent,
+               ColKey incoming_column)
+    : Object(r, &s, o, parent, incoming_column)
 {
 }
 

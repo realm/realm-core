@@ -72,7 +72,8 @@ class Object {
 public:
     Object();
     Object(const std::shared_ptr<Realm>& r, Obj const& o);
-    Object(const std::shared_ptr<Realm>& r, ObjectSchema const& s, Obj const& o);
+    Object(const std::shared_ptr<Realm>& r, ObjectSchema const& s, Obj const& o, Obj const& parent = {},
+           ColKey incoming_column = {});
     Object(const std::shared_ptr<Realm>& r, StringData object_type, ObjKey key);
     Object(const std::shared_ptr<Realm>& r, StringData object_type, size_t index);
     Object(const std::shared_ptr<Realm>& r, ObjLink link);
@@ -189,7 +190,8 @@ private:
     const ObjectSchema* m_object_schema;
     _impl::CollectionNotifier::Handle<_impl::ObjectNotifier> m_notifier;
 
-    Object(std::shared_ptr<Realm> r, const ObjectSchema* s, Obj const& o);
+    Object(std::shared_ptr<Realm> r, const ObjectSchema* s, Obj const& o, Obj const& parent = {},
+           ColKey incoming_column = {});
     template <typename Key>
     Object(const std::shared_ptr<Realm>& r, const ObjectSchema* s, Key key);
 

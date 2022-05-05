@@ -21,7 +21,6 @@
 
 #include <realm/object-store/object.hpp>
 
-#include <realm/object-store/audit.hpp>
 #include <realm/object-store/feature_checks.hpp>
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/dictionary.hpp>
@@ -219,9 +218,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             auto linked = const_cast<Obj&>(m_obj).get_linked_object(column);
-            if (auto audit = m_realm->audit_context())
-                audit->record_read(m_realm->read_transaction_version(), linked, m_obj, column);
-            return ctx.box(Object(m_realm, *linkObjectSchema, linked));
+            return ctx.box(Object(m_realm, *linkObjectSchema, linked, m_obj, column));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
