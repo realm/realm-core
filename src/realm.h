@@ -3531,11 +3531,12 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
                                                            void* userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 /**
- * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception and
- * retrieve a it later via realm_get_last_error.
+ * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
+ * and retrieve a it later via realm_get_last_error.
  * @param user_error a ptr rapresenting whatever object the SDK treats as exception/error.
  * @param userdata_free a ptr to fuction for deleting the user_error just passed in
  */
-RLM_API void realm_register_user_code_callback_error(void* user_error, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+RLM_API void realm_register_user_code_callback_error(void* user_error,
+                                                     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 #endif // REALM_H
