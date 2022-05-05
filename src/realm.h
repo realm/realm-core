@@ -251,7 +251,8 @@ typedef enum realm_logic_error_kind {
 typedef struct realm_error {
     realm_errno_e error;
     const char* message;
-    //SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to realm_register_user_code_callback_error()
+    // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
+    // realm_register_user_code_callback_error()
     void* usercode_error;
     union {
         int code;
