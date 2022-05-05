@@ -52,7 +52,6 @@ struct InvalidPropertyKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 struct CallbackFailed : std::runtime_error {
-
     void* user_error{nullptr};
     using CallbackFailedDeleteUserError = std::function<void(void*)>;
     CallbackFailedDeleteUserError user_error_delete;
