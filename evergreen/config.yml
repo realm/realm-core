@@ -174,6 +174,7 @@ functions:
           TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          export UNITTEST_PROGRESS=1
           if [[ -n "${report_test_progress|}" ]]; then
               export UNITTEST_PROGRESS=${report_test_progress|}
           fi
