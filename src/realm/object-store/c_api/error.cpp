@@ -312,13 +312,13 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
     });
 }
 
-RLM_API void realm_register_user_code_callback_error(void* user_error,
-                                                     realm_free_userdata_func_t userdata_free) noexcept
+RLM_API void realm_register_user_code_callback_error(void* usercode_error,
+                                                     realm_free_userdata_func_t usercode_data_free) noexcept
 {
     realm::c_api::wrap_err([=]() {
         // register a callback failed exception storing the ptr to the user code error passed by the SDK
         // when this excpetion is caught the original error can be processed
-        throw realm::c_api::CallbackFailed(user_error, userdata_free);
+        throw realm::c_api::CallbackFailed(usercode_error, usercode_data_free);
         return false;
     });
 }

@@ -14,7 +14,7 @@ inline auto wrap_err(F&& f) noexcept -> decltype(f())
         return f();
     }
     catch (const CallbackFailed& e) {
-        set_last_exception_callback_error(std::current_exception(), e.user_error);
+        set_last_exception_callback_error(std::current_exception(), e.usercode_error);
         return {};
     }
     catch (...) {

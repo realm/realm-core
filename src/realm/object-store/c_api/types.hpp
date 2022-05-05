@@ -52,26 +52,28 @@ struct InvalidPropertyKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 struct CallbackFailed : std::runtime_error {
-    void* user_error{nullptr};
+    // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
+    // realm_register_user_code_callback_error()
+    void* usercode_error{nullptr};
     using CallbackFailedDeleteUserError = std::function<void(void*)>;
-    CallbackFailedDeleteUserError user_error_delete;
+    CallbackFailedDeleteUserError usercode_error_deleter;
 
     CallbackFailed()
         : std::runtime_error("User-provided callback failed")
     {
     }
 
-    CallbackFailed(void* user_error, CallbackFailedDeleteUserError user_error_delete)
+    CallbackFailed(void* usercode_error, CallbackFailedDeleteUserError usercode_error_deleter)
         : std::runtime_error("User-provided callback failed")
-        , user_error(user_error)
-        , user_error_delete(user_error_delete)
+        , usercode_error(usercode_error)
+        , usercode_error_deleter(usercode_error_deleter)
     {
     }
 
     virtual ~CallbackFailed()
     {
-        if (user_error_delete) {
-            user_error_delete(user_error);
+        if (usercode_error_deleter) {
+            usercode_error_deleter(usercode_error);
         }
     }
 };
