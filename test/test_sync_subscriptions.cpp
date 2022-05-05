@@ -428,7 +428,7 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     //     realm->convert(config, false);
     //   });
     auto path = std::filesystem::path(test_util::get_test_resource_path()) / "test_flx_metadata_tables_v1.realm";
-    CHECK(util::File::exists(path.native()));
+    CHECK(util::File::exists(path.string()));
     util::File::copy(path.native(), sub_store_path);
     SubscriptionStoreFixture fixture(sub_store_path);
     auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
