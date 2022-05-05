@@ -116,7 +116,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
-    , m_socket_factory(config.socket_factory_builder(websocket::EZConfig{
+    , m_socket_factory(config.socket_factory(websocket::EZConfig{
           logger,
           m_random,
           m_service,
