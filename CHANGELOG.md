@@ -9,7 +9,7 @@
 * Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
 
 ### Fixed
-* C API client reset callbacks don't leak the `realm_t` parameter. ([#xxxx]https://github.com/realm/realm-core/pull/xxxx)
+* C API client reset callbacks don't leak the `realm_t` parameter. ([#5464]https://github.com/realm/realm-core/pull/5464)
  
 ### Breaking changes
 * Extra `realm_free_userdata_func_t` parameter added on some realm_config_set_... functions in the C API. The userdata will be freed when the config object is freed.
