@@ -112,6 +112,7 @@ public:
 
     const char* data() const noexcept;
     size_t size() const noexcept;
+    [[nodiscard]] bool empty() const noexcept;
 
     /// Is this a null reference?
     ///
@@ -254,6 +255,11 @@ inline const char* StringData::data() const noexcept
 inline size_t StringData::size() const noexcept
 {
     return m_size;
+}
+
+inline bool StringData::empty() const noexcept
+{
+    return m_size == 0;
 }
 
 inline bool StringData::is_null() const noexcept

@@ -335,62 +335,12 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
 }
 
 
-void Connection::websocket_read_or_write_error_handler(std::error_code ec)
+void Connection::websocket_401_unauthorized_error_handler()
 {
-    read_or_write_error(ec); // Throws
-}
-
-
-void Connection::websocket_handshake_error_handler(std::error_code ec, const std::string_view* body)
-{
-    bool is_fatal;
-    if (ec == util::websocket::Error::bad_response_3xx_redirection ||
-        ec == util::websocket::Error::bad_response_301_moved_permanently ||
-        ec == util::websocket::Error::bad_response_401_unauthorized ||
-        ec == util::websocket::Error::bad_response_5xx_server_error ||
-        ec == util::websocket::Error::bad_response_500_internal_server_error ||
-        ec == util::websocket::Error::bad_response_502_bad_gateway ||
-        ec == util::websocket::Error::bad_response_503_service_unavailable ||
-        ec == util::websocket::Error::bad_response_504_gateway_timeout) {
-        is_fatal = false;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_nonfatal_error;
-    }
-    else {
-        is_fatal = true;
-        m_reconnect_info.m_reason = ConnectionTerminationReason::http_response_says_fatal_error;
-        if (body) {
-            std::string_view identifier = "REALM_SYNC_PROTOCOL_MISMATCH";
-            auto i = body->find(identifier);
-            if (i != std::string_view::npos) {
-                std::string_view rest = body->substr(i + identifier.size());
-                // FIXME: Use std::string_view::begins_with() in C++20.
-                auto begins_with = [](std::string_view string, std::string_view prefix) {
-                    return (string.size() >= prefix.size() &&
-                            std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                };
-                if (begins_with(rest, ":CLIENT_TOO_OLD")) {
-                    ec = ClientError::client_too_old_for_server;
-                }
-                else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
-                    ec = ClientError::client_too_new_for_server;
-                }
-                else {
-                    // Other more complicated forms of mismatch
-                    ec = ClientError::protocol_mismatch;
-                }
-            }
-        }
-    }
-
-    close_due_to_client_side_error(ec, is_fatal); // Throws
-}
-
-
-void Connection::websocket_protocol_error_handler(std::error_code ec)
-{
-    m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-    bool is_fatal = true;                         // A WebSocket protocol violation is a fatal error
-    close_due_to_client_side_error(ec, is_fatal); // Throws
+    // This is handled the same as any other connect failure. However, we need to use this exact error code because
+    // that is what the Object Store layer is looking for in order to refresh the access token.
+    // TODO delete this function once REALMC-10531 is resolved.
+    websocket_network_error_handler(util::websocket::Error::bad_response_401_unauthorized, {});
 }
 
 
@@ -408,13 +358,9 @@ bool Connection::websocket_binary_message_received(const char* data, std::size_t
 }
 
 
-bool Connection::websocket_close_message_received(std::error_code error_code, StringData message)
+bool Connection::websocket_close_message_received(int code, StringData message)
 {
-    if (error_code.category() == websocket::websocket_close_status_category() && error_code.value() != 1005 &&
-        error_code.value() != 1000) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
-        involuntary_disconnect(error_code, false, &message);
-    }
+    websocket_network_error_handler({code, websocket::websocket_close_status_category()}, message);
 
     return bool(m_websocket);
 }
@@ -481,7 +427,6 @@ void Connection::initiate_reconnect_wait()
                     delay = min_delay;
                     break;
                 case ConnectionTerminationReason::connect_operation_failed:
-                case ConnectionTerminationReason::http_response_says_nonfatal_error:
                 case ConnectionTerminationReason::sync_connect_timeout:
                     // The last attempt at establishing a connection failed. In
                     // this case, the reconnect delay will increase with the
@@ -501,10 +446,8 @@ void Connection::initiate_reconnect_wait()
                     delay = max_delay;
                     record_delay_as_zero = true;
                     break;
-                case ConnectionTerminationReason::ssl_certificate_rejected:
                 case ConnectionTerminationReason::ssl_protocol_violation:
                 case ConnectionTerminationReason::websocket_protocol_violation:
-                case ConnectionTerminationReason::http_response_says_fatal_error:
                 case ConnectionTerminationReason::bad_headers_in_http_response:
                 case ConnectionTerminationReason::sync_protocol_violation:
                 case ConnectionTerminationReason::server_said_do_not_reconnect:
@@ -977,42 +920,48 @@ void Connection::handle_disconnect_wait(std::error_code ec)
 }
 
 
-void Connection::websocket_connect_error_handler(std::error_code ec)
+void Connection::websocket_network_error_handler(std::error_code ec, StringData message)
 {
-    m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec, is_fatal, custom_message); // Throws
+    if (m_state == ConnectionState::connecting) {
+        // All errors while trying to connect are treated the same.
+        m_reconnect_info.m_reason = ConnectionTerminationReason::connect_operation_failed;
+        bool is_fatal = false;
+        involuntary_disconnect(ec, is_fatal, message.empty() ? nullptr : &message); // Throws
+        return;
+    }
+
+    REALM_ASSERT_RELEASE(m_state == ConnectionState::connected);
+
+    if (ec.category() == websocket::websocket_close_status_category()) {
+        switch (ec.value()) {
+            case 1000:
+            case 1005:
+                break; // These are treated the same as any other post-connect failure.
+
+            case 1009:
+                // FIXME: This should probably be handled as a request for client reset.
+                // See realm-core github issue #5209
+                [[fallthrough]];
+            default:
+                // This includes 1009 which means that we sent too large of a message in a single frame that the
+                // server will never accept. Therefore, we should treat these as a "hard" error and not try to
+                // reconnect any time soon. In practice, the reconnect logic will try again after about an hour since
+                // the server may eventually be restarted in a new configuration that might accept this request.
+                m_reconnect_info.m_reason = ConnectionTerminationReason::websocket_protocol_violation;
+                involuntary_disconnect(ec, false, message.empty() ? nullptr : &message);
+                return;
+        }
+    }
+
+    read_or_write_error(ec, message);
 }
 
-void Connection::websocket_ssl_handshake_error_handler(std::error_code ec)
-{
-    logger.error("SSL handshake failed: %1", ec.message()); // Throws
-    // FIXME: Some error codes (those from OpenSSL) most likely indicate a
-    // fatal error (SSL protocol violation), but other errors codes
-    // (read/write error from underlying socket) most likely indicate a
-    // nonfatal error.
-    bool is_fatal = false;
-    std::error_code ec2;
-    if (ec == network::ssl::Errors::certificate_rejected) {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::ssl_certificate_rejected;
-        ec2 = ClientError::ssl_server_cert_rejected;
-        is_fatal = true;
-    }
-    else {
-        m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
-        ec2 = ec;
-        is_fatal = false;
-    }
-    close_due_to_client_side_error(ec2, is_fatal); // Throws
-}
 
-
-void Connection::read_or_write_error(std::error_code ec)
+void Connection::read_or_write_error(std::error_code ec, StringData message)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, is_fatal);     // Throws
+    close_due_to_client_side_error(ec, is_fatal, message); // Throws
 }
 
 
@@ -1034,11 +983,10 @@ void Connection::close_due_to_missing_protocol_feature()
 
 
 // Close connection due to error discovered on the client-side.
-void Connection::close_due_to_client_side_error(std::error_code ec, bool is_fatal)
+void Connection::close_due_to_client_side_error(std::error_code ec, bool is_fatal, StringData message)
 {
     logger.info("Connection closed due to error"); // Throws
-    StringData* custom_message = nullptr;
-    involuntary_disconnect(ec, is_fatal, custom_message); // Throws
+    involuntary_disconnect(ec, is_fatal, message.empty() ? nullptr : &message); // Throws
 }
 
 

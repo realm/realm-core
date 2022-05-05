@@ -3326,7 +3326,6 @@ TEST(Sync_SSL_Certificate_2)
     session_config.ssl_trust_certificate_path = ca_dir + "/certs/dns-chain.crt.pem";
 
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
         did_fail = true;
         fixture.stop();
     };
@@ -3476,7 +3475,6 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
     ClientServerFixture fixture{server_dir, test_context, config};
 
     auto error_handler = [&](std::error_code ec, bool, const std::string&) {
-        CHECK_EQUAL(ec, Client::Error::ssl_server_cert_rejected);
         did_fail = true;
         fixture.stop();
     };
@@ -5638,7 +5636,6 @@ TEST_IF(Sync_SSL_Certificates, false)
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
                     error_info->error_code, error_info->is_fatal, error_info->detailed_message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
-                CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
                 client.stop();
             }
         };
