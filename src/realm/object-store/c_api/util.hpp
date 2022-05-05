@@ -13,6 +13,10 @@ inline auto wrap_err(F&& f) noexcept -> decltype(f())
     try {
         return f();
     }
+    catch (const CallbackFailed& e) {
+        set_last_exception_callback_error(std::current_exception(), e.user_error);
+        return {};
+    }
     catch (...) {
         set_last_exception(std::current_exception());
         return {};

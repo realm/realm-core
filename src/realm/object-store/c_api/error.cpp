@@ -19,6 +19,12 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     assign(std::move(ptr));
 }
 
+ErrorStorage::ErrorStorage(std::exception_ptr ptr, void* usercode_error) noexcept
+    : m_err(none)
+{
+    assign(std::move(ptr), usercode_error);
+}
+
 ErrorStorage::ErrorStorage(const ErrorStorage& other)
     : m_err(other.m_err)
     , m_message_buf(other.m_message_buf)
@@ -70,7 +76,7 @@ bool ErrorStorage::operator==(const ErrorStorage& other) const noexcept
     return m_err->error == other.m_err->error && m_message_buf == other.m_message_buf;
 }
 
-void ErrorStorage::assign(std::exception_ptr eptr) noexcept
+void ErrorStorage::assign(std::exception_ptr eptr, void* usercode_error) noexcept
 {
     if (!eptr) {
         clear();
@@ -79,11 +85,14 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     m_err.emplace();
     m_err->kind.code = 0;
+    m_err->usercode_error = nullptr;
     auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
         m_err->error = error_number;
         try {
             m_message_buf = ex.what();
             m_err->message = m_message_buf.c_str();
+            if (usercode_error)
+                m_err->usercode_error = usercode_error;
         }
         catch (const std::bad_alloc&) {
             // If we are unable to build the new error because we ran out of memory we should propagate the OOM
@@ -264,6 +273,11 @@ void set_last_exception(std::exception_ptr eptr)
     ErrorStorage::get_thread_local()->assign(std::move(eptr));
 }
 
+void set_last_exception_callback_error(std::exception_ptr eptr, void* usercode_error)
+{
+    ErrorStorage::get_thread_local()->assign(std::move(eptr), usercode_error);
+}
+
 RLM_API bool realm_get_last_error(realm_error_t* err)
 {
     return ErrorStorage::get_thread_local()->get_as_realm_error_t(err);
@@ -295,5 +309,16 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
     return realm::c_api::wrap_err([=]() {
         (func)();
         return true;
+    });
+}
+
+RLM_API void realm_register_user_code_callback_error(void* user_error,
+                                                     realm_free_userdata_func_t userdata_free) noexcept
+{
+    realm::c_api::wrap_err([=]() {
+        // register a callback failed exception storing the ptr to the user code error passed by the SDK
+        // when this excpetion is caught the original error can be processed
+        throw realm::c_api::CallbackFailed(user_error, userdata_free);
+        return false;
     });
 }

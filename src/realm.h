@@ -251,6 +251,7 @@ typedef enum realm_logic_error_kind {
 typedef struct realm_error {
     realm_errno_e error;
     const char* message;
+    void* usercode_error;
     union {
         int code;
         realm_logic_error_kind_e logic_error_kind;

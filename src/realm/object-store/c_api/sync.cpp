@@ -895,16 +895,4 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
         };
     (*session)->wait_for_upload_completion(std::move(cb));
 }
-
-RLM_API void realm_register_user_code_callback_error(void* user_error,
-                                                     realm_free_userdata_func_t userdata_free) noexcept
-{
-    wrap_err([=]() {
-        // register a callback failed exception storing the ptr to the user code error passed by the SDK
-        // when this excpetion is caught the original error can be processed
-        throw CallbackFailed(user_error, userdata_free);
-        return false;
-    });
-}
-
 } // namespace realm::c_api
