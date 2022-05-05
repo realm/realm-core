@@ -444,7 +444,7 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
 
     auto tr = fixture.db->start_read();
     SyncMetadataSchemaVersions versions(tr);
-    auto flx_sub_store_version = versions.get_version_for(tr, sync::internal_table_groups::c_flx_subscription_store);
+    auto flx_sub_store_version = versions.get_version_for(tr, sync::internal_schema_groups::c_flx_subscription_store);
     CHECK(flx_sub_store_version);
     CHECK_EQUAL(*flx_sub_store_version, 2);
 

@@ -582,10 +582,10 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
     auto tr = m_db->start_read();
     SyncMetadataSchemaVersions schema_versions(tr);
 
-    if (auto schema_version = schema_versions.get_version_for(tr, internal_table_groups::c_flx_subscription_store);
+    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
         !schema_version) {
         tr->promote_to_write();
-        schema_versions.set_version_for(tr, internal_table_groups::c_flx_subscription_store, c_flx_schema_version);
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version);
         create_sync_metadata_schema(tr, &internal_tables);
         tr->commit_and_continue_as_read();
     }

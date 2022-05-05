@@ -30,7 +30,7 @@ namespace {
 constexpr static std::string_view c_flx_metadata_table("flx_metadata");
 constexpr static std::string_view c_sync_internal_schemas_table("sync_internal_schemas");
 constexpr static std::string_view c_meta_schema_version_field("schema_version");
-constexpr static std::string_view c_meta_schema_table_group_field("table_group");
+constexpr static std::string_view c_meta_schema_schema_group_field("schema_group_name");
 
 } // namespace
 
@@ -148,7 +148,7 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
                 table_ref->get_link_target(col_key)->get_name() != col.target_table) {
                 throw std::runtime_error(
                     util::format("column %1 in sync internal table %2 links to the wrong table %3", col.name,
-                                 table.name, table_ref->get_link_target(col_key)));
+                                 table.name, table_ref->get_link_target(col_key)->get_name()));
             }
             *col.key_out = col_key;
         }
@@ -164,9 +164,10 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     std::vector<SyncMetadataTable> unified_schema_version_table_def{
         {&m_table,
          c_sync_internal_schemas_table,
-         {&m_table_group_field, c_meta_schema_table_group_field, type_String},
+         {&m_schema_group_field, c_meta_schema_schema_group_field, type_String},
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
+    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
     if (!m_table) {
         if (tr->has_table(c_sync_internal_schemas_table)) {
             load_sync_metadata_schema(tr, &unified_schema_version_table_def);
@@ -188,16 +189,17 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
     tr->promote_to_write();
     auto legacy_meta_table = tr->get_table(legacy_table_key);
     auto legacy_obj = legacy_meta_table->get_object(0);
-    set_version_for(tr, internal_table_groups::c_flx_subscription_store, legacy_obj.get<int64_t>(legacy_version_key));
+    set_version_for(tr, internal_schema_groups::c_flx_subscription_store,
+                    legacy_obj.get<int64_t>(legacy_version_key));
     tr->remove_table(legacy_table_key);
     tr->commit_and_continue_as_read();
 }
 
 util::Optional<int64_t> SyncMetadataSchemaVersions::get_version_for(const TransactionRef& tr,
-                                                                    std::string_view table_group_name)
+                                                                    std::string_view schema_group_name)
 {
     auto schema_versions = tr->get_table(m_table);
-    auto obj_key = schema_versions->find_primary_key(Mixed{StringData(table_group_name)});
+    auto obj_key = schema_versions->find_primary_key(Mixed{StringData(schema_group_name)});
     if (!obj_key) {
         return util::none;
     }
@@ -209,11 +211,11 @@ util::Optional<int64_t> SyncMetadataSchemaVersions::get_version_for(const Transa
     return metadata_obj.get<int64_t>(m_version_field);
 }
 
-void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view table_group_name,
+void SyncMetadataSchemaVersions::set_version_for(const TransactionRef& tr, std::string_view schema_group_name,
                                                  int64_t version)
 {
     auto schema_versions = tr->get_table(m_table);
-    auto metadata_obj = schema_versions->create_object_with_primary_key(Mixed{StringData(table_group_name)});
+    auto metadata_obj = schema_versions->create_object_with_primary_key(Mixed{StringData(schema_group_name)});
     metadata_obj.set(m_version_field, version);
 }
 

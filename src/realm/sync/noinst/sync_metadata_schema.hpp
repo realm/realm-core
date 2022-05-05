@@ -32,7 +32,7 @@ using TransactionRef = std::shared_ptr<Transaction>;
 } // namespace realm
 
 namespace realm::sync {
-namespace internal_table_groups {
+namespace internal_schema_groups {
 constexpr static std::string_view c_flx_subscription_store("flx_subscription_store");
 
 }
@@ -125,13 +125,13 @@ class SyncMetadataSchemaVersions {
 public:
     explicit SyncMetadataSchemaVersions(const TransactionRef& ref);
 
-    util::Optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view table_group_name);
-    void set_version_for(const TransactionRef& tr, std::string_view table_group_name, int64_t version);
+    util::Optional<int64_t> get_version_for(const TransactionRef& tr, std::string_view schema_group_name);
+    void set_version_for(const TransactionRef& tr, std::string_view schema_group_name, int64_t version);
 
 private:
     TableKey m_table;
     ColKey m_version_field;
-    ColKey m_table_group_field;
+    ColKey m_schema_group_field;
 };
 
 } // namespace realm::sync
