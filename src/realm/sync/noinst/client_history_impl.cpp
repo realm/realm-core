@@ -332,7 +332,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
 
     while (accum_byte_size < accum_byte_size_soft_limit) {
         HistoryEntry entry;
-        version_type last_integrated_upstream_version_2;
+        version_type last_integrated_upstream_version_2 = last_integrated_upstream_version;
         version_type version = find_sync_history_entry(arrays, sync_history_base_version, begin_version_2,
                                                        end_version_2, entry, last_integrated_upstream_version_2);
 
