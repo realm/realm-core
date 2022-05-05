@@ -3,6 +3,7 @@
 ### Enhancements
 * Adding recovery mode to new automatic client reset handling. In this mode, local unsynced changes which would otherwise be lost during a client reset are replayed on the seamlessly reset Realm. ([#5323](https://github.com/realm/realm-core/pull/5323))
 * Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432]https://github.com/realm/realm-core/pull/5432)
+* Expose client reset functionalities for C API. ([#5425]https://github.com/realm/realm-core/issues/5425)
 * Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async`
 ([#5446](https://github.com/realm/realm-core/pull/5446))
 * Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))

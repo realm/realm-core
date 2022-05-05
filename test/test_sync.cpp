@@ -7130,13 +7130,13 @@ TEST(Sync_BundledRealmFile)
     });
 
     // We cannot write out file if changes are not synced to server
-    CHECK_THROW_ANY(db->write_copy(path.c_str()));
+    CHECK_THROW_ANY(db->write_copy(path.c_str(), nullptr));
 
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
     // Now we can
-    db->write_copy(path.c_str());
+    db->write_copy(path.c_str(), nullptr);
 }
 
 TEST(Sync_UpgradeToClientHistory)

@@ -1265,9 +1265,9 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
-void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_overwrite)
+void RealmCoordinator::write_copy(StringData path, const char* key)
 {
-    m_db->write_copy(path, key.data(), allow_overwrite);
+    m_db->write_copy(path, key);
 }
 
 void RealmCoordinator::async_request_write_mutex(Realm& realm)
