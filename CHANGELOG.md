@@ -10,7 +10,7 @@
 * Expose Subscription properties on C-API ([#5454](https://github.com/realm/realm-core/pull/5454))
 
 ### Fixed
-* C API client reset callbacks don't leak the `realm_t` parameter. ([#5464]https://github.com/realm/realm-core/pull/5464)
+* C API client reset callbacks don't leak the `realm_t` parameter. ([#5464](https://github.com/realm/realm-core/pull/5464))
 * The sync client may have sent a corrupted upload cursor leading to a fatal error from the server due to an uninitialized variable. ([#5460](https://github.com/realm/realm-core/pull/5460), since v11.14.0)
  
 ### Breaking changes
