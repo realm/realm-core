@@ -91,7 +91,14 @@ RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_m
             realm_t r2{new_realm};
             realm_schema_t sch{&schema};
             if (!(func)(userdata, &r1, &r2, &sch)) {
-                throw CallbackFailed{};
+                realm_error_t _err;
+                if (realm_get_last_error(&_err) && _err.usercode_error) {
+                    // the user code callback has thrown something, just relay the user error
+                    throw CallbackFailed{_err.usercode_error};
+                }
+                else {
+                    throw CallbackFailed{};
+                }
             }
         };
         config->migration_function = std::move(migration_func);
@@ -112,7 +119,14 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t* confi
         auto init_func = [=](SharedRealm realm) {
             realm_t r{realm};
             if (!(func)(userdata, &r)) {
-                throw CallbackFailed{};
+                realm_error_t _err;
+                if (realm_get_last_error(&_err) && _err.usercode_error) {
+                    // the user code callback has thrown something, just relay the user error
+                    throw CallbackFailed{_err.usercode_error};
+                }
+                else {
+                    throw CallbackFailed{};
+                }
             }
         };
         config->initialization_function = std::move(init_func);

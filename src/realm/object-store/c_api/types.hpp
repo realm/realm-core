@@ -55,27 +55,19 @@ struct CallbackFailed : std::runtime_error {
     // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
     // realm_register_user_code_callback_error()
     void* usercode_error{nullptr};
-    using CallbackFailedDeleteUserError = std::function<void(void*)>;
-    CallbackFailedDeleteUserError usercode_error_deleter;
 
     CallbackFailed()
         : std::runtime_error("User-provided callback failed")
     {
     }
 
-    CallbackFailed(void* usercode_error, CallbackFailedDeleteUserError usercode_error_deleter)
+    CallbackFailed(void* usercode_error)
         : std::runtime_error("User-provided callback failed")
         , usercode_error(usercode_error)
-        , usercode_error_deleter(usercode_error_deleter)
     {
     }
 
-    virtual ~CallbackFailed()
-    {
-        if (usercode_error_deleter) {
-            usercode_error_deleter(usercode_error);
-        }
-    }
+    virtual ~CallbackFailed() = default;
 };
 
 //// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE
