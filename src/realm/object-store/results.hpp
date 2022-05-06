@@ -368,8 +368,8 @@ private:
     std::shared_ptr<Realm> m_realm;
     mutable util::CopyableAtomic<const ObjectSchema*> m_object_schema = nullptr;
     Query m_query GUARDED_BY(m_mutex);
-    TableView m_table_view GUARDED_BY(m_mutex);
     ConstTableRef m_table;
+    TableView m_table_view GUARDED_BY(m_mutex);
     DescriptorOrdering m_descriptor_ordering;
     std::shared_ptr<CollectionBase> m_collection;
     util::Optional<std::vector<size_t>> m_list_indices GUARDED_BY(m_mutex);
@@ -404,6 +404,10 @@ private:
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
     enum class EvaluateMode { Count, Snapshot, Normal };
+    /// Return true if the collection has changed since the last call to
+    /// `has_changed()`. Note that this function is not idempotent and updates
+    /// the internal state of the accessor if it has changed.
+    bool has_changed() REQUIRES(!m_mutex);
     void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
 
     // Shared logic between freezing and thawing Results as the Core API is the same.

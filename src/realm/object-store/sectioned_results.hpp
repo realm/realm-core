@@ -120,7 +120,7 @@ private:
     uint_fast64_t get_content_version();
 
     friend struct SectionedResultsNotificationHandler;
-    void calculate_sections_if_required();
+    void calculate_sections_if_required(bool force_update = false);
 
     NotificationToken add_notification_callback_for_section(size_t section_index,
                                                             SectionedResultsNotificatonCallback callback,
