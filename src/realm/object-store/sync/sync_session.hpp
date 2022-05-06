@@ -315,8 +315,10 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
 
-    void download_fresh_realm() REQUIRES(!m_config_mutex, !m_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
+    void download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+        REQUIRES(!m_config_mutex, !m_state_mutex);
+    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+                                       util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
         REQUIRES(!m_state_mutex, !m_config_mutex);
     void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
@@ -368,7 +370,7 @@ private:
     SyncConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
     const std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
-    bool m_force_client_reset GUARDED_BY(m_state_mutex) = false;
+    util::Optional<SyncError::ClientResetModeAllowed> m_force_client_reset GUARDED_BY(m_state_mutex) = util::none;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;
