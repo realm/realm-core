@@ -1,9 +1,13 @@
 #include "realm/exceptions.hpp"
+#include "realm/object_id.hpp"
+#include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/sync/subscriptions.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 
 #include "test.hpp"
 #include "util/test_path.hpp"
+
+#include <filesystem>
 
 namespace realm::sync {
 
@@ -409,6 +413,42 @@ TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
 
     // Throws since the SubscriptionStore is gone.
     CHECK_THROW(latest->refresh(), std::logic_error);
+}
+
+TEST(Sync_SubscriptionStoreInternalSchemaMigration)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+
+    // This test file was created using the FLXSyncTestHarness in the object store tests like this:
+    //   FLXSyncTestHarness harness("flx_generate_meta_tables");
+    //     harness.load_initial_data([&](SharedRealm realm) {
+    //     auto config = realm->config();
+    //     config.path = "test_flx_metadata_tables_v1.realm";
+    //     config.cache = false;
+    //     realm->convert(config, false);
+    //   });
+    auto path = std::filesystem::path(test_util::get_test_resource_path()) / "test_flx_metadata_tables_v1.realm";
+    CHECK(util::File::exists(path.string()));
+    util::File::copy(path.string(), sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto [active_version, latest_version] = store->get_active_and_latest_versions();
+    CHECK_EQUAL(active_version, latest_version);
+    auto active = store->get_active();
+    CHECK_EQUAL(active.version(), 1);
+    CHECK_EQUAL(active.state(), SubscriptionSet::State::Complete);
+    CHECK_EQUAL(active.size(), 1);
+    auto sub = active.at(0);
+    CHECK_EQUAL(sub.id(), ObjectId("62742ab959d7f2e48f59f75d"));
+    CHECK_EQUAL(sub.object_class_name(), "TopLevel");
+
+    auto tr = fixture.db->start_read();
+    SyncMetadataSchemaVersions versions(tr);
+    auto flx_sub_store_version = versions.get_version_for(tr, sync::internal_schema_groups::c_flx_subscription_store);
+    CHECK(flx_sub_store_version);
+    CHECK_EQUAL(*flx_sub_store_version, 2);
+
+    CHECK(!versions.get_version_for(tr, "non_existent_table"));
 }
 
 } // namespace realm::sync

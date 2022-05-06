@@ -8,6 +8,7 @@ set(SYNC_SOURCES
     noinst/client_reset_recovery.cpp
     noinst/compact_changesets.cpp
     noinst/protocol_codec.cpp
+    noinst/sync_metadata_schema.cpp
     changeset_encoder.cpp
     changeset_parser.cpp
     changeset.cpp
@@ -61,6 +62,7 @@ set(NOINST_HEADERS
     noinst/integer_codec.hpp
     noinst/protocol_codec.hpp
     noinst/root_certs.hpp
+    noinst/sync_metadata_schema.hpp
 )
 
 set(SYNC_HEADERS ${IMPL_INSTALL_HEADESR}

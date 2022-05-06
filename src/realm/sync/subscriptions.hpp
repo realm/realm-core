@@ -327,24 +327,6 @@ private:
 protected:
     explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
 
-    struct SubscriptionKeys {
-        TableKey table;
-        ColKey id;
-        ColKey created_at;
-        ColKey updated_at;
-        ColKey name;
-        ColKey object_class_name;
-        ColKey query_str;
-    };
-
-    struct SubscriptionSetKeys {
-        TableKey table;
-        ColKey snapshot_version;
-        ColKey state;
-        ColKey error_str;
-        ColKey subscriptions;
-    };
-
     struct NotificationRequest {
         NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
                             SubscriptionSet::State notify_when)
@@ -368,9 +350,22 @@ protected:
     friend class Subscription;
     friend class SubscriptionSet;
 
+    TableKey m_sub_table;
+    ColKey m_sub_id;
+    ColKey m_sub_created_at;
+    ColKey m_sub_updated_at;
+    ColKey m_sub_name;
+    ColKey m_sub_object_class_name;
+    ColKey m_sub_query_str;
+
+    TableKey m_sub_set_table;
+    ColKey m_sub_set_version_num;
+    ColKey m_sub_set_snapshot_version;
+    ColKey m_sub_set_state;
+    ColKey m_sub_set_error_str;
+    ColKey m_sub_set_subscriptions;
+
     util::UniqueFunction<void(int64_t)> m_on_new_subscription_set;
-    std::unique_ptr<SubscriptionSetKeys> m_sub_set_keys;
-    std::unique_ptr<SubscriptionKeys> m_sub_keys;
 
     mutable std::mutex m_pending_notifications_mutex;
     mutable std::condition_variable m_pending_notifications_cv;

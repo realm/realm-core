@@ -173,6 +173,15 @@ endif()
 
 target_link_libraries(CoreTests TestUtil QueryParser)
 
+# Enable std::filesystem in core tests
+if(APPLE)
+    target_compile_definitions(CoreTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
+endif()
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+        target_link_libraries(CoreTests stdc++fs)
+    endif()
+endif()
 
 if(UNIX AND NOT APPLE)
     # This enables symbols in backtraces
@@ -256,6 +265,16 @@ if(REALM_ENABLE_SYNC)
     set_target_properties(SyncTests PROPERTIES OUTPUT_NAME "realm-sync-tests")
     target_link_libraries(SyncTests Sync SyncServer TestUtil)
     add_test(NAME SyncTests COMMAND realm-sync-tests)
+
+    # Enable std::filesystem in sync tests.
+    if(APPLE)
+        target_compile_definitions(SyncTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
+    endif()
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+            target_link_libraries(SyncTests stdc++fs)
+        endif()
+    endif()
 
     if(UNIX AND NOT APPLE)
         # This enables symbols in backtraces
