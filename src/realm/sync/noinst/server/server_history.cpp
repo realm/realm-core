@@ -308,8 +308,6 @@ namespace {
 constexpr ServerHistory::file_ident_type g_root_node_file_ident = 1;
 
 
-const AllocationMetricName g_log_compaction_metric{"log_compaction"};
-
 } // unnamed namespace
 
 
@@ -420,11 +418,9 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
             has_changesets = true;
     }
 
-    IntegrationReporter& reporter = m_context.get_integration_reporter(); // Throws
     result = {};
     for (;;) {
         if (has_changesets) {
-            reporter.on_integration_session_begin(); // Throws
             result.partial_clear();
         }
 
@@ -493,7 +489,7 @@ bool ServerHistory::integrate_client_changesets(const IntegratableChangesets& in
                     num_changesets_to_dump += num_changesets;
                     bool dirty_2 = integrate_remote_changesets(
                         client_file_ident, upload_progress, list.locked_server_version, changesets_2, num_changesets,
-                        &reporter, &reporter, logger); // Throws
+                        logger); // Throws
                     if (dirty_2) {
                         dirty = true;
                         bool backup_whole_realm_3 =
@@ -606,7 +602,6 @@ auto ServerHistory::integrate_backup_idents_and_changeset(
             changesets[ic.client_file_ident].push_back(ic);
 
         for (auto& pair : changesets) {
-            Transformer::Reporter* transform_reporter = nullptr;
             file_ident_type client_file_ident = pair.first;
             // FIXME: Backup should also get the proper upload progress and
             // locked server version. This requires extending the backup
@@ -614,10 +609,8 @@ auto ServerHistory::integrate_backup_idents_and_changeset(
             const auto& back = pair.second.back();
             UploadCursor upload_progress = {back.remote_version, back.last_integrated_local_version};
             version_type locked_server_version = upload_progress.last_integrated_server_version;
-            IntegrationReporter* integration_reporter = nullptr;
             integrate_remote_changesets(client_file_ident, upload_progress, locked_server_version, pair.second.data(),
-                                        pair.second.size(), transform_reporter, integration_reporter,
-                                        logger); // Throws
+                                        pair.second.size(), logger); // Throws
         }
 
         auto ta = util::make_temp_assign(m_is_local_changeset, false, true);
@@ -977,7 +970,6 @@ bool ServerHistory::fetch_download_info(file_ident_type client_file_ident, Downl
     }
 
     if (!disable_download_compaction) {
-        AllocationMetricNameScope scope{g_log_compaction_metric};
         compact_changesets(changesets.data(), changesets.size());
 
         ChangesetEncoder::Buffer encode_buffer;
@@ -1059,8 +1051,7 @@ bool ServerHistory::compact_history(const TransactionRef& wt, Logger& logger)
 }
 
 
-util::metered::vector<sync::Changeset> ServerHistory::get_parsed_changesets(version_type begin,
-                                                                            version_type end) const
+std::vector<sync::Changeset> ServerHistory::get_parsed_changesets(version_type begin, version_type end) const
 {
     TransactionRef rt = m_db->start_read(); // Throws
     version_type realm_version = rt->get_version();
@@ -1073,7 +1064,7 @@ util::metered::vector<sync::Changeset> ServerHistory::get_parsed_changesets(vers
     }
     REALM_ASSERT(begin <= end);
 
-    util::metered::vector<sync::Changeset> changesets;
+    std::vector<sync::Changeset> changesets;
     changesets.reserve(std::size_t(end - begin)); // Throws
     for (version_type version = begin; version < end; ++version) {
         std::size_t ndx = std::size_t(version - m_history_base_version - 1);
@@ -1108,7 +1099,6 @@ bool ServerHistory::do_compact_history(Logger& logger, bool force)
         return false;
 
     bool dirty = false;
-    AllocationMetricNameScope scope{g_log_compaction_metric};
 
     // Flush "last seen" cache.
     std::size_t num_client_files = m_acc->cf_rh_base_versions.size();
@@ -1586,8 +1576,7 @@ private:
 
 bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_ident, UploadCursor upload_progress,
                                                 version_type locked_server_version, const RemoteChangeset* changesets,
-                                                std::size_t num_changesets, Transformer::Reporter* transform_reporter,
-                                                IntegrationReporter* integration_reporter, util::Logger& logger)
+                                                std::size_t num_changesets, util::Logger& logger)
 {
     std::size_t remote_file_index = std::size_t(remote_file_ident);
     REALM_ASSERT(remote_file_index < m_num_client_files);
@@ -1638,7 +1627,6 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
             Transformer& transformer = m_context.get_transformer(); // Throws
             transformer.transform_remote_changesets(transform_hist, m_local_file_ident, current_server_version,
                                                     parsed_transformed_changesets.data(), num_changesets,
-                                                    transform_reporter,
                                                     &logger); // Throws
         }
 
@@ -1664,11 +1652,6 @@ bool ServerHistory::integrate_remote_changesets(file_ident_type remote_file_iden
 
             add_sync_history_entry(entry); // Throws
             reset();                       // Reset the instruction encoder
-
-            if (integration_reporter != nullptr) {
-                // Report the original size of the integrated changeset
-                integration_reporter->on_changeset_integrated(changesets[i].data.size()); // Throws
-            }
         }
     }
 
@@ -2722,12 +2705,6 @@ Transformer& ServerHistory::Context::get_transformer()
 
 
 util::Buffer<char>& ServerHistory::Context::get_transform_buffer()
-{
-    throw util::runtime_error("Not supported");
-}
-
-
-auto ServerHistory::Context::get_integration_reporter() -> IntegrationReporter&
 {
     throw util::runtime_error("Not supported");
 }

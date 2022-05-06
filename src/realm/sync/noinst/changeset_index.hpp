@@ -7,9 +7,6 @@
 #include <map>
 
 #include <realm/sync/changeset.hpp>
-#include <realm/util/metered/map.hpp>
-#include <realm/util/metered/set.hpp>
-#include <realm/util/metered/vector.hpp>
 
 namespace realm {
 namespace _impl {
@@ -39,8 +36,7 @@ struct ChangesetIndex {
     };
 
     // This is always sorted by (changeset->version, range->begin).
-    using Ranges =
-        util::metered::map<Changeset*, util::metered::vector<Changeset::Range>, CompareChangesetPointersByVersion>;
+    using Ranges = std::map<Changeset*, std::vector<Changeset::Range>, CompareChangesetPointersByVersion>;
 
     /// Scan changeset to discover objects connected by link instructions,
     /// classes connected by link columns, and destructive schema changes.
@@ -117,13 +113,13 @@ struct ChangesetIndex {
 private:
     struct ConflictGroup {
         Ranges ranges;
-        util::metered::map<StringData, util::metered::vector<PrimaryKey>> objects;
-        util::metered::vector<StringData> schemas;
+        std::map<StringData, std::vector<PrimaryKey>> objects;
+        std::vector<StringData> schemas;
         size_t size = 0;
         std::list<ConflictGroup>::iterator self_it;
     };
-    util::metered::map<StringData, util::metered::map<PrimaryKey, ConflictGroup*>> m_object_instructions;
-    util::metered::map<StringData, ConflictGroup*> m_schema_instructions;
+    std::map<StringData, std::map<PrimaryKey, ConflictGroup*>> m_object_instructions;
+    std::map<StringData, ConflictGroup*> m_schema_instructions;
     std::list<ConflictGroup> m_conflict_groups_owner;
     size_t m_num_conflict_groups = 0; // must be kept in sync with m_conflict_groups_owner
 

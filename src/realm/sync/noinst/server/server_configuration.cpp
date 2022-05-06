@@ -589,19 +589,6 @@ std::string load_workdir_locking_debug_info(const std::string& lockfile_path)
 namespace realm {
 namespace config {
 
-std::string get_default_metrics_prefix()
-{
-    std::string prefix = util::network::host_name(); // Throws
-    if (prefix.empty()) {
-        prefix = "realm"; // Throws
-    }
-    else {
-        prefix = "realm." + prefix; // Throws
-    }
-    return prefix;
-}
-
-
 #if !REALM_MOBILE
 
 void show_help(const std::string& program_name)
@@ -796,7 +783,7 @@ sync::ServerWorkdirLock::ServerWorkdirLock(const std::string& lockfile_path)
 }
 
 
-void sync::prepare_server_workdir(const config::Configuration& config, util::Logger& logger, Metrics&)
+void sync::prepare_server_workdir(const config::Configuration& config, util::Logger& logger)
 {
     REALM_ASSERT(config.root_dir);
     const std::string& root_dir = *config.root_dir;

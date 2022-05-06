@@ -46,7 +46,6 @@
 #include "util/demangle.hpp"
 #include "util/semaphore.hpp"
 #include "util/thread_wrapper.hpp"
-#include "util/mock_metrics.hpp"
 #include "util/compare_groups.hpp"
 
 using namespace realm;
@@ -5785,15 +5784,6 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
 
 namespace issue2104 {
 
-class IntegrationReporter : public _impl::ServerHistory::IntegrationReporter {
-public:
-    void on_integration_session_begin() override {}
-
-    void on_changeset_integrated(std::size_t) override {}
-
-    void on_changesets_merged(long) override {}
-};
-
 class ServerHistoryContext : public _impl::ServerHistory::Context {
 public:
     ServerHistoryContext()
@@ -5816,16 +5806,10 @@ public:
         return m_transform_buffer;
     }
 
-    IntegrationReporter& get_integration_reporter() override
-    {
-        return m_integration_reporter;
-    }
-
 private:
     std::mt19937_64 m_random;
     std::unique_ptr<sync::Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
-    IntegrationReporter m_integration_reporter;
 };
 
 } // namespace issue2104
@@ -6317,11 +6301,9 @@ TEST(Sync_ClientFileBlacklisting)
     }
 
     // Check that blacklisting works
-    MockMetrics metrics;
     bool did_fail = false;
     {
         ClientServerFixture::Config config;
-        config.server_metrics = &metrics;
         config.client_file_blacklists["/test"].push_back(client_file_ident);
         ClientServerFixture fixture(server_dir, test_context, std::move(config));
         fixture.start();
@@ -6344,7 +6326,6 @@ TEST(Sync_ClientFileBlacklisting)
         session.wait_for_download_complete_or_client_stopped();
     }
     CHECK(did_fail);
-    CHECK_EQUAL(1.0, metrics.sum_equal("blacklisted"));
 }
 
 // This test could trigger the assertion that the row_for_object_id cache is

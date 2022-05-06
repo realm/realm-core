@@ -411,8 +411,6 @@ public:
         // through unit_test::TestContext will be used.
         util::Logger* logger = nullptr;
 
-        sync::Metrics* server_metrics = nullptr;
-
         // These values will disable the heartbeats by default.
         milliseconds_type client_ping_period = 100000000;  // do not send pings
         milliseconds_type client_pong_timeout = 100000000; // do not expect pongs
@@ -512,7 +510,6 @@ public:
             config_2.max_open_files = config.server_max_open_files;
             config_2.logger = &*m_server_loggers[i];
             config_2.token_expiration_clock = &m_fake_token_expiration_clock;
-            config_2.metrics = config.server_metrics;
             config_2.ssl = m_enable_server_ssl;
             config_2.ssl_certificate_path = config.server_ssl_certificate_path;
             config_2.ssl_certificate_key_path = config.server_ssl_certificate_key_path;

@@ -367,8 +367,7 @@ public:
 
 protected:
     void merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets, std::size_t their_size,
-                          Changeset** our_changesets, std::size_t our_size, Reporter* reporter,
-                          util::Logger* logger) override final
+                          Changeset** our_changesets, std::size_t our_size, util::Logger* logger) override final
     {
         std::string directory;
         if (m_changeset_dump_dir_gen) {
@@ -383,7 +382,7 @@ protected:
         }
 
         _impl::TransformerImpl::merge_changesets(local_file_ident, their_changesets, their_size, our_changesets,
-                                                 our_size, reporter, logger);
+                                                 our_size, logger);
 
         if (m_changeset_dump_dir_gen) {
             encode_changesets(our_changesets, our_size, logger);
@@ -487,9 +486,8 @@ inline auto ShortCircuitHistory::integrate_remote_changesets(file_ident_type rem
     }
 
     TransformHistoryImpl transform_hist{*this, remote_file_ident};
-    Transformer::Reporter* reporter = nullptr;
     m_transformer->transform_remote_changesets(transform_hist, m_local_file_ident, local_version, changesets.data(),
-                                               changesets.size(), reporter, logger);
+                                               changesets.size(), logger);
 
     sync::ChangesetEncoder::Buffer assembled_transformed_changeset;
 

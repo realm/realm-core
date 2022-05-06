@@ -152,7 +152,7 @@ void ChangesetIndex::merge_conflict_groups(ConflictGroup& into, ConflictGroup& f
 void ChangesetIndex::add_changeset(Changeset& log)
 {
     if (!log.empty())
-        m_everything[&log] = util::metered::vector<Changeset::Range>(1, Changeset::Range{log.begin(), log.end()});
+        m_everything[&log] = std::vector<Changeset::Range>(1, Changeset::Range{log.begin(), log.end()});
 
     if (m_contains_destructive_schema_changes)
         return; // Just add to everything.

@@ -13,7 +13,6 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/time.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
-#include <realm/sync/noinst/server/metrics.hpp>
 #include <realm/sync/noinst/server/crypto_server.hpp>
 #include <realm/sync/client.hpp>
 
@@ -95,12 +94,6 @@ public:
         /// util::StderrLogger with the log level threshold set to
         /// util::Logger::Level::info.
         util::Logger* logger = nullptr;
-
-        /// An optional sink for recording metrics about the internal operation
-        /// of the server. For the list of counters and gauges see
-        /// "doc/monitoring.md". When no metrics sink is specified, no metrics
-        /// will be recorded.
-        Metrics* metrics = nullptr;
 
         /// A unique id of this server. Used in the backup protocol to tell
         /// slaves apart.

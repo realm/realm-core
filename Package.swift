@@ -372,7 +372,6 @@ let package = Package(
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
-                "dogless",
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",
@@ -422,7 +421,6 @@ let package = Package(
             path: "src",
             exclude: ([
                 "CMakeLists.txt",
-                "dogless",
                 "external",
                 "realm/CMakeLists.txt",
                 "realm/exec",

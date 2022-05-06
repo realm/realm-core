@@ -28,13 +28,6 @@ namespace {
 // FIXME: this is from test/util/server_history.hpp
 // The following classes are the necessary things to instantiate a ServerHistory
 
-class IntegrationReporter : public _impl::ServerHistory::IntegrationReporter {
-public:
-    void on_integration_session_begin() override {}
-    void on_changeset_integrated(std::size_t) override {}
-    void on_changesets_merged(long) override {}
-};
-
 class ServerHistoryContextImpl : public _impl::ServerHistory::Context {
 public:
     ServerHistoryContextImpl()
@@ -54,16 +47,11 @@ public:
     {
         return m_transform_buffer;
     }
-    _impl::ServerHistory::IntegrationReporter& get_integration_reporter() override
-    {
-        return m_integration_reporter;
-    }
 
 private:
     std::mt19937_64 m_random;
     std::unique_ptr<sync::Transformer> m_transformer;
     util::Buffer<char> m_transform_buffer;
-    IntegrationReporter m_integration_reporter;
 };
 
 Replication::HistoryType peek_history_type(const std::string& file_name, const char* read_key)

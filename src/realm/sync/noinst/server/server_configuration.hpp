@@ -6,15 +6,10 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/util/file.hpp>
-#include <realm/sync/noinst/server/metrics.hpp>
 #include <realm/sync/noinst/server/server.hpp>
 
 namespace realm {
 namespace config {
-
-/// Returns `realm.<hostname>` where `<hostname>` is whatever is returned by
-/// util::network::host_name().
-std::string get_default_metrics_prefix();
 
 struct Configuration {
     std::string id = "";
@@ -57,16 +52,6 @@ struct Configuration {
 
     /// If set to true, the partial sync completion mechanism will be disabled.
     bool disable_psync_completer = false;
-
-    /// If nonempty, the effective prefix will be what you specify plus a dot
-    /// (`.`). If empty, there will be no prefix.
-    std::string metrics_prefix = get_default_metrics_prefix();
-
-    /// A blacklist of metrics options.
-    /// The exclusions can be a bitwise OR of different options.
-    /// This can reduce noise in the network, but can also be a way to
-    /// increase performance, as some metrics are costly to compute.
-    realm::sync::MetricsOptions::OptionType metrics_exclusions = realm::sync::MetricsOptions::Core_All;
 
     /// In the case of the Node.js wrapper, if \a log_to_file is set to true,
     /// all logging from the sync server will be forwarded both to a file
@@ -119,7 +104,7 @@ private:
 /// Realm files open concurrently. The application is advised to make sure that
 /// all agents (including the sync server), that might open server-side Realm
 /// files are not started until after this function has completed sucessfully.
-void prepare_server_workdir(const config::Configuration&, util::Logger&, Metrics&);
+void prepare_server_workdir(const config::Configuration&, util::Logger&);
 
 Server::ClientFileBlacklists load_client_file_blacklists(const config::Configuration&, util::Logger&);
 

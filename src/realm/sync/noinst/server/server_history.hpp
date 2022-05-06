@@ -168,7 +168,7 @@ public:
         timestamp_type origin_timestamp;
         file_ident_type origin_file_ident; // Zero if otherwise equal to client_file_ident
         UploadCursor upload_cursor;
-        util::metered::string changeset;
+        std::string changeset;
 
         IntegratableChangeset(file_ident_type client_file_ident, timestamp_type origin_timestamp,
                               file_ident_type origin_file_ident, UploadCursor upload_cursor,
@@ -189,7 +189,7 @@ public:
     struct IntegratableChangesetList {
         UploadCursor upload_progress = {0, 0};
         version_type locked_server_version = 0;
-        util::metered::vector<IntegratableChangeset> changesets;
+        std::vector<IntegratableChangeset> changesets;
 
         bool has_changesets() const noexcept
         {
@@ -200,7 +200,7 @@ public:
     /// Key is identifier of client file from which the changes were
     /// received. That client file is not necessarily the client file from which
     /// the changes originated (star topology).
-    using IntegratableChangesets = util::metered::map<file_ident_type, IntegratableChangesetList>;
+    using IntegratableChangesets = std::map<file_ident_type, IntegratableChangesetList>;
 
     struct IntegrationResult {
         std::map<file_ident_type, ExtendedIntegrationError> excluded_client_files;
@@ -415,7 +415,7 @@ public:
     template <class H>
     bool transact(H handler, sync::VersionInfo&);
 
-    util::metered::vector<sync::Changeset> get_parsed_changesets(version_type begin, version_type end) const;
+    std::vector<sync::Changeset> get_parsed_changesets(version_type begin, version_type end) const;
 
     // History inspection for debugging purposes and for testing the
     // backup.
@@ -740,8 +740,7 @@ private:
     /// std::error_code instead.
     bool integrate_remote_changesets(file_ident_type remote_file_ident, UploadCursor upload_progress,
                                      version_type locked_server_version, const RemoteChangeset* changesets,
-                                     std::size_t num_changesets, sync::Transformer::Reporter*, IntegrationReporter*,
-                                     util::Logger&);
+                                     std::size_t num_changesets, util::Logger&);
 
     bool update_upload_progress(version_type orig_client_version, ReciprocalHistory& recip_hist,
                                 UploadCursor upload_progress);
@@ -757,13 +756,6 @@ private:
 };
 
 
-class ServerHistory::IntegrationReporter : public sync::Transformer::Reporter {
-public:
-    virtual void on_integration_session_begin() = 0;
-    virtual void on_changeset_integrated(std::size_t changeset_size) = 0;
-};
-
-
 class ServerHistory::Context {
 public:
     virtual std::mt19937_64& server_history_get_random() noexcept = 0;
@@ -776,7 +768,6 @@ public:
     /// saying "Not supported".
     virtual sync::Transformer& get_transformer();
     virtual util::Buffer<char>& get_transform_buffer();
-    virtual IntegrationReporter& get_integration_reporter();
     // @}
 
     /// \param ignore_clients If true, the determination of how far in-place
