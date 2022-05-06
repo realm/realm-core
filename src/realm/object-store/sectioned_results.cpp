@@ -29,7 +29,6 @@ static std::vector<SectionRange> calculate_sections(Results& results,
                                                     const SectionedResults::SectionKeyFunc& callback)
 {
     auto sections = std::map<Mixed, SectionRange>();
-    auto offset_ranges = std::vector<SectionRange>();
     // Take a snapshot in case the underlying results change while
     // the calculation is being performed.
     auto snapshot = results.snapshot();
@@ -55,10 +54,12 @@ static std::vector<SectionRange> calculate_sections(Results& results,
         }
     }
 
-    transform(sections.begin(), sections.end(), back_inserter(offset_ranges),
-              [](const std::map<Mixed, SectionRange>::value_type& val) {
-                  return val.second;
-              });
+    std::vector<SectionRange> offset_ranges;
+    offset_ranges.reserve(sections.size());
+    for (auto& elem : sections) {
+        offset_ranges.push_back(std::move(elem.second));
+    }
+
     auto desc = results.get_descriptor_ordering();
     if (desc.will_apply_sort()) {
         const SortDescriptor* sort_desc = static_cast<const SortDescriptor*>(desc[0]);
@@ -91,9 +92,9 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
                     return v.size() > 0 ? v.prefix(1) : "";
                 };
             }
+        default:
+            throw std::logic_error("Builtin section algorithm not implemented.");
     }
-
-    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 /// Returns the section of an element for the index of that element in the underlying Results.
@@ -200,24 +201,11 @@ NotificationToken ResultsSection::add_notification_callback(SectionedResultsNoti
     return m_parent->add_notification_callback_for_section(m_index, std::move(callback), key_path_array);
 }
 
-inline uint_fast64_t SectionedResults::get_content_version()
-{
-    // TODO: Can results have a simple mode which tells us what table to use?
-    if (m_results.get_collection() != nullptr) {
-        return m_results.get_collection()->get_table()->get_content_version();
-    }
-    else if (m_results.get_table() != nullptr) {
-        return m_results.get_table()->get_content_version();
-    }
-    throw std::logic_error("Unsupported table.");
-}
-
 SectionedResults::SectionedResults(Results results, SectionKeyFunc section_key_func)
     : m_results(results)
     , m_callback(std::move(section_key_func))
 {
-    m_previous_content_version = get_content_version();
-    m_offset_ranges = calculate_sections(m_results, m_callback);
+    calculate_sections_if_required(true);
 }
 
 SectionedResults::SectionedResults(Results results, Results::SectionedResultsOperator op,
@@ -225,19 +213,21 @@ SectionedResults::SectionedResults(Results results, Results::SectionedResultsOpe
     : m_results(results)
     , m_callback(builtin_comparison(results, op, prop_name))
 {
-    m_previous_content_version = get_content_version();
-    m_offset_ranges = calculate_sections(m_results, m_callback);
+    calculate_sections_if_required(true);
 }
 
-void SectionedResults::calculate_sections_if_required()
+void SectionedResults::calculate_sections_if_required(bool force_update)
 {
     if (m_results.m_update_policy == Results::UpdatePolicy::Never)
         return;
-    auto current_content_version = get_content_version();
-    if (m_previous_content_version == current_content_version)
+    else if (!m_results.has_changed() && !force_update)
         return;
 
-    m_previous_content_version = current_content_version;
+    {
+        util::CheckedUniqueLock lock(m_results.m_mutex);
+        m_results.ensure_up_to_date();
+    }
+
     m_offset_ranges = calculate_sections(m_results, m_callback);
 }
 

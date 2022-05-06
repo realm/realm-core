@@ -708,6 +708,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->create_object().set(name_col, "cake");
         r->commit_transaction();
 
+        sectioned_results.size();
         REQUIRE(sectioned_results.size() == 6);
         REQUIRE(algo_run_count == 10);
         std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "cake",
@@ -975,13 +976,25 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_changes.deletions.empty());
         REQUIRE(algo_run_count == 7);
         algo_run_count = 0;
+        // Modify the column value to now be in a diff section
+        r->begin_transaction();
+        o1.set(name_col, "zebra");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(section1_notification_calls == 3);
+        REQUIRE(section2_notification_calls == 1);
+        REQUIRE(section1_changes.modifications.empty());
+        REQUIRE(section1_changes.insertions[3][0] == 0);
+        REQUIRE(section1_changes.deletions[0][0] == 0);
+        REQUIRE(algo_run_count == 7);
+        algo_run_count = 0;
 
         // Deletions
         r->begin_transaction();
         table->remove_object(o2.get_key());
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(section1_notification_calls == 2);
+        REQUIRE(section1_notification_calls == 3);
         REQUIRE(section2_notification_calls == 2);
         REQUIRE(section2_changes.deletions.size() == 1);
         REQUIRE(section2_changes.deletions[1][0] == 1);
@@ -994,10 +1007,10 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->remove_object(o5.get_key());
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(section1_notification_calls == 3);
+        REQUIRE(section1_notification_calls == 4);
         REQUIRE(section2_notification_calls == 2);
         REQUIRE(section1_changes.deletions.size() == 1);
-        REQUIRE(section1_changes.deletions[0][0] == 2);
+        REQUIRE(section1_changes.deletions[0][0] == 1);
         REQUIRE(section1_changes.insertions.empty());
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(algo_run_count == 5);
