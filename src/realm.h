@@ -3173,6 +3173,8 @@ typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
  * @param realm Downloaded realm instance, or null if an error occurred.
  *              Move to the thread you want to use it on and
  *              thaw with @a realm_from_thread_safe_reference().
+ *              Be aware that once received through this call, you own
+ *              the object and must release it when used.
  * @param error Null, if the operation complete successfully.
  */
 typedef void (*realm_async_open_task_completion_func_t)(void* userdata, realm_thread_safe_reference_t* realm,
