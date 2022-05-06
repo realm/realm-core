@@ -190,11 +190,11 @@ typedef struct realm_version_id {
 
 /* Error types */
 typedef struct realm_async_error realm_async_error_t;
-typedef unsigned realm_error_category;
+typedef unsigned realm_error_categories;
 
 typedef struct realm_error {
     realm_errno_e error;
-    realm_error_category categories;
+    realm_error_categories categories;
     const char* message;
 } realm_error_t;
 
@@ -2459,7 +2459,7 @@ typedef struct realm_app_user_apikey {
 // of the callback they were passed to.
 typedef struct realm_app_error {
     realm_errno_e error;
-    realm_error_category categories;
+    realm_error_categories categories;
     const char* message;
 
     /**
@@ -2943,6 +2943,11 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_USER_MISMATCH = 223,
     RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS = 224,
     RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE = 225,
+    RLM_SYNC_ERR_SESSION_BAD_QUERY = 226,
+    RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS = 227,
+    RLM_SYNC_ERR_SESSION_SERVER_PERMISSION_CHANGED = 228,
+    RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED = 229,
+    RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED = 230,
 } realm_sync_errno_session_e;
 
 typedef struct realm_sync_session realm_sync_session_t;

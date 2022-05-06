@@ -136,10 +136,10 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case ServiceNotFound:
         case ServiceTypeNotFound:
         case ServiceAlreadyExists:
-        case Service_commandNotFound:
+        case ServiceCommandNotFound:
         case ValueNotFound:
         case ValueAlreadyExists:
-        case Value_duplicateName:
+        case ValueDuplicateName:
         case FunctionNotFound:
         case FunctionAlreadyExists:
         case FunctionDuplicateName:
@@ -147,12 +147,12 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case FunctionInvalid:
         case IncomingWebhookNotFound:
         case IncomingWebhookAlreadyExists:
-        case IncomingWebhook_duplicateName:
+        case IncomingWebhookDuplicateName:
         case RuleNotFound:
         case APIKeyNotFound:
         case RuleAlreadyExists:
         case RuleDuplicateName:
-        case AuthProvider_duplicateName:
+        case AuthProviderDuplicateName:
         case RestrictedHost:
         case APIKeyAlreadyExists:
         case IncomingWebhookAuthFailed:
@@ -282,10 +282,10 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"ServiceNotFound", ErrorCodes::ServiceNotFound},
     {"ServiceTypeNotFound", ErrorCodes::ServiceTypeNotFound},
     {"ServiceAlreadyExists", ErrorCodes::ServiceAlreadyExists},
-    {"Service_commandNotFound", ErrorCodes::Service_commandNotFound},
+    {"ServiceCommandNotFound", ErrorCodes::ServiceCommandNotFound},
     {"ValueNotFound", ErrorCodes::ValueNotFound},
     {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
-    {"Value_duplicateName", ErrorCodes::Value_duplicateName},
+    {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
     {"FunctionNotFound", ErrorCodes::FunctionNotFound},
     {"FunctionAlreadyExists", ErrorCodes::FunctionAlreadyExists},
     {"FunctionDuplicateName", ErrorCodes::FunctionDuplicateName},
@@ -293,12 +293,12 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"FunctionInvalid", ErrorCodes::FunctionInvalid},
     {"IncomingWebhookNotFound", ErrorCodes::IncomingWebhookNotFound},
     {"IncomingWebhookAlreadyExists", ErrorCodes::IncomingWebhookAlreadyExists},
-    {"IncomingWebhook_duplicateName", ErrorCodes::IncomingWebhook_duplicateName},
+    {"IncomingWebhookDuplicateName", ErrorCodes::IncomingWebhookDuplicateName},
     {"RuleNotFound", ErrorCodes::RuleNotFound},
     {"APIKeyNotFound", ErrorCodes::APIKeyNotFound},
     {"RuleAlreadyExists", ErrorCodes::RuleAlreadyExists},
     {"RuleDuplicateName", ErrorCodes::RuleDuplicateName},
-    {"AuthProvider_duplicateName", ErrorCodes::AuthProvider_duplicateName},
+    {"AuthProviderDuplicateName", ErrorCodes::AuthProviderDuplicateName},
     {"RestrictedHost", ErrorCodes::RestrictedHost},
     {"APIKeyAlreadyExists", ErrorCodes::APIKeyAlreadyExists},
     {"IncomingWebhookAuthFailed", ErrorCodes::IncomingWebhookAuthFailed},
