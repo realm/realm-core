@@ -234,9 +234,11 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         auto subs = std::move(new_subs).commit();
         auto sub_res = subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get_no_throw();
         CHECK(!sub_res.is_ok());
-        CHECK(sub_res.get_status().reason() ==
-              "Client provided query with bad syntax: invalid match expression for table "
-              "\"TopLevel\": key \"non_queryable_field\" is not a queryable field");
+        if (sub_res.get_status().reason().find("Client provided query with bad syntax:") == std::string::npos ||
+            sub_res.get_status().reason().find(
+                "\"TopLevel\": key \"non_queryable_field\" is not a queryable field") == std::string::npos) {
+            FAIL(sub_res.get_status().reason());
+        }
 
         CHECK(realm->get_active_subscription_set().version() == 0);
         CHECK(realm->get_latest_subscription_set().version() == 1);

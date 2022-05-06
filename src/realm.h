@@ -3228,6 +3228,24 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                                                               realm_sync_after_client_reset_func_t, void* userdata,
                                                               realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 
+RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+RLM_API realm_string_t realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+RLM_API realm_string_t
+realm_flx_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) RLM_API_NOEXCEPT;
+
+RLM_API realm_string_t realm_flx_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+RLM_API realm_timestamp_t realm_flx_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+RLM_API realm_timestamp_t realm_flx_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
 /**
  * Get latest subscription set
  * @return a non null subscription set pointer if such it exists.

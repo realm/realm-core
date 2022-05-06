@@ -545,8 +545,10 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
-    return nlohmann::json{
-        {"database_name", config.database_name}, {"partition", config.partition}, {"state", config.state}};
+    return nlohmann::json{{"database_name", config.database_name},
+                          {"partition", config.partition},
+                          {"state", config.state},
+                          {"is_recovery_mode_disabled", config.recovery_is_disabled}};
 }
 
 AdminAPIEndpoint AdminAPISession::service_config_endpoint(const std::string& app_id,
@@ -586,6 +588,16 @@ AdminAPISession::ServiceConfig AdminAPISession::enable_sync(const std::string& a
     return sync_config;
 }
 
+AdminAPISession::ServiceConfig AdminAPISession::set_disable_recovery_to(const std::string& app_id,
+                                                                        const std::string& service_id,
+                                                                        ServiceConfig sync_config, bool disable) const
+{
+    auto endpoint = service_config_endpoint(app_id, service_id);
+    sync_config.recovery_is_disabled = disable;
+    endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    return sync_config;
+}
+
 AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& app_id,
                                                            const AdminAPISession::Service& service) const
 {
@@ -597,6 +609,7 @@ AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& ap
         config.state = sync["state"];
         config.database_name = sync["database_name"];
         config.partition = sync["partition"];
+        config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
     }
     catch (const std::exception&) {
         // ignored - the config for a disabled sync service will be empty
