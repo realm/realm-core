@@ -3535,8 +3535,8 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
  * and retrieve a it later via realm_get_last_error.
- * @param usercode_error a ptr rapresenting whatever object the SDK treats as exception/error.
- * @param usercode_data_free a ptr to fuction for deleting the user_error just passed in
+ * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
+ * @param usercode_data_free pointer to function for deleting the usercode_error just passed in
  */
 RLM_API void realm_register_user_code_callback_error(void* usercode_error,
                                                      realm_free_userdata_func_t usercode_data_free) RLM_API_NOEXCEPT;
