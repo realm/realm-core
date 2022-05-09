@@ -130,12 +130,11 @@ public:
     // Register a callback that will be called when all pending uploads have completed.
     // The callback is run asynchronously, and upon whatever thread the underlying sync client
     // chooses to run it on.
-    void wait_for_upload_completion(util::UniqueFunction<void(std::error_code)>&& callback) REQUIRES(!m_state_mutex);
+    void wait_for_upload_completion(util::UniqueFunction<void(Status)>&& callback) REQUIRES(!m_state_mutex);
 
     // Register a callback that will be called when all pending downloads have been completed.
     // Works the same way as `wait_for_upload_completion()`.
-    void wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
-        REQUIRES(!m_state_mutex);
+    void wait_for_download_completion(util::UniqueFunction<void(Status)>&& callback) REQUIRES(!m_state_mutex);
 
     // Register a notifier that updates the app regarding progress.
     //
@@ -269,8 +268,7 @@ public:
 
 private:
     using std::enable_shared_from_this<SyncSession>::shared_from_this;
-    using CompletionCallbacks =
-        std::map<int64_t, std::pair<ProgressDirection, util::UniqueFunction<void(std::error_code)>>>;
+    using CompletionCallbacks = std::map<int64_t, std::pair<ProgressDirection, util::UniqueFunction<void(Status)>>>;
 
     class ConnectionChangeNotifier {
     public:
@@ -319,9 +317,9 @@ private:
     void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
         REQUIRES(!m_state_mutex, !m_config_mutex);
     void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex);
-    void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
-                         const std::string& context_message) REQUIRES(!m_state_mutex, !m_config_mutex);
-    void cancel_pending_waits(util::CheckedUniqueLock, std::error_code) RELEASE(m_state_mutex);
+    void handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code, const std::string& context_message)
+        REQUIRES(!m_state_mutex, !m_config_mutex);
+    void cancel_pending_waits(util::CheckedUniqueLock, Status) RELEASE(m_state_mutex);
     enum class ShouldBackup { yes, no };
     void update_error_and_mark_file_for_deletion(SyncError&, ShouldBackup) REQUIRES(m_state_mutex, !m_config_mutex);
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
@@ -337,10 +335,10 @@ private:
 
     void become_active() REQUIRES(m_state_mutex, !m_config_mutex);
     void become_dying(util::CheckedUniqueLock) RELEASE(m_state_mutex);
-    void become_inactive(util::CheckedUniqueLock, std::error_code ec = {}) RELEASE(m_state_mutex);
+    void become_inactive(util::CheckedUniqueLock, Status ec = Status::OK()) RELEASE(m_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
 
-    void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
+    void add_completion_callback(util::UniqueFunction<void(Status)> callback, ProgressDirection direction)
         REQUIRES(m_state_mutex);
 
     util::UniqueFunction<TransactionCallback> m_sync_transact_callback GUARDED_BY(m_state_mutex);

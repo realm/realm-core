@@ -39,133 +39,19 @@ static_assert(realm_auth_provider_e(AuthProvider::FUNCTION) == RLM_AUTH_PROVIDER
 static_assert(realm_auth_provider_e(AuthProvider::USER_API_KEY) == RLM_AUTH_PROVIDER_USER_API_KEY);
 static_assert(realm_auth_provider_e(AuthProvider::SERVER_API_KEY) == RLM_AUTH_PROVIDER_SERVER_API_KEY);
 
-static_assert(realm_app_errno_json_e(JSONErrorCode::bad_token) == RLM_APP_ERR_JSON_BAD_TOKEN);
-static_assert(realm_app_errno_json_e(JSONErrorCode::malformed_json) == RLM_APP_ERR_JSON_MALFORMED_JSON);
-static_assert(realm_app_errno_json_e(JSONErrorCode::missing_json_key) == RLM_APP_ERR_JSON_MISSING_JSON_KEY);
-static_assert(realm_app_errno_json_e(JSONErrorCode::bad_bson_parse) == RLM_APP_ERR_JSON_BAD_BSON_PARSE);
-
-static_assert(realm_app_errno_client_e(ClientErrorCode::user_not_found) == RLM_APP_ERR_CLIENT_USER_NOT_FOUND);
-static_assert(realm_app_errno_client_e(ClientErrorCode::user_not_logged_in) == RLM_APP_ERR_CLIENT_USER_NOT_LOGGED_IN);
-static_assert(realm_app_errno_client_e(ClientErrorCode::app_deallocated) == RLM_APP_ERR_CLIENT_APP_DEALLOCATED);
-
-static_assert(realm_app_errno_service_e(ServiceErrorCode::missing_auth_req) == RLM_APP_ERR_SERVICE_MISSING_AUTH_REQ);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_session) == RLM_APP_ERR_SERVICE_INVALID_SESSION);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_app_domain_mismatch) ==
-              RLM_APP_ERR_SERVICE_USER_APP_DOMAIN_MISMATCH);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::domain_not_allowed) ==
-              RLM_APP_ERR_SERVICE_DOMAIN_NOT_ALLOWED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::read_size_limit_exceeded) ==
-              RLM_APP_ERR_SERVICE_READ_SIZE_LIMIT_EXCEEDED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_parameter) ==
-              RLM_APP_ERR_SERVICE_INVALID_PARAMETER);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::missing_parameter) ==
-              RLM_APP_ERR_SERVICE_MISSING_PARAMETER);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::twilio_error) == RLM_APP_ERR_SERVICE_TWILIO_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::gcm_error) == RLM_APP_ERR_SERVICE_GCM_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::http_error) == RLM_APP_ERR_SERVICE_HTTP_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::aws_error) == RLM_APP_ERR_SERVICE_AWS_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::mongodb_error) == RLM_APP_ERR_SERVICE_MONGODB_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::arguments_not_allowed) ==
-              RLM_APP_ERR_SERVICE_ARGUMENTS_NOT_ALLOWED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_execution_error) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_EXECUTION_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::no_matching_rule_found) ==
-              RLM_APP_ERR_SERVICE_NO_MATCHING_RULE_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::internal_server_error) ==
-              RLM_APP_ERR_SERVICE_INTERNAL_SERVER_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_not_found) ==
-              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_already_exists) ==
-              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_not_found) ==
-              RLM_APP_ERR_SERVICE_SERVICE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_type_not_found) ==
-              RLM_APP_ERR_SERVICE_SERVICE_TYPE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_already_exists) ==
-              RLM_APP_ERR_SERVICE_SERVICE_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::service_command_not_found) ==
-              RLM_APP_ERR_SERVICE_SERVICE_COMMAND_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::value_not_found) == RLM_APP_ERR_SERVICE_VALUE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::value_already_exists) ==
-              RLM_APP_ERR_SERVICE_VALUE_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::value_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_VALUE_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_not_found) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_already_exists) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_syntax_error) ==
-              RLM_APP_ERR_SERVICE_FUNCTION_SYNTAX_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::function_invalid) == RLM_APP_ERR_SERVICE_FUNCTION_INVALID);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_not_found) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_already_exists) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_not_found) == RLM_APP_ERR_SERVICE_RULE_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::api_key_not_found) ==
-              RLM_APP_ERR_SERVICE_API_KEY_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_already_exists) ==
-              RLM_APP_ERR_SERVICE_RULE_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::rule_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_RULE_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_provider_duplicate_name) ==
-              RLM_APP_ERR_SERVICE_AUTH_PROVIDER_DUPLICATE_NAME);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::restricted_host) == RLM_APP_ERR_SERVICE_RESTRICTED_HOST);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::api_key_already_exists) ==
-              RLM_APP_ERR_SERVICE_API_KEY_ALREADY_EXISTS);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::incoming_webhook_auth_failed) ==
-              RLM_APP_ERR_SERVICE_INCOMING_WEBHOOK_AUTH_FAILED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::execution_time_limit_exceeded) ==
-              RLM_APP_ERR_SERVICE_EXECUTION_TIME_LIMIT_EXCEEDED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::not_callable) == RLM_APP_ERR_SERVICE_NOT_CALLABLE);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_already_confirmed) ==
-              RLM_APP_ERR_SERVICE_USER_ALREADY_CONFIRMED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_not_found) == RLM_APP_ERR_SERVICE_USER_NOT_FOUND);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::user_disabled) == RLM_APP_ERR_SERVICE_USER_DISABLED);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::auth_error) == RLM_APP_ERR_SERVICE_AUTH_ERROR);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::bad_request) == RLM_APP_ERR_SERVICE_BAD_REQUEST);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::account_name_in_use) ==
-              RLM_APP_ERR_SERVICE_ACCOUNT_NAME_IN_USE);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::invalid_email_password) ==
-              RLM_APP_ERR_SERVICE_INVALID_EMAIL_PASSWORD);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::unknown) == RLM_APP_ERR_SERVICE_UNKNOWN);
-static_assert(realm_app_errno_service_e(ServiceErrorCode::none) == RLM_APP_ERR_SERVICE_NONE);
 
 static realm_app_error_t to_capi(const AppError& error)
 {
     auto ret = realm_app_error_t();
 
-    const std::error_category& category = error.error_code.category();
-    if (category == http_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_HTTP;
-    }
-    else if (category == json_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_JSON;
-    }
-    else if (category == client_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_CLIENT;
-    }
-    else if (category == service_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_SERVICE;
-    }
-    else if (category == custom_error_category()) {
-        ret.error_category = RLM_APP_ERROR_CATEGORY_CUSTOM;
-    }
-    else {
-        REALM_TERMINATE("Unexpected error category");
+    ret.error = realm_errno_e(error.code());
+    ret.categories = ErrorCodes::error_categories(error.code()).value();
+
+    if (error.additional_status_code) {
+        ret.http_status_code = *error.additional_status_code;
     }
 
-    ret.error_code = error.error_code.value();
-
-    if (error.http_status_code) {
-        ret.http_status_code = *error.http_status_code;
-    }
-
-    ret.message = error.message.c_str();
+    ret.message = error.what();
 
     if (error.link_to_server_logs.size() > 0) {
         ret.link_to_server_logs = error.link_to_server_logs.c_str();

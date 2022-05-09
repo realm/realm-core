@@ -38,8 +38,8 @@ std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error)
         os << "(none)";
     }
     else {
-        os << "AppError(error_code=" << error->error_code
-           << ", http_status_code=" << error->http_status_code.value_or(0) << ", message=\"" << error->message
+        os << "AppError(error_code=" << error->code()
+           << ", http_status_code=" << error->additional_status_code.value_or(0) << ", message=\"" << error->reason()
            << "\", link_to_server_logs=\"" << error->link_to_server_logs << "\")";
     }
     return os;

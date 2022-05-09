@@ -328,7 +328,7 @@ std::string make_temp_dir()
     std::filesystem::path path;
     for (;;) {
         if (GetTempFileNameW(temp.c_str(), L"rlm", 0, buffer) == 0)
-            throw SystemError("GetTempFileName() failed", GetLastError());
+            throw SystemError(GetLastError(), "GetTempFileName() failed");
         path = buffer;
         std::filesystem::remove(path);
         try {
@@ -348,7 +348,7 @@ std::string make_temp_dir()
 #if REALM_ANDROID
     char buffer[] = "/data/local/tmp/realm_XXXXXX";
     if (mkdtemp(buffer) == 0) {
-        throw SystemError("mkdtemp() failed", errno); // LCOV_EXCL_LINE
+        throw SystemError(errno, "mkdtemp() failed"); // LCOV_EXCL_LINE
     }
     return std::string(buffer);
 #else
@@ -361,7 +361,7 @@ std::string make_temp_dir()
     std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
     memcpy(buffer.get(), tmp.c_str(), tmp.size());
     if (mkdtemp(buffer.get()) == 0) {
-        throw SystemError("mkdtemp() failed", errno); // LCOV_EXCL_LINE
+        throw SystemError(errno, "mkdtemp() failed"); // LCOV_EXCL_LINE
     }
     return std::string(buffer.get());
 #endif
@@ -552,7 +552,7 @@ size_t File::read_static(FileDesc fd, char* data, size_t size)
 
 error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    throw SystemError("ReadFile() failed", int(err));
+    throw SystemError(int(err), "ReadFile() failed");
 
 #else // POSIX version
 
@@ -573,7 +573,7 @@ error:
 
 error:
     // LCOV_EXCL_START
-    throw SystemError("read() failed", errno);
+    throw SystemError(errno, "read() failed");
 // LCOV_EXCL_STOP
 #endif
 }
@@ -620,7 +620,7 @@ error:
         std::string msg = get_last_error_msg("WriteFile() failed: ", err);
         throw OutOfDiskSpace(msg);
     }
-    throw SystemError("WriteFile() failed", err);
+    throw SystemError(err, "WriteFile() failed");
 #else
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
@@ -642,7 +642,7 @@ error:
         std::string msg = get_errno_msg("write() failed: ", err);
         throw OutOfDiskSpace(msg);
     }
-    throw SystemError("write() failed", err);
+    throw SystemError(err, "write() failed");
     // LCOV_EXCL_STOP
 
 #endif
@@ -677,13 +677,13 @@ uint64_t File::get_file_pos(FileDesc fd)
     li.QuadPart = 0;
     bool ok = SetFilePointerEx(fd, li, &res, FILE_CURRENT);
     if (!ok)
-        throw SystemError("SetFilePointer() failed", GetLastError());
+        throw SystemError(GetLastError(), "SetFilePointer() failed");
 
     return uint64_t(res.QuadPart);
 #else
     auto pos = lseek(fd, 0, SEEK_CUR);
     if (pos < 0) {
-        throw SystemError("lseek() failed", errno);
+        throw SystemError(errno, "lseek() failed");
     }
     return uint64_t(pos);
 #endif
@@ -706,7 +706,7 @@ File::SizeType File::get_size_static(FileDesc fd)
 
         return size;
     }
-    throw SystemError("GetFileSizeEx() failed", GetLastError());
+    throw SystemError(GetLastError(), "GetFileSizeEx() failed");
 
 #else // POSIX version
 
@@ -718,7 +718,7 @@ File::SizeType File::get_size_static(FileDesc fd)
 
         return size;
     }
-    throw SystemError("fstat() failed", errno);
+    throw SystemError(errno, "fstat() failed");
 
 #endif
 }
@@ -760,7 +760,7 @@ void File::resize(SizeType size)
             std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
             throw OutOfDiskSpace(msg);
         }
-        throw SystemError("SetEndOfFile() failed", int(err));
+        throw SystemError(int(err), "SetEndOfFile() failed");
     }
 
     // Restore file position
@@ -783,7 +783,7 @@ void File::resize(SizeType size)
             std::string msg = get_errno_msg("ftruncate() failed: ", err);
             throw OutOfDiskSpace(msg);
         }
-        throw SystemError("ftruncate() failed", err);
+        throw SystemError(err, "ftruncate() failed");
     }
 
 #endif
@@ -852,7 +852,7 @@ void File::prealloc(size_t size)
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) != 0) {
         int err = errno;
-        throw SystemError("fstat() inside prealloc() failed", err);
+        throw SystemError(err, "fstat() inside prealloc() failed");
     }
 
     size_t allocated_size;
@@ -903,7 +903,7 @@ void File::prealloc(size_t size)
         int err = errno;
         // by the definition of F_PREALLOCATE, a proceeding ftruncate will not fail due to out of disk space
         // so this is some other runtime error and not OutOfDiskSpace
-        throw SystemError("ftruncate() inside prealloc() failed", err);
+        throw SystemError(err, "ftruncate() inside prealloc() failed");
     }
 #elif REALM_ANDROID || defined(_WIN32)
 
@@ -949,7 +949,7 @@ bool File::prealloc_if_supported(SizeType offset, size_t size)
     if (status == EINVAL || status == EPERM) {
         return false; // Retry with non-atomic version
     }
-    throw SystemError("posix_fallocate() failed", status);
+    throw SystemError(status, "posix_fallocate() failed");
 
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
@@ -999,7 +999,7 @@ void File::seek_static(FileDesc fd, SizeType position)
         throw RuntimeError(ErrorCodes::RangeError, "File position overflow");
 
     if (!SetFilePointerEx(fd, large_int, 0, FILE_BEGIN))
-        throw SystemError("SetFilePointerEx() failed", GetLastError());
+        throw SystemError(GetLastError(), "SetFilePointerEx() failed");
 
 #else // POSIX version
 
@@ -1009,7 +1009,7 @@ void File::seek_static(FileDesc fd, SizeType position)
 
     if (0 <= ::lseek(fd, position2, SEEK_SET))
         return;
-    throw SystemError("lseek() failed", errno);
+    throw SystemError(errno, "lseek() failed");
 
 #endif
 }
@@ -1026,19 +1026,19 @@ void File::sync()
 
     if (FlushFileBuffers(m_fd))
         return;
-    throw SystemError("FlushFileBuffers() failed", GetLastError());
+    throw SystemError(GetLastError(), "FlushFileBuffers() failed");
 
 #elif REALM_PLATFORM_APPLE
 
     if (::fcntl(m_fd, F_FULLFSYNC) == 0)
         return;
-    throw SystemError("fcntl() with F_FULLSYNC failed", errno);
+    throw SystemError(errno, "fcntl() with F_FULLSYNC failed");
 
 #else // POSIX version
 
     if (::fsync(m_fd) == 0)
         return;
-    throw SystemError("fsync() failed", errno);
+    throw SystemError(errno, "fsync() failed");
 
 #endif
 }
@@ -1083,7 +1083,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     if (err == ERROR_LOCK_VIOLATION)
         return false;
-    throw SystemError("LockFileEx() failed", err);
+    throw SystemError(err, "LockFileEx() failed");
 
 #else
 #ifdef REALM_FILELOCK_EMULATION
@@ -1102,7 +1102,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (status != 0 && errno == EWOULDBLOCK)
         return false;
     if (status != 0)
-        throw SystemError("flock() failed", errno);
+        throw SystemError(errno, "flock() failed");
     m_has_exclusive_lock = true;
 
     // now use a named pipe to emulate locking in conjunction with using exclusive lock
@@ -1154,7 +1154,7 @@ bool File::lock(bool exclusive, bool non_blocking)
             fd = ::open(m_fifo_path.c_str(), O_WRONLY | O_NONBLOCK);
         } while (fd == -1 && errno == EINTR);
         if (fd == -1 && errno != ENXIO)
-            throw SystemError("opening lock fifo for writing failed", errno);
+            throw SystemError(errno, "opening lock fifo for writing failed");
         if (fd == -1) {
             // No reader was present so we have the exclusive lock!
             return true;
@@ -1174,7 +1174,7 @@ bool File::lock(bool exclusive, bool non_blocking)
         // will deadlock when un-suspending the app.
         int fd = ::open(m_fifo_path.c_str(), O_RDWR | O_NONBLOCK);
         if (fd == -1)
-            throw SystemError("opening lock fifo for reading failed", errno);
+            throw SystemError(errno, "opening lock fifo for reading failed");
         unlock();
         m_pipe_fd = fd;
         return true;
@@ -1210,7 +1210,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     int err = errno; // Eliminate any risk of clobbering
     if (err == EWOULDBLOCK)
         return false;
-    throw SystemError("flock() failed", err);
+    throw SystemError(err, "flock() failed");
 
 #endif
 #endif
@@ -1372,7 +1372,7 @@ bool File::exists(const std::string& path)
         case ENOTDIR:
             return false;
     }
-    throw SystemError("access() failed", err);
+    throw SystemError(err, "access() failed");
 }
 
 
@@ -1389,7 +1389,7 @@ bool File::is_dir(const std::string& path)
         case ENOTDIR:
             return false;
     }
-    throw SystemError("stat() failed", err);
+    throw SystemError(err, "stat() failed");
 #elif REALM_HAVE_STD_FILESYSTEM
     std::wstring w_path = string_to_wstring(path);
     return std::filesystem::is_directory(w_path);
@@ -1511,7 +1511,7 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
                    fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
         }
     }
-    throw SystemError("GetFileInformationByHandleEx() failed", GetLastError());
+    throw SystemError(GetLastError(), "GetFileInformationByHandleEx() failed");
 
 #else // POSIX version
 
@@ -1522,7 +1522,7 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
         if (::fstat(f2, &statbuf) == 0)
             return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
     }
-    throw SystemError("fstat() failed", errno);
+    throw SystemError(errno, "fstat() failed");
 
 #endif
 }
@@ -1544,7 +1544,7 @@ File::UniqueID File::get_unique_id() const
     if (::fstat(m_fd, &statbuf) == 0) {
         return UniqueID(statbuf.st_dev, statbuf.st_ino);
     }
-    throw SystemError("fstat() failed", errno);
+    throw SystemError(errno, "fstat() failed");
 #endif
 }
 
@@ -1568,7 +1568,7 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
     // File doesn't exist
     if (err == ENOENT)
         return false;
-    throw SystemError("fstat() failed", err);
+    throw SystemError(err, "fstat() failed");
 #endif
 }
 
@@ -1590,7 +1590,7 @@ bool File::is_removed() const
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0)
         return statbuf.st_nlink == 0;
-    throw SystemError("fstat() failed", errno);
+    throw SystemError(errno, "fstat() failed");
 
 #endif
 }
@@ -1736,12 +1736,12 @@ std::time_t File::last_write_time(const std::string& path)
                                                      OPEN_EXISTING, nullptr));
 
     if (fileHandle == INVALID_HANDLE_VALUE) {
-        throw SystemError("CreateFileW failed", int(GetLastError()));
+        throw SystemError(int(GetLastError()), "CreateFileW failed");
     }
 
     FILETIME mtime = {0};
     if (!::GetFileTime(fileHandle, nullptr, nullptr, &mtime)) {
-        throw SystemError("GetFileTime failed", int(GetLastError()));
+        throw SystemError(int(GetLastError()), "GetFileTime failed");
     }
 
     auto tp = file_time_to_system_clock(mtime);
@@ -1749,7 +1749,7 @@ std::time_t File::last_write_time(const std::string& path)
 #else
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) != 0) {
-        throw SystemError("stat() failed", errno);
+        throw SystemError(errno, "stat() failed");
     }
     return statbuf.st_mtime;
 #endif
@@ -1768,13 +1768,13 @@ File::SizeType File::get_free_space(const std::string& path)
     }
     ULARGE_INTEGER available;
     if (!GetDiskFreeSpaceExA(dir_path.c_str(), &available, NULL, NULL)) {
-        throw SystemError("GetDiskFreeSpaceExA failed", errno);
+        throw SystemError(errno, "GetDiskFreeSpaceExA failed");
     }
     return available.QuadPart;
 #else
     struct statvfs stat;
     if (statvfs(path.c_str(), &stat) != 0) {
-        throw SystemError("statvfs() failed", errno);
+        throw SystemError(errno, "statvfs() failed");
     }
     return SizeType(stat.f_bavail) * stat.f_bsize;
 #endif
@@ -1841,7 +1841,7 @@ bool DirScanner::next(std::string& name)
 
         if (!dirent) {
             if (errno != 0)
-                throw SystemError("readdir() failed", errno);
+                throw SystemError(errno, "readdir() failed");
             return false; // End of stream
         }
         const char* name_1 = dirent->d_name;

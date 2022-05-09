@@ -20,6 +20,7 @@
 #define REALM_EXCEPTIONS_HPP
 
 #include <stdexcept>
+#include <system_error>
 
 #include <realm/util/features.h>
 #include <realm/status.hpp>
@@ -395,19 +396,26 @@ private:
 
 class SystemError : public RuntimeError {
 public:
-    SystemError(const std::string& msg, int err)
+    SystemError(std::error_code err, const std::string& msg)
         : RuntimeError(ErrorCodes::SystemError, msg)
-        , m_errno(err)
+    {
+        const_cast<Status&>(to_status()).set_std_error_code(err);
+    }
+
+    SystemError(int err_no, const std::string& msg)
+        : SystemError(std::error_code(err_no, std::system_category()), msg)
     {
     }
 
-    int get_errno() const
+    std::error_code get_system_error() const
     {
-        return m_errno;
+        return to_status().get_std_error_code();
     }
 
-private:
-    int m_errno;
+    const std::error_category& get_category() const
+    {
+        return get_system_error().category();
+    }
 };
 
 namespace query_parser {

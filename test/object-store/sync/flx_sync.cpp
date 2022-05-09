@@ -178,7 +178,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in a client rese
             realm->commit_transaction();
 
             auto sync_error = std::move(error_future).get();
-            CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::write_not_allowed));
+            CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::write_not_allowed));
             CHECK(sync_error.is_session_level_protocol_error());
             CHECK(sync_error.is_client_reset_requested());
         });
@@ -212,7 +212,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in a client rese
             realm->commit_transaction();
 
             auto sync_error = std::move(error_future).get();
-            CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::write_not_allowed));
+            CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::write_not_allowed));
             CHECK(sync_error.is_session_level_protocol_error());
             CHECK(sync_error.is_client_reset_requested());
         });
@@ -513,7 +513,7 @@ TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
         return static_cast<bool>(sync_error);
     });
 
-    CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_flx_sync));
+    CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_flx_sync));
 }
 
 TEST_CASE("flx: connect to FLX with partition value returns an error", "[sync][flx][app]") {
@@ -553,7 +553,7 @@ TEST_CASE("flx: connect to PBS as FLX returns an error", "[sync][flx][app]") {
         return static_cast<bool>(sync_error);
     });
 
-    CHECK(sync_error->error_code == make_error_code(sync::ProtocolError::switch_to_pbs));
+    CHECK(sync_error->get_system_error() == make_error_code(sync::ProtocolError::switch_to_pbs));
 }
 
 TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][flx][app]") {

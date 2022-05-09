@@ -124,7 +124,7 @@ void SyncSession::become_dying(util::CheckedUniqueLock lock)
     m_state_mutex.unlock(lock);
 }
 
-void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code ec)
+void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status)
 {
     REALM_ASSERT(m_state != State::Inactive);
     m_state = State::Inactive;
@@ -148,12 +148,12 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
         m_connection_change_notifier.invoke_callbacks(old_state, connection_state());
     }
 
-    if (!ec)
-        ec = make_error_code(util::error::operation_aborted);
+    if (!status.get_std_error_code())
+        status = Status(make_error_code(util::error::operation_aborted), "SyncSession::become_inactive");
 
     // Inform any queued-up completion handlers that they were cancelled.
     for (auto& [id, callback] : waits)
-        callback.second(ec);
+        callback.second(status);
 }
 
 void SyncSession::become_waiting_for_access_token()
@@ -162,7 +162,7 @@ void SyncSession::become_waiting_for_access_token()
     m_state = State::WaitingForAccessToken;
 }
 
-void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
+void SyncSession::handle_bad_auth(const std::shared_ptr<SyncUser>& user, Status error_code,
                                   const std::string& context_message)
 {
     // TODO: ideally this would write to the logs as well in case users didn't set up their error handler.
@@ -187,24 +187,25 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
         auto session_user = session->user();
         if (!session_user) {
             util::CheckedUniqueLock lock(session->m_state_mutex);
-            session->cancel_pending_waits(std::move(lock), error ? error->error_code : std::error_code());
+            session->cancel_pending_waits(std::move(lock), error ? error->to_status() : Status::OK());
         }
         else if (error) {
-            if (error->error_code == app::make_client_error_code(app::ClientErrorCode::app_deallocated)) {
+            if (error->code() == ErrorCodes::ClientAppDeallocated) {
                 return; // this response came in after the app shut down, ignore it
             }
-            else if (error->error_code.category() == app::client_error_category()) {
+            else if (ErrorCodes::error_categories(error->code()).test(ErrorCategory::client_error)) {
                 // any other client errors other than app_deallocated are considered fatal because
                 // there was a problem locally before even sending the request to the server
                 // eg. ClientErrorCode::user_not_found, ClientErrorCode::user_not_logged_in
-                session->handle_bad_auth(session_user, error->error_code, error->message);
+                session->handle_bad_auth(session_user, error->to_status(), error->reason());
             }
-            else if (error->http_status_code &&
-                     (*error->http_status_code == 401 || *error->http_status_code == 403)) {
+            else if (error->additional_status_code &&
+                     (*error->additional_status_code == 401 || *error->additional_status_code == 403)) {
                 // A 401 response on a refresh request means that the token cannot be refreshed and we should not
                 // retry. This can be because an admin has revoked this user's sessions, the user has been disabled,
                 // or the refresh token has expired according to the server's clock.
-                session->handle_bad_auth(session_user, error->error_code, "Unable to refresh the user access token.");
+                session->handle_bad_auth(session_user, error->to_status(),
+                                         "Unable to refresh the user access token.");
             }
             else {
                 // A refresh request has failed. This is an unexpected non-fatal error and we would
@@ -333,13 +334,13 @@ void SyncSession::download_fresh_realm()
         sync_session = create(m_client, db, config, m_sync_manager);
     }
     sync_session->assert_mutex_unlocked();
-    sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
+    sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](Status s) {
         // Keep the sync session alive while it's downloading, but then close
         // it immediately
         sync_session->close();
         if (auto strong_self = weak_self.lock()) {
-            if (ec) {
-                strong_self->handle_fresh_realm_downloaded(nullptr, ec.message());
+            if (s.get_std_error_code()) {
+                strong_self->handle_fresh_realm_downloaded(nullptr, s.reason());
             }
             else {
                 strong_self->handle_fresh_realm_downloaded(db, none);
@@ -400,7 +401,7 @@ void SyncSession::handle_error(SyncError error)
 {
     enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
-    auto error_code = error.error_code;
+    auto error_code = error.get_system_error();
     util::Optional<ShouldBackup> delete_file;
     bool log_out_user = false;
 
@@ -523,15 +524,15 @@ void SyncSession::handle_error(SyncError error)
     switch (next_state) {
         case NextStateAfterError::none:
             if (config(&SyncConfig::cancel_waits_on_nonfatal_error)) {
-                cancel_pending_waits(std::move(lock), error.error_code); // unlocks the mutex
+                cancel_pending_waits(std::move(lock), error.to_status()); // unlocks the mutex
             }
             break;
         case NextStateAfterError::inactive: {
-            become_inactive(std::move(lock), error.error_code);
+            become_inactive(std::move(lock), error.to_status());
             break;
         }
         case NextStateAfterError::error: {
-            cancel_pending_waits(std::move(lock), error.error_code);
+            cancel_pending_waits(std::move(lock), error.to_status());
             break;
         }
     }
@@ -546,7 +547,7 @@ void SyncSession::handle_error(SyncError error)
     }
 }
 
-void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, std::error_code error)
+void SyncSession::cancel_pending_waits(util::CheckedUniqueLock lock, Status error)
 {
     CompletionCallbacks callbacks;
     std::swap(callbacks, m_completion_callbacks);
@@ -862,7 +863,7 @@ void SyncSession::initiate_access_token_refresh()
     }
 }
 
-void SyncSession::add_completion_callback(util::UniqueFunction<void(std::error_code)> callback,
+void SyncSession::add_completion_callback(util::UniqueFunction<void(Status)> callback,
                                           _impl::SyncProgressNotifier::NotifierType direction)
 {
     bool is_download = (direction == _impl::SyncProgressNotifier::NotifierType::download);
@@ -886,18 +887,19 @@ void SyncSession::add_completion_callback(util::UniqueFunction<void(std::error_c
         util::CheckedUniqueLock lock(self->m_state_mutex);
         auto callback_node = self->m_completion_callbacks.extract(id);
         lock.unlock();
-        if (callback_node)
-            callback_node.mapped().second(ec);
+        if (callback_node) {
+            callback_node.mapped().second(Status(ec, ""));
+        }
     });
 }
 
-void SyncSession::wait_for_upload_completion(util::UniqueFunction<void(std::error_code)>&& callback)
+void SyncSession::wait_for_upload_completion(util::UniqueFunction<void(Status)>&& callback)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     add_completion_callback(std::move(callback), ProgressDirection::upload);
 }
 
-void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
+void SyncSession::wait_for_download_completion(util::UniqueFunction<void(Status)>&& callback)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     add_completion_callback(std::move(callback), ProgressDirection::download);

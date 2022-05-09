@@ -121,7 +121,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
+                                  error.what())
                   << std::endl;
         abort();
     };
@@ -135,7 +135,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson par
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
+                                  error.what())
                   << std::endl;
         abort();
     };
@@ -151,7 +151,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
         std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.message)
+                                  error.what())
                   << std::endl;
         abort();
     };
@@ -166,7 +166,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, bson::Bson partition, 
     sync_config = std::make_shared<SyncConfig>(app->current_user(), partition);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, auto err) {
-        fprintf(stderr, "Unexpected sync error: %s\n", err.message.c_str());
+        fprintf(stderr, "Unexpected sync error: %s\n", err.what());
         abort();
     };
     schema_mode = SchemaMode::AdditiveExplicit;
@@ -231,19 +231,18 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
-static std::error_code wait_for_session(Realm& realm,
-                                        void (SyncSession::*fn)(util::UniqueFunction<void(std::error_code)>&&),
-                                        std::chrono::seconds timeout)
+static Status wait_for_session(Realm& realm, void (SyncSession::*fn)(util::UniqueFunction<void(Status)>&&),
+                               std::chrono::seconds timeout)
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
     bool wait_flag(false);
-    std::error_code ec;
+    Status status = Status::OK();
     auto& session = *realm.config().sync_config->user->session_for_on_disk_path(realm.config().path);
-    (session.*fn)([&](std::error_code error) {
+    (session.*fn)([&](Status s) {
         std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;
-        ec = error;
+        status = s;
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(wait_mutex);
@@ -251,17 +250,17 @@ static std::error_code wait_for_session(Realm& realm,
         return wait_flag == true;
     });
     REALM_ASSERT_RELEASE(completed);
-    return ec;
+    return status;
 }
 
-std::error_code wait_for_upload(Realm& realm, std::chrono::seconds timeout)
+bool wait_for_upload(Realm& realm, std::chrono::seconds timeout)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_upload_completion, timeout);
+    return !wait_for_session(realm, &SyncSession::wait_for_upload_completion, timeout).is_ok();
 }
 
-std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
+bool wait_for_download(Realm& realm, std::chrono::seconds timeout)
 {
-    return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
+    return !wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout).is_ok();
 }
 
 namespace {

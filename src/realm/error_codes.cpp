@@ -103,8 +103,72 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case InvalidReadOnlySchemaChange:
         case InvalidExternalSchemaChange:
             return ErrorCategory().set(ErrorCategory::logic_error);
-        case OK:
+        case CustomError:
+            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::custom_error);
+        case HTTPError:
+            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::http_error);
+        case ClientUserNotFound:
+        case ClientUserNotLoggedIn:
+        case ClientAppDeallocated:
+            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::client_error);
+        case BadToken:
+        case MalformedJson:
+        case MissingJsonKey:
+        case BadBsonParse:
+            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::json_error);
+        case MissingAuthReq:
+        case InvalidSession:
+        case UserAppDomainMismatch:
+        case DomainNotAllowed:
+        case ReadSizeLimitExceeded:
+        case InvalidParameter:
+        case MissingParameter:
+        case TwilioError:
+        case GCMError:
+        case AWSError:
+        case MongoDBError:
+        case ArgumentsNotAllowed:
+        case FunctionExecutionError:
+        case NoMatchingRule:
+        case InternalServerError:
+        case AuthProviderNotFound:
+        case AuthProviderAlreadyExists:
+        case ServiceNotFound:
+        case ServiceTypeNotFound:
+        case ServiceAlreadyExists:
+        case ServiceCommandNotFound:
+        case ValueNotFound:
+        case ValueAlreadyExists:
+        case ValueDuplicateName:
+        case FunctionNotFound:
+        case FunctionAlreadyExists:
+        case FunctionDuplicateName:
+        case FunctionSyntaxError:
+        case FunctionInvalid:
+        case IncomingWebhookNotFound:
+        case IncomingWebhookAlreadyExists:
+        case IncomingWebhookDuplicateName:
+        case RuleNotFound:
+        case APIKeyNotFound:
+        case RuleAlreadyExists:
+        case RuleDuplicateName:
+        case AuthProviderDuplicateName:
+        case RestrictedHost:
+        case APIKeyAlreadyExists:
+        case IncomingWebhookAuthFailed:
+        case ExecutionTimeLimitExceeded:
+        case NotCallable:
+        case UserAlreadyConfirmed:
+        case UserNotFound:
+        case UserDisabled:
+        case AuthError:
+        case BadRequest:
+        case AccountNameInUse:
+        case InvalidPassword:
+        case SchemaValidationFailedWrite:
         case UnknownError:
+            return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::service_error);
+        case OK:
         case GenericError:
         case MaxError:
             break;
@@ -187,7 +251,68 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"InvalidReadOnlySchemaChange", ErrorCodes::InvalidReadOnlySchemaChange},
     {"InvalidExternalSchemaChange", ErrorCodes::InvalidExternalSchemaChange},
     {"DeleteOnOpenRealm", ErrorCodes::DeleteOnOpenRealm},
-    {"NotSupported", ErrorCodes::NotSupported}};
+    {"NotSupported", ErrorCodes::NotSupported},
+    {"ClientUserNotFound", ErrorCodes::ClientUserNotFound},
+    {"ClientUserNotLogged_in", ErrorCodes::ClientUserNotLoggedIn},
+    {"ClientAppDeallocated", ErrorCodes::ClientAppDeallocated},
+    {"BadToken", ErrorCodes::BadToken},
+    {"MalformedJson", ErrorCodes::MalformedJson},
+    {"MissingJsonKey", ErrorCodes::MissingJsonKey},
+    {"BadBsonParse", ErrorCodes::BadBsonParse},
+
+    {"CustomError", ErrorCodes::CustomError},
+    {"MissingAuthReq", ErrorCodes::MissingAuthReq},
+    {"InvalidSession", ErrorCodes::InvalidSession},
+    {"UserAppDomainMismatch", ErrorCodes::UserAppDomainMismatch},
+    {"DomainNotAllowed", ErrorCodes::DomainNotAllowed},
+    {"ReadSizeLimitExceeded", ErrorCodes::ReadSizeLimitExceeded},
+    {"InvalidParameter", ErrorCodes::InvalidParameter},
+    {"MissingParameter", ErrorCodes::MissingParameter},
+    {"TwilioError", ErrorCodes::TwilioError},
+    {"GCMError", ErrorCodes::GCMError},
+    {"HTTPError", ErrorCodes::HTTPError},
+    {"AWSError", ErrorCodes::AWSError},
+    {"MongoDBError", ErrorCodes::MongoDBError},
+    {"ArgumentsNotAllowed", ErrorCodes::ArgumentsNotAllowed},
+    {"FunctionExecutionError", ErrorCodes::FunctionExecutionError},
+    {"NoMatchingRule", ErrorCodes::NoMatchingRule},
+    {"InternalServerError", ErrorCodes::InternalServerError},
+    {"AuthProviderNotFound", ErrorCodes::AuthProviderNotFound},
+    {"AuthProviderAlreadyExists", ErrorCodes::AuthProviderAlreadyExists},
+    {"ServiceNotFound", ErrorCodes::ServiceNotFound},
+    {"ServiceTypeNotFound", ErrorCodes::ServiceTypeNotFound},
+    {"ServiceAlreadyExists", ErrorCodes::ServiceAlreadyExists},
+    {"ServiceCommandNotFound", ErrorCodes::ServiceCommandNotFound},
+    {"ValueNotFound", ErrorCodes::ValueNotFound},
+    {"ValueAlreadyExists", ErrorCodes::ValueAlreadyExists},
+    {"ValueDuplicateName", ErrorCodes::ValueDuplicateName},
+    {"FunctionNotFound", ErrorCodes::FunctionNotFound},
+    {"FunctionAlreadyExists", ErrorCodes::FunctionAlreadyExists},
+    {"FunctionDuplicateName", ErrorCodes::FunctionDuplicateName},
+    {"FunctionSyntaxError", ErrorCodes::FunctionSyntaxError},
+    {"FunctionInvalid", ErrorCodes::FunctionInvalid},
+    {"IncomingWebhookNotFound", ErrorCodes::IncomingWebhookNotFound},
+    {"IncomingWebhookAlreadyExists", ErrorCodes::IncomingWebhookAlreadyExists},
+    {"IncomingWebhookDuplicateName", ErrorCodes::IncomingWebhookDuplicateName},
+    {"RuleNotFound", ErrorCodes::RuleNotFound},
+    {"APIKeyNotFound", ErrorCodes::APIKeyNotFound},
+    {"RuleAlreadyExists", ErrorCodes::RuleAlreadyExists},
+    {"RuleDuplicateName", ErrorCodes::RuleDuplicateName},
+    {"AuthProviderDuplicateName", ErrorCodes::AuthProviderDuplicateName},
+    {"RestrictedHost", ErrorCodes::RestrictedHost},
+    {"APIKeyAlreadyExists", ErrorCodes::APIKeyAlreadyExists},
+    {"IncomingWebhookAuthFailed", ErrorCodes::IncomingWebhookAuthFailed},
+    {"ExecutionTimeLimitExceeded", ErrorCodes::ExecutionTimeLimitExceeded},
+    {"NotCallable", ErrorCodes::NotCallable},
+    {"UserAlreadyConfirmed", ErrorCodes::UserAlreadyConfirmed},
+    {"UserNotFound", ErrorCodes::UserNotFound},
+    {"UserDisabled", ErrorCodes::UserDisabled},
+    {"AuthError", ErrorCodes::AuthError},
+    {"BadRequest", ErrorCodes::BadRequest},
+    {"AccountNameInUse", ErrorCodes::AccountNameInUse},
+    {"InvalidPassword", ErrorCodes::InvalidPassword},
+    {"SchemaValidationFailedWrite", ErrorCodes::SchemaValidationFailedWrite},
+};
 
 std::string_view ErrorCodes::error_string(Error code)
 {

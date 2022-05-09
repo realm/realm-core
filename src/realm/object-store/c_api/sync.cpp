@@ -182,9 +182,17 @@ static_assert(realm_sync_errno_session_e(ProtocolError::user_mismatch) == RLM_SY
 static_assert(realm_sync_errno_session_e(ProtocolError::too_many_sessions) == RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS);
 static_assert(realm_sync_errno_session_e(ProtocolError::invalid_schema_change) ==
               RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE);
+static_assert(realm_sync_errno_session_e(ProtocolError::bad_query) == RLM_SYNC_ERR_SESSION_BAD_QUERY);
+static_assert(realm_sync_errno_session_e(ProtocolError::object_already_exists) ==
+              RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS);
+static_assert(realm_sync_errno_session_e(ProtocolError::server_permissions_changed) ==
+              RLM_SYNC_ERR_SESSION_SERVER_PERMISSION_CHANGED);
+static_assert(realm_sync_errno_session_e(ProtocolError::initial_sync_not_completed) ==
+              RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED);
+static_assert(realm_sync_errno_session_e(ProtocolError::write_not_allowed) == RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED);
 } // namespace
 
-static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
+static realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 {
     auto ret = realm_sync_error_code_t();
 
@@ -197,6 +205,7 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
         realm_basic_system_category = &dummy.category();
     }
 
+    auto error_code = status.get_std_error_code();
     const std::error_category& category = error_code.category();
     if (category == realm::sync::client_error_category()) {
         ret.category = RLM_SYNC_ERROR_CATEGORY_CLIENT;
@@ -341,8 +350,8 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         auto c_error = realm_sync_error_t();
 
         std::string error_code_message;
-        c_error.error_code = to_capi(error.error_code, error_code_message);
-        c_error.detailed_message = error.message.c_str();
+        c_error.error_code = to_capi(error.to_status(), error_code_message);
+        c_error.detailed_message = error.what();
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
 
@@ -743,11 +752,11 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
                                                              void* userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
-    util::UniqueFunction<void(std::error_code)> cb =
-        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](std::error_code e) {
-            if (e) {
+    util::UniqueFunction<void(Status)> cb =
+        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
+            if (s.get_std_error_code()) {
                 std::string error_code_message;
-                realm_sync_error_code_t error = to_capi(e, error_code_message);
+                realm_sync_error_code_t error = to_capi(s, error_code_message);
                 done(userdata.get(), &error);
             }
             else {
@@ -761,11 +770,11 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
                                                            realm_sync_upload_completion_func_t done, void* userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
-    util::UniqueFunction<void(std::error_code)> cb =
-        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](std::error_code e) {
-            if (e) {
+    util::UniqueFunction<void(Status)> cb =
+        [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](Status s) {
+            if (s.get_std_error_code()) {
                 std::string error_code_message;
-                realm_sync_error_code_t error = to_capi(e, error_code_message);
+                realm_sync_error_code_t error = to_capi(s, error_code_message);
                 done(userdata.get(), &error);
             }
             else {
