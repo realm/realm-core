@@ -318,6 +318,5 @@ RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexc
         // register a callback failed exception storing the ptr to the user code error passed by the SDK
         // when this excpetion is caught the original error can be processed
         throw realm::c_api::CallbackFailed(usercode_error);
-        return false;
     });
 }

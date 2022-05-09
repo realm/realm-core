@@ -66,8 +66,6 @@ struct CallbackFailed : std::runtime_error {
         , usercode_error(usercode_error)
     {
     }
-
-    virtual ~CallbackFailed() = default;
 };
 
 //// FIXME: BEGIN EXCEPTIONS THAT SHOULD BE MOVED INTO OBJECT STORE

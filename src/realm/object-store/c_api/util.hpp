@@ -15,11 +15,13 @@ inline auto wrap_err(F&& f) noexcept -> decltype(f())
     }
     catch (const CallbackFailed& e) {
         set_last_exception_callback_error(std::current_exception(), e.usercode_error);
-        return {};
+        if constexpr (!std::is_same_v<decltype(f()), void>)
+            return {};
     }
     catch (...) {
         set_last_exception(std::current_exception());
-        return {};
+        if constexpr (!std::is_same_v<decltype(f()), void>)
+            return {};
     };
 }
 
@@ -108,6 +110,18 @@ inline char* duplicate_string(const std::string& string)
     string.copy(ret, string.size());
     ret[string.size()] = '\0';
     return ret;
+}
+
+inline void throw_callback_error()
+{
+    realm_error_t _err;
+    if (realm_get_last_error(&_err) && _err.usercode_error) {
+        // the user code callback has thrown something, just relay the user error
+        throw CallbackFailed{_err.usercode_error};
+    }
+    else {
+        throw CallbackFailed{};
+    }
 }
 
 struct FreeUserdata {
