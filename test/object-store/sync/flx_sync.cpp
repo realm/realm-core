@@ -300,18 +300,16 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     {
         SharedRealm realm;
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
-        int download_msg_counter = 0;
         Realm::Config config = interrupted_realm_config;
         config.sync_config->on_download_message_received_hook =
-            [&realm, &download_msg_counter,
+            [&realm, download_msg_counter = int(0),
              promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise))]() mutable {
-                REALM_ASSERT(realm);
                 // We interrupt on the 5rd download message, which should be 1/3rd of the way through the
                 // bootstrap.
                 if (++download_msg_counter != 5) {
                     return;
                 }
-
+                REALM_ASSERT(realm);
                 realm->sync_session()->close();
                 promise->emplace_value();
             };
