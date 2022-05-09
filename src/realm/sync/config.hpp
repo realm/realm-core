@@ -58,18 +58,29 @@ enum class ProtocolError;
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError : public SystemError {
+    enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
+
     bool is_fatal;
+    /// A consolidated explanation of the error, including a link to the server logs if applicable.
+    std::string message;
+    // Just the minimal error message, without any log URL.
+    std::string_view simple_message;
+    // The URL to the associated server log if any. If not supplied by the server, this will be `empty()`.
+    std::string_view logURL;
+    /// A dictionary of extra user information associated with this error.
+    /// If this is a client reset error, the keys for c_original_file_path_key and c_recovery_file_path_key will be
+    /// populated with the relevant filesystem paths.
     std::unordered_map<std::string, std::string> user_info;
     /// The sync server may send down an error that the client does not recognize,
     /// whether because of a version mismatch or an oversight. It is still valuable
     /// to expose these errors so that users can do something about them.
     bool is_unrecognized_by_client = false;
+    // the server may explicitly send down "IsClientReset" as part of an error
+    // if this is set, it overrides the clients interpretation of the error
+    util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
 
-    SyncError(std::error_code error_code, std::string message, bool is_fatal)
-        : SystemError(std::move(error_code), std::move(message))
-        , is_fatal(is_fatal)
-    {
-    }
+    SyncError(std::error_code error_code, std::string msg, bool is_fatal,
+              util::Optional<std::string> serverLog = util::none);
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
     static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";

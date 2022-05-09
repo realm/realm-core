@@ -19,6 +19,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/object-store/c_api/conversion.hpp>
 #include <realm/object-store/sync/sync_manager.hpp>
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/async_open_task.hpp>
@@ -354,6 +355,9 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.detailed_message = error.what();
         c_error.is_fatal = error.is_fatal;
         c_error.is_unrecognized_by_client = error.is_unrecognized_by_client;
+        c_error.is_client_reset_requested = error.is_client_reset_requested();
+        c_error.c_original_file_path_key = error.c_original_file_path_key;
+        c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
         for (auto& info : error.user_info) {
@@ -417,6 +421,72 @@ RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t* config,
                                                realm_sync_session_resync_mode_e mode) noexcept
 {
     config->client_resync_mode = ClientResyncMode(mode);
+}
+
+RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return to_capi(subscription->id());
+}
+
+RLM_API realm_string_t realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return to_capi(subscription->name());
+}
+
+RLM_API realm_string_t
+realm_flx_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return to_capi(subscription->object_class_name());
+}
+
+RLM_API realm_string_t
+realm_flx_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return to_capi(subscription->query_string());
+}
+
+RLM_API realm_timestamp_t
+realm_flx_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return to_capi(subscription->created_at());
+}
+
+RLM_API realm_timestamp_t
+realm_flx_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription) noexcept
+{
+    REALM_ASSERT(subscription != nullptr);
+    return to_capi(subscription->updated_at());
+}
+
+RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t* config,
+                                                               realm_sync_before_client_reset_func_t callback,
+                                                               void* userdata,
+                                                               realm_free_userdata_func_t userdata_free) noexcept
+{
+    auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
+        realm_t r1{before_realm};
+        return callback(userdata.get(), &r1);
+    };
+    config->notify_before_client_reset = std::move(cb);
+}
+
+RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_t* config,
+                                                              realm_sync_after_client_reset_func_t callback,
+                                                              void* userdata,
+                                                              realm_free_userdata_func_t userdata_free) noexcept
+{
+    auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
+                  SharedRealm before_realm, SharedRealm after_realm, bool did_recover) {
+        realm_t r1{before_realm};
+        realm_t r2{after_realm};
+        return callback(userdata.get(), &r1, &r2, did_recover);
+    };
+    config->notify_after_client_reset = std::move(cb);
 }
 
 RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t* realm) noexcept
@@ -622,7 +692,9 @@ realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t* su
 
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config) noexcept
 {
-    return new realm_async_open_task_t(Realm::get_synchronized_realm(*config));
+    return wrap_err([config] {
+        return new realm_async_open_task_t(Realm::get_synchronized_realm(*config));
+    });
 }
 
 RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_async_open_task_completion_func_t done,
@@ -635,8 +707,8 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_as
             done(userdata.get(), nullptr, &c_error);
         }
         else {
-            realm_t::thread_safe_reference c_realm(std::move(realm));
-            done(userdata.get(), &c_realm, nullptr);
+            auto tsr = new realm_t::thread_safe_reference(std::move(realm));
+            done(userdata.get(), tsr, nullptr);
         }
     };
     (*task)->start(std::move(cb));
@@ -707,6 +779,13 @@ RLM_API void realm_sync_session_pause(realm_sync_session_t* session) noexcept
 RLM_API void realm_sync_session_resume(realm_sync_session_t* session) noexcept
 {
     (*session)->revive_if_needed();
+}
+
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char* sync_path) noexcept
+{
+    return wrap_err([&]() {
+        return (*app)->sync_manager()->immediately_run_file_actions(sync_path);
+    });
 }
 
 RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(

@@ -2,14 +2,17 @@
 
 ### Enhancements
 * Adding recovery mode to new automatic client reset handling. In this mode, local unsynced changes which would otherwise be lost during a client reset are replayed on the seamlessly reset Realm. ([#5323](https://github.com/realm/realm-core/pull/5323))
-* Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432]https://github.com/realm/realm-core/pull/5432)
-* Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async`
-([#5446](https://github.com/realm/realm-core/pull/5446))
+* Client reset in recovery mode is controlled by the server's protocol 4 json error format. ([#5382](https://github.com/realm/realm-core/pull/5382))
+* Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432](https://github.com/realm/realm-core/pull/5432))
+* Expose client reset functionalities for C API. ([#5425](https://github.com/realm/realm-core/issues/5425))
+* Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async` ([#5438](https://github.com/realm/realm-core/pull/5438))
 * Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
+* Expose Subscription properties on C-API ([#5454](https://github.com/realm/realm-core/pull/5454))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* C API client reset callbacks don't leak the `realm_t` parameter. ([#5464](https://github.com/realm/realm-core/pull/5464))
+* The sync client may have sent a corrupted upload cursor leading to a fatal error from the server due to an uninitialized variable. ([#5460](https://github.com/realm/realm-core/pull/5460), since v11.14.0)
+* The realm_async_open_task_start() in C API was not really useful as the received realm reference could not be transferred to another thread. ([#5465](https://github.com/realm/realm-core/pull/5465), since v11.5.0)
  
 ### Breaking changes
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
@@ -21,7 +24,8 @@
 -----------
 
 ### Internals
-* None.
+* Sync protocol version bumped to 4. ([#5382](https://github.com/realm/realm-core/pull/5382))
+* Internal sync metadata tables were abstracted into a new schema management framework and their schema versions are now tracked in the `sync_internal_schemas` table. ([#5455](https://github.com/realm/realm-core/pull/5455)) 
 
 ----------------------------------------------
 

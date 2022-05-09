@@ -293,8 +293,17 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 }
 
 
-void SyncSession::download_fresh_realm()
+void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
 {
+    // first check that recovery will not be prevented
+    if (allowed_mode && *allowed_mode == SyncError::ClientResetModeAllowed::RecoveryNotPermitted) {
+        auto mode = config(&SyncConfig::client_resync_mode);
+        if (mode == ClientResyncMode::Recover) {
+            handle_fresh_realm_downloaded(
+                nullptr, {"A client reset is required but the server does not permit recovery for this client"},
+                allowed_mode);
+        }
+    }
     DBOptions options;
     options.encryption_key = m_db->get_encryption_key();
     options.allow_file_format_upgrade = false;
@@ -320,19 +329,23 @@ void SyncSession::download_fresh_realm()
     catch (std::exception const& e) {
         // Failed to open the fresh path after attempting to delete it, so we
         // just can't do automatic recovery.
-        handle_fresh_realm_downloaded(nullptr, std::string(e.what()));
+        handle_fresh_realm_downloaded(nullptr, std::string(e.what()), allowed_mode);
         return;
     }
 
+    util::CheckedLockGuard state_lock(m_state_mutex);
+    if (m_state != State::Active) {
+        return;
+    }
     std::shared_ptr<SyncSession> sync_session;
     {
-        util::CheckedLockGuard state_lock(m_state_mutex);
         util::CheckedLockGuard config_lock(m_config_mutex);
         SyncConfig config = m_config;
         config.stop_policy = SyncSessionStopPolicy::Immediately;
         config.client_resync_mode = ClientResyncMode::Manual;
         sync_session = create(m_client, db, config, m_sync_manager);
     }
+
     sync_session->assert_mutex_unlocked();
     sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](Status s) {
         // Keep the sync session alive while it's downloading, but then close
@@ -340,17 +353,18 @@ void SyncSession::download_fresh_realm()
         sync_session->close();
         if (auto strong_self = weak_self.lock()) {
             if (s.get_std_error_code()) {
-                strong_self->handle_fresh_realm_downloaded(nullptr, s.reason());
+                strong_self->handle_fresh_realm_downloaded(nullptr, s.reason(), allowed_mode);
             }
             else {
-                strong_self->handle_fresh_realm_downloaded(db, none);
+                strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
             }
         }
     });
     sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+                                                util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state != State::Active) {
@@ -378,7 +392,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // that moving to the inactive state doesn't clear them - they will be
     // re-registered when the session becomes active again.
     {
-        m_force_client_reset = true;
+        m_force_client_reset = allowed_mode.value_or(SyncError::ClientResetModeAllowed::RecoveryPermitted);
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
         std::swap(m_completion_callbacks, callbacks);
@@ -414,6 +428,23 @@ void SyncSession::handle_error(SyncError error)
     else if (error_code.category() == realm::sync::protocol_error_category()) {
         SimplifiedProtocolError simplified =
             get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
+        if (error.server_requests_client_reset) {
+            // we have specific instructions from the server concerning client resets
+            switch (*error.server_requests_client_reset) {
+                case SyncError::ClientResetModeAllowed::DoNotClientReset:
+                    if (simplified == SimplifiedProtocolError::ClientResetRequested) {
+                        // Server says not to do a client reset, but the client wants
+                        // to do one; make a fatal (non-reset) error instead.
+                        simplified = SimplifiedProtocolError::UnexpectedInternalIssue;
+                    }
+                    break;
+                case SyncError::ClientResetModeAllowed::RecoveryPermitted:
+                    [[fallthrough]];
+                case SyncError::ClientResetModeAllowed::RecoveryNotPermitted:
+                    simplified = SimplifiedProtocolError::ClientResetRequested;
+                    break;
+            }
+        }
         switch (simplified) {
             case SimplifiedProtocolError::ConnectionIssue:
                 // Not real errors, don't need to be reported to the binding.
@@ -443,7 +474,7 @@ void SyncSession::handle_error(SyncError error)
                     case ClientResyncMode::RecoverOrDiscard:
                         [[fallthrough]];
                     case ClientResyncMode::Recover:
-                        download_fresh_realm();
+                        download_fresh_realm(error.server_requests_client_reset);
                         return; // do not propgate the error to the user at this point
                 }
                 break;
@@ -564,7 +595,8 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
 }
 
-static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy)
+static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy,
+                                                                   bool recovery_is_allowed)
 {
     sync::Session::Config::ClientReset config;
     REALM_ASSERT(session_config.client_resync_mode != ClientResyncMode::Manual);
@@ -603,6 +635,7 @@ static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& s
         }
     };
     config.fresh_copy = std::move(fresh_copy);
+    config.recovery_is_allowed = recovery_is_allowed;
     return config;
 }
 
@@ -643,8 +676,10 @@ void SyncSession::create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        session_config.client_reset_config = make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy));
-        m_force_client_reset = false;
+        const bool allowed_to_recover = *m_force_client_reset == SyncError::ClientResetModeAllowed::RecoveryPermitted;
+        session_config.client_reset_config =
+            make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
+        m_force_client_reset = util::none;
     }
 
     m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
@@ -675,7 +710,7 @@ void SyncSession::create_sync_session()
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
     m_session->set_connection_state_change_listener([weak_self](sync::ConnectionState state,
-                                                                const sync::Session::ErrorInfo* error) {
+                                                                util::Optional<sync::Session::ErrorInfo> error) {
         // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
         // nothing useful we can do with them.
         if (auto self = weak_self.lock()) {
@@ -699,7 +734,20 @@ void SyncSession::create_sync_session()
             lock.unlock();
             self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
             if (error) {
-                self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
+                SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal(),
+                                     error->logURL};
+                if (error->should_client_reset) {
+                    if (*error->should_client_reset) {
+                        sync_error.server_requests_client_reset =
+                            error->client_reset_recovery_is_disabled
+                                ? SyncError::ClientResetModeAllowed::RecoveryNotPermitted
+                                : SyncError::ClientResetModeAllowed::RecoveryPermitted;
+                    }
+                    else {
+                        sync_error.server_requests_client_reset = SyncError::ClientResetModeAllowed::DoNotClientReset;
+                    }
+                }
+                self->handle_error(std::move(sync_error));
             }
         }
     });

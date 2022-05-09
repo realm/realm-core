@@ -66,6 +66,7 @@ int main(int argc, char** argv)
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
         config.reporterName = "evergreen";
         config.outputFilename = str;
+        config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         config.reporterName = "junit";
@@ -81,6 +82,18 @@ int main(int argc, char** argv)
 namespace Catch {
 class EvergreenReporter : public CumulativeReporterBase<EvergreenReporter> {
 public:
+    struct TestResult {
+        TestResult()
+            : start_time{std::chrono::system_clock::now()}
+            , end_time{}
+            , status{"unknown"}
+        {
+        }
+        std::chrono::system_clock::time_point start_time;
+        std::chrono::system_clock::time_point end_time;
+        std::string status;
+    };
+
     using Base = CumulativeReporterBase<EvergreenReporter>;
     explicit EvergreenReporter(ReporterConfig const& config)
         : Base(config)
@@ -95,6 +108,15 @@ public:
     using Base::testGroupEnded;
     using Base::testGroupStarting;
     using Base::testRunStarting;
+
+    void print_duration(std::map<std::string, TestResult>::const_iterator it) const
+    {
+        if (m_config->showDurations() == Catch::ShowDurations::Always) {
+            using namespace std::literals;
+            auto duration = (it->second.end_time - it->second.start_time) / 1ms;
+            std::cout << realm::util::format("%1 ms : %2\n", duration, it->first);
+        }
+    }
 
     bool assertionEnded(AssertionStats const& assertionStats) override
     {
@@ -129,6 +151,7 @@ public:
             it->second.status = "fail";
         }
         it->second.end_time = std::chrono::system_clock::now();
+        print_duration(it);
         Base::testCaseEnded(testCaseStats);
     }
     void sectionStarting(SectionInfo const& sectionInfo) override
@@ -152,7 +175,8 @@ public:
                 m_pending_test.status = "fail";
             }
             m_pending_test.end_time = std::chrono::system_clock::now();
-            m_results.emplace(std::make_pair(m_pending_name, m_pending_test));
+            auto it = m_results.emplace(std::make_pair(m_pending_name, m_pending_test)).first;
+            print_duration(it);
             m_pending_name = "";
         }
         Base::sectionEnded(sectionStats);
@@ -181,17 +205,6 @@ public:
         stream << result_file_obj << std::endl;
     }
 
-    struct TestResult {
-        TestResult()
-            : start_time{std::chrono::system_clock::now()}
-            , end_time{}
-            , status{"unknown"}
-        {
-        }
-        std::chrono::system_clock::time_point start_time;
-        std::chrono::system_clock::time_point end_time;
-        std::string status;
-    };
     TestResult m_pending_test;
     std::string m_pending_name;
     std::vector<std::pair<std::string, TestResult>> m_current_stack;
