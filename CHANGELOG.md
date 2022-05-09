@@ -8,6 +8,7 @@
 * Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async` ([#5438](https://github.com/realm/realm-core/pull/5438))
 * Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
 * Expose Subscription properties on C-API ([#5454](https://github.com/realm/realm-core/pull/5454))
+* Exit and report size if SDK allocated array does not have enough capacity via C API ([#5430](https://github.com/realm/realm-core/issues/5430))
 
 ### Fixed
 * C API client reset callbacks don't leak the `realm_t` parameter. ([#5464](https://github.com/realm/realm-core/pull/5464))
