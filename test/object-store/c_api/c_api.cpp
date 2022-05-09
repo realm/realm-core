@@ -8,11 +8,17 @@
 
 #include "sync/flx_sync_harness.hpp"
 #include "util/test_file.hpp"
+#include "util/event_loop.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 
 #include <cstring>
 #include <numeric>
 #include <thread>
+
+#if REALM_ENABLE_SYNC
+#include <realm/object-store/sync/sync_user.hpp>
+#include <external/json/json.hpp>
+#endif
 
 using namespace realm;
 
@@ -3896,7 +3902,9 @@ struct Userdata {
     realm_thread_safe_reference_t* realm_ref = nullptr;
 };
 
-void task_completion_func(void* p, realm_thread_safe_reference_t* realm, const realm_async_error_t* async_error)
+#if REALM_ENABLE_SYNC
+static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
+                                 const realm_async_error_t* async_error)
 {
     auto userdata_p = static_cast<Userdata*>(p);
 
@@ -3983,6 +3991,7 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         realm_release(sync_config);
     }
 }
+#endif
 
 #ifdef REALM_ENABLE_AUTH_TESTS
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
