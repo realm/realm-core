@@ -35,7 +35,16 @@ const Schema g_minimal_schema{
          {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
      }},
 };
-}
+
+const Schema g_large_array_schema{
+    ObjectSchema("TopLevel",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+                     {"list_of_strings", PropertyType::Array | PropertyType::String},
+                 }),
+};
+} // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     FLXSyncTestHarness harness("basic_flx_connect");
@@ -253,6 +262,96 @@ TEST_CASE("flx: query on non-queryable field results in query error message", "[
         CHECK(realm->get_active_subscription_set().version() == 2);
         CHECK(realm->get_latest_subscription_set().version() == 2);
     });
+}
+
+TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
+
+    // First we need to seed the server with objects that are large and complex enough that they get broken
+    // into multiple download messages.
+    //
+    // The server will break up changesets and download messages when they contain more than 1000 instructions
+    // and are bigger than 1MB respectively.
+    //
+    // So this generates 5 objects each with 1000+ instructions that are each 1MB+ big. This should result in
+    // 3 download messages total with one changeset each for the bootstrap download messages.
+    std::vector<ObjectId> obj_ids_at_end;
+    harness.load_initial_data([&](SharedRealm realm) {
+        CppContext c(realm);
+        for (int i = 0; i < 5; ++i) {
+            auto id = ObjectId::gen();
+            auto obj = Object::create(c, realm, "TopLevel",
+                                      util::Any(AnyDict{{"_id", id},
+                                                        {"list_of_strings", AnyVector{}},
+                                                        {"queryable_int_field", static_cast<int64_t>(i * 5)}}));
+            List str_list(obj, realm->schema().find("TopLevel")->property_for_name("list_of_strings"));
+            for (int j = 0; j < 1024; ++j) {
+                str_list.add(c, util::Any(std::string(1024, 'a' + (j % 26))));
+            }
+
+            obj_ids_at_end.push_back(id);
+        }
+    });
+    SyncTestFile interrupted_realm_config(harness.app()->current_user(), harness.schema(),
+                                          SyncConfig::FLXSyncEnabled{});
+    interrupted_realm_config.cache = false;
+
+    {
+        SharedRealm realm;
+        auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
+        int download_msg_counter = 0;
+        Realm::Config config = interrupted_realm_config;
+        config.sync_config->on_download_message_received_hook =
+            [&realm, &download_msg_counter,
+             promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise))]() mutable {
+                REALM_ASSERT(realm);
+                // We interrupt on the 5rd download message, which should be 1/3rd of the way through the
+                // bootstrap.
+                if (++download_msg_counter != 5) {
+                    return;
+                }
+
+                realm->sync_session()->close();
+                promise->emplace_value();
+            };
+
+        realm = Realm::get_shared_realm(config);
+        {
+            auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            auto table = realm->read_group().get_table("class_TopLevel");
+            mut_subs.insert_or_assign(Query(table));
+            std::move(mut_subs).commit();
+        }
+
+        interrupted.get();
+    }
+
+    {
+        auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
+        auto sub_store = sync::SubscriptionStore::create(realm, [](int64_t) {});
+        REQUIRE(sub_store->get_active_and_latest_versions() == std::pair<int64_t, int64_t>{0, 1});
+        auto latest_subs = sub_store->get_latest();
+        REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Bootstrapping);
+        REQUIRE(latest_subs.size() == 1);
+        REQUIRE(latest_subs.at(0).object_class_name() == "TopLevel");
+    }
+
+    auto realm = Realm::get_shared_realm(interrupted_realm_config);
+    auto table = realm->read_group().get_table("class_TopLevel");
+    realm->get_latest_subscription_set().get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+    wait_for_upload(*realm);
+    wait_for_download(*realm);
+
+    realm->refresh();
+    REQUIRE(table->size() == obj_ids_at_end.size());
+    for (auto& id : obj_ids_at_end) {
+        REQUIRE(table->find_primary_key(Mixed{id}));
+    }
+
+    auto active_subs = realm->get_active_subscription_set();
+    auto latest_subs = realm->get_latest_subscription_set();
+    REQUIRE(active_subs.version() == latest_subs.version());
+    REQUIRE(active_subs.version() == int64_t(1));
 }
 
 TEST_CASE("flx: dev mode uploads schema before query change", "[sync][flx][app]") {

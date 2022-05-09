@@ -237,6 +237,8 @@ private:
     util::UniqueFunction<ProgressHandler> m_progress_handler;
     util::UniqueFunction<ConnectionStateChangeListener> m_connection_state_change_listener;
 
+    std::function<void()> m_on_download_message_received_hook;
+
     std::shared_ptr<SubscriptionStore> m_flx_subscription_store;
     int64_t m_flx_active_version = 0;
     int64_t m_flx_last_seen_version = 0;
@@ -743,6 +745,14 @@ SubscriptionStore* SessionImpl::get_flx_subscription_store()
     return m_wrapper.get_flx_subscription_store();
 }
 
+void SessionImpl::receive_download_message_hook()
+{
+    if (REALM_LIKELY(!m_wrapper.m_on_download_message_received_hook)) {
+        return;
+    }
+    m_wrapper.m_on_download_message_received_hook();
+}
+
 // ################ SessionWrapper ################
 
 SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<SubscriptionStore> flx_sub_store,
@@ -764,6 +774,7 @@ SessionWrapper::SessionWrapper(ClientImpl& client, DBRef db, std::shared_ptr<Sub
     , m_signed_access_token{std::move(config.signed_user_token)}
     , m_client_reset_config{std::move(config.client_reset_config)}
     , m_proxy_config{config.proxy_config} // Throws
+    , m_on_download_message_received_hook(std::move(config.on_download_message_received_hook))
     , m_flx_subscription_store(std::move(flx_sub_store))
 {
     REALM_ASSERT(m_db);

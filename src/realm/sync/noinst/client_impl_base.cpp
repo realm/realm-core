@@ -1010,7 +1010,7 @@ void Connection::read_or_write_error(std::error_code ec)
 {
     m_reconnect_info.m_reason = ConnectionTerminationReason::read_or_write_error;
     bool is_fatal = false;
-    close_due_to_client_side_error(ec, is_fatal);     // Throws
+    close_due_to_client_side_error(ec, is_fatal); // Throws
 }
 
 
@@ -1111,7 +1111,7 @@ void Connection::disconnect(const SessionErrorInfo& info)
     m_sending = false;
 
     report_connection_state_change(ConnectionState::disconnected, info); // Throws
-    initiate_reconnect_wait();                     // Throws
+    initiate_reconnect_wait();                                           // Throws
 }
 
 bool Connection::is_flx_sync_connection() const noexcept
@@ -1637,8 +1637,8 @@ void Session::send_bind_message()
     // Discard the token since it's ignored by the server.
     std::string empty_access_token{};
     protocol.make_bind_message(protocol_version, out, session_ident, path, empty_access_token, need_client_file_ident,
-                               is_subserver);                           // Throws
-    m_conn.initiate_write_message(out, this);                           // Throws
+                               is_subserver); // Throws
+    m_conn.initiate_write_message(out, this); // Throws
 
     m_bind_message_sent = true;
 
@@ -1683,7 +1683,7 @@ void Session::send_ident_message()
                      m_progress.latest_server_version.salt);                                  // Throws
         protocol.make_pbs_ident_message(out, session_ident, m_client_file_ident, m_progress); // Throws
     }
-    m_conn.initiate_write_message(out, this);                                         // Throws
+    m_conn.initiate_write_message(out, this); // Throws
 
     m_ident_message_sent = true;
 
@@ -2063,6 +2063,8 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
+    receive_download_message_hook();
+
     if (batch_state == DownloadBatchState::LastInBatch) {
         update_progress(progress); // Throws
     }
@@ -2146,10 +2148,10 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
-std::error_code Session::receive_error_message(int error_code, const ProtocolErrorInfo& info)
+std::error_code Session::receive_error_message(int error_code_int, const ProtocolErrorInfo& info)
 {
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, recovery_disabled=%4)", info.message,
-                error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
+                error_code_int, info.try_again, info.client_reset_recovery_is_disabled); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2157,20 +2159,19 @@ std::error_code Session::receive_error_message(int error_code, const ProtocolErr
         return ClientError::bad_message_order;
     }
 
-    bool known_error_code = bool(get_protocol_error_message(error_code));
+    bool known_error_code = bool(get_protocol_error_message(error_code_int));
     if (REALM_UNLIKELY(!known_error_code)) {
         logger.error("Unknown error code"); // Throws
         return ClientError::bad_error_code;
     }
-    ProtocolError error_code_2 = ProtocolError(error_code);
-    if (REALM_UNLIKELY(!is_session_level_error(error_code_2))) {
+    ProtocolError error_code = ProtocolError(error_code_int);
+    if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
         logger.error("Not a session level error code"); // Throws
         return ClientError::bad_error_code;
     }
 
     REALM_ASSERT(!m_suspended);
     REALM_ASSERT(m_state == Active || m_state == Deactivating);
-
     logger.debug("Suspended"); // Throws
 
     m_error_message_received = true;
@@ -2194,10 +2195,8 @@ std::error_code Session::receive_error_message(int error_code, const ProtocolErr
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session(); // Throws
-        std::error_code ec = make_error_code(error_code_2);
-        SessionErrorInfo error_info(info, ec);
-        on_suspended(error_info); // Throws
+        m_conn.one_less_active_unsuspended_session();      // Throws
+        on_suspended({info, make_error_code(error_code)}); // Throws
     }
 
     if (info.try_again) {

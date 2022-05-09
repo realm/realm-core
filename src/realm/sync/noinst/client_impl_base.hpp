@@ -1057,6 +1057,7 @@ private:
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
+    void receive_download_message_hook();
 
     friend class Connection;
 };

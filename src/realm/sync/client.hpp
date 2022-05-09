@@ -312,6 +312,11 @@ public:
         ///
         /// This feature exists exclusively for testing purposes at this time.
         bool simulate_integration_error = false;
+
+        // Will be called after a download message is received and validated bytes
+        // the client but befefore it's been transformed or applied. To be used in
+        // testing only.
+        std::function<void()> on_download_message_received_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.
