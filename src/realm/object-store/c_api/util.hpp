@@ -106,6 +106,13 @@ inline char* duplicate_string(const std::string& string)
     return ret;
 }
 
+inline void set_array_size(size_t* out_n, size_t n)
+{
+    if (out_n) {
+        *out_n = n;
+    }
+}
+
 struct FreeUserdata {
     realm_free_userdata_func_t m_func;
     FreeUserdata(realm_free_userdata_func_t func = nullptr)

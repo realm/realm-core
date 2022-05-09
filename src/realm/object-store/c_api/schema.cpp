@@ -94,6 +94,11 @@ RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_k
     return wrap_err([&]() {
         const auto& shared_realm = **realm;
         const auto& schema = shared_realm.schema();
+        set_array_size(out_n, schema.size());
+
+        if (max < schema.size())
+            return false;
+
         if (out_keys) {
             size_t i = 0;
             for (auto& os : schema) {
@@ -103,11 +108,6 @@ RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_k
             }
             if (out_n)
                 *out_n = i;
-        }
-        else {
-            if (out_n) {
-                *out_n = schema.size();
-            }
         }
         return true;
     });
@@ -147,6 +147,11 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t 
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
+        const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
+        set_array_size(out_n, prop_size);
+
+        if (max < prop_size)
+            return false;
 
         if (out_properties) {
             size_t i = 0;
@@ -167,11 +172,6 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t 
                 *out_n = i;
             }
         }
-        else {
-            if (out_n) {
-                *out_n = os.persisted_properties.size() + os.computed_properties.size();
-            }
-        }
         return true;
     });
 }
@@ -181,6 +181,10 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
+        const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
+        set_array_size(out_n, prop_size);
+        if (max < prop_size)
+            return false;
 
         if (out_keys) {
             size_t i = 0;
@@ -199,11 +203,6 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
 
             if (out_n) {
                 *out_n = i;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;

@@ -1184,11 +1184,12 @@ TEST_CASE("C API", "[c_api]") {
 
     SECTION("realm_get_class_keys()") {
         realm_class_key_t keys[2];
+        // return total number of keys present, copy only if there is enough space in the vector passed in
         size_t found = 0;
-        CHECK(checked(realm_get_class_keys(realm, keys, 2, &found)));
-        CHECK(found == 2);
-        CHECK(checked(realm_get_class_keys(realm, keys, 1, &found)));
-        CHECK(found == 1);
+        CHECK(!(realm_get_class_keys(realm, keys, 2, &found)));
+        CHECK(found == 3);
+        CHECK(!(realm_get_class_keys(realm, keys, 1, &found)));
+        CHECK(found == 3);
     }
 
     SECTION("realm_find_property() errors") {
@@ -1227,22 +1228,25 @@ TEST_CASE("C API", "[c_api]") {
     SECTION("realm_get_property_keys()") {
         realm_property_key_t properties[3];
         size_t num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties, 3, &num_found)));
-        CHECK(num_found == 3);
+        size_t properties_found = 0;
+
+        // discover how many properties there are.
+        CHECK(!realm_get_property_keys(realm, class_foo.key, properties, 0, &properties_found));
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties, properties_found, &num_found)));
+        CHECK(num_found == properties_found);
         CHECK(properties[0] == foo_properties["int"]);
 
         num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 3, &num_found)));
-        CHECK(num_found == 3);
+        properties_found = 0;
+        // discover how many properties there are.
+        CHECK(!realm_get_property_keys(realm, class_bar.key, properties, 0, &properties_found));
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, properties_found, &num_found)));
+        CHECK(num_found == properties_found);
         CHECK(properties[2] == bar_properties["doubles"]);
-
-        num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 1, &num_found)));
-        CHECK(num_found == 1);
         CHECK(properties[0] == bar_properties["int"]);
 
         num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
+        CHECK(!(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
         CHECK(num_found == class_foo.num_properties + class_foo.num_computed_properties);
 
         std::vector<realm_property_key_t> ps;
