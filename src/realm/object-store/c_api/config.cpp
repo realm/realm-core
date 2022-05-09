@@ -91,7 +91,8 @@ RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_m
             realm_t r2{new_realm};
             realm_schema_t sch{&schema};
             if (!(func)(userdata, &r1, &r2, &sch)) {
-                throw_callback_error();
+                throw_callback_error_if_needed(); // throw either sdk error containing sdk obaque exception ptr or
+                                                  // default failure exception.
             }
         };
         config->migration_function = std::move(migration_func);
@@ -112,7 +113,8 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t* confi
         auto init_func = [=](SharedRealm realm) {
             realm_t r{realm};
             if (!(func)(userdata, &r)) {
-                throw_callback_error();
+                throw_callback_error_if_needed(); // throw either sdk error containing sdk obaque exception ptr or
+                                                  // default failure exception.
             }
         };
         config->initialization_function = std::move(init_func);
@@ -132,7 +134,9 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* 
     if (func) {
         auto should_func = [=](uint64_t total_bytes, uint64_t used_bytes) -> bool {
             if (!func(userdata, total_bytes, used_bytes)) {
-                throw_callback_error();
+                throw_callback_error_if_needed(
+                    false); // do not throw any exception unless the sdk has instructed core to do so
+                return false;
             }
             return true;
         };
