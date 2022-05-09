@@ -24,6 +24,7 @@
 #include "util/test_file.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/sync/protocol.hpp"
+#include "realm/sync/noinst/client_history_impl.hpp"
 #include <realm/sync/noinst/server/access_token.hpp>
 
 namespace realm::app {
