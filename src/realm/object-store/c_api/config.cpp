@@ -131,7 +131,11 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* 
 {
     if (func) {
         auto should_func = [=](uint64_t total_bytes, uint64_t used_bytes) -> bool {
-            return func(userdata, total_bytes, used_bytes);
+            if (!func(userdata, total_bytes, used_bytes)) {
+                throw_callback_error();
+                return false;
+            }
+            return true;
         };
         config->should_compact_on_launch_function = std::move(should_func);
     }
