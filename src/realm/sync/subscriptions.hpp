@@ -204,6 +204,8 @@ protected:
 
 class MutableSubscriptionSet : public SubscriptionSet {
 public:
+    ~MutableSubscriptionSet();
+
     // Erases all subscriptions in the subscription set.
     void clear();
 
