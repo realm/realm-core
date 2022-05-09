@@ -683,7 +683,9 @@ realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t* su
 
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config) noexcept
 {
-    return new realm_async_open_task_t(Realm::get_synchronized_realm(*config));
+    return wrap_err([config] {
+        return new realm_async_open_task_t(Realm::get_synchronized_realm(*config));
+    });
 }
 
 RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_async_open_task_completion_func_t done,
@@ -696,8 +698,8 @@ RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_as
             done(userdata.get(), nullptr, &c_error);
         }
         else {
-            realm_t::thread_safe_reference c_realm(std::move(realm));
-            done(userdata.get(), &c_realm, nullptr);
+            auto tsr = new realm_t::thread_safe_reference(std::move(realm));
+            done(userdata.get(), tsr, nullptr);
         }
     };
     (*task)->start(std::move(cb));
