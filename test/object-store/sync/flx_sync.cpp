@@ -23,6 +23,7 @@
 #include "flx_sync_harness.hpp"
 #include "util/test_file.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
+#include "realm/sync/config.hpp"
 #include "realm/sync/protocol.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 #include <realm/sync/noinst/server/access_token.hpp>
@@ -302,15 +303,17 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         auto [interrupted_promise, interrupted] = util::make_promise_future<void>();
         Realm::Config config = interrupted_realm_config;
         config.sync_config->on_download_message_received_hook =
-            [&realm, download_msg_counter = int(0),
-             promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise))]() mutable {
+            [download_msg_counter = int(0),
+             promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise))](
+                std::weak_ptr<SyncSession> weak_session) mutable {
+                auto session = weak_session.lock();
                 // We interrupt on the 5rd download message, which should be 1/3rd of the way through the
                 // bootstrap.
-                if (++download_msg_counter != 5) {
+                if (!session || ++download_msg_counter != 5) {
                     return;
                 }
-                REALM_ASSERT(realm);
-                realm->sync_session()->close();
+
+                session->close();
                 promise->emplace_value();
             };
 
