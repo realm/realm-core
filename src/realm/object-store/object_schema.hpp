@@ -19,6 +19,7 @@
 #ifndef REALM_OBJECT_SCHEMA_HPP
 #define REALM_OBJECT_SCHEMA_HPP
 
+#include <initializer_list>
 #include <realm/object-store/util/tagged_bool.hpp>
 
 #include <realm/keys.hpp>
@@ -38,13 +39,17 @@ struct Property;
 class ObjectSchema {
 public:
     using IsEmbedded = util::TaggedBool<class IsEmbeddedTag>;
+    using IsAsymmetric = util::TaggedBool<class IsAsymmetricTag>;
 
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties);
+    ObjectSchema(std::string name, IsAsymmetric is_asymmetric, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
+                 std::initializer_list<Property> computed_properties, std::string name_alias = "");
+    ObjectSchema(std::string name, IsEmbedded is_embedded, IsAsymmetric is_asymmetric, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ~ObjectSchema();
 
@@ -63,6 +68,7 @@ public:
     std::string primary_key;
     TableKey table_key;
     IsEmbedded is_embedded = false;
+    IsAsymmetric is_asymmetric = false;
     std::string alias;
 
     Property* property_for_public_name(StringData public_name) noexcept;

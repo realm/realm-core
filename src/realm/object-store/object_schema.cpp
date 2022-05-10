@@ -49,13 +49,14 @@ ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> per
 {
 }
 
-ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
+ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded, IsAsymmetric is_asymmetric,
                            std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties, std::string name_alias)
     : name(std::move(name))
     , persisted_properties(persisted_properties)
     , computed_properties(computed_properties)
     , is_embedded(is_embedded)
+    , is_asymmetric(is_asymmetric)
     , alias(name_alias)
 {
     for (auto const& prop : persisted_properties) {
@@ -416,7 +417,7 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 namespace realm {
 bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
-    return std::tie(a.name, a.is_embedded, a.primary_key, a.persisted_properties, a.computed_properties) ==
-           std::tie(b.name, b.is_embedded, b.primary_key, b.persisted_properties, b.computed_properties);
+    return std::tie(a.name, a.is_embedded, a.is_asymmetric, a.primary_key, a.persisted_properties, a.computed_properties) ==
+           std::tie(b.name, b.is_embedded, b.is_asymmetric, b.primary_key, b.persisted_properties, b.computed_properties);
 }
 } // namespace realm
