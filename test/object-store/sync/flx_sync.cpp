@@ -307,8 +307,9 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
              promise = std::make_shared<util::Promise<void>>(std::move(interrupted_promise))](
                 std::weak_ptr<SyncSession> weak_session) mutable {
                 auto session = weak_session.lock();
-                // We interrupt on the 5rd download message, which should be 1/3rd of the way through the
-                // bootstrap.
+                // We interrupt on the 5th download message, which should be 2/3rd of the way through the
+                // bootstrap. The first two download messages are for exchanging schema instructions and then
+                // two messages of actual data.
                 if (!session || ++download_msg_counter != 5) {
                     return;
                 }

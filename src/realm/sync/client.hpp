@@ -313,7 +313,7 @@ public:
         /// This feature exists exclusively for testing purposes at this time.
         bool simulate_integration_error = false;
 
-        // Will be called after a download message is received and validated bytes
+        // Will be called after a download message is received and validated by
         // the client but befefore it's been transformed or applied. To be used in
         // testing only.
         std::function<void()> on_download_message_received_hook;
