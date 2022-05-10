@@ -106,18 +106,6 @@ inline char* duplicate_string(const std::string& string)
     return ret;
 }
 
-inline void throw_callback_error_if_needed(bool throw_default_callback_failure = true)
-{
-    realm_error_t _err;
-    if (realm_get_last_error(&_err) && _err.usercode_error) {
-        // the user code callback has thrown something, just relay the user error
-        throw CallbackFailed{_err.usercode_error};
-    }
-    else if (throw_default_callback_failure) {
-        throw CallbackFailed{};
-    }
-}
-
 struct FreeUserdata {
     realm_free_userdata_func_t m_func;
     FreeUserdata(realm_free_userdata_func_t func = nullptr)
