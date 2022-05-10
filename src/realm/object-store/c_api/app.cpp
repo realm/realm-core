@@ -387,7 +387,7 @@ RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_
     return wrap_err([&] {
         const auto& users = (*app)->all_users();
         set_array_size(out_n, users.size());
-        if (capacity < users.size() || users.size() == 0)
+        if (capacity < users.size())
             return false;
 
         if (out_users) {
@@ -733,7 +733,7 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
     return wrap_err([&] {
         const auto& identities = (*user)->identities();
         set_array_size(out_n, identities.size());
-        if (max < identities.size() || identities.size() == 0)
+        if (max < identities.size())
             return false;
 
         if (out_identities) {
@@ -741,9 +741,6 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
             for (size_t i = 0; i < max; i++) {
                 out_identities[i] = {identities[i].id.c_str(),
                                      realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
-            }
-            if (out_n) {
-                *out_n = max;
             }
         }
         return true;
