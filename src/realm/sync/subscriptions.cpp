@@ -678,7 +678,11 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {true}});
     auto res = sub_sets->where()
                    .greater(sub_sets->get_primary_key_column(), last_query_version)
+                   .group()
                    .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending))
+                   .Or()
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Bootstrapping))
+                   .end_group()
                    .greater_equal(m_sub_set_snapshot_version, static_cast<int64_t>(after_client_version))
                    .find_all(descriptor_ordering);
 

@@ -165,6 +165,10 @@ struct SyncConfig {
     std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after, bool did_recover)>
         notify_after_client_reset;
 
+    // Will be called after a download message is received and validated by the client but befefore it's been
+    // transformed or applied. To be used in testing only.
+    std::function<void(std::weak_ptr<SyncSession>)> on_download_message_received_hook;
+
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition);

@@ -655,6 +655,12 @@ void SyncSession::create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
+    if (m_config.on_download_message_received_hook) {
+        session_config.on_download_message_received_hook = [hook = m_config.on_download_message_received_hook,
+                                                            anchor = weak_from_this()] {
+            hook(anchor);
+        };
+    }
 
     {
         std::string sync_route = m_sync_manager->sync_route();
