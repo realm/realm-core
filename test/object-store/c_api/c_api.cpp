@@ -3900,6 +3900,8 @@ struct Userdata {
     bool has_error;
     realm_error_t error;
     realm_thread_safe_reference_t* realm_ref = nullptr;
+    std::string error_message;
+    std::string error_catagory;
 };
 
 #if REALM_ENABLE_SYNC
@@ -3913,6 +3915,14 @@ static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
     if (userdata_p->has_error)
         realm_get_async_error(async_error, &userdata_p->error);
     userdata_p->called = true;
+}
+
+static void sync_error_handler(void* p, realm_sync_session_t*, const realm_sync_error_t error)
+{
+    auto userdata_p = static_cast<Userdata*>(p);
+    userdata_p->has_error = true;
+    userdata_p->error_message = error.error_code.message;
+    userdata_p->error_catagory = error.error_code.category_name;
 }
 
 TEST_CASE("C API - async_open", "[c_api][sync]") {
@@ -3974,9 +3984,11 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         sync_config->user->update_access_token(std::move(invalid_token));
 
         realm_config_set_path(config, test_config.path.c_str());
-        realm_config_set_sync_config(config, sync_config);
         realm_config_set_schema_version(config, 1);
         Userdata userdata;
+        realm_sync_config_set_error_handler(sync_config, sync_error_handler, &userdata, nullptr);
+        realm_config_set_sync_config(config, sync_config);
+
         realm_async_open_task_t* task = realm_open_synchronized(config);
         REQUIRE(task);
         realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
@@ -3986,6 +3998,8 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
         });
         REQUIRE(userdata.called);
         REQUIRE(!userdata.realm_ref);
+        REQUIRE(userdata.error_message == "Bad user authentication (BIND)");
+        REQUIRE(userdata.error_catagory == "realm::sync::ProtocolError");
         realm_release(task);
         realm_release(config);
         realm_release(sync_config);
