@@ -2961,6 +2961,7 @@ typedef struct realm_sync_error_code {
     realm_sync_error_category_e category;
     int value;
     const char* message;
+    const char* category_name;
 } realm_sync_error_code_t;
 
 typedef struct realm_sync_error_user_info {

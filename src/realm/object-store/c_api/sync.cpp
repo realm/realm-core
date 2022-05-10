@@ -229,6 +229,7 @@ static realm_sync_error_code_t to_capi(const Status& status, std::string& messag
     ret.value = error_code.value();
     message = error_code.message(); // pass the string to the caller for lifetime purposes
     ret.message = message.c_str();
+    ret.category_name = category.name();
 
     return ret;
 }
