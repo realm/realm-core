@@ -385,14 +385,14 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcep
 RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n)
 {
     return wrap_err([&] {
-        const size_t users_size = (*app)->all_users().size();
-        set_array_size(out_n, users_size);
-        if (capacity < users_size)
+        const auto& users = (*app)->all_users();
+        set_array_size(out_n, users.size());
+        if (capacity < users.size() || users.size() == 0)
             return false;
 
         if (out_users) {
             OutBuffer<realm_user_t> buf(out_users);
-            for (const auto& user : (*app)->all_users()) {
+            for (const auto& user : users) {
                 buf.emplace(user);
                 if (buf.size() == capacity)
                     break;
@@ -731,13 +731,12 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
                                            size_t max, size_t* out_n)
 {
     return wrap_err([&] {
-        const auto identities_size = (*user)->identities().size();
-        set_array_size(out_n, identities_size);
-        if (max < identities_size)
+        const auto& identities = (*user)->identities();
+        set_array_size(out_n, identities.size());
+        if (max < identities.size() || identities.size() == 0)
             return false;
 
         if (out_identities) {
-            const auto& identities = (*user)->identities();
             max = std::min(identities.size(), max);
             for (size_t i = 0; i < max; i++) {
                 out_identities[i] = {identities[i].id.c_str(),
