@@ -132,7 +132,7 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* 
     if (func) {
         auto should_func = [=](uint64_t total_bytes, uint64_t used_bytes) -> bool {
             auto result = func(userdata, total_bytes, used_bytes);
-            if (usercode_error = ErrorStorage::get_thread_local()->get_and_clear_usercode_error())
+            if (auto usercode_error = ErrorStorage::get_thread_local()->get_and_clear_usercode_error())
                 throw CallbackFailed{usercode_error};
             return result;
         };

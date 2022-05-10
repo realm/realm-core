@@ -52,7 +52,7 @@ public:
 private:
     util::Optional<realm_error_t> m_err;
     std::string m_message_buf;
-    util::Optional<void*> m_usercode_error;
+    void* m_usercode_error;
 };
 
 } // namespace realm::c_api
