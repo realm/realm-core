@@ -26,7 +26,6 @@
 namespace realm::c_api {
 
 void set_last_exception(std::exception_ptr eptr);
-void set_last_exception_callback_error(std::exception_ptr eptr, void* usercode_error);
 
 class ErrorStorage {
 public:
@@ -34,7 +33,6 @@ public:
 
     ErrorStorage() = default;
     explicit ErrorStorage(std::exception_ptr eptr) noexcept;
-    explicit ErrorStorage(std::exception_ptr eptr, void* usercode_error) noexcept;
     ErrorStorage(const ErrorStorage& other);
     ErrorStorage& operator=(const ErrorStorage& other);
 
@@ -43,14 +41,18 @@ public:
 
     bool operator==(const ErrorStorage& other) const noexcept;
 
-    void assign(std::exception_ptr eptr, void* usercode_error = nullptr) noexcept;
+    void assign(std::exception_ptr eptr) noexcept;
     bool has_error() const noexcept;
     bool get_as_realm_error_t(realm_error_t* out) const noexcept;
     bool clear() noexcept;
 
+    void set_usercode_error(void* usercode_error);
+    void* get_and_clear_usercode_error();
+
 private:
     util::Optional<realm_error_t> m_err;
     std::string m_message_buf;
+    util::Optional<void*> m_usercode_error;
 };
 
 } // namespace realm::c_api

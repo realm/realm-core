@@ -13,15 +13,9 @@ inline auto wrap_err(F&& f) noexcept -> decltype(f())
     try {
         return f();
     }
-    catch (const CallbackFailed& e) {
-        set_last_exception_callback_error(std::current_exception(), e.usercode_error);
-        if constexpr (!std::is_same_v<decltype(f()), void>)
-            return {};
-    }
     catch (...) {
         set_last_exception(std::current_exception());
-        if constexpr (!std::is_same_v<decltype(f()), void>)
-            return {};
+        return {};
     };
 }
 

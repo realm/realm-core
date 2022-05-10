@@ -19,12 +19,6 @@ ErrorStorage::ErrorStorage(std::exception_ptr ptr) noexcept
     assign(std::move(ptr));
 }
 
-ErrorStorage::ErrorStorage(std::exception_ptr ptr, void* usercode_error) noexcept
-    : m_err(none)
-{
-    assign(std::move(ptr), usercode_error);
-}
-
 ErrorStorage::ErrorStorage(const ErrorStorage& other)
     : m_err(other.m_err)
     , m_message_buf(other.m_message_buf)
@@ -76,7 +70,7 @@ bool ErrorStorage::operator==(const ErrorStorage& other) const noexcept
     return m_err->error == other.m_err->error && m_message_buf == other.m_message_buf;
 }
 
-void ErrorStorage::assign(std::exception_ptr eptr, void* usercode_error) noexcept
+void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 {
     if (!eptr) {
         clear();
@@ -91,8 +85,6 @@ void ErrorStorage::assign(std::exception_ptr eptr, void* usercode_error) noexcep
         try {
             m_message_buf = ex.what();
             m_err->message = m_message_buf.c_str();
-            if (usercode_error)
-                m_err->usercode_error = usercode_error;
         }
         catch (const std::bad_alloc&) {
             // If we are unable to build the new error because we ran out of memory we should propagate the OOM
@@ -124,6 +116,7 @@ void ErrorStorage::assign(std::exception_ptr eptr, void* usercode_error) noexcep
     }
     catch (const CallbackFailed& ex) {
         populate_error(ex, RLM_ERR_CALLBACK);
+        m_err->usercode_error = ex.usercode_error;
     }
 
     // Core exceptions:
@@ -243,6 +236,20 @@ bool ErrorStorage::clear() noexcept
     return ret;
 }
 
+void ErrorStorage::set_usercode_error(void* usercode_error)
+{
+    m_usercode_error = usercode_error;
+}
+void* ErrorStorage::get_and_clear_usercode_error()
+{
+    if (m_usercode_error) {
+        auto usercode_error = m_usercode_error.value();
+        m_usercode_error.reset();
+        return usercode_error;
+    }
+    return nullptr;
+}
+
 ErrorStorage* ErrorStorage::get_thread_local()
 {
 #if !defined(RLM_NO_THREAD_LOCAL)
@@ -271,11 +278,6 @@ ErrorStorage* ErrorStorage::get_thread_local()
 void set_last_exception(std::exception_ptr eptr)
 {
     ErrorStorage::get_thread_local()->assign(std::move(eptr));
-}
-
-void set_last_exception_callback_error(std::exception_ptr eptr, void* usercode_error)
-{
-    ErrorStorage::get_thread_local()->assign(std::move(eptr), usercode_error);
 }
 
 RLM_API bool realm_get_last_error(realm_error_t* err)
@@ -314,9 +316,5 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
 
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept
 {
-    realm::c_api::wrap_err([=]() {
-        // register a callback failed exception storing the ptr to the user code error passed by the SDK
-        // when this excpetion is caught the original error can be processed
-        throw realm::c_api::CallbackFailed(usercode_error);
-    });
+    realm::c_api::ErrorStorage::get_thread_local()->set_usercode_error(usercode_error);
 }
