@@ -240,14 +240,12 @@ void ErrorStorage::set_usercode_error(void* usercode_error)
 {
     m_usercode_error = usercode_error;
 }
+
 void* ErrorStorage::get_and_clear_usercode_error()
 {
-    if (m_usercode_error) {
-        auto ret = m_usercode_error;
-        m_usercode_error = nullptr;
-        return ret;
-    }
-    return nullptr;
+    auto ret = m_usercode_error;
+    m_usercode_error = nullptr;
+    return ret;
 }
 
 ErrorStorage* ErrorStorage::get_thread_local()
