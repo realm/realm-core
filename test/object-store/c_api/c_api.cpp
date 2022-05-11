@@ -1236,7 +1236,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties_foo, properties_found, &num_found)));
         CHECK(num_found == properties_found);
         CHECK(properties_foo[0] == foo_properties["int"]);
-        realm_release(properties_foo);
+        realm_free(properties_foo);
 
         num_found = 0;
         properties_found = 0;
@@ -1248,7 +1248,7 @@ TEST_CASE("C API", "[c_api]") {
         CHECK(num_found == properties_found);
         CHECK(properties_bar[2] == bar_properties["doubles"]);
         CHECK(properties_bar[0] == bar_properties["int"]);
-        realm_release(properties_bar);
+        realm_free(properties_bar);
 
         num_found = 0;
         CHECK(!(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
