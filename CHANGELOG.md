@@ -1,15 +1,15 @@
-# NEXT RELEASE
+# 11.16.0 Release notes
 
 ### Enhancements
 * Adding recovery mode to new automatic client reset handling. In this mode, local unsynced changes which would otherwise be lost during a client reset are replayed on the seamlessly reset Realm. ([#5323](https://github.com/realm/realm-core/pull/5323))
 * Client reset in recovery mode is controlled by the server's protocol 4 json error format. ([#5382](https://github.com/realm/realm-core/pull/5382))
-* Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the c_api. ([#5432](https://github.com/realm/realm-core/pull/5432))
+* Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the C API. ([#5432](https://github.com/realm/realm-core/pull/5432))
 * Expose client reset functionalities for C API. ([#5425](https://github.com/realm/realm-core/issues/5425))
 * Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async` ([#5438](https://github.com/realm/realm-core/pull/5438))
 * Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
 * Expose Subscription properties on C API. ([#5454](https://github.com/realm/realm-core/pull/5454))
 * Added in the C API the possibility for SDKs to catch user code callback excpetions, store them in core and retrieve via `realm_get_last_error()` ([#5406](https://github.com/realm/realm-core/issues/5406))
-* Erase Subscription by id for C API. ([#5475]https://github.com/realm/realm-core/issues/5475)
+* Erase Subscription by id for C API. ([#5475](https://github.com/realm/realm-core/issues/5475))
 * Erase and Find Subscription by Results for C API. ([#5470](https://github.com/realm/realm-core/issues/5470))
 
 ### Fixed
@@ -19,7 +19,7 @@
 * FLX sync would not correctly resume syncing if a bootstrap was interrupted ([#5466](https://github.com/realm/realm-core/pull/5466), since v11.8.0)
  
 ### Breaking changes
-* Extra `realm_free_userdata_func_t` parameter added on some realm_config_set_... functions in the C API. The userdata will be freed when the config object is freed.
+* Extra `realm_free_userdata_func_t` parameter added on some realm_config_set_... functions in the C API. The userdata will be freed when the config object is freed ([#5452](https://github.com/realm/realm-core/pull/5452)).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
