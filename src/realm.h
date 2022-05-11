@@ -3365,7 +3365,7 @@ RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set
  *  @return a pointer to a mutable subscription
  */
 RLM_API realm_flx_sync_mutable_subscription_set_t*
-realm_flx_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*);
+realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*);
 
 /**
  *  Clear the subscription set passed as parameter

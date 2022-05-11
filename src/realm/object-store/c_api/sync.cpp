@@ -608,7 +608,7 @@ RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set
 }
 
 RLM_API realm_flx_sync_mutable_subscription_set_t*
-realm_flx_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t* subscription_set)
+realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t* subscription_set)
 {
     REALM_ASSERT(subscription_set != nullptr);
     return wrap_err([&]() {
@@ -664,10 +664,10 @@ RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subs
         auto it = std::find_if(subscription_set->begin(), subscription_set->end(), [id](const Subscription& sub) {
             return from_capi(*id) == sub.id();
         });
-        if (it == subscription_set->end())
-            return false;
-        subscription_set->erase(it);
-        *erased = true;
+        if (it != subscription_set->end()) {
+            subscription_set->erase(it);
+            *erased = true;
+        }
         return true;
     });
 }
@@ -681,9 +681,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_su
         if (auto it = subscription_set->find(name); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
-            return true;
         }
-        return false;
+        return true;
     });
 }
 
@@ -696,9 +695,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
         if (auto it = subscription_set->find(query->get_query()); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
-            return true;
         }
-        return false;
+        return true;
     });
 }
 
@@ -711,9 +709,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
         if (auto it = subscription_set->find(results->get_query()); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
-            return true;
         }
-        return false;
+        return true;
     });
 }
 
