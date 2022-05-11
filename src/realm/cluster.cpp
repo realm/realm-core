@@ -46,7 +46,7 @@ FieldValues::FieldValues(std::initializer_list<FieldValue> init)
 {
     if (m_values.size() > 1) {
         // Sort according to ColKey index
-        std::sort(m_values.begin(), m_values.end(), [](auto& a, auto& b) {
+        std::sort(m_values.begin(), m_values.end(), [](const auto& a, const auto& b) {
             return a.col_key.get_index().val < b.col_key.get_index().val;
         });
     }
@@ -59,7 +59,7 @@ void FieldValues::insert(ColKey k, Mixed val, bool is_default)
         return;
     }
     unsigned int idx = k.get_index().val;
-    auto it = std::lower_bound(m_values.begin(), m_values.end(), idx, [](auto& a, unsigned int i) {
+    auto it = std::lower_bound(m_values.begin(), m_values.end(), idx, [](const auto& a, unsigned int i) {
         return a.col_key.get_index().val < i;
     });
     m_values.insert(it, {k, val, is_default});

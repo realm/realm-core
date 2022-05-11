@@ -38,7 +38,7 @@ class ColumnAttrMask;
 class CascadeState;
 
 struct FieldValue {
-    FieldValue(ColKey k, Mixed val, bool is_default = false)
+    FieldValue(ColKey k, Mixed val, bool is_default = false) noexcept
         : col_key(k)
         , value(val)
         , is_default(is_default)
