@@ -949,6 +949,56 @@ TEST_CASE("C API", "[c_api]") {
             CHECK(userdata->num_initializations == 1);
             CHECK(userdata->num_compact_on_launch == 1);
         }
+
+        SECTION("migration callback register exception error") {
+            ConfigUserdata userdata;
+            auto realm = cptr_checked(realm_open(config.get()));
+            realm.reset();
+
+            auto config2 = cptr(realm_config_new());
+            auto empty_schema = cptr(realm_schema_new(nullptr, 0, nullptr));
+            realm_config_set_path(config2.get(), test_file_2.path.c_str());
+            realm_config_set_schema_mode(config2.get(), RLM_SCHEMA_MODE_AUTOMATIC);
+            realm_config_set_schema_version(config2.get(), 999);
+            realm_config_set_schema(config2.get(), empty_schema.get());
+
+            struct MyExceptionWrapper {
+                std::exception_ptr m_ptr{nullptr};
+            };
+
+            realm_config_set_migration_function(
+                config2.get(),
+                [](void*, realm_t*, realm_t*, const realm_schema_t*) {
+                    try {
+                        throw std::runtime_error("Test error in callback");
+                    }
+                    catch (...) {
+                        auto wrapper = new MyExceptionWrapper();
+                        wrapper->m_ptr = std::current_exception();
+                        realm_register_user_code_callback_error((void*)(wrapper));
+                    }
+                    return false;
+                },
+                &userdata, nullptr);
+
+            CHECK(!realm_open(config2.get()));
+            realm_error_t _err;
+            _err.message = "";
+            _err.error = RLM_ERR_NONE;
+            CHECK(realm_get_last_error(&_err));
+            CHECK(_err.error == RLM_ERR_CALLBACK);
+            CHECK(std::string{_err.message} == "User-provided callback failed");
+            REQUIRE(_err.usercode_error); // this is the error registered inside the callback
+            auto ex = (MyExceptionWrapper*)_err.usercode_error;
+            try {
+                std::rethrow_exception(ex->m_ptr);
+            }
+            catch (const std::exception& ex) {
+                CHECK(std::string{ex.what()} == std::string{"Test error in callback"});
+            }
+            CHECK(realm_clear_last_error());
+            delete ex;
+        }
     }
 
     realm_t* realm;

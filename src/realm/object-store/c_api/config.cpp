@@ -91,7 +91,7 @@ RLM_API void realm_config_set_migration_function(realm_config_t* config, realm_m
             realm_t r2{new_realm};
             realm_schema_t sch{&schema};
             if (!(func)(userdata, &r1, &r2, &sch)) {
-                throw CallbackFailed{};
+                throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_usercode_error()};
             }
         };
         config->migration_function = std::move(migration_func);
@@ -112,7 +112,7 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t* confi
         auto init_func = [=](SharedRealm realm) {
             realm_t r{realm};
             if (!(func)(userdata, &r)) {
-                throw CallbackFailed{};
+                throw CallbackFailed{ErrorStorage::get_thread_local()->get_and_clear_usercode_error()};
             }
         };
         config->initialization_function = std::move(init_func);
@@ -131,7 +131,10 @@ RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t* 
 {
     if (func) {
         auto should_func = [=](uint64_t total_bytes, uint64_t used_bytes) -> bool {
-            return func(userdata, total_bytes, used_bytes);
+            auto result = func(userdata, total_bytes, used_bytes);
+            if (auto usercode_error = ErrorStorage::get_thread_local()->get_and_clear_usercode_error())
+                throw CallbackFailed{usercode_error};
+            return result;
         };
         config->should_compact_on_launch_function = std::move(should_func);
     }

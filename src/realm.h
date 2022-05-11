@@ -251,6 +251,9 @@ typedef enum realm_logic_error_kind {
 typedef struct realm_error {
     realm_errno_e error;
     const char* message;
+    // When error is RLM_ERR_CALLBACK this is an opaque pointer to an SDK-owned error object
+    // thrown by user code inside a callback with realm_register_user_code_callback_error(), otherwise null.
+    void* usercode_error;
     union {
         int code;
         realm_logic_error_kind_e logic_error_kind;
@@ -3529,5 +3532,12 @@ realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_syn
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*, realm_sync_upload_completion_func_t,
                                                            void* userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+/**
+ * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
+ * and retrieve a it later via realm_get_last_error.
+ * Most importantly the SDK is responsible to handle the memory pointed by usercode_error.
+ * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
+ */
+RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
 
 #endif // REALM_H
