@@ -23,7 +23,6 @@
 
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
-#include "util/test_file.hpp"
 
 namespace realm::app {
 
@@ -114,11 +113,6 @@ public:
     std::shared_ptr<App> app() const noexcept
     {
         return m_test_session.app();
-    }
-
-    const TestAppSession& app_session() const noexcept
-    {
-        return m_test_session;
     }
 
 private:

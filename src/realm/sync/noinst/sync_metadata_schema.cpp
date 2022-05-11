@@ -168,7 +168,6 @@ SyncMetadataSchemaVersions::SyncMetadataSchemaVersions(const TransactionRef& tr)
          {{&m_version_field, c_meta_schema_version_field, type_Int}}}};
 
     REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Reading);
-
     if (!m_table) {
         if (tr->has_table(c_sync_internal_schemas_table)) {
             load_sync_metadata_schema(tr, &unified_schema_version_table_def);
