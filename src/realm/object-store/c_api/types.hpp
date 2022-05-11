@@ -641,6 +641,17 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     }
 };
 
+struct realm_user_identity : realm::c_api::WrapC {
+    realm_user_identity(std::string id, realm_auth_provider_e provider_type) noexcept
+        : id(std::move(id))
+        , provider_type(provider_type)
+    {
+    }
+
+    std::string id;
+    realm_auth_provider_e provider_type;
+};
+
 struct realm_sync_session : realm::c_api::WrapC, std::shared_ptr<realm::SyncSession> {
     realm_sync_session(std::shared_ptr<realm::SyncSession> session)
         : std::shared_ptr<realm::SyncSession>{std::move(session)}

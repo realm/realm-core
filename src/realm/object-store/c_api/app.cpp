@@ -727,17 +727,19 @@ RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) noexce
     return realm_user_state_e((*user)->state());
 }
 
-RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
+RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t** out_identities,
                                            size_t max, size_t* out_n)
 {
     return wrap_err([&] {
         if (out_identities) {
             const auto& identities = (*user)->identities();
             max = std::min(identities.size(), max);
+            OutBuffer<realm_user_identity_t> buf(out_identities);
             for (size_t i = 0; i < max; i++) {
-                out_identities[i] = {identities[i].id.c_str(),
-                                     realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
+                buf.emplace(identities[i].id,
+                            realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type)));
             }
+            buf.release(out_n);
             if (out_n) {
                 *out_n = max;
             }
@@ -749,6 +751,12 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
         }
         return true;
     });
+}
+
+RLM_API const char* realm_user_get_identity_id(const realm_user_identity_t* identity) noexcept
+{
+    REALM_ASSERT(identity);
+    return identity->id.c_str();
 }
 
 RLM_API const char* realm_user_get_local_identity(const realm_user_t* user) noexcept

@@ -2489,6 +2489,7 @@ RLM_API void realm_http_transport_complete_request(void* request_context, const 
 typedef struct realm_app realm_app_t;
 typedef struct realm_app_credentials realm_app_credentials_t;
 typedef struct realm_user realm_user_t;
+typedef struct realm_user_identity realm_user_identity_t;
 
 typedef enum realm_user_state {
     RLM_USER_STATE_LOGGED_OUT,
@@ -2894,11 +2895,6 @@ RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEP
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
 
-typedef struct {
-    const char* id;
-    realm_auth_provider_e provider_type;
-} realm_user_identity_t;
-
 /**
  * Get the list of identities of this @a user.
  *
@@ -2911,8 +2907,10 @@ typedef struct {
  * @param out_n The actual number of entries written to `out_identities`. May be NULL.
  * @return true, if no errors occurred.
  */
-RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
+RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t** out_identities,
                                            size_t capacity, size_t* out_n);
+
+RLM_API const char* realm_user_get_identity_id(const realm_user_identity_t* identity) RLM_API_NOEXCEPT;
 
 RLM_API const char* realm_user_get_local_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
