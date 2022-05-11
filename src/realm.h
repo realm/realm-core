@@ -3230,35 +3230,59 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                                                               realm_sync_after_client_reset_func_t, void* userdata,
                                                               realm_free_userdata_func_t) RLM_API_NOEXCEPT;
 
-RLM_API realm_object_id_t realm_flx_sync_subscription_id(const realm_flx_sync_subscription_t* subscription)
+/**
+ * Fetch subscription id for the subscription passed as argument.
+ * @return realm_object_id_t for the subscription passed as argument
+ */
+RLM_API realm_object_id_t realm_sync_subscription_id(const realm_flx_sync_subscription_t* subscription)
     RLM_API_NOEXCEPT;
 
-RLM_API realm_string_t realm_flx_sync_subscription_name(const realm_flx_sync_subscription_t* subscription)
+/**
+ * Fetch subscription name for the subscription passed as argument.
+ * @return realm_string_t which contains the name of the subscription.
+ */
+RLM_API realm_string_t realm_sync_subscription_name(const realm_flx_sync_subscription_t* subscription)
     RLM_API_NOEXCEPT;
 
-RLM_API realm_string_t
-realm_flx_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) RLM_API_NOEXCEPT;
-
-RLM_API realm_string_t realm_flx_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription)
+/**
+ * Fetch object class name for the subscription passed as argument.
+ * @return a realm_string_t which contains the class name of the subscription.
+ */
+RLM_API realm_string_t realm_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription)
     RLM_API_NOEXCEPT;
 
-RLM_API realm_timestamp_t realm_flx_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription)
+/**
+ * Fetch the query string associated with the subscription passed as argument.
+ * @return realm_string_t which contains the query associated with the subscription.
+ */
+RLM_API realm_string_t realm_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription)
     RLM_API_NOEXCEPT;
 
-RLM_API realm_timestamp_t realm_flx_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription)
+/**
+ * Fetch the timestamp in which the subscription was created for the subscription passed as argument.
+ * @return realm_timestamp_t representing the timestamp in which the subscription for created.
+ */
+RLM_API realm_timestamp_t realm_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+/**
+ * Fetch the timestamp in which the subscription was updated for the subscription passed as argument.
+ * @return realm_timestamp_t representing the timestamp in which the subscription was updated.
+ */
+RLM_API realm_timestamp_t realm_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription)
     RLM_API_NOEXCEPT;
 
 /**
  * Get latest subscription set
  * @return a non null subscription set pointer if such it exists.
  */
-RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t*);
 
 /**
  * Get active subscription set
  * @return a non null subscription set pointer if such it exists.
  */
-RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*);
 
 /**
  * Wait until subscripton set state is equal to the state passed as parameter.
@@ -3273,11 +3297,9 @@ RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_s
  * This is an asynchronous operation.
  * @return true/false if the handler was registered correctly
  */
-RLM_API bool
-realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t* subscription_set,
-                                                  realm_flx_sync_subscription_set_state_e notify_when,
-                                                  realm_sync_on_subscription_state_changed callback, void* userdata,
-                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_on_subscription_set_state_change_async(
+    const realm_flx_sync_subscription_set_t* subscription_set, realm_flx_sync_subscription_set_state_e notify_when,
+    realm_sync_on_subscription_state_changed callback, void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  *  Retrieve version for the subscription set passed as parameter
@@ -3309,37 +3331,47 @@ RLM_API size_t realm_sync_subscription_set_size(const realm_flx_sync_subscriptio
  *  @return the subscription or nullptr if the index is not valid
  */
 RLM_API realm_flx_sync_subscription_t* realm_sync_subscription_at(const realm_flx_sync_subscription_set_t*,
-                                                                  size_t index) RLM_API_NOEXCEPT;
-/**
- *  Find subscription by name
- *  @return a pointer to the subscription with the name passed as parameter
- */
-RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*,
-                                                                            const char* name) RLM_API_NOEXCEPT;
+                                                                  size_t index);
 /**
  *  Find subscription associated to the query passed as parameter
  *  @return a pointer to the subscription or nullptr if not found
  */
 RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t*,
                                                                              realm_query_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Find subscription associated to the results set  passed as parameter
+ *  @return a pointer to the subscription or nullptr if not found
+ */
+RLM_API realm_flx_sync_subscription_t*
+realm_sync_find_subscription_by_results(const realm_flx_sync_subscription_set_t*, realm_results_t*) RLM_API_NOEXCEPT;
+
+
+/**
+ *  Find subscription by name passed as parameter
+ *  @return a pointer to the subscription or nullptr if not found
+ */
+RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*,
+                                                                            const char* name) RLM_API_NOEXCEPT;
+
 /**
  *  Refresh subscription
  *  @return true/false if the operation was successful or not
  */
-RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t*);
 
 /**
  *  Convert a subscription into a mutable one in order to alter the subscription itself
  *  @return a pointer to a mutable subscription
  */
 RLM_API realm_flx_sync_mutable_subscription_set_t*
-realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*);
 
 /**
  *  Clear the subscription set passed as parameter
  *  @return true/false if operation was successful
  */
-RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*);
 
 /**
  * Insert ot update the query contained inside a result object for the subscription set passed as parameter, if
@@ -3349,8 +3381,7 @@ RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscripti
  */
 RLM_API bool realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subscription_set_t*,
                                                                   realm_results_t*, const char* name,
-                                                                  size_t* out_index,
-                                                                  bool* out_inserted) RLM_API_NOEXCEPT;
+                                                                  size_t* out_index, bool* out_inserted);
 /**
  * Insert ot update a query for the subscription set passed as parameter, if successful the index where the query
  * was inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
@@ -3359,25 +3390,37 @@ RLM_API bool realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync
  */
 RLM_API bool realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscription_set_t*,
                                                                 realm_query_t*, const char* name, size_t* out_index,
-                                                                bool* out_inserted) RLM_API_NOEXCEPT;
+                                                                bool* out_inserted);
 /**
- *  Erase from subscription set by name
- *  @return true/false if operation was successful
+ *  Erase from subscription set by id. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error).
  */
-RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*,
-                                                       const char*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subscription_set_t*,
+                                                     const realm_object_id_t*, bool*);
 /**
- *  Erase from subscription set by query
- *  @return true/false if operation was successful
+ *  Erase from subscription set by name. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
  */
-RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*,
-                                                        realm_query_t*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
+                                                       bool* erased);
+/**
+ *  Erase from subscription set by query. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*, realm_query_t*,
+                                                        bool* erased);
+/**
+ *  Erase from subscription set by results. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable_subscription_set_t*,
+                                                          realm_results_t*, bool* erased);
 /**
  *  Commit the subscription_set passed as parameter (in order that all the changes made will take effect)
  *  @return pointer to a valid immutable subscription if commit was successful
  */
 RLM_API realm_flx_sync_subscription_set_t*
-realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
+realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*);
 
 /**
  * Create a task that will open a realm with the specific configuration
