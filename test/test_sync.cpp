@@ -6279,55 +6279,6 @@ TEST(Sync_LogCompaction_EraseObject_LinkList)
 }
 
 
-TEST(Sync_ClientFileBlacklisting)
-{
-    TEST_CLIENT_DB(db);
-    TEST_DIR(server_dir);
-
-    // Get a client file identifier allocated for the client-side file
-    {
-        ClientServerFixture fixture(server_dir, test_context);
-        fixture.start();
-        Session session = fixture.make_bound_session(db, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    file_ident_type client_file_ident;
-    {
-        version_type client_version;
-        SaltedFileIdent client_file_ident_2;
-        SyncProgress progress;
-        get_history(db).get_status(client_version, client_file_ident_2, progress);
-        client_file_ident = client_file_ident_2.ident;
-    }
-
-    // Check that blacklisting works
-    bool did_fail = false;
-    {
-        ClientServerFixture::Config config;
-        config.client_file_blacklists["/test"].push_back(client_file_ident);
-        ClientServerFixture fixture(server_dir, test_context, std::move(config));
-        fixture.start();
-        using ConnectionState = ConnectionState;
-        using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
-            if (state != ConnectionState::disconnected)
-                return;
-            REALM_ASSERT(error_info);
-            std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal();
-            CHECK_EQUAL(sync::ProtocolError::client_file_blacklisted, ec);
-            CHECK(is_fatal);
-            did_fail = true;
-            fixture.stop();
-        };
-        Session session = fixture.make_session(db);
-        session.set_connection_state_change_listener(listener);
-        fixture.bind_session(session, "/test");
-        session.wait_for_download_complete_or_client_stopped();
-    }
-    CHECK(did_fail);
-}
-
 // This test could trigger the assertion that the row_for_object_id cache is
 // valid before the cache was properly invalidated in the case of a short
 // circuited sync replicator.

@@ -106,8 +106,6 @@ private:
 /// files are not started until after this function has completed sucessfully.
 void prepare_server_workdir(const config::Configuration&, util::Logger&);
 
-Server::ClientFileBlacklists load_client_file_blacklists(const config::Configuration&, util::Logger&);
-
 } // namespace sync
 } // namespace realm
 

@@ -52,15 +52,6 @@ private:
 /// sync server is running.
 class Server {
 public:
-    /// A list of client file identifiers. See ClientFileBlacklists.
-    using ClientFileBlacklist = std::vector<file_ident_type>;
-
-    /// A collection of client-side Realms that should be rejected by the
-    /// server. Each entry in this map associates a virtual path of a
-    /// server-side Realm with the set of client-side Realms that should be
-    /// rejected for that server-side Realm.
-    using ClientFileBlacklists = std::map<std::string, ClientFileBlacklist>;
-
     using SessionBootstrapCallback = void(std::string_view virt_path, file_ident_type client_file_ident);
 
     // FIXME: The default values for `http_request_timeout`,
@@ -247,9 +238,6 @@ public:
 
         /// An optional 64 byte key to encrypt all files with.
         util::Optional<std::array<char, 64>> encryption_key;
-
-        /// Make the server reject sessions associated with these client files.
-        ClientFileBlacklists client_file_blacklists;
 
         /// Sets a limit on the allowed accumulated size in bytes of buffered
         /// incoming changesets waiting to be processed. If left at zero, an

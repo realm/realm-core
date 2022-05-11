@@ -96,9 +96,6 @@ using LastClientAccessesRange = CompactionControl::LastClientAccessesRange;
 
 using UploadChangesets = std::vector<UploadChangeset>;
 
-using ClientFileBlacklist = Server::ClientFileBlacklist;
-using ClientFileBlacklists = Server::ClientFileBlacklists;
-
 using EventLoopMetricsHandler = util::network::Service::EventLoopMetricsHandler;
 
 
@@ -468,11 +465,6 @@ public:
         return m_file.virt_path;
     }
 
-    const ClientFileBlacklist& get_client_file_blacklist() const noexcept
-    {
-        return m_client_file_blacklist;
-    }
-
     ServerFileAccessCache::File& access()
     {
         return m_file.access(); // Throws
@@ -564,7 +556,6 @@ public:
 private:
     ServerImpl& m_server;
     ServerFileAccessCache::Slot m_file;
-    const ClientFileBlacklist m_client_file_blacklist; // Sorted ascendingly
 
     // In general, `m_version_info` refers to the last snapshot of the Realm
     // file that is supposed to be visible to remote peers engaging in regular
@@ -704,8 +695,6 @@ private:
     bool m_realm_deletion_is_ongoing = false;
 
     DownloadCache m_download_cache;
-
-    static ClientFileBlacklist make_client_file_blacklist(const ServerImpl&, const std::string& virt_path);
 
     void on_changesets_from_downstream_added(std::size_t num_changesets, std::size_t num_bytes);
     void on_work_added();
@@ -2524,16 +2513,6 @@ public:
                      client_file_ident, client_file_ident_salt, scan_server_version, scan_client_version,
                      latest_server_version, latest_server_version_salt); // Throws
 
-        {
-            const ClientFileBlacklist& list = m_server_file->get_client_file_blacklist();
-            if (std::binary_search(list.begin(), list.end(), client_file_ident)) {
-                logger.error("Rejecting blacklisted client file (client_file_ident=%1)",
-                             client_file_ident); // Throws
-                error = ProtocolError::client_file_blacklisted;
-                return false;
-            }
-        }
-
         SaltedFileIdent client_file_ident_2 = {client_file_ident, client_file_ident_salt};
         DownloadCursor download_progress = {scan_server_version, scan_client_version};
         SaltedVersion server_version_2 = {latest_server_version, latest_server_version_salt};
@@ -3382,7 +3361,6 @@ ServerFile::ServerFile(ServerImpl& server, ServerFileAccessCache& cache, const s
     , wlogger{"ServerFile[" + virt_path + "]: ", server.get_worker().logger} // Throws
     , m_server{server}
     , m_file{cache, real_path, virt_path, *this, false, disable_sync_to_disk} // Throws
-    , m_client_file_blacklist{make_client_file_blacklist(server, virt_path)}  // Throws
     , m_worker_file{
           server.get_worker().get_file_access_cache(), real_path, virt_path, *this, true, disable_sync_to_disk}
 {
@@ -3631,19 +3609,6 @@ done:
     };
     util::network::Service& service = m_server.get_service();
     service.post(std::move(handler)); // Throws
-}
-
-
-ClientFileBlacklist ServerFile::make_client_file_blacklist(const ServerImpl& server, const std::string& virt_path)
-{
-    ClientFileBlacklist list;
-    const ClientFileBlacklists& lists = server.get_config().client_file_blacklists;
-    auto i = lists.find(virt_path);
-    if (i != lists.end()) {
-        list = i->second; // Throws
-        std::sort(list.begin(), list.end());
-    }
-    return list;
 }
 
 
@@ -4415,13 +4380,6 @@ void ServerImpl::start()
         }
     }
 
-    {
-        std::size_t n = 0;
-        for (const auto& entry : m_config.client_file_blacklists)
-            n += entry.second.size();
-        logger.info("Number of client file blacklists: %1 (%2 client files in total)",
-                    m_config.client_file_blacklists.size(), n); // Throws
-    }
     logger.debug("Authorization header name: %1", m_config.authorization_header_name); // Throws
 
     m_transformer = make_transformer(); // Throws
