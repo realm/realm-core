@@ -206,8 +206,6 @@ if(REALM_ENABLE_SYNC)
         test_compact_changesets.cpp
         test_crypto.cpp
         test_embedded_objects.cpp
-        test_encrypt_fingerprint.cpp
-        test_encrypt_transform.cpp
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp

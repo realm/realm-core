@@ -1,15 +1,10 @@
 set(SERVER_SOURCES
     access_control.cpp
     access_token.cpp
-    encrypt_fingerprint.cpp
-    encryption_transformer.cpp
-    reopening_file_logger.cpp
     server.cpp
-    server_configuration.cpp
     server_dir.cpp
     server_file_access_cache.cpp
     server_history.cpp
-    server_legacy_migration.cpp
     vacuum.cpp
 )
 
@@ -17,19 +12,13 @@ set(SERVER_HEADERS
     access_control.hpp
     access_token.hpp
     clock.hpp
-    command_line_util.hpp
     crypto_server.hpp
-    encrypt_fingerprint.hpp
-    encryption_transformer.hpp
     permissions.hpp
-    reopening_file_logger.hpp
     server.hpp
-    server_configuration.hpp
     server_dir.hpp
     server_file_access_cache.hpp
     server_history.hpp
     server_impl_base.hpp
-    server_legacy_migration.hpp
     vacuum.hpp
 )
 

@@ -9,7 +9,6 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/server/access_control.hpp>
-#include <realm/sync/noinst/server/encrypt_fingerprint.hpp>
 #include <realm/sync/noinst/server/server_dir.hpp>
 #include <realm/sync/noinst/server/server_file_access_cache.hpp>
 #include <realm/sync/noinst/server/server_impl_base.hpp>
@@ -243,13 +242,8 @@ public:
     // deletion.
     bool has_primary_work = false;
 
-    bool request_compaction = false;
-    bool request_deletion = false;
-
     // Only for reference files
     bool might_produce_new_sync_version = false;
-    bool group_has_compaction_requests = false;
-    bool group_has_deletion_requests = false;
 
     bool produced_new_realm_version = false;
     bool produced_new_sync_version = false;
@@ -272,12 +266,7 @@ public:
     {
         has_primary_work = false;
 
-        request_compaction = false;
-        request_deletion = false;
-
         might_produce_new_sync_version = false;
-        group_has_compaction_requests = false;
-        group_has_deletion_requests = false;
 
         produced_new_realm_version = false;
         produced_new_sync_version = false;
@@ -547,12 +536,6 @@ public:
 
     void recognize_external_change();
 
-    void initiate_compaction();
-
-    void initiate_deletion(std::int_fast64_t conn_id);
-
-    bool realm_deletion_is_ongoing() const;
-
 private:
     ServerImpl& m_server;
     ServerFileAccessCache::Slot m_file;
@@ -631,14 +614,6 @@ private:
     // accumulated chunk of work related to this file is currently in progress.
     bool m_has_blocked_work = false;
 
-    // A value of true counts towards outstanding blocked work (see
-    // `m_has_blocked_work`).
-    bool m_request_compaction = false;
-
-    // A value of true counts towards outstanding blocked work (see
-    // `m_has_blocked_work`).
-    bool m_request_deletion = false;
-
     // A file, that is not a partial file, is considered *exposed to the worker
     // thread* from the point in time where it is submitted to the worker
     // (Worker::enqueue()) and up until the point in time where
@@ -688,12 +663,6 @@ private:
 
     std::vector<std::int_fast64_t> m_deleting_connections;
 
-    // The network thread performs Realm deletion. However, the state Realm threads
-    // must finish using the Realms before it can be deleted. This leaves a
-    // time period where Realm deletion is ongoing. During that period, new sessions
-    // must be rejected at receipt of the BIND message.
-    bool m_realm_deletion_is_ongoing = false;
-
     DownloadCache m_download_cache;
 
     void on_changesets_from_downstream_added(std::size_t num_changesets, std::size_t num_bytes);
@@ -718,12 +687,6 @@ private:
     void group_finalize_work_stage_2();
     void finalize_work_stage_1();
     void finalize_work_stage_2();
-
-    void perform_compaction();
-
-    bool group_perform_file_deletions();
-    void perform_file_deletion();
-    void perform_file_deletion_after_state_realm_deletion();
 
     // Overriding member functions in CompactionControl
     LastClientAccessesRange get_last_client_accesses() override final;
@@ -919,8 +882,6 @@ public:
     void run();
     void stop() noexcept;
 
-    HTTPConnection* get_http_connection(std::int_fast64_t conn_id) noexcept;
-
     void remove_http_connection(std::int_fast64_t conn_id) noexcept;
 
     void add_sync_connection(int_fast64_t connection_id, std::unique_ptr<SyncConnection>&& sync_conn);
@@ -984,8 +945,6 @@ public:
         return {};
     }
 
-    void remove_file(const std::string& virt_path);
-
     // Returns the number of seconds since the Epoch of
     // std::chrono::system_clock.
     std::chrono::system_clock::time_point token_expiration_clock_now() const noexcept
@@ -1004,8 +963,6 @@ public:
 
     void stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_backup)> completion_handler,
                                                   milliseconds_type timeout);
-
-    void initiate_compact_realm(std::int_fast64_t conn_id, StringData virt_path);
 
     // Server global outputbuffers that can be reused.
     // The server is single threaded, so there are no
@@ -1035,9 +992,6 @@ public:
     // These functions must be called on the network thread.
     void inc_byte_size_for_pending_downstream_changesets(std::size_t byte_size);
     void dec_byte_size_for_pending_downstream_changesets(std::size_t byte_size);
-
-    void inc_num_outstanding_compaction_processes() noexcept;
-    void dec_num_outstanding_compaction_processes();
 
     // Overriding member functions in _impl::ServerHistory::Context
     std::mt19937_64& server_history_get_random() noexcept override final;
@@ -1099,13 +1053,9 @@ private:
 
     std::size_t m_pending_changesets_from_downstream_byte_size = 0;
 
-    std::size_t m_num_outstanding_compaction_processes = 0;
-
     util::CondVar m_wait_or_service_stopped_cond; // Protected by `m_mutex`
 
     util::ScratchMemory m_scratch_memory;
-
-    std::int_fast64_t m_compacting_connection = 0;
 
     void listen();
     void initiate_accept();
@@ -1142,11 +1092,6 @@ private:
     void do_stop_sync_and_wait_for_backup_completion(util::UniqueFunction<void(bool did_complete)> completion_handler,
                                                      milliseconds_type timeout);
 };
-
-inline void ServerImpl::inc_num_outstanding_compaction_processes() noexcept
-{
-    ++m_num_outstanding_compaction_processes;
-}
 
 // ============================ SyncConnection ============================
 
@@ -1724,9 +1669,6 @@ private:
         if (path == "/realm-sync" || path.begins_with("/realm-sync?") || path.begins_with("/realm-sync/%2F")) {
             handle_request_for_sync(request); // Throws
         }
-        else if (path.begins_with("/api/")) {
-            handle_request_for_api(request); // Throws
-        }
         else {
             handle_404_not_found(request); // Throws
         }
@@ -1973,119 +1915,6 @@ private:
             terminate(Logger::Level::detail, "HTTP connection closed"); // Throws
         };
         m_http_server.async_send_response(response, std::move(handler));
-    }
-
-    void handle_request_for_info(const HTTPRequest&)
-    {
-        logger.detail("Request for /api/info");
-        size_t number_of_http_connections = m_server.get_number_of_http_connections();
-        size_t number_of_sync_connections = m_server.get_number_of_sync_connections();
-        const std::set<std::string>& realm_names = m_server.get_realm_names();
-
-        std::string body = "Realm sync server\n\n";
-        body += "Number of open HTTP connections: " + util::to_string(number_of_http_connections) + "\n";
-        body += "Number of open Sync connections: " + util::to_string(number_of_sync_connections) + "\n";
-        body += "Realm names:\n";
-        for (const std::string& name : realm_names) {
-            body += "   " + name + "\n";
-        }
-
-        handle_text_response(HTTPStatus::Ok, body); // Throws
-    }
-
-    void handle_request_for_api(const HTTPRequest& request)
-    {
-        logger.detail("Request for /api");
-        StringData request_path = request.path;
-
-        // The healt check "/api/ok" is allowed without authorization.
-        if (request_path == "/api/ok") {
-            handle_text_response(HTTPStatus::Ok, ""); // Throws
-            return;
-        }
-
-        // All other api endpoints require authorization
-        AccessToken::ParseError error;
-        const Server::Config& config = m_server.get_config();
-        const std::string& authorization_header_name = config.authorization_header_name;
-        auto authorization_header = request.headers.find(authorization_header_name);
-        if (authorization_header == request.headers.end()) {
-            handle_text_response(HTTPStatus::Forbidden, "no access token"); // Throws
-            return;
-        }
-
-        util::Optional<StringData> signed_user_token =
-            _impl::parse_authorization_header(authorization_header->second);
-
-        if (!signed_user_token) {
-            handle_text_response(HTTPStatus::Forbidden, "no access token"); // Throws
-            return;
-        }
-
-        util::Optional<AccessToken> access_token =
-            get_server().get_access_control().verify_access_token(*signed_user_token, &error);
-
-        if (error != AccessToken::ParseError::none) {
-            handle_text_response(HTTPStatus::Forbidden, "invalid token"); // Throws
-            return;
-        }
-
-        bool is_admin = get_server().get_access_control().is_admin(*access_token);
-
-        if (request_path == "/api/info") {
-            if (is_admin) {
-                handle_request_for_info(request);
-                return;
-            }
-            handle_text_response(HTTPStatus::Forbidden, "must be admin"); // Throws
-            return;
-        }
-
-        StringData compact_prefix = "/api/compact/";
-        bool is_compact = (request_path == compact_prefix.substr(0, compact_prefix.size() - 1) ||
-                           request_path.begins_with(compact_prefix));
-        if (is_compact) {
-            if (is_admin) {
-                StringData virt_path = request_path.substr(compact_prefix.size() - 1);
-                logger.detail("Request for /api/compact");        // Throws
-                m_server.initiate_compact_realm(m_id, virt_path); // Throws
-                return;
-            }
-            handle_text_response(HTTPStatus::Forbidden, "must be admin"); // Throws
-            return;
-        }
-
-        StringData api_realm_prefix = "/api/realm/";
-        if (request_path.begins_with(api_realm_prefix)) {
-            std::string realm_path = request_path.substr(api_realm_prefix.size() - 1);
-
-            if (!is_admin && access_token->path != realm_path) {
-                handle_text_response(HTTPStatus::Forbidden,
-                                     "no rights to access the realm"); // Throws
-                return;
-            }
-
-            // Realm deletion
-            if (request.method == HTTPMethod::Delete) {
-                if (!get_server().get_access_control().can(*access_token, Privilege::DeleteRealm, realm_path)) {
-                    handle_text_response(HTTPStatus::Forbidden,
-                                         "access token has no delete rights"); // Throws
-                    return;
-                }
-                const std::set<std::string>& realm_names = m_server.get_realm_names();
-                if (realm_names.find(realm_path) != realm_names.end()) {
-                    util::bind_ptr<ServerFile> file = m_server.get_or_create_file(realm_path);
-                    file->initiate_deletion(m_id); // Throws
-                    return;
-                }
-                handle_text_response(HTTPStatus::NotFound, "Realm not found"); // Throws
-                return;
-            }
-            handle_text_response(HTTPStatus::MethodNotAllowed, "Unsupported"); // Throws
-            return;
-        }
-
-        handle_404_not_found(request); // Throws
     }
 
     void handle_400_bad_request(std::string_view body)
@@ -2457,19 +2286,6 @@ public:
 
         m_server_file = server.get_or_create_file(path); // Throws
 
-        {
-            bool realm_deletion_is_ongoing = false;
-            if (m_server_file->realm_deletion_is_ongoing()) {
-                logger.debug("BIND message received for Realm that is being deleted"); // Throws
-                realm_deletion_is_ongoing = true;
-            }
-
-            if (realm_deletion_is_ongoing) {
-                error = ProtocolError::server_file_deleted;
-                return false;
-            }
-        }
-
         m_server_file->add_unidentified_session(this); // Throws
 
         logger.info("Client info: (path='%1', from=%2, protocol=%3) %4", path, m_connection.get_remote_endpoint(),
@@ -2505,7 +2321,6 @@ public:
         REALM_ASSERT(!unbind_message_received());
         REALM_ASSERT(!error_occurred());
         REALM_ASSERT(!m_error_message_sent);
-        REALM_ASSERT(!m_server_file->realm_deletion_is_ongoing());
 
         logger.debug("Received: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
                      "scan_server_version=%3, scan_client_version=%4, latest_server_version=%5, "
@@ -3573,11 +3388,6 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
     wlogger.debug("Work unit execution started"); // Throws
 
     if (work.has_primary_work) {
-        if (REALM_UNLIKELY(work.request_deletion)) {
-            m_worker_file.proper_close(); // Throws
-            goto done;
-        }
-
         if (REALM_UNLIKELY(!m_work.file_ident_alloc_slots.empty()))
             worker_allocate_file_identifiers(); // Throws
 
@@ -3585,13 +3395,6 @@ void ServerFile::worker_process_work_unit(WorkerState& state)
             worker_integrate_changes_from_downstream(state); // Throws
     }
 
-    // Compaction
-    if (REALM_UNLIKELY(work.group_has_compaction_requests)) {
-        if (work.request_compaction)
-            m_worker_file.proper_close(); // Throws
-    }
-
-done:
     wlogger.debug("Work unit execution completed"); // Throws
 
     milliseconds_type time = steady_duration(start_time);
@@ -3643,21 +3446,11 @@ void ServerFile::group_unblock_work()
     if (REALM_LIKELY(!m_server.is_sync_stopped())) {
         unblock_work(); // Throws
         const Work& work = m_work;
-        bool pass_to_worker = (work.has_primary_work || work.group_has_compaction_requests);
-        bool work_was_unblocked = pass_to_worker;
-        if (REALM_LIKELY(work_was_unblocked)) {
+        if (REALM_LIKELY(work.has_primary_work)) {
             logger.trace("Work unit unblocked"); // Throws
             m_has_work_in_progress = true;
-            if (pass_to_worker) {
-                Worker& worker = m_server.get_worker();
-                worker.enqueue(this); // Throws
-            }
-            else {
-                // Note: Suicide is not possible here, because if
-                // `m_work.request_deletion` was true, `m_work.has_primary_work`
-                // would have become true too.
-                group_postprocess_stage_1(); // Throws
-            }
+            Worker& worker = m_server.get_worker();
+            worker.enqueue(this); // Throws
         }
     }
 }
@@ -3668,15 +3461,6 @@ void ServerFile::unblock_work()
     REALM_ASSERT(m_has_blocked_work);
 
     m_work.reset();
-
-    if (REALM_UNLIKELY(m_request_deletion)) {
-        // When deletion is requested, take care to not unblock any other type
-        // of work.
-        m_work.has_primary_work = true;
-        m_work.request_deletion = true;
-        m_work.group_has_deletion_requests = true;
-        return;
-    }
 
     // Discard requests for file identifiers whose receiver is no longer
     // waiting.
@@ -3721,12 +3505,6 @@ void ServerFile::unblock_work()
     m_unblocked_changesets_from_downstream_byte_size = m_blocked_changesets_from_downstream_byte_size;
     m_blocked_changesets_from_downstream_byte_size = 0;
 
-    if (REALM_UNLIKELY(m_request_compaction)) {
-        m_request_compaction = false;
-        m_work.request_compaction = true;
-        m_work.group_has_compaction_requests = true;
-    }
-
     m_num_changesets_from_downstream = 0;
     m_has_blocked_work = false;
 }
@@ -3756,28 +3534,6 @@ void ServerFile::recognize_external_change()
     if (m_version_info.sync_version.version > prev_version_info.sync_version.version) {
         REALM_ASSERT(m_version_info.realm_version > prev_version_info.realm_version);
         resume_download();
-    }
-}
-
-
-void ServerFile::initiate_compaction()
-{
-    REALM_ASSERT(!m_request_compaction);
-    m_request_compaction = true;
-    on_work_added(); // Throws
-}
-
-
-void ServerFile::initiate_deletion(std::int_fast64_t conn_id)
-{
-    // Note: Actual deletion takes place in
-    // perform_file_deletion_after_state_realm_deletion(), which is also where
-    // the HTTP response is sent from.
-
-    m_deleting_connections.push_back(conn_id); // Throws
-    if (!m_request_deletion) {
-        m_request_deletion = true;
-        on_work_added(); // Throws
     }
 }
 
@@ -3834,10 +3590,6 @@ ServerHistory& ServerFile::get_client_file_history(WorkerState& state, std::uniq
 
 
 // When worker thread finishes work unit.
-//
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
 void ServerFile::group_postprocess_stage_1()
 {
     REALM_ASSERT(m_has_work_in_progress);
@@ -3845,13 +3597,9 @@ void ServerFile::group_postprocess_stage_1()
     group_finalize_work_stage_1(); // Throws
     group_finalize_work_stage_2(); // Throws
     group_postprocess_stage_2();   // Throws
-    // Suicide may have happened at this point
 }
 
 
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
 void ServerFile::group_postprocess_stage_2()
 {
     REALM_ASSERT(m_has_work_in_progress);
@@ -3861,22 +3609,9 @@ void ServerFile::group_postprocess_stage_2()
 
 
 // When all files, including the reference file, have been backed up.
-//
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
 void ServerFile::group_postprocess_stage_3()
 {
     REALM_ASSERT(m_has_work_in_progress);
-
-    Work& work = m_work;
-    if (REALM_UNLIKELY(work.group_has_deletion_requests)) {
-        if (group_perform_file_deletions()) { // Throws
-            // Suicide may have happened at this point
-            return;
-        }
-    }
-
     m_has_work_in_progress = false;
 
     logger.trace("Work unit postprocessing complete"); // Throws
@@ -3893,26 +3628,6 @@ void ServerFile::finalize_work_stage_1()
         get_server().dec_byte_size_for_pending_downstream_changesets(byte_size); // Throws
         m_unblocked_changesets_from_downstream_byte_size = 0;
     }
-
-    // Compaction
-    //
-    // FIXME: This ought to happen on the worker thread, but this is currently
-    // impossible, because compaction requires that the file is not open through
-    // any SharedGroup object other that the one used for the purpose of
-    // compaction, and it would be problematic to prevent the network event loop
-    // thread from opening the file while compaction was running on the worker
-    // thread.
-    if (REALM_UNLIKELY(m_work.request_compaction)) {
-        if (REALM_LIKELY(!m_work.request_deletion)) {
-            // `m_worker_file` must have been closed by the worker thread at this
-            // point.
-            perform_compaction(); // Throws
-        }
-        m_server.dec_num_outstanding_compaction_processes(); // Throws
-    }
-
-    if (REALM_UNLIKELY(m_work.request_deletion))
-        return;
 
     // Deal with errors (bad changesets) pertaining to downstream clients
     std::size_t num_changesets_removed = 0;
@@ -3970,9 +3685,6 @@ void ServerFile::finalize_work_stage_1()
 
 void ServerFile::finalize_work_stage_2()
 {
-    if (REALM_UNLIKELY(m_work.request_deletion))
-        return;
-
     // Expose new snapshot to remote peers
     REALM_ASSERT(m_work.produced_new_realm_version || m_work.version_info.realm_version == 0);
     if (m_work.version_info.realm_version > m_version_info.realm_version) {
@@ -4004,153 +3716,6 @@ void ServerFile::finalize_work_stage_2()
     }
 }
 
-
-void ServerFile::perform_compaction()
-{
-    REALM_ASSERT(m_work.request_compaction);
-
-    m_file.proper_close(); // Throws
-
-    using _impl::Vacuum;
-    Vacuum::Options options;
-    options.history_type = Replication::hist_SyncServer;
-    // NOTE: The backup mechanism requires that the snapshot number is
-    // incremented whenever the Realm file changes at all.
-    options.bump_realm_version = true;
-    options.encryption_key = m_server.get_config().encryption_key;
-    Vacuum vacuum{logger, std::move(options)};
-
-    logger.detail("Starting compaction");
-
-    const std::string& real_path = get_real_path();
-    Vacuum::Results res = vacuum.vacuum(real_path);
-
-    logger.detail("Compaction completed: before_size = %1, after_size = %2, time = %3 ms", res.before_size,
-                  res.after_size, res.time.count() / 1000);
-
-    const ServerHistory& history = access().history;       // Throws
-    bool has_upstream_status;                              // Dummy
-    sync::file_ident_type partial_file_ident;              // Dummy
-    sync::version_type partial_progress_reference_version; // Dummy
-    history.get_status(m_work.version_info, has_upstream_status, partial_file_ident,
-                       partial_progress_reference_version); // Throws
-    m_work.produced_new_realm_version = true;
-}
-
-
-// Returns true iff `m_work.request_deletion` was true, i.e., iff
-// the file was deleted.
-//
-// May commit suicide due to file deletion, but only if
-// `m_work.request_deletion` is true and the caller does not hold a counted
-// reference.
-bool ServerFile::group_perform_file_deletions()
-{
-
-    REALM_ASSERT(m_work.group_has_deletion_requests);
-
-    if (m_work.request_deletion) {
-        perform_file_deletion(); // Throws
-        // Suicide may have happened at this point
-        return true;
-    }
-
-    return false;
-}
-
-void ServerFile::perform_file_deletion()
-{
-    if (m_realm_deletion_is_ongoing)
-        return;
-    m_realm_deletion_is_ongoing = true;
-
-    // The use of ProtocolError::bad_server_file_ident here (when protocol
-    // version < 26) was due to a temporary hack of using an otherwise obsolete
-    // error code to ensure that the client reset process was properly triggered
-    // on the client side when the server-side file is deleted.
-    while (!m_unidentified_sessions.empty()) {
-        Session* sess = *m_unidentified_sessions.begin();
-        SyncConnection& conn = sess->get_connection();
-        ProtocolError error = ProtocolError::server_file_deleted;
-        // Calling protocol_error() is guaranteed to detatch the session object
-        // from this ServerFile object, and therefore remove it from
-        // m_unidentified_sessions.
-        conn.protocol_error(error, sess);
-        REALM_ASSERT(m_unidentified_sessions.count(sess) == 0);
-    }
-    while (!m_identified_sessions.empty()) {
-        const auto& entry = *m_identified_sessions.begin();
-        Session* sess = entry.second;
-        SyncConnection& conn = sess->get_connection();
-        ProtocolError error = ProtocolError::server_file_deleted;
-        // Calling protocol_error() is guaranteed to detatch the session object
-        // from this ServerFile object, and therefore remove it from
-        // m_identified_sessions.
-        conn.protocol_error(error, sess);
-        REALM_ASSERT(m_identified_sessions.count(sess->get_client_file_ident()) == 0);
-    }
-
-    m_file.proper_close(); // Throws
-
-    perform_file_deletion_after_state_realm_deletion();
-}
-
-// May commit suicide, but not if the caller holds a counted reference.
-void ServerFile::perform_file_deletion_after_state_realm_deletion()
-{
-    REALM_ASSERT(m_realm_deletion_is_ongoing);
-
-    // Remove the Realm file and its associates
-    bool delete_lockfile = true;
-    DB::delete_files(m_file.realm_path, nullptr, delete_lockfile); // Throws
-    logger.info("Realm file deleted");                             // Throws
-
-    // Remove the directories that would otherwise be left empty
-    {
-        std::string vpath = m_file.virt_path;  // Throws (copy)
-        std::string rpath = m_file.realm_path; // Throws (copy)
-        REALM_ASSERT(!vpath.empty() && vpath.front() == '/');
-        for (;;) {
-            std::size_t i = vpath.rfind('/');
-            if (i == 0)
-                break;
-            bool nonempty_dir = false;
-            StringData vpath_prefix{&vpath.front(), i + 1};
-            for (const std::string& x : m_server.get_realm_names()) {
-                if (REALM_UNLIKELY(StringData{x}.begins_with(vpath_prefix) && x != m_file.virt_path)) {
-                    nonempty_dir = true;
-                    break;
-                }
-            }
-            if (nonempty_dir)
-                break;
-            rpath = util::parent_dir(rpath); // Throws
-            REALM_ASSERT(!rpath.empty());
-            if (!util::try_remove_dir(rpath)) // Throws
-                break;
-            vpath = vpath.erase(i);
-            m_server.logger.detail("Realm directory '%1' deleted", vpath); // Throws
-        }
-    }
-
-    {
-        std::vector<std::int_fast64_t> connections;
-        using std::swap;
-        swap(connections, m_deleting_connections);
-        for (std::int_fast64_t conn_id : connections) {
-            if (HTTPConnection* conn = m_server.get_http_connection(conn_id))
-                conn->respond_200_ok(); // Throws
-        }
-    }
-
-    if (m_request_compaction)
-        m_server.dec_num_outstanding_compaction_processes(); // Throws
-
-    std::string virt_path = get_virt_path(); // Throws (copy)
-    m_server.remove_file(virt_path);         // Throws
-    // Suicide may have happened at this point
-}
-
 auto ServerFile::get_last_client_accesses() -> LastClientAccessesRange
 {
     m_last_client_accesses_buffer.clear();
@@ -4170,11 +3735,6 @@ auto ServerFile::get_last_client_accesses() -> LastClientAccessesRange
 version_type ServerFile::get_max_compactable_server_version()
 {
     return std::numeric_limits<version_type>::max();
-}
-
-bool ServerFile::realm_deletion_is_ongoing() const
-{
-    return m_realm_deletion_is_ongoing;
 }
 
 
@@ -4329,8 +3889,7 @@ void ServerImpl::start()
     {
         const char* lead_text = "Encryption";
         if (m_config.encryption_key) {
-            std::string fingerprint = encrypt::calculate_fingerprint(m_config.encryption_key); // Throws
-            logger.info("%1: Yes (fingerprint = %2)", lead_text, fingerprint);                 // Throws
+            logger.info("%1: Yes", lead_text); // Throws
         }
         else {
             logger.info("%1: No", lead_text); // Throws
@@ -4442,16 +4001,6 @@ void ServerImpl::stop() noexcept
     m_stopped = true;
     m_wait_or_service_stopped_cond.notify_all();
     m_service.stop();
-}
-
-
-void ServerImpl::dec_num_outstanding_compaction_processes()
-{
-    REALM_ASSERT(m_num_outstanding_compaction_processes > 0);
-    if (REALM_LIKELY(--m_num_outstanding_compaction_processes > 0))
-        return;
-    if (HTTPConnection* conn = get_http_connection(m_compacting_connection))
-        conn->respond_200_ok(); // Throws
 }
 
 
@@ -4614,15 +4163,6 @@ void ServerImpl::handle_accept(std::error_code ec)
 }
 
 
-HTTPConnection* ServerImpl::get_http_connection(std::int_fast64_t conn_id) noexcept
-{
-    auto i = m_http_connections.find(conn_id);
-    if (i == m_http_connections.end())
-        return nullptr;
-    return i->second.get();
-}
-
-
 void ServerImpl::remove_http_connection(std::int_fast64_t conn_id) noexcept
 {
     m_http_connections.erase(conn_id);
@@ -4638,13 +4178,6 @@ void ServerImpl::add_sync_connection(int_fast64_t connection_id, std::unique_ptr
 void ServerImpl::remove_sync_connection(int_fast64_t connection_id)
 {
     m_sync_connections.erase(connection_id);
-}
-
-
-void ServerImpl::remove_file(const std::string& virt_path)
-{
-    m_files.erase(virt_path);
-    m_realm_names.erase(virt_path);
 }
 
 
@@ -4744,39 +4277,6 @@ void ServerImpl::do_close_connections()
         SyncConnection& conn = *entry.second;
         conn.initiate_soft_close(); // Throws
     }
-}
-
-
-void ServerImpl::initiate_compact_realm(std::int_fast64_t conn_id, StringData virt_path)
-{
-    if (m_num_outstanding_compaction_processes == 0) {
-        m_compacting_connection = conn_id;
-        if (virt_path.size() > 0) {
-            auto i = m_realm_names.find(virt_path);
-            if (i != m_realm_names.end()) {
-                logger.detail("Scheduling compaction of '%1'", virt_path); // Throws
-                inc_num_outstanding_compaction_processes();
-                util::bind_ptr<ServerFile> file = get_or_create_file(virt_path); // Throws
-                file->initiate_compaction();                                     // Throws
-                return;
-            }
-            if (HTTPConnection* conn = get_http_connection(conn_id))
-                conn->respond_404_not_found(); // Throws
-            return;
-        }
-        logger.detail("Scheduling compaction of all %1 Realm files",
-                      m_realm_names.size()); // Throws
-        inc_num_outstanding_compaction_processes();
-        for (const std::string& virt_path : m_realm_names) {
-            inc_num_outstanding_compaction_processes();
-            util::bind_ptr<ServerFile> file = get_or_create_file(virt_path); // Throws
-            file->initiate_compaction();                                     // Throws
-        }
-        dec_num_outstanding_compaction_processes(); // Throws
-        return;
-    }
-    if (HTTPConnection* conn = get_http_connection(conn_id))
-        conn->respond_503_service_unavailable(); // Throws
 }
 
 
