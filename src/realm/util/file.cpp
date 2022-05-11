@@ -220,6 +220,29 @@ void make_dir(const std::string& path)
 }
 
 
+void make_dir_recursive(std::string path)
+{
+    // Skip the first separator as we're assuming an absolute path
+    size_t pos = path.find_first_of("/\\");
+    if (pos == std::string::npos)
+        return;
+    pos += 1;
+
+    while (pos < path.size()) {
+        auto sep = path.find_first_of("/\\", pos);
+        char c = 0;
+        if (sep < path.size()) {
+            c = path[sep];
+            path[sep] = 0;
+        }
+        try_make_dir(path);
+        if (sep < path.size())
+            path[sep] = c;
+        pos = sep + 1;
+    }
+}
+
+
 void remove_dir(const std::string& path)
 {
     if (try_remove_dir(path)) // Throws

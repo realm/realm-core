@@ -110,24 +110,6 @@ realm::Schema make_schema()
                     {c_sync_app_metadata_ws_hostname, PropertyType::String}}}};
 }
 
-class DummyScheduler : public realm::util::Scheduler {
-public:
-    bool is_on_thread() const noexcept override
-    {
-        return true;
-    }
-    bool is_same_as(const Scheduler* other) const noexcept override
-    {
-        auto o = dynamic_cast<const DummyScheduler*>(other);
-        return (o != nullptr);
-    }
-    bool can_invoke() const noexcept override
-    {
-        return false;
-    }
-    void invoke(realm::util::UniqueFunction<void()>&&) override {}
-};
-
 } // anonymous namespace
 
 namespace realm {
@@ -139,17 +121,15 @@ SyncMetadataManager::SyncMetadataManager(std::string path, bool should_encrypt,
 {
     constexpr uint64_t SCHEMA_VERSION = 6;
 
-#if !REALM_PLATFORM_APPLE
-    if (should_encrypt && !encryption_key)
+    if (!REALM_PLATFORM_APPLE && should_encrypt && !encryption_key)
         throw std::invalid_argument("Metadata Realm encryption was specified, but no encryption key was provided.");
-#endif
 
     m_metadata_config.automatic_change_notifications = false;
     m_metadata_config.path = path;
     m_metadata_config.schema = make_schema();
     m_metadata_config.schema_version = SCHEMA_VERSION;
     m_metadata_config.schema_mode = SchemaMode::Automatic;
-    m_metadata_config.scheduler = std::make_shared<DummyScheduler>();
+    m_metadata_config.scheduler = util::Scheduler::make_dummy();
     if (encryption_key)
         m_metadata_config.encryption_key = std::move(*encryption_key);
 

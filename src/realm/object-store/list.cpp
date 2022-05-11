@@ -68,11 +68,22 @@ T List::get(size_t row_ndx) const
 }
 
 template <>
+Mixed List::get(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    auto value = as<Mixed>().get(row_ndx);
+    record_audit_read(value);
+    return value;
+}
+
+template <>
 Obj List::get(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     auto& list = as<Obj>();
-    return list.get_target_table()->get_object(list.get(row_ndx));
+    auto obj = list.get_target_table()->get_object(list.get(row_ndx));
+    record_audit_read(obj);
+    return obj;
 }
 
 template <typename T>
@@ -189,7 +200,9 @@ void List::set_any(size_t row_ndx, Mixed value)
 Mixed List::get_any(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
-    return list_base().get_any(row_ndx);
+    auto value = list_base().get_any(row_ndx);
+    record_audit_read(value);
+    return value;
 }
 
 size_t List::find_any(Mixed value) const
@@ -282,31 +295,18 @@ Results List::filter(Query q) const
     return Results(m_realm, std::dynamic_pointer_cast<LnkLst>(m_coll_base), get_query().and_query(std::move(q)));
 }
 
-// The simpler definition of void_t below does not work in gcc 4.9 due to a bug
-// in that version of gcc (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64395)
-
-// template<class...> using VoidT = void;
-namespace _impl {
-template <class...>
-struct MakeVoid {
-    using type = void;
-};
-} // namespace _impl
-template <class... T>
-using VoidT = typename _impl::MakeVoid<T...>::type;
-
-template <class, class = VoidT<>>
+template <class, class = void>
 struct HasMinmaxType : std::false_type {
 };
 template <class T>
-struct HasMinmaxType<T, VoidT<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type {
+struct HasMinmaxType<T, std::void_t<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type {
 };
 
-template <class, class = VoidT<>>
+template <class, class = void>
 struct HasSumType : std::false_type {
 };
 template <class T>
-struct HasSumType<T, VoidT<typename ColumnTypeTraits<T>::sum_type>> : std::true_type {
+struct HasSumType<T, std::void_t<typename ColumnTypeTraits<T>::sum_type>> : std::true_type {
 };
 
 template <bool cond>
@@ -414,13 +414,17 @@ REALM_PRIMITIVE_LIST_TYPE(ObjKey)
 REALM_PRIMITIVE_LIST_TYPE(ObjectId)
 REALM_PRIMITIVE_LIST_TYPE(Decimal)
 REALM_PRIMITIVE_LIST_TYPE(UUID)
-REALM_PRIMITIVE_LIST_TYPE(Mixed)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<ObjectId>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<UUID>)
+
+template size_t List::find<Mixed>(Mixed const&) const;
+template void List::add<Mixed>(Mixed);
+template void List::insert<Mixed>(size_t, Mixed);
+template void List::set<Mixed>(size_t, Mixed);
 
 #undef REALM_PRIMITIVE_LIST_TYPE
 } // namespace realm

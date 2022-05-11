@@ -103,6 +103,11 @@ public:
     /// notifications and does not perform any thread checking.
     static std::shared_ptr<Scheduler> make_frozen(VersionID version);
 
+    /// Create a dummy scheduler which does not support any scheduler
+    /// functionality. This should be used only for Realms opened internally
+    /// and not exposed in SDKs.
+    static std::shared_ptr<Scheduler> make_dummy();
+
 #if REALM_PLATFORM_APPLE
     /// Create a scheduler which is bound to the given run loop. Pass NULL to
     /// get a scheduler for the current thread's run loop.

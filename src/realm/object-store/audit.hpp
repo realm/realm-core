@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2018 Realm Inc.
+// Copyright 2022 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,20 +16,109 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#ifndef REALM_AUDIT_HPP
+#define REALM_AUDIT_HPP
+
+#include <realm/util/functional.hpp>
+#include <realm/util/optional.hpp>
+#include <realm/util/terminate.hpp>
+
+#include <memory>
+#include <string>
+#include <vector>
+
 namespace realm {
-class Table;
+class DB;
+class AuditObjectSerializer;
+class Obj;
+class SyncUser;
 class TableView;
-template <typename>
-class BasicRowExpr;
-using RowExpr = BasicRowExpr<Table>;
+class Timestamp;
+struct ColKey;
+struct RealmConfig;
+struct SyncError;
 struct VersionID;
+namespace util {
+class Logger;
+}
+
+struct AuditConfig {
+    // User to open the audit Realms with. If null, the user used to open the
+    // Realm being audited is used
+    std::shared_ptr<SyncUser> audit_user;
+    // Prefix added to the start of generated partition keys for audit Realms.
+    std::string partition_value_prefix = "audit";
+    // Object serializer instance for converting objects to JSON payloads. If
+    // null, a default implementation is used.
+    std::shared_ptr<AuditObjectSerializer> serializer;
+    // Logger for audit events. If null, the sync logger from the Realm under
+    // audit is used.
+    std::shared_ptr<util::Logger> logger;
+    // Error handler which is called if fatal sync errors occur on the sync
+    // Realm. If null, an error is logged then abort() is called.
+    std::function<void(SyncError)> sync_error_handler;
+    // Metadata to attach to each audit event. Each key used must be a property
+    // in the server-side schema for AuditEvent. This is not validated and will
+    // result in a sync error if violated.
+    std::vector<std::pair<std::string, std::string>> metadata;
+};
 
 class AuditInterface {
 public:
-    virtual ~AuditInterface() {}
+    virtual ~AuditInterface() = default;
 
-    virtual void record_query(realm::VersionID, realm::TableView const&) = 0;
-    virtual void record_read(realm::VersionID, realm::RowExpr) = 0;
-    virtual void record_write(realm::VersionID, realm::VersionID) = 0;
+    // Internal interface for recording auditable events. SDKs may need to call
+    // record_read() if they do not go through Object; record_query() and
+    // record_write() should be handled automatically
+    virtual void record_query(VersionID, const TableView&) = 0;
+    virtual void record_read(VersionID, const Obj& obj, const Obj& parent, ColKey col) = 0;
+    virtual void record_write(VersionID old_version, VersionID new_version) = 0;
+
+    // -- Audit functionality which should be exposed in the SDK
+
+    // Update the metadata attached to subsequence audit events. Does not effect
+    // the current audit scope if called while a scope is active.
+    virtual void update_metadata(std::vector<std::pair<std::string, std::string>> new_metadata) = 0;
+
+    // Begin an audit scope. The given `name` is stored in the activity field
+    // of each generated event.
+    virtual void begin_scope(std::string_view name) = 0;
+    // End the current scope and asynchronously save it to disk. The optional
+    // completion function is called once it has been committed (or an error
+    // ocurred while trying to do so).
+    virtual void end_scope(util::UniqueFunction<void(std::exception_ptr)>&& completion = nullptr) = 0;
+    // Record a custom audit event. Does not use the scope (and does not need to be inside a scope).
+    virtual void record_event(std::string_view activity, util::Optional<std::string> event_type,
+                              util::Optional<std::string> data,
+                              util::UniqueFunction<void(std::exception_ptr)>&& completion) = 0;
+
+    // -- Test helper functionality
+
+    // Wait for all scopes to be written to disk. Does not wait for them to be
+    // uploaded to the server.
+    virtual void wait_for_completion() = 0;
+    // Wait for there to be no more data to upload. This is not a precise check;
+    // if more scopes are created while this is waiting they may or may not be
+    // included in the wait.
+    virtual void wait_for_uploads() = 0;
 };
+
+std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB>, RealmConfig const& parent_config);
+
+// Hooks for testing. Do not use outside of tests.
+namespace audit_test_hooks {
+void set_maximum_shard_size(int64_t max_size);
+// Not thread-safe, so this must be called at a point when no audit contexts exist.
+void set_clock(util::UniqueFunction<Timestamp()>&&);
+} // namespace audit_test_hooks
+
+#if !REALM_PLATFORM_APPLE
+inline std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB>, RealmConfig const&)
+{
+    REALM_TERMINATE("Audit not supported on this platform");
+}
+#endif
+
 } // namespace realm
+
+#endif // REALM_AUDIT_HPP

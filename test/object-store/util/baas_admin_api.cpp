@@ -69,48 +69,43 @@ class BaasRuleBuilder {
 public:
     using IncludePropCond = util::UniqueFunction<bool(const Property&)>;
     BaasRuleBuilder(const Schema& schema, const Property& partition_key, const std::string& service_name,
-                    const std::string& db_name, IncludePropCond include_prop)
+                    const std::string& db_name)
         : m_schema(schema)
         , m_partition_key(partition_key)
         , m_mongo_service_name(service_name)
         , m_mongo_db_name(db_name)
-        , m_include_prop(std::move(include_prop))
     {
     }
 
-    nlohmann::json property_to_jsonschema(const Property& prop);
-    nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema, bool clear_path = false);
-    nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema);
+    nlohmann::json property_to_jsonschema(const Property& prop, const IncludePropCond& include_prop);
+    nlohmann::json object_schema_to_jsonschema(const ObjectSchema& obj_schema, const IncludePropCond& include_prop,
+                                               bool clear_path = false);
+    nlohmann::json object_schema_to_baas_schema(const ObjectSchema& obj_schema, IncludePropCond include_prop);
 
-    static nlohmann::json generic_baas_rule(const std::string& db_name, const std::string& schema_name);
+    nlohmann::json generic_baas_rule(const std::string& schema_name);
 
 private:
     const Schema& m_schema;
     const Property& m_partition_key;
     const std::string& m_mongo_service_name;
     const std::string& m_mongo_db_name;
-    util::UniqueFunction<bool(const Property&)> m_include_prop;
     nlohmann::json m_relationships;
     std::vector<std::string> m_current_path;
 };
 
-
-static const auto include_all_props = [](const Property&) -> bool {
-    return true;
-};
-
-nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& obj_schema, bool clear_path)
+nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& obj_schema,
+                                                            const IncludePropCond& include_prop, bool clear_path)
 {
     nlohmann::json required = nlohmann::json::array();
     nlohmann::json properties;
     for (const auto& prop : obj_schema.persisted_properties) {
-        if (!m_include_prop(prop)) {
+        if (include_prop && !include_prop(prop)) {
             continue;
         }
         if (clear_path) {
             m_current_path.clear();
         }
-        properties.emplace(prop.name, property_to_jsonschema(prop));
+        properties.emplace(prop.name, property_to_jsonschema(prop, include_prop));
         if (!is_nullable(prop.type) && !is_collection(prop.type)) {
             required.push_back(prop.name);
         }
@@ -122,7 +117,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
     };
 }
 
-nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
+nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, const IncludePropCond& include_prop)
 {
     nlohmann::json type_output;
 
@@ -136,7 +131,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
                 m_current_path.push_back("[]");
             }
 
-            type_output = object_schema_to_jsonschema(*target_obj);
+            type_output = object_schema_to_jsonschema(*target_obj, include_prop);
             type_output.emplace("bsonType", "object");
         }
         else {
@@ -176,13 +171,16 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop)
     return type_output;
 }
 
-nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema& obj_schema)
+nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema& obj_schema,
+                                                             IncludePropCond include_prop)
 {
-    auto schema_json = object_schema_to_jsonschema(obj_schema, true);
+    m_relationships.clear();
+
+    auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
     schema_json.emplace("title", obj_schema.name);
     auto& prop_sub_obj = schema_json["properties"];
-    if (m_include_prop(m_partition_key) && prop_sub_obj.find(m_partition_key.name) == prop_sub_obj.end()) {
-        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key));
+    if (!prop_sub_obj.contains(m_partition_key.name)) {
+        prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));
         if (!is_nullable(m_partition_key.type)) {
             schema_json["required"].push_back(m_partition_key.name);
         }
@@ -197,10 +195,10 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
     };
 }
 
-nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& db_name, const std::string& schema_name)
+nlohmann::json BaasRuleBuilder::generic_baas_rule(const std::string& schema_name)
 {
     return {
-        {"database", db_name},
+        {"database", m_mongo_db_name},
         {"collection", schema_name},
         {"roles", nlohmann::json::array({{{"name", "default"},
                                           {"apply_when", nlohmann::json::object()},
@@ -727,14 +725,14 @@ AppCreateConfig default_app_config(const std::string& base_url)
                            db_name,
                            std::move(default_schema),
                            std::move(partition_key),
-                           true,
+                           true,       // dev_mode_enabled
                            util::none, // Default to no FLX sync config
                            std::move(funcs),
                            std::move(user_pass_config),
                            std::string{"authFunc"},
-                           true,
-                           true,
-                           true};
+                           true,  // enable_api_key_auth
+                           true,  // enable_anonymous_auth
+                           true}; // enable_custom_token_auth
 }
 
 AppCreateConfig minimal_app_config(const std::string& base_url, const std::string& name, const Schema& schema)
@@ -902,36 +900,31 @@ AppSession create_app(const AppCreateConfig& config)
     auto rules = services[mongo_service_id]["rules"];
     auto schemas = app["schemas"];
 
-    std::unordered_map<std::string, std::string> obj_schema_name_to_id;
+    auto pk_only = [&](const Property& prop) {
+        return prop.name == "_id" || prop.name == config.partition_key.name;
+    };
+
+    // Create the rules in two passes: first populate just the primary key and
+    // parition key, then add the rest of the properties. This ensures that the
+    // targest of links exist before adding the links.
+    std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
+    BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname);
     for (const auto& obj_schema : config.schema) {
         if (auto pk_prop = obj_schema.primary_key_property(); pk_prop == nullptr || pk_prop->name != "_id") {
             continue;
         }
 
-        BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
-                                     [&](const Property& prop) {
-                                         return prop.name == "_id" || prop.name == config.partition_key.name;
-                                     });
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_only);
         auto schema_create_resp = schemas.post_json(schema_to_create);
-        obj_schema_name_to_id.insert({obj_schema.name, schema_create_resp["_id"]});
+        object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
 
-        schema_to_create = BaasRuleBuilder::generic_baas_rule(config.mongo_dbname, obj_schema.name);
-        auto rule_create_resp = rules.post_json(schema_to_create);
+        rules.post_json(rule_builder.generic_baas_rule(obj_schema.name));
     }
 
-    for (const auto& obj_schema : config.schema) {
-        if (auto pk_prop = obj_schema.primary_key_property(); pk_prop == nullptr || pk_prop->name != "_id") {
-            continue;
-        }
-
-        auto schema_id = obj_schema_name_to_id.find(obj_schema.name);
-        REALM_ASSERT(schema_id != obj_schema_name_to_id.end());
-        BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname,
-                                     include_all_props);
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema);
-        schema_to_create["_id"] = schema_id->second;
-        schemas[schema_id->second].put_json(schema_to_create);
+    for (const auto& [id, obj_schema] : object_schema_to_create) {
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(*obj_schema, nullptr);
+        schema_to_create["_id"] = id;
+        schemas[id].put_json(schema_to_create);
     }
 
     // For PBS, enable sync after schema is created.

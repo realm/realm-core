@@ -429,33 +429,36 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                 changesets[i].last_integrated_remote_version = m_sync_history_base_version;
         }
 
-        Transformer& transformer = get_transformer(); // Throws
-        Transformer::Reporter* reporter = nullptr;
-        transformer.transform_remote_changesets(*this, transact->get_sync_file_id(), local_version, changesets.data(),
-                                                changesets.size(), reporter, &logger); // Throws
+        if (m_replication.apply_server_changes()) {
+            Transformer& transformer = get_transformer(); // Throws
+            Transformer::Reporter* reporter = nullptr;
+            transformer.transform_remote_changesets(*this, transact->get_sync_file_id(), local_version,
+                                                    changesets.data(), changesets.size(), reporter,
+                                                    &logger); // Throws
 
-        for (std::size_t i = 0; i < num_changesets; ++i) {
-            ChangesetEncoder::Buffer transformed_changeset;
-            encode_changeset(changesets[i], transformed_changeset);
+            for (std::size_t i = 0; i < num_changesets; ++i) {
+                ChangesetEncoder::Buffer transformed_changeset;
+                encode_changeset(changesets[i], transformed_changeset);
 
-            InstructionApplier applier{*transact};
-            {
-                TempShortCircuitReplication tscr{*m_replication};
-                applier.apply(changesets[i], &logger); // Throws
+                InstructionApplier applier{*transact};
+                {
+                    TempShortCircuitReplication tscr{m_replication};
+                    applier.apply(changesets[i], &logger); // Throws
+                }
+
+                // The need to produce a combined changeset is unfortunate from a
+                // memory pressure/allocation cost point of view. It is believed
+                // that the history (list of applied changesets) will be moved into
+                // the main Realm file eventually, and that would probably eliminate
+                // this problem.
+                std::size_t size_1 = assembled_transformed_changeset.size();
+                std::size_t size_2 = size_1;
+                if (util::int_add_with_overflow_detect(size_2, transformed_changeset.size()))
+                    throw util::overflow_error{"Changeset size overflow"};
+                assembled_transformed_changeset.resize(size_2); // Throws
+                std::copy(transformed_changeset.data(), transformed_changeset.data() + transformed_changeset.size(),
+                          assembled_transformed_changeset.data() + size_1);
             }
-
-            // The need to produce a combined changeset is unfortunate from a
-            // memory pressure/allocation cost point of view. It is believed
-            // that the history (list of applied changesets) will be moved into
-            // the main Realm file eventually, and that would probably eliminate
-            // this problem.
-            std::size_t size_1 = assembled_transformed_changeset.size();
-            std::size_t size_2 = size_1;
-            if (util::int_add_with_overflow_detect(size_2, transformed_changeset.size()))
-                throw util::overflow_error{"Changeset size overflow"};
-            assembled_transformed_changeset.resize(size_2); // Throws
-            std::copy(transformed_changeset.data(), transformed_changeset.data() + transformed_changeset.size(),
-                      assembled_transformed_changeset.data() + size_1);
         }
     }
     catch (BadChangesetError& e) {
