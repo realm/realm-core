@@ -93,6 +93,12 @@ typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_MANUAL,
 } realm_schema_mode_e;
 
+typedef enum realm_update_mode {
+    RLM_UPDATE_MODE_NEVER,
+    RLM_UPDATE_MODE_CHANGED,
+    RLM_UPDATE_MODE_ALL,
+} realm_update_mode_e;
+
 /* Key types */
 typedef uint32_t realm_class_key_t;
 typedef int64_t realm_property_key_t;
@@ -194,6 +200,17 @@ typedef struct realm_version_id {
     uint64_t version;
     uint64_t index;
 } realm_version_id_t;
+
+typedef struct realm_field_value {
+    realm_property_key_t property_key;
+    realm_value_t value;
+    bool is_default;
+} realm_field_value_t;
+
+typedef struct realm_field_values {
+    size_t nb_elements;
+    realm_field_value_t* values;
+} realm_field_values_t;
 
 
 /* Error types */
@@ -1379,6 +1396,19 @@ RLM_API realm_object_t* realm_object_create(realm_t*, realm_class_key_t);
 RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t*, realm_class_key_t, realm_value_t pk);
 
 /**
+ * Update an object in a class with a primary key. If the object does not exist
+ * and mode is not REALM_UPDATE_MODE_NEVER, the object will be created
+ *
+ * @param values The values to update.
+ * @param mode Update mode.
+ * @param did_create pointer to a boolean that will be true, if the object was created.
+ * @return A non-NULL pointer if no errors occurred.
+ */
+RLM_API realm_object_t* realm_object_create_or_update(realm_t*, realm_class_key_t, realm_value_t pk,
+                                                      const realm_field_values_t* values, realm_update_mode_e mode,
+                                                      bool* did_create);
+
+/**
  * Create an object in a class with a primary key. If an object with the given
  * primary key value already exists, that object will be returned.
  *
@@ -1538,16 +1568,10 @@ RLM_API char* realm_object_to_string(realm_object_t*);
  * as type mismatch, nullability mismatch, etc.), the object will remain
  * unmodified.
  *
- * @param num_values The number of elements in @a properties and @a values.
- * @param properties The keys of the properties to set. May not be NULL.
- * @param values The values to assign to the properties. May not be NULL.
- * @param is_default True if the properties are being set as part of setting
- *                   default values for a new object. This has no effect in
- *                   non-sync'ed realms.
+ * @param values Structure holding the values to set.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_set_values(realm_object_t*, size_t num_values, const realm_property_key_t* properties,
-                              const realm_value_t* values, bool is_default);
+RLM_API bool realm_set_values(realm_object_t*, const realm_field_values_t* values);
 
 /**
  * Get a list instance for the property of an object.

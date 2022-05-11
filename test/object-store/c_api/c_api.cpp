@@ -1533,19 +1533,21 @@ TEST_CASE("C API", "[c_api]") {
         }
 
         SECTION("realm_set_values() errors") {
-            realm_value_t int456 = rlm_int_val(456);
-            CHECK(!realm_set_values(obj1.get(), 1, &foo_int_key, &int456, false));
+            realm_field_value_t int456 = {foo_int_key, rlm_int_val(456), false};
+            realm_field_values_t val1 = {1, &int456};
+            CHECK(!realm_set_values(obj1.get(), &val1));
             CHECK_ERR(RLM_ERR_NOT_IN_A_TRANSACTION);
 
             write([&]() {
                 realm_value_t value;
-                realm_property_key_t keys1[3] = {foo_int_key, foo_str_key, foo_int_key};
-                realm_property_key_t keys2[3] = {foo_int_key, 123123123, foo_str_key};
 
                 // No error; check that the last value wins when there are
                 // duplicate keys.
-                realm_value_t values1[3] = {rlm_int_val(234), rlm_str_val("aaa"), rlm_int_val(345)};
-                CHECK(checked(realm_set_values(obj1.get(), 3, keys1, values1, false)));
+                realm_field_value_t values[3] = {{foo_int_key, rlm_int_val(234), false},
+                                                 {foo_str_key, rlm_str_val("aaa"), false},
+                                                 {foo_int_key, rlm_int_val(345), false}};
+                realm_field_values_t field_values = {3, values};
+                CHECK(checked(realm_set_values(obj1.get(), &field_values)));
 
                 realm_get_value(obj1.get(), foo_int_key, &value);
                 CHECK(value.type == RLM_TYPE_INT);
@@ -1555,8 +1557,10 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(strncmp("aaa", value.string.data, value.string.size) == 0);
 
                 // Type mismatch error.
-                realm_value_t values2[3] = {rlm_int_val(111), rlm_str_val("bbb"), rlm_str_val("ccc")};
-                CHECK(!realm_set_values(obj1.get(), 3, keys1, values2, false));
+                values[0].value = rlm_int_val(111);
+                values[1].value = rlm_str_val("bbb");
+                values[2].value = rlm_str_val("ccc");
+                CHECK(!realm_set_values(obj1.get(), &field_values));
                 CHECK_ERR(RLM_ERR_PROPERTY_TYPE_MISMATCH);
                 // Properties should remain unchanged.
                 realm_get_value(obj1.get(), foo_int_key, &value);
@@ -1566,7 +1570,9 @@ TEST_CASE("C API", "[c_api]") {
                 CHECK(value.type == RLM_TYPE_STRING);
 
                 // Invalid property key error.
-                CHECK(!realm_set_values(obj1.get(), 3, keys2, values2, false));
+                values[1].property_key = 123123123;
+                values[2].property_key = foo_str_key;
+                CHECK(!realm_set_values(obj1.get(), &field_values));
                 CHECK_ERR(RLM_ERR_INVALID_PROPERTY);
                 // Properties should remain unchanged.
                 realm_get_value(obj1.get(), foo_int_key, &value);

@@ -29,6 +29,23 @@ static void check_property_info_equal(const realm_property_info_t* lhs, const re
     assert(lhs->flags == rhs->flags);
 }
 
+static realm_value_t rlm_str_val(const char* str)
+{
+    realm_value_t val;
+    val.type = RLM_TYPE_STRING;
+    val.string.data = str;
+    val.string.size = strlen(str);
+    return val;
+}
+
+static realm_value_t rlm_int_val(int64_t n)
+{
+    realm_value_t val;
+    val.type = RLM_TYPE_INT;
+    val.integer = n;
+    return val;
+}
+
 int realm_c_api_tests(const char* file);
 int realm_c_api_tests(const char* file)
 {
@@ -43,8 +60,8 @@ int realm_c_api_tests(const char* file)
         },
         {
             .name = "Bar",
-            .primary_key = "int",
-            .num_properties = 2,
+            .primary_key = "_id",
+            .num_properties = 3,
             .num_computed_properties = 0,
             .key = RLM_INVALID_CLASS_KEY,
             .flags = RLM_CLASS_NORMAL,
@@ -86,7 +103,7 @@ int realm_c_api_tests(const char* file)
 
     const realm_property_info_t def_bar_properties[] = {
         {
-            .name = "int",
+            .name = "_id",
             .public_name = "",
             .type = RLM_PROPERTY_TYPE_INT,
             .collection_type = RLM_COLLECTION_TYPE_NONE,
@@ -94,6 +111,16 @@ int realm_c_api_tests(const char* file)
             .link_origin_property_name = "",
             .key = RLM_INVALID_PROPERTY_KEY,
             .flags = RLM_PROPERTY_INDEXED | RLM_PROPERTY_PRIMARY_KEY,
+        },
+        {
+            .name = "int",
+            .public_name = "",
+            .type = RLM_PROPERTY_TYPE_INT,
+            .collection_type = RLM_COLLECTION_TYPE_NONE,
+            .link_target = "",
+            .link_origin_property_name = "",
+            .key = RLM_INVALID_PROPERTY_KEY,
+            .flags = RLM_PROPERTY_NORMAL,
         },
         {
             .name = "strings",
@@ -157,7 +184,7 @@ int realm_c_api_tests(const char* file)
     realm_find_class(realm, "Bar", &found, &bar_info);
     CHECK_ERROR();
     assert(found);
-    assert(bar_info.num_properties == 2);
+    assert(bar_info.num_properties == 3);
     assert(bar_info.key == class_keys[0] || bar_info.key == class_keys[1]);
 
     realm_class_info_t dummy_info;
@@ -194,8 +221,8 @@ int realm_c_api_tests(const char* file)
     check_property_info_equal(&foo_int, &foo_properties[0]);
     check_property_info_equal(&foo_str, &foo_properties[1]);
     check_property_info_equal(&foo_bars, &foo_properties[2]);
-    check_property_info_equal(&bar_int, &bar_properties[0]);
-    check_property_info_equal(&bar_strings, &bar_properties[1]);
+    check_property_info_equal(&bar_int, &bar_properties[1]);
+    check_property_info_equal(&bar_strings, &bar_properties[2]);
 
 
     // Find properties by key.
@@ -211,18 +238,18 @@ int realm_c_api_tests(const char* file)
         realm_get_property(realm, foo_info.key, foo_properties[2].key, &foo_bars);
         CHECK_ERROR();
         assert(found);
-        realm_get_property(realm, bar_info.key, bar_properties[0].key, &bar_int);
+        realm_get_property(realm, bar_info.key, bar_properties[1].key, &bar_int);
         CHECK_ERROR();
         assert(found);
-        realm_get_property(realm, bar_info.key, bar_properties[1].key, &bar_strings);
+        realm_get_property(realm, bar_info.key, bar_properties[2].key, &bar_strings);
         CHECK_ERROR();
         assert(found);
 
         check_property_info_equal(&foo_int, &foo_properties[0]);
         check_property_info_equal(&foo_str, &foo_properties[1]);
         check_property_info_equal(&foo_bars, &foo_properties[2]);
-        check_property_info_equal(&bar_int, &bar_properties[0]);
-        check_property_info_equal(&bar_strings, &bar_properties[1]);
+        check_property_info_equal(&bar_int, &bar_properties[1]);
+        check_property_info_equal(&bar_strings, &bar_properties[2]);
     }
 
     size_t num_foos, num_bars;
@@ -243,6 +270,7 @@ int realm_c_api_tests(const char* file)
     realm_clear_last_error();
 
     realm_object_t* foo_1;
+    realm_object_t* bar_1;
     {
         realm_begin_write(realm);
         CHECK_ERROR();
@@ -250,6 +278,10 @@ int realm_c_api_tests(const char* file)
         foo_1 = realm_object_create(realm, foo_info.key);
         CHECK_ERROR();
         assert(realm_object_is_valid(foo_1));
+        realm_field_value_t foo_values[3] = {{foo_int.key, rlm_int_val(234), false},
+                                             {foo_str.key, rlm_str_val("aaa"), false}};
+        realm_field_values_t foo_field_values = {2, foo_values};
+        realm_set_values(foo_1, &foo_field_values);
 
         realm_object_key_t foo_1_key = realm_object_get_key(foo_1);
 
@@ -260,6 +292,25 @@ int realm_c_api_tests(const char* file)
         assert(foo_1_link.target == foo_1_key);
         assert(foo_1_link.target_table == foo_1_table);
 
+        bar_1 = realm_object_create_with_primary_key(realm, bar_info.key, rlm_int_val(1));
+
+        realm_field_value_t bar_value = {bar_int.key, rlm_int_val(248), false};
+        realm_field_values_t bar_field_values = {1, &bar_value};
+        bool did_create;
+        realm_release(bar_1);
+        bar_1 = realm_object_create_or_update(realm, bar_info.key, rlm_int_val(1), &bar_field_values,
+                                              RLM_UPDATE_MODE_ALL, &did_create);
+        assert(!did_create);
+
+        realm_object_t* none = realm_object_create_or_update(realm, bar_info.key, rlm_int_val(1), &bar_field_values,
+                                                             RLM_UPDATE_MODE_NEVER, &did_create);
+        assert(!none);
+        assert(realm_clear_last_error());
+
+        realm_value_t out_value;
+        assert(realm_get_value(bar_1, bar_int.key, &out_value));
+        assert(out_value.integer == 248);
+
         realm_commit(realm);
         CHECK_ERROR();
     }
@@ -267,6 +318,7 @@ int realm_c_api_tests(const char* file)
     assert(realm_object_is_valid(foo_1));
 
     realm_release(foo_1);
+    realm_release(bar_1);
 
     realm_close(realm);
     CHECK_ERROR();

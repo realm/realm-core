@@ -110,6 +110,13 @@ RLM_API realm_object_t* realm_object_create_with_primary_key(realm_t* realm, rea
 RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* realm, realm_class_key_t table_key,
                                                                     realm_value_t pk, bool* did_create)
 {
+    return realm_object_create_or_update(realm, table_key, pk, nullptr, RLM_UPDATE_MODE_NEVER, did_create);
+}
+
+RLM_API realm_object_t* realm_object_create_or_update(realm_t* realm, realm_class_key_t table_key, realm_value_t pk,
+                                                      const realm_field_values_t* values, realm_update_mode_e mode,
+                                                      bool* did_create)
+{
     return wrap_err([&]() {
         auto& shared_realm = *realm;
         auto tblkey = TableKey(table_key);
@@ -133,7 +140,26 @@ RLM_API realm_object_t* realm_object_get_or_create_with_primary_key(realm_t* rea
             throw WrongPrimaryKeyTypeException{schema.name};
         }
 
-        auto obj = table->create_object_with_primary_key(pkval, did_create);
+        FieldValues field_values;
+        if (values) {
+            for (size_t i = 0; i < values->nb_elements; i++) {
+                auto& val = values->values[i];
+                ColKey col_key(val.property_key);
+                table->check_column(col_key);
+
+                if (col_key.is_collection()) {
+                    auto& schema = schema_for_table(shared_realm, table->get_key());
+                    throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
+                }
+
+                auto mixed_val = from_capi(values->values[i].value);
+                check_value_assignable(shared_realm, *table, col_key, mixed_val);
+                field_values.insert(col_key, mixed_val, val.is_default);
+            }
+        }
+
+        auto obj = table->create_object_with_primary_key(pkval, std::move(field_values), Table::UpdateMode(mode),
+                                                         did_create);
         auto object = Object{shared_realm, std::move(obj)};
         return new realm_object_t{std::move(object)};
     });
@@ -275,11 +301,12 @@ RLM_API bool realm_get_values(const realm_object_t* obj, size_t num_values, cons
 
 RLM_API bool realm_set_value(realm_object_t* obj, realm_property_key_t col, realm_value_t new_value, bool is_default)
 {
-    return realm_set_values(obj, 1, &col, &new_value, is_default);
+    realm_field_value_t value = {col, new_value, is_default};
+    realm_field_values_t values = {1, &value};
+    return realm_set_values(obj, &values);
 }
 
-RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const realm_property_key_t* properties,
-                              const realm_value_t* values, bool is_default)
+RLM_API bool realm_set_values(realm_object_t* obj, const realm_field_values_t* values)
 {
     return wrap_err([&]() {
         obj->verify_attached();
@@ -290,8 +317,8 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
         // unlikely to incur performance overhead because the object itself is
         // not accessed here, just the bits of the column key and the input type.
 
-        for (size_t i = 0; i < num_values; ++i) {
-            auto col_key = ColKey(properties[i]);
+        for (size_t i = 0; i < values->nb_elements; ++i) {
+            auto col_key = ColKey(values->values[i].property_key);
             table->check_column(col_key);
 
             if (col_key.is_collection()) {
@@ -299,16 +326,15 @@ RLM_API bool realm_set_values(realm_object_t* obj, size_t num_values, const real
                 throw PropertyTypeMismatch{schema.name, table->get_column_name(col_key)};
             }
 
-            auto val = from_capi(values[i]);
+            auto val = from_capi(values->values[i].value);
             check_value_assignable(obj->get_realm(), *table, col_key, val);
         }
 
         // Actually write the properties.
-
-        for (size_t i = 0; i < num_values; ++i) {
-            auto col_key = ColKey(properties[i]);
-            auto val = from_capi(values[i]);
-            o.set_any(col_key, val, is_default);
+        for (size_t i = 0; i < values->nb_elements; ++i) {
+            realm_field_value_t& val = values->values[i];
+            auto col_key = ColKey(val.property_key);
+            o.set_any(col_key, from_capi(val.value), val.is_default);
         }
 
         return true;
