@@ -1226,24 +1226,25 @@ TEST_CASE("C API", "[c_api]") {
     }
 
     SECTION("realm_get_property_keys()") {
-        realm_property_key_t properties[3];
         size_t num_found = 0;
         size_t properties_found = 0;
 
         // discover how many properties there are.
-        CHECK(!realm_get_property_keys(realm, class_foo.key, properties, 0, &properties_found));
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties, properties_found, &num_found)));
+        CHECK(!realm_get_property_keys(realm, class_foo.key, nullptr, 0, &properties_found));
+        realm_property_key_t properties_foo[properties_found];
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties_foo, properties_found, &num_found)));
         CHECK(num_found == properties_found);
-        CHECK(properties[0] == foo_properties["int"]);
+        CHECK(properties_foo[0] == foo_properties["int"]);
 
         num_found = 0;
         properties_found = 0;
         // discover how many properties there are.
-        CHECK(!realm_get_property_keys(realm, class_bar.key, properties, 0, &properties_found));
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, properties_found, &num_found)));
+        CHECK(!realm_get_property_keys(realm, class_bar.key, nullptr, 0, &properties_found));
+        realm_property_key_t properties_bar[properties_found];
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties_bar, properties_found, &num_found)));
         CHECK(num_found == properties_found);
-        CHECK(properties[2] == bar_properties["doubles"]);
-        CHECK(properties[0] == bar_properties["int"]);
+        CHECK(properties_bar[2] == bar_properties["doubles"]);
+        CHECK(properties_bar[0] == bar_properties["int"]);
 
         num_found = 0;
         CHECK(!(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
