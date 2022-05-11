@@ -4218,7 +4218,6 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
         }
 
         {
-            auto test_query = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
@@ -4278,11 +4277,9 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
             realm_release(mut_sub);
             realm_release(sub_c);
             realm_release(results);
-            realm_release(test_query);
         }
 
         {
-            auto test_query = realm_query_parse(&c_wrap_realm, table_info.key, "name = 'bar'", 0, nullptr);
             auto sub = realm_sync_get_latest_subscription_set(&c_wrap_realm);
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             std::size_t index = -1;
@@ -4321,15 +4318,15 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
             const auto sub_not_found = realm_sync_find_subscription_by_name(sub_c_1, "test_bar");
             CHECK(!sub_not_found);
 
-            realm_release(results);
-            realm_release(sub_by_res);
-            realm_release(realm_flx_sync_sub);
             realm_release(sub);
             realm_release(mut_sub);
+            realm_release(results);
             realm_release(sub_c);
+            realm_release(sub_by_res);
+            realm_release(realm_flx_sync_sub);
             realm_release(mut_sub_1);
             realm_release(sub_c_1);
-            realm_release(test_query);
+            realm_release(sub_not_found);
         }
 
         {
@@ -4352,12 +4349,13 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
             CHECK(erased);
             auto sub_c_1 = realm_sync_subscription_set_commit(mut_sub_1);
 
-            realm_release(sub_c_1);
-            realm_release(mut_sub_1);
+            realm_release(sub);
+            realm_release(mut_sub);
             realm_release(results);
             realm_release(sub_c);
-            realm_release(mut_sub);
             realm_release(sub_by_res);
+            realm_release(mut_sub_1);
+            realm_release(sub_c_1);
         }
 
         realm_release(c_wrap_query_foo);
