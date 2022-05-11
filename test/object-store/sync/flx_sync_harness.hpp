@@ -19,11 +19,11 @@
 #ifndef FLX_SYNC_HARNESS_H
 #define FLX_SYNC_HARNESS_H
 
-#include "util/test_file.hpp"
 #ifdef REALM_ENABLE_AUTH_TESTS
 
 #include "sync/sync_test_utils.hpp"
 #include "util/baas_admin_api.hpp"
+#include "util/test_file.hpp"
 
 namespace realm::app {
 

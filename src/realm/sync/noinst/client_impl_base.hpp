@@ -2,7 +2,6 @@
 #ifndef REALM_NOINST_CLIENT_IMPL_BASE_HPP
 #define REALM_NOINST_CLIENT_IMPL_BASE_HPP
 
-#include "realm/util/span.hpp"
 #include <cstdint>
 #include <utility>
 #include <functional>
@@ -17,6 +16,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/ez_websocket.hpp>
+#include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>

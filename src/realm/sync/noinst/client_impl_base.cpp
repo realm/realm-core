@@ -1,4 +1,3 @@
-#include "realm/sync/protocol.hpp"
 #include <system_error>
 #include <sstream>
 
@@ -17,6 +16,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
