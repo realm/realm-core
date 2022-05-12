@@ -758,7 +758,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir('build-macosx') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -776,7 +776,7 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -835,7 +835,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
             getArchive()
 
             dir('build-xcode-platforms') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
                     sh "cmake ${cmakeDefinitions} -G Xcode .."
                     runAndCollectWarnings(
                         parser: 'clang',

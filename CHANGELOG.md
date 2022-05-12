@@ -7,7 +7,6 @@
 ### Fixed
 * Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
 
- 
 ### Breaking changes
 * None.
 
@@ -17,7 +16,7 @@
 -----------
 
 ### Internals
-* None.
+* The release package for Apple platforms is now built with Xcode 13 and the SPM package requires Xcode 13.
 
 ----------------------------------------------
 
