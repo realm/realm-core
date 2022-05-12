@@ -19,7 +19,7 @@
 * The sync client may have sent a corrupted upload cursor leading to a fatal error from the server due to an uninitialized variable. ([#5460](https://github.com/realm/realm-core/pull/5460), since v11.14.0)
 * The realm_async_open_task_start() in C API was not really useful as the received realm reference could not be transferred to another thread. ([#5465](https://github.com/realm/realm-core/pull/5465), since v11.5.0)
 * FLX sync would not correctly resume syncing if a bootstrap was interrupted ([#5466](https://github.com/realm/realm-core/pull/5466), since v11.8.0)
-* C API `realm_user_get_all_identities` does not support identity id deep copy. ([#5467]https://github.com/realm/realm-core/issues/5467)
+* C API `realm_user_get_all_identities` does not support identity id deep copy. ([#5467](https://github.com/realm/realm-core/issues/5467))
 
 ### Breaking changes
 * Extra `realm_free_userdata_func_t` parameter added on some realm_config_set... functions in the C API. The userdata will be freed when the config object is freed.
