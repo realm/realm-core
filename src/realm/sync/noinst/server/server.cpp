@@ -1654,7 +1654,7 @@ private:
 
     void handle_http_request(const HTTPRequest& request)
     {
-        StringData path = request.path;
+        auto& path = request.path;
 
         logger.debug("HTTP request received, request = %1", request);
 
@@ -1666,7 +1666,7 @@ private:
         // supposed to be mandatory, then that check ought to be delegated to
         // handle_request_for_sync(), as that will yield a sharper separation of
         // concerns.
-        if (path == "/realm-sync" || path.begins_with("/realm-sync?") || path.begins_with("/realm-sync/%2F")) {
+        if (path == "/realm-sync" || path.starts_with("/realm-sync?") || path.starts_with("/realm-sync/%2F")) {
             handle_request_for_sync(request); // Throws
         }
         else {
@@ -1703,10 +1703,7 @@ private:
             std::string_view elem;
             while (parser.next(elem)) {
                 auto prefix = get_pbs_websocket_protocol_prefix();
-                // FIXME: Use std::string_view::begins_with() in C++20.
-                bool begins_with = (elem.size() >= prefix.size() &&
-                                    std::equal(elem.data(), elem.data() + prefix.size(), prefix.data()));
-                if (begins_with) {
+                if (elem.starts_with(prefix)) {
                     auto parse_version = [&](std::string_view str) {
                         in.set_buffer(str.data(), str.data() + str.size());
                         int version = 0;
@@ -3953,9 +3950,7 @@ void ServerImpl::start()
             throw std::runtime_error("History TTL is zero. All clients will immediately expire, "
                                      "and this is very likely a configuration error.");
         if (m_config.history_ttl != std::chrono::seconds::max()) {
-            // std::chrono::days is only defined since C++20.
-            using days_t = std::chrono::duration<int64_t, std::ratio<86400>>;
-            auto days = std::chrono::duration_cast<days_t>(m_config.history_ttl);
+            auto days = std::chrono::duration_cast<std::chrono::days>(m_config.history_ttl);
             logger.info("History compaction with expiration enabled. Clients offline for longer "
                         "than %1 days (%2 seconds) may lose local modifications.",
                         days.count(), m_config.history_ttl.count());

@@ -95,8 +95,7 @@ std::vector<AuditEvent> get_audit_events(TestSyncManager& manager, bool parse_ev
     std::string file_name;
     util::DirScanner dir(root);
     while (dir.next(file_name)) {
-        StringData sd(file_name);
-        if (!sd.begins_with("audit-") || !sd.ends_with(".realm"))
+        if (!file_name.starts_with("audit-") || !file_name.ends_with(".realm"))
             continue;
 
         Group g(root + "/" + file_name);

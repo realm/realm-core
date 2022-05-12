@@ -304,11 +304,7 @@ void Connection::websocket_handshake_completion_handler(const std::string& proto
     if (!protocol.empty()) {
         std::string_view expected_prefix =
             is_flx_sync_connection() ? get_flx_websocket_protocol_prefix() : get_pbs_websocket_protocol_prefix();
-        // FIXME: Use std::string_view::begins_with() in C++20.
-        auto prefix_matches = [&](std::string_view other) {
-            return protocol.size() >= other.size() && (protocol.substr(0, other.size()) == other);
-        };
-        if (prefix_matches(expected_prefix)) {
+        if (protocol.starts_with(expected_prefix)) {
             util::MemoryInputStream in;
             in.set_buffer(protocol.data() + expected_prefix.size(), protocol.data() + protocol.size());
             in.imbue(std::locale::classic());
@@ -365,15 +361,10 @@ void Connection::websocket_handshake_error_handler(std::error_code ec, const std
             auto i = body->find(identifier);
             if (i != std::string_view::npos) {
                 std::string_view rest = body->substr(i + identifier.size());
-                // FIXME: Use std::string_view::begins_with() in C++20.
-                auto begins_with = [](std::string_view string, std::string_view prefix) {
-                    return (string.size() >= prefix.size() &&
-                            std::equal(string.data(), string.data() + prefix.size(), prefix.data()));
-                };
-                if (begins_with(rest, ":CLIENT_TOO_OLD")) {
+                if (rest.starts_with(":CLIENT_TOO_OLD")) {
                     ec = ClientError::client_too_old_for_server;
                 }
-                else if (begins_with(rest, ":CLIENT_TOO_NEW")) {
+                else if (rest.starts_with(":CLIENT_TOO_NEW")) {
                     ec = ClientError::client_too_new_for_server;
                 }
                 else {

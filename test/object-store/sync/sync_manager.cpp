@@ -130,12 +130,12 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
 
             // Note: does not include `identity` as that's in the hashed part
             auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id";
-            const std::string expected_suffix = ".realm";
+            const std::string_view expected_suffix = ".realm";
             std::string actual = sync_manager->path_for_realm(config);
             size_t expected_length = base_path.string().length() + 1 + 64 + expected_suffix.length();
             REQUIRE(actual.length() == expected_length);
-            REQUIRE(StringData(actual).begins_with(base_path.string()));
-            REQUIRE(StringData(actual).ends_with(expected_suffix));
+            REQUIRE(actual.starts_with(base_path.string()));
+            REQUIRE(actual.ends_with(expected_suffix));
         }
 
         SECTION("int32") {
