@@ -305,9 +305,9 @@ public:
     {
         return m_source.get_col_key();
     }
-    bool has_changed() const final
+    bool has_changed(bool is_idempotent = false) const final
     {
-        return m_source.has_changed();
+        return m_source.has_changed(is_idempotent);
     }
 
     // Overrides of ObjCollectionBase:

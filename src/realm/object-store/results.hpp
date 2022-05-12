@@ -404,9 +404,8 @@ private:
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
     enum class EvaluateMode { Count, Snapshot, Normal };
-    /// Return true if the collection has changed since the last call to
-    /// `has_changed()`. Note that this function is not idempotent and updates
-    /// the internal state of the accessor if it has changed.
+    /// Return true if the Results has changed since the last call to
+    /// `has_changed()`. Note that this function is idempotent.
     bool has_changed() REQUIRES(!m_mutex);
     void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
 

@@ -39,7 +39,7 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
     : m_realm(std::move(r))
     , m_query(std::move(q))
     , m_table(m_query.get_table())
-    , m_table_view(TableView(m_table))
+    , m_table_view(m_table)
     , m_descriptor_ordering(std::move(o))
     , m_mode(Mode::Query)
     , m_mutex(m_realm && m_realm->is_frozen())
@@ -49,7 +49,7 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 Results::Results(SharedRealm r, ConstTableRef table)
     : m_realm(std::move(r))
     , m_table(table)
-    , m_table_view(TableView(m_table))
+    , m_table_view(m_table)
     , m_mode(Mode::Table)
     , m_mutex(m_realm && m_realm->is_frozen())
 {
@@ -186,12 +186,9 @@ bool Results::has_changed() REQUIRES(!m_mutex)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_collection)
-        return m_collection->has_changed();
+        return m_collection->has_changed(true);
 
-    bool has_changed = m_table_view.has_changed();
-    if (has_changed)
-        ensure_up_to_date();
-    return has_changed;
+    return m_table_view.has_changed();
 }
 
 void Results::ensure_up_to_date(EvaluateMode mode)

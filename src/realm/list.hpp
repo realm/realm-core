@@ -380,7 +380,7 @@ public:
     void sort(std::vector<size_t>& indices, bool ascending = true) const final;
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
-    bool has_changed() const final;
+    bool has_changed(bool is_idempotent = false) const final;
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of LstBase:
@@ -1005,9 +1005,9 @@ inline const Obj& LnkLst::get_obj() const noexcept
     return m_list.get_obj();
 }
 
-inline bool LnkLst::has_changed() const
+inline bool LnkLst::has_changed(bool is_idempotent) const
 {
-    return m_list.has_changed();
+    return m_list.has_changed(is_idempotent);
 }
 
 inline ColKey LnkLst::get_col_key() const noexcept

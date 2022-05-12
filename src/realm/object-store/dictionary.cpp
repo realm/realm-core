@@ -82,9 +82,9 @@ public:
     {
         return m_dictionary->get_obj();
     }
-    bool has_changed() const override
+    bool has_changed(bool is_idempotent = false) const override
     {
-        return m_dictionary->has_changed();
+        return m_dictionary->has_changed(is_idempotent);
     }
 
     // -------------------------------------------------------------------------

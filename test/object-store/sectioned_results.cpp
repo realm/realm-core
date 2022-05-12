@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 
+#include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
@@ -46,11 +47,6 @@ struct Int : Base<PropertyType::Int, int64_t> {
     static std::vector<int64_t> values()
     {
         return {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
-    }
-
-    static std::vector<int64_t> expected_unsorted()
-    {
-        return {2, 4, 2, 4, 1, 3, 5, 1, 3, 5};
     }
 
     static std::vector<int64_t> expected_sorted()
@@ -84,11 +80,6 @@ struct Bool : Base<PropertyType::Bool, bool> {
         return {true, false, true, false};
     }
 
-    static std::vector<bool> expected_unsorted()
-    {
-        return {false, false, true, true};
-    }
-
     static std::vector<bool> expected_sorted()
     {
         return {false, false, true, true};
@@ -118,11 +109,6 @@ struct Float : Base<PropertyType::Float, float> {
     static std::vector<float> values()
     {
         return {1.1f, 2.2f, 3.3f, 4.4f, 5.5f, 1.1f, 2.2f, 3.3f, 4.4f, 5.5f};
-    }
-
-    static std::vector<float> expected_unsorted()
-    {
-        return {2.2f, 4.4f, 2.2f, 4.4f, 1.1f, 3.3f, 5.5f, 1.1f, 3.3f, 5.5f};
     }
 
     static std::vector<float> expected_sorted()
@@ -156,11 +142,6 @@ struct Double : Base<PropertyType::Double, double> {
         return {1.1, 2.2, 3.3, 4.4, 5.5, 1.2, 2.3, 3.4, 4.5, 5.6};
     }
 
-    static std::vector<double> expected_unsorted()
-    {
-        return {2.2, 4.4, 2.3, 4.5, 1.1, 3.3, 5.5, 1.2, 3.4, 5.6};
-    }
-
     static std::vector<double> expected_sorted()
     {
         return {2.2, 2.3, 4.4, 4.5, 1.1, 1.2, 3.3, 3.4, 5.5, 5.6};
@@ -192,12 +173,6 @@ struct String : Base<PropertyType::String, StringData> {
     {
         return {"apple",  "banana",  "cherry",   "dragon fruit",   "elderberry",
                 "apples", "bananas", "cherries", "dragon fruit's", "elderberries"};
-    }
-
-    static std::vector<StringData> expected_unsorted()
-    {
-        return {"apple",    "apples",       "banana",         "bananas",    "cherry",
-                "cherries", "dragon fruit", "dragon fruit's", "elderberry", "elderberries"};
     }
 
     static std::vector<StringData> expected_sorted()
@@ -236,13 +211,6 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
                 BinaryData("e", 1), BinaryData("ee", 2)};
     }
 
-    static std::vector<BinaryData> expected_unsorted()
-    {
-        return {BinaryData("a", 1),  BinaryData("b", 1),  BinaryData("c", 1),  BinaryData("d", 1),
-                BinaryData("e", 1),  BinaryData("aa", 2), BinaryData("bb", 2), BinaryData("cc", 2),
-                BinaryData("dd", 2), BinaryData("ee", 2)};
-    }
-
     static std::vector<BinaryData> expected_sorted()
     {
         return {BinaryData("a", 1),  BinaryData("b", 1),  BinaryData("c", 1),  BinaryData("d", 1),
@@ -275,12 +243,6 @@ struct Date : Base<PropertyType::Date, Timestamp> {
     {
         return {Timestamp(1, 1),  Timestamp(20, 2), Timestamp(3, 1),  Timestamp(40, 2), Timestamp(5, 1),
                 Timestamp(10, 2), Timestamp(2, 1),  Timestamp(30, 2), Timestamp(4, 1),  Timestamp(50, 2)};
-    }
-
-    static std::vector<Timestamp> expected_unsorted()
-    {
-        return {Timestamp(20, 2), Timestamp(40, 2), Timestamp(10, 2), Timestamp(30, 2), Timestamp(50, 2),
-                Timestamp(1, 1),  Timestamp(3, 1),  Timestamp(5, 1),  Timestamp(2, 1),  Timestamp(4, 1)};
     }
 
     static std::vector<Timestamp> expected_sorted()
@@ -317,20 +279,6 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
                 Mixed{Timestamp(1, 1)},    Mixed{Decimal128("300")},
                 Mixed{double(2.2)},        Mixed{float(3.3)},
                 Mixed{BinaryData("a", 1)}, Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")}};
-    }
-
-    static std::vector<realm::Mixed> expected_unsorted()
-    {
-        return {Mixed{realm::UUID()},
-                Mixed{"hello world"},
-                Mixed{Timestamp(1, 1)},
-                Mixed{BinaryData("a", 1)},
-                Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
-                Mixed{util::none},
-                Mixed{int64_t(1)},
-                Mixed{Decimal128("300")},
-                Mixed{double(2.2)},
-                Mixed{float(3.3)}};
     }
 
     static std::vector<realm::Mixed> expected_sorted()
@@ -377,15 +325,6 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
                 ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")};
     }
 
-    static std::vector<ObjectId> expected_unsorted()
-    {
-        return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
-    }
-
     static std::vector<ObjectId> expected_sorted()
     {
         return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
@@ -427,16 +366,6 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
         };
     }
 
-    static std::vector<realm::UUID> expected_unsorted()
-    {
-        return {
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962")};
-    }
-
     static std::vector<realm::UUID> expected_sorted()
     {
         return {
@@ -475,13 +404,6 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
             Decimal128("876.54e32"), Decimal128("123.45e6"), Decimal128("876.54e32"), Decimal128("123.45e6"),
             Decimal128("876.54e32"), Decimal128("123.45e6"),
         };
-    }
-
-    static std::vector<Decimal128> expected_unsorted()
-    {
-        return {Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"),
-                Decimal128("876.54e32"), Decimal128("123.45e6"),  Decimal128("123.45e6"),  Decimal128("123.45e6"),
-                Decimal128("123.45e6"),  Decimal128("123.45e6")};
     }
 
     static std::vector<Decimal128> expected_sorted()
@@ -533,15 +455,6 @@ struct BoxedOptional : BaseT {
         return BaseT::expected_size() + 1;
     }
 
-    static std::vector<Type> expected_unsorted()
-    {
-        std::vector<Type> ret;
-        for (auto v : BaseT::expected_unsorted())
-            ret.push_back(Type(v));
-        ret.push_back(util::none);
-        return ret;
-    }
-
     static std::vector<Type> expected_sorted()
     {
         std::vector<Type> ret;
@@ -582,19 +495,6 @@ struct UnboxedOptional : BaseT {
     static size_t expected_size()
     {
         return BaseT::expected_size() + 1;
-    }
-
-    static auto expected_unsorted() -> decltype(BaseT::values())
-    {
-        auto ret = BaseT::expected_unsorted();
-        if constexpr (std::is_same_v<BaseT, sectioned_results_fixtures::Decimal>) {
-            // The default Decimal128 ctr is 0, but we want a null value
-            ret.push_back(Decimal128(realm::null()));
-        }
-        else {
-            ret.push_back(typename BaseT::Type());
-        }
-        return ret;
     }
 
     static auto expected_sorted() -> decltype(BaseT::values())
@@ -792,7 +692,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         str_list.add("orange");
         r->commit_transaction();
         List lst(r, o1, array_string_col);
-        auto sr = lst.as_results().sectioned_results(Results::SectionedResultsOperator::FirstLetter);
+        auto sr = lst.sort({{"self", true}})
+            .sectioned_results(Results::SectionedResultsOperator::FirstLetter);
 
         REQUIRE(sr.size() == 3);
         REQUIRE(sr[0].size() == 3);
@@ -800,7 +701,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(sr[2].size() == 1);
 
         std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
-
         std::vector<std::string> expected_keys{"a", "b", "o"};
 
         int section_count = 0;
@@ -823,6 +723,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->begin_transaction();
         lst.add(StringData(""));
         r->commit_transaction();
+        advance_and_notify(*r);
 
         expected.insert(expected.begin(), 1, "");
         expected_keys.insert(expected_keys.begin(), 1, "");
@@ -867,21 +768,23 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 11);
 
+        REQUIRE(changes.sections_to_insert.count() == 3);
+        REQUIRE(changes.sections_to_delete.count() == 0);
+        REQUIRE_INDICES(changes.sections_to_insert, 2, 3, 5);
+
         REQUIRE(changes.insertions.size() == 4);
         // Section 0 is 'A'
-        REQUIRE(changes.insertions[0].size() == 1);
-        REQUIRE(changes.insertions[0][0] == 0);
+        REQUIRE_INDICES(changes.insertions[0], 0);
+        REQUIRE(changes.insertions[0].count() == 1);
         // Section 2 is 'C'
-        REQUIRE(changes.insertions[2].size() == 2);
-        REQUIRE(changes.insertions[2][0] == 0);
-        REQUIRE(changes.insertions[2][1] == 1);
+        REQUIRE(changes.insertions[2].count() == 2);
+        REQUIRE_INDICES(changes.insertions[2], 0, 1);
         // Section 3 is 'M'
-        REQUIRE(changes.insertions[3].size() == 1);
-        REQUIRE(changes.insertions[3][0] == 0);
+        REQUIRE(changes.insertions[3].count() == 1);
+        REQUIRE_INDICES(changes.insertions[3], 0);
         // Section 5 is 'S'
-        REQUIRE(changes.insertions[5].size() == 2);
-        REQUIRE(changes.insertions[5][0] == 0);
-        REQUIRE(changes.insertions[5][1] == 1);
+        REQUIRE(changes.insertions[5].count() == 2);
+        REQUIRE_INDICES(changes.insertions[5], 0, 1);
         REQUIRE(changes.modifications.empty());
         REQUIRE(changes.deletions.empty());
 
@@ -891,8 +794,11 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         o4.set(name_col, "stocksss");
         r->commit_transaction();
         advance_and_notify(*r);
+        REQUIRE(changes.sections_to_insert.count() == 0);
+        REQUIRE(changes.sections_to_delete.count() == 0);
+
         REQUIRE(changes.modifications.size() == 1);
-        REQUIRE(changes.modifications[5][0] == 1);
+        REQUIRE_INDICES(changes.modifications[5], 1);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.deletions.empty());
         REQUIRE(algo_run_count == 11);
@@ -900,14 +806,58 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         algo_run_count = 0;
         // Deletions
         r->begin_transaction();
+        table->remove_object(o2.get_key());
         table->remove_object(o3.get_key());
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(changes.deletions.size() == 1);
-        REQUIRE(changes.deletions[2][0] == 1);
+        REQUIRE(changes.sections_to_insert.count() == 0);
+        REQUIRE(changes.sections_to_delete.count() == 1);
+
+        REQUIRE(changes.deletions.size() == 2);
+        REQUIRE_INDICES(changes.deletions[2], 1);
+        REQUIRE_INDICES(changes.deletions[3], 0);
         REQUIRE(changes.insertions.empty());
         REQUIRE(changes.modifications.empty());
-        REQUIRE(algo_run_count == 10);
+        REQUIRE(algo_run_count == 9);
+
+        // Test moving objects from one section to a new one.
+        // delete all objects starting with 'S'
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "elephant");
+        o4.set(name_col, "erie");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(changes.sections_to_insert.count() == 1);
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_delete, 4);
+        REQUIRE_INDICES(changes.sections_to_insert, 3);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.empty());
+        REQUIRE_INDICES(changes.deletions[4], 0, 1);
+        REQUIRE_INDICES(changes.insertions[3], 0, 1);
+        REQUIRE(algo_run_count == 9);
+
+        // Test moving objects from one section to an existing one.
+        // move all objects starting with 'E'
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "asimov");
+        o4.set(name_col, "animal");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(changes.sections_to_insert.empty());
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_delete, 3);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.empty());
+        REQUIRE_INDICES(changes.deletions[3], 0, 1);
+        REQUIRE_INDICES(changes.insertions[0], 0, 5);
+        REQUIRE(algo_run_count == 9);
     }
 
     SECTION("notifications on section") {
@@ -943,8 +893,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 0);
         REQUIRE(section1_changes.insertions.size() == 1);
-        REQUIRE(section1_changes.insertions[0].size() == 1);
-        REQUIRE(section1_changes.insertions[0][0] == 0);
+        REQUIRE(section1_changes.insertions[0].count() == 1);
+        REQUIRE_INDICES(section1_changes.insertions[0], 0);
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(section1_changes.deletions.empty());
         algo_run_count = 0;
@@ -956,8 +906,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 1);
         REQUIRE(section2_notification_calls == 1);
         REQUIRE(section2_changes.insertions.size() == 1);
-        REQUIRE(section2_changes.insertions[1].size() == 1);
-        REQUIRE(section2_changes.insertions[1][0] == 1);
+        REQUIRE(section2_changes.insertions[1].count() == 1);
+        REQUIRE_INDICES(section2_changes.insertions[1], 1);
         REQUIRE(section2_changes.modifications.empty());
         REQUIRE(section2_changes.deletions.empty());
         REQUIRE(algo_run_count == 7);
@@ -971,7 +921,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 2);
         REQUIRE(section2_notification_calls == 1);
         REQUIRE(section1_changes.modifications.size() == 1);
-        REQUIRE(section1_changes.modifications[0][0] == 0);
+        REQUIRE_INDICES(section1_changes.modifications[0], 0);
         REQUIRE(section1_changes.insertions.empty());
         REQUIRE(section1_changes.deletions.empty());
         REQUIRE(algo_run_count == 7);
@@ -984,8 +934,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 3);
         REQUIRE(section2_notification_calls == 1);
         REQUIRE(section1_changes.modifications.empty());
-        REQUIRE(section1_changes.insertions[3][0] == 0);
-        REQUIRE(section1_changes.deletions[0][0] == 0);
+        REQUIRE_INDICES(section1_changes.insertions[3], 0);
+        REQUIRE_INDICES(section1_changes.deletions[0], 0);
         REQUIRE(algo_run_count == 7);
         algo_run_count = 0;
 
@@ -997,7 +947,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 3);
         REQUIRE(section2_notification_calls == 2);
         REQUIRE(section2_changes.deletions.size() == 1);
-        REQUIRE(section2_changes.deletions[1][0] == 1);
+        REQUIRE_INDICES(section2_changes.deletions[1], 1);
         REQUIRE(section2_changes.insertions.empty());
         REQUIRE(section2_changes.modifications.empty());
         REQUIRE(algo_run_count == 6);
@@ -1010,7 +960,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 4);
         REQUIRE(section2_notification_calls == 2);
         REQUIRE(section1_changes.deletions.size() == 1);
-        REQUIRE(section1_changes.deletions[0][0] == 1);
+        REQUIRE_INDICES(section1_changes.deletions[0], 1);
         REQUIRE(section1_changes.insertions.empty());
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(algo_run_count == 5);
@@ -1087,7 +1037,6 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
 
     auto values = TestType::values();
     auto exp_keys = TestType::expected_keys();
-    auto exp_values = TestType::expected_unsorted();
     auto exp_values_sorted = TestType::expected_sorted();
 
     r->begin_transaction();
@@ -1100,26 +1049,6 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
     List lst(r, o, array_col);
     auto results = lst.as_results();
     auto algo_run_count = 0;
-
-    SECTION("primitives section correctly unsorted") {
-        auto sectioned_results = results.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
-            algo_run_count++;
-            return TestType::comparison_value(value);
-        });
-        REQUIRE(sectioned_results.size() == TestType::expected_size());
-        auto results_idx = 0;
-        for (size_t section_idx = 0; section_idx < sectioned_results.size(); section_idx++) {
-            auto section = sectioned_results[section_idx];
-            REQUIRE(exp_keys[section_idx] == section.key());
-            for (size_t element_idx = 0; element_idx < section.size(); element_idx++) {
-                auto element = sectioned_results[section_idx][element_idx];
-                Mixed value = T(exp_values[results_idx]);
-                REQUIRE(element == value);
-                results_idx++;
-            }
-        }
-        REQUIRE(algo_run_count == (int)exp_values.size());
-    }
 
     SECTION("primitives section correctly with sort ascending") {
         auto sorted = results.sort({{"self", true}});
@@ -1140,7 +1069,7 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
                 results_idx++;
             }
         }
-        REQUIRE(algo_run_count == (int)exp_values.size());
+        REQUIRE(algo_run_count == (int)exp_values_sorted.size());
     }
 
     SECTION("primitives section correctly with sort decending") {
@@ -1164,6 +1093,6 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
                 results_idx++;
             }
         }
-        REQUIRE(algo_run_count == (int)exp_values.size());
+        REQUIRE(algo_run_count == (int)exp_values_sorted.size());
     }
 }

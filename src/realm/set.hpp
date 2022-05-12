@@ -327,7 +327,7 @@ public:
     void distinct(std::vector<size_t>& indices, util::Optional<bool> sort_order = util::none) const final;
     const Obj& get_obj() const noexcept final;
     bool is_attached() const final;
-    bool has_changed() const final;
+    bool has_changed(bool is_idempotent = false) const final;
     ColKey get_col_key() const noexcept final;
 
     // Overriding members of SetBase:
@@ -1226,9 +1226,9 @@ inline bool LnkSet::is_attached() const
     return m_set.is_attached();
 }
 
-inline bool LnkSet::has_changed() const
+inline bool LnkSet::has_changed(bool is_idempotent) const
 {
-    return m_set.has_changed();
+    return m_set.has_changed(is_idempotent);
 }
 
 inline ColKey LnkSet::get_col_key() const noexcept
