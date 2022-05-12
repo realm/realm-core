@@ -267,10 +267,11 @@ public:
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
                 try {
                     auto json = nlohmann::json::parse(json_raw);
+                    logger.trace("Error message encoded as json: %1", json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
                     info.message = json["message"];
-                    info.logURL = util::make_optional<std::string>(json["logURL"]);
+                    info.log_url = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
                 }
                 catch (const nlohmann::json::exception& e) {

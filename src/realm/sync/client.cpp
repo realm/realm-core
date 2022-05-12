@@ -1403,13 +1403,6 @@ void SessionWrapper::on_resumed()
 void SessionWrapper::on_connection_state_changed(ConnectionState state,
                                                  const util::Optional<SessionErrorInfo>& error_info)
 {
-    if (state == ConnectionState::connected && m_sess) {
-        ClientImpl::Connection& conn = m_sess->get_connection();
-        if (conn.is_flx_sync_connection()) {
-            get_flx_subscription_store();
-        }
-    }
-
     if (m_connection_state_change_listener) {
         if (!m_suspended)
             m_connection_state_change_listener(state, error_info); // Throws

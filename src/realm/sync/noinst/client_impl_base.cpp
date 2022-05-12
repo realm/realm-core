@@ -1,3 +1,4 @@
+#include "realm/sync/protocol.hpp"
 #include <system_error>
 #include <sstream>
 
@@ -2171,6 +2172,11 @@ std::error_code Session::receive_error_message(int error_code_int, const Protoco
     if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
         logger.error("Not a session level error code"); // Throws
         return ClientError::bad_error_code;
+    }
+
+    if (!session_level_error_requires_suspend(error_code)) {
+        on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
+        return {}; // Success
     }
 
     REALM_ASSERT(!m_suspended);

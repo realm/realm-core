@@ -172,6 +172,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::server_permissions_changed:
         case ProtocolError::write_not_allowed:
             return SimplifiedProtocolError::ClientResetRequested;
+        case ProtocolError::compensating_write:
+            return SimplifiedProtocolError::CompensatingWrite;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
 }

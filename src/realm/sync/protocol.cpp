@@ -137,6 +137,9 @@ const char* get_protocol_error_message(int error_code) noexcept
         case ProtocolError::write_not_allowed:
             return "Client attempted a write that is disallowed by permissions, or modifies an object outside the "
                    "current query - requires client reset";
+        case ProtocolError::compensating_write:
+            return "Client attempted a write that is disallowed by permissions, or modifies and object outside the "
+                   "current query, and the server undid the modification";
     }
     return nullptr;
 }

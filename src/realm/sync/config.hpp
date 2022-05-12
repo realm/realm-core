@@ -48,6 +48,7 @@ enum class SimplifiedProtocolError {
     BadAuthentication,
     PermissionDenied,
     ClientResetRequested,
+    CompensatingWrite,
 };
 
 namespace sync {

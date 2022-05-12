@@ -190,7 +190,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     });
 }
 
-TEST_CASE("flx: uploading an object that is out-of-view results in a client reset", "[sync][flx][app]") {
+TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
 
     // TODO(RCORE-912) When DiscardLocal is supported with FLX sync we should remove this check in favor of the
@@ -231,9 +231,15 @@ TEST_CASE("flx: uploading an object that is out-of-view results in a client rese
             realm->commit_transaction();
 
             auto sync_error = std::move(error_future).get();
-            CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::write_not_allowed));
+            CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::compensating_write));
             CHECK(sync_error.is_session_level_protocol_error());
-            CHECK(sync_error.is_client_reset_requested());
+            CHECK(!sync_error.is_client_reset_requested());
+
+            wait_for_download(*realm);
+            realm->refresh();
+
+            auto top_level_table = realm->read_group().get_table("class_TopLevel");
+            REQUIRE(top_level_table->is_empty());
         });
     }
 
@@ -252,8 +258,9 @@ TEST_CASE("flx: uploading an object that is out-of-view results in a client rese
 
             CppContext c(realm);
             realm->begin_transaction();
+            auto valid_obj = ObjectId::gen();
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{{"_id", ObjectId::gen()},
+                           util::Any(AnyDict{{"_id", valid_obj},
                                              {"queryable_str_field", std::string{"foo"}},
                                              {"queryable_int_field", static_cast<int64_t>(5)},
                                              {"non_queryable_field", std::string{"non queryable 1"}}}));
@@ -265,9 +272,16 @@ TEST_CASE("flx: uploading an object that is out-of-view results in a client rese
             realm->commit_transaction();
 
             auto sync_error = std::move(error_future).get();
-            CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::write_not_allowed));
+            CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::compensating_write));
             CHECK(sync_error.is_session_level_protocol_error());
-            CHECK(sync_error.is_client_reset_requested());
+            CHECK(!sync_error.is_client_reset_requested());
+
+            wait_for_download(*realm);
+            realm->refresh();
+
+            auto top_level_table = realm->read_group().get_table("class_TopLevel");
+            REQUIRE(top_level_table->size() == 1);
+            REQUIRE(top_level_table->get_object_with_primary_key(valid_obj));
         });
     }
 }
