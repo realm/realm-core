@@ -223,8 +223,9 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             auto realm = Realm::get_shared_realm(config);
             CppContext c(realm);
             realm->begin_transaction();
+            auto invalid_obj = ObjectId::gen();
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{{"_id", ObjectId::gen()},
+                           util::Any(AnyDict{{"_id", invalid_obj},
                                              {"queryable_str_field", std::string{"foo"}},
                                              {"queryable_int_field", static_cast<int64_t>(5)},
                                              {"non_queryable_field", std::string{"non queryable 1"}}}));
@@ -234,6 +235,12 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::compensating_write));
             CHECK(sync_error.is_session_level_protocol_error());
             CHECK(!sync_error.is_client_reset_requested());
+            CHECK(sync_error.compensating_writes_info.size() == 1);
+            auto write_info = sync_error.compensating_writes_info[0];
+            CHECK(write_info.primary_key.is_type(type_ObjectId));
+            CHECK(write_info.primary_key.get_object_id() == invalid_obj);
+            CHECK(write_info.object_name == "TopLevel");
+            CHECK(write_info.reason.find("before opening a subscription on it") != std::string::npos);
 
             wait_for_download(*realm);
             realm->refresh();
@@ -259,13 +266,14 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             CppContext c(realm);
             realm->begin_transaction();
             auto valid_obj = ObjectId::gen();
+            auto invalid_obj = ObjectId::gen();
             Object::create(c, realm, "TopLevel",
                            util::Any(AnyDict{{"_id", valid_obj},
                                              {"queryable_str_field", std::string{"foo"}},
                                              {"queryable_int_field", static_cast<int64_t>(5)},
                                              {"non_queryable_field", std::string{"non queryable 1"}}}));
             Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{{"_id", ObjectId::gen()},
+                           util::Any(AnyDict{{"_id", invalid_obj},
                                              {"queryable_str_field", std::string{"bar"}},
                                              {"queryable_int_field", static_cast<int64_t>(10)},
                                              {"non_queryable_field", std::string{"non queryable 2"}}}));
@@ -275,6 +283,13 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::compensating_write));
             CHECK(sync_error.is_session_level_protocol_error());
             CHECK(!sync_error.is_client_reset_requested());
+            CHECK(sync_error.compensating_writes_info.size() == 1);
+            auto write_info = sync_error.compensating_writes_info[0];
+            CHECK(write_info.primary_key.is_type(type_ObjectId));
+            CHECK(write_info.primary_key.get_object_id() == invalid_obj);
+            CHECK(write_info.object_name == "TopLevel");
+            CHECK(write_info.reason.find("object is outside of the current query view") != std::string::npos);
+
 
             wait_for_download(*realm);
             realm->refresh();

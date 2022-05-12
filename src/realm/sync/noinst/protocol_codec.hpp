@@ -273,6 +273,29 @@ public:
                     info.message = json["message"];
                     info.log_url = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+
+                    if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
+                        if (!rejected_updates->is_array()) {
+                            return report_error(
+                                Error::bad_syntax,
+                                "Compensating writes error list is not stored in an array as expected");
+                        }
+
+                        for (const auto& rejected_update : *rejected_updates) {
+                            if (!rejected_update.is_object()) {
+                                return report_error(
+                                    Error::bad_syntax,
+                                    "Compensating write error information is not stored in an object as expected");
+                            }
+
+                            sync::CompensatingWriteErrorInfo cwei;
+                            cwei.reason = rejected_update["reason"];
+                            cwei.object_name = rejected_update["table"];
+                            std::string_view pk = rejected_update["pk"].get<std::string_view>();
+                            cwei.primary_key = sync::parse_base64_encoded_primary_key(pk);
+                            info.compensating_writes.push_back(std::move(cwei));
+                        }
+                    }
                 }
                 catch (const nlohmann::json::exception& e) {
                     // If any of the above json fields are not present, this is a fatal error

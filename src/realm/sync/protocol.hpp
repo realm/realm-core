@@ -191,6 +191,12 @@ struct SyncProgress {
     UploadCursor upload = {0, 0};
 };
 
+struct CompensatingWriteErrorInfo {
+    std::string object_name;
+    Mixed primary_key;
+    std::string reason;
+};
+
 struct ProtocolErrorInfo {
     ProtocolErrorInfo() = default;
     ProtocolErrorInfo(const std::string& msg, bool do_try_again)
@@ -205,6 +211,7 @@ struct ProtocolErrorInfo {
     bool client_reset_recovery_is_disabled = false;
     util::Optional<bool> should_client_reset;
     util::Optional<std::string> log_url;
+    std::vector<CompensatingWriteErrorInfo> compensating_writes;
 
     bool is_fatal() const
     {
@@ -344,11 +351,11 @@ constexpr bool is_session_level_error(ProtocolError error)
 
 constexpr bool session_level_error_requires_suspend(ProtocolError error)
 {
-    switch(error) {
-    case ProtocolError::compensating_write:
-        return false;
-    default:
-        return true;
+    switch (error) {
+        case ProtocolError::compensating_write:
+            return false;
+        default:
+            return true;
     }
 }
 
