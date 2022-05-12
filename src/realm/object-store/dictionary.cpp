@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/dictionary.hpp>
+
 #include <realm/object-store/results.hpp>
 #include <realm/table.hpp>
 
@@ -207,29 +208,40 @@ void Dictionary::remove_all()
 
 Obj Dictionary::get_object(StringData key)
 {
-    return dict().get_object(key);
+    auto& dictionary = dict();
+    auto obj = dictionary.get_object(key);
+    record_audit_read(obj);
+    return obj;
 }
 
 Mixed Dictionary::get_any(StringData key)
 {
-    return dict().get(key);
+    auto value = dict().get(key);
+    record_audit_read(value);
+    return value;
 }
 
 Mixed Dictionary::get_any(size_t ndx) const
 {
     verify_valid_row(ndx);
-    return dict().get_any(ndx);
+    auto value = dict().get_any(ndx);
+    record_audit_read(value);
+    return value;
 }
 
 util::Optional<Mixed> Dictionary::try_get_any(StringData key) const
 {
-    return dict().try_get(key);
+    auto value = dict().try_get(key);
+    if (value)
+        record_audit_read(*value);
+    return value;
 }
 
 std::pair<StringData, Mixed> Dictionary::get_pair(size_t ndx) const
 {
     verify_valid_row(ndx);
     auto pair = dict().get_pair(ndx);
+    record_audit_read(pair.second);
     return {pair.first.get_string(), pair.second};
 }
 

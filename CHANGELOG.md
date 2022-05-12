@@ -1,3 +1,26 @@
+# NEXT RELEASE
+
+### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Move the implementation of the Audit API to the open-source repo and update it to work with MongoDB Realm.
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+ 
+### Breaking changes
+* `realm::Realm::Config` has been renamed to `realm::RealmConfig`.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 11.16.0 Release notes
 
 ### Enhancements
@@ -17,7 +40,7 @@
 * The sync client may have sent a corrupted upload cursor leading to a fatal error from the server due to an uninitialized variable. ([#5460](https://github.com/realm/realm-core/pull/5460), since v11.14.0)
 * The realm_async_open_task_start() in C API was not really useful as the received realm reference could not be transferred to another thread. ([#5465](https://github.com/realm/realm-core/pull/5465), since v11.5.0)
 * FLX sync would not correctly resume syncing if a bootstrap was interrupted ([#5466](https://github.com/realm/realm-core/pull/5466), since v11.8.0)
- 
+
 ### Breaking changes
 * Extra `realm_free_userdata_func_t` parameter added on some realm_config_set_... functions in the C API. The userdata will be freed when the config object is freed ([#5452](https://github.com/realm/realm-core/pull/5452)).
 

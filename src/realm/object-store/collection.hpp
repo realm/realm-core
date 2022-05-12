@@ -148,6 +148,12 @@ protected:
     void validate_embedded(Context& ctx, T&& value, CreatePolicy policy) const;
 
     size_t hash() const noexcept;
+
+    void record_audit_read(const Obj& obj) const;
+    void record_audit_read(const Mixed& obj) const;
+
+private:
+    Collection(std::shared_ptr<Realm>&& r, CollectionBasePtr&& coll, PropertyType type);
 };
 
 template <typename T, typename Context>

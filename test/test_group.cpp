@@ -1627,11 +1627,15 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK(primary_key_column);
     ColKey col1 = primary_key_column;
     ColKey col2 = table->add_column(type_String, "secondary");
+    ColKey col3 = table->add_column(type_Int, "another");
     ColKey list_col = table->add_column_list(type_Float, "floats");
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK(table->has_search_index(primary_key_column));
 
-    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col2, "first"}});
+    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col3, 5}, {col2, "last"}});
+    CHECK_THROW_ANY(table->create_object_with_primary_key("Exactly!", {{}}, Table::UpdateMode::never));
+    table->create_object_with_primary_key("Exactly!", {{col2, "first"}}, Table::UpdateMode::changed);
+
     table->create_object_with_primary_key("Paul", {{col2, "John"}});
     table->create_object_with_primary_key("John", {{col2, "Paul"}});
     table->create_object_with_primary_key("George", {{col2, "George"}});

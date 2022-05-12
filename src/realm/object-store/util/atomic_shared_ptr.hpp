@@ -22,6 +22,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <type_traits>
 
 namespace realm {
 namespace _impl {
@@ -29,19 +30,12 @@ namespace _impl {
 // Check if std::atomic_load has an overload taking a std::shared_ptr, and set
 // HasAtomicPtrOps to either true_type or false_type
 
-template <typename... Ts>
-struct make_void {
-    typedef void type;
-};
-template <typename... Ts>
-using void_t = typename make_void<Ts...>::type;
-
-template <typename, typename = void_t<>>
+template <typename, typename = std::void_t<>>
 struct HasAtomicPtrOps : std::false_type {
 };
 
 template <class T>
-struct HasAtomicPtrOps<T, void_t<decltype(std::atomic_load(std::declval<T*>()))>> : std::true_type {
+struct HasAtomicPtrOps<T, std::void_t<decltype(std::atomic_load(std::declval<T*>()))>> : std::true_type {
 };
 } // namespace _impl
 
