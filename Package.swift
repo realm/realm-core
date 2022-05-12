@@ -538,5 +538,5 @@ let package = Package(
                 .headerSearchPath("../"),
             ] + cxxSettings) as [CXXSetting]),
     ],
-    cxxLanguageStandard: .cxx17
+    cxxLanguageStandard: .cxx20
 )
