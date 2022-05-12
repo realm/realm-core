@@ -219,7 +219,7 @@ Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> 
     if (partition) {
         ColKey col = table->get_column_key(partition->property_name);
         REALM_ASSERT(col);
-        values.push_back({col, Mixed{partition->value}});
+        values.insert(col, Mixed{partition->value});
     }
     return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
 }

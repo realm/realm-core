@@ -1358,7 +1358,7 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
 
 void Transaction::copy_to(TransactionRef dest) const
 {
-    impl::CopyReplication repl(dest);
+    _impl::CopyReplication repl(dest);
     replicate(dest.get(), repl);
 }
 

@@ -78,12 +78,16 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     }
 
     m_err.emplace();
+    m_err->usercode_error = nullptr;
     auto populate_error = [&](const std::exception& ex, ErrorCodes::Error error_code) {
         m_err->error = realm_errno_e(error_code);
         m_err->categories = ErrorCodes::error_categories(error_code).value();
         try {
             m_message_buf = ex.what();
             m_err->message = m_message_buf.c_str();
+            if (error_code == ErrorCodes::CallbackFailed) {
+                m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
+            }
         }
         catch (const std::bad_alloc&) {
             // If we are unable to build the new error because we ran out of memory we should propagate the OOM
@@ -145,6 +149,18 @@ bool ErrorStorage::clear() noexcept
 {
     auto ret = static_cast<bool>(m_err);
     m_err.reset();
+    return ret;
+}
+
+void ErrorStorage::set_usercode_error(void* usercode_error)
+{
+    m_usercode_error = usercode_error;
+}
+
+void* ErrorStorage::get_and_clear_usercode_error()
+{
+    auto ret = m_usercode_error;
+    m_usercode_error = nullptr;
     return ret;
 }
 
@@ -210,4 +226,9 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
         (func)();
         return true;
     });
+}
+
+RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept
+{
+    realm::c_api::ErrorStorage::get_thread_local()->set_usercode_error(usercode_error);
 }

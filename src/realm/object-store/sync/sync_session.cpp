@@ -132,8 +132,10 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, Status status)
     // Manually set the disconnected state. Sync would also do this, but
     // since the underlying SyncSession object already have been destroyed,
     // we are not able to get the callback.
+    util::CheckedUniqueLock connection_state_lock(m_connection_state_mutex);
     auto old_state = m_connection_state;
     auto new_state = m_connection_state = SyncSession::ConnectionState::Disconnected;
+    connection_state_lock.unlock();
 
     SyncSession::CompletionCallbacks waits;
     std::swap(waits, m_completion_callbacks);
@@ -656,6 +658,12 @@ void SyncSession::create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
+    if (m_config.on_download_message_received_hook) {
+        session_config.on_download_message_received_hook = [hook = m_config.on_download_message_received_hook,
+                                                            anchor = weak_from_this()] {
+            hook(anchor);
+        };
+    }
 
     {
         std::string sync_route = m_sync_manager->sync_route();
@@ -714,7 +722,7 @@ void SyncSession::create_sync_session()
         // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
         // nothing useful we can do with them.
         if (auto self = weak_self.lock()) {
-            util::CheckedUniqueLock lock(self->m_state_mutex);
+            util::CheckedUniqueLock lock(self->m_connection_state_mutex);
             auto old_state = self->m_connection_state;
             using cs = sync::ConnectionState;
             switch (state) {
@@ -953,6 +961,24 @@ void SyncSession::wait_for_download_completion(util::UniqueFunction<void(Status)
     add_completion_callback(std::move(callback), ProgressDirection::download);
 }
 
+bool SyncSession::wait_for_upload_completion()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    if (m_session) {
+        return m_session->wait_for_upload_complete_or_client_stopped();
+    }
+    return false;
+}
+
+bool SyncSession::wait_for_download_completion()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    if (m_session) {
+        return m_session->wait_for_download_complete_or_client_stopped();
+    }
+    return false;
+}
+
 uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,
                                                  ProgressDirection direction, bool is_streaming)
 {
@@ -984,7 +1010,7 @@ SyncSession::State SyncSession::state() const
 
 SyncSession::ConnectionState SyncSession::connection_state() const
 {
-    util::CheckedUniqueLock lock(m_state_mutex);
+    util::CheckedUniqueLock lock(m_connection_state_mutex);
     return m_connection_state;
 }
 

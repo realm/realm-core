@@ -171,7 +171,8 @@ struct SyncTestFile : TestFile {
 
     SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name = "",
                  std::string user_name = "test");
-    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition, realm::Schema schema);
+    SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::bson::Bson partition,
+                 realm::util::Optional<realm::Schema> schema = realm::util::none);
     SyncTestFile(std::shared_ptr<realm::app::App> app, realm::bson::Bson partition, realm::Schema schema);
     SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema schema, realm::SyncConfig::FLXSyncEnabled);
 };
@@ -272,7 +273,6 @@ inline TestSyncManager::TestSyncManager(realm::SyncManager::MetadataMode mode)
     }())
 {
 }
-
 
 bool wait_for_upload(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));
 bool wait_for_download(realm::Realm& realm, std::chrono::seconds timeout = std::chrono::seconds(60));

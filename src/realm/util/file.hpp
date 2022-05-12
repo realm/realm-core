@@ -70,8 +70,12 @@ void make_dir(const std::string& path);
 
 /// Same as make_dir() except that this one returns false, rather than throwing
 /// an exception, if the specified directory already existed. If the directory
-// did not already exist and was newly created, this returns true.
+/// did not already exist and was newly created, this returns true.
 bool try_make_dir(const std::string& path);
+
+/// Recursively create each of the directories in the given absolute path. Existing directories are ignored, and
+/// File::AccessError is thrown for any other errors that occur.
+void make_dir_recursive(std::string path);
 
 /// Remove the specified empty directory path from the file system. It is an
 /// error if the specified path is not a directory, or if it is a nonempty

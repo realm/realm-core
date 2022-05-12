@@ -4056,7 +4056,7 @@ TEST(Shared_CopyReplication)
     DBRef db2 = DB::create(make_in_realm_history(), path2);
     auto wt = db2->start_write();
 
-    impl::CopyReplication repl(wt);
+    _impl::CopyReplication repl(wt);
     DBRef db1 = DB::create(repl, path1);
     auto tr = db1->start_write();
 

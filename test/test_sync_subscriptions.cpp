@@ -400,7 +400,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
-TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
+TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
@@ -449,6 +449,44 @@ TEST(Sync_SubscriptionStoreInternalSchemaMigration)
     CHECK_EQUAL(*flx_sub_store_version, 2);
 
     CHECK(!versions.get_version_for(tr, "non_existent_table"));
+}
+
+TEST(Sync_SubscriptionStoreNextPendingVersion)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    auto mut_sub_set = store->get_latest().make_mutable_copy();
+    auto sub_set = std::move(mut_sub_set).commit();
+    auto complete_set = sub_set.version();
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    sub_set = std::move(mut_sub_set).commit();
+    auto bootstrapping_set = sub_set.version();
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    sub_set = std::move(mut_sub_set).commit();
+    auto pending_set = sub_set.version();
+
+    mut_sub_set = store->get_mutable_by_version(complete_set);
+    mut_sub_set.update_state(SubscriptionSet::State::Complete);
+    std::move(mut_sub_set).commit();
+
+    mut_sub_set = store->get_mutable_by_version(bootstrapping_set);
+    mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
+    std::move(mut_sub_set).commit();
+
+    auto pending_version = store->get_next_pending_version(0, DB::version_type{});
+    CHECK(pending_version);
+    CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
+
+    pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
+    CHECK(pending_set);
+    CHECK_EQUAL(pending_version->query_version, pending_set);
+
+    pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
+    CHECK(!pending_version);
 }
 
 } // namespace realm::sync

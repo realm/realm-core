@@ -17,12 +17,14 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <realm/object-store/collection.hpp>
-#include <realm/object-store/shared_realm.hpp>
+
+#include <realm/object-store/audit.hpp>
+#include <realm/object-store/impl/list_notifier.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/results.hpp>
-#include <realm/object-store/impl/list_notifier.hpp>
-#include <realm/object-store/impl/realm_coordinator.hpp>
+#include <realm/object-store/shared_realm.hpp>
 
 namespace realm::object_store {
 
@@ -32,39 +34,38 @@ Collection::Collection(PropertyType type) noexcept
 }
 
 Collection::Collection(const Object& parent_obj, const Property* prop)
-    : m_realm(parent_obj.get_realm())
-    , m_type(prop->type)
-    , m_coll_base(parent_obj.obj().get_collection_ptr(prop->column_key))
-    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+    : Collection(std::shared_ptr(parent_obj.get_realm()), parent_obj.obj().get_collection_ptr(prop->column_key),
+                 prop->type)
 {
 }
 
 Collection::Collection(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-    : m_realm(std::move(r))
-    , m_type(ObjectSchema::from_core_type(col) & ~PropertyType::Collection)
-    , m_coll_base(parent_obj.get_collection_ptr(col))
-    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+    : Collection(std::move(r), parent_obj.get_collection_ptr(col),
+                 ObjectSchema::from_core_type(col) & ~PropertyType::Collection)
 {
 }
 
 Collection::Collection(std::shared_ptr<Realm> r, const CollectionBase& coll)
-    : m_realm(std::move(r))
-    , m_type(ObjectSchema::from_core_type(coll.get_col_key()) & ~PropertyType::Collection)
-    , m_coll_base(coll.clone_collection())
-    , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
+    : Collection(std::move(r), coll.clone_collection(),
+                 ObjectSchema::from_core_type(coll.get_col_key()) & ~PropertyType::Collection)
 {
 }
 
 Collection::Collection(std::shared_ptr<Realm> r, CollectionBasePtr coll)
+    : Collection(std::move(r), std::move(coll),
+                 ObjectSchema::from_core_type(coll->get_col_key()) & ~PropertyType::Collection)
+{
+}
+
+Collection::Collection(std::shared_ptr<Realm>&& r, CollectionBasePtr&& coll, PropertyType type)
     : m_realm(std::move(r))
-    , m_type(ObjectSchema::from_core_type(coll->get_col_key()) & ~PropertyType::Collection)
+    , m_type(type)
     , m_coll_base(std::move(coll))
     , m_is_embedded(m_type == PropertyType::Object && m_coll_base->get_target_table()->is_embedded())
 {
 }
 
-Collection::~Collection() {}
-
+Collection::~Collection() = default;
 Collection::Collection(const Collection&) = default;
 Collection& Collection::operator=(const Collection&) = default;
 Collection::Collection(Collection&&) = default;
@@ -216,6 +217,23 @@ NotificationToken Collection::add_notification_callback(CollectionChangeCallback
         _impl::RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(callback), std::move(key_path_array))};
+}
+
+void Collection::record_audit_read(const Obj& obj) const
+{
+    if (auto audit = m_realm->audit_context()) {
+        audit->record_read(m_realm->read_transaction_version(), obj, m_coll_base->get_obj(),
+                           m_coll_base->get_col_key());
+    }
+}
+
+void Collection::record_audit_read(const Mixed& value) const
+{
+    if (auto audit = m_realm->audit_context(); audit && value.is_type(type_TypedLink)) {
+        audit->record_read(m_realm->read_transaction_version(),
+                           m_realm->read_group().get_object(value.get<ObjLink>()), m_coll_base->get_obj(),
+                           m_coll_base->get_col_key());
+    }
 }
 
 namespace {

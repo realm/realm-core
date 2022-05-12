@@ -107,28 +107,19 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
-{
-    REALM_ASSERT(app);
 
-    std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
-    std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
-    std::string fake_device_id = "123400000000000000000000";
-    sync_config =
-        std::make_shared<SyncConfig>(app->sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token,
-                                                                   app->base_url(), fake_device_id),
-                                     bson::Bson(name));
-    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](auto, SyncError error) {
-        std::cerr << util::format("An unexpected sync error was caught by the default SyncTestFile handler: '%1'",
-                                  error.what())
-                  << std::endl;
-        abort();
-    };
-    schema_mode = SchemaMode::AdditiveExplicit;
+static const std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
+static const std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
+static const std::string fake_device_id = "123400000000000000000000";
+
+SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
+    : SyncTestFile(app->sync_manager()->get_user(user_name, fake_refresh_token, fake_access_token, app->base_url(),
+                                                 fake_device_id),
+                   bson::Bson(name))
+{
 }
 
-SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson partition, realm::Schema _schema)
+SyncTestFile::SyncTestFile(std::shared_ptr<SyncUser> user, bson::Bson partition, util::Optional<Schema> schema)
 {
     REALM_ASSERT(user);
     sync_config = std::make_shared<realm::SyncConfig>(user, partition);
@@ -140,7 +131,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, bson::Bson par
         abort();
     };
     schema_version = 1;
-    schema = _schema;
+    this->schema = std::move(schema);
     schema_mode = SchemaMode::AdditiveExplicit;
 }
 
@@ -161,17 +152,8 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
 }
 
 SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, bson::Bson partition, Schema schema)
+    : SyncTestFile(app->current_user(), std::move(partition), std::move(schema))
 {
-    REALM_ASSERT(app);
-    sync_config = std::make_shared<SyncConfig>(app->current_user(), partition);
-    sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->error_handler = [](auto, auto err) {
-        fprintf(stderr, "Unexpected sync error: %s\n", err.what());
-        abort();
-    };
-    schema_mode = SchemaMode::AdditiveExplicit;
-    schema_version = 1;
-    this->schema = std::move(schema);
 }
 
 // MARK: - SyncServer
@@ -196,6 +178,7 @@ SyncServer::SyncServer(const SyncServer::Config& config)
                    config.history_ttl = 1s;
                    config.history_compaction_interval = 1s;
                    config.listen_address = "127.0.0.1";
+                   config.disable_sync_to_disk = true;
 
                    return config;
                })())

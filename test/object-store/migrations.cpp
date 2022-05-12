@@ -1657,7 +1657,7 @@ TEST_CASE("migration: Automatic") {
             StringData new_name;
         };
 
-        auto apply_renames = [&](std::initializer_list<Rename> renames) -> Realm::MigrationFunction {
+        auto apply_renames = [&](std::initializer_list<Rename> renames) -> MigrationFunction {
             return [=](SharedRealm, SharedRealm realm, Schema& schema) {
                 for (auto rename : renames) {
                     ObjectStore::rename_property(realm->read_group(), schema, rename.object_type, rename.old_name,

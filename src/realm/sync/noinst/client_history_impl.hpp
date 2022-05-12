@@ -274,12 +274,12 @@ private:
     friend class ClientReplication;
     static constexpr version_type s_initial_version = 1;
 
-    ClientHistory(ClientReplication* owner)
+    ClientHistory(ClientReplication& owner)
         : m_replication(owner)
     {
     }
 
-    ClientReplication* m_replication;
+    ClientReplication& m_replication;
     DB* m_db = nullptr;
 
     // FIXME: All history objects belonging to a particular client object
@@ -439,8 +439,9 @@ private:
 
 class ClientReplication final : public SyncReplication {
 public:
-    ClientReplication()
-        : m_history(this)
+    ClientReplication(bool apply_server_changes = true)
+        : m_history(*this)
+        , m_apply_server_changes(apply_server_changes)
     {
     }
 
@@ -457,7 +458,7 @@ public:
     }
     std::unique_ptr<_impl::History> _create_history_read() override
     {
-        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(this));
+        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(*this));
         hist->initialize(*m_history.m_db);
         return hist;
     }
@@ -466,18 +467,24 @@ public:
     version_type prepare_changeset(const char*, size_t, version_type) override final;
     void finalize_changeset() noexcept override final;
 
-    ClientHistory& get_history()
+    ClientHistory& get_history() noexcept
     {
         return m_history;
     }
 
-    const ClientHistory& get_history() const
+    const ClientHistory& get_history() const noexcept
     {
         return m_history;
+    }
+
+    bool apply_server_changes() const noexcept
+    {
+        return m_apply_server_changes;
     }
 
 private:
     ClientHistory m_history;
+    const bool m_apply_server_changes;
 };
 
 

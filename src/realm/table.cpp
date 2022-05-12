@@ -1653,10 +1653,10 @@ bool Table::migrate_objects()
             auto col_type = col_key.get_type();
             auto nullable = col_key.get_attrs().test(col_attr_Nullable);
             auto val = get_val_from_column(row_ndx, col_type, nullable, it.second.get());
-            init_values.emplace_back(col_key, val);
+            init_values.insert(col_key, val);
         }
         for (auto& it : ts_accessors) {
-            init_values.emplace_back(it.first, Mixed(it.second->get(row_ndx)));
+            init_values.insert(it.first, Mixed(it.second->get(row_ndx)));
         }
 
         // Create object with the initial values
@@ -2935,7 +2935,8 @@ Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
     }
 }
 
-Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, bool* did_create)
+Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&& field_values, UpdateMode mode,
+                                          bool* did_create)
 {
     auto primary_key_col = get_primary_key_column();
     if (m_is_embedded || !primary_key_col)
@@ -2963,7 +2964,18 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     // Check for existing object
     if (ObjKey key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
-        return m_clusters.get(key);
+        if (mode == UpdateMode::never) {
+            throw std::logic_error(
+                util::format("Attempting to create an object in '%1' with an existing primary key value '%2'.",
+                             get_name(), primary_key));
+        }
+        auto obj = m_clusters.get(key);
+        for (auto& val : field_values) {
+            if (mode == UpdateMode::all || obj.get_any(val.col_key) != val.value) {
+                obj.set_any(val.col_key, val.value, val.is_default);
+            }
+        }
+        return obj;
     }
 
     ObjKey unres_key;
@@ -2992,7 +3004,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
         *did_create = true;
     }
 
-    field_values.emplace_back(primary_key_col, primary_key);
+    field_values.insert(primary_key_col, primary_key);
     Obj ret = m_clusters.insert(key, field_values);
 
     // Check if unresolved exists

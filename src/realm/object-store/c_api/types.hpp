@@ -34,9 +34,19 @@ public:
 
 class CallbackFailed : public RuntimeError {
 public:
+    // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
+    // realm_register_user_code_callback_error()
+    void* usercode_error{nullptr};
+
     CallbackFailed()
         : RuntimeError(ErrorCodes::CallbackFailed, "User-provided callback failed")
     {
+    }
+
+    CallbackFailed(void* str)
+        : CallbackFailed()
+    {
+        usercode_error = str;
     }
 };
 
@@ -100,8 +110,8 @@ protected:
     realm_thread_safe_reference() {}
 };
 
-struct realm_config : realm::c_api::WrapC, realm::Realm::Config {
-    using Config::Config;
+struct realm_config : realm::c_api::WrapC, realm::RealmConfig {
+    using RealmConfig::RealmConfig;
     std::map<void*, realm_free_userdata_func_t> free_functions;
     ~realm_config()
     {
