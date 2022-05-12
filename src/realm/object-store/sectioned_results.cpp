@@ -20,59 +20,9 @@
 #include <realm/object-store/sectioned_results.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
+#include <set>
+
 namespace realm {
-
-// This method will run in the following scenarios:
-// - SectionedResults is freshly created from Results
-// - The underlying Table in the Results collection has changed
-static std::vector<SectionRange> calculate_sections(Results& results,
-                                                    const SectionedResults::SectionKeyFunc& callback)
-{
-    auto sections = std::map<Mixed, SectionRange>();
-    // Take a snapshot in case the underlying results change while
-    // the calculation is being performed.
-    auto snapshot = results.snapshot();
-    const size_t size = snapshot.size();
-    size_t current_section = 0;
-    for (size_t i = 0; i < size; ++i) {
-        Mixed section_key = callback(snapshot.get_any(i), snapshot.get_realm());
-        // Disallow links as section keys. It would be uncommon to use them to begin with
-        // and if the object acting as the key was deleted bad things would happen.
-        if (!section_key.is_null() && section_key.get_type() == type_Link) {
-            throw std::logic_error("Links are not supported as section keys.");
-        }
-        if (sections.find(section_key) == sections.end()) {
-            SectionRange section;
-            section.index = current_section;
-            section.key = section_key;
-            section.indices.push_back(i);
-            sections[section_key] = section;
-            current_section++;
-        }
-        else {
-            sections[section_key].indices.push_back(i);
-        }
-    }
-
-    std::vector<SectionRange> offset_ranges;
-    offset_ranges.reserve(sections.size());
-    for (auto& elem : sections) {
-        offset_ranges.push_back(std::move(elem.second));
-    }
-
-    auto desc = results.get_descriptor_ordering();
-    if (desc.will_apply_sort()) {
-        const SortDescriptor* sort_desc = static_cast<const SortDescriptor*>(desc[0]);
-        auto is_asc = sort_desc->is_ascending(0);
-        if (is_asc) {
-            bool is_ascending = *is_asc;
-            std::sort(offset_ranges.begin(), offset_ranges.end(), [&is_ascending](SectionRange a, SectionRange b) {
-                return is_ascending ? (a.key < b.key) : (a.key > b.key);
-            });
-        }
-    }
-    return offset_ranges;
-}
 
 static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Results::SectionedResultsOperator op,
                                                            util::Optional<StringData> prop_name)
@@ -80,9 +30,13 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
     switch (op) {
         case Results::SectionedResultsOperator::FirstLetter:
             if (results.get_type() == PropertyType::Object) {
-                return [p = *prop_name](Mixed value, SharedRealm realm) {
-                    auto obj = Object(realm, value.get_link());
-                    auto v = obj.get_column_value<StringData>(p);
+                auto col_key = results.get_table()->get_column_key(*prop_name);
+                return [col_key](Mixed value, SharedRealm realm) {
+                    auto link = value.get_link();
+                    auto v = realm->read_group()
+                                 .get_table(link.get_table_key())
+                                 ->get_object(link.get_obj_key())
+                                 .get<StringData>(col_key);
                     return v.size() > 0 ? v.prefix(1) : "";
                 };
             }
@@ -97,24 +51,21 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
     }
 }
 
-/// Returns the section of an element for the index of that element in the underlying Results.
-static SectionRange section_for_index(std::vector<SectionRange> offsets, size_t index)
-{
-    for (auto offset : offsets) {
-        if (std::find(offset.indices.begin(), offset.indices.end(), index) != offset.indices.end()) {
-            return offset;
-        }
-    }
-    throw std::logic_error("Section for given index not found.");
-}
-
 struct SectionedResultsNotificationHandler {
 public:
+    // Cocoa requires specific information on when a section
+    // needs to be added, removed, or reloaded when data changes
+    struct SectionChangeInfo {
+        IndexSet sections_to_insert;
+        IndexSet sections_to_delete;
+    };
+
     SectionedResultsNotificationHandler(SectionedResults& sectioned_results, SectionedResultsNotificatonCallback cb,
                                         util::Optional<size_t> section_filter = util::none)
         : m_cb(std::move(cb))
         , m_sectioned_results(sectioned_results)
-        , m_prev_offset_ranges(m_sectioned_results.m_offset_ranges)
+        , m_prev_sections(m_sectioned_results.m_sections)
+        , m_prev_row_to_index_path(m_sectioned_results.m_row_to_index_path)
         , m_section_filter(section_filter)
     {
     }
@@ -122,10 +73,21 @@ public:
     void before(CollectionChangeSet const&) {}
     void after(CollectionChangeSet const& c)
     {
+        auto convert_indices = [&](const IndexSet& indices,
+                                   const std::vector<std::pair<size_t, size_t>>& rows_to_index_path) {
+            std::map<size_t, IndexSet> ret;
+            for (auto index : indices.as_indexes()) {
+                auto& index_path = rows_to_index_path[index];
+                ret[index_path.first].add(index_path.second);
+            }
+            return ret;
+        };
+
         m_sectioned_results.calculate_sections_if_required();
-        auto insertions = convert_indicies(m_sectioned_results.m_offset_ranges, c.insertions.as_indexes());
-        auto modifications = convert_indicies(m_sectioned_results.m_offset_ranges, c.modifications.as_indexes());
-        auto deletions = convert_indicies(m_prev_offset_ranges, c.deletions.as_indexes());
+        auto insertions = convert_indices(c.insertions, m_sectioned_results.m_row_to_index_path);
+        auto modifications = convert_indices(c.modifications, m_sectioned_results.m_row_to_index_path);
+        auto deletions = convert_indices(c.deletions, m_prev_row_to_index_path);
+        auto section_changes = calculate_sections_to_insert_and_delete(insertions, deletions, modifications);
 
         bool should_notify = true;
         if (m_section_filter) {
@@ -135,63 +97,297 @@ public:
             should_notify = has_insertions || has_modifications || has_deletions;
         }
         if (should_notify) {
-            m_cb(SectionedResultsChangeSet{insertions, modifications, deletions}, {});
+            m_cb(SectionedResultsChangeSet{insertions, modifications, deletions, section_changes.sections_to_insert,
+                                           section_changes.sections_to_delete},
+                 {});
         }
 
         REALM_ASSERT(m_sectioned_results.m_results.is_valid());
-        m_prev_offset_ranges = m_sectioned_results.m_offset_ranges;
+
+        m_prev_row_to_index_path = m_sectioned_results.m_row_to_index_path;
+        m_prev_sections = m_sectioned_results.m_sections;
     }
     void error(std::exception_ptr ptr)
     {
         m_cb({}, ptr);
     }
 
-    /// Takes each change index and transforms it to it's corresponding section and index within that section.
-    std::map<size_t, std::vector<size_t>> convert_indicies(std::vector<SectionRange>& offsets,
-                                                           IndexSet::IndexIteratableAdaptor indicies)
+    SectionChangeInfo calculate_sections_to_insert_and_delete(std::map<size_t, IndexSet>& insertions,
+                                                              std::map<size_t, IndexSet>& deletions,
+                                                              std::map<size_t, IndexSet>& modifications)
     {
-        auto modified_sections = std::map<size_t, std::vector<size_t>>();
-        for (auto i : indicies) {
-            auto range = section_for_index(offsets, i);
-            auto it = std::find(range.indices.begin(), range.indices.end(), i);
-            if (it != range.indices.end()) {
-                auto index = std::distance(range.indices.begin(), it);
-                modified_sections[range.index].push_back(index);
+        std::map<size_t, size_t> new_section_indexes;
+        std::map<size_t, size_t> old_section_indexes;
+
+        std::vector<size_t> new_section_hashes, old_section_hashes;
+        for (auto& n : m_sectioned_results.m_sections) {
+            new_section_indexes[n.hash] = n.index;
+            new_section_hashes.push_back(n.hash);
+        }
+        for (auto& n : m_prev_sections) {
+            old_section_indexes[n.hash] = n.index;
+            old_section_hashes.push_back(n.hash);
+        }
+
+        IndexSet sections_to_insert;
+        IndexSet sections_to_remove;
+
+        auto diff = [](const std::vector<size_t>& a, const std::vector<size_t>& b,
+                       std::map<size_t, size_t>& hash_lookup, IndexSet& out) {
+            for (auto& hash : b) {
+                if (std::find(a.begin(), a.end(), hash) == a.end()) {
+                    out.add(hash_lookup[hash]);
+                }
+            }
+        };
+
+        diff(old_section_hashes, new_section_hashes, new_section_indexes, sections_to_insert);
+        diff(new_section_hashes, old_section_hashes, old_section_indexes, sections_to_remove);
+
+        /*
+         This struct allows us to do bookkeeping on the changesets that the collection change checker produced.
+         The need for this is that sometimes the changechecker may report a modification when we expect an insertion
+         or deletion and we need to compensate for any missing insertions or deletions. It also helps compensate for
+         any missing insertions / deletions when moving elements from from section to another.
+         */
+        struct Changes {
+            size_t index;
+            size_t current_indice_count;
+
+            size_t insertions_since_last_comparison;
+            size_t deletions_since_last_comparison;
+
+            size_t change_insertion_count;
+            size_t change_deletion_count;
+            size_t change_modification_count;
+
+            bool is_new_section;
+            bool is_deleted_section;
+
+            util::Optional<IndexSet&> insertions;
+            util::Optional<IndexSet&> deletions;
+            util::Optional<IndexSet&> modifications;
+
+            void validate_insertions()
+            {
+                if (insertions_since_last_comparison == change_insertion_count && !is_new_section) {
+                    // All looks good
+                    return;
+                }
+
+                if (is_new_section) {
+                    insertions->set(current_indice_count);
+                    change_insertion_count = insertions->count();
+                    REALM_ASSERT(current_indice_count == change_insertion_count);
+                    return;
+                }
+
+                // The change checker had issues producing the insertions we need.
+                if (insertions_since_last_comparison > change_insertion_count) {
+                    // We are missing insertions
+                    // The issue with this approach is that we
+                    // lose precision on what indexes we actually need to insert
+                    insertions->set(insertions_since_last_comparison);
+                    change_insertion_count = insertions->count();
+                }
+                else if (change_insertion_count > insertions_since_last_comparison) {
+                    // We are adding too many insertions
+                    // dump the extra indicies to modifications instead
+                    // ensure we dont go out of range
+                    IndexSet indexes_to_remove;
+                    for (auto index : insertions->as_indexes()) {
+                        modifications->add(index);
+                        indexes_to_remove.add(index);
+                        change_insertion_count--;
+                        if (change_insertion_count == insertions_since_last_comparison)
+                            break;
+                    }
+                    insertions->remove(indexes_to_remove);
+                }
+                REALM_ASSERT(change_insertion_count == insertions->count());
+            }
+
+            void validate_deletions()
+            {
+                if (deletions_since_last_comparison == change_deletion_count && !is_deleted_section) {
+                    // All looks good
+                    return;
+                }
+                if (is_deleted_section) {
+                    deletions->set(current_indice_count);
+                    change_deletion_count = deletions->count();
+                    REALM_ASSERT(current_indice_count == change_deletion_count);
+                    return;
+                }
+                // The change checker had issues producing the deletions we need.
+                if (deletions_since_last_comparison > change_deletion_count) {
+                    // We are missing deletions
+                    // Can we use anything from modifications?
+                    deletions->set(deletions_since_last_comparison);
+                    change_deletion_count = deletions->count();
+                }
+                else if (change_deletion_count > deletions_since_last_comparison) {
+                    // We are adding too many deletions
+                    // dump the extra indicies to modifications instead
+                    // ensure we dont go out of range
+                    IndexSet indexes_to_remove;
+                    for (auto index : deletions->as_indexes()) {
+                        modifications->add(index);
+                        indexes_to_remove.add(index);
+                        change_deletion_count--;
+                        if (change_deletion_count == deletions_since_last_comparison)
+                            break;
+                    }
+                    deletions->remove(indexes_to_remove);
+                }
+                REALM_ASSERT(deletions_since_last_comparison == change_deletion_count);
+            }
+
+            void validate_modifications()
+            {
+                if (is_deleted_section)
+                    return;
+                for (auto m : deletions->as_indexes()) {
+                    modifications->remove(m);
+                }
+
+                for (auto m : insertions->as_indexes()) {
+                    modifications->remove(m);
+                }
+            }
+
+            void validate()
+            {
+                validate_insertions();
+                validate_deletions();
+                validate_modifications();
+            }
+        };
+
+        for (auto& section : m_sectioned_results.m_sections) {
+            auto it = find(old_section_hashes.begin(), old_section_hashes.end(), section.hash);
+            if (it == old_section_hashes.end()) {
+                auto& i = insertions[section.index];
+                auto& d = deletions[section.index];
+                auto& m = modifications[section.index];
+
+                // This is a new section
+                Changes c = {.index = section.index,
+                             .current_indice_count = section.indices.size(),
+                             .insertions_since_last_comparison = 0,
+                             .deletions_since_last_comparison = 0,
+                             .change_insertion_count = i.count(),
+                             .change_deletion_count = 0,
+                             .change_modification_count = m.count(),
+                             .is_new_section = true,
+                             .is_deleted_section = false,
+                             .insertions = i,
+                             .deletions = d,
+                             .modifications = m};
+                c.validate();
+            }
+            else {
+                // This section previously existed
+                size_t old_index = it - old_section_hashes.begin();
+                int64_t diff = m_sectioned_results.m_sections[section.index].indices.size() -
+                               m_prev_sections[old_index].indices.size();
+
+                auto& i = insertions[section.index];
+                auto& d = deletions[old_index];
+                auto& m = modifications[section.index];
+
+                Changes c = {.index = section.index,
+                             .current_indice_count = section.indices.size(),
+                             .insertions_since_last_comparison = diff > 0 ? (size_t)diff : 0,
+                             .deletions_since_last_comparison = diff < 0 ? (size_t)abs(diff) : 0,
+                             .change_insertion_count = i.count(),
+                             .change_deletion_count = d.count(),
+                             .change_modification_count = m.count(),
+                             .is_new_section = false,
+                             .is_deleted_section = false,
+                             .insertions = i,
+                             .deletions = d,
+                             .modifications = m};
+                c.validate();
             }
         }
-        return modified_sections;
+
+        for (auto old_index : sections_to_remove.as_indexes()) {
+            auto& d = deletions[old_index];
+            Changes c = {.index = old_index,
+                         .current_indice_count = m_prev_sections[old_index].indices.size(),
+                         .insertions_since_last_comparison = 0,
+                         .deletions_since_last_comparison = 0,
+                         .change_insertion_count = 0,
+                         .change_deletion_count = d.count(),
+                         .change_modification_count = 0,
+                         .is_new_section = false,
+                         .is_deleted_section = true,
+                         .insertions = util::none,
+                         .deletions = d,
+                         .modifications = util::none};
+            c.validate();
+        }
+
+        // Cocoa will throw an error if an index is
+        // deleted and reloaded in the same table view update block
+        for (auto& [section, indexes] : deletions) {
+            modifications[section].remove(indexes);
+            if (modifications[section].empty()) {
+                modifications.erase(section);
+            }
+        }
+
+        auto remove_empty_changes = [](std::map<size_t, IndexSet>& change) {
+            std::vector<size_t> indexes_to_remove;
+            for (auto& [section, indexes] : change) {
+                if (indexes.empty()) {
+                    indexes_to_remove.push_back(section);
+                }
+            }
+            for (auto i : indexes_to_remove) {
+                change.erase(i);
+            }
+        };
+
+        remove_empty_changes(insertions);
+        remove_empty_changes(deletions);
+        remove_empty_changes(modifications);
+
+        return {sections_to_insert, sections_to_remove};
     }
 
 private:
     SectionedResultsNotificatonCallback m_cb;
     SectionedResults& m_sectioned_results;
-    std::vector<SectionRange> m_prev_offset_ranges;
+    std::vector<SectionRange> m_prev_sections;
+    std::vector<std::pair<size_t, size_t>> m_prev_row_to_index_path;
     util::Optional<size_t> m_section_filter;
 };
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
     m_parent->calculate_sections_if_required();
-    return m_parent->m_results.get_any(m_parent->m_offset_ranges[m_index].indices[idx]);
+    return m_parent->m_results.get_any(m_parent->m_sections[m_index].indices[idx]);
 }
 
 Mixed ResultsSection::key()
 {
-    return m_parent->m_offset_ranges[m_index].key;
+    return m_parent->m_sections[m_index].key;
 }
 
 template <typename Context>
 auto ResultsSection::get(Context& ctx, size_t row_ndx)
 {
     m_parent->calculate_sections_if_required();
-    return m_parent->m_results.get(ctx, m_parent->m_offset_ranges[m_index].indices[row_ndx]);
+    return m_parent->m_results.get(ctx, m_parent->m_sections[m_index].indices[row_ndx]);
 }
 
 size_t ResultsSection::size()
 {
     m_parent->calculate_sections_if_required();
-    REALM_ASSERT(m_parent->m_offset_ranges.size() > m_index);
-    auto range = m_parent->m_offset_ranges[m_index];
+    REALM_ASSERT(m_parent->m_sections.size() > m_index);
+    auto range = m_parent->m_sections[m_index];
     return range.indices.size();
 }
 
@@ -228,13 +424,65 @@ void SectionedResults::calculate_sections_if_required(bool force_update)
         m_results.ensure_up_to_date();
     }
 
-    m_offset_ranges = calculate_sections(m_results, m_callback);
+    calculate_sections();
 }
+
+// This method will run in the following scenarios:
+// - SectionedResults is freshly created from Results
+// - The underlying Table in the Results collection has changed
+void SectionedResults::calculate_sections()
+{
+    auto r = m_results.snapshot();
+    size_t size = r.size();
+    m_sections.clear();
+    m_row_to_index_path.clear();
+    std::map<Mixed, size_t> key_to_section_index;
+    m_row_to_index_path.resize(size);
+    for (size_t i = 0; i < size; ++i) {
+        Mixed key = m_callback(r.get_any(i), r.get_realm());
+        // Disallow links as section keys. It would be uncommon to use them to begin with
+        // and if the object acting as the key was deleted bad things would happen.
+        if (!key.is_null() && key.get_type() == type_Link) {
+            throw std::logic_error("Links are not supported as section keys.");
+        }
+        auto it = key_to_section_index.find(key);
+        if (it == key_to_section_index.end()) {
+            auto idx = m_sections.size();
+            SectionRange section;
+            section.key = key;
+            section.index = idx;
+            section.indices.push_back(i);
+            section.hash = key.hash();
+            m_sections.push_back(section);
+            it = key_to_section_index.insert({key, m_sections.size() - 1}).first;
+            m_row_to_index_path[i] = {it->second, section.indices.size() - 1};
+        }
+        else {
+            auto& section = m_sections[it->second];
+            section.indices.push_back(i);
+            m_row_to_index_path[i] = {it->second, section.indices.size() - 1};
+        }
+    }
+
+    auto desc = r.get_descriptor_ordering();
+    if (desc.will_apply_sort()) {
+        const SortDescriptor* sort_desc = static_cast<const SortDescriptor*>(desc[0]);
+        auto is_asc = sort_desc->is_ascending(0);
+        if (is_asc) {
+            bool is_ascending = *is_asc;
+            std::sort(m_sections.begin(), m_sections.end(),
+                      [&is_ascending](const SectionRange& a, const SectionRange& b) {
+                          return is_ascending ? (a.key < b.key) : (a.key > b.key);
+                      });
+        }
+    }
+}
+
 
 size_t SectionedResults::size()
 {
     calculate_sections_if_required();
-    return m_offset_ranges.size();
+    return m_sections.size();
 }
 
 ResultsSection SectionedResults::operator[](size_t idx)
@@ -268,7 +516,7 @@ SectionedResults SectionedResults::snapshot()
     // not need to set it.
     SectionedResults sr;
     sr.m_results = m_results.snapshot();
-    sr.m_offset_ranges = m_offset_ranges;
+    sr.m_sections = m_sections;
     return sr;
 }
 

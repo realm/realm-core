@@ -121,6 +121,7 @@ private:
 
     friend struct SectionedResultsNotificationHandler;
     void calculate_sections_if_required(bool force_update = false);
+    void calculate_sections();
 
     NotificationToken add_notification_callback_for_section(size_t section_index,
                                                             SectionedResultsNotificatonCallback callback,
@@ -128,24 +129,31 @@ private:
 
     friend class realm::ResultsSection;
     Results m_results;
-    std::vector<SectionRange> m_offset_ranges;
+    std::vector<SectionRange> m_sections;
+    std::vector<std::pair<size_t, size_t>> m_row_to_index_path;
     SectionKeyFunc m_callback;
     uint_fast64_t m_previous_content_version;
 };
 
 struct SectionedResultsChangeSet {
     /// Sections and indices in the _new_ collection which are new insertions
-    std::map<size_t, std::vector<size_t>> insertions;
+    std::map<size_t, IndexSet> insertions;
     /// Sections and indices of objects in the _old_ collection which were modified
-    std::map<size_t, std::vector<size_t>> modifications;
+    std::map<size_t, IndexSet> modifications;
     /// Sections and indices which were removed from the _old_ collection
-    std::map<size_t, std::vector<size_t>> deletions;
+    std::map<size_t, IndexSet> deletions;
+
+    IndexSet sections_to_insert;
+    IndexSet sections_to_delete;
 };
 
 /// For internal use only. Used to track the indicies for a given section.
 struct SectionRange {
     size_t index;
     Mixed key;
+    // A unique id which helps us calculate what section has changed in the notification callback.
+    // We need this because Mixed doesn't copy all value types.
+    size_t hash;
     std::vector<size_t> indices;
 };
 
