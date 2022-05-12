@@ -2638,7 +2638,7 @@ typedef struct realm_user_identity {
     /**
      * Ptr to null terminated string representing user identity (memory has to be freed by SDK)
      */
-    const char* id;
+    char* id;
     /**
      * Enum representing the list of auth providers
      */
