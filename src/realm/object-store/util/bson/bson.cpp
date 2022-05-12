@@ -599,6 +599,8 @@ Bson dom_elem_to_bson(const Json& json)
             return Bson();
         case Json::value_t::string:
             return Bson(json.get<std::string>());
+        case Json::value_t::binary:
+            return Bson(json.get_binary());
         case Json::value_t::boolean:
             return Bson(json.get<bool>());
         case Json::value_t::number_integer:

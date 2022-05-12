@@ -91,15 +91,9 @@ else()
         add_compile_options(-Wunreachable-code -Wshorten-64-to-32 -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types -Wdocumentation -Wthread-safety -Wthread-safety-negative -Wmissing-prototypes)
     endif()
 
-    if(CMAKE_CXX_STANDARD EQUAL 20)
-        # std::is_pod was deprecated in c++20, but is still used by 3rd party json parser.
-        # TODO remove this once we upgrade it.
-        add_cxx_flag_if_supported(-Wno-deprecated-declarations)
-    endif()
-
     add_cxx_flag_if_supported(-Wpartial-availability)
 
-    # This warning is too agressive. It warns about moves that are not redundant on older
+    # This warning is too aggressive. It warns about moves that are not redundant on older
     # compilers that we still support. It is also harmless, unlike pessimizing moves.
     add_cxx_flag_if_supported(-Wno-redundant-move)
 
@@ -126,7 +120,6 @@ endif()
 set(OPENSSL_VERSION ${DEP_OPENSSL_VERSION})
 
 set(CMAKE_DEBUG_POSTFIX "-dbg")
-set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

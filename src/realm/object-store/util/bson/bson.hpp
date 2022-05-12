@@ -30,10 +30,11 @@
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <realm/uuid.hpp>
+#include <realm/util/span.hpp>
+
 #include <ostream>
 
-namespace realm {
-namespace bson {
+namespace realm::bson {
 
 class Bson {
 public:
@@ -81,6 +82,7 @@ public:
 
     Bson(const RegularExpression&) noexcept;
     Bson(const std::vector<char>&) noexcept;
+    Bson(util::Span<const uint8_t>) noexcept;
     Bson(const std::string&) noexcept;
     Bson(const IndexedMap<Bson>&) noexcept;
     Bson(const std::vector<Bson>&) noexcept;
@@ -315,6 +317,13 @@ inline Bson::Bson(const std::vector<char>& v) noexcept
     new (&binary_val) std::vector<char>(v);
 }
 
+inline Bson::Bson(util::Span<const uint8_t> v) noexcept
+{
+    m_type = Bson::Type::Binary;
+    auto data = reinterpret_cast<const char*>(v.data());
+    new (&binary_val) std::vector<char>(data, data + v.size());
+}
+
 inline Bson::Bson(const std::string& v) noexcept
 {
     m_type = Bson::Type::String;
@@ -391,7 +400,6 @@ std::ostream& operator<<(std::ostream& out, const Bson& b);
 
 Bson parse(const std::string_view& json);
 
-} // namespace bson
-} // namespace realm
+} // namespace realm::bson
 
 #endif // REALM_BSON_HPP
