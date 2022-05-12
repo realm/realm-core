@@ -773,7 +773,7 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
 {
     m_logger.info("Audit: Uploading '%1'", session->path());
     m_upload_sessions.push_back(session);
-    session->wait_for_upload_completion([this, weak_self = weak_from_this(), session](std::error_code ec) {
+    session->wait_for_upload_completion([this, weak_self = weak_from_this(), session](Status status) {
         auto self = weak_self.lock();
         if (!self)
             return;
@@ -786,10 +786,10 @@ void AuditRealmPool::wait_for_upload(std::shared_ptr<SyncSession> session)
             auto path = session->path();
             session->close();
             m_open_paths.erase(path);
-            if (ec) {
-                m_logger.error("Audit: Upload on '%1' failed with error '%2'.", path, ec.message());
+            if (status.get_std_error_code()) {
+                m_logger.error("Audit: Upload on '%1' failed with error '%2'.", path, status.reason());
                 if (m_error_handler) {
-                    m_error_handler(SyncError(ec, ec.message(), false));
+                    m_error_handler(SyncError(status.get_std_error_code(), status.reason(), false));
                 }
             }
             else {
@@ -872,7 +872,8 @@ void AuditRealmPool::open_new_realm()
     sync_config->error_handler = [error_handler = m_error_handler, weak_self = weak_from_this()](auto,
                                                                                                  SyncError error) {
         if (auto self = weak_self.lock()) {
-            self->m_logger.error("Audit: Received sync error: %1 (ec=%2)", error.message, error.error_code.value());
+            self->m_logger.error("Audit: Received sync error: %1 (ec=%2)", error.message,
+                                 error.get_system_error().value());
         }
         if (error_handler) {
             error_handler(error);
