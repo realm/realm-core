@@ -329,7 +329,7 @@ private:
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
 
     void download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
-        REQUIRES(!m_config_mutex, !m_state_mutex);
+        REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
     void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
                                        util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
         REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
