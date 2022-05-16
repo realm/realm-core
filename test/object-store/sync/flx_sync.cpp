@@ -16,10 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "realm/object-store/property.hpp"
-#include "realm/query_conditions.hpp"
-#include "realm/util/any.hpp"
-#include "util/baas_admin_api.hpp"
 #if REALM_ENABLE_AUTH_TESTS
 
 #include <catch2/catch.hpp>
@@ -191,6 +187,33 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
+    });
+}
+
+TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
+    FLXSyncTestHarness harness("flx_bad_query");
+    harness.do_with_new_user([&](auto user) {
+        SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
+        auto [error_promise, error_future] = util::make_promise_future<SyncError>();
+        auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+        config.sync_config->error_handler = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>,
+                                                                                        SyncError err) {
+            error_promise->emplace_value(std::move(err));
+        };
+
+        REQUIRE_THROWS_AS(
+            [&] {
+                auto realm = Realm::get_shared_realm(config);
+                CppContext c(realm);
+                realm->begin_transaction();
+                Object::create(c, realm, "TopLevel",
+                               util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                                 {"queryable_str_field", std::string{"foo"}},
+                                                 {"queryable_int_field", static_cast<int64_t>(5)},
+                                                 {"non_queryable_field", std::string{"non queryable 1"}}}));
+                realm->commit_transaction();
+            }(),
+            NoSubscriptionForWrite);
     });
 }
 

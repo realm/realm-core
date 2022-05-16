@@ -449,7 +449,7 @@ public:
 
     // A write validator takes a single argument right now - the table name minus the "class_" prefix.
     // If a write is okay to proceed, then this function should have no side-effects. Otherwise, it should throw.
-    using WriteValidator = void(StringData);
+    using WriteValidator = void(std::string_view);
     void set_write_validator(util::UniqueFunction<WriteValidator> validator)
     {
         m_write_validator = std::move(validator);
@@ -497,7 +497,6 @@ protected:
 private:
     ClientHistory m_history;
     const bool m_apply_server_changes;
-    std::mutex m_write_validator_mutex;
     util::UniqueFunction<WriteValidator> m_write_validator;
 };
 

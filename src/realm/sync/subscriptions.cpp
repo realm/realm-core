@@ -143,8 +143,18 @@ void SubscriptionSet::load_from_database(TransactionRef tr, Obj obj)
     m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
     auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
     m_subs.clear();
+    m_tables.clear();
     for (size_t idx = 0; idx < sub_list.size(); ++idx) {
         m_subs.push_back(Subscription(mgr.get(), sub_list.get_object(idx)));
+        increment_table_count(m_subs.back());
+    }
+}
+
+void SubscriptionSet::increment_table_count(const Subscription& sub)
+{
+    auto [table_it, inserted] = m_tables.insert({std::string{sub.object_class_name()}, 1});
+    if (!inserted) {
+        ++table_it->second;
     }
 }
 
@@ -210,6 +220,11 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
     });
 }
 
+bool SubscriptionSet::has_subscription_for_table(std::string_view object_class_name) const
+{
+    return m_tables.find(object_class_name) != m_tables.end();
+}
+
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
     : SubscriptionSet(mgr, tr, obj)
     , m_tr(std::move(tr))
@@ -238,19 +253,27 @@ MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     check_is_mutable();
-    return m_subs.erase(it);
+    REALM_ASSERT(it != end());
+    auto tables_it = m_tables.find(it->object_class_name());
+    auto ret = m_subs.erase(it);
+    if (--tables_it->second == 0) {
+        m_tables.erase(tables_it);
+    }
+    return ret;
 }
 
 void MutableSubscriptionSet::clear()
 {
     check_is_mutable();
     m_subs.clear();
+    m_tables.clear();
 }
 
 void MutableSubscriptionSet::insert_sub(const Subscription& sub)
 {
     check_is_mutable();
     m_subs.push_back(sub);
+    increment_table_count(sub);
 }
 
 std::pair<SubscriptionSet::iterator, bool>
@@ -267,6 +290,7 @@ MutableSubscriptionSet::insert_or_assign_impl(iterator it, util::Optional<std::s
     }
     it = m_subs.insert(m_subs.end(),
                        Subscription(std::move(name), std::move(object_class_name), std::move(query_str)));
+    increment_table_count(*it);
 
     return {it, true};
 }
@@ -733,6 +757,12 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
     remove_query.remove();
+}
+
+bool SubscriptionStore::latest_has_subscription_for_object_class(std::string_view object_class_name)
+{
+    auto latest = get_latest();
+    return latest.has_subscription_for_table(object_class_name);
 }
 
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const

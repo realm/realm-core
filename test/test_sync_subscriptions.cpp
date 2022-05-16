@@ -489,4 +489,49 @@ TEST(Sync_SubscriptionStoreNextPendingVersion)
     CHECK(!pending_version);
 }
 
+TEST(Sync_SubscriptionStoreSubSetHasTable)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    // We should have no subscriptions yet so this should return false.
+    CHECK_NOT(store->latest_has_subscription_for_object_class("a"));
+    CHECK_NOT(store->latest_has_subscription_for_object_class("fake_table_that_doesnt_exist"));
+
+    auto read_tr = fixture.db->start_read();
+    Query query_a(read_tr->get_table(fixture.a_table_key));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    auto mut_sub_set = store->get_latest().make_mutable_copy();
+    mut_sub_set.insert_or_assign(query_a);
+    mut_sub_set.insert_or_assign(query_b);
+    auto sub_set = std::move(mut_sub_set).commit();
+
+    CHECK(sub_set.has_subscription_for_table("a"));
+    CHECK(store->latest_has_subscription_for_object_class("a"));
+    CHECK_NOT(sub_set.has_subscription_for_table("fake_table_that_doesnt_exist"));
+    CHECK_NOT(store->latest_has_subscription_for_object_class("fake_table_that_doesnt_exist"));
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    mut_sub_set.erase(mut_sub_set.find(query_a));
+    sub_set = std::move(mut_sub_set).commit();
+
+    CHECK(sub_set.has_subscription_for_table("a"));
+    CHECK(store->latest_has_subscription_for_object_class("a"));
+    CHECK_NOT(sub_set.has_subscription_for_table("fake_table_that_doesnt_exist"));
+    CHECK_NOT(store->latest_has_subscription_for_object_class("fake_table_that_doesnt_exist"));
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    mut_sub_set.erase(mut_sub_set.find(query_b));
+    sub_set = std::move(mut_sub_set).commit();
+
+    CHECK_NOT(sub_set.has_subscription_for_table("a"));
+    CHECK_NOT(store->latest_has_subscription_for_object_class("a"));
+    CHECK_NOT(sub_set.has_subscription_for_table("fake_table_that_doesnt_exist"));
+    CHECK_NOT(store->latest_has_subscription_for_object_class("fake_table_that_doesnt_exist"));
+}
+
 } // namespace realm::sync

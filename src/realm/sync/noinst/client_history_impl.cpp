@@ -230,19 +230,18 @@ void ClientReplication::finalize_changeset() noexcept
 
 void ClientReplication::validate_write(const Table* table)
 {
-        if (!m_write_validator) {
-            return;
-        }
+    if (!m_write_validator) {
+        return;
+    }
 
-        auto table_name = table->get_name();
-        if (!table_name.begins_with("class_")) {
-            return;
-        }
+    auto table_name = table->get_name();
+    if(!table_name.begins_with("class_")) {
+        return;
+    }
 
-        // Trim the "class_" from the table name.
-        table_name = table_name.substr(6);
+    table_name = Group::table_name_to_class_name(table_name);
 
-        m_write_validator(table_name);
+    m_write_validator(std::string_view(table_name));
 }
 
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,

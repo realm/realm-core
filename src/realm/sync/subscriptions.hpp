@@ -23,6 +23,7 @@
 #include "realm/obj.hpp"
 #include "realm/query.hpp"
 #include "realm/timestamp.hpp"
+#include "realm/util/flat_map.hpp"
 #include "realm/util/future.hpp"
 #include "realm/util/functional.hpp"
 #include "realm/util/optional.hpp"
@@ -178,6 +179,9 @@ public:
     const_iterator find(StringData name) const;
     const_iterator find(const Query& query) const;
 
+    // Returns true if at least one subscription exists for a given object_class_name
+    bool has_subscription_for_table(std::string_view object_class_name) const;
+
     // Returns this query set as extended JSON in a form suitable for transmitting to the server.
     std::string to_ext_json() const;
 
@@ -194,6 +198,7 @@ protected:
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
 
     void load_from_database(TransactionRef tr, Obj obj);
+    void increment_table_count(const Subscription& sub);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -205,6 +210,7 @@ protected:
     State m_state = State::Uncommitted;
     std::string m_error_str;
     DB::version_type m_snapshot_version;
+    util::FlatMap<std::string, int> m_tables;
     std::vector<Subscription> m_subs;
 };
 
@@ -325,6 +331,8 @@ public:
 
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
+
+    bool latest_has_subscription_for_object_class(std::string_view object_class_name);
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;
