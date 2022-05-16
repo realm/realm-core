@@ -723,11 +723,11 @@ void SyncSession::create_sync_session()
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
     // Configure the sync transaction callback.
-    auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
+    auto wrapped_callback = [weak_self](VersionID old_version, VersionID new_version) {
         if (auto self = weak_self.lock()) {
-            util::CheckedLockGuard l(m_state_mutex);
-            if (m_sync_transact_callback) {
-                m_sync_transact_callback(old_version, new_version);
+            util::CheckedLockGuard l(self->m_state_mutex);
+            if (self->m_sync_transact_callback) {
+                self->m_sync_transact_callback(old_version, new_version);
             }
         }
     };
