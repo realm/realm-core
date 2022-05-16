@@ -382,20 +382,20 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcep
     return nullptr;
 }
 
-RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n)
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n,
+                                     bool* data_copied)
 {
     return wrap_err([&] {
         const auto& users = (*app)->all_users();
-        set_array_size(out_n, users.size());
-        if (capacity < users.size())
-            return false;
-
-        if (out_users) {
+        set_out_param(out_n, users.size());
+        set_out_param(data_copied, false);
+        if (out_users && capacity >= users.size()) {
             OutBuffer<realm_user_t> buf(out_users);
             for (const auto& user : users) {
                 buf.emplace(user);
             }
             buf.release(out_n);
+            set_out_param(data_copied, true);
         }
         return true;
     });
@@ -726,19 +726,18 @@ RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) noexce
 }
 
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
-                                           size_t max, size_t* out_n)
+                                           size_t max, size_t* out_n, bool* data_copied)
 {
     return wrap_err([&] {
         const auto& identities = (*user)->identities();
-        set_array_size(out_n, identities.size());
-        if (max < identities.size())
-            return false;
-
-        if (out_identities) {
+        set_out_param(out_n, identities.size());
+        set_out_param(data_copied, false);
+        if (out_identities && max >= identities.size()) {
             for (size_t i = 0; i < identities.size(); i++) {
                 out_identities[i] = {identities[i].id.c_str(),
                                      realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
             }
+            set_out_param(data_copied, true);
         }
         return true;
     });

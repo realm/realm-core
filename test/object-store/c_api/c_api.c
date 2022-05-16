@@ -140,9 +140,11 @@ int realm_c_api_tests(const char* file)
 
     realm_class_key_t class_keys[2];
     size_t n;
-    realm_get_class_keys(realm, class_keys, 2, &n);
+    bool data_copied = false;
+    realm_get_class_keys(realm, class_keys, 2, &n, &data_copied);
     CHECK_ERROR();
     assert(n == 2);
+    assert(data_copied);
 
     bool found = false;
     realm_class_info_t foo_info;
@@ -168,10 +170,12 @@ int realm_c_api_tests(const char* file)
     realm_property_info_t* foo_properties = malloc(sizeof(realm_property_info_t) * foo_info.num_properties);
     realm_property_info_t* bar_properties = malloc(sizeof(realm_property_info_t) * bar_info.num_properties);
 
-    realm_get_class_properties(realm, foo_info.key, foo_properties, foo_info.num_properties, NULL);
+    realm_get_class_properties(realm, foo_info.key, foo_properties, foo_info.num_properties, NULL, &data_copied);
     CHECK_ERROR();
-    realm_get_class_properties(realm, bar_info.key, bar_properties, bar_info.num_properties, NULL);
+    assert(data_copied);
+    realm_get_class_properties(realm, bar_info.key, bar_properties, bar_info.num_properties, NULL, &data_copied);
     CHECK_ERROR();
+    assert(data_copied);
 
     // Find properties by name.
     realm_property_info_t foo_int, foo_str, foo_bars, bar_int, bar_strings;

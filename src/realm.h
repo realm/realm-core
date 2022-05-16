@@ -1169,15 +1169,18 @@ RLM_API size_t realm_get_num_classes(const realm_t*);
 
 /**
  * Get the table keys for classes in the schema.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  data_copied  accordingly.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param out_keys An array that will contain the keys of each class in the
- *                 schema. May be NULL, in which case `out_n` can be used to
- *                 determine the number of classes in the schema.
+ *                 schema. Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of keys to write to `out_keys`.
  * @param out_n The actual number of classes. May be NULL.
+ * @param data_copied true if the data was copied sucessfully into the array
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_class_keys(const realm_t*, realm_class_key_t* out_keys, size_t max, size_t* out_n);
+RLM_API bool realm_get_class_keys(const realm_t*, realm_class_key_t* out_keys, size_t max, size_t* out_n, bool* data_copied);
 
 /**
  * Find a by the name of @a name.
@@ -1207,37 +1210,39 @@ RLM_API bool realm_get_class(const realm_t*, realm_class_key_t key, realm_class_
 
 /**
  * Get the list of properties for the class with this @a key.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  data_copied  accordingly.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
- * @param out_properties A pointer to an array of `realm_property_info_t`, which
+ * @param out_properties  A pointer to an array of `realm_property_info_t`, which
  *                       will be populated with the information about the
- *                       properties. To see all properties, the length of the
- *                       array should be at least the number of properties in
- *                       the class, as reported in the sum of persisted and
- *                       computed properties for the class. May be NULL, in
- *                       which case this function can be used to discover the
- *                       number of properties in the class.
+ *                       properties.  Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of entries to write to `out_properties`.
  * @param out_n The actual number of properties written to `out_properties`.
+ * @param data_copied true if the data was copied successfully into the array passed
  * @return True if no exception occurred.
  */
 RLM_API bool realm_get_class_properties(const realm_t*, realm_class_key_t key, realm_property_info_t* out_properties,
-                                        size_t max, size_t* out_n);
+                                        size_t max, size_t* out_n, bool* data_copied);
 
 /**
  * Get the property keys for the class with this @a key.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  data_copied  accordingly.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param key The class key.
- * @param out_col_keys An array of property keys. May be NULL, in which case
- *                     this function can be used to discover the number of
- *                     properties for this class.
+ * @param out_col_keys An array of property keys. Array may be NULL,
+ *                     in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of keys to write to `out_col_keys`. Ignored if
  *            `out_col_keys == NULL`.
  * @param out_n The actual number of properties written to `out_col_keys` (if
  *              non-NULL), or number of properties in the class.
+ * @param data_copied true if the data was copied successfully into the array passed.
+ * @return True if no exception occurred.
  **/
 RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, realm_property_key_t* out_col_keys,
-                                     size_t max, size_t* out_n);
-
+                                     size_t max, size_t* out_n, bool* data_copied);
 
 /**
  * Find a property by its column key.
@@ -2727,18 +2732,21 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
 
 /**
  * Get the list of active users in this @a app.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  data_copied  accordingly.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param out_users A pointer to an array of `realm_user_t*`, which
  *                  will be populated with the list of active users in the app.
- *                  May be NULL, in which case this function can be used to
- *                  discover the number of active users by passing in just `out_n`.
+ *                  Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param capacity The maximum number of elements `out_users` can hold.
  * @param out_n The actual number of entries written to `out_users`.
  *              May be NULL.
+ * @param data_copied true if the data was copied successfully into the array passed.
  * @return True if no exception occurred.
  */
 RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity,
-                                     size_t* out_n);
+                                     size_t* out_n, bool* data_copied);
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
                                                realm_app_user_completion_func_t, void* userdata,
@@ -2904,15 +2912,14 @@ typedef struct {
  *
  * @param out_identities A pointer to an array of `realm_user_identity_t`, which
  *                       will be populated with the list of identities of this user.
- *                       May be NULL, in which case this function can be used to
- *                       discover the number of identities of this user by passing in NULL here
- *                       and examining `*out_n`.
+ *                       Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param capacity The maximum number of elements `out_identities` can hold.
  * @param out_n The actual number of entries written to `out_identities`. May be NULL.
+ * @param data_copied true if the data was copied successfully into the array passed.
  * @return true, if no errors occurred.
  */
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
-                                           size_t capacity, size_t* out_n);
+                                           size_t capacity, size_t* out_n, bool* data_copied);
 
 RLM_API const char* realm_user_get_local_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 

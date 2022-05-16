@@ -106,7 +106,8 @@ inline char* duplicate_string(const std::string& string)
     return ret;
 }
 
-inline void set_array_size(size_t* out_n, size_t n)
+template <typename T>
+inline void set_out_param(T* out_n, T n)
 {
     if (out_n) {
         *out_n = n;
