@@ -145,9 +145,7 @@ SyncTestFile::SyncTestFile(std::shared_ptr<realm::SyncUser> user, realm::Schema 
                          "An unexpected sync error was caught by the default SyncTestFile handler: '%1' for '%2'",
                          error.message, session->path())
                   << std::endl;
-        if (error.is_fatal) {
-            abort();
-        }
+        abort();
     };
     schema_version = 1;
     schema = _schema;

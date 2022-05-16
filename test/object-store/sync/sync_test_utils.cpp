@@ -331,6 +331,36 @@ private:
 
 #if REALM_ENABLE_AUTH_TESTS
 
+static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const AppSession& app_session,
+                                       const std::string& schema_name, const bson::BsonDocument& filter_bson)
+{
+    // While at this point the object has been sync'd successfully, we must also
+    // wait for it to appear in the backing database before terminating sync
+    // otherwise the translator may be terminated before it has a chance to
+    // integrate it into the backing database. If the server were to change
+    // the meaning of "upload complete" to include writing to atlas then this would
+    // not be necessary.
+    app::MongoClient remote_client = user->mongo_client("BackingDB");
+    app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
+    app::MongoCollection object_coll = db[schema_name];
+    uint64_t count_external = 0;
+
+    timed_sleeping_wait_for(
+        [&]() -> bool {
+            if (count_external == 0) {
+                object_coll.count(filter_bson, [&](uint64_t count, util::Optional<app::AppError> error) {
+                    REQUIRE(!error);
+                    count_external = count;
+                });
+            }
+            if (count_external == 0) {
+                millisleep(2000); // don't spam the server too much
+            }
+            return count_external > 0;
+        },
+        std::chrono::minutes(5));
+}
+
 struct BaasClientReset : public TestClientReset {
     BaasClientReset(const Realm::Config& local_config, const Realm::Config& remote_config,
                     TestAppSession& test_app_session)
@@ -373,32 +403,9 @@ struct BaasClientReset : public TestClientReset {
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            // While at this point the object has been sync'd successfully, we must also
-            // wait for it to appear in the backing database before terminating sync
-            // otherwise the translator may be terminated before it has a chance to
-            // integrate it into the backing database. If the server were to change
-            // the meaning of "upload complete" to include writing to atlas then this would
-            // not be necessary.
-            app::MongoClient remote_client = m_local_config.sync_config->user->mongo_client("BackingDB");
-            app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
-            app::MongoCollection object_coll = db[object_schema_name];
-            uint64_t count_external = 0;
+            wait_for_object_to_persist(m_local_config.sync_config->user, app_session, object_schema_name,
+                                       {{pk_col_name, pk}});
 
-            timed_sleeping_wait_for(
-                [&]() -> bool {
-                    if (count_external == 0) {
-                        object_coll.count({{pk_col_name, pk}},
-                                          [&](uint64_t count, util::Optional<app::AppError> error) {
-                                              REQUIRE(!error);
-                                              count_external = count;
-                                          });
-                    }
-                    if (count_external == 0) {
-                        millisleep(2000); // don't spam the server too much
-                    }
-                    return count_external > 0;
-                },
-                std::chrono::minutes(5));
             session->log_out();
 
             realm->begin_transaction();
@@ -487,25 +494,11 @@ struct BaasFLXClientReset : public TestClientReset {
         REALM_ASSERT(m_local_config.schema->find(c_object_schema_name) != m_local_config.schema->end());
     }
 
-    void wait_for_initial_sync()
-    {
-        // Reduce the liklihood of getting ProtocolError 229:
-        // "attempted to start a session while initial sync is in progress"
-        // This is not a fatal error, and sync should retry within 5 minutes,
-        // but rather not prolong the tests if it can be avoided.
-        // TODO: it should be possible to poll MongoDB to see if it is done
-        // initial bootstraping by checking via the Admin API if this database
-        // name is in the QBS metadata.
-        // https://github.com/10gen/baas/blob/a63be65c69bbeca78a1c31201e7aeee472d120b3/etc/sync/e2e/net/Utils/TestHarness.cs#L313
-        millisleep(2000);
-    }
-
     void run() override
     {
         m_did_run = true;
         const AppSession& app_session = m_test_app_session.app_session();
 
-        wait_for_initial_sync();
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = realm->sync_session();
         const ObjectId pk_of_added_object("123456789000000000000000");
@@ -516,32 +509,9 @@ struct BaasFLXClientReset : public TestClientReset {
             constexpr bool create_object = true;
             subscribe_to_object_by_id(realm, pk_of_added_object, create_object);
 
-            // While at this point the object has been sync'd successfully, we must also
-            // wait for it to appear in the backing database before terminating sync
-            // otherwise the translator may be terminated before it has a chance to
-            // integrate it into the backing database. If the server were to change
-            // the meaning of "upload complete" to include writing to atlas then this would
-            // not be necessary.
-            app::MongoClient remote_client = m_local_config.sync_config->user->mongo_client("BackingDB");
-            app::MongoDatabase db = remote_client.db(app_session.config.mongo_dbname);
-            app::MongoCollection object_coll = db[std::string(c_object_schema_name)];
-            uint64_t count_external = 0;
-
-            timed_sleeping_wait_for(
-                [&]() -> bool {
-                    if (count_external == 0) {
-                        object_coll.count({{std::string(c_id_col_name), pk_of_added_object}},
-                                          [&](uint64_t count, util::Optional<app::AppError> error) {
-                                              REQUIRE(!error);
-                                              count_external = count;
-                                          });
-                    }
-                    if (count_external == 0) {
-                        millisleep(2000); // don't spam the server too much
-                    }
-                    return count_external > 0;
-                },
-                std::chrono::minutes(5));
+            wait_for_object_to_persist(m_local_config.sync_config->user, app_session,
+                                       std::string(c_object_schema_name),
+                                       {{std::string(c_id_col_name), pk_of_added_object}});
             session->log_out();
 
             if (m_make_local_changes) {
@@ -563,7 +533,6 @@ struct BaasFLXClientReset : public TestClientReset {
         }
 
         {
-            wait_for_initial_sync();
             auto realm2 = Realm::get_shared_realm(m_remote_config);
             wait_for_download(*realm2);
             load_initial_data(realm2);
