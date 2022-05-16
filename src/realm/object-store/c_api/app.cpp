@@ -824,7 +824,6 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user)
         }
         return nullptr;
     });
-    return nullptr;
 }
 
 } // namespace realm::c_api
