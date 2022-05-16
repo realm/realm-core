@@ -21,6 +21,7 @@
 #include "external/json/json.hpp"
 
 #include "realm/data_type.hpp"
+#include "realm/db.hpp"
 #include "realm/group.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
@@ -118,10 +119,15 @@ std::string_view Subscription::query_string() const
 }
 
 SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
+    : SubscriptionSet(std::move(mgr), *tr, std::move(obj))
+{
+}
+
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj)
     : m_mgr(mgr)
 {
     if (obj.is_valid()) {
-        load_from_database(std::move(tr), std::move(obj));
+        load_from_database(tr, std::move(obj));
     }
 }
 
@@ -132,11 +138,11 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(TransactionRef tr, Obj obj)
+void SubscriptionSet::load_from_database(const Transaction& tr, Obj obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    m_cur_version = tr->get_version();
+    m_cur_version = tr.get_version();
     m_version = obj.get_primary_key().get_int();
     m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_state));
     m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
@@ -759,9 +765,13 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     remove_query.remove();
 }
 
-bool SubscriptionStore::latest_has_subscription_for_object_class(std::string_view object_class_name)
+bool SubscriptionStore::latest_has_subscription_for_object_class(const Transaction& tr,
+                                                                 std::string_view object_class_name)
 {
-    auto latest = get_latest();
+    auto sub_sets = tr.get_table(m_sub_set_table);
+    auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
+    SubscriptionSet latest(weak_from_this(), tr, std::move(latest_obj));
     return latest.has_subscription_for_table(object_class_name);
 }
 

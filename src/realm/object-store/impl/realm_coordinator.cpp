@@ -107,13 +107,13 @@ void RealmCoordinator::create_sync_session()
     if (m_config.sync_config && m_config.sync_config->flx_sync_requested) {
         std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_sync_session->get_flx_subscription_store());
         sync::ClientReplication& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
-        history.set_write_validator([weak_sub_mgr](std::string_view object_class_name) {
+        history.set_write_validator([weak_sub_mgr](const Transaction& tr, std::string_view object_class_name) {
             auto sub_mgr = weak_sub_mgr.lock();
             if (!sub_mgr) {
                 return;
             }
 
-            if (!sub_mgr->latest_has_subscription_for_object_class(object_class_name)) {
+            if (!sub_mgr->latest_has_subscription_for_object_class(tr, object_class_name)) {
                 throw NoSubscriptionForWrite(
                     util::format("Cannot write to class %1 when no flexible sync subscription has been created.",
                                  object_class_name));

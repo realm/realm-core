@@ -88,7 +88,7 @@ protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
 
-    virtual void validate_write(const Table*) {}
+    virtual void validate_write(const Transaction&, const Table*) {}
 
 private:
     bool m_short_circuit = false;

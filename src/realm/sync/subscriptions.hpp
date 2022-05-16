@@ -196,8 +196,9 @@ protected:
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj);
 
-    void load_from_database(TransactionRef tr, Obj obj);
+    void load_from_database(const Transaction& tr, Obj obj);
     void increment_table_count(const Subscription& sub);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
@@ -332,7 +333,8 @@ public:
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
 
-    bool latest_has_subscription_for_object_class(std::string_view object_class_name);
+    bool latest_has_subscription_for_object_class(const Transaction& tr,
+                                                  std::string_view object_class_name);
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;

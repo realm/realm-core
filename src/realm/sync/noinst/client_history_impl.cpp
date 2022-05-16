@@ -228,7 +228,7 @@ void ClientReplication::finalize_changeset() noexcept
     m_history.m_changeset_from_server = util::none;
 }
 
-void ClientReplication::validate_write(const Table* table)
+void ClientReplication::validate_write(const Transaction& tr, const Table* table)
 {
     if (!m_write_validator) {
         return;
@@ -241,7 +241,7 @@ void ClientReplication::validate_write(const Table* table)
 
     table_name = Group::table_name_to_class_name(table_name);
 
-    m_write_validator(std::string_view(table_name));
+    m_write_validator(tr, std::string_view(table_name));
 }
 
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
