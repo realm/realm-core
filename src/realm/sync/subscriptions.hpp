@@ -159,6 +159,9 @@ public:
     // The query version number used in the sync wire protocol to identify this subscription set to the server.
     int64_t version() const;
 
+    // The database version that this subscription set was created at or -1 if Uncommitted.
+    DB::version_type snapshot_version() const;
+
     // The current state of this subscription set
     State state() const;
 
@@ -205,7 +208,7 @@ protected:
     int64_t m_version = 0;
     State m_state = State::Uncommitted;
     std::string m_error_str;
-    DB::version_type m_snapshot_version;
+    DB::version_type m_snapshot_version = std::numeric_limits<DB::version_type>::max();
     std::vector<Subscription> m_subs;
 };
 
@@ -335,6 +338,7 @@ public:
 
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
+    std::vector<SubscriptionSet> get_pending_subscriptions() const;
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;

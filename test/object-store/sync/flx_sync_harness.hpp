@@ -39,12 +39,10 @@ public:
     {
         Schema schema{
             {"TopLevel",
-             {
-                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                 {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-                 {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-                 {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
-             }},
+             {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+              {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+              {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+              {"non_queryable_field", PropertyType::String | PropertyType::Nullable}}},
         };
 
         return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};

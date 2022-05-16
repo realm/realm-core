@@ -29,6 +29,7 @@
 #include "realm/object-store/sync/generic_network_transport.hpp"
 #include "realm/object-store/sync/sync_session.hpp"
 #include "realm/object_id.hpp"
+#include "realm/query_expression.hpp"
 #include "realm/sync/client_base.hpp"
 #include "realm/sync/config.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
@@ -246,17 +247,53 @@ static auto make_client_reset_handler()
 }
 
 TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
-    FLXSyncTestHarness harness("flx_client_reset");
+    Schema schema{
+        {"TopLevel",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+             {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+             {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
+             {"list_of_ints_field", PropertyType::Int | PropertyType::Array},
+             {"sum_of_list_field", PropertyType::Int},
+         }},
+    };
 
-    auto add_object = [](SharedRealm realm, std::string str_field, int64_t int_field) {
+    // some of these tests makde additive schema changes which is only allowed in dev mode
+    constexpr bool dev_mode = true;
+    FLXSyncTestHarness harness("flx_client_reset",
+                               {schema, {"queryable_str_field", "queryable_int_field"}, {}, dev_mode});
+
+    auto add_object = [](SharedRealm realm, std::string str_field, int64_t int_field,
+                         ObjectId oid = ObjectId::gen()) {
         CppContext c(realm);
         realm->begin_transaction();
+        int64_t r1 = random_int();
+        int64_t r2 = random_int();
+        int64_t r3 = random_int();
+
         Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{{"_id", ObjectId::gen()},
+                       util::Any(AnyDict{{"_id", oid},
                                          {"queryable_str_field", str_field},
                                          {"queryable_int_field", int_field},
-                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+                                         {"non_queryable_field", std::string{"non queryable 1"}},
+                                         {"list_of_ints_field", std::vector<util::Any>{r1, r2, r3}},
+                                         {"sum_of_list_field", r1 + r2 + r3}}));
         realm->commit_transaction();
+    };
+
+    auto subscribe_to_and_add_objects = [&](SharedRealm realm, size_t num_objects) {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto id_col = table->get_primary_key_column();
+        auto sub_set = realm->get_latest_subscription_set();
+        for (size_t i = 0; i < num_objects; ++i) {
+            auto oid = ObjectId::gen();
+            auto mut_sub = sub_set.make_mutable_copy();
+            mut_sub.clear();
+            mut_sub.insert_or_assign(Query(table).equal(id_col, oid));
+            sub_set = std::move(mut_sub).commit();
+            add_object(realm, util::format("added _id='%1'", oid), 0, oid);
+        }
     };
 
     auto add_subscription_for_new_object = [&](SharedRealm realm, std::string str_field,
@@ -300,6 +337,166 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     const int64_t local_added_int = 100;
     const int64_t remote_added_int = 200;
 
+    SECTION("Recover: offline writes and subscriptions") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+                sync::SubscriptionSet::State actual =
+                    remote_realm->get_latest_subscription_set()
+                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                        .get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                auto subs = local_realm->get_latest_subscription_set();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                // make sure that the subscription for "foo" survived the reset
+                size_t count_of_foo = count_queries_with_str(subs, util::format("\"%1\"", str_field_value));
+                REQUIRE(subs.state() == sync::SubscriptionSet::State::Complete);
+                REQUIRE(count_of_foo == 1);
+                local_realm->refresh();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto str_col = table->get_column_key("queryable_str_field");
+                auto int_col = table->get_column_key("queryable_int_field");
+                auto tv = table->where().equal(str_col, StringData(str_field_value)).find_all();
+                tv.sort(int_col);
+                // the object we created while offline was recovered, and the remote object was downloaded
+                REQUIRE(tv.size() == 2);
+                CHECK(tv.get_object(0).get<Int>(int_col) == local_added_int);
+                CHECK(tv.get_object(1).get<Int>(int_col) == remote_added_int);
+            })
+            ->run();
+    }
+
+    auto validate_integrity_of_arrays = [](TableRef table) -> size_t {
+        auto sum_col = table->get_column_key("sum_of_list_field");
+        auto array_col = table->get_column_key("list_of_ints_field");
+        auto query = table->column<Lst<Int>>(array_col).sum() == table->column<Int>(sum_col) &&
+                     table->column<Lst<Int>>(array_col).size() > 0;
+        return query.count();
+    };
+
+    SECTION("Recover: offline writes with associated subscriptions in the correct order") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        constexpr size_t num_objects_added = 20;
+        constexpr size_t num_objects_added_by_harness = 1; // BaasFLXClientReset.run()
+        constexpr size_t num_objects_added_by_remote = 1;  // make_remote_changes()
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                subscribe_to_and_add_objects(local_realm, num_objects_added);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                REQUIRE(table->size() == num_objects_added + num_objects_added_by_harness);
+                size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
+                REQUIRE(count_of_valid_array_data == num_objects_added);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+                sync::SubscriptionSet::State actual =
+                    remote_realm->get_latest_subscription_set()
+                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                        .get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::Recover);
+                local_realm->refresh();
+                auto latest_subs = local_realm->get_latest_subscription_set();
+                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Complete);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                REQUIRE(table->size() == 1);
+                auto mut_sub = latest_subs.make_mutable_copy();
+                mut_sub.clear();
+                mut_sub.insert_or_assign(Query(table));
+                latest_subs = std::move(mut_sub).commit();
+                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                local_realm->refresh();
+                REQUIRE(table->size() ==
+                        num_objects_added + num_objects_added_by_harness + num_objects_added_by_remote);
+                size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
+                REQUIRE(count_of_valid_array_data == num_objects_added + num_objects_added_by_remote);
+            })
+            ->run();
+    }
+
+    SECTION("Recover: incompatible property changes are rejected") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+        size_t before_reset_count = 0;
+        size_t after_reset_count = 0;
+        config_local.sync_config->notify_before_client_reset = [&before_reset_count](SharedRealm) {
+            ++before_reset_count;
+        };
+        config_local.sync_config->notify_after_client_reset = [&after_reset_count](SharedRealm, SharedRealm, bool) {
+            ++after_reset_count;
+        };
+        auto&& [error_future, err_handler] = make_error_handler();
+        config_local.sync_config->error_handler = err_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        constexpr size_t num_objects_added_before = 2;
+        constexpr size_t num_objects_added_after = 2;
+        constexpr size_t num_objects_added_by_harness = 1; // BaasFLXClientReset.run()
+        constexpr std::string_view added_property_name = "new_property";
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                subscribe_to_and_add_objects(local_realm, num_objects_added_before);
+                Schema local_update = schema;
+                Schema::iterator it = local_update.find("TopLevel");
+                REQUIRE(it != local_update.end());
+                it->persisted_properties.push_back(
+                    {std::string(added_property_name), PropertyType::Float | PropertyType::Nullable});
+                local_realm->update_schema(local_update);
+                subscribe_to_and_add_objects(local_realm, num_objects_added_after);
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                REQUIRE(table->size() ==
+                        num_objects_added_before + num_objects_added_after + num_objects_added_by_harness);
+                size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
+                REQUIRE(count_of_valid_array_data == num_objects_added_before + num_objects_added_after);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+                Schema remote_update = schema;
+                Schema::iterator it = remote_update.find("TopLevel");
+                REQUIRE(it != remote_update.end());
+                it->persisted_properties.push_back(
+                    {std::string(added_property_name), PropertyType::UUID | PropertyType::Nullable});
+                remote_realm->update_schema(remote_update);
+                sync::SubscriptionSet::State actual =
+                    remote_realm->get_latest_subscription_set()
+                        .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+                        .get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Complete);
+            })
+            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm local_realm) {
+                auto sync_error = std::move(err_future).get();
+                REQUIRE(before_reset_count == 1);
+                REQUIRE(after_reset_count == 0);
+                REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+                REQUIRE(sync_error.is_client_reset_requested());
+                local_realm->refresh();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                // since schema validation happens in the first recovery commit, that whole commit is rolled back
+                // and the final state here is "pre reset"
+                REQUIRE(table->size() ==
+                        num_objects_added_before + num_objects_added_by_harness + num_objects_added_after);
+                size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
+                REQUIRE(count_of_valid_array_data == num_objects_added_before + num_objects_added_after);
+            })
+            ->run();
+    }
+
     SECTION("DiscardLocal: offline writes and subscriptions are lost") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
         auto&& [reset_future, reset_handler] = make_client_reset_handler();
@@ -315,6 +512,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
             ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
                 ClientResyncMode mode = client_reset_future.get();
                 REQUIRE(mode == ClientResyncMode::DiscardLocal);
+                auto subs = local_realm->get_latest_subscription_set();
+                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 auto queryable_str_field = table->get_column_key("queryable_str_field");
@@ -322,19 +521,15 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 auto tv = table->where().equal(queryable_str_field, StringData(str_field_value)).find_all();
                 // the object we created while offline was discarded, and the remote object was not downloaded
                 REQUIRE(tv.size() == 0);
-                auto active_subs = local_realm->get_active_subscription_set();
-                size_t count_of_foo = count_queries_with_str(active_subs, util::format("\"%1\"", str_field_value));
+                size_t count_of_foo = count_queries_with_str(subs, util::format("\"%1\"", str_field_value));
                 // make sure that the subscription for "foo" did not survive the reset
                 REQUIRE(count_of_foo == 0);
-                REQUIRE(active_subs.state() == sync::SubscriptionSet::State::Complete);
-                // the latest subscription set is the same one as the active one
-                auto latest_subs = local_realm->get_latest_subscription_set();
-                REQUIRE(latest_subs.version() == active_subs.version());
+                REQUIRE(subs.state() == sync::SubscriptionSet::State::Complete);
 
                 // adding data and subscriptions to a reset Realm works as normal
                 add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
-                latest_subs = local_realm->get_latest_subscription_set();
-                REQUIRE(latest_subs.version() > active_subs.version());
+                auto latest_subs = local_realm->get_latest_subscription_set();
+                REQUIRE(latest_subs.version() > subs.version());
                 latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 local_realm->refresh();
                 count_of_foo = count_queries_with_str(latest_subs, util::format("\"%1\"", str_field_value));
@@ -482,16 +677,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
     FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
-
-    SECTION("disallow recovery mode") {
-        harness.do_with_new_user([&](auto user) {
-            SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
-            config.sync_config->client_resync_mode = ClientResyncMode::Recover;
-            CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
-            config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
-            CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
-        });
-    }
 
     auto make_error_handler = [] {
         auto [error_promise, error_future] = util::make_promise_future<SyncError>();

@@ -566,8 +566,6 @@ struct BaasFLXClientReset : public TestClientReset {
             m_on_post_local(realm);
         }
         wait_for_upload(*realm);
-        auto subs = realm->get_latest_subscription_set();
-        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         if (m_on_post_reset) {
             m_on_post_reset(realm);
         }

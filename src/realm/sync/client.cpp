@@ -969,7 +969,6 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
             if (m_flx_active_version == new_version) {
                 return;
             }
-
             on_flx_sync_version_complete(new_version);
             new_state = SubscriptionSet::State::Complete;
             break;

@@ -24,6 +24,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/protocol.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 namespace realm {
 namespace _impl {
@@ -154,9 +155,10 @@ private:
 };
 
 struct RecoverLocalChangesetsHandler : public sync::InstructionApplier {
-    RecoverLocalChangesetsHandler(Transaction& remote_wt, Transaction& local_wt, util::Logger& logger);
+    RecoverLocalChangesetsHandler(Transaction& dest_wt, Transaction& frozen_pre_local_state, util::Logger& logger);
     virtual ~RecoverLocalChangesetsHandler();
-    void process_changesets(const std::vector<ChunkedBinaryData>& changesets);
+    void process_changesets(const std::vector<sync::ClientHistory::LocalChange>& changesets,
+                            std::vector<sync::SubscriptionSet>&& pending_subs);
 
 protected:
     using Instruction = sync::Instruction;
@@ -203,8 +205,7 @@ protected:
     friend struct sync::Instruction; // to allow visitor
 
 private:
-    Transaction& m_remote;
-    Transaction& m_local;
+    Transaction& m_frozen_pre_local_state;
     util::Logger& m_logger;
     InterningBuffer m_intern_keys;
     // Track any recovered operations on lists to make sure that they are allowed.
