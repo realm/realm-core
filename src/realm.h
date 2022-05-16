@@ -1180,7 +1180,8 @@ RLM_API size_t realm_get_num_classes(const realm_t*);
  * @param data_copied true if the data was copied sucessfully into the array
  * @return True if no exception occurred.
  */
-RLM_API bool realm_get_class_keys(const realm_t*, realm_class_key_t* out_keys, size_t max, size_t* out_n, bool* data_copied);
+RLM_API bool realm_get_class_keys(const realm_t*, realm_class_key_t* out_keys, size_t max, size_t* out_n,
+                                  bool* data_copied);
 
 /**
  * Find a by the name of @a name.
@@ -1216,7 +1217,8 @@ RLM_API bool realm_get_class(const realm_t*, realm_class_key_t key, realm_class_
  *
  * @param out_properties  A pointer to an array of `realm_property_info_t`, which
  *                       will be populated with the information about the
- *                       properties.  Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
+ *                       properties.  Array may be NULL, in this case no data will be copied and `out_n` set if not
+ * NULL.
  * @param max The maximum number of entries to write to `out_properties`.
  * @param out_n The actual number of properties written to `out_properties`.
  * @param data_copied true if the data was copied successfully into the array passed
@@ -2745,8 +2747,8 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
  * @param data_copied true if the data was copied successfully into the array passed.
  * @return True if no exception occurred.
  */
-RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity,
-                                     size_t* out_n, bool* data_copied);
+RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n,
+                                     bool* data_copied);
 
 RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
                                                realm_app_user_completion_func_t, void* userdata,
