@@ -58,7 +58,6 @@ enum class ProtocolError;
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError {
-
     enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
 
     std::error_code error_code;
@@ -143,16 +142,21 @@ struct SyncConfig {
 
     std::shared_ptr<SyncUser> user;
     std::string partition_value;
-    bool flx_sync_requested = false;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
-    bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SSLVerifyCallback> ssl_verify_callback;
     util::Optional<ProxyConfig> proxy_config;
+    bool flx_sync_requested = false;
+    bool client_validate_ssl = true;
 
     // If true, upload/download waits are canceled on any sync error and not just fatal ones
     bool cancel_waits_on_nonfatal_error = false;
+
+    // If false, changesets incoming from the server are discarded without
+    // applying them to the Realm file. This is required when writing objects
+    // directly to replication, and will break horribly otherwise
+    bool apply_server_changes = true;
 
     util::Optional<std::string> authorization_header_name;
     std::map<std::string, std::string> custom_http_headers;
@@ -164,6 +168,10 @@ struct SyncConfig {
     std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
     std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after, bool did_recover)>
         notify_after_client_reset;
+
+    // Will be called after a download message is received and validated by the client but befefore it's been
+    // transformed or applied. To be used in testing only.
+    std::function<void(std::weak_ptr<SyncSession>)> on_download_message_received_hook;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

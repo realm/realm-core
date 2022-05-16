@@ -210,7 +210,6 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
                                               : ctx.box(m_obj.get<ObjectId>(column));
         case PropertyType::Decimal:
             return ctx.box(m_obj.get<Decimal>(column));
-            //        case PropertyType::Any:    return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::UUID:
             return is_nullable(property.type) ? ctx.box(m_obj.get<util::Optional<UUID>>(column))
                                               : ctx.box(m_obj.get<UUID>(column));
@@ -218,7 +217,8 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property& prop
             return ctx.box(m_obj.get<Mixed>(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
-            return ctx.box(Object(m_realm, *linkObjectSchema, const_cast<Obj&>(m_obj).get_linked_object(column)));
+            auto linked = const_cast<Obj&>(m_obj).get_linked_object(column);
+            return ctx.box(Object(m_realm, *linkObjectSchema, linked, m_obj, column));
         }
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);

@@ -79,6 +79,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     m_err.emplace();
     m_err->kind.code = 0;
+    m_err->usercode_error = nullptr;
     auto populate_error = [&](const std::exception& ex, realm_errno_e error_number) {
         m_err->error = error_number;
         try {
@@ -115,6 +116,7 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     }
     catch (const CallbackFailed& ex) {
         populate_error(ex, RLM_ERR_CALLBACK);
+        m_err->usercode_error = ex.usercode_error;
     }
 
     // Core exceptions:
@@ -234,6 +236,18 @@ bool ErrorStorage::clear() noexcept
     return ret;
 }
 
+void ErrorStorage::set_usercode_error(void* usercode_error)
+{
+    m_usercode_error = usercode_error;
+}
+
+void* ErrorStorage::get_and_clear_usercode_error()
+{
+    auto ret = m_usercode_error;
+    m_usercode_error = nullptr;
+    return ret;
+}
+
 ErrorStorage* ErrorStorage::get_thread_local()
 {
 #if !defined(RLM_NO_THREAD_LOCAL)
@@ -296,4 +310,9 @@ RLM_EXPORT bool realm_wrap_exceptions(void (*func)()) noexcept
         (func)();
         return true;
     });
+}
+
+RLM_API void realm_register_user_code_callback_error(void* usercode_error) noexcept
+{
+    realm::c_api::ErrorStorage::get_thread_local()->set_usercode_error(usercode_error);
 }

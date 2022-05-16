@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let versionStr = "11.15.0"
+let versionStr = "11.16.0"
 let versionPieces = versionStr.split(separator: "-")
 let versionCompontents = versionPieces[0].split(separator: ".")
 let versionExtra = versionPieces.count > 1 ? versionPieces[1] : ""
@@ -423,6 +423,7 @@ let headers: [String] = [
     "realm/obj.hpp",
     "realm/obj_list.hpp",
     "realm/object-store/audit.hpp",
+    "realm/object-store/audit_serializer.hpp",
     "realm/object-store/binding_callback_thread_observer.hpp",
     "realm/object-store/binding_context.hpp",
     "realm/object-store/c_api/conversion.hpp",
@@ -824,6 +825,7 @@ let package = Package(
                 "sync-1.x.realm",
                 "sync-metadata-v4.realm",
                 "sync-metadata-v5.realm",
+                "sync/flx_sync_harness.hpp",
                 "sync/session/session_util.hpp",
                 "sync/sync_test_utils.hpp",
                 "test_backup-olden-and-golden.realm",

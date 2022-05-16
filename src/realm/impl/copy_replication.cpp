@@ -16,12 +16,13 @@
  *
  **************************************************************************/
 
-#include "copy_replication.hpp"
+#include <realm/impl/copy_replication.hpp>
+
+#include <realm/dictionary.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>
-#include <realm/dictionary.hpp>
 
-namespace realm::impl {
+namespace realm::_impl {
 
 void CopyReplication::add_class(TableKey, StringData name, bool is_embedded)
 {
@@ -276,4 +277,4 @@ Mixed CopyReplication::handle_link(ColKey col_key, Mixed val, util::FunctionRef<
     return {};
 }
 
-} // namespace realm::impl
+} // namespace realm::_impl

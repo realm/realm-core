@@ -52,8 +52,18 @@ struct InvalidPropertyKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 struct CallbackFailed : std::runtime_error {
+    // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
+    // realm_register_user_code_callback_error()
+    void* usercode_error{nullptr};
+
     CallbackFailed()
         : std::runtime_error("User-provided callback failed")
+    {
+    }
+
+    CallbackFailed(void* usercode_error)
+        : std::runtime_error("User-provided callback failed")
+        , usercode_error(usercode_error)
     {
     }
 };
@@ -153,8 +163,8 @@ protected:
     realm_thread_safe_reference() {}
 };
 
-struct realm_config : realm::c_api::WrapC, realm::Realm::Config {
-    using Config::Config;
+struct realm_config : realm::c_api::WrapC, realm::RealmConfig {
+    using RealmConfig::RealmConfig;
     std::map<void*, realm_free_userdata_func_t> free_functions;
     ~realm_config()
     {

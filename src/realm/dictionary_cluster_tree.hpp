@@ -79,9 +79,7 @@ public:
 
     ClusterNode::State insert(ObjKey k, Mixed key, Mixed value)
     {
-        FieldValues values;
-        values.emplace_back(m_keys_col, key);
-        values.emplace_back(s_values_col, value);
+        FieldValues values{{m_keys_col, key}, {s_values_col, value}};
         return ClusterTree::insert(k, values);
     }
 
