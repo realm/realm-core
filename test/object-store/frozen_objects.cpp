@@ -374,6 +374,79 @@ TEST_CASE("Freeze List", "[freeze_list]") {
     }
 }
 
+TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
+
+    constexpr int num_pending_transactions = 200;
+    constexpr int num_transactions_created = 1000;
+    constexpr int num_objects = 200;
+    constexpr int num_checks_pr_trans = 10;
+    struct Entry {
+        SharedRealm realm;
+        Object o;
+        int64_t value;
+    };
+    std::vector<Entry> refs;
+    refs.resize(num_pending_transactions);
+    TestFile config;
+
+    config.schema_version = 1;
+    config.schema = Schema{{"table", {{"value", PropertyType::Int}}}};
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_table");
+    auto table_key = table->get_key();
+    auto col = table->get_column_key("value");
+    realm->begin_transaction();
+    for (int j = 0; j < num_objects; ++j) {
+        auto o = table->create_object(ObjKey(j));
+        o.set(col, j);
+    }
+    realm->commit_transaction();
+    TestFile config2 = config;
+    config2.automatic_change_notifications = false;
+    config2.cache = false;
+    int notifications = 0;
+    for (int j = 0; j < num_transactions_created; ++j) {
+        int trans_number = (unsigned)random_int() % num_pending_transactions;
+
+        // advance and notify for object in the previous realm before replacing it
+        if (refs[trans_number].realm) {
+            advance_and_notify(*refs[trans_number].realm);
+        }
+
+        // set up and save a new realm for later refresh
+        auto realm2 = Realm::get_shared_realm(config2);
+        refs[trans_number].realm = realm2;
+        // capture a random object and its current state
+        int key = (unsigned)random_int() % num_objects;
+        auto o = Object(realm2, realm2->read_group().get_table(table_key)->get_object(key));
+        refs[trans_number].o = o;
+        refs[trans_number].value = o.obj().get<Int>(col);
+        // add a dummy notification callback to exercise the notification machinery
+        o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            ++notifications;
+        });
+        {
+            realm->begin_transaction();
+            auto o = table->get_object(ObjKey(key));
+            o.set(col, o.get<Int>(col) + j + 42);
+            realm->commit_transaction();
+        }
+        for (int k = 0; k < num_checks_pr_trans; ++k) {
+            int selected_trans = (unsigned)random_int() % num_pending_transactions;
+            if (refs[selected_trans].realm) {
+                CHECK(refs[selected_trans].value == refs[selected_trans].o.obj().get<Int>(col));
+            }
+        }
+    }
+    for (auto& e : refs) {
+        if (e.realm)
+            advance_and_notify(*e.realm);
+        e.realm.reset();
+    }
+    realm->begin_transaction();
+    realm->commit_transaction();
+}
+
 TEST_CASE("Freeze Object", "[freeze_object]") {
 
     TestFile config;

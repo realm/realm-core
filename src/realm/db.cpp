@@ -266,7 +266,10 @@ struct VersionList {
                 oldest_v = get(oldest).version;
                 oldest_live_v = r.version;
                 REALM_ASSERT(oldest_v <= oldest_live_v);
-                // return;
+                // remove this return to reclaim ALL intermediate versions
+                // not supported yet, as notifications need access to data
+                // in intermediate versions...
+                return;
             }
             it = r.newer;
             if (r.count_frozen == 0 && r.count_live == 0) {
@@ -2458,6 +2461,12 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         // protect against concurrent updates to the .lock file.
         // must release m_mutex before this point to obey lock order
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
+
+        // this is not correct .. but what should we return instead?
+        // just returning the number of reachable versions is also misleading,
+        // because we retain a transaction history stretching all the way from
+        // oldest live version to newest version - even though we may have reclaimed
+        // individual versions within this range
         info->number_of_versions = new_version - oldest_version + 1;
         info->latest_version_number = new_version;
 
