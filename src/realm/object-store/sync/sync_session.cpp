@@ -348,8 +348,12 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
 
     sync_session->assert_mutex_unlocked();
     if (m_flx_subscription_store) {
-        m_flx_subscription_store->copy_to(db);
-        sync_session->nonsync_transact_notify(db->get_version_of_latest_snapshot());
+        sync::SubscriptionSet active = m_flx_subscription_store->get_active();
+        auto fresh_sub_store = sync_session->get_flx_subscription_store();
+        REALM_ASSERT(fresh_sub_store);
+        auto fresh_mut_sub = fresh_sub_store->get_latest().make_mutable_copy();
+        fresh_mut_sub.import(active);
+        std::move(fresh_mut_sub).commit();
         sync_session->get_flx_subscription_store()
             ->get_latest()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
@@ -400,7 +404,14 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     if (error_message) {
         lock.unlock();
         if (m_flx_subscription_store) {
-            m_flx_subscription_store->client_reset_finished(error_message);
+            // In DiscardLocal mode, only the active subscription set is preserved
+            // this means that we have to remove all other subscriptions including later
+            // versioned ones.
+            auto mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
+            m_flx_subscription_store->supercede_all_except(mut_sub);
+            mut_sub.update_state(sync::SubscriptionSet::State::Error,
+                                 util::make_optional<std::string_view>(*error_message));
+            std::move(mut_sub).commit();
         }
         const bool is_fatal = true;
         SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
@@ -642,7 +653,12 @@ static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& s
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
             if (auto sub_store = active_after->sync_session()->get_flx_subscription_store()) {
-                sub_store->client_reset_finished(util::none);
+                // In DiscardLocal mode, only the active subscription set is preserved.
+                // Make a copy and set it to complete. This will cause all other subscription
+                // set to become superceded.
+                auto mut_subs = sub_store->get_active().make_mutable_copy();
+                mut_subs.update_state(sync::SubscriptionSet::State::Complete);
+                std::move(mut_subs).commit();
             }
         }
         if (notify) {

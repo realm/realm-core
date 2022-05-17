@@ -294,6 +294,14 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
 }
 
+void MutableSubscriptionSet::import(const SubscriptionSet& src_subs)
+{
+    clear();
+    for (const Subscription& sub : src_subs) {
+        insert_sub(sub);
+    }
+}
+
 void MutableSubscriptionSet::update_state(State new_state, util::Optional<std::string_view> error_str)
 {
     check_is_mutable();
@@ -727,39 +735,6 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     }
 }
 
-void SubscriptionStore::copy_to(DBRef db) const
-{
-    REALM_ASSERT(db);
-    REALM_ASSERT(m_db);
-    REALM_ASSERT_EX(db->get_path() != m_db->get_path(), db->get_path());
-    SubscriptionSet src_subs = get_active();
-    SubscriptionStoreRef dest_store = SubscriptionStore::create(db, [](int64_t) {});
-    MutableSubscriptionSet dst_subs = dest_store->get_latest().make_mutable_copy();
-    dst_subs.clear();
-    for (const Subscription& sub : src_subs) {
-        dst_subs.insert_sub(sub);
-    }
-    dst_subs.m_snapshot_version = db->get_version_of_latest_snapshot();
-    std::move(dst_subs).commit();
-}
-
-void SubscriptionStore::client_reset_finished(const util::Optional<std::string>& error_message) const
-{
-    auto mut_sub = get_active().make_mutable_copy();
-    // In DiscardLocal mode, only the active subscription set is preserved
-    // this means that we have to remove all other subscriptions including later
-    // versioned ones.
-    supercede_all_except(mut_sub.m_tr, mut_sub);
-    if (error_message) {
-        mut_sub.update_state(sync::SubscriptionSet::State::Error,
-                             util::make_optional<std::string_view>(*error_message));
-    }
-    else {
-        mut_sub.update_state(sync::SubscriptionSet::State::Complete);
-    }
-    std::move(mut_sub).commit();
-}
-
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
 {
     auto sub_sets = tr->get_table(m_sub_set_table);
@@ -768,14 +743,10 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     remove_query.remove();
 }
 
-void SubscriptionStore::supercede_all_except(TransactionRef tr, MutableSubscriptionSet& mut_sub) const
+void SubscriptionStore::supercede_all_except(MutableSubscriptionSet& mut_sub) const
 {
     auto version_to_keep = mut_sub.version();
-
-    auto sub_sets = tr->get_table(m_sub_set_table);
-    Query remove_query(sub_sets);
-    remove_query.not_equal(sub_sets->get_primary_key_column(), version_to_keep);
-    remove_query.remove();
+    supercede_prior_to(mut_sub.m_tr, version_to_keep);
 
     std::list<SubscriptionStore::NotificationRequest> to_finish;
     std::unique_lock<std::mutex> lk(m_pending_notifications_mutex);
