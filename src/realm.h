@@ -3166,7 +3166,7 @@ typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
 typedef void (*realm_sync_on_subscription_state_changed_t)(void* userdata,
-                                                         realm_flx_sync_subscription_set_state_e state);
+                                                           realm_flx_sync_subscription_set_state_e state);
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
