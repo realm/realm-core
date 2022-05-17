@@ -45,6 +45,7 @@ if(REALM_ENABLE_SYNC)
         util/baas_admin_api.hpp
     )
     list(APPEND SOURCES
+        sync/test_ez_websocket.cpp
         bson.cpp
         sync/client_reset.cpp
         sync/file.cpp
