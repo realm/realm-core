@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Move the implementation of the Audit API to the open-source repo and update it to work with MongoDB Realm.
+* Expose delete app user for C API. ([#5490](https://github.com/realm/realm-core/issues/5490))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
