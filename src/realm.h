@@ -2894,6 +2894,14 @@ RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEP
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
 
+/**
+ * Delete the user passed as argument
+ * @param user a valid ptr to the user that has to be deleted
+ * @return True if no error happend during the deletion of the user
+ */
+RLM_API bool realm_user_delete(const realm_sync_config_t* user);
+
+
 typedef struct {
     const char* id;
     realm_auth_provider_e provider_type;

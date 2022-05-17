@@ -727,6 +727,15 @@ RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) noexce
     return realm_user_state_e((*user)->state());
 }
 
+RLM_API bool realm_user_delete(const realm_sync_config_t* config)
+{
+    REALM_ASSERT(config);
+    return wrap_err([&]() {
+        config->user->sync_manager()->delete_user(config->user->identity());
+        return true;
+    });
+}
+
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
                                            size_t max, size_t* out_n)
 {
