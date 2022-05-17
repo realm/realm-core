@@ -228,20 +228,13 @@ void ClientReplication::finalize_changeset() noexcept
     m_history.m_changeset_from_server = util::none;
 }
 
-void ClientReplication::validate_write(const Transaction& tr, const Table* table)
+util::UniqueFunction<SyncReplication::WriteValidator> ClientReplication::make_write_validator(Transaction& tr)
 {
-    if (!m_write_validator) {
-        return;
+    if (!m_write_validator_factory) {
+        return {};
     }
 
-    auto table_name = table->get_name();
-    if(!table_name.begins_with("class_")) {
-        return;
-    }
-
-    table_name = Group::table_name_to_class_name(table_name);
-
-    m_write_validator(tr, std::string_view(table_name));
+    return m_write_validator_factory(tr);
 }
 
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,

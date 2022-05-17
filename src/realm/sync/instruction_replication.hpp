@@ -29,6 +29,8 @@ namespace sync {
 
 class SyncReplication : public Replication {
 public:
+    using WriteValidator = void(std::string_view);
+
     void set_short_circuit(bool) noexcept;
     bool is_short_circuited() const noexcept;
 
@@ -88,7 +90,9 @@ protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
 
-    virtual void validate_write(const Transaction&, const Table*) {}
+    virtual util::UniqueFunction<WriteValidator> make_write_validator(Transaction&) {
+        return {};
+    }
 
 private:
     bool m_short_circuit = false;
@@ -136,6 +140,7 @@ private:
     InternString m_last_class_name;
     util::Optional<Instruction::PrimaryKey> m_last_primary_key;
     InternString m_last_field_name;
+    util::UniqueFunction<WriteValidator> m_write_validator;
 };
 
 inline void SyncReplication::set_short_circuit(bool b) noexcept

@@ -22,6 +22,7 @@ void SyncReplication::do_initiate_transact(Group& group, version_type current_ve
 {
     Replication::do_initiate_transact(group, current_version, history_updated);
     m_transaction = dynamic_cast<Transaction*>(&group); // FIXME: Is this safe?
+    m_write_validator = make_write_validator(*m_transaction);
     reset();
 }
 
@@ -715,8 +716,8 @@ bool SyncReplication::select_table(const Table& table, SelectTableFor mode)
         return false;
     }
 
-    if (mode == SelectTableFor::ObjectInstruction) {
-        validate_write(*m_transaction, &table);
+    if (mode == SelectTableFor::ObjectInstruction && m_write_validator) {
+        m_write_validator(std::string_view(Group::table_name_to_class_name(name)));
     }
     m_last_class_name = emit_class_name(table);
     m_last_table = &table;

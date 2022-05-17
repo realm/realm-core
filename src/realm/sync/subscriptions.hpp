@@ -306,12 +306,12 @@ public:
     // Get the latest subscription created by calling update_latest(). Once bootstrapping is complete,
     // this and get_active() will return the same thing. If no SubscriptionSet has been set, then
     // this returns an empty SubscriptionSet that you can clone() in order to mutate.
-    SubscriptionSet get_latest() const;
+    SubscriptionSet get_latest(util::Optional<Transaction&> tr = util::none) const;
 
     // Gets the subscription set that has been acknowledged by the server as having finished bootstrapping.
     // If no subscriptions have reached the complete stage, this returns an empty subscription with version
     // zero.
-    SubscriptionSet get_active() const;
+    SubscriptionSet get_active(util::Optional<Transaction&> tr = util::none) const;
 
     // Returns the version number of the current active and latest subscription sets. This function guarantees
     // that the versions will be read from the same underlying transaction and will thus be consistent.
@@ -332,9 +332,6 @@ public:
 
     util::Optional<PendingSubscription> get_next_pending_version(int64_t last_query_version,
                                                                  DB::version_type after_client_version) const;
-
-    bool latest_has_subscription_for_object_class(const Transaction& tr,
-                                                  std::string_view object_class_name);
 
 private:
     using std::enable_shared_from_this<SubscriptionStore>::weak_from_this;

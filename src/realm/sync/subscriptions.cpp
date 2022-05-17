@@ -30,6 +30,7 @@
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
 #include "realm/util/flat_map.hpp"
+#include <algorithm>
 #include <initializer_list>
 #include <stdexcept>
 
@@ -637,25 +638,33 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
     }
 }
 
-SubscriptionSet SubscriptionStore::get_latest() const
+SubscriptionSet SubscriptionStore::get_latest(util::Optional<Transaction&> tr) const
 {
-    auto tr = m_db->start_frozen();
-    auto sub_sets = tr->get_table(m_sub_set_table);
+    TransactionRef owned_tr;
+    if (!tr) {
+        owned_tr = m_db->start_frozen();
+        tr = *owned_tr;
+    }
+    auto sub_sets = tr.value().get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), tr.value(), Obj{});
     }
     auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
     auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
-    return SubscriptionSet(weak_from_this(), std::move(tr), std::move(latest_obj));
+    return SubscriptionSet(weak_from_this(), tr.value(), std::move(latest_obj));
 }
 
-SubscriptionSet SubscriptionStore::get_active() const
+SubscriptionSet SubscriptionStore::get_active(util::Optional<Transaction&> tr) const
 {
-    auto tr = m_db->start_frozen();
-    auto sub_sets = tr->get_table(m_sub_set_table);
+    TransactionRef owned_tr;
+    if (!tr) {
+        owned_tr = m_db->start_frozen();
+        tr = *owned_tr;
+    }
+    auto sub_sets = tr.value().get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
 
     DescriptorOrdering descriptor_ordering;
@@ -666,9 +675,9 @@ SubscriptionSet SubscriptionStore::get_active() const
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), tr.value(), Obj{});
     }
-    return SubscriptionSet(weak_from_this(), std::move(tr), res.get_object(0));
+    return SubscriptionSet(weak_from_this(), tr.value(), res.get_object(0));
 }
 
 std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
@@ -763,16 +772,6 @@ void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
     remove_query.remove();
-}
-
-bool SubscriptionStore::latest_has_subscription_for_object_class(const Transaction& tr,
-                                                                 std::string_view object_class_name)
-{
-    auto sub_sets = tr.get_table(m_sub_set_table);
-    auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
-    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
-    SubscriptionSet latest(weak_from_this(), tr, std::move(latest_obj));
-    return latest.has_subscription_for_table(object_class_name);
 }
 
 MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSet& set) const
