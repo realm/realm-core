@@ -330,7 +330,8 @@ public:
     {
         if (is_idempotent) {
             return m_last_content_version != m_content_version;
-        } else {
+        }
+        else {
             update_if_needed();
             if (m_last_content_version != m_content_version) {
                 m_last_content_version = m_content_version;
