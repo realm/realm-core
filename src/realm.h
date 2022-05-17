@@ -3165,8 +3165,8 @@ typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_ERROR,
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
-typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
-                                                         realm_flx_sync_subscription_set_state_e state);
+typedef void (*realm_sync_on_subscription_state_changed_t)(void* userdata,
+                                                           realm_flx_sync_subscription_set_state_e state);
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3302,7 +3302,7 @@ RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_s
  */
 RLM_API bool realm_sync_on_subscription_set_state_change_async(
     const realm_flx_sync_subscription_set_t* subscription_set, realm_flx_sync_subscription_set_state_e notify_when,
-    realm_sync_on_subscription_state_changed callback, void* userdata, realm_free_userdata_func_t userdata_free);
+    realm_sync_on_subscription_state_changed_t, void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  *  Retrieve version for the subscription set passed as parameter
