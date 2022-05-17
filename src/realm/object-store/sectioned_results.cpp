@@ -478,7 +478,6 @@ void SectionedResults::calculate_sections()
     }
 }
 
-
 size_t SectionedResults::size()
 {
     calculate_sections_if_required();
