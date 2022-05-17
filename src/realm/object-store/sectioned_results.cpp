@@ -150,7 +150,7 @@ public:
          or deletion and we need to compensate for any missing insertions or deletions. It also helps compensate for
          any missing insertions / deletions when moving elements from from section to another.
          */
-        struct Changes {
+        struct ChangeBookkeeper {
             size_t index;
             size_t current_indice_count;
 
@@ -168,79 +168,40 @@ public:
             util::Optional<IndexSet&> deletions;
             util::Optional<IndexSet&> modifications;
 
-            void validate_insertions()
+            void validate(IndexSet& indexes, bool is_new_or_deleted_section, size_t& changes_since_last_comparison,
+                          size_t& change_count)
             {
-                if (insertions_since_last_comparison == change_insertion_count && !is_new_section) {
+                if (changes_since_last_comparison == change_count && !is_new_or_deleted_section) {
                     // All looks good
                     return;
                 }
-
-                if (is_new_section) {
-                    insertions->set(current_indice_count);
-                    change_insertion_count = insertions->count();
-                    REALM_ASSERT(current_indice_count == change_insertion_count);
+                if (is_new_or_deleted_section) {
+                    indexes.set(current_indice_count);
+                    change_count = indexes.count();
+                    REALM_ASSERT(current_indice_count == change_count);
                     return;
                 }
-
-                // The change checker had issues producing the insertions we need.
-                if (insertions_since_last_comparison > change_insertion_count) {
-                    // We are missing insertions
-                    // The issue with this approach is that we
-                    // lose precision on what indexes we actually need to insert
-                    insertions->set(insertions_since_last_comparison);
-                    change_insertion_count = insertions->count();
-                }
-                else if (change_insertion_count > insertions_since_last_comparison) {
-                    // We are adding too many insertions
-                    // dump the extra indicies to modifications instead
-                    // ensure we dont go out of range
-                    IndexSet indexes_to_remove;
-                    for (auto index : insertions->as_indexes()) {
-                        modifications->add(index);
-                        indexes_to_remove.add(index);
-                        change_insertion_count--;
-                        if (change_insertion_count == insertions_since_last_comparison)
-                            break;
-                    }
-                    insertions->remove(indexes_to_remove);
-                }
-                REALM_ASSERT(change_insertion_count == insertions->count());
-            }
-
-            void validate_deletions()
-            {
-                if (deletions_since_last_comparison == change_deletion_count && !is_deleted_section) {
-                    // All looks good
-                    return;
-                }
-                if (is_deleted_section) {
-                    deletions->set(current_indice_count);
-                    change_deletion_count = deletions->count();
-                    REALM_ASSERT(current_indice_count == change_deletion_count);
-                    return;
-                }
-                // The change checker had issues producing the deletions we need.
-                if (deletions_since_last_comparison > change_deletion_count) {
+                // The change checker had issues producing the indexes we need.
+                if (changes_since_last_comparison > change_count) {
                     // We are missing deletions
-                    // Can we use anything from modifications?
-                    deletions->set(deletions_since_last_comparison);
-                    change_deletion_count = deletions->count();
+                    indexes.set(changes_since_last_comparison);
+                    change_count = indexes.count();
                 }
-                else if (change_deletion_count > deletions_since_last_comparison) {
-                    // We are adding too many deletions
+                else if (change_count > changes_since_last_comparison) {
+                    // We are adding too many changes
                     // dump the extra indicies to modifications instead
                     // ensure we dont go out of range
                     IndexSet indexes_to_remove;
-                    for (auto index : deletions->as_indexes()) {
+                    for (auto index : indexes.as_indexes()) {
                         modifications->add(index);
                         indexes_to_remove.add(index);
-                        change_deletion_count--;
-                        if (change_deletion_count == deletions_since_last_comparison)
+                        change_count--;
+                        if (change_count == changes_since_last_comparison)
                             break;
                     }
-                    deletions->remove(indexes_to_remove);
+                    indexes.remove(indexes_to_remove);
                 }
-                REALM_ASSERT(deletions_since_last_comparison == change_deletion_count);
+                REALM_ASSERT(changes_since_last_comparison == change_count);
             }
 
             void validate_modifications()
@@ -258,8 +219,9 @@ public:
 
             void validate()
             {
-                validate_insertions();
-                validate_deletions();
+                if (insertions)
+                    validate(*insertions, is_new_section, insertions_since_last_comparison, change_insertion_count);
+                validate(*deletions, is_deleted_section, deletions_since_last_comparison, change_deletion_count);
                 validate_modifications();
             }
         };
@@ -272,18 +234,19 @@ public:
                 auto& m = modifications[section.index];
 
                 // This is a new section
-                Changes c = {.index = section.index,
-                             .current_indice_count = section.indices.size(),
-                             .insertions_since_last_comparison = 0,
-                             .deletions_since_last_comparison = 0,
-                             .change_insertion_count = i.count(),
-                             .change_deletion_count = 0,
-                             .change_modification_count = m.count(),
-                             .is_new_section = true,
-                             .is_deleted_section = false,
-                             .insertions = i,
-                             .deletions = d,
-                             .modifications = m};
+                ChangeBookkeeper c;
+                c.index = section.index;
+                c.current_indice_count = section.indices.size();
+                c.insertions_since_last_comparison = 0;
+                c.deletions_since_last_comparison = 0;
+                c.change_insertion_count = i.count();
+                c.change_deletion_count = 0;
+                c.change_modification_count = m.count();
+                c.is_new_section = true;
+                c.is_deleted_section = false;
+                c.insertions = i;
+                c.deletions = d;
+                c.modifications = m;
                 c.validate();
             }
             else {
@@ -296,36 +259,38 @@ public:
                 auto& d = deletions[old_index];
                 auto& m = modifications[section.index];
 
-                Changes c = {.index = section.index,
-                             .current_indice_count = section.indices.size(),
-                             .insertions_since_last_comparison = diff > 0 ? (size_t)diff : 0,
-                             .deletions_since_last_comparison = diff < 0 ? (size_t)abs(diff) : 0,
-                             .change_insertion_count = i.count(),
-                             .change_deletion_count = d.count(),
-                             .change_modification_count = m.count(),
-                             .is_new_section = false,
-                             .is_deleted_section = false,
-                             .insertions = i,
-                             .deletions = d,
-                             .modifications = m};
+                ChangeBookkeeper c;
+                c.index = section.index;
+                c.current_indice_count = section.indices.size();
+                c.insertions_since_last_comparison = diff > 0 ? (size_t)diff : 0;
+                c.deletions_since_last_comparison = diff < 0 ? (size_t)abs(diff) : 0;
+                c.change_insertion_count = i.count();
+                c.change_deletion_count = d.count();
+                c.change_modification_count = m.count();
+                c.is_new_section = false;
+                c.is_deleted_section = false;
+                c.insertions = i;
+                c.deletions = d;
+                c.modifications = m;
                 c.validate();
             }
         }
 
         for (auto old_index : sections_to_remove.as_indexes()) {
             auto& d = deletions[old_index];
-            Changes c = {.index = old_index,
-                         .current_indice_count = m_prev_sections[old_index].indices.size(),
-                         .insertions_since_last_comparison = 0,
-                         .deletions_since_last_comparison = 0,
-                         .change_insertion_count = 0,
-                         .change_deletion_count = d.count(),
-                         .change_modification_count = 0,
-                         .is_new_section = false,
-                         .is_deleted_section = true,
-                         .insertions = util::none,
-                         .deletions = d,
-                         .modifications = util::none};
+            ChangeBookkeeper c;
+            c.index = old_index;
+            c.current_indice_count = m_prev_sections[old_index].indices.size();
+            c.insertions_since_last_comparison = 0;
+            c.deletions_since_last_comparison = 0;
+            c.change_insertion_count = 0;
+            c.change_deletion_count = d.count();
+            c.change_modification_count = 0;
+            c.is_new_section = false;
+            c.is_deleted_section = true;
+            c.insertions = util::none;
+            c.deletions = d;
+            c.modifications = util::none;
             c.validate();
         }
 

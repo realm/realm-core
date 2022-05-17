@@ -692,8 +692,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         str_list.add("orange");
         r->commit_transaction();
         List lst(r, o1, array_string_col);
-        auto sr = lst.sort({{"self", true}})
-            .sectioned_results(Results::SectionedResultsOperator::FirstLetter);
+        auto sr = lst.sort({{"self", true}}).sectioned_results(Results::SectionedResultsOperator::FirstLetter);
 
         REQUIRE(sr.size() == 3);
         REQUIRE(sr[0].size() == 3);
@@ -858,6 +857,139 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.deletions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[0], 0, 5);
         REQUIRE(algo_run_count == 9);
+
+        // Test clearing all from the table
+        algo_run_count = 0;
+        r->begin_transaction();
+        table->clear();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 0);
+        REQUIRE(changes.sections_to_insert.empty());
+        REQUIRE(changes.sections_to_delete.count() == 4);
+        REQUIRE_INDICES(changes.sections_to_delete, 0, 1, 2, 3);
+
+        REQUIRE(changes.deletions.size() == 4);
+        REQUIRE(changes.insertions.empty());
+        REQUIRE(changes.modifications.empty());
+        REQUIRE_INDICES(changes.deletions[0], 0, 1, 2, 3, 4, 5);
+        REQUIRE_INDICES(changes.deletions[1], 0);
+        REQUIRE_INDICES(changes.deletions[2], 0);
+        REQUIRE_INDICES(changes.deletions[3], 0);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1 = table->create_object().set(name_col, "any");
+        o2 = table->create_object().set(name_col, "any");
+        o3 = table->create_object().set(name_col, "any");
+        o4 = table->create_object().set(name_col, "beans");
+        o5 = table->create_object().set(name_col, "duck");
+        o6 = table->create_object().set(name_col, "goat");
+        auto o7 = table->create_object().set(name_col, "zebra");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 7);
+        REQUIRE(changes.sections_to_insert.count() == 5);
+        REQUIRE(changes.sections_to_delete.empty());
+        REQUIRE_INDICES(changes.sections_to_insert, 0, 1, 2, 3, 4);
+
+        REQUIRE(changes.deletions.empty());
+        REQUIRE(changes.insertions.size() == 5);
+        REQUIRE(changes.modifications.empty());
+        REQUIRE_INDICES(changes.insertions[0], 0, 1, 2);
+        REQUIRE_INDICES(changes.insertions[1], 0);
+        REQUIRE_INDICES(changes.insertions[2], 0);
+        REQUIRE_INDICES(changes.insertions[3], 0);
+        REQUIRE_INDICES(changes.insertions[4], 0);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "banana");
+        o2.set(name_col, "melon");
+        o3.set(name_col, "calender");
+        o4.set(name_col, "apricot");
+        o5.set(name_col, "duck"); // stays the same
+        o6.set(name_col, "duck");
+        o7.set(name_col, "apple");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 7);
+        REQUIRE(changes.sections_to_insert.count() == 2);
+        REQUIRE(changes.sections_to_delete.count() == 2);
+        REQUIRE_INDICES(changes.sections_to_insert, 2, 4);
+        REQUIRE_INDICES(changes.sections_to_delete, 3, 4);
+
+        REQUIRE(changes.deletions.size() == 3);
+        REQUIRE(changes.insertions.size() == 3);
+        REQUIRE(changes.modifications.size() == 3);
+        REQUIRE_INDICES(changes.insertions[2], 0);
+        REQUIRE_INDICES(changes.insertions[3], 0);
+        REQUIRE_INDICES(changes.insertions[4], 0);
+
+        REQUIRE_INDICES(changes.deletions[0], 1);
+        REQUIRE_INDICES(changes.deletions[3], 0);
+        REQUIRE_INDICES(changes.deletions[4], 0);
+
+        REQUIRE_INDICES(changes.modifications[0], 0);
+        REQUIRE_INDICES(changes.modifications[1], 0);
+        REQUIRE_INDICES(changes.modifications[3], 1);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "any");
+        o2.set(name_col, "apple");
+        o3.set(name_col, "apricot");
+        o4.set(name_col, "cake");
+        o5.set(name_col, "duck");
+        o6.set(name_col, "duck");
+        o7.set(name_col, "melon");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 7);
+        REQUIRE(changes.sections_to_insert.empty());
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_delete, 1);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.size() == 3);
+
+        REQUIRE_INDICES(changes.insertions[0], 2);
+        REQUIRE_INDICES(changes.deletions[1], 0);
+
+        REQUIRE_INDICES(changes.modifications[0], 0, 1);
+        REQUIRE_INDICES(changes.modifications[2], 0, 1);
+        REQUIRE_INDICES(changes.modifications[3], 0);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "calender");
+        o2.set(name_col, "apricot");
+        o3.set(name_col, "goat");
+        o4.set(name_col, "zebra");
+        o5.set(name_col, "goat");
+        o6.set(name_col, "fire");
+        o7.set(name_col, "calender");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 7);
+        REQUIRE(changes.sections_to_insert.count() == 3);
+        REQUIRE(changes.sections_to_delete.count() == 2);
+        REQUIRE_INDICES(changes.sections_to_insert, 2, 3, 4);
+        REQUIRE_INDICES(changes.sections_to_delete, 2, 3);
+
+        REQUIRE(changes.deletions.size() == 3);
+        REQUIRE(changes.insertions.size() == 4);
+        REQUIRE(changes.modifications.empty());
+
+        REQUIRE_INDICES(changes.insertions[1], 1);
+        REQUIRE_INDICES(changes.insertions[2], 0);
+        REQUIRE_INDICES(changes.insertions[3], 0, 1);
+        REQUIRE_INDICES(changes.insertions[4], 0);
+
+        REQUIRE_INDICES(changes.deletions[0], 0, 1);
+        REQUIRE_INDICES(changes.deletions[2], 0, 1);
+        REQUIRE_INDICES(changes.deletions[3], 0);
     }
 
     SECTION("notifications on section") {
