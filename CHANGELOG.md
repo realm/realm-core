@@ -10,6 +10,7 @@
  
 ### Breaking changes
 * `realm::Realm::Config` has been renamed to `realm::RealmConfig`.
+* `realm_app_sync_client_get_default_file_path_for_realm` should not have app as input argument C API.([#5486](https://github.com/realm/realm-core/issues/5486))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
