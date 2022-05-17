@@ -1077,8 +1077,7 @@ TEST_CASE("C API", "[c_api]") {
         size_t num_classes = realm_get_num_classes(realm);
         realm_class_key_t* out_keys = (realm_class_key_t*)malloc(sizeof(realm_class_key_t) * num_classes);
         // get class keys
-        bool data_copied = false;
-        realm_get_class_keys(realm, out_keys, num_classes, nullptr, &data_copied);
+        realm_get_class_keys(realm, out_keys, num_classes, nullptr);
         realm_class_info_t* classes = (realm_class_info_t*)malloc(sizeof(realm_class_info_t) * (num_classes + 1));
         const realm_property_info_t** properties =
             (const realm_property_info_t**)malloc(sizeof(realm_property_info_t*) * (num_classes + 1));
@@ -1086,10 +1085,9 @@ TEST_CASE("C API", "[c_api]") {
         for (size_t i = 0; i < num_classes; i++) {
             realm_get_class(realm, out_keys[i], &classes[i]);
             size_t out_n;
-            bool data_copied = false;
-            realm_get_class_properties(realm, out_keys[i], nullptr, 0, &out_n, &data_copied);
+            realm_get_class_properties(realm, out_keys[i], nullptr, 0, &out_n);
             realm_property_info_t* out_props = (realm_property_info_t*)malloc(sizeof(realm_property_info_t) * out_n);
-            realm_get_class_properties(realm, out_keys[i], out_props, out_n, nullptr, &data_copied);
+            realm_get_class_properties(realm, out_keys[i], out_props, out_n, nullptr);
             properties[i] = out_props;
         }
         // add the new class and its properties to the arrays
@@ -1238,13 +1236,10 @@ TEST_CASE("C API", "[c_api]") {
         realm_class_key_t keys[2];
         // return total number of keys present, copy only if there is enough space in the vector passed in
         size_t found = 0;
-        bool data_copied = false;
-        CHECK(checked(realm_get_class_keys(realm, keys, 2, &found, &data_copied)));
+        CHECK(checked(realm_get_class_keys(realm, keys, 2, &found)));
         CHECK(found == 3);
-        CHECK(!data_copied);
-        CHECK(checked(realm_get_class_keys(realm, keys, 1, &found, &data_copied)));
+        CHECK(checked(realm_get_class_keys(realm, keys, 1, &found)));
         CHECK(found == 3);
-        CHECK(!data_copied);
     }
 
     SECTION("realm_find_property() errors") {
@@ -1283,49 +1278,39 @@ TEST_CASE("C API", "[c_api]") {
     SECTION("realm_get_property_keys()") {
         size_t num_found = 0;
         size_t properties_found = 0;
-        bool data_copied = false;
 
         // discover how many properties there are.
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &properties_found, &data_copied)));
-        CHECK(!data_copied);
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &properties_found)));
         realm_property_key_t* properties_foo =
             (realm_property_key_t*)malloc(sizeof(realm_property_key_t) * properties_found);
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties_foo, properties_found, &num_found,
-                                              &data_copied)));
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties_foo, properties_found, &num_found)));
         CHECK(num_found == properties_found);
-        CHECK(data_copied);
         CHECK(properties_foo[0] == foo_properties["int"]);
         realm_free(properties_foo);
 
         num_found = 0;
         properties_found = 0;
         // discover how many properties there are.
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, nullptr, 0, &properties_found, &data_copied)));
-        CHECK(!data_copied);
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, nullptr, 0, &properties_found)));
         realm_property_key_t* properties_bar =
             (realm_property_key_t*)malloc(sizeof(realm_property_key_t) * properties_found);
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties_bar, properties_found, &num_found,
-                                              &data_copied)));
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties_bar, properties_found, &num_found)));
         CHECK(num_found == properties_found);
-        CHECK(data_copied);
         CHECK(properties_bar[2] == bar_properties["doubles"]);
         CHECK(properties_bar[0] == bar_properties["int"]);
         realm_free(properties_bar);
 
         num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found, &data_copied)));
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
         CHECK(num_found == class_foo.num_properties + class_foo.num_computed_properties);
-        CHECK(!data_copied);
 
         std::vector<realm_property_key_t> ps;
         ps.resize(1000);
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, ps.data(), ps.size(), &num_found, &data_copied)));
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, ps.data(), ps.size(), &num_found)));
         CHECK(num_found == class_foo.num_properties + class_foo.num_computed_properties);
-        CHECK(data_copied);
 
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, ps.data(), ps.size(), &num_found, &data_copied)));
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, ps.data(), ps.size(), &num_found)));
         CHECK(num_found == 6);
-        CHECK(data_copied);
     }
 
     SECTION("realm_get_property()") {

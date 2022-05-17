@@ -84,27 +84,23 @@ RLM_API size_t realm_get_num_classes(const realm_t* realm)
 {
     size_t max = std::numeric_limits<size_t>::max();
     size_t n = 0;
-    bool data_copied = false;
-    auto success = realm_get_class_keys(realm, nullptr, max, &n, &data_copied);
+    auto success = realm_get_class_keys(realm, nullptr, max, &n);
     REALM_ASSERT(success);
     return n;
 }
 
-RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_keys, size_t max, size_t* out_n,
-                                  bool* data_copied)
+RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_keys, size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
         const auto& shared_realm = **realm;
         const auto& schema = shared_realm.schema();
         set_out_param(out_n, schema.size());
-        set_out_param(data_copied, false);
 
         if (out_keys && max >= schema.size()) {
             size_t i = 0;
             for (auto& os : schema) {
                 out_keys[i++] = os.table_key.value;
             }
-            set_out_param(data_copied, true);
         }
         return true;
     });
@@ -140,14 +136,12 @@ RLM_API bool realm_get_class(const realm_t* realm, realm_class_key_t key, realm_
 }
 
 RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t key,
-                                        realm_property_info_t* out_properties, size_t max, size_t* out_n,
-                                        bool* data_copied)
+                                        realm_property_info_t* out_properties, size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
         const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
         set_out_param(out_n, prop_size);
-        set_out_param(data_copied, false);
 
         if (out_properties && max >= prop_size) {
             size_t i = 0;
@@ -157,20 +151,18 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t 
             for (auto& prop : os.computed_properties) {
                 out_properties[i++] = to_capi(prop);
             }
-            set_out_param(data_copied, true);
         }
         return true;
     });
 }
 
 RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key, realm_property_key_t* out_keys,
-                                     size_t max, size_t* out_n, bool* data_copied)
+                                     size_t max, size_t* out_n)
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
         const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
         set_out_param(out_n, prop_size);
-        set_out_param(data_copied, false);
         if (out_keys && max >= prop_size) {
             size_t i = 0;
             for (auto& prop : os.persisted_properties) {
@@ -179,7 +171,6 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
             for (auto& prop : os.computed_properties) {
                 out_keys[i++] = prop.column_key.value;
             }
-            set_out_param(data_copied, true);
         }
         return true;
     });
