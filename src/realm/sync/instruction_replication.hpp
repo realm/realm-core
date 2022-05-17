@@ -47,6 +47,7 @@ public:
                                     bool nullable, Table::Type table_type) final;
     void create_object(const Table*, GlobalKey) final;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
+
     void prepare_erase_class(TableKey tk) final;
     void erase_class(TableKey table_key, size_t num_tables) final;
     void rename_class(TableKey table_key, StringData new_name) final;
@@ -90,7 +91,8 @@ protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
 
-    virtual util::UniqueFunction<WriteValidator> make_write_validator(Transaction&) {
+    virtual util::UniqueFunction<WriteValidator> make_write_validator(Transaction&)
+    {
         return {};
     }
 
