@@ -2637,6 +2637,17 @@ typedef struct realm_app_error {
     const char* link_to_server_logs;
 } realm_app_error_t;
 
+typedef struct realm_user_identity {
+    /**
+     * Ptr to null terminated string representing user identity (memory has to be freed by SDK)
+     */
+    char* id;
+    /**
+     * Enum representing the list of auth providers
+     */
+    realm_auth_provider_e provider_type;
+} realm_user_identity_t;
+
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
@@ -2898,11 +2909,6 @@ RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_
 RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
 
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
-
-typedef struct {
-    const char* id;
-    realm_auth_provider_e provider_type;
-} realm_user_identity_t;
 
 /**
  * Get the list of identities of this @a user.

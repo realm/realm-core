@@ -730,7 +730,7 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
         set_out_param(out_n, identities.size());
         if (out_identities && max >= identities.size()) {
             for (size_t i = 0; i < identities.size(); i++) {
-                out_identities[i] = {identities[i].id.c_str(),
+                out_identities[i] = {duplicate_string(identities[i].id),
                                      realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
             }
         }

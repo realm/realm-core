@@ -4053,6 +4053,51 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 #endif
 
 #ifdef REALM_ENABLE_AUTH_TESTS
+
+static void realm_app_void_completion(void*, const realm_app_error_t*) {}
+
+static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t*)
+{
+    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(realm_clone(user));
+}
+
+static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t*)
+{
+    realm_user_identity_t idents[10];
+    size_t n;
+    realm_user_get_all_identities(user, idents, 10, &n);
+    *static_cast<bool*>(p) = n == 2;
+    for (size_t i = 0; i < n; i++) {
+        realm_free(idents[i].id);
+    }
+}
+
+TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
+    TestAppSession session;
+    realm_app app(session.app());
+
+    SECTION("link_user intergration") {
+        AutoVerifiedEmailCredentials creds;
+        bool processed = false;
+        realm_user_t* sync_user = nullptr;
+
+        realm_string_t password{creds.password.c_str(), creds.password.length()};
+        realm_app_email_password_provider_client_register_email(&app, creds.email.c_str(), password,
+                                                                realm_app_void_completion, nullptr, nullptr);
+
+        realm_app_credentials anonymous(app::AppCredentials::anonymous());
+        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user, nullptr);
+
+        CHECK(realm_user_get_auth_provider(sync_user) == RLM_AUTH_PROVIDER_ANONYMOUS);
+
+        realm_app_credentials email_creds(creds);
+        realm_app_link_user(&app, sync_user, &email_creds, realm_app_user2, &processed, nullptr);
+
+        CHECK(processed);
+        realm_release(sync_user);
+    }
+}
+
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
     using namespace realm::app;
 
