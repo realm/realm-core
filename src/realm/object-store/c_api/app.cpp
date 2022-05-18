@@ -385,19 +385,14 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcep
 RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n)
 {
     return wrap_err([&] {
-        if (out_users) {
+        const auto& users = (*app)->all_users();
+        set_out_param(out_n, users.size());
+        if (out_users && capacity >= users.size()) {
             OutBuffer<realm_user_t> buf(out_users);
-            for (const auto& user : (*app)->all_users()) {
+            for (const auto& user : users) {
                 buf.emplace(user);
-                if (buf.size() == capacity)
-                    break;
             }
             buf.release(out_n);
-        }
-        else {
-            if (out_n) {
-                *out_n = (*app)->all_users().size();
-            }
         }
         return true;
     });
@@ -717,13 +712,15 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t* a
     (*app)->sync_manager()->wait_for_sessions_to_terminate();
 }
 
-RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t* app,
-                                                                    const realm_sync_config_t* config,
-                                                                    const char* custom_filename) noexcept
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_sync_config_t* config,
+                                                                    const char* custom_filename)
 {
-    util::Optional<std::string> filename = custom_filename ? util::some<std::string>(custom_filename) : util::none;
-    std::string file_path = (*app)->sync_manager()->path_for_realm(*config, std::move(filename));
-    return duplicate_string(file_path);
+    return wrap_err([&]() {
+        util::Optional<std::string> filename =
+            custom_filename ? util::some<std::string>(custom_filename) : util::none;
+        std::string file_path = config->user->sync_manager()->path_for_realm(*config, std::move(filename));
+        return duplicate_string(file_path);
+    });
 }
 
 RLM_API const char* realm_user_get_identity(const realm_user_t* user) noexcept
@@ -740,20 +737,12 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
                                            size_t max, size_t* out_n)
 {
     return wrap_err([&] {
-        if (out_identities) {
-            const auto& identities = (*user)->identities();
-            max = std::min(identities.size(), max);
-            for (size_t i = 0; i < max; i++) {
-                out_identities[i] = {identities[i].id.c_str(),
+        const auto& identities = (*user)->identities();
+        set_out_param(out_n, identities.size());
+        if (out_identities && max >= identities.size()) {
+            for (size_t i = 0; i < identities.size(); i++) {
+                out_identities[i] = {duplicate_string(identities[i].id),
                                      realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
-            }
-            if (out_n) {
-                *out_n = max;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = (*user)->identities().size();
             }
         }
         return true;
@@ -822,6 +811,19 @@ RLM_API char* realm_user_get_refresh_token(const realm_user_t* user)
     return wrap_err([&] {
         return duplicate_string((*user)->refresh_token());
     });
+}
+
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
+{
+    REALM_ASSERT(user);
+    try {
+        if (auto shared_app = (*user)->sync_manager()->app().lock()) {
+            return new realm_app_t(shared_app);
+        }
+    }
+    catch (const std::exception&) {
+    }
+    return nullptr;
 }
 
 } // namespace realm::c_api

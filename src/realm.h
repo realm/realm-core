@@ -1169,10 +1169,12 @@ RLM_API size_t realm_get_num_classes(const realm_t*);
 
 /**
  * Get the table keys for classes in the schema.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param out_keys An array that will contain the keys of each class in the
- *                 schema. May be NULL, in which case `out_n` can be used to
- *                 determine the number of classes in the schema.
+ *                 schema. Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of keys to write to `out_keys`.
  * @param out_n The actual number of classes. May be NULL.
  * @return True if no exception occurred.
@@ -1207,15 +1209,14 @@ RLM_API bool realm_get_class(const realm_t*, realm_class_key_t key, realm_class_
 
 /**
  * Get the list of properties for the class with this @a key.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
- * @param out_properties A pointer to an array of `realm_property_info_t`, which
+ * @param out_properties  A pointer to an array of `realm_property_info_t`, which
  *                       will be populated with the information about the
- *                       properties. To see all properties, the length of the
- *                       array should be at least the number of properties in
- *                       the class, as reported in the sum of persisted and
- *                       computed properties for the class. May be NULL, in
- *                       which case this function can be used to discover the
- *                       number of properties in the class.
+ *                       properties.  Array may be NULL, in this case no data will be copied and `out_n` set if not
+ * NULL.
  * @param max The maximum number of entries to write to `out_properties`.
  * @param out_n The actual number of properties written to `out_properties`.
  * @return True if no exception occurred.
@@ -1225,19 +1226,21 @@ RLM_API bool realm_get_class_properties(const realm_t*, realm_class_key_t key, r
 
 /**
  * Get the property keys for the class with this @a key.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param key The class key.
- * @param out_col_keys An array of property keys. May be NULL, in which case
- *                     this function can be used to discover the number of
- *                     properties for this class.
+ * @param out_col_keys An array of property keys. Array may be NULL,
+ *                     in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of keys to write to `out_col_keys`. Ignored if
  *            `out_col_keys == NULL`.
  * @param out_n The actual number of properties written to `out_col_keys` (if
  *              non-NULL), or number of properties in the class.
+ * @return True if no exception occurred.
  **/
 RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, realm_property_key_t* out_col_keys,
                                      size_t max, size_t* out_n);
-
 
 /**
  * Find a property by its column key.
@@ -2634,6 +2637,17 @@ typedef struct realm_app_error {
     const char* link_to_server_logs;
 } realm_app_error_t;
 
+typedef struct realm_user_identity {
+    /**
+     * Ptr to null terminated string representing user identity (memory has to be freed by SDK)
+     */
+    char* id;
+    /**
+     * Enum representing the list of auth providers
+     */
+    realm_auth_provider_e provider_type;
+} realm_user_identity_t;
+
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
@@ -2727,11 +2741,13 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
 
 /**
  * Get the list of active users in this @a app.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param out_users A pointer to an array of `realm_user_t*`, which
  *                  will be populated with the list of active users in the app.
- *                  May be NULL, in which case this function can be used to
- *                  discover the number of active users by passing in just `out_n`.
+ *                  Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param capacity The maximum number of elements `out_users` can hold.
  * @param out_n The actual number of entries written to `out_users`.
  *              May be NULL.
@@ -3020,25 +3036,28 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  *
  * Return value must be manually released with realm_free().
  */
-RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
-                                                                    const char* custom_filename) RLM_API_NOEXCEPT;
-RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_sync_config_t*,
+                                                                    const char* custom_filename);
+/**
+ * Return the identiy for the user passed as argument
+ * @param user ptr to the user for which the identiy has to be retrieved
+ * @return a ptr to the identity string
+ */
+RLM_API const char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
 
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
-
-typedef struct {
-    const char* id;
-    realm_auth_provider_e provider_type;
-} realm_user_identity_t;
+/**
+ * Retrieve the state for the user passed as argument
+ * @param user ptr to the user for which the state has to be retrieved
+ * @return realm_user_state_e value
+ */
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
 
 /**
  * Get the list of identities of this @a user.
  *
  * @param out_identities A pointer to an array of `realm_user_identity_t`, which
  *                       will be populated with the list of identities of this user.
- *                       May be NULL, in which case this function can be used to
- *                       discover the number of identities of this user by passing in NULL here
- *                       and examining `*out_n`.
+ *                       Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param capacity The maximum number of elements `out_identities` can hold.
  * @param out_n The actual number of entries written to `out_identities`. May be NULL.
  * @return true, if no errors occurred.
@@ -3095,6 +3114,12 @@ RLM_API char* realm_user_get_access_token(const realm_user_t*);
  * @return a string that represents the refresh token
  */
 RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
+/**
+ * Return the realm app for the user passed as parameter.
+ * @return a ptr to the app for the user.
+ */
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 
 /* Sync */
@@ -3297,8 +3322,8 @@ typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_ERROR,
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
-typedef void (*realm_sync_on_subscription_state_changed)(void* userdata,
-                                                         realm_flx_sync_subscription_set_state_e state);
+typedef void (*realm_sync_on_subscription_state_changed_t)(void* userdata,
+                                                           realm_flx_sync_subscription_set_state_e state);
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3434,7 +3459,7 @@ RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_s
  */
 RLM_API bool realm_sync_on_subscription_set_state_change_async(
     const realm_flx_sync_subscription_set_t* subscription_set, realm_flx_sync_subscription_set_state_e notify_when,
-    realm_sync_on_subscription_state_changed callback, void* userdata, realm_free_userdata_func_t userdata_free);
+    realm_sync_on_subscription_state_changed_t, void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  *  Retrieve version for the subscription set passed as parameter

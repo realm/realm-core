@@ -1234,11 +1234,12 @@ TEST_CASE("C API", "[c_api]") {
 
     SECTION("realm_get_class_keys()") {
         realm_class_key_t keys[2];
+        // return total number of keys present, copy only if there is enough space in the vector passed in
         size_t found = 0;
         CHECK(checked(realm_get_class_keys(realm, keys, 2, &found)));
-        CHECK(found == 2);
+        CHECK(found == 3);
         CHECK(checked(realm_get_class_keys(realm, keys, 1, &found)));
-        CHECK(found == 1);
+        CHECK(found == 3);
     }
 
     SECTION("realm_find_property() errors") {
@@ -1275,21 +1276,29 @@ TEST_CASE("C API", "[c_api]") {
     }
 
     SECTION("realm_get_property_keys()") {
-        realm_property_key_t properties[3];
         size_t num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties, 3, &num_found)));
-        CHECK(num_found == 3);
-        CHECK(properties[0] == foo_properties["int"]);
+        size_t properties_found = 0;
+
+        // discover how many properties there are.
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &properties_found)));
+        realm_property_key_t* properties_foo =
+            (realm_property_key_t*)malloc(sizeof(realm_property_key_t) * properties_found);
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties_foo, properties_found, &num_found)));
+        CHECK(num_found == properties_found);
+        CHECK(properties_foo[0] == foo_properties["int"]);
+        realm_free(properties_foo);
 
         num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 3, &num_found)));
-        CHECK(num_found == 3);
-        CHECK(properties[2] == bar_properties["doubles"]);
-
-        num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 1, &num_found)));
-        CHECK(num_found == 1);
-        CHECK(properties[0] == bar_properties["int"]);
+        properties_found = 0;
+        // discover how many properties there are.
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, nullptr, 0, &properties_found)));
+        realm_property_key_t* properties_bar =
+            (realm_property_key_t*)malloc(sizeof(realm_property_key_t) * properties_found);
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties_bar, properties_found, &num_found)));
+        CHECK(num_found == properties_found);
+        CHECK(properties_bar[2] == bar_properties["doubles"]);
+        CHECK(properties_bar[0] == bar_properties["int"]);
+        realm_free(properties_bar);
 
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
@@ -4044,6 +4053,51 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 #endif
 
 #ifdef REALM_ENABLE_AUTH_TESTS
+
+static void realm_app_void_completion(void*, const realm_app_error_t*) {}
+
+static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t*)
+{
+    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(realm_clone(user));
+}
+
+static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t*)
+{
+    realm_user_identity_t idents[10];
+    size_t n;
+    realm_user_get_all_identities(user, idents, 10, &n);
+    *static_cast<bool*>(p) = n == 2;
+    for (size_t i = 0; i < n; i++) {
+        realm_free(idents[i].id);
+    }
+}
+
+TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
+    TestAppSession session;
+    realm_app app(session.app());
+
+    SECTION("link_user intergration") {
+        AutoVerifiedEmailCredentials creds;
+        bool processed = false;
+        realm_user_t* sync_user = nullptr;
+
+        realm_string_t password{creds.password.c_str(), creds.password.length()};
+        realm_app_email_password_provider_client_register_email(&app, creds.email.c_str(), password,
+                                                                realm_app_void_completion, nullptr, nullptr);
+
+        realm_app_credentials anonymous(app::AppCredentials::anonymous());
+        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user, nullptr);
+
+        CHECK(realm_user_get_auth_provider(sync_user) == RLM_AUTH_PROVIDER_ANONYMOUS);
+
+        realm_app_credentials email_creds(creds);
+        realm_app_link_user(&app, sync_user, &email_creds, realm_app_user2, &processed, nullptr);
+
+        CHECK(processed);
+        realm_release(sync_user);
+    }
+}
+
 TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
     using namespace realm::app;
 

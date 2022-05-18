@@ -166,6 +166,8 @@ protected:
 struct realm_config : realm::c_api::WrapC, realm::RealmConfig {
     using RealmConfig::RealmConfig;
     std::map<void*, realm_free_userdata_func_t> free_functions;
+    realm_config(const realm_config&) = delete;
+    realm_config& operator=(const realm_config&) = delete;
     ~realm_config()
     {
         for (auto& f : free_functions) {
