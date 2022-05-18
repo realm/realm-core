@@ -27,6 +27,7 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/util/ez_websocket.hpp>
 #endif
 
 #include <realm/db.hpp>
@@ -337,6 +338,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
     sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.socket_factory = util::websocket::EZSocketFactory::defaultSocketFactory;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
     if (config.override_sync_route) {

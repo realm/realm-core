@@ -28,6 +28,7 @@
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
+#include <realm/util/ez_websocket.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -244,6 +245,7 @@ void SyncManager::reset_for_testing()
 
         // Reset even more state.
         m_config = {};
+        m_config.socket_factory = util::websocket::EZSocketFactory::defaultSocketFactory;
 
         m_sync_route = "";
     }
