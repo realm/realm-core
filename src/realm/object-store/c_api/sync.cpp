@@ -430,14 +430,16 @@ RLM_API realm_string_t
 realm_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->object_class_name());
+    REALM_ASSERT(subscription->object_class_name().data());
+    return to_capi(StringData{subscription->object_class_name()});
 }
 
 RLM_API realm_string_t
 realm_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription) noexcept
 {
     REALM_ASSERT(subscription != nullptr);
-    return to_capi(subscription->query_string());
+    REALM_ASSERT(subscription->query_string().data());
+    return to_capi(StringData{subscription->query_string()});
 }
 
 RLM_API realm_timestamp_t
