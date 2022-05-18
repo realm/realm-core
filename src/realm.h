@@ -2761,8 +2761,8 @@ RLM_API bool realm_app_log_in_with_credentials(realm_app_t* app, realm_app_crede
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_log_out_current_user(realm_app_t* app, realm_app_void_completion_func_t callback, void* userdata,
-                                            realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_log_out_current_user(realm_app_t* app, realm_app_void_completion_func_t callback,
+                                            void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Refreshes the custom data for a specified user.
@@ -2773,8 +2773,9 @@ RLM_API bool realm_app_log_out_current_user(realm_app_t* app, realm_app_void_com
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
-                                           void* userdata, realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user,
+                                           realm_app_void_completion_func_t callback, void* userdata,
+                                           realm_free_userdata_func_t userdata_free);
 
 /**
  * Log out the given user if they are not already logged out.
@@ -2785,11 +2786,12 @@ RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user,
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback, void* userdata,
-                               realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                               void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
- * Links the currently authenticated user with a new identity, where the identity is defined by the credentia specified as a parameter.
+ * Links the currently authenticated user with a new identity, where the identity is defined by the credentia
+ * specified as a parameter.
  * @param app ptr to realm_app
  * @param user ptr to the user to link
  * @param credentials sync credentials
@@ -2799,10 +2801,12 @@ RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, realm_app_v
  * @return True if no error has been recorded, False otherwise
  */
 RLM_API bool realm_app_link_user(realm_app_t* app, realm_user_t* user, realm_app_credentials_t* credentials,
-                                 realm_app_user_completion_func_t callback, void* userdata, realm_free_userdata_func_t userdata_free);
+                                 realm_app_user_completion_func_t callback, void* userdata,
+                                 realm_free_userdata_func_t userdata_free);
 
 /**
- * Switches the active user with the specified one. The user must exist in the list of all users who have logged into this application.
+ * Switches the active user with the specified one. The user must exist in the list of all users who have logged into
+ * this application.
  * @param app ptr to realm_app
  * @param user ptr to current user
  * @param new_user ptr to the new user to switch
@@ -2819,8 +2823,8 @@ RLM_API bool realm_app_switch_user(realm_app_t* app, realm_user_t* user, realm_u
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback, void* userdata,
-                                   realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Deletes a user and all its data from the server.
@@ -2831,8 +2835,8 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_a
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback, void* userdata,
-                                   realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Registers a new email identity with the username/password provider and send confirmation email.
@@ -2846,7 +2850,8 @@ RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_a
  */
 RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
                                                                      realm_string_t password,
-                                                                     realm_app_void_completion_func_t callback, void* userdata,
+                                                                     realm_app_void_completion_func_t callback,
+                                                                     void* userdata,
                                                                      realm_free_userdata_func_t userdata_free);
 
 /**
@@ -2861,7 +2866,8 @@ RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t
  */
 RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t* app, const char* token,
                                                                    const char* token_id,
-                                                                   realm_app_void_completion_func_t callback, void* userdata,
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   void* userdata,
                                                                    realm_free_userdata_func_t userdata_free);
 
 /**
@@ -2873,10 +2879,9 @@ RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t* 
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(realm_app_t* app, const char* email,
-                                                                                realm_app_void_completion_func_t callback,
-                                                                                void* userdata,
-                                                                                realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(
+    realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, void* userdata,
+    realm_free_userdata_func_t userdata_free);
 
 /**
  * Send reset password to the email specified in the parameter passed to the function.
@@ -2887,10 +2892,9 @@ RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(realm_app_t* app, const char* email,
-                                                                                realm_app_void_completion_func_t callback,
-                                                                                void* userdata,
-                                                                                realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(
+    realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, void* userdata,
+    realm_free_userdata_func_t userdata_free);
 /**
  * Retries the custom confirmation function on a user for a given email.
  * @param app ptr to realm_app
@@ -2900,10 +2904,9 @@ RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(
  * @param userdata_free deleter for custom userdata
  * @return True if no error has been recorded, False otherwise
  */
-RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(realm_app_t* app, const char* email,
-                                                                                realm_app_void_completion_func_t callback,
-                                                                                void* userdata,
-                                                                                realm_free_userdata_func_t userdata_free);
+RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(
+    realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, void* userdata,
+    realm_free_userdata_func_t userdata_free);
 /**
  * Resets the password of an email identity using the password reset token emailed to a user.
  * @param app ptr to realm_app
@@ -2916,7 +2919,8 @@ RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(
  */
 RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t* app, realm_string_t password,
                                                                      const char* token, const char* token_id,
-                                                                     realm_app_void_completion_func_t callback, void* userdata,
+                                                                     realm_app_void_completion_func_t callback,
+                                                                     void* userdata,
                                                                      realm_free_userdata_func_t userdata_free);
 
 /**
