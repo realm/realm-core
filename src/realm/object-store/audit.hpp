@@ -103,6 +103,8 @@ public:
     virtual void wait_for_uploads() = 0;
 };
 
+std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB>, RealmConfig const& parent_config);
+
 // Hooks for testing. Do not use outside of tests.
 namespace audit_test_hooks {
 void set_maximum_shard_size(int64_t max_size);
@@ -110,15 +112,11 @@ void set_maximum_shard_size(int64_t max_size);
 void set_clock(util::UniqueFunction<Timestamp()>&&);
 } // namespace audit_test_hooks
 
-#if REALM_ENABLE_SYNC
-#if REALM_PLATFORM_APPLE
-std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB>, RealmConfig const& parent_config);
-#else
+#if !REALM_PLATFORM_APPLE
 inline std::shared_ptr<AuditInterface> make_audit_context(std::shared_ptr<DB>, RealmConfig const&)
 {
     REALM_TERMINATE("Audit not supported on this platform");
 }
-#endif
 #endif
 
 } // namespace realm
