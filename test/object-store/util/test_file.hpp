@@ -223,6 +223,7 @@ public:
 
     TestSyncManager(realm::SyncManager::MetadataMode mode);
     TestSyncManager(const Config& = Config(), const SyncServer::Config& = {});
+    TestSyncManager(const realm::SyncClientConfig&, const Config& = Config(), const SyncServer::Config& = {});
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const noexcept

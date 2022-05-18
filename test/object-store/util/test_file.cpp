@@ -248,9 +248,12 @@ std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
     return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
 }
 
-namespace {
-void set_app_config_defaults(app::App::Config& app_config,
-                             const std::shared_ptr<app::GenericNetworkTransport>& transport)
+// MARK: - TestSyncManager
+
+TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config, const Config& config, const SyncServer::Config& sync_server_config)
+    : m_sync_server(sync_server_config)
+    , m_should_teardown_test_directory(config.should_teardown_test_directory)
+    , m_app_session(config.app_session)
 {
     if (!app_config.transport)
         app_config.transport = transport;
