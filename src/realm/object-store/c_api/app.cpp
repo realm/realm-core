@@ -732,7 +732,7 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
 {
     return wrap_err([&] {
         if (out_identities) {
-            const auto& identities = (*user)->identities();
+            const auto identities = (*user)->identities();
             max = std::min(identities.size(), max);
             for (size_t i = 0; i < max; i++) {
                 out_identities[i] = {duplicate_string(identities[i].id),
