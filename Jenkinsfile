@@ -131,7 +131,7 @@ jobWrapper {
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
             // FIXME: disabled due to issues with CI
-	    // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
+	        // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -214,7 +214,7 @@ jobWrapper {
             rlmNode('docker') {
                 deleteDir()
                 dir('temp') {
-                    withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
+                    withAWS(credentials: 'aws-s3-bucket-static.realm.io', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
                             unstash name: publishingStash
                             def path = publishingStash.replaceAll('___', '/')
