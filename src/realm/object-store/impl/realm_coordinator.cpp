@@ -16,7 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "realm/exceptions.hpp"
 #include <realm/object-store/impl/realm_coordinator.hpp>
 
 #include <realm/object-store/impl/collection_notifier.hpp>
