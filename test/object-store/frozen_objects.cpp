@@ -377,12 +377,14 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
     constexpr int num_pending_transactions = 200;
-    constexpr int num_transactions_created = 1000;
-    constexpr int num_objects = 200;
+    constexpr int num_transactions_created = 100000;
+    constexpr int num_objects = 20;
     constexpr int num_checks_pr_trans = 10;
     struct Entry {
         SharedRealm realm;
         Object o;
+        ObjKey link;
+        int64_t linked_value;
         int64_t value;
     };
     std::vector<Entry> refs;
@@ -390,15 +392,20 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     TestFile config;
 
     config.schema_version = 1;
-    config.schema = Schema{{"table", {{"value", PropertyType::Int}}}};
+    config.automatic_change_notifications = false;
+    config.schema = Schema{{"table", 
+        {{"value", PropertyType::Int},{"link", PropertyType::Object | PropertyType::Nullable, "table"}
+    }}};
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_table");
     auto table_key = table->get_key();
     auto col = table->get_column_key("value");
+    auto link_col = table->get_column_key("link");
     realm->begin_transaction();
     for (int j = 0; j < num_objects; ++j) {
         auto o = table->create_object(ObjKey(j));
         o.set(col, j);
+        o.set(link_col, o.get_key());
     }
     realm->commit_transaction();
     TestFile config2 = config;
@@ -421,6 +428,9 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         auto o = Object(realm2, realm2->read_group().get_table(table_key)->get_object(key));
         refs[trans_number].o = o;
         refs[trans_number].value = o.obj().get<Int>(col);
+        refs[trans_number].link = o.obj().get<ObjKey>(link_col);
+        auto linked = realm2->read_group().get_table(table_key)->get_object(refs[trans_number].link);
+        refs[trans_number].linked_value = linked.get<Int>(col);
         // add a dummy notification callback to exercise the notification machinery
         o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             ++notifications;
@@ -429,6 +439,8 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
             realm->begin_transaction();
             auto o = table->get_object(ObjKey(key));
             o.set(col, o.get<Int>(col) + j + 42);
+            int link = (unsigned)random_int() % num_objects;
+            o.set(link_col, ObjKey(link));
             realm->commit_transaction();
         }
         for (int k = 0; k < num_checks_pr_trans; ++k) {

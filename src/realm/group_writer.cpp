@@ -497,7 +497,7 @@ ref_type GroupWriter::write_group()
 #endif
     // We now back-date (if possbible) any blocks freed in versions which
     // are becoming unreachable.
-    // backdate();
+    backdate();
 
     // We now have a bit of a chicken-and-egg problem. We need to write the
     // free-lists to the file, but the act of writing them will consume free
