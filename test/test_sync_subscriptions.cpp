@@ -71,9 +71,7 @@ TEST(Sync_SubscriptionStoreBasic)
         CHECK_NOT(it == out.end());
         CHECK(inserted);
 
-        CHECK_EQUAL(it->name(), std::string_view{});
-        StringData name(it->name());
-        CHECK(name.is_null());
+        CHECK_NOT(it->name());
         anon_sub_id = it->id();
 
         std::move(out).commit();
@@ -105,7 +103,7 @@ TEST(Sync_SubscriptionStoreBasic)
             return sub.id() == anon_sub_id;
         });
         CHECK_NOT(anon_sub_it == set.end());
-        CHECK_EQUAL(anon_sub_it->name(), std::string_view{});
+        CHECK_NOT(anon_sub_it->name());
     }
 }
 

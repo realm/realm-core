@@ -96,7 +96,6 @@ Timestamp Subscription::updated_at() const
 
 util::Optional<std::string_view> Subscription::name() const
 {
-
     if (!m_name) {
         return util::none;
     }
@@ -273,7 +272,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.has_name() && sub.name() == name);
+        return (sub.name() && *sub.name() == name);
     });
 
     return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
@@ -284,7 +283,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name().empty() && sub.object_class_name() == table_name && sub.query_string() == query_str);
+        return (!sub.name() && sub.object_class_name() == table_name && sub.query_string() == query_str);
     });
 
     return insert_or_assign_impl(it, util::none, std::move(table_name), std::move(query_str));
@@ -464,8 +463,8 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
             new_sub.set(mgr->m_sub_id, sub.id());
             new_sub.set(mgr->m_sub_created_at, sub.created_at());
             new_sub.set(mgr->m_sub_updated_at, sub.updated_at());
-            if (sub.m_name) {
-                new_sub.set(mgr->m_sub_name, StringData(sub.name()));
+            if (auto name = sub.name(); name) {
+                new_sub.set(mgr->m_sub_name, StringData(*name));
             }
             new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name()));
             new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string()));
