@@ -49,11 +49,8 @@ public:
     // Returns the timestamp of the last time this subscription was updated by calling update_query.
     Timestamp updated_at() const;
 
-    // Returns whether the subscription was created as an anonymous subscription or a named subscription.
-    bool has_name() const;
-
     // Returns the name of the subscription that was set when it was created.
-    std::string_view name() const;
+    util::Optional<std::string_view> name() const;
 
     // Returns the name of the object class of the query for this subscription.
     std::string_view object_class_name() const;

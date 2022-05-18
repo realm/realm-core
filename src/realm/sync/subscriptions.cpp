@@ -94,17 +94,13 @@ Timestamp Subscription::updated_at() const
     return m_updated_at;
 }
 
-bool Subscription::has_name() const
+util::Optional<std::string_view> Subscription::name() const
 {
-    return static_cast<bool>(m_name);
-}
 
-std::string_view Subscription::name() const
-{
     if (!m_name) {
-        return std::string_view{};
+        return util::none;
     }
-    return m_name.value();
+    return std::string_view{*m_name};
 }
 
 std::string_view Subscription::object_class_name() const
