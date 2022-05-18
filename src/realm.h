@@ -2904,11 +2904,21 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  *
  * Return value must be manually released with realm_free().
  */
-RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
-                                                                    const char* custom_filename) RLM_API_NOEXCEPT;
-RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_sync_config_t*,
+                                                                    const char* custom_filename);
+/**
+ * Return the identiy for the user passed as argument
+ * @param user ptr to the user for which the identiy has to be retrieved
+ * @return a ptr to the identity string
+ */
+RLM_API const char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
 
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
+/**
+ * Retrieve the state for the user passed as argument
+ * @param user ptr to the user for which the state has to be retrieved
+ * @return realm_user_state_e value
+ */
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
 
 /**
  * Get the list of identities of this @a user.

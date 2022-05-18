@@ -703,13 +703,15 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t* a
     (*app)->sync_manager()->wait_for_sessions_to_terminate();
 }
 
-RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t* app,
-                                                                    const realm_sync_config_t* config,
-                                                                    const char* custom_filename) noexcept
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_sync_config_t* config,
+                                                                    const char* custom_filename)
 {
-    util::Optional<std::string> filename = custom_filename ? util::some<std::string>(custom_filename) : util::none;
-    std::string file_path = (*app)->sync_manager()->path_for_realm(*config, std::move(filename));
-    return duplicate_string(file_path);
+    return wrap_err([&]() {
+        util::Optional<std::string> filename =
+            custom_filename ? util::some<std::string>(custom_filename) : util::none;
+        std::string file_path = config->user->sync_manager()->path_for_realm(*config, std::move(filename));
+        return duplicate_string(file_path);
+    });
 }
 
 RLM_API const char* realm_user_get_identity(const realm_user_t* user) noexcept
