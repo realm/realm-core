@@ -471,6 +471,15 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_a
     });
 }
 
+RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&] {
+        (*app)->delete_user(*user, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
 RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
                                                                      realm_string_t password,
                                                                      realm_app_void_completion_func_t callback,
@@ -725,15 +734,6 @@ RLM_API const char* realm_user_get_identity(const realm_user_t* user) noexcept
 RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) noexcept
 {
     return realm_user_state_e((*user)->state());
-}
-
-RLM_API bool realm_user_delete(const realm_sync_config_t* config)
-{
-    REALM_ASSERT(config);
-    return wrap_err([&]() {
-        config->user->sync_manager()->delete_user(config->user->identity());
-        return true;
-    });
 }
 
 RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_identity_t* out_identities,
