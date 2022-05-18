@@ -349,12 +349,15 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     if (realm->config().sync_config)
         create_sync_session();
 
+#if REALM_ENABLE_SYNC
     if (realm->config().audit_config) {
         if (m_audit_context)
             m_audit_context->update_metadata(realm->config().audit_config->metadata);
         else
             m_audit_context = make_audit_context(m_db, realm->config());
     }
+#endif
+
 
     realm_lock.unlock_unchecked();
     if (schema) {
