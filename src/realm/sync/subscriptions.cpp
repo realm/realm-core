@@ -272,7 +272,7 @@ std::pair<SubscriptionSet::iterator, bool> MutableSubscriptionSet::insert_or_ass
     auto table_name = Group::table_name_to_class_name(query.get_table()->get_name());
     auto query_str = query.get_description();
     auto it = std::find_if(begin(), end(), [&](const Subscription& sub) {
-        return (sub.name() && *sub.name() == name);
+        return (sub.name() == name);
     });
 
     return insert_or_assign_impl(it, std::string{name}, std::move(table_name), std::move(query_str));
@@ -463,7 +463,7 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
             new_sub.set(mgr->m_sub_id, sub.id());
             new_sub.set(mgr->m_sub_created_at, sub.created_at());
             new_sub.set(mgr->m_sub_updated_at, sub.updated_at());
-            if (auto name = sub.name(); name) {
+            if (auto name = sub.name()) {
                 new_sub.set(mgr->m_sub_name, StringData(*name));
             }
             new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name()));
