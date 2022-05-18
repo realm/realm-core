@@ -439,18 +439,20 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
 }
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
-    constexpr int num_pending_transactions = 200;
+    constexpr int num_pending_transactions = 2;
     constexpr int num_transactions_created = 1000;
-    constexpr int num_objects = 200;
+    constexpr int num_objects = 2;
     constexpr int num_checks_pr_trans = 10;
     struct Entry {
         SharedRealm realm;
         Object o;
         int64_t value;
+        NotificationToken token;
     };
     std::vector<Entry> refs;
     refs.resize(num_pending_transactions);
     TestFile config;
+    config.automatic_change_notifications = false;
 
     config.schema_version = 1;
     config.schema = Schema{{"table", {{"value", PropertyType::Int}}}};
@@ -485,9 +487,10 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         refs[trans_number].o = o;
         refs[trans_number].value = o.obj().get<Int>(col);
         // add a dummy notification callback to exercise the notification machinery
-        o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        refs[trans_number].token = o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             ++notifications;
         });
+        //advance_and_notify(*realm2);
         {
             realm->begin_transaction();
             auto o = table->get_object(ObjKey(key));
