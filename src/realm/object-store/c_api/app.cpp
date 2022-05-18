@@ -804,4 +804,17 @@ RLM_API char* realm_user_get_refresh_token(const realm_user_t* user)
     });
 }
 
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
+{
+    REALM_ASSERT(user);
+    try {
+        if (auto shared_app = (*user)->sync_manager()->app().lock()) {
+            return new realm_app_t(shared_app);
+        }
+    }
+    catch (const std::exception&) {
+    }
+    return nullptr;
+}
+
 } // namespace realm::c_api
