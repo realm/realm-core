@@ -385,19 +385,14 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t* app) noexcep
 RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity, size_t* out_n)
 {
     return wrap_err([&] {
-        if (out_users) {
+        const auto& users = (*app)->all_users();
+        set_out_param(out_n, users.size());
+        if (out_users && capacity >= users.size()) {
             OutBuffer<realm_user_t> buf(out_users);
-            for (const auto& user : (*app)->all_users()) {
+            for (const auto& user : users) {
                 buf.emplace(user);
-                if (buf.size() == capacity)
-                    break;
             }
             buf.release(out_n);
-        }
-        else {
-            if (out_n) {
-                *out_n = (*app)->all_users().size();
-            }
         }
         return true;
     });
@@ -731,20 +726,12 @@ RLM_API bool realm_user_get_all_identities(const realm_user_t* user, realm_user_
                                            size_t max, size_t* out_n)
 {
     return wrap_err([&] {
-        if (out_identities) {
-            const auto& identities = (*user)->identities();
-            max = std::min(identities.size(), max);
-            for (size_t i = 0; i < max; i++) {
+        const auto& identities = (*user)->identities();
+        set_out_param(out_n, identities.size());
+        if (out_identities && max >= identities.size()) {
+            for (size_t i = 0; i < identities.size(); i++) {
                 out_identities[i] = {identities[i].id.c_str(),
                                      realm_auth_provider_e(enum_from_provider_type(identities[i].provider_type))};
-            }
-            if (out_n) {
-                *out_n = max;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = (*user)->identities().size();
             }
         }
         return true;

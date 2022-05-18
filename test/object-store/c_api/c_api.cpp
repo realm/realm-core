@@ -1234,11 +1234,12 @@ TEST_CASE("C API", "[c_api]") {
 
     SECTION("realm_get_class_keys()") {
         realm_class_key_t keys[2];
+        // return total number of keys present, copy only if there is enough space in the vector passed in
         size_t found = 0;
         CHECK(checked(realm_get_class_keys(realm, keys, 2, &found)));
-        CHECK(found == 2);
+        CHECK(found == 3);
         CHECK(checked(realm_get_class_keys(realm, keys, 1, &found)));
-        CHECK(found == 1);
+        CHECK(found == 3);
     }
 
     SECTION("realm_find_property() errors") {
@@ -1275,21 +1276,29 @@ TEST_CASE("C API", "[c_api]") {
     }
 
     SECTION("realm_get_property_keys()") {
-        realm_property_key_t properties[3];
         size_t num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties, 3, &num_found)));
-        CHECK(num_found == 3);
-        CHECK(properties[0] == foo_properties["int"]);
+        size_t properties_found = 0;
+
+        // discover how many properties there are.
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &properties_found)));
+        realm_property_key_t* properties_foo =
+            (realm_property_key_t*)malloc(sizeof(realm_property_key_t) * properties_found);
+        CHECK(checked(realm_get_property_keys(realm, class_foo.key, properties_foo, properties_found, &num_found)));
+        CHECK(num_found == properties_found);
+        CHECK(properties_foo[0] == foo_properties["int"]);
+        realm_free(properties_foo);
 
         num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 3, &num_found)));
-        CHECK(num_found == 3);
-        CHECK(properties[2] == bar_properties["doubles"]);
-
-        num_found = 0;
-        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties, 1, &num_found)));
-        CHECK(num_found == 1);
-        CHECK(properties[0] == bar_properties["int"]);
+        properties_found = 0;
+        // discover how many properties there are.
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, nullptr, 0, &properties_found)));
+        realm_property_key_t* properties_bar =
+            (realm_property_key_t*)malloc(sizeof(realm_property_key_t) * properties_found);
+        CHECK(checked(realm_get_property_keys(realm, class_bar.key, properties_bar, properties_found, &num_found)));
+        CHECK(num_found == properties_found);
+        CHECK(properties_bar[2] == bar_properties["doubles"]);
+        CHECK(properties_bar[0] == bar_properties["int"]);
+        realm_free(properties_bar);
 
         num_found = 0;
         CHECK(checked(realm_get_property_keys(realm, class_foo.key, nullptr, 0, &num_found)));
