@@ -2968,7 +2968,7 @@ RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
  * Return the realm app for the user passed as parameter.
  * @return a ptr to the app for the user.
  */
-RLM_API realm_app_t* realm_user_get_app(const realm_user_t*);
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 
 /* Sync */
