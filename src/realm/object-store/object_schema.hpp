@@ -43,9 +43,12 @@ public:
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties);
+    ObjectSchema(std::string name, IsAsymmetric is_asymmetric, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
+                 std::initializer_list<Property> computed_properties, std::string name_alias = "");
+    ObjectSchema(std::string name, IsAsymmetric is_asymmetric, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ~ObjectSchema();
 
