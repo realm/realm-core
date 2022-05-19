@@ -99,11 +99,12 @@ public:
     {
     }
 
-    virtual ~EZSocketFactory() { }
+    virtual ~EZSocketFactory() {}
 
     virtual std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint);
 
-    static std::unique_ptr<EZSocketFactory>defaultSocketFactory(EZConfig&& config) {
+    static std::unique_ptr<EZSocketFactory> defaultSocketFactory(EZConfig&& config)
+    {
         return std::unique_ptr<EZSocketFactory>(new EZSocketFactory(std::move(config)));
     }
 

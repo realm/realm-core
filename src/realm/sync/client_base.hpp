@@ -296,8 +296,8 @@ struct ClientConfig {
     bool disable_sync_to_disk = false;
 
     /// Default implementation of the WebSocket factory. Can be overriden in SDK
-    std::function<std::unique_ptr<websocket::EZSocketFactory>(websocket::EZConfig&&)> socket_factory
-        = websocket::EZSocketFactory::defaultSocketFactory;
+    std::function<std::unique_ptr<websocket::EZSocketFactory>(websocket::EZConfig&&)> socket_factory =
+        websocket::EZSocketFactory::defaultSocketFactory;
 };
 
 /// \brief Information about an error causing a session to be temporarily

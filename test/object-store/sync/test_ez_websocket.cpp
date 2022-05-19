@@ -35,14 +35,16 @@ using namespace realm;
 using namespace realm::sync;
 using namespace realm::util::websocket;
 
-class TestSocketFactory: public EZSocketFactory {
+class TestSocketFactory : public EZSocketFactory {
 public:
     TestSocketFactory(EZConfig config, std::function<void()> factoryCallback)
         : EZSocketFactory(config)
         , didCallHandler(factoryCallback)
-    { }
+    {
+    }
 
-    std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint) override {
+    std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint) override
+    {
         didCallHandler();
         return EZSocketFactory::connect(observer, std::move(endpoint));
     }
@@ -59,14 +61,16 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     };
 
     TestSyncManager::Config testConfig = TestSyncManager::Config();
-    
+
     // Configuring custom socket factory in SyncClientConfig
     SyncClientConfig sc_config;
-    std::string m_base_file_path = testConfig.base_path.empty() ? util::make_temp_dir() + random_string(10) : testConfig.base_path;
+    std::string m_base_file_path =
+        testConfig.base_path.empty() ? util::make_temp_dir() + random_string(10) : testConfig.base_path;
     util::try_make_dir(m_base_file_path);
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = testConfig.metadata_mode;
-    sc_config.log_level = testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.log_level =
+        testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
     sc_config.socket_factory = [&factoryCallHandler](EZConfig&& config) {
         return std::unique_ptr<EZSocketFactory>(new TestSocketFactory(std::move(config), factoryCallHandler));
     };

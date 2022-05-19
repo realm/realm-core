@@ -250,7 +250,8 @@ std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
 
 // MARK: - TestSyncManager
 
-TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config, const Config& config, const SyncServer::Config& sync_server_config)
+TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config, const Config& config,
+                                 const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
     , m_app_session(config.app_session)
