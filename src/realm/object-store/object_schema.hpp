@@ -38,6 +38,7 @@ struct Property;
 class ObjectSchema {
 public:
     using IsEmbedded = util::TaggedBool<class IsEmbeddedTag>;
+    using IsAsymmetric = util::TaggedBool<class IsAsymmetricTag>;
 
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
@@ -63,6 +64,7 @@ public:
     std::string primary_key;
     TableKey table_key;
     IsEmbedded is_embedded = false;
+    IsAsymmetric is_asymmetric = false;
     std::string alias;
 
     Property* property_for_public_name(StringData public_name) noexcept;
