@@ -208,8 +208,7 @@ public:
     void finalize_before_actualization() noexcept;
 
     // Overriding member function in SyncTransactReporter
-    void report_sync_transact(VersionID, VersionID)
-    override;
+    void report_sync_transact(VersionID, VersionID) override;
 
     void on_new_flx_subscription_set(int64_t new_version);
 

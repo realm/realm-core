@@ -2073,7 +2073,7 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         return;
     }
 
-    update_progress(progress); // Throws
+    update_progress(progress);                                                           // Throws
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
