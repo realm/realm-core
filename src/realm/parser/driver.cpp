@@ -504,6 +504,11 @@ Query BetweenNode::visit(ParserDriver* drv)
     if (limits->elements.size() != 2) {
         throw InvalidQueryError("Operator 'BETWEEN' requires list with 2 elements.");
     }
+    if (PropNode* p = dynamic_cast<PropNode*>(prop->prop)) {
+        if (p->comp_type == ExpressionComparisonType::None) {
+            throw InvalidQueryError("'NONE' not supported for Operator 'BETWEEN'.");
+        }
+    }
 
     ValueNode min(limits->elements.at(0));
     ValueNode max(limits->elements.at(1));

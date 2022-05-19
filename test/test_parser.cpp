@@ -5208,4 +5208,21 @@ TEST_TYPES(Parser_Arithmetic, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Dec
     verify_query_sub(test_context, person, "age * $0 == $1", args, 1);
 }
 
+TEST(Parser_Between)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col = table->add_column_list(type_Int, "scores");
+    for (int i = 0; i < 3; ++i) {
+        auto list = table->create_object().get_list<Int>(col);
+        for (int j = 0; j < 10; j++) {
+            list.add(j + i * 5);
+        }
+    }
+
+    verify_query(test_context, table, "ANY scores between {5, 15}", 3);
+    verify_query(test_context, table, "ALL scores between {5, 15}", 1);
+    CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
+}
+
 #endif // TEST_PARSER

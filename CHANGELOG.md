@@ -8,7 +8,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* In RQL 'NONE BETWEEN' had incorrect behavior, so it is now disallowed ([#5508](https://github.com/realm/realm-core/issues/5508), since v11.3.0)
  
 ### Breaking changes
 * `realm::Realm::Config` has been renamed to `realm::RealmConfig`.
