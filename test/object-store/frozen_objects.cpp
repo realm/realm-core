@@ -376,8 +376,8 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
-    constexpr int num_pending_transactions = 200;
-    constexpr int num_transactions_created = 100000;
+    constexpr int num_pending_transactions = 20;
+    constexpr int num_transactions_created = 10000;
     constexpr int num_objects = 20;
     constexpr int num_checks_pr_trans = 10;
     struct Entry {
@@ -386,16 +386,17 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         ObjKey link;
         int64_t linked_value;
         int64_t value;
+        NotificationToken token;
     };
     std::vector<Entry> refs;
     refs.resize(num_pending_transactions);
     TestFile config;
 
     config.schema_version = 1;
-    config.automatic_change_notifications = false;
-    config.schema = Schema{{"table", 
-        {{"value", PropertyType::Int},{"link", PropertyType::Object | PropertyType::Nullable, "table"}
-    }}};
+    config.automatic_change_notifications = true;
+    config.cache = false;
+    config.schema = Schema{
+        {"table", {{"value", PropertyType::Int}, {"link", PropertyType::Object | PropertyType::Nullable, "table"}}}};
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_table");
     auto table_key = table->get_key();
@@ -408,31 +409,36 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         o.set(link_col, o.get_key());
     }
     realm->commit_transaction();
-    TestFile config2 = config;
-    config2.automatic_change_notifications = false;
-    config2.cache = false;
     int notifications = 0;
     for (int j = 0; j < num_transactions_created; ++j) {
         int trans_number = (unsigned)random_int() % num_pending_transactions;
 
         // advance and notify for object in the previous realm before replacing it
         if (refs[trans_number].realm) {
-            advance_and_notify(*refs[trans_number].realm);
+            auto& r = refs[trans_number].realm;
+            REALM_ASSERT(r->is_in_read_transaction());
+            auto before = r->current_transaction_version();
+            r->refresh();
+            auto after = r->current_transaction_version();
+            REALM_ASSERT(before != after);
+            // advance_and_notify(*r);
         }
 
         // set up and save a new realm for later refresh
-        auto realm2 = Realm::get_shared_realm(config2);
+        auto realm2 = Realm::get_shared_realm(config);
         refs[trans_number].realm = realm2;
         // capture a random object and its current state
         int key = (unsigned)random_int() % num_objects;
-        auto o = Object(realm2, realm2->read_group().get_table(table_key)->get_object(key));
-        refs[trans_number].o = o;
+        auto table2 = realm2->read_group().get_table(table_key);
+        auto& o = refs[trans_number].o;
+        o = Object{};
+        o = std::move(Object(realm2, table2->get_object(key)));
         refs[trans_number].value = o.obj().get<Int>(col);
         refs[trans_number].link = o.obj().get<ObjKey>(link_col);
-        auto linked = realm2->read_group().get_table(table_key)->get_object(refs[trans_number].link);
+        auto linked = table2->get_object(refs[trans_number].link);
         refs[trans_number].linked_value = linked.get<Int>(col);
         // add a dummy notification callback to exercise the notification machinery
-        o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+        refs[trans_number].token = o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
             ++notifications;
         });
         {
@@ -447,14 +453,22 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
             int selected_trans = (unsigned)random_int() % num_pending_transactions;
             if (refs[selected_trans].realm) {
                 CHECK(refs[selected_trans].value == refs[selected_trans].o.obj().get<Int>(col));
+                auto link = refs[selected_trans].o.obj().get<ObjKey>(link_col);
+                CHECK(link == refs[selected_trans].link);
+                auto table = refs[selected_trans].realm->read_group().get_table(table_key);
+                auto linked_value = table->get_object(link).get<Int>(col);
+                CHECK(refs[selected_trans].linked_value == linked_value);
             }
         }
     }
+    /*
     for (auto& e : refs) {
         if (e.realm)
             advance_and_notify(*e.realm);
         e.realm.reset();
     }
+    */
+    refs.clear();
     realm->begin_transaction();
     realm->commit_transaction();
 }
