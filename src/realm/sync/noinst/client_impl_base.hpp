@@ -867,7 +867,7 @@ private:
     bool process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
                                        int64_t query_version, const ReceivedChangesets& received_changesets);
 
-    // Processes any pending FLX bootstraps, if one excists. Otherwise this is a noop.
+    // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
     void begin_resumption_delay();

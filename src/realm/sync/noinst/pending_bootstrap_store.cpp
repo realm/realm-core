@@ -111,10 +111,8 @@ PendingBootstrapStore::PendingBootstrapStore(DBRef db, util::Logger* logger)
         tr->commit_and_continue_as_read();
     }
 
-    // If there are any incomplete bootstraps in the table, we need to clear them and then update our has_pending
-    // flag accordingly.
     if (auto bootstrap_table = tr->get_table(m_table); !bootstrap_table->is_empty()) {
-        m_has_pending = (bootstrap_table->is_empty() == false);
+        m_has_pending = true;
     }
     else {
         m_has_pending = false;
@@ -136,7 +134,7 @@ void PendingBootstrapStore::add_batch(int64_t query_version, util::Optional<Sync
 
     auto tr = m_db->start_write();
     auto bootstrap_table = tr->get_table(m_table);
-    auto incomplete_bootstraps = Query(bootstrap_table).less(m_query_version, query_version).find_all();
+    auto incomplete_bootstraps = Query(bootstrap_table).not_equal(m_query_version, query_version).find_all();
     incomplete_bootstraps.for_each([&](Obj obj) {
         m_logger->debug("Clearing incomplete bootstrap for query version %1", obj.get<int64_t>(m_query_version));
         return false;
@@ -231,8 +229,8 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
         ret.changeset_data.push_back(util::AppendBuffer<char>());
         auto& uncompressed_buffer = ret.changeset_data.back();
 
-        auto raw_changeset_data = cur_changeset.get<BinaryData>(m_changeset_data);
-        ChunkedBinaryInputStream changeset_is(raw_changeset_data);
+        auto compressed_changeset_data = cur_changeset.get<BinaryData>(m_changeset_data);
+        ChunkedBinaryInputStream changeset_is(compressed_changeset_data);
         auto ec = util::compression::decompress_nonportable(changeset_is, uncompressed_buffer);
         if (ec == util::compression::error::decompress_unsupported) {
             REALM_TERMINATE(
@@ -257,6 +255,7 @@ PendingBootstrapStore::PendingBatch PendingBootstrapStore::peek_pending(size_t l
 
 void PendingBootstrapStore::pop_front_pending(const TransactionRef& tr, size_t count)
 {
+    REALM_ASSERT_3(tr->get_transact_stage(), ==, DB::transact_Writing);
     auto bootstrap_table = tr->get_table(m_table);
     if (bootstrap_table->is_empty()) {
         return;

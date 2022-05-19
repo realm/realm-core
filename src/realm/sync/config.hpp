@@ -184,7 +184,7 @@ struct SyncConfig {
     // transformed or applied. To be used in testing only.
     std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
         on_download_message_received_hook;
-    // Will be called after each bootstrap message is added to the pending bootstrap store, but before_frozen
+    // Will be called after each bootstrap message is added to the pending bootstrap store, but before
     // processing a finalized bootstrap. For testing only.
     std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
         on_bootstrap_message_processed_hook;

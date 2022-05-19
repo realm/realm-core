@@ -66,11 +66,11 @@ public:
     // state.
     PendingBatch peek_pending(size_t limit_in_bytes);
 
-    // Removes the first set of changesets from the current pending bootstrap batch. The transaction must be int the
+    // Removes the first set of changesets from the current pending bootstrap batch. The transaction must be in the
     // writing state.
     void pop_front_pending(const TransactionRef& tr, size_t count);
 
-    // Adds a set of changesets to the store and returns the local version produced by the transaction.
+    // Adds a set of changesets to the store.
     void add_batch(int64_t query_version, util::Optional<SyncProgress> progress,
                    const std::vector<Transformer::RemoteChangeset>& changesets);
 
