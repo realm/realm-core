@@ -5212,16 +5212,22 @@ TEST(Parser_Between)
 {
     Group g;
     TableRef table = g.add_table("table");
-    auto col = table->add_column_list(type_Int, "scores");
+    auto col_age = table->add_column(type_Int, "age");
+    auto col_scores = table->add_column_list(type_Int, "scores");
     for (int i = 0; i < 3; ++i) {
-        auto list = table->create_object().get_list<Int>(col);
-        for (int j = 0; j < 10; j++) {
+        auto list = table->create_object().set(col_age, 5 * i + 30).get_list<Int>(col_scores);
+        for (int j = 0; j < 5; j++) {
             list.add(j + i * 5);
         }
+        for (int j = 0; j < 5; j++) {
+            list.add(j + i * 5 + 10);
+        }
     }
-
-    verify_query(test_context, table, "ANY scores between {5, 15}", 3);
-    verify_query(test_context, table, "ALL scores between {5, 15}", 1);
+    g.to_json(std::cout);
+    verify_query(test_context, table, "age between {30, 37}", 2);
+    verify_query(test_context, table, "ALL scores between {5, 19}", 1);
+    CHECK_THROW_ANY(verify_query(test_context, table, "scores between {5, 9}", 1));
+    CHECK_THROW_ANY(verify_query(test_context, table, "ANY scores between {5, 9}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
 }
 

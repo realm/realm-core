@@ -504,9 +504,11 @@ Query BetweenNode::visit(ParserDriver* drv)
     if (limits->elements.size() != 2) {
         throw InvalidQueryError("Operator 'BETWEEN' requires list with 2 elements.");
     }
-    if (PropNode* p = dynamic_cast<PropNode*>(prop->prop)) {
-        if (p->comp_type == ExpressionComparisonType::None) {
-            throw InvalidQueryError("'NONE' not supported for Operator 'BETWEEN'.");
+
+    if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
+        // It's a list!
+        if (dynamic_cast<PropNode*>(prop->prop)->comp_type != ExpressionComparisonType::All) {
+            throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }
 
@@ -514,9 +516,12 @@ Query BetweenNode::visit(ParserDriver* drv)
     ValueNode max(limits->elements.at(1));
     RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, &min);
     RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, &max);
-    AndNode and_node(&cmp1, &cmp2);
 
-    return and_node.visit(drv);
+    Query q(drv->m_base_table);
+    q.and_query(cmp1.visit(drv));
+    q.and_query(cmp2.visit(drv));
+
+    return q;
 }
 
 Query RelationalNode::visit(ParserDriver* drv)
