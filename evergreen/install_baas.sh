@@ -3,7 +3,7 @@
 # and will import a given app into it.
 #
 # Usage:
-# ./evergreen/build_and_run_baas.sh {path to working directory} {path to app to import} [git revision of baas]
+# ./evergreen/install_baas.sh -w {path to working directory} [-b git revision of baas]
 #
 
 set -o errexit
@@ -62,13 +62,34 @@ case $(uname -s) in
                 esac
             ;;
             *)
-                echo "Unsupported platform $DISTRO_NAME $DISTRO_VERSION"
-                exit 1
+                if [[ -z "MONGODB_DOWNLOAD_URL" ]]; then
+                    echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
+                    exit 1
+                fi
+                if [[ -z "$STITCH_ASSISTED_AGG_LIB_PATH" ]]; then
+                    echo "Missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
+                    exit 1
+                fi
+                if [[ -z "$STITCH_SUPPORT_LIB_PATH" ]]; then
+                    echo "Missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
+                    exit 1
+                fi
             ;;
         esac
     ;;
     *)
-        echo "Unsupported platform $(uname -s)"
+        if [[ -z "MONGODB_DOWNLOAD_URL" ]]; then
+            echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
+            exit 1
+        fi
+        if [[ -z "$STITCH_ASSISTED_AGG_LIB_PATH" ]]; then
+            echo "Missing STITCH_ASSISTED_AGG_LIB_PATH env variable to find assisted agg libmongo.so"
+            exit 1
+        fi
+        if [[ -z "$STITCH_SUPPORT_LIB_PATH" ]]; then
+            echo "Missing STITCH_SUPPORT_LIB_PATH env variable to find the mongo stitch support library"
+            exit 1
+        fi
         exit 1
     ;;
 esac
@@ -156,21 +177,33 @@ git checkout "$BAAS_VERSION"
 cd -
 
 if [[ ! -d $WORK_PATH/baas/etc/dylib/lib ]]; then
-    echo "Downloading stitch support library"
-    mkdir baas/etc/dylib
-    cd baas/etc/dylib
-    $CURL -LsS $STITCH_SUPPORT_LIB_URL | tar -xz --strip-components=1
-    cd -
+    if [[ -n "$STITCH_SUPPORT_LIB_PATH" ]]; then
+        echo "Copying stitch support library from $STITCH_SUPPORT_LIB_PATH"
+        mkdir baas/etc/dylib
+        cp -rav $STITCH_SUPPORT_LIB_PATH/* $WORK_PATH/baas/etc/dylib
+    else
+        echo "Downloading stitch support library"
+        mkdir baas/etc/dylib
+        cd baas/etc/dylib
+        $CURL -LsS $STITCH_SUPPORT_LIB_URL | tar -xz --strip-components=1
+        cd -
+    fi
 fi
 export LD_LIBRARY_PATH="$WORK_PATH/baas/etc/dylib/lib"
 export DYLD_LIBRARY_PATH="$WORK_PATH/baas/etc/dylib/lib"
 
-if [[ ! -x $WORK_PATH/baas_dep_binaries/libmongo.so && -n "$STITCH_ASSISTED_AGG_LIB_URL" ]]; then
-    echo "Downloading assisted agg library"
-    cd "$WORK_PATH/baas_dep_binaries"
-    $CURL -LsS $STITCH_ASSISTED_AGG_LIB_URL > libmongo.so
-    chmod 755 libmongo.so 
-    cd -
+if [[ ! -x $WORK_PATH/baas_dep_binaries/libmongo.so ]]; then
+    if [[ -n "$STITCH_ASSISTED_AGG_LIB_PATH" ]]; then
+        echo "Copying stitch support library from $STITCH_ASSISTED_AGG_LIB_PATH"
+        cp -rav $STITCH_ASSISTED_AGG_LIB_PATH $WORK_PATH/baas_dep_binaries/libmongo.so
+        chmod 755 $WORK_PATH/baas_dep_binaries/libmongo.so
+    elif [[ -n "$STITCH_ASSISTED_AGG_LIB_URL" ]]; then
+        echo "Downloading assisted agg library"
+        cd "$WORK_PATH/baas_dep_binaries"
+        $CURL -LsS $STITCH_ASSISTED_AGG_LIB_URL > libmongo.so
+        chmod 755 libmongo.so
+        cd -
+    fi
 fi
 
 if [[ ! -x $WORK_PATH/baas_dep_binaries/assisted_agg && -n "$STITCH_ASSISTED_AGG_URL" ]]; then
