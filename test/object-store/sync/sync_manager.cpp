@@ -177,7 +177,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
 
         SECTION("Custom filename for Flexible Sync") {
             SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
-            REQUIRE(sync_manager->path_for_realm(config, util::make_optional("custom")) ==
+            REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom")) ==
                     base_path / "custom.realm");
         }
 
