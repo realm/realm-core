@@ -308,7 +308,7 @@ public:
     TableRef add_embedded_table(StringData name);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false,
                                         bool asymmetric = false);
-    TableRef get_or_add_table(StringData name, bool asymmetric = false, bool* was_added = nullptr);
+    TableRef get_or_add_table(StringData name, bool* was_added = nullptr, bool asymmetric = false);
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
                                                bool nullable = false, bool asymmetric = false);
 
@@ -988,7 +988,7 @@ inline TableRef Group::add_embedded_table(StringData name)
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-inline TableRef Group::get_or_add_table(StringData name, bool asymmetric, bool* was_added)
+inline TableRef Group::get_or_add_table(StringData name, bool* was_added, bool asymmetric)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);

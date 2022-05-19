@@ -82,7 +82,6 @@ RLM_API realm_object_t* realm_object_create(realm_t* realm, realm_class_key_t ta
         auto table = shared_realm->read_group().get_table(tblkey);
 
         if (table->get_primary_key_column()) {
-            // GET schema
             auto& object_schema = schema_for_table(*realm, tblkey);
             throw MissingPrimaryKeyException{object_schema.name};
         }

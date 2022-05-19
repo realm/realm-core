@@ -25,12 +25,14 @@ namespace sync {
 //   4 Error messaging format accepts a flexible JSON field in 'json_error'.
 //     JSONErrorMessage.IsClientReset controls recovery mode.
 //
+//   6 Support for asymmetric tables.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 4;
+    return 6;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept

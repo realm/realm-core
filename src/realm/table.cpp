@@ -1043,8 +1043,6 @@ void Table::set_table_type(Type table_type)
         return;
     }
 
-    // TODO: only allow migration to/from TopLevel to Embedded.
-
     if (m_table_type == Type::TopLevelAsymmetric || table_type == Type::TopLevelAsymmetric) {
         throw std::logic_error(util::format("Cannot change '%1' to/from asymmetric.", get_name()));
     }
