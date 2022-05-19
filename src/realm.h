@@ -2765,55 +2765,167 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
 RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity,
                                      size_t* out_n);
 
-RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
-                                               realm_app_user_completion_func_t, realm_userdata_t,
+/**
+ * Log in a user and asynchronously retrieve a user object. Inform caller via callback once operation completes.
+ * @param app ptr to realm_app
+ * @param credentials sync credentials
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_log_in_with_credentials(realm_app_t* app, realm_app_credentials_t* credentials,
+                                               realm_app_user_completion_func_t callback, realm_userdata_t,
                                                realm_free_userdata_func_t);
 
-RLM_API bool realm_app_log_out_current_user(realm_app_t*, realm_app_void_completion_func_t, realm_userdata_t,
-                                            realm_free_userdata_func_t);
+/**
+ * Logout the current user.
+ * @param app ptr to realm_app
+ * @param callback invoked once operation has completed
+ * @param userdata custom userdata ptr
+ * @param userdata_free deleter for custom userdata
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_log_out_current_user(realm_app_t* app, realm_app_void_completion_func_t callback,
+                                            void* userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_refresh_custom_data(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t,
-                                           realm_userdata_t, realm_free_userdata_func_t);
+/**
+ * Refreshes the custom data for a specified user.
+ * @param app ptr to realm_app
+ * @param user ptr to user
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user,
+                                           realm_app_void_completion_func_t callback, realm_userdata_t,
+                                           realm_free_userdata_func_t);
 
-RLM_API bool realm_app_log_out(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, realm_userdata_t,
-                               realm_free_userdata_func_t);
+/**
+ * Log out the given user if they are not already logged out.
+ * @param app ptr to realm_app
+ * @param user ptr to user
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                               realm_userdata_t, realm_free_userdata_func_t);
 
-RLM_API bool realm_app_link_user(realm_app_t*, realm_user_t*, realm_app_credentials_t*,
-                                 realm_app_user_completion_func_t, realm_userdata_t, realm_free_userdata_func_t);
+/**
+ * Links the currently authenticated user with a new identity, where the identity is defined by the credentia
+ * specified as a parameter.
+ * @param app ptr to realm_app
+ * @param user ptr to the user to link
+ * @param credentials sync credentials
+ * @param callback invoked once operation has completed
+ * @param userdata custom userdata ptr
+ * @param userdata_free deleter for custom userdata
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_link_user(realm_app_t* app, realm_user_t* user, realm_app_credentials_t* credentials,
+                                 realm_app_user_completion_func_t callback, void* userdata,
+                                 realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** new_user);
+/**
+ * Switches the active user with the specified one. The user must exist in the list of all users who have logged into
+ * this application.
+ * @param app ptr to realm_app
+ * @param user ptr to current user
+ * @param new_user ptr to the new user to switch
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_switch_user(realm_app_t* app, realm_user_t* user, realm_user_t** new_user);
 
-RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, realm_userdata_t,
-                                   realm_free_userdata_func_t);
+/**
+ * Logs out and removes the provided user.
+ * @param app ptr to realm_app
+ * @param user ptr to the user to remove
+ * @param callback invoked once operation has completed
+ * @param userdata custom userdata ptr
+ * @param userdata_free deleter for custom userdata
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t*, const char* email,
+/**
+ * Deletes a user and all its data from the server.
+ * @param app ptr to realm_app
+ * @param user ptr to the user to delete
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   realm_userdata_t, realm_free_userdata_func_t);
+
+/**
+ * Registers a new email identity with the username/password provider and send confirmation email.
+ * @param app ptr to realm_app
+ * @param email identity email
+ * @param password associated to the identity
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
                                                                      realm_string_t password,
-                                                                     realm_app_void_completion_func_t,
+                                                                     realm_app_void_completion_func_t callback,
                                                                      realm_userdata_t, realm_free_userdata_func_t);
 
-RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t*, const char* token,
+/**
+ * Confirms an email identity with the username/password provider.
+ * @param app ptr to realm_app
+ * @param token string emailed
+ * @param token_id string emailed
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t* app, const char* token,
                                                                    const char* token_id,
-                                                                   realm_app_void_completion_func_t, realm_userdata_t,
-                                                                   realm_free_userdata_func_t);
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   realm_userdata_t, realm_free_userdata_func_t);
 
-RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(realm_app_t*, const char* email,
-                                                                                realm_app_void_completion_func_t,
-                                                                                realm_userdata_t,
-                                                                                realm_free_userdata_func_t);
+/**
+ * Re-sends a confirmation email to a user that has registered but not yet confirmed their email address.
+ * @param app ptr to realm_app
+ * @param email to use
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool
+realm_app_email_password_provider_client_resend_confirmation_email(realm_app_t* app, const char* email,
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   realm_userdata_t, realm_free_userdata_func_t);
 
-RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(realm_app_t*, const char* email,
-                                                                                realm_app_void_completion_func_t,
-                                                                                realm_userdata_t,
-                                                                                realm_free_userdata_func_t);
-
-RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(realm_app_t*, const char* email,
-                                                                                realm_app_void_completion_func_t,
-                                                                                realm_userdata_t,
-                                                                                realm_free_userdata_func_t);
-
-RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t*, realm_string_t password,
+/**
+ * Send reset password to the email specified in the parameter passed to the function.
+ * @param app ptr to realm_app
+ * @param email where to send the reset instructions
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool
+realm_app_email_password_provider_client_send_reset_password_email(realm_app_t* app, const char* email,
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   realm_userdata_t, realm_free_userdata_func_t);
+/**
+ * Retries the custom confirmation function on a user for a given email.
+ * @param app ptr to realm_app
+ * @param email email for the user
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool
+realm_app_email_password_provider_client_retry_custom_confirmation(realm_app_t* app, const char* email,
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   realm_userdata_t, realm_free_userdata_func_t);
+/**
+ * Resets the password of an email identity using the password reset token emailed to a user.
+ * @param app ptr to realm_app
+ * @param password new password to set
+ * @param token ptr to token string emailed to the user
+ * @param token_id ptr to token_id emailed to the user
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t* app, realm_string_t password,
                                                                      const char* token, const char* token_id,
-                                                                     realm_app_void_completion_func_t,
+                                                                     realm_app_void_completion_func_t callback,
                                                                      realm_userdata_t, realm_free_userdata_func_t);
 
 /**
@@ -2991,6 +3103,12 @@ RLM_API char* realm_user_get_access_token(const realm_user_t*);
  * @return a string that represents the refresh token
  */
 RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
+/**
+ * Return the realm app for the user passed as parameter.
+ * @return a ptr to the app for the user.
+ */
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
 
 
 /* Sync */

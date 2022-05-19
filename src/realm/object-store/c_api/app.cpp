@@ -467,6 +467,15 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_a
     });
 }
 
+RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&] {
+        (*app)->delete_user(*user, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
 RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
                                                                      realm_string_t password,
                                                                      realm_app_void_completion_func_t callback,
@@ -802,6 +811,19 @@ RLM_API char* realm_user_get_refresh_token(const realm_user_t* user)
     return wrap_err([&] {
         return duplicate_string((*user)->refresh_token());
     });
+}
+
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
+{
+    REALM_ASSERT(user);
+    try {
+        if (auto shared_app = (*user)->sync_manager()->app().lock()) {
+            return new realm_app_t(shared_app);
+        }
+    }
+    catch (const std::exception&) {
+    }
+    return nullptr;
 }
 
 } // namespace realm::c_api
