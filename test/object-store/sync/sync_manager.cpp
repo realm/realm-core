@@ -174,6 +174,11 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
             REQUIRE(sync_manager->path_for_realm(config) == base_path / "flx_sync_default.realm");
         }
 
+        SECTION("Custom filename for Flexible Sync") {
+            SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+            REQUIRE(sync_manager->path_for_realm(config, "custom") == base_path / "custom.realm");
+        }
+
         // Should now exist after getting the path
         REQUIRE_DIR_PATH_EXISTS(base_path);
     }
