@@ -3556,7 +3556,7 @@ RLM_API bool realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_m
  *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error).
  */
 RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subscription_set_t*,
-                                                     const realm_object_id_t*, bool*);
+                                                     const realm_object_id_t*, bool* erased);
 /**
  *  Erase from subscription set by name. If operation completes successfully set the bool out param.
  *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
