@@ -82,18 +82,66 @@ public:
         };
 
         m_sectioned_results.calculate_sections_if_required();
-        auto changes = c;
-        changes.deletions.add(changes.modifications);
-        changes.insertions.add(changes.modifications_new);
 
-        auto converted_insertions = convert_indices(changes.insertions, m_sectioned_results.m_row_to_index_path);
-        auto converted_modifications = convert_indices(changes.modifications, m_prev_row_to_index_path);
-        auto converted_modifications_new =
-            convert_indices(changes.modifications_new, m_sectioned_results.m_row_to_index_path);
-        auto converted_deletions = convert_indices(changes.deletions, m_prev_row_to_index_path);
+        // Insertions and deletions can be translated directly
+        auto converted_insertions = convert_indices(c.insertions, m_sectioned_results.m_row_to_index_path);
+        auto converted_deletions = convert_indices(c.deletions, m_prev_row_to_index_path);
 
-        auto section_changes = calculate_sections_to_insert_and_delete(
-            converted_insertions, converted_deletions, converted_modifications, converted_modifications_new);
+        // For all modifications there are two options as we know the index is both in the
+        // old sections and in the new sections:
+        // 1: the index is in the same section - this should result in a modification
+        // 2: the index has moved - this should result in a deletion from the old section
+        //                          and an insertion in the new section
+        std::map<size_t, IndexSet> converted_modifications;
+
+        // Iterators for insertions and deletions
+        auto ins = c.insertions.as_indexes().begin();
+        auto ins_end = c.insertions.as_indexes().end();
+        auto del = c.deletions.as_indexes().begin();
+        auto del_end = c.deletions.as_indexes().end();
+        // number of deletions and insertions before the current index
+        size_t deleted = 0;
+        size_t inserted = 0;
+
+        for (auto index : c.modifications.as_indexes()) {
+            // This is where it used to be
+            auto& index_path_before = m_prev_row_to_index_path[index];
+
+            // Adjust index according to deletions and insertions
+            while (del != del_end && *del < index) {
+                ++del;
+                ++deleted;
+            }
+            index -= deleted;
+            while (ins != ins_end && *ins < index) {
+                ++ins;
+                ++inserted;
+            }
+            index += inserted;
+
+            // This is where it is now
+            auto& index_path_now = m_sectioned_results.m_row_to_index_path[index];
+
+            auto old_hash = m_prev_sections.at(index_path_before.first).hash;
+            auto new_hash = m_sectioned_results.m_sections.at(index_path_now.first).hash;
+            if (old_hash == new_hash) {
+                // It is in the same section
+                converted_modifications[index_path_before.first].add(index_path_before.second);
+            }
+            else {
+                // It has moved - add deletion and insertion
+                converted_deletions[index_path_before.first].add(index_path_before.second);
+                converted_insertions[index_path_now.first].add(index_path_now.second);
+            }
+        }
+
+        auto section_changes = calculate_sections_to_insert_and_delete();
+
+        // Cocoa only requires the index of the deleted sections to remove all deleted rows.
+        // There is no need to pass back each individual deletion IndexPath.
+        for (auto section : section_changes.sections_to_delete.as_indexes()) {
+            converted_deletions.erase(section);
+        }
 
         bool should_notify = true;
         if (m_section_filter) {
@@ -118,10 +166,7 @@ public:
         m_cb({}, ptr);
     }
 
-    SectionChangeInfo calculate_sections_to_insert_and_delete(std::map<size_t, IndexSet>& insertions,
-                                                              std::map<size_t, IndexSet>& deletions,
-                                                              std::map<size_t, IndexSet>& modifications,
-                                                              std::map<size_t, IndexSet>& modifications_new)
+    SectionChangeInfo calculate_sections_to_insert_and_delete()
     {
         IndexSet sections_to_insert, sections_to_remove;
         std::map<size_t, size_t> new_sections, old_sections;
@@ -143,54 +188,6 @@ public:
 
         diff(old_sections, new_sections, sections_to_insert);
         diff(new_sections, old_sections, sections_to_remove);
-
-        // Cocoa only requires the index of the deleted sections to remove all deleted rows.
-        // There is no need to pass back each individual deletion IndexPath.
-        for (auto section : sections_to_remove.as_indexes()) {
-            deletions.erase(section);
-        }
-
-        std::map<size_t, IndexSet> modifications_to_keep;
-        std::map<size_t, IndexSet> modifications_to_keep_new;
-
-        for (auto [section_old, indexes_old] : modifications) {
-            auto it = m_prev_sections.at(section_old);
-            auto old_hash = it.hash;
-            for (auto [section_new, indexes_new] : modifications_new) {
-                auto it_new = m_sectioned_results.m_sections.at(section_new);
-                auto new_hash = it_new.hash;
-                if (old_hash == new_hash) {
-                    for (auto index_old : indexes_old.as_indexes()) {
-                        if (indexes_new.contains(index_old)) {
-                            modifications_to_keep[section_old].add(index_old);
-                            modifications_to_keep_new[section_new].add(index_old);
-                        }
-                    }
-                }
-            }
-        }
-
-        modifications.clear();
-        modifications_new.clear();
-
-        modifications = modifications_to_keep;
-        modifications_new = modifications_to_keep_new;
-
-        for (auto [section, indexes] : modifications) {
-            auto& it = deletions[section];
-            it.remove(indexes);
-            if (it.empty()) {
-                deletions.erase(section);
-            }
-        }
-
-        for (auto [section, indexes] : modifications_new) {
-            auto& it = insertions[section];
-            it.remove(indexes);
-            if (it.empty()) {
-                insertions.erase(section);
-            }
-        }
 
         return {sections_to_insert, sections_to_remove};
     }

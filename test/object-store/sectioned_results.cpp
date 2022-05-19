@@ -568,6 +568,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     });
     REQUIRE(algo_run_count == 5);
 
+    auto sectioned_results1 = sorted.sectioned_results([](Mixed value, SharedRealm realm) {
+        auto obj = Object(realm, value.get_link());
+        auto v = obj.get_column_value<Int>("int_col");
+        return v % 3;
+    });
+
     SECTION("sorts results correctly") {
         REQUIRE(sectioned_results.size() == 3);
         REQUIRE(sectioned_results[0].size() == 3);
@@ -600,14 +606,15 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
         coordinator->on_change();
         r->begin_transaction();
-        table->create_object().set(name_col, "safari");
-        table->create_object().set(name_col, "mail");
-        table->create_object().set(name_col, "car");
-        table->create_object().set(name_col, "stocks");
-        table->create_object().set(name_col, "cake");
+        table->create_object().set(name_col, "safari").set(int_col, 4);
+        table->create_object().set(name_col, "mail").set(int_col, 5);
+        table->create_object().set(name_col, "car").set(int_col, 6);
+        table->create_object().set(name_col, "stocks").set(int_col, 7);
+        table->create_object().set(name_col, "cake").set(int_col, 8);
         r->commit_transaction();
 
         REQUIRE(sectioned_results.size() == 6);
+        REQUIRE(sectioned_results1.size() == 3);
         REQUIRE(algo_run_count == 10);
         std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "cake",
                                           "car",   "mail",   "orange",  "safari", "stocks"};
@@ -748,6 +755,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
                 REQUIRE_FALSE(err);
                 changes = c;
             });
+        SectionedResultsChangeSet changes1;
+        auto token1 =
+            sectioned_results1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes1 = c;
+            });
 
         coordinator->on_change();
         REQUIRE(algo_run_count == 5);
@@ -820,10 +833,38 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         // delete all objects starting with 'S'
         algo_run_count = 0;
         r->begin_transaction();
+        /* sectioned_results1 before
+        Section 0
+           any
+           apples
+           banana
+           cake
+           safari
+           stocksss
+        Section 1
+           apple
+        Section 2
+           apricot
+           orange
+         */
         o1.set(name_col, "elephant");
         o4.set(name_col, "erie");
         r->commit_transaction();
         advance_and_notify(*r);
+        /* sectioned_results1 after
+        Section 0
+           any
+           apples
+           banana
+           cake
+           elephant
+           erie
+        Section 1
+           apple
+        Section 2
+           apricot
+           orange
+         */
         REQUIRE(changes.sections_to_insert.count() == 1);
         REQUIRE(changes.sections_to_delete.count() == 1);
         REQUIRE_INDICES(changes.sections_to_delete, 4);
@@ -835,6 +876,11 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE_INDICES(changes.deletions[3], 0);
         REQUIRE_INDICES(changes.insertions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[4], 0);
+
+        REQUIRE(changes1.sections_to_insert.count() == 0);
+        REQUIRE(changes1.sections_to_delete.count() == 0);
+        REQUIRE(changes1.modifications.size() == 1);
+        REQUIRE_INDICES(changes1.modifications[0], 4, 5);
         REQUIRE(algo_run_count == 9);
 
         // Test moving objects from one section to an existing one.
