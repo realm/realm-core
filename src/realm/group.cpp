@@ -835,13 +835,15 @@ Table* Group::do_get_table(StringData name)
     return table;
 }
 
-TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable)
+TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable,
+                                           bool asymmetric)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
 
-    auto table = do_add_table(name, false, false);
+    auto table_type = asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel;
+    auto table = do_add_table(name, table_type, false);
 
     // Add pk column - without replication
     ColumnAttrMask attr;
@@ -852,12 +854,12 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
     table->do_set_primary_key_column(pk_col);
 
     if (Replication* repl = *get_repl())
-        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable);
+        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable, asymmetric);
 
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
+Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl)
 {
     if (!m_is_writable)
         throw LogicError(LogicError::wrong_transact_state);
@@ -899,13 +901,13 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 
     Replication* repl = *get_repl();
     if (do_repl && repl)
-        repl->add_class(key, name, is_embedded);
+        repl->add_class(key, name, table_type);
 
     ++m_num_tables;
 
     Table* table = create_table_accessor(j);
-    if (is_embedded)
-        table->do_set_embedded(true);
+    if (table_type == Table::Type::Embedded)
+        table->do_set_table_type(Table::Type::Embedded);
 
     return table;
 }

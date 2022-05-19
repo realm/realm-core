@@ -304,12 +304,13 @@ public:
     TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
 
-    TableRef add_table(StringData name);
+    TableRef add_table(StringData name, bool asymmetric = false);
     TableRef add_embedded_table(StringData name);
-    TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
+    TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false,
+                                        bool asymmetric = false);
+    TableRef get_or_add_table(StringData name, bool asymmetric = false, bool* was_added = nullptr);
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
-                                               bool nullable = false);
+                                               bool nullable = false, bool asymmetric = false);
 
     void remove_table(TableKey key);
     void remove_table(StringData name);
@@ -670,7 +671,7 @@ private:
     const Table* do_get_table(size_t ndx) const;
     Table* do_get_table(StringData name);
     const Table* do_get_table(StringData name) const;
-    Table* do_add_table(StringData name, bool is_embedded, bool do_repl = true);
+    Table* do_add_table(StringData name, Table::Type table_type, bool do_repl = true);
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
@@ -968,12 +969,13 @@ inline ConstTableRef Group::get_table(StringData name) const
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-inline TableRef Group::add_table(StringData name)
+inline TableRef Group::add_table(StringData name, bool asymmetric)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
-    Table* table = do_add_table(name, false); // Throws
+    auto table_type = asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel;
+    Table* table = do_add_table(name, table_type); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
@@ -982,35 +984,36 @@ inline TableRef Group::add_embedded_table(StringData name)
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
-    Table* table = do_add_table(name, true); // Throws
+    Table* table = do_add_table(name, Table::Type::Embedded); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
+inline TableRef Group::get_or_add_table(StringData name, bool asymmetric, bool* was_added)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
+    auto table_type = asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel;
     if (!table) {
-        table = do_add_table(name, false);
+        table = do_add_table(name, table_type);
     }
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
 inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
-                                                         bool nullable)
+                                                         bool nullable, bool asymmetric)
 {
     if (TableRef table = get_table(name)) {
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
-            table->is_nullable(table->get_primary_key_column()) != nullable) {
+            table->is_nullable(table->get_primary_key_column()) != nullable || table->is_asymmetric() != asymmetric) {
             throw std::runtime_error("Inconsistent schema");
         }
         return table;
     }
     else {
-        return add_table_with_primary_key(name, pk_type, pk_name, nullable);
+        return add_table_with_primary_key(name, pk_type, pk_name, nullable, asymmetric);
     }
 }
 

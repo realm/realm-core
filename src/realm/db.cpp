@@ -554,7 +554,7 @@ struct alignas(8) DB::SharedInfo {
 DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
-    , shared_writemutex() // Throws
+    , shared_writemutex()   // Throws
     , shared_controlmutex() // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
@@ -1306,10 +1306,10 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
                     util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
                                  Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
-                                            pk_col.is_nullable());
+                                            pk_col.is_nullable(), table->is_asymmetric());
         }
         else {
-            repl.add_class(tk, table_name, true);
+            repl.add_class(tk, table_name, Table::Type::Embedded);
         }
     }
     // Create columns
@@ -2306,7 +2306,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
         // fails. The application then has the option of terminating the
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(current_version); // Throws
+        new_version = repl->prepare_commit(current_version);        // Throws
         low_level_commit(new_version, transaction, commit_to_disk); // Throws
         repl->finalize_commit();
     }

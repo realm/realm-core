@@ -40,9 +40,9 @@ public:
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;
 
-    void add_class(TableKey tk, StringData table_name, bool is_embedded) final;
+    void add_class(TableKey tk, StringData table_name, Table::Type table_type = Table::Type::TopLevel) final;
     void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
-                                    bool nullable) final;
+                                    bool nullable, bool is_asymmetric) final;
     void create_object(const Table*, GlobalKey) final;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
     void prepare_erase_class(TableKey tk) final;

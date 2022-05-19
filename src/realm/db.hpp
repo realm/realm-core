@@ -887,9 +887,9 @@ public:
         return trans->get_table(name); // Throws
     }
 
-    TableRef add_table(StringData name) const
+    TableRef add_table(StringData name, bool asymmetric = false) const
     {
-        return trans->add_table(name); // Throws
+        return trans->add_table(name, asymmetric); // Throws
     }
 
     TableRef add_embedded_table(StringData name) const
@@ -897,9 +897,9 @@ public:
         return trans->add_embedded_table(name); // Throws
     }
 
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
+    TableRef get_or_add_table(StringData name, bool asymmetric = false, bool* was_added = nullptr) const
     {
-        return trans->get_or_add_table(name, was_added); // Throws
+        return trans->get_or_add_table(name, asymmetric, was_added); // Throws
     }
 
     Group& get_group() const noexcept

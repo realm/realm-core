@@ -24,23 +24,24 @@
 
 namespace realm::_impl {
 
-void CopyReplication::add_class(TableKey, StringData name, bool is_embedded)
+void CopyReplication::add_class(TableKey, StringData name, Table::Type table_type)
 {
     if (auto existing_table = m_tr->get_table(name)) {
-        if (existing_table->is_embedded() != is_embedded)
+        if (existing_table->get_table_type() != table_type)
             throw std::runtime_error(util::format("Incompatible class: %1", name));
         return;
     }
-    if (is_embedded) {
+    if (table_type == Table::Type::Embedded) {
         m_tr->add_embedded_table(name);
     }
     else {
-        m_tr->add_table(name);
+        bool is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
+        m_tr->add_table(name, is_asymmetric);
     }
 }
 
 void CopyReplication::add_class_with_primary_key(TableKey, StringData name, DataType type, StringData pk_name,
-                                                 bool nullable)
+                                                 bool nullable, bool asymmetric)
 {
     if (auto existing_table = m_tr->get_table(name)) {
         auto pk_col = existing_table->get_primary_key_column();
@@ -48,7 +49,7 @@ void CopyReplication::add_class_with_primary_key(TableKey, StringData name, Data
             throw std::runtime_error(util::format("Incompatible class: %1", name));
         return;
     }
-    m_tr->add_table_with_primary_key(name, type, pk_name, nullable);
+    m_tr->add_table_with_primary_key(name, type, pk_name, nullable, asymmetric);
 }
 
 void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType type, StringData name, Table* dest)

@@ -119,23 +119,24 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
     TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     auto add_table = util::overload{
-        [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-            if (spec.type == Instruction::Payload::Type::GlobalKey) {
+        [&](const Instruction::AddTable::TopLevelTable& spec) {
+            if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
                 log("sync::create_table(group, \"%1\");", table_name);
-                m_transaction.get_or_add_table(table_name);
+                m_transaction.get_or_add_table(table_name, spec.is_asymmetric);
             }
             else {
-                if (!is_valid_key_type(spec.type)) {
-                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.type),
+                if (!is_valid_key_type(spec.pk_type)) {
+                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.pk_type),
                                         table_name);
                 }
-                DataType pk_type = get_data_type(spec.type);
-                StringData pk_field = get_string(spec.field);
-                bool nullable = spec.nullable;
+                DataType pk_type = get_data_type(spec.pk_type);
+                StringData pk_field = get_string(spec.pk_field);
+                bool nullable = spec.pk_nullable;
+                bool asymmetric = spec.is_asymmetric;
 
                 log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
                     pk_field, nullable);
-                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable);
+                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable, asymmetric);
             }
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {
@@ -244,6 +245,7 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
             },
         },
         instr.object);
+    // TODO: check here and skip asymetric object
 }
 
 void InstructionApplier::operator()(const Instruction::EraseObject& instr)
@@ -492,6 +494,7 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
     };
     UpdateResolver resolver(this, instr);
     resolver.resolve();
+    // TODO: maybe here too
 }
 
 void InstructionApplier::operator()(const Instruction::AddInteger& instr)

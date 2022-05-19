@@ -32,9 +32,9 @@ public:
     }
     using version_type = _impl::History::version_type;
 
-    void add_class(TableKey, StringData name, bool is_embedded) override;
-    void add_class_with_primary_key(TableKey, StringData name, DataType type, StringData pk_name,
-                                    bool nullable) override;
+    void add_class(TableKey, StringData name, Table::Type table_type) override;
+    void add_class_with_primary_key(TableKey, StringData name, DataType type, StringData pk_name, bool nullable,
+                                    bool asymmetric) override;
     void insert_column(const Table* t, ColKey col_key, DataType type, StringData name, Table* dest) override;
     void create_object_with_primary_key(const Table* t, ObjKey key, Mixed primary_key) override;
     void set(const Table* t, ColKey col_key, ObjKey key, Mixed value, _impl::Instruction) override;

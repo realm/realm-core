@@ -281,32 +281,46 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
         if (!primary_value && !is_nullable(primary_prop->type))
             throw MissingPropertyValueException(object_schema.name, primary_prop->name);
 
-        // When changing the primary key of a table, we remove the existing pk (if any), call
-        // the migration function, then add the new pk (if any). This means that we can't call
-        // create_object_with_primary_key(), and creating duplicate primary keys is allowed as
-        // long as they're unique by the end of the migration.
-        if (table->get_primary_key_column() == ColKey{}) {
-            REALM_ASSERT(realm->is_in_migration());
-            if (policy.update) {
-                if (auto key = get_for_primary_key_in_migration(ctx, *table, *primary_prop, *primary_value))
-                    obj = table->get_object(key);
+        if (object_schema.is_asymmetric) {
+            obj = table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
+            if (!created) {
+                throw std::logic_error(util::format(
+                    "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
+                    object_schema.name, primary_value ? ctx.print(*primary_value) : "null"));
             }
-            if (!obj)
-                skip_primary = false;
         }
         else {
-            obj = table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
-            if (!created && !policy.update) {
-                if (!realm->is_in_migration()) {
-                    throw std::logic_error(util::format(
-                        "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                        object_schema.name, primary_value ? ctx.print(*primary_value) : "null"));
+            // When changing the primary key of a table, we remove the existing pk (if any), call
+            // the migration function, then add the new pk (if any). This means that we can't call
+            // create_object_with_primary_key(), and creating duplicate primary keys is allowed as
+            // long as they're unique by the end of the migration.
+            if (table->get_primary_key_column() == ColKey{}) {
+                REALM_ASSERT(realm->is_in_migration());
+                if (policy.update) {
+                    if (auto key = get_for_primary_key_in_migration(ctx, *table, *primary_prop, *primary_value))
+                        obj = table->get_object(key);
                 }
-                table->set_primary_key_column(ColKey{});
-                skip_primary = false;
-                obj = {};
+                if (!obj)
+                    skip_primary = false;
+            }
+            else {
+                obj =
+                    table->create_object_with_primary_key(as_mixed(ctx, primary_value, primary_prop->type), &created);
+                if (!created && !policy.update) {
+                    if (!realm->is_in_migration()) {
+                        throw std::logic_error(util::format(
+                            "Attempting to create an object of type '%1' with an existing primary key value '%2'.",
+                            object_schema.name, primary_value ? ctx.print(*primary_value) : "null"));
+                    }
+                    table->set_primary_key_column(ColKey{});
+                    skip_primary = false;
+                    obj = {};
+                }
             }
         }
+    }
+    else {
+        // TODO: do we want to make pk mandatory for asymmetric objects?
     }
 
     // No primary key (possibly temporarily due to migrations). If we're

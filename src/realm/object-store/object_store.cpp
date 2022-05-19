@@ -601,7 +601,15 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_embedded(op.object->is_embedded);
+            if (op.object->is_embedded) {
+                table(op.object).set_table_type(Table::Type::Embedded);
+            }
+            else if (op.object->is_asymmetric) {
+                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
+            }
+            else {
+                table(op.object).set_table_type(Table::Type::TopLevel);
+            }
         }
         void operator()(AddProperty op)
         {
@@ -817,7 +825,15 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_embedded(op.object->is_embedded);
+            if (op.object->is_embedded) {
+                table(op.object).set_table_type(Table::Type::Embedded);
+            }
+            else if (op.object->is_asymmetric) {
+                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
+            }
+            else {
+                table(op.object).set_table_type(Table::Type::TopLevel);
+            }
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}

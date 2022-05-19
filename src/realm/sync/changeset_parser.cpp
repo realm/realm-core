@@ -308,19 +308,27 @@ void ChangesetParser::State::parse_one()
         case Instruction::Type::AddTable: {
             Instruction::AddTable instr;
             instr.table = read_intern_string();
-            bool is_embedded = read_bool();
-            if (!is_embedded) {
-                Instruction::AddTable::PrimaryKeySpec spec;
-                spec.field = read_intern_string();
-                spec.type = read_payload_type();
-                if (!is_valid_key_type(spec.type)) {
-                    parser_error("Invalid primary key type in AddTable");
+            auto table_type = Table::Type(read_int<uint8_t>());
+            switch (table_type) {
+                case Table::Type::TopLevel:
+                case Table::Type::TopLevelAsymmetric: {
+                    Instruction::AddTable::TopLevelTable spec;
+                    spec.pk_field = read_intern_string();
+                    spec.pk_type = read_payload_type();
+                    if (!is_valid_key_type(spec.pk_type)) {
+                        parser_error("Invalid primary key type in AddTable");
+                    }
+                    spec.pk_nullable = read_bool();
+                    spec.is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
+                    instr.type = spec;
+                    break;
                 }
-                spec.nullable = read_bool();
-                instr.type = spec;
-            }
-            else {
-                instr.type = Instruction::AddTable::EmbeddedTable{};
+                case Table::Type::Embedded: {
+                    instr.type = Instruction::AddTable::EmbeddedTable{};
+                    break;
+                }
+                default:
+                    REALM_UNREACHABLE();
             }
             m_handler(instr);
             return;
