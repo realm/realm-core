@@ -5,6 +5,9 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/functional.hpp>
+#include <realm/util/ez_websocket.hpp>
+
+using namespace realm::util;
 
 namespace realm::sync {
 class ClientImpl;
@@ -292,7 +295,9 @@ struct ClientConfig {
     /// Testing/debugging feature. Should never be enabled in production.
     bool disable_sync_to_disk = false;
 
-    std::function<std::unique_ptr<util::websocket::EZSocketFactory>(util::websocket::EZConfig&&)> socket_factory;
+    /// Default implementation of the WebSocket factory. Can be overriden in SDK
+    std::function<std::unique_ptr<websocket::EZSocketFactory>(websocket::EZConfig&&)> socket_factory
+        = websocket::EZSocketFactory::defaultSocketFactory;
 };
 
 /// \brief Information about an error causing a session to be temporarily

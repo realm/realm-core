@@ -116,12 +116,15 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_roundtrip_time_handler{std::move(config.roundtrip_time_handler)}
     , m_user_agent_string{make_user_agent_string(config)} // Throws
     , m_service{}                                         // Throws
-    , m_socket_factory(config.socket_factory(websocket::EZConfig{
-          logger,
-          m_random,
-          m_service,
-          get_user_agent_string(),
-      }))
+    , m_socket_factory([&] {
+        REALM_ASSERT(config.socket_factory);
+        return config.socket_factory(websocket::EZConfig{
+            logger,
+            m_random,
+            m_service,
+            get_user_agent_string(),
+        });
+    }())
     , m_client_protocol{} // Throws
     , m_one_connection_per_session{config.one_connection_per_session}
     , m_keep_running_timer{get_service()} // Throws
