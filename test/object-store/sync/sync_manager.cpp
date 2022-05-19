@@ -26,6 +26,7 @@
 #include "util/test_utils.hpp"
 
 #include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
@@ -176,7 +177,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
 
         SECTION("Custom filename for Flexible Sync") {
             SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
-            REQUIRE(sync_manager->path_for_realm(config, "custom") == base_path / "custom.realm");
+            REQUIRE(sync_manager->path_for_realm(config, util::make_optional("custom")) == base_path / "custom.realm");
         }
 
         // Should now exist after getting the path
