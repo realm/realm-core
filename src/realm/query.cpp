@@ -79,6 +79,9 @@ Query::Query(ConstTableRef table, std::unique_ptr<TableView> tv)
 
 void Query::create()
 {
+    if (m_table && m_table->is_asymmetric()) {
+        throw util::runtime_error("query on asymmetric table is not supported");
+    }
     m_groups.emplace_back();
 }
 
@@ -176,6 +179,10 @@ void Query::set_table(TableRef tr)
 {
     if (tr == m_table) {
         return;
+    }
+
+    if (tr->is_asymmetric()) {
+        throw util::runtime_error("query on asymmetric table is not supported");
     }
 
     m_table = tr;
