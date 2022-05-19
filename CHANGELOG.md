@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Enhancements
+* Expose delete app user for C API. ([#5490](https://github.com/realm/realm-core/issues/5490))
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* None.
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* None.
+
+----------------------------------------------
+
 # 11.17.0 Release notes
 
 ### Enhancements

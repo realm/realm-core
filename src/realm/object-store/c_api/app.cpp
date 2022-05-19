@@ -466,6 +466,15 @@ RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_a
     });
 }
 
+RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free)
+{
+    return wrap_err([&] {
+        (*app)->delete_user(*user, make_callback(callback, userdata, userdata_free));
+        return true;
+    });
+}
+
 RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
                                                                      realm_string_t password,
                                                                      realm_app_void_completion_func_t callback,
