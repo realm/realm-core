@@ -94,19 +94,12 @@ RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_k
     return wrap_err([&]() {
         const auto& shared_realm = **realm;
         const auto& schema = shared_realm.schema();
-        if (out_keys) {
+        set_out_param(out_n, schema.size());
+
+        if (out_keys && max >= schema.size()) {
             size_t i = 0;
             for (auto& os : schema) {
-                if (i >= max)
-                    break;
                 out_keys[i++] = os.table_key.value;
-            }
-            if (out_n)
-                *out_n = i;
-        }
-        else {
-            if (out_n) {
-                *out_n = schema.size();
             }
         }
         return true;
@@ -147,29 +140,16 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t 
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
+        const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
+        set_out_param(out_n, prop_size);
 
-        if (out_properties) {
+        if (out_properties && max >= prop_size) {
             size_t i = 0;
-
             for (auto& prop : os.persisted_properties) {
-                if (i >= max)
-                    break;
                 out_properties[i++] = to_capi(prop);
             }
-
             for (auto& prop : os.computed_properties) {
-                if (i >= max)
-                    break;
                 out_properties[i++] = to_capi(prop);
-            }
-
-            if (out_n) {
-                *out_n = i;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;
@@ -181,29 +161,15 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
-
-        if (out_keys) {
+        const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
+        set_out_param(out_n, prop_size);
+        if (out_keys && max >= prop_size) {
             size_t i = 0;
-
             for (auto& prop : os.persisted_properties) {
-                if (i >= max)
-                    break;
                 out_keys[i++] = prop.column_key.value;
             }
-
             for (auto& prop : os.computed_properties) {
-                if (i >= max)
-                    break;
                 out_keys[i++] = prop.column_key.value;
-            }
-
-            if (out_n) {
-                *out_n = i;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;

@@ -106,6 +106,14 @@ inline char* duplicate_string(const std::string& string)
     return ret;
 }
 
+template <typename T>
+inline void set_out_param(T* out_n, T n)
+{
+    if (out_n) {
+        *out_n = n;
+    }
+}
+
 struct FreeUserdata {
     realm_free_userdata_func_t m_func;
     FreeUserdata(realm_free_userdata_func_t func = nullptr)
