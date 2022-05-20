@@ -199,6 +199,7 @@ typedef struct realm_error {
     // When error is RLM_ERR_CALLBACK this is an opaque pointer to an SDK-owned error object
     // thrown by user code inside a callback with realm_register_user_code_callback_error(), otherwise null.
     void* usercode_error;
+    const char* path;
 } realm_error_t;
 
 /* Schema types */

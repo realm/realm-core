@@ -79,15 +79,13 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
 
     m_err.emplace();
     m_err->usercode_error = nullptr;
+    m_err->path = nullptr;
     auto populate_error = [&](const std::exception& ex, ErrorCodes::Error error_code) {
         m_err->error = realm_errno_e(error_code);
         m_err->categories = ErrorCodes::error_categories(error_code).value();
         try {
             m_message_buf = ex.what();
             m_err->message = m_message_buf.c_str();
-            if (error_code == ErrorCodes::CallbackFailed) {
-                m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
-            }
         }
         catch (const std::bad_alloc&) {
             // If we are unable to build the new error because we ran out of memory we should propagate the OOM
@@ -104,6 +102,14 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     // Core exceptions:
     catch (const Exception& ex) {
         populate_error(ex, ex.code());
+        if (ex.code() == ErrorCodes::CallbackFailed) {
+            m_err->usercode_error = static_cast<const CallbackFailed&>(ex).usercode_error;
+        }
+        if (ErrorCodes::error_categories(ex.code()).test(ErrorCategory::file_access)) {
+            auto& file_access_error = static_cast<const FileAccessError&>(ex);
+            m_path_buf = file_access_error.get_path();
+            m_err->path = m_path_buf.c_str();
+        }
     }
 
     // Generic exceptions:

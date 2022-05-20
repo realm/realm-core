@@ -811,7 +811,12 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         note_reader_end(this);
         throw InvalidDatabase("Realm file decryption failed", path);
     }
+    catch (const InvalidDatabase&) {
+        note_reader_end(this);
+        throw;
+    }
     catch (const std::exception& e) {
+        // Catch all for other exceptions
         note_reader_end(this);
         // we end up here if any of the file or mapping operations fail.
         throw InvalidDatabase(util::format("Realm file initial open failed: %1", e.what()), path);
