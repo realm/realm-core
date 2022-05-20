@@ -3704,7 +3704,8 @@ RLM_API uint64_t realm_sync_session_register_progress_notifier(
  * @param session ptr to a valid sync session
  * @param token the token returned by `realm_sync_session_register_progress_notifier`
  */
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session, uint64_t token) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session,
+                                                             uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
