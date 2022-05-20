@@ -1964,6 +1964,8 @@ std::error_code Session::receive_ident_message(SaltedFileIdent client_file_ident
 
         m_upload_target_version = m_last_version_available;
         m_upload_progress = m_progress.upload;
+        // in recovery mode, there may be new changesets to upload and nothing left to download
+        m_allow_upload = true;
         REALM_ASSERT_EX(m_last_version_selected_for_upload == 0, m_last_version_selected_for_upload);
 
         get_transact_reporter()->report_sync_transact(client_reset_old_version, client_reset_new_version);

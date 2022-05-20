@@ -261,7 +261,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 REQUIRE(latest_subs.version() > active_subs.version());
                 latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
                 local_realm->refresh();
-                count_of_foo = count_queries_with_str(active_subs, util::format("\"%1\"", str_field_value));
+                count_of_foo = count_queries_with_str(latest_subs, util::format("\"%1\"", str_field_value));
                 REQUIRE(count_of_foo == 1);
                 tv = table->where().equal(queryable_str_field, StringData(str_field_value)).find_all();
                 REQUIRE(tv.size() == 2);
