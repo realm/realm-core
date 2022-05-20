@@ -353,9 +353,8 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
         REALM_ASSERT(fresh_sub_store);
         auto fresh_mut_sub = fresh_sub_store->get_latest().make_mutable_copy();
         fresh_mut_sub.import(active);
-        std::move(fresh_mut_sub).commit();
-        sync_session->get_flx_subscription_store()
-            ->get_latest()
+        std::move(fresh_mut_sub)
+            .commit()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
             .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
                 // Keep the sync session alive while it's downloading, but then close

@@ -69,7 +69,6 @@ int main(int argc, char** argv)
         config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs on evergreen
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
-        config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs on Jenkins
         config.reporterName = "junit";
         config.outputFilename = "unit-test-report.xml";
     }

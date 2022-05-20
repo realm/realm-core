@@ -188,7 +188,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
         auto table = realm->read_group().get_table("class_TopLevel");
         auto queryable_str_field = table->get_column_key("queryable_str_field");
         auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
-        sub_set.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+        sub_set.insert_or_assign(Query(table).equal(queryable_str_field, StringData(str_field)));
         auto resulting_set = std::move(sub_set).commit();
         add_object(realm, str_field, int_field);
         return resulting_set;
@@ -242,6 +242,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 auto queryable_str_field = table->get_column_key("queryable_str_field");
+                auto queryable_int_field = table->get_column_key("queryable_int_field");
                 auto tv = table->where().equal(queryable_str_field, StringData(str_field_value)).find_all();
                 // the object we created while offline was discarded, and the remote object was not downloaded
                 REQUIRE(tv.size() == 0);
@@ -253,6 +254,20 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 // the latest subscription set is the same one as the active one
                 auto latest_subs = local_realm->get_latest_subscription_set();
                 REQUIRE(latest_subs.version() == active_subs.version());
+
+                // adding data and subscriptions to a reset Realm works as normal
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+                latest_subs = local_realm->get_latest_subscription_set();
+                REQUIRE(latest_subs.version() > active_subs.version());
+                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                local_realm->refresh();
+                count_of_foo = count_queries_with_str(active_subs, util::format("\"%1\"", str_field_value));
+                REQUIRE(count_of_foo == 1);
+                tv = table->where().equal(queryable_str_field, StringData(str_field_value)).find_all();
+                REQUIRE(tv.size() == 2);
+                tv.sort(queryable_int_field);
+                REQUIRE(tv.get_object(0).get<int64_t>(queryable_int_field) == local_added_int);
+                REQUIRE(tv.get_object(1).get<int64_t>(queryable_int_field) == remote_added_int);
             })
             ->run();
     }
