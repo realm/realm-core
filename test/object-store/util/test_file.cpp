@@ -248,13 +248,9 @@ std::error_code wait_for_download(Realm& realm, std::chrono::seconds timeout)
     return wait_for_session(realm, &SyncSession::wait_for_download_completion, timeout);
 }
 
-// MARK: - TestSyncManager
-
-TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config, const Config& config,
-                                 const SyncServer::Config& sync_server_config)
-    : m_sync_server(sync_server_config)
-    , m_should_teardown_test_directory(config.should_teardown_test_directory)
-    , m_app_session(config.app_session)
+namespace {
+void set_app_config_defaults(app::App::Config& app_config,
+                             const std::shared_ptr<app::GenericNetworkTransport>& transport)
 {
     if (!app_config.transport)
         app_config.transport = transport;
@@ -326,6 +322,25 @@ TestAppSession::~TestAppSession()
 #endif
 
 // MARK: - TestSyncManager
+
+TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config,
+                                 const Config& config,
+                                 const SyncServer::Config& sync_server_config)
+    : m_sync_server(sync_server_config)
+    , m_should_teardown_test_directory(config.should_teardown_test_directory)
+{
+    if (config.transport)
+        transport = config.transport;
+    app::App::Config app_config = config.app_config;
+    set_app_config_defaults(app_config, transport);
+
+    m_app = app::App::get_uncached_app(app_config, sync_client_config);
+    if (config.override_sync_route) {
+        m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
+    }
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
+}
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
