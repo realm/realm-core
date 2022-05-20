@@ -5223,8 +5223,10 @@ TEST(Parser_Between)
             list.add(j + i * 5 + 10);
         }
     }
-    g.to_json(std::cout);
+
+    // g.to_json(std::cout);
     verify_query(test_context, table, "age between {30, 37}", 2);
+    CHECK_THROW_ANY(verify_query(test_context, table, "NONE age between {30, 37}", 2));
     verify_query(test_context, table, "ALL scores between {5, 19}", 1);
     CHECK_THROW_ANY(verify_query(test_context, table, "scores between {5, 9}", 1));
     CHECK_THROW_ANY(verify_query(test_context, table, "ANY scores between {5, 9}", 1));
