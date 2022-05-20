@@ -14,6 +14,7 @@
 #include <cstring>
 #include <numeric>
 #include <thread>
+#include <fstream>
 
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
@@ -799,6 +800,18 @@ TEST_CASE("C API", "[c_api]") {
         realm_config_set_schema_mode(config.get(), RLM_SCHEMA_MODE_AUTOMATIC);
         realm_config_set_schema_version(config.get(), 0);
         realm_config_set_schema(config.get(), schema.get());
+
+        SECTION("error on open") {
+            {
+                std::ofstream o(test_file_2.path.c_str());
+                o << "Mary had a little lamb" << std::endl;
+            }
+            CHECK(!realm_open(config.get()));
+            realm_error_t err;
+            CHECK(realm_get_last_error(&err));
+            REQUIRE(test_file_2.path == err.path);
+            CHECK(realm_clear_last_error());
+        }
 
         SECTION("data initialization callback") {
             ConfigUserdata userdata;
