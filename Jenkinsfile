@@ -131,7 +131,7 @@ jobWrapper {
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
             // FIXME: disabled due to issues with CI
-	    // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
+	        // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -214,7 +214,7 @@ jobWrapper {
             rlmNode('docker') {
                 deleteDir()
                 dir('temp') {
-                    withAWS(credentials: 'aws-credentials', region: 'us-east-1') {
+                    withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
                             unstash name: publishingStash
                             def path = publishingStash.replaceAll('___', '/')
@@ -594,7 +594,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             getArchive()
 
             dir('build-dir') {
-                withAWS(credentials: 'aws-credentials', region: 'eu-west-1') {
+                withAWS(credentials: 'tightdb-s3-ci', region: 'eu-west-1') {
                     withEnv(["VCPKG_BINARY_SOURCES=clear;x-aws,s3://vcpkg-binary-caches,readwrite"]) {
                         bat "\"${tool 'cmake'}\" ${cmakeDefinitions} .."
                     }
@@ -713,7 +713,9 @@ def buildPerformance() {
             ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
-          rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
+          withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
+            rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
+          }
           sh 'cd test/bench && ./parse_bench_hist.py --local-html results/ core-benchmarks/'
           publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance_Report'])
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
