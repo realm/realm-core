@@ -356,7 +356,6 @@ util::Optional<std::string> SyncFileManager::get_existing_realm_file_path(const 
 
     // The legacy fallback paths are not applicable to flexible sync
     if (partition.empty()) {
-        REALM_ASSERT(realm_file_name == "flx_sync_default");
         return util::none;
     }
 
