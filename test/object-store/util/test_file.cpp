@@ -323,8 +323,7 @@ TestAppSession::~TestAppSession()
 
 // MARK: - TestSyncManager
 
-TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config,
-                                 const Config& config,
+TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config, const Config& config,
                                  const SyncServer::Config& sync_server_config)
     : m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
@@ -357,6 +356,7 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.base_file_path = m_base_file_path;
     sc_config.metadata_mode = config.metadata_mode;
     sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+    sc_config.socket_factory = util::websocket::EZSocketFactory::defaultSocketFactory;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
     if (config.override_sync_route) {
