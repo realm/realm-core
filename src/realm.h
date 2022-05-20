@@ -3608,14 +3608,34 @@ RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_a
  */
 RLM_API realm_sync_session_t* realm_sync_session_get(const realm_t*) RLM_API_NOEXCEPT;
 
-RLM_API realm_sync_session_state_e realm_sync_session_get_state(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+/**
+ * Fetch state for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the state for
+ * @return realm_sync_session_state_e value
+ */
+RLM_API realm_sync_session_state_e realm_sync_session_get_state(const realm_sync_session_t* session) RLM_API_NOEXCEPT;
 
-RLM_API realm_sync_connection_state_e realm_sync_session_get_connection_state(const realm_sync_session_t*)
+/**
+ * Fetch connection state for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the state for
+ * @return realm_sync_connection_state_e value
+ */
+RLM_API realm_sync_connection_state_e realm_sync_session_get_connection_state(const realm_sync_session_t* session)
     RLM_API_NOEXCEPT;
 
-RLM_API realm_user_t* realm_sync_session_get_user(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+/**
+ * Fetch user for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the user for
+ * @return ptr to realm_user_t
+ */
+RLM_API realm_user_t* realm_sync_session_get_user(const realm_sync_session_t* session) RLM_API_NOEXCEPT;
 
-RLM_API const char* realm_sync_session_get_partition_value(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+/**
+ * Fetch partition value for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the partition value for
+ * @return a string containing the partition value
+ */
+RLM_API const char* realm_sync_session_get_partition_value(const realm_sync_session_t* session) RLM_API_NOEXCEPT;
 
 /**
  * Get the filesystem path of the realm file backing this session.
@@ -3656,7 +3676,12 @@ RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
     realm_sync_session_t*, realm_sync_connection_state_changed_func_t, void* userdata,
     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
-RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t*,
+/**
+ * Unregister a callback that will be invoked every time the session's connection state changes.
+ * @param session ptr to a valid sync session
+ * @param token the token returned by `realm_sync_session_register_connection_state_change_callback`
+ */
+RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t* session,
                                                                             uint64_t token) RLM_API_NOEXCEPT;
 
 /**
@@ -3673,7 +3698,13 @@ RLM_API uint64_t realm_sync_session_register_progress_notifier(
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
     void* userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t*, uint64_t token) RLM_API_NOEXCEPT;
+
+/**
+ * Unregister a callback that will be invoked every time the session reports progress.
+ * @param session ptr to a valid sync session
+ * @param token the token returned by `realm_sync_session_register_progress_notifier`
+ */
+RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session, uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
@@ -3689,6 +3720,14 @@ realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_syn
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*, realm_sync_upload_completion_func_t,
                                                            void* userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+/**
+ * Wrapper for SyncSession::OnlyForTesting::handle_error. This routine should be used only for testing.
+ * @param session ptr to a valid sync session
+ * @param error sync error to simulate
+ */
+RLM_API void realm_sync_session_handle_error_for_testing(realm_sync_session_t* session, realm_sync_error_t* error);
+
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
  * and retrieve a it later via realm_get_last_error.

@@ -895,4 +895,13 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
         };
     (*session)->wait_for_upload_completion(std::move(cb));
 }
+
+RLM_API void realm_sync_session_handle_error_for_testing(realm_sync_session_t* session, realm_sync_error_t* error)
+{
+    REALM_ASSERT(session);
+    REALM_ASSERT(error);
+    auto err = std::make_error_code(std::errc{error->error_code.value});
+    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error->error_code.message, error->is_fatal});
+}
+
 } // namespace realm::c_api
