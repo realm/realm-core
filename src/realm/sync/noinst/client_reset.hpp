@@ -21,22 +21,12 @@
 
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 
 #include <ostream>
 
 namespace realm {
-
-enum class ClientResyncMode : unsigned char {
-    // Fire a client reset error
-    Manual,
-    // Discard local changes, without disrupting accessors or closing the Realm
-    DiscardLocal,
-    // Attempt to recover unsynchronized but committed changes.
-    Recover,
-    // Attempt recovery and if that fails, discard local.
-    RecoverOrDiscard,
-};
 
 std::ostream& operator<<(std::ostream& os, const ClientResyncMode& mode);
 

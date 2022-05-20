@@ -4,7 +4,6 @@
 #include <realm/db.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
-#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/util/functional.hpp>
 
 namespace realm::sync {

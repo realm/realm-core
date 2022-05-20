@@ -22,7 +22,6 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/sync/noinst/client_reset.hpp>
 
 #include <functional>
 #include <memory>
@@ -125,6 +124,17 @@ enum class SyncSessionStopPolicy {
     Immediately,          // Immediately stop the session as soon as all Realms/Sessions go out of scope.
     LiveIndefinitely,     // Never stop the session.
     AfterChangesUploaded, // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
+};
+
+enum class ClientResyncMode : unsigned char {
+    // Fire a client reset error
+    Manual,
+    // Discard local changes, without disrupting accessors or closing the Realm
+    DiscardLocal,
+    // Attempt to recover unsynchronized but committed changes.
+    Recover,
+    // Attempt recovery and if that fails, discard local.
+    RecoverOrDiscard,
 };
 
 struct SyncConfig {

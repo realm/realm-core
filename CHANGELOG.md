@@ -1,16 +1,14 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Move the implementation of the Audit API to the open-source repo and update it to work with MongoDB Realm.
 * Allow flexible sync with discard local client resets. ([#5404](https://github.com/realm/realm-core/pull/5404))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* `SyncManager::path_for_realm` now allows custom file names for Flexible Sync enabled Realms. (Issue [#5473](https://github.com/realm/realm-core/issues/5473)).
+
 ### Breaking changes
-* `realm::Realm::Config` has been renamed to `realm::RealmConfig`.
+* None.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -19,6 +17,26 @@
 
 ### Internals
 * None.
+
+----------------------------------------------
+
+# 11.17.0 Release notes
+
+### Enhancements
+* Move the implementation of the Audit API to the open-source repo and update it to work with MongoDB Realm. ([#5436](https://github.com/realm/realm-core/pull/5436))
+* Expose delete app user for C API. ([#5490](https://github.com/realm/realm-core/issues/5490))
+* Expose an API to get the app from user in the C API. ([#5478](https://github.com/realm/realm-core/issues/5478))
+
+### Fixed
+* C API `realm_user_get_all_identities` does not support identity id deep copy. ([#5467](https://github.com/realm/realm-core/issues/5467))
+
+### Breaking changes
+* `realm::Realm::Config` has been renamed to `realm::RealmConfig`. ([#5436](https://github.com/realm/realm-core/pull/5436))
+* C API `realm_get_class_keys`, `realm_get_class_properties`, `realm_get_property_keys`, `realm_app_get_all_users`, `realm_user_get_all_identities` will immediately return and report how big the SDK allocated array should be, if no enough space is found to accomadate core's array data. No `realm_error_t` is going to be set if memory is not copied. ([#5430](https://github.com/realm/realm-core/issues/5430))
+* `realm_app_sync_client_get_default_file_path_for_realm` should not have app as input argument C API.([#5486](https://github.com/realm/realm-core/issues/5486))
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
 
 ----------------------------------------------
 

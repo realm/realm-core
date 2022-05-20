@@ -26,6 +26,7 @@
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 
