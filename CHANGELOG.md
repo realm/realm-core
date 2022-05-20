@@ -6,7 +6,7 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* `SyncManager::path_for_realm` now allows custom file names for Flexible Sync enabled Realms. (Issue [#5473](https://github.com/realm/realm-core/issues/5473)).
 
 ### Breaking changes
 * None.
