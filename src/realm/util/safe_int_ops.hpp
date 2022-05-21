@@ -25,11 +25,11 @@
 #include <safeint.h>
 #endif
 
+#include <concepts>
 #include <limits>
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
-#include <realm/util/type_traits.hpp>
 
 namespace realm {
 namespace util {
@@ -55,18 +55,18 @@ namespace util {
 /// specializations of std::numeric_limits<> and that both are indeed
 /// integers.
 
-template <class A, class B>
-inline bool int_equal_to(A, B) noexcept;
-template <class A, class B>
-inline bool int_not_equal_to(A, B) noexcept;
-template <class A, class B>
-inline bool int_less_than(A, B) noexcept;
-template <class A, class B>
-inline bool int_less_than_or_equal(A, B) noexcept;
-template <class A, class B>
-inline bool int_greater_than(A, B) noexcept;
-template <class A, class B>
-inline bool int_greater_than_or_equal(A, B) noexcept;
+template <std::integral A, std::integral B>
+constexpr bool int_equal_to(A, B) noexcept;
+template <std::integral A, std::integral B>
+constexpr bool int_not_equal_to(A, B) noexcept;
+template <std::integral A, std::integral B>
+constexpr bool int_less_than(A, B) noexcept;
+template <std::integral A, std::integral B>
+constexpr bool int_less_than_or_equal(A, B) noexcept;
+template <std::integral A, std::integral B>
+constexpr bool int_greater_than(A, B) noexcept;
+template <std::integral A, std::integral B>
+constexpr bool int_greater_than_or_equal(A, B) noexcept;
 
 //@}
 
@@ -89,11 +89,11 @@ inline bool int_greater_than_or_equal(A, B) noexcept;
 /// specializations of std::numeric_limits<> and that both are indeed
 /// integers.
 
-template <class L, class R>
-inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept;
+template <std::integral L, std::integral R>
+constexpr bool int_add_with_overflow_detect(L& lval, R rval) noexcept;
 
-template <class L, class R>
-inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept;
+template <std::integral L, std::integral R>
+constexpr bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept;
 
 //@}
 
@@ -113,8 +113,8 @@ inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept;
 /// This function checks at compile time that both types have valid
 /// specializations of std::numeric_limits<> and that both are indeed
 /// integers.
-template <class L, class R>
-inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
+template <std::integral L, std::integral R>
+constexpr bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
 
 
 /// Checks for positive overflow when performing a bitwise shift to
@@ -128,8 +128,8 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept;
 /// value that is defined by the C++03 standard. In particular, the
 /// value of i must not exceed the number of bits of storage type T as
 /// shifting by this amount is not defined by the standard.
-template <class T>
-inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
+template <std::integral T>
+constexpr bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
 
 
 //@{
@@ -146,116 +146,113 @@ inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept;
 /// These functions make absolutely no assumptions about the platform
 /// except that it complies with at least C++03.
 
-template <class To, class From>
-bool int_cast_has_overflow(From from) noexcept;
+template <std::integral To, std::integral From>
+constexpr bool int_cast_has_overflow(From from) noexcept;
 
-template <class To, class From>
-bool int_cast_with_overflow_detect(From from, To& to) noexcept;
+template <std::integral To, std::integral From>
+constexpr bool int_cast_with_overflow_detect(From from, To& to) noexcept;
 
 //@}
 
 } // namespace util
 
 namespace _impl {
+template <typename L, typename R>
+constexpr const bool is_larger_int = std::numeric_limits<L>::digits > std::numeric_limits<R>::digits;
 
-template <class L, class R, typename = void>
-struct SafeIntBinopsImpl;
-
-// (both signed or both unsigned)
-template <class L, class R>
-struct SafeIntBinopsImpl<L, R, std::enable_if_t<std::is_signed_v<L> == std::is_signed_v<R>>> {
+template <std::unsigned_integral L, std::unsigned_integral R>
+constexpr bool safe_equal(L l, R r)
+{
     using common = std::common_type_t<L, R>;
-    static bool equal(L l, R r) noexcept
-    {
-        return common(l) == common(r);
-    }
-    static bool less(L l, R r) noexcept
-    {
-        return common(l) < common(r);
-    }
-};
+    return common(l) == common(r);
+}
 
-// (unsigned, signed)
-template <class L, class R>
-struct SafeIntBinopsImpl<L, R, std::enable_if_t<!std::is_signed_v<L> && std::is_signed_v<R>>> {
-    using lim_l = std::numeric_limits<L>;
-    using lim_r = std::numeric_limits<R>;
-    static bool equal(L l, R r) noexcept
-    {
-        return (lim_l::digits > lim_r::digits) ? r >= 0 && l == L(r) : R(l) == r;
-    }
-    static bool less(L l, R r) noexcept
-    {
-        return (lim_l::digits > lim_r::digits) ? r >= 0 && l < L(r) : R(l) < r;
-    }
-};
+template <std::signed_integral L, std::signed_integral R>
+constexpr bool safe_equal(L l, R r)
+{
+    using common = std::common_type_t<L, R>;
+    return common(l) == common(r);
+}
 
-// (signed, unsigned) (all size combinations)
-template <class L, class R>
-struct SafeIntBinopsImpl<L, R, std::enable_if_t<std::is_signed_v<L> && !std::is_signed_v<R>>> {
-    static bool equal(L l, R r) noexcept
-    {
-        // r == l
-        return SafeIntBinopsImpl<R, L>::equal(r, l);
-    }
-    static bool less(L l, R r) noexcept
-    {
-        // !(r == l || r < l)
-        return !(SafeIntBinopsImpl<R, L>::equal(r, l) || SafeIntBinopsImpl<R, L>::less(r, l));
-    }
-};
+template <std::unsigned_integral L, std::signed_integral R>
+constexpr bool safe_equal(L l, R r)
+{
+    return is_larger_int<L, R> ? r >= 0 && l == L(r) : R(l) == r;
+}
 
-template <class L, class R>
-struct SafeIntBinops : SafeIntBinopsImpl<L, R> {
-    typedef std::numeric_limits<L> lim_l;
-    typedef std::numeric_limits<R> lim_r;
-    static_assert(lim_l::is_specialized && lim_r::is_specialized,
-                  "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_l::is_integer && lim_r::is_integer, "Both types must be integers");
-};
+template <std::signed_integral L, std::unsigned_integral R>
+constexpr bool safe_equal(L l, R r)
+{
+    return safe_equal(r, l);
+}
 
+template <std::unsigned_integral L, std::unsigned_integral R>
+constexpr bool safe_less(L l, R r)
+{
+    using common = std::common_type_t<L, R>;
+    return common(l) < common(r);
+}
+
+template <std::signed_integral L, std::signed_integral R>
+constexpr bool safe_less(L l, R r)
+{
+    using common = std::common_type_t<L, R>;
+    return common(l) < common(r);
+}
+
+template <std::unsigned_integral L, std::signed_integral R>
+constexpr bool safe_less(L l, R r)
+{
+    return is_larger_int<L, R> ? r >= 0 && l < L(r) : R(l) < r;
+}
+
+template <std::signed_integral L, std::unsigned_integral R>
+constexpr bool safe_less(L l, R r)
+{
+    return !(safe_equal(r, l) || safe_less(r, l));
+}
 } // namespace _impl
 
 namespace util {
 
-template <class A, class B>
-inline bool int_equal_to(A a, B b) noexcept
+template <std::integral A, std::integral B>
+constexpr bool int_equal_to(A a, B b) noexcept
 {
-    return realm::_impl::SafeIntBinops<A, B>::equal(a, b);
+    return _impl::safe_equal(a, b);
 }
 
-template <class A, class B>
-inline bool int_not_equal_to(A a, B b) noexcept
+template <std::integral A, std::integral B>
+constexpr bool int_not_equal_to(A a, B b) noexcept
 {
-    return !realm::_impl::SafeIntBinops<A, B>::equal(a, b);
+    return !_impl::safe_equal(a, b);
 }
 
-template <class A, class B>
-inline bool int_less_than(A a, B b) noexcept
+template <std::integral A, std::integral B>
+constexpr bool int_less_than(A a, B b) noexcept
 {
-    return realm::_impl::SafeIntBinops<A, B>::less(a, b);
+    return _impl::safe_less(a, b);
 }
 
-template <class A, class B>
-inline bool int_less_than_or_equal(A a, B b) noexcept
+template <std::integral A, std::integral B>
+constexpr bool int_less_than_or_equal(A a, B b) noexcept
 {
-    return !realm::_impl::SafeIntBinops<B, A>::less(b, a); // Not greater than
+    return !_impl::safe_less(b, a); // Not greater than
 }
 
-template <class A, class B>
-inline bool int_greater_than(A a, B b) noexcept
+template <std::integral A, std::integral B>
+constexpr bool int_greater_than(A a, B b) noexcept
 {
-    return realm::_impl::SafeIntBinops<B, A>::less(b, a);
+    return _impl::safe_less(b, a);
 }
 
-template <class A, class B>
-inline bool int_greater_than_or_equal(A a, B b) noexcept
+template <std::integral A, std::integral B>
+constexpr bool int_greater_than_or_equal(A a, B b) noexcept
 {
-    return !realm::_impl::SafeIntBinops<A, B>::less(a, b); // Not less than
+    return !_impl::safe_less(a, b); // Not less than
 }
 
-template <class L, class R>
-inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept
+template <std::integral L, std::integral R>
+constexpr bool int_add_with_overflow_detect(L& lval, R rval) noexcept
 {
     // Note: MSVC returns true on success, while gcc/clang return true on overflow.
     // Note: Both may write to destination on overflow, but our tests check that this doesn't happen.
@@ -270,8 +267,8 @@ inline bool int_add_with_overflow_detect(L& lval, R rval) noexcept
     return overflow;
 }
 
-template <class L, class R>
-inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
+template <std::integral L, std::integral R>
+constexpr bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
 {
     auto old = lval;
 #ifdef _MSC_VER
@@ -284,8 +281,8 @@ inline bool int_subtract_with_overflow_detect(L& lval, R rval) noexcept
     return overflow;
 }
 
-template <class L, class R>
-inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
+template <std::integral L, std::integral R>
+constexpr bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
 {
     auto old = lval;
 #ifdef _MSC_VER
@@ -298,12 +295,11 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
     return overflow;
 }
 
-template <class T>
-inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
+template <std::integral T>
+constexpr bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
 {
     typedef std::numeric_limits<T> lim;
     static_assert(lim::is_specialized, "std::numeric_limits<> must be specialized for T");
-    static_assert(lim::is_integer, "T must be an integer type");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     if ((lim::max() >> i) < lval)
         return true;
@@ -311,15 +307,15 @@ inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
     return false;
 }
 
-template <class To, class From>
-inline bool int_cast_has_overflow(From from) noexcept
+template <std::integral To, std::integral From>
+constexpr bool int_cast_has_overflow(From from) noexcept
 {
     typedef std::numeric_limits<To> lim_to;
     return int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from);
 }
 
-template <class To, class From>
-inline bool int_cast_with_overflow_detect(From from, To& to) noexcept
+template <std::integral To, std::integral From>
+constexpr bool int_cast_with_overflow_detect(From from, To& to) noexcept
 {
     if (REALM_LIKELY(!int_cast_has_overflow<To>(from))) {
         to = To(from);
