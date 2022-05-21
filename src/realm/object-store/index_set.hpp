@@ -319,16 +319,6 @@ private:
     void shift_until_end_by(iterator begin, ptrdiff_t shift);
 };
 
-namespace util {
-// This was added in C++14 but is missing from libstdc++ 4.9
-template <typename Iterator>
-std::reverse_iterator<Iterator> make_reverse_iterator(Iterator it) noexcept
-{
-    return std::reverse_iterator<Iterator>(it);
-}
-} // namespace util
-
-
 namespace _impl {
 template <typename T>
 template <typename OtherIterator>

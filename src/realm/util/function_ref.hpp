@@ -55,15 +55,6 @@ public:
     // A FunctionRef is never empty, and so cannot be default-constructed.
     constexpr FunctionRef() noexcept = delete;
 
-    // FunctionRef is copyable and moveable.
-#if defined(__GNUC__) && __GNUC__ == 4 && __GNUC_MINOR__ <= 9 && !defined(__clang__)
-    FunctionRef(ThisType&) noexcept = default;
-    FunctionRef(ThisType const&) noexcept = default;
-    ThisType& operator=(ThisType&) noexcept = default;
-    ThisType& operator=(const ThisType&) noexcept = default;
-    FunctionRef(ThisType&&) noexcept = default;
-    ThisType& operator=(ThisType&&) noexcept = default;
-#else
 #ifdef _WIN32
     // VC++ incorrectly rejects multiple versions of a defaulted special member function
     constexpr FunctionRef(ThisType& o) noexcept
@@ -88,7 +79,7 @@ public:
         m_callback = o.m_callback;
         return *this;
     }
-#else
+#else // _WIN32
     constexpr FunctionRef(ThisType&) noexcept = default;
     constexpr ThisType& operator=(ThisType&) noexcept = default;
     constexpr FunctionRef(ThisType const&) noexcept = default;
@@ -96,7 +87,6 @@ public:
 #endif
     constexpr FunctionRef(ThisType&&) noexcept = default;
     constexpr ThisType& operator=(ThisType&&) noexcept = default;
-#endif
 
     // Construct a FunctionRef which wraps the given callable.
     template <typename F>

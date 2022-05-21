@@ -76,7 +76,6 @@ set(HEADERS
     impl/transact_log_handler.hpp
     impl/weak_realm_notifier.hpp
 
-    util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/copyable_atomic.hpp
     util/event_loop_dispatcher.hpp

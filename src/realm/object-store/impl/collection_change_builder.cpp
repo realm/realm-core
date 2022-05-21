@@ -558,8 +558,8 @@ void verify_changeset(std::vector<T> const& prev_rows, std::vector<T> const& nex
 #ifdef REALM_DEBUG
     { // Verify that applying the calculated change to prev_rows actually produces next_rows
         auto rows = prev_rows;
-        auto it = util::make_reverse_iterator(changeset.deletions.end());
-        auto end = util::make_reverse_iterator(changeset.deletions.begin());
+        auto it = std::make_reverse_iterator(changeset.deletions.end());
+        auto end = std::make_reverse_iterator(changeset.deletions.begin());
         for (; it != end; ++it) {
             rows.erase(rows.begin() + it->first, rows.begin() + it->second);
         }
