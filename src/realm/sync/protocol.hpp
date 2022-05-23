@@ -266,7 +266,7 @@ enum class ProtocolError {
     invalid_schema_change        = RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE,      // Invalid schema change (UPLOAD)
     bad_query                    = RLM_SYNC_ERR_SESSION_BAD_QUERY,                  // Client query is invalid/malformed (IDENT, QUERY)
     object_already_exists        = RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS,      // Client tried to create an object that already exists outside their view (UPLOAD)
-    server_permissions_changed   = RLM_SYNC_ERR_SESSION_SERVER_PERMISSION_CHANGED,  // Server permissions for this file ident have changed since the last time it was used (IDENT)
+    server_permissions_changed   = RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED, // Server permissions for this file ident have changed since the last time it was used (IDENT)
     initial_sync_not_completed   = RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED, // Client tried to open a session before initial sync is complete (BIND)
     write_not_allowed            = RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED,          // Client attempted a write that is disallowed by permissions, or modifies an
                                                                                     // object outside the current query - requires client reset (UPLOAD)
