@@ -5208,4 +5208,29 @@ TEST_TYPES(Parser_Arithmetic, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Dec
     verify_query_sub(test_context, person, "age * $0 == $1", args, 1);
 }
 
+TEST(Parser_Between)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_age = table->add_column(type_Int, "age");
+    auto col_scores = table->add_column_list(type_Int, "scores");
+    for (int i = 0; i < 3; ++i) {
+        auto list = table->create_object().set(col_age, 5 * i + 30).get_list<Int>(col_scores);
+        for (int j = 0; j < 5; j++) {
+            list.add(j + i * 5);
+        }
+        for (int j = 0; j < 5; j++) {
+            list.add(j + i * 5 + 10);
+        }
+    }
+
+    // g.to_json(std::cout);
+    verify_query(test_context, table, "age between {30, 37}", 2);
+    CHECK_THROW_ANY(verify_query(test_context, table, "NONE age between {30, 37}", 2));
+    verify_query(test_context, table, "ALL scores between {5, 19}", 1);
+    CHECK_THROW_ANY(verify_query(test_context, table, "scores between {5, 9}", 1));
+    CHECK_THROW_ANY(verify_query(test_context, table, "ANY scores between {5, 9}", 1));
+    CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
+}
+
 #endif // TEST_PARSER

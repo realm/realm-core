@@ -5,3 +5,4 @@
 ## ☑️ ToDos
 * [ ] 📝 Changelog update
 * [ ] 🚦 Tests (or not relevant)
+* [ ] C-API, if public C++ API changed.
