@@ -9,6 +9,7 @@
 * Fix ignoring ordering for queries passed into sync subscriptions in the C API. (Issue [#5504](https://github.com/realm/realm-core/issues/5504)).
 * Fix adding Flx Sync error codes to the C API. (Issue [#5519](https://github.com/realm/realm-core/issues/5519)).
 * OT may have failed with an assertion in debug builds for FLX sync bootstrap messages because changesets were being sorted by version number, which does not increase within a bootstrap. ([#5527](https://github.com/realm/realm-core/pull/5527))
+* FLX sync will now ensure that a bootstrap from the server will only be applied if the entire bootstrap is received - ensuring there are no orphaned objects as a result of changing the read snapshot on the server ([#5331](https://github.com/realm/realm-core/pull/5331))
 
 ### Breaking changes
 * None.

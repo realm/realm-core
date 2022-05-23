@@ -22,6 +22,7 @@
 
 #include "flx_sync_harness.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
+#include "realm/object-store/impl/realm_coordinator.hpp"
 #include "realm/object-store/schema.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
 #include "realm/object-store/sync/sync_session.hpp"
@@ -358,7 +359,11 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
         }
 
         interrupted.get();
+        realm->sync_session()->shutdown_and_wait();
+        realm->close();
     }
+
+    _impl::RealmCoordinator::clear_all_caches();
 
     {
         auto realm = DB::create(sync::make_client_replication(), interrupted_realm_config.path);
