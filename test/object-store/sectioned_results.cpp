@@ -46,17 +46,17 @@ struct Base {
 struct Int : Base<PropertyType::Int, int64_t> {
     static std::vector<int64_t> values()
     {
-        return {1, 2, 3, 4, 5, 1, 2, 3, 4, 5};
+        return {1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 6};
     }
 
     static std::vector<int64_t> expected_sorted()
     {
-        return {2, 2, 4, 4, 1, 1, 3, 3, 5, 5};
+        return {1, 1, 3, 3, 5, 5, 2, 2, 4, 4, 6};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {0, 1};
+        return {1, 0};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -108,17 +108,17 @@ struct Bool : Base<PropertyType::Bool, bool> {
 struct Float : Base<PropertyType::Float, float> {
     static std::vector<float> values()
     {
-        return {1.1f, 2.2f, 3.3f, 4.4f, 5.5f, 1.1f, 2.2f, 3.3f, 4.4f, 5.5f};
+        return {1.1f, 2.2f, 3.3f, 4.4f, 6.6f, 5.5f, 1.1f, 2.2f, 3.3f, 4.4f, 5.5f};
     }
 
     static std::vector<float> expected_sorted()
     {
-        return {2.2f, 2.2f, 4.4f, 4.4f, 1.1f, 1.1f, 3.3f, 3.3f, 5.5f, 5.5f};
+        return {1.1f, 1.1f, 3.3f, 3.3f, 5.5f, 5.5f, 2.2f, 2.2f, 4.4f, 4.4f, 6.6f};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {0, 1};
+        return {1, 0};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -139,17 +139,17 @@ struct Float : Base<PropertyType::Float, float> {
 struct Double : Base<PropertyType::Double, double> {
     static std::vector<double> values()
     {
-        return {1.1, 2.2, 3.3, 4.4, 5.5, 1.2, 2.3, 3.4, 4.5, 5.6};
+        return {1.1, 2.2, 3.3, 4.4, 5.5, 1.2, 2.3, 3.4, 4.5, 5.6, 6.6};
     }
 
     static std::vector<double> expected_sorted()
     {
-        return {2.2, 2.3, 4.4, 4.5, 1.1, 1.2, 3.3, 3.4, 5.5, 5.6};
+        return {1.1, 1.2, 3.3, 3.4, 5.5, 5.6, 2.2, 2.3, 4.4, 4.5, 6.6};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {0, 1};
+        return {1, 0};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -247,13 +247,13 @@ struct Date : Base<PropertyType::Date, Timestamp> {
 
     static std::vector<Timestamp> expected_sorted()
     {
-        return {Timestamp(10, 2), Timestamp(20, 2), Timestamp(30, 2), Timestamp(40, 2), Timestamp(50, 2),
-                Timestamp(1, 1),  Timestamp(2, 1),  Timestamp(3, 1),  Timestamp(4, 1),  Timestamp(5, 1)};
+        return {Timestamp(1, 1),  Timestamp(2, 1),  Timestamp(3, 1),  Timestamp(4, 1),  Timestamp(5, 1),
+                Timestamp(10, 2), Timestamp(20, 2), Timestamp(30, 2), Timestamp(40, 2), Timestamp(50, 2)};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Bar", "Foo"};
+        return {"Foo", "Bar"};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -283,16 +283,15 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
 
     static std::vector<realm::Mixed> expected_sorted()
     {
-        return {Mixed{BinaryData("a", 1)}, Mixed{"hello world"},
-                Mixed{Timestamp(1, 1)},    Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
-                Mixed{realm::UUID()},      Mixed{util::none},
-                Mixed{int64_t(1)},         Mixed{double(2.2)},
-                Mixed{float(3.3)},         Mixed{Decimal128("300")}};
+        return {Mixed{util::none},    Mixed{int64_t(1)},        Mixed{double(2.2)},
+                Mixed{float(3.3)},    Mixed{Decimal128("300")}, Mixed{BinaryData("a", 1)},
+                Mixed{"hello world"}, Mixed{Timestamp(1, 1)},   Mixed{ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")},
+                Mixed{realm::UUID()}};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Alphanumeric", "Empty", "Numerics"};
+        return {"Empty", "Numerics", "Alphanumeric"};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -327,16 +326,16 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
 
     static std::vector<ObjectId> expected_sorted()
     {
-        return {ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
-                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
+        return {ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
                 ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"),
-                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")};
+                ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"),
+                ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Bar", "Foo"};
+        return {"Foo", "Bar"};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -369,16 +368,16 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
     static std::vector<realm::UUID> expected_sorted()
     {
         return {
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
-            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
             realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
-            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962")};
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+            realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"),
+            realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999")};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Bar", "Foo"};
+        return {"Foo", "Bar"};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -408,14 +407,14 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
 
     static std::vector<Decimal128> expected_sorted()
     {
-        return {Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"),
-                Decimal128("876.54e32"), Decimal128("123.45e6"),  Decimal128("123.45e6"),  Decimal128("123.45e6"),
-                Decimal128("123.45e6"),  Decimal128("123.45e6")};
+        return {Decimal128("123.45e6"),  Decimal128("123.45e6"),  Decimal128("123.45e6"),  Decimal128("123.45e6"),
+                Decimal128("123.45e6"),  Decimal128("876.54e32"), Decimal128("876.54e32"), Decimal128("876.54e32"),
+                Decimal128("876.54e32"), Decimal128("876.54e32")};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {false, true};
+        return {true, false};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -460,14 +459,14 @@ struct BoxedOptional : BaseT {
         std::vector<Type> ret;
         for (auto v : BaseT::expected_sorted())
             ret.push_back(Type(v));
-        ret.push_back(util::none);
+        ret.insert(ret.begin(), util::none);
         return ret;
     }
 
     static std::vector<Mixed> expected_keys()
     {
         auto exp_keys = BaseT::expected_keys();
-        exp_keys.push_back("nulls");
+        exp_keys.insert(exp_keys.begin(), "nulls");
         return exp_keys;
     }
 };
@@ -502,10 +501,10 @@ struct UnboxedOptional : BaseT {
         auto ret = BaseT::expected_sorted();
         if constexpr (std::is_same_v<BaseT, sectioned_results_fixtures::Decimal>) {
             // The default Decimal128 ctr is 0, but we want a null value
-            ret.push_back(Decimal128(realm::null()));
+            ret.insert(ret.begin(), Decimal128(realm::null()));
         }
         else {
-            ret.push_back(typename BaseT::Type());
+            ret.insert(ret.begin(), typename BaseT::Type());
         }
         return ret;
     }
@@ -513,7 +512,7 @@ struct UnboxedOptional : BaseT {
     static std::vector<Mixed> expected_keys()
     {
         auto exp_keys = BaseT::expected_keys();
-        exp_keys.push_back("nulls");
+        exp_keys.insert(exp_keys.begin(), "nulls");
         return exp_keys;
     }
 };
@@ -980,16 +979,221 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
         REQUIRE(changes.deletions.size() == 3);
         REQUIRE(changes.insertions.size() == 4);
-        REQUIRE(changes.modifications.empty());
+        REQUIRE(changes.modifications.size() == 1);
 
         REQUIRE_INDICES(changes.insertions[1], 1);
         REQUIRE_INDICES(changes.insertions[2], 0);
         REQUIRE_INDICES(changes.insertions[3], 0, 1);
         REQUIRE_INDICES(changes.insertions[4], 0);
 
+        REQUIRE_INDICES(changes.modifications[1], 0);
+
         REQUIRE_INDICES(changes.deletions[0], 0, 1);
         REQUIRE_INDICES(changes.deletions[2], 0, 1);
         REQUIRE_INDICES(changes.deletions[3], 0);
+    }
+
+    SECTION("notifications ascending / decsending") {
+        // Ascending
+        SectionedResultsChangeSet changes;
+        auto token =
+            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes = c;
+            });
+
+        coordinator->on_change();
+        algo_run_count = 0;
+
+        r->begin_transaction();
+        table->clear();
+        auto o1 = table->create_object().set(name_col, "apple");
+        auto o2 = table->create_object().set(name_col, "banana");
+        auto o3 = table->create_object().set(name_col, "beans");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 3);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "fire");
+        o2.set(name_col, "banana");
+        o3.set(name_col, "fred");
+        auto o4 = table->create_object().set(name_col, "box");
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(algo_run_count == 4);
+        REQUIRE(changes.sections_to_insert.count() == 1);
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_insert, 1);
+        REQUIRE_INDICES(changes.sections_to_delete, 0);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.size() == 1);
+
+        REQUIRE_INDICES(changes.insertions[1], 0, 1); // insert 'fire', 'fred'
+        REQUIRE_INDICES(changes.deletions[0], 0);     // remove 'apple'
+        // refresh 'box', because the section 'B' previously existed and
+        // 'beans' was at index '1' previously, treat this as a modification.
+        REQUIRE_INDICES(changes.modifications[0], 1);
+
+        // Descending
+        sorted = results.sort({{"name_col", false}});
+        sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm realm) {
+            algo_run_count++;
+            auto obj = Object(realm, value.get_link());
+            auto v = obj.get_column_value<StringData>("name_col");
+            return v.prefix(1);
+        });
+
+        token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            changes = c;
+        });
+
+        coordinator->on_change();
+        algo_run_count = 0;
+
+        r->begin_transaction();
+        table->clear();
+        o1 = table->create_object().set(name_col, "apple");
+        o2 = table->create_object().set(name_col, "banana");
+        o3 = table->create_object().set(name_col, "beans");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 3);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        o1.set(name_col, "fire");
+        o2.set(name_col, "banana");
+        o3.set(name_col, "fred");
+        o4 = table->create_object().set(name_col, "box");
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(algo_run_count == 4);
+        REQUIRE(changes.sections_to_insert.count() == 1);
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_insert, 0);
+        REQUIRE_INDICES(changes.sections_to_delete, 1);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.size() == 1);
+
+        REQUIRE_INDICES(changes.insertions[0], 0, 1);
+        REQUIRE_INDICES(changes.deletions[1], 0);
+        REQUIRE_INDICES(changes.modifications[1], 1);
+    }
+
+    SECTION("notifications ascending / decsending primitive") {
+        // Ascending
+        r->begin_transaction();
+        auto o1 = table->create_object();
+        auto str_list = o1.get_list<StringData>(array_string_col);
+        r->commit_transaction();
+        List lst(r, o1, array_string_col);
+        sectioned_results = lst.sort({{"self", true}}).sectioned_results([&algo_run_count](Mixed value, SharedRealm) {
+            algo_run_count++;
+            auto v = value.get_string();
+            return v.prefix(1);
+        });
+
+        SectionedResultsChangeSet changes;
+        auto token =
+            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes = c;
+            });
+
+        coordinator->on_change();
+        algo_run_count = 0;
+
+        r->begin_transaction();
+        lst.delete_all();
+        lst.add(StringData("apple"));
+        lst.add(StringData("banana"));
+        lst.add(StringData("beans"));
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 3);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        lst.set(0, StringData("fire"));
+        lst.set(1, StringData("banana"));
+        lst.set(2, StringData("fred"));
+        lst.add(StringData("box"));
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(algo_run_count == 4);
+        REQUIRE(changes.sections_to_insert.count() == 1);
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_insert, 1);
+        REQUIRE_INDICES(changes.sections_to_delete, 0);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.size() == 1);
+
+        REQUIRE_INDICES(changes.insertions[1], 0, 1); // insert 'fire', 'fred'
+        REQUIRE_INDICES(changes.deletions[0], 0);     // remove 'apple'
+        // refresh 'box', because the section 'B' previously existed and
+        // 'beans' was at index '1' previously, treat this as a modification.
+        REQUIRE_INDICES(changes.modifications[0], 1);
+
+        // Descending
+        sectioned_results =
+            lst.sort({{"self", false}}).sectioned_results([&algo_run_count](Mixed value, SharedRealm) {
+                algo_run_count++;
+                auto v = value.get_string();
+                return v.prefix(1);
+            });
+
+        token = sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            changes = c;
+        });
+
+        coordinator->on_change();
+        algo_run_count = 0;
+
+        // Insertions
+        r->begin_transaction();
+        lst.delete_all();
+        lst.add(StringData("apple"));
+        lst.add(StringData("banana"));
+        lst.add(StringData("beans"));
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 3);
+
+        algo_run_count = 0;
+        r->begin_transaction();
+        lst.set(0, StringData("fire"));
+        lst.set(1, StringData("banana"));
+        lst.set(2, StringData("fred"));
+        lst.add(StringData("box"));
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(algo_run_count == 4);
+        REQUIRE(changes.sections_to_insert.count() == 1);
+        REQUIRE(changes.sections_to_delete.count() == 1);
+        REQUIRE_INDICES(changes.sections_to_insert, 0);
+        REQUIRE_INDICES(changes.sections_to_delete, 1);
+
+        REQUIRE(changes.deletions.size() == 1);
+        REQUIRE(changes.insertions.size() == 1);
+        REQUIRE(changes.modifications.size() == 1);
+
+        REQUIRE_INDICES(changes.insertions[0], 0, 1);
+        REQUIRE_INDICES(changes.deletions[1], 0);
+        REQUIRE_INDICES(changes.modifications[1], 1);
     }
 
     SECTION("notifications on section") {

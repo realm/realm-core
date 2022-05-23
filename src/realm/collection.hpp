@@ -329,7 +329,12 @@ public:
     bool has_changed(bool is_idempotent = false) const final
     {
         if (is_idempotent) {
-            return m_last_content_version != m_content_version;
+            // We need to get the current storage version as multiple instances
+            // of `m_coll_base` can exist at one time for the same underlying collection
+            // due to how Cocoa's property accessors work,
+            // meaning that `m_content_version` can be out of date for this current instance.
+            auto current_version = m_obj.get_alloc().get_storage_version();
+            return m_last_content_version != current_version;
         }
         else {
             update_if_needed();

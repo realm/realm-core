@@ -20,8 +20,6 @@
 #include <realm/object-store/sectioned_results.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 
-#include <set>
-
 namespace realm {
 
 static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Results::SectionedResultsOperator op,
@@ -54,7 +52,7 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
 struct SectionedResultsNotificationHandler {
 public:
     // Cocoa requires specific information on when a section
-    // needs to be added, removed, or reloaded when data changes
+    // needs to be added or removed;
     struct SectionChangeInfo {
         IndexSet sections_to_insert;
         IndexSet sections_to_delete;
@@ -85,7 +83,7 @@ public:
 
         m_sectioned_results.calculate_sections_if_required();
         auto insertions = convert_indices(c.insertions, m_sectioned_results.m_row_to_index_path);
-        auto modifications = convert_indices(c.modifications, m_sectioned_results.m_row_to_index_path);
+        auto modifications = convert_indices(c.modifications_new, m_sectioned_results.m_row_to_index_path);
         auto deletions = convert_indices(c.deletions, m_prev_row_to_index_path);
         auto section_changes = calculate_sections_to_insert_and_delete(insertions, deletions, modifications);
 
@@ -112,88 +110,163 @@ public:
         m_cb({}, ptr);
     }
 
+    /*
+     Produces an IndexSet of which section indexes have been removed and which section indexes
+     are to be inserted.
+     */
     SectionChangeInfo calculate_sections_to_insert_and_delete(std::map<size_t, IndexSet>& insertions,
                                                               std::map<size_t, IndexSet>& deletions,
                                                               std::map<size_t, IndexSet>& modifications)
     {
-        std::map<size_t, size_t> new_section_indexes;
-        std::map<size_t, size_t> old_section_indexes;
+        IndexSet sections_to_insert, sections_to_remove;
+        std::map<size_t, size_t> new_sections, old_sections;
 
-        std::vector<size_t> new_section_hashes, old_section_hashes;
         for (auto& n : m_sectioned_results.m_sections) {
-            new_section_indexes[n.hash] = n.index;
-            new_section_hashes.push_back(n.hash);
+            new_sections[n.hash] = n.index;
         }
         for (auto& n : m_prev_sections) {
-            old_section_indexes[n.hash] = n.index;
-            old_section_hashes.push_back(n.hash);
+            old_sections[n.hash] = n.index;
         }
 
-        IndexSet sections_to_insert;
-        IndexSet sections_to_remove;
-
-        auto diff = [](const std::vector<size_t>& a, const std::vector<size_t>& b,
-                       std::map<size_t, size_t>& hash_lookup, IndexSet& out) {
-            for (auto& hash : b) {
-                if (std::find(a.begin(), a.end(), hash) == a.end()) {
-                    out.add(hash_lookup[hash]);
+        auto diff = [](const std::map<size_t, size_t>& a, const std::map<size_t, size_t>& b, IndexSet& out) {
+            for (auto& [hash, index] : b) {
+                if (a.find(hash) == a.end()) {
+                    out.add(b.at(hash));
                 }
             }
         };
 
-        diff(old_section_hashes, new_section_hashes, new_section_indexes, sections_to_insert);
-        diff(new_section_hashes, old_section_hashes, old_section_indexes, sections_to_remove);
+        diff(old_sections, new_sections, sections_to_insert);
+        diff(new_sections, old_sections, sections_to_remove);
 
         /*
          This struct allows us to do bookkeeping on the changesets that the collection change checker produced.
          The need for this is that sometimes the changechecker may report a modification when we expect an insertion
          or deletion and we need to compensate for any missing insertions or deletions. It also helps compensate for
          any missing insertions / deletions when moving elements from from section to another.
+
+         Example:
+
+         ------------
+         |A:        |
+         |   apples |
+         |   arizona|
+         ------------
+         |M:        |
+         |   melon  |
+         |   motor  |
+
+         Delete 'apples' which is [section: 0, index: 0]
+         Delete 'arizona' which is [section: 0, index: 1]
+
+         Insert 'banana' which will be [section: 0, index: 0]
+
+         Here is what the change checker will produce:
+         Insertions: [empty], Deletions: [[section: 0, index: 1]], Modifications: [[section: 0, index: 0]]
+
+         While this is correct for a nonsectioned collection, this doesn't prove valid when updating a UI
+         using sectioned results.
+
+         What we actually need:
+         Insertions: [[section: 0, index: 0]], Deletions: [[section: 0, index: 0], [section: 0, index: 1]],
+         Modifications: [empty] The bookkeeper will modify the insertions, deletions & modifications IndexSet's to
+         something that is logically correct for the SDK's UI.
+
          */
         struct ChangeBookkeeper {
-            size_t index;
-            size_t current_indice_count;
 
-            size_t insertions_since_last_comparison;
-            size_t deletions_since_last_comparison;
+            ChangeBookkeeper(size_t current_indice_count, size_t insertions_since_last_comparison,
+                             size_t deletions_since_last_comparison, size_t change_insertion_count,
+                             size_t change_deletion_count, bool is_new_section, bool is_deleted_section,
+                             util::Optional<IndexSet&> insertions, IndexSet& deletions, IndexSet& modifications)
+                : m_current_indice_count(current_indice_count)
+                , m_insertions_since_last_comparison(insertions_since_last_comparison)
+                , m_deletions_since_last_comparison(deletions_since_last_comparison)
+                , m_change_insertion_count(change_insertion_count)
+                , m_change_deletion_count(change_deletion_count)
+                , m_is_new_section(is_new_section)
+                , m_is_deleted_section(is_deleted_section)
+                , m_insertions(insertions)
+                , m_deletions(deletions)
+                , m_modifications(modifications)
+            {
+            }
 
-            size_t change_insertion_count;
-            size_t change_deletion_count;
-            size_t change_modification_count;
+        public:
+            void validate()
+            {
+                if (m_insertions)
+                    validate(*m_insertions, m_is_new_section, m_insertions_since_last_comparison,
+                             m_change_insertion_count);
+                validate(m_deletions, m_is_deleted_section, m_deletions_since_last_comparison,
+                         m_change_deletion_count);
+                validate_modifications();
+            }
 
-            bool is_new_section;
-            bool is_deleted_section;
-
-            util::Optional<IndexSet&> insertions;
-            util::Optional<IndexSet&> deletions;
-            util::Optional<IndexSet&> modifications;
-
+        private:
             void validate(IndexSet& indexes, bool is_new_or_deleted_section, size_t& changes_since_last_comparison,
                           size_t& change_count)
             {
                 if (changes_since_last_comparison == change_count && !is_new_or_deleted_section) {
-                    // All looks good
+                    // The change checker has produced the correct result.
+                    // No further action is required.
                     return;
                 }
                 if (is_new_or_deleted_section) {
-                    indexes.set(current_indice_count);
-                    change_count = indexes.count();
-                    REALM_ASSERT(current_indice_count == change_count);
+                    // If a section is new or recently deleted just
+                    // insert or remove all indexes for the count of
+                    // the objects in the section.
+                    indexes.set(m_current_indice_count);
                     return;
                 }
                 // The change checker had issues producing the indexes we need.
                 if (changes_since_last_comparison > change_count) {
-                    // We are missing deletions
+                    /*
+                     We are missing changes from insertions or deletions.
+                     Example of why we might hit this scenario:
+                     - We deleted a section and this current section will take the place
+                       of those old objects. The changechecker will likely only report a modification
+                       if the changes line up to replace the old section (due to sorting), if that happens we cannot
+                     report modifications back to the SDK, we need to properly produce a changeset that removes the
+                     modifications and in its place return insertions or deletions.
+                     */
                     indexes.set(changes_since_last_comparison);
                     change_count = indexes.count();
                 }
                 else if (change_count > changes_since_last_comparison) {
-                    // We are adding too many changes
-                    // dump the extra indicies to modifications instead
-                    // ensure we dont go out of range
+                    /*
+                     We are adding too many changes from insertions or deletions.
+                     Dump the extra indicies to modifications instead.
+                     Example of why we might hit this scenario:
+                     A change can be reported in both insertions and deletions for the same section & index
+                     ------------
+                     |A:        |
+                     |  apricot |
+                     ------------
+                     |B:        |
+                     |  banana  |
+                     ------------
+                     |C:        |
+                     |  calender|
+
+                     Modify 'apricot' to 'zebra'
+                     Modify 'banana' to 'any'
+                     Modify 'calender' to 'goat'
+
+                     Change check will produce:
+                     deletions: [[section: 0, index: 0]],
+                     insertions: [[section: 2, index: 0]],
+                     modifications: [[section: 1, index: 0], [section: 2, index: 0]]
+
+                     The issue here is that section 'A' will still exist after
+                     this update and there is a deletion at [section: 0, index: 0]
+                     with no compensating insertion.
+                     As the actual count of objects will stay the same in the section
+                     move the extra deletion to the modifications IndexSet instead.
+                     */
                     IndexSet indexes_to_remove;
                     for (auto index : indexes.as_indexes()) {
-                        modifications->add(index);
+                        m_modifications.add(index);
                         indexes_to_remove.add(index);
                         change_count--;
                         if (change_count == changes_since_last_comparison)
@@ -206,103 +279,75 @@ public:
 
             void validate_modifications()
             {
-                if (is_deleted_section)
+                // Cocoa will throw an error if an index is
+                // deleted and reloaded in the same table view update block.
+                for (auto m : m_deletions.as_indexes()) {
+                    m_modifications.remove(m);
+                }
+
+                if (m_is_deleted_section)
                     return;
-                for (auto m : deletions->as_indexes()) {
-                    modifications->remove(m);
-                }
 
-                for (auto m : insertions->as_indexes()) {
-                    modifications->remove(m);
+                for (auto m : m_insertions->as_indexes()) {
+                    m_modifications.remove(m);
                 }
             }
 
-            void validate()
-            {
-                if (insertions)
-                    validate(*insertions, is_new_section, insertions_since_last_comparison, change_insertion_count);
-                validate(*deletions, is_deleted_section, deletions_since_last_comparison, change_deletion_count);
-                validate_modifications();
-            }
+            size_t m_current_indice_count;
+            size_t m_insertions_since_last_comparison;
+            size_t m_deletions_since_last_comparison;
+            size_t m_change_insertion_count;
+            size_t m_change_deletion_count;
+
+            bool m_is_new_section;
+            bool m_is_deleted_section;
+
+            util::Optional<IndexSet&> m_insertions;
+            IndexSet& m_deletions;
+            IndexSet& m_modifications;
         };
 
         for (auto& section : m_sectioned_results.m_sections) {
-            auto it = find(old_section_hashes.begin(), old_section_hashes.end(), section.hash);
-            if (it == old_section_hashes.end()) {
+            auto it = old_sections.find(section.hash);
+            if (it == old_sections.end()) {
                 auto& i = insertions[section.index];
                 auto& d = deletions[section.index];
                 auto& m = modifications[section.index];
 
                 // This is a new section
-                ChangeBookkeeper c;
-                c.index = section.index;
-                c.current_indice_count = section.indices.size();
-                c.insertions_since_last_comparison = 0;
-                c.deletions_since_last_comparison = 0;
-                c.change_insertion_count = i.count();
-                c.change_deletion_count = 0;
-                c.change_modification_count = m.count();
-                c.is_new_section = true;
-                c.is_deleted_section = false;
-                c.insertions = i;
-                c.deletions = d;
-                c.modifications = m;
+                auto c = ChangeBookkeeper(section.indices.size(), 0, 0, i.count(), 0, true, false, i, d, m);
                 c.validate();
             }
             else {
                 // This section previously existed
-                size_t old_index = it - old_section_hashes.begin();
+                size_t old_index = it->second;
                 int64_t diff = m_sectioned_results.m_sections[section.index].indices.size() -
                                m_prev_sections[old_index].indices.size();
 
                 auto& i = insertions[section.index];
                 auto& d = deletions[old_index];
                 auto& m = modifications[section.index];
+                auto insertions_since_last_comparison = diff > 0 ? (size_t)diff : 0;
+                auto deletions_since_last_comparison = diff < 0 ? (size_t)std::abs(diff) : 0;
 
-                ChangeBookkeeper c;
-                c.index = section.index;
-                c.current_indice_count = section.indices.size();
-                c.insertions_since_last_comparison = diff > 0 ? (size_t)diff : 0;
-                c.deletions_since_last_comparison = diff < 0 ? (size_t)abs(diff) : 0;
-                c.change_insertion_count = i.count();
-                c.change_deletion_count = d.count();
-                c.change_modification_count = m.count();
-                c.is_new_section = false;
-                c.is_deleted_section = false;
-                c.insertions = i;
-                c.deletions = d;
-                c.modifications = m;
+                auto c =
+                    ChangeBookkeeper(section.indices.size(), insertions_since_last_comparison,
+                                     deletions_since_last_comparison, i.count(), d.count(), false, false, i, d, m);
                 c.validate();
             }
         }
 
+        // Validate changesets for deleted sections.
         for (auto old_index : sections_to_remove.as_indexes()) {
             auto& d = deletions[old_index];
-            ChangeBookkeeper c;
-            c.index = old_index;
-            c.current_indice_count = m_prev_sections[old_index].indices.size();
-            c.insertions_since_last_comparison = 0;
-            c.deletions_since_last_comparison = 0;
-            c.change_insertion_count = 0;
-            c.change_deletion_count = d.count();
-            c.change_modification_count = 0;
-            c.is_new_section = false;
-            c.is_deleted_section = true;
-            c.insertions = util::none;
-            c.deletions = d;
-            c.modifications = util::none;
+            auto& m = modifications[old_index];
+
+            auto c = ChangeBookkeeper(m_prev_sections[old_index].indices.size(), 0, 0, 0, d.count(), false, true,
+                                      util::none, d, m);
             c.validate();
         }
 
-        // Cocoa will throw an error if an index is
-        // deleted and reloaded in the same table view update block
-        for (auto& [section, indexes] : deletions) {
-            modifications[section].remove(indexes);
-            if (modifications[section].empty()) {
-                modifications.erase(section);
-            }
-        }
-
+        // Remove empty entries in each change set.
         auto remove_empty_changes = [](std::map<size_t, IndexSet>& change) {
             std::vector<size_t> indexes_to_remove;
             for (auto& [section, indexes] : change) {
@@ -403,6 +448,7 @@ void SectionedResults::calculate_sections()
     m_row_to_index_path.clear();
     std::map<Mixed, size_t> key_to_section_index;
     m_row_to_index_path.resize(size);
+
     for (size_t i = 0; i < size; ++i) {
         Mixed key = m_callback(r.get_any(i), r.get_realm());
         // Disallow links as section keys. It would be uncommon to use them to begin with
@@ -426,19 +472,6 @@ void SectionedResults::calculate_sections()
             auto& section = m_sections[it->second];
             section.indices.push_back(i);
             m_row_to_index_path[i] = {it->second, section.indices.size() - 1};
-        }
-    }
-
-    auto desc = r.get_descriptor_ordering();
-    if (desc.will_apply_sort()) {
-        const SortDescriptor* sort_desc = static_cast<const SortDescriptor*>(desc[0]);
-        auto is_asc = sort_desc->is_ascending(0);
-        if (is_asc) {
-            bool is_ascending = *is_asc;
-            std::sort(m_sections.begin(), m_sections.end(),
-                      [&is_ascending](const SectionRange& a, const SectionRange& b) {
-                          return is_ascending ? (a.key < b.key) : (a.key > b.key);
-                      });
         }
     }
 }
