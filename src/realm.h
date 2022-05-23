@@ -3727,7 +3727,7 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
  * @param session ptr to a valid sync session
  * @param error sync error to simulate
  */
-RLM_API void realm_sync_session_handle_error_for_testing(realm_sync_session_t* session, realm_sync_error_t* error);
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, const realm_sync_error_t* error);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
