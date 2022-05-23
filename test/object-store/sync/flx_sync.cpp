@@ -812,10 +812,11 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             }
 
             interrupted.get();
-
-            // We'll close the realm before finishing the bootstrap. Since we turned off tearing down the test
-            // directory we should be able to re-open it and continue later though.
+            realm->sync_session()->shutdown_and_wait();
+            realm->close();
         }
+
+        _impl::RealmCoordinator::clear_all_caches();
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -886,10 +887,11 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             }
 
             interrupted.get();
-
-            // We'll close the realm before finishing the bootstrap. Since we turned off tearing down the test
-            // directory we should be able to re-open it and continue later though.
+            realm->sync_session()->shutdown_and_wait();
+            realm->close();
         }
+
+        _impl::RealmCoordinator::clear_all_caches();
 
         // Open up the realm without the sync client attached and verify that the realm got interrupted in the state
         // we expected it to be in.
@@ -911,25 +913,26 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         // if the bootstrap batches weren't being cached until lastInBatch were true.
         mutate_realm();
 
+        auto [saw_valid_state_promise, saw_valid_state_future] = util::make_promise_future<void>();
+        auto shared_saw_valid_state_promise =
+            std::make_shared<decltype(saw_valid_state_promise)>(std::move(saw_valid_state_promise));
         SharedRealm realm;
-        int download_counter = 0;
-
         // This hook will let us check what the state of the realm is before it's integrated any new download
         // messages from the server. This should be the full 5 object bootstrap that was received before we
         // called mutate_realm().
         interrupted_realm_config.sync_config->on_download_message_received_hook =
-            [&](std::weak_ptr<SyncSession> weak_session, const sync::SyncProgress&, int64_t query_version,
-                sync::DownloadBatchState batch_state) {
+            [&, promise = std::move(shared_saw_valid_state_promise)](std::weak_ptr<SyncSession> weak_session,
+                                                                     const sync::SyncProgress&, int64_t query_version,
+                                                                     sync::DownloadBatchState batch_state) {
                 auto session = weak_session.lock();
                 if (!session) {
                     return;
                 }
-                if (++download_counter > 1) {
+
+                if (query_version != 1 || batch_state != sync::DownloadBatchState::LastInBatch) {
                     return;
                 }
 
-                REQUIRE(query_version == 1);
-                REQUIRE(batch_state == sync::DownloadBatchState::LastInBatch);
                 auto latest_sub_set = session->get_flx_subscription_store()->get_latest();
                 auto active_sub_set = session->get_flx_subscription_store()->get_active();
                 REQUIRE(latest_sub_set.version() == active_sub_set.version());
@@ -943,10 +946,13 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 for (auto& id : obj_ids_at_end) {
                     REQUIRE(table->find_primary_key(Mixed{id}));
                 }
+
+                promise->emplace_value();
             };
 
         // Finally re-open the realm whose bootstrap we interrupted and just wait for it to finish downloading.
         realm = Realm::get_shared_realm(interrupted_realm_config);
+        saw_valid_state_future.get();
         auto table = realm->read_group().get_table("class_TopLevel");
         realm->get_latest_subscription_set()
             .get_state_change_notification(sync::SubscriptionSet::State::Complete)
