@@ -183,6 +183,14 @@ static_assert(realm_sync_errno_session_e(ProtocolError::user_mismatch) == RLM_SY
 static_assert(realm_sync_errno_session_e(ProtocolError::too_many_sessions) == RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS);
 static_assert(realm_sync_errno_session_e(ProtocolError::invalid_schema_change) ==
               RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE);
+static_assert(realm_sync_errno_session_e(ProtocolError::bad_query) == RLM_SYNC_ERR_SESSION_BAD_QUERY);
+static_assert(realm_sync_errno_session_e(ProtocolError::object_already_exists) ==
+              RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS);
+static_assert(realm_sync_errno_session_e(ProtocolError::server_permissions_changed) ==
+              RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED);
+static_assert(realm_sync_errno_session_e(ProtocolError::initial_sync_not_completed) ==
+              RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED);
+static_assert(realm_sync_errno_session_e(ProtocolError::write_not_allowed) == RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED);
 } // namespace
 
 static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
