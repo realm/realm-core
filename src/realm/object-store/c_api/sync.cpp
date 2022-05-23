@@ -224,6 +224,14 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     return ret;
 }
 
+static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrdering& ordering)
+{
+    auto ordering_copy = util::make_bind<DescriptorOrdering>();
+    *ordering_copy = ordering;
+    realm_query.set_ordering(ordering_copy);
+    return realm_query;
+}
+
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
 {
     return new realm_sync_client_config_t;
@@ -573,7 +581,8 @@ realm_sync_find_subscription_by_results(const realm_flx_sync_subscription_set_t*
                                         realm_results_t* results) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr);
-    auto it = subscription_set->find(results->get_query());
+    auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
+    auto it = subscription_set->find(realm_query);
     if (it == subscription_set->end())
         return nullptr;
     return new realm_flx_sync_subscription_t{*it};
@@ -596,7 +605,8 @@ realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t* s
                                       realm_query_t* query) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr);
-    auto it = subscription_set->find(query->get_query());
+    auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
+    auto it = subscription_set->find(realm_query);
     if (it == subscription_set->end())
         return nullptr;
     return new realm_flx_sync_subscription_t(*it);
@@ -636,10 +646,7 @@ realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subs
 {
     REALM_ASSERT(subscription_set != nullptr && results != nullptr);
     return wrap_err([&]() {
-        auto realm_query = results->get_query();
-        auto ordering_copy = util::make_bind<DescriptorOrdering>();
-        *ordering_copy = results->get_ordering();
-        realm_query.set_ordering(ordering_copy);
+        auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
         const auto [it, successful] = name ? subscription_set->insert_or_assign(name, realm_query)
                                            : subscription_set->insert_or_assign(realm_query);
         *index = std::distance(subscription_set->begin(), it);
@@ -655,10 +662,7 @@ realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscr
 {
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
     return wrap_err([&]() {
-        auto realm_query = query->get_query();
-        auto ordering_copy = util::make_bind<DescriptorOrdering>();
-        *ordering_copy = query->get_ordering();
-        realm_query.set_ordering(ordering_copy);
+        auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
         const auto [it, successful] = name ? subscription_set->insert_or_assign(name, realm_query)
                                            : subscription_set->insert_or_assign(realm_query);
         *index = std::distance(subscription_set->begin(), it);
@@ -704,7 +708,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
     *erased = false;
     return wrap_err([&]() {
-        if (auto it = subscription_set->find(query->get_query()); it != subscription_set->end()) {
+        auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
+        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
         }
@@ -718,7 +723,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     REALM_ASSERT(subscription_set != nullptr && results != nullptr);
     *erased = false;
     return wrap_err([&]() {
-        if (auto it = subscription_set->find(results->get_query()); it != subscription_set->end()) {
+        auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
+        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
         }
