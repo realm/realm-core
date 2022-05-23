@@ -574,8 +574,10 @@ void WatchStream::feed_sse(ServerSentEvent sse)
                 return;
             if (msg.type() != Bson::Type::String)
                 return;
-            m_error = std::make_unique<AppError>(ErrorCodes::from_string(static_cast<const std::string&>(code)),
-                                                 std::move(static_cast<std::string&>(msg)));
+            auto error_code = ErrorCodes::from_string(static_cast<const std::string&>(code));
+            if (error_code == ErrorCodes::UnknownError)
+                error_code = ErrorCodes::AppUnknownError;
+            m_error = std::make_unique<AppError>(error_code, std::move(static_cast<std::string&>(msg)));
         }
         catch (...) {
             return; // Use the default state.
