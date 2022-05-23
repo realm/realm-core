@@ -62,7 +62,7 @@ case $(uname -s) in
                 esac
             ;;
             *)
-                if [[ -z "MONGODB_DOWNLOAD_URL" ]]; then
+                if [[ -z "$MONGODB_DOWNLOAD_URL" ]]; then
                     echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
                     exit 1
                 fi
@@ -78,7 +78,7 @@ case $(uname -s) in
         esac
     ;;
     *)
-        if [[ -z "MONGODB_DOWNLOAD_URL" ]]; then
+        if [[ -z "$MONGODB_DOWNLOAD_URL" ]]; then
             echo "Missing MONGODB_DOWNLOAD_URL env variable to download mongodb from."
             exit 1
         fi
