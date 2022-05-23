@@ -56,7 +56,7 @@ util::Optional<AppError> AppUtils::check_for_errors(const Response& response)
                                 std::move(parsed_link), response.http_status_code);
             }
             else if (message != body.end()) {
-                return AppError(ErrorCodes::UnknownError, message->get<std::string>(), std::move(parsed_link),
+                return AppError(ErrorCodes::AppUnknownError, message->get<std::string>(), std::move(parsed_link),
                                 response.http_status_code);
             }
         }

@@ -860,7 +860,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
 Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 {
     if (!m_is_writable)
-        throw LogicError(ErrorCodes::ReadOnly, "Database not writable");
+        throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
 
     // get new key and index
     // find first empty spot:
@@ -982,7 +982,7 @@ void Group::remove_table(TableKey key)
 void Group::remove_table(size_t table_ndx, TableKey key)
 {
     if (!m_is_writable)
-        throw LogicError(ErrorCodes::ReadOnly, "Database not writable");
+        throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     REALM_ASSERT(table_ndx < m_tables.size());
     TableRef table = get_table(key);
@@ -1050,7 +1050,7 @@ void Group::rename_table(TableKey key, StringData new_name, bool require_unique_
 {
     check_attached();
     if (!m_is_writable)
-        throw LogicError(ErrorCodes::ReadOnly, "Database not writable");
+        throw LogicError(ErrorCodes::ReadOnlyDB, "Database not writable");
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     if (require_unique_name && has_table(new_name))
         throw TableNameInUse();
