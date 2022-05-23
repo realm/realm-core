@@ -118,7 +118,7 @@ public:
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
         LogicError = RLM_ERR_LOGIC,
-        NotSupported = REALM_ERR_NOT_SUPPORTED,
+        NotSupported = RLM_ERR_NOT_SUPPORTED,
         BrokenPromise = RLM_ERR_BROKEN_PROMISE,
         CrossTableLinkTarget = RLM_ERR_CROSS_TABLE_LINK_TARGET,
         KeyAlreadyUsed = RLM_ERR_KEY_ALREADY_USED,
