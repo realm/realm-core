@@ -130,6 +130,7 @@ private:
     friend class realm::ResultsSection;
     Results m_results;
     std::vector<SectionRange> m_sections;
+    // Key: Original index in Results, Value: <section_index, section_size>
     std::vector<std::pair<size_t, size_t>> m_row_to_index_path;
     SectionKeyFunc m_callback;
     uint_fast64_t m_previous_content_version;
