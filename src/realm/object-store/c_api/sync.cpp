@@ -29,6 +29,9 @@
 #include "types.hpp"
 #include "util.hpp"
 
+using realm::sync::Client;
+using namespace realm::sync;
+
 namespace realm::c_api {
 static_assert(realm_sync_client_metadata_mode_e(SyncClientConfig::MetadataMode::NoEncryption) ==
               RLM_SYNC_CLIENT_METADATA_MODE_PLAINTEXT);
@@ -68,8 +71,6 @@ static_assert(realm_sync_progress_direction_e(SyncSession::ProgressDirection::up
               RLM_SYNC_PROGRESS_DIRECTION_UPLOAD);
 static_assert(realm_sync_progress_direction_e(SyncSession::ProgressDirection::download) ==
               RLM_SYNC_PROGRESS_DIRECTION_DOWNLOAD);
-
-
 
 static realm_sync_error_code_t to_capi(const Status& status, std::string& message)
 {
