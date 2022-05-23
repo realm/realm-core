@@ -78,7 +78,7 @@ public:
     Query get_query() const REQUIRES(!m_mutex);
 
     // Get ordering for thr query associated with the result
-    DescriptorOrdering get_ordering() const REQUIRES(!m_mutex);
+    const DescriptorOrdering& get_ordering() const;
 
     // Get the Collection this Results is derived from, if any
     const std::shared_ptr<CollectionBase>& get_collection() const

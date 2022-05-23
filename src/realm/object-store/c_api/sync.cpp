@@ -633,7 +633,7 @@ realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subs
     REALM_ASSERT(subscription_set != nullptr && results != nullptr);
     return wrap_err([&]() {
         auto realm_query = results->get_query();
-        const auto& ordering_copy = util::make_bind<DescriptorOrdering>();
+        auto ordering_copy = util::make_bind<DescriptorOrdering>();
         *ordering_copy = results->get_ordering();
         realm_query.set_ordering(ordering_copy);
         const auto [it, successful] = name ? subscription_set->insert_or_assign(name, realm_query)
@@ -651,8 +651,8 @@ realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscr
 {
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
     return wrap_err([&]() {
-        auto& realm_query = query->get_query();
-        const auto& ordering_copy = util::make_bind<DescriptorOrdering>();
+        auto realm_query = query->get_query();
+        auto ordering_copy = util::make_bind<DescriptorOrdering>();
         *ordering_copy = query->get_ordering();
         realm_query.set_ordering(ordering_copy);
         const auto [it, successful] = name ? subscription_set->insert_or_assign(name, realm_query)
