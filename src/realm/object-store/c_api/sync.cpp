@@ -110,6 +110,8 @@ static_assert(realm_sync_errno_client_e(Client::Error::bad_state_message) == RLM
 static_assert(realm_sync_errno_client_e(Client::Error::missing_protocol_feature) ==
               RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE);
 static_assert(realm_sync_errno_client_e(Client::Error::http_tunnel_failed) == RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED);
+static_assert(realm_sync_errno_client_e(Client::Error::auto_client_reset_failure) ==
+              RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE);
 } // namespace
 
 namespace {
