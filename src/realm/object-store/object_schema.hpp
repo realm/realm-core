@@ -66,6 +66,7 @@ public:
     std::vector<Property> computed_properties;
     std::string primary_key;
     TableKey table_key;
+    // Cannot be both true at the same time.
     IsEmbedded is_embedded = false;
     IsAsymmetric is_asymmetric = false;
     std::string alias;

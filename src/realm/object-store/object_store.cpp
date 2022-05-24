@@ -163,14 +163,14 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
 
     if (auto* pk_property = object_schema.primary_key_property()) {
         table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
-                                                 is_nullable(pk_property->type));
+                                                 is_nullable(pk_property->type), object_schema.is_asymmetric);
     }
     else {
         if (object_schema.is_embedded) {
             table = group.add_embedded_table(name);
         }
         else {
-            table = group.get_or_add_table(name);
+            table = group.get_or_add_table(name, nullptr, object_schema.is_asymmetric);
         }
     }
 

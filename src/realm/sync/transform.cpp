@@ -1439,7 +1439,7 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
 
                 if (left_spec->is_asymmetric != right_spec->is_asymmetric) {
                     std::stringstream ss;
-                    ss << "Schema mismatch: '" << left_name << "' is asymmetric on one side, but not the other";
+                    ss << "Schema mismatch: '" << left_name << "' is asymmetric on one side, but not on the other.";
                     throw SchemaMismatchError(ss.str());
                 }
             }

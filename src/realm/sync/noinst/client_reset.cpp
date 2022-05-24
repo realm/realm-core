@@ -583,7 +583,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
                 auto pk_col_src = table_src->get_primary_key_column();
                 DataType pk_type = DataType(pk_col_src.get_type());
                 StringData pk_col_name = table_src->get_column_name(pk_col_src);
-                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable());
+                group_dst.add_table_with_primary_key(table_name, pk_type, pk_col_name, pk_col_src.is_nullable(), table_src->is_asymmetric());
             }
         }
     }

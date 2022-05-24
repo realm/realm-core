@@ -154,6 +154,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     }
     table_key = table->get_key();
     is_embedded = table->is_embedded();
+    is_asymmetric = table->is_asymmetric();
 
     size_t count = table->get_column_count();
     ColKey pk_col = table->get_primary_key_column();
@@ -421,6 +422,9 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
+    if (primary_key.empty() && is_asymmetric) {
+        exceptions.emplace_back("Asymmetric object type '%1' must have a primary key.", name);
+    }
 
     if (for_sync && !is_embedded) {
         if (primary_key.empty()) {
@@ -439,7 +443,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 namespace realm {
 bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
-    return std::tie(a.name, a.is_embedded, a.primary_key, a.persisted_properties, a.computed_properties) ==
-           std::tie(b.name, b.is_embedded, b.primary_key, b.persisted_properties, b.computed_properties);
+    return std::tie(a.name, a.is_embedded, a.is_asymmetric, a.primary_key, a.persisted_properties,
+                    a.computed_properties) == std::tie(b.name, b.is_embedded, b.is_asymmetric, b.primary_key,
+                                                       b.persisted_properties, b.computed_properties);
 }
 } // namespace realm

@@ -906,8 +906,7 @@ Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl
     ++m_num_tables;
 
     Table* table = create_table_accessor(j);
-    if (table_type == Table::Type::Embedded)
-        table->do_set_table_type(Table::Type::Embedded);
+    table->do_set_table_type(table_type);
 
     return table;
 }

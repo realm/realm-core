@@ -650,6 +650,15 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
 ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table, DataType key_type)
 {
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric() && target_table) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target_table && target_table->is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+
     col_key = do_insert_root_column(col_key, ColumnType(type), name, key_type); // Throws
 
     // When the inserted column is a link-type column, we must also add a
