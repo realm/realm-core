@@ -112,7 +112,7 @@ let notSyncServerSources: [String] = [
     "realm/sync/noinst/client_reset_operation.cpp",
     "realm/sync/noinst/client_reset_recovery.cpp",
     "realm/sync/noinst/compact_changesets.cpp",
-    "relam/sync/noinst/pending_bootstrap_store.cpp",
+    "realm/sync/noinst/pending_bootstrap_store.cpp",
     "realm/sync/noinst/protocol_codec.cpp",
     "realm/sync/noinst/sync_metadata_schema.cpp",
     "realm/sync/object_id.cpp",
