@@ -231,7 +231,29 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     message = error_code.message(); // pass the string to the caller for lifetime purposes
     ret.message = message.c_str();
 
+
     return ret;
+}
+
+static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
+{
+    auto error = std::error_code();
+    const realm_sync_error_category_e category = sync_error_code.category;
+    if (category == RLM_SYNC_ERROR_CATEGORY_CLIENT) {
+        error.assign(sync_error_code.value, realm::sync::client_error_category());
+    }
+    else if (category == RLM_SYNC_ERROR_CATEGORY_SESSION || category == RLM_SYNC_ERROR_CATEGORY_CONNECTION) {
+        error.assign(sync_error_code.value, realm::sync::protocol_error_category());
+    }
+    else if (category == RLM_SYNC_ERROR_CATEGORY_SYSTEM) {
+        error.assign(sync_error_code.value, std::system_category());
+    }
+    else if (category == RLM_SYNC_ERROR_CATEGORY_UNKNOWN) {
+        using namespace realm::util::error;
+        std::error_code dummy = make_error_code(basic_system_errors::invalid_argument);
+        error.assign(sync_error_code.value, dummy.category());
+    }
+    return error;
 }
 
 static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrdering& ordering)
@@ -924,4 +946,14 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
         };
     (*session)->wait_for_upload_completion(std::move(cb));
 }
+
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
+                                                         const realm_sync_error_t* error)
+{
+    REALM_ASSERT(session);
+    REALM_ASSERT(error);
+    auto err = sync_error_to_error_code(error->error_code);
+    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error->error_code.message, error->is_fatal});
+}
+
 } // namespace realm::c_api
