@@ -545,7 +545,7 @@ let headers: [String] = [
     "realm/sync/noinst/client_reset_recovery.hpp",
     "realm/sync/noinst/compact_changesets.hpp",
     "realm/sync/noinst/integer_codec.hpp",
-    "relam/sync/noinst/pending_bootstrap_store.hpp",
+    "realm/sync/noinst/pending_bootstrap_store.hpp",
     "realm/sync/noinst/protocol_codec.hpp",
     "realm/sync/noinst/root_certs.hpp",
     "realm/sync/noinst/server/access_control.hpp",
