@@ -231,9 +231,10 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     message = error_code.message(); // pass the string to the caller for lifetime purposes
     ret.message = message.c_str();
 
-  
-      return ret;
+
+    return ret;
 }
+
 static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
 {
     auto error = std::error_code();
@@ -253,6 +254,14 @@ static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& s
         error.assign(sync_error_code.value, dummy.category());
     }
     return error;
+}
+
+static Query add_ordering_to_realm_query(Query realm_query, const DescriptorOrdering& ordering)
+{
+    auto ordering_copy = util::make_bind<DescriptorOrdering>();
+    *ordering_copy = ordering;
+    realm_query.set_ordering(ordering_copy);
+    return realm_query;
 }
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) noexcept
