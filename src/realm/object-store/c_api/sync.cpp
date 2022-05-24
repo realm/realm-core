@@ -110,6 +110,8 @@ static_assert(realm_sync_errno_client_e(Client::Error::bad_state_message) == RLM
 static_assert(realm_sync_errno_client_e(Client::Error::missing_protocol_feature) ==
               RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE);
 static_assert(realm_sync_errno_client_e(Client::Error::http_tunnel_failed) == RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED);
+static_assert(realm_sync_errno_client_e(Client::Error::auto_client_reset_failure) ==
+              RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE);
 } // namespace
 
 namespace {
@@ -183,6 +185,14 @@ static_assert(realm_sync_errno_session_e(ProtocolError::user_mismatch) == RLM_SY
 static_assert(realm_sync_errno_session_e(ProtocolError::too_many_sessions) == RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS);
 static_assert(realm_sync_errno_session_e(ProtocolError::invalid_schema_change) ==
               RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE);
+static_assert(realm_sync_errno_session_e(ProtocolError::bad_query) == RLM_SYNC_ERR_SESSION_BAD_QUERY);
+static_assert(realm_sync_errno_session_e(ProtocolError::object_already_exists) ==
+              RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS);
+static_assert(realm_sync_errno_session_e(ProtocolError::server_permissions_changed) ==
+              RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED);
+static_assert(realm_sync_errno_session_e(ProtocolError::initial_sync_not_completed) ==
+              RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED);
+static_assert(realm_sync_errno_session_e(ProtocolError::write_not_allowed) == RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED);
 } // namespace
 
 static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::string& message)
@@ -221,9 +231,9 @@ static realm_sync_error_code_t to_capi(const std::error_code& error_code, std::s
     message = error_code.message(); // pass the string to the caller for lifetime purposes
     ret.message = message.c_str();
 
-    return ret;
+  
+      return ret;
 }
-
 static std::error_code sync_error_to_error_code(const realm_sync_error_code_t& sync_error_code)
 {
     auto error = std::error_code();
@@ -269,7 +279,7 @@ RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_cli
 }
 
 RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t* config, realm_log_func_t callback,
-                                                       void* userdata,
+                                                       realm_userdata_t userdata,
                                                        realm_free_userdata_func_t userdata_free) noexcept
 {
     config->logger_factory = make_logger_factory(callback, userdata, userdata_free);
@@ -356,7 +366,8 @@ RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t* conf
 }
 
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, realm_sync_error_handler_func_t handler,
-                                                 void* userdata, realm_free_userdata_func_t userdata_free) noexcept
+                                                 realm_userdata_t userdata,
+                                                 realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [handler, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                   std::shared_ptr<SyncSession> session, SyncError error) {
@@ -396,7 +407,8 @@ RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_
 }
 
 RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t* config,
-                                                       realm_sync_ssl_verify_func_t callback, void* userdata,
+                                                       realm_sync_ssl_verify_func_t callback,
+                                                       realm_userdata_t userdata,
                                                        realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
@@ -477,7 +489,7 @@ realm_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscrip
 
 RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config_t* config,
                                                                realm_sync_before_client_reset_func_t callback,
-                                                               void* userdata,
+                                                               realm_userdata_t userdata,
                                                                realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
@@ -489,7 +501,7 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
 
 RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_t* config,
                                                               realm_sync_after_client_reset_func_t callback,
-                                                              void* userdata,
+                                                              realm_userdata_t userdata,
                                                               realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
@@ -527,9 +539,11 @@ realm_sync_on_subscription_set_state_change_wait(const realm_flx_sync_subscripti
     return realm_flx_sync_subscription_set_state_e(static_cast<int>(state));
 }
 
-RLM_API bool realm_sync_on_subscription_set_state_change_async(
-    const realm_flx_sync_subscription_set_t* subscription_set, realm_flx_sync_subscription_set_state_e notify_when,
-    realm_sync_on_subscription_state_changed_t callback, void* userdata, realm_free_userdata_func_t userdata_free)
+RLM_API bool
+realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t* subscription_set,
+                                                  realm_flx_sync_subscription_set_state_e notify_when,
+                                                  realm_sync_on_subscription_state_changed_t callback,
+                                                  realm_userdata_t userdata, realm_free_userdata_func_t userdata_free)
 {
     REALM_ASSERT(subscription_set != nullptr && callback != nullptr);
     return wrap_err([&]() {
@@ -590,7 +604,8 @@ realm_sync_find_subscription_by_results(const realm_flx_sync_subscription_set_t*
                                         realm_results_t* results) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr);
-    auto it = subscription_set->find(results->get_query());
+    auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
+    auto it = subscription_set->find(realm_query);
     if (it == subscription_set->end())
         return nullptr;
     return new realm_flx_sync_subscription_t{*it};
@@ -613,7 +628,8 @@ realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t* s
                                       realm_query_t* query) noexcept
 {
     REALM_ASSERT(subscription_set != nullptr);
-    auto it = subscription_set->find(query->get_query());
+    auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
+    auto it = subscription_set->find(realm_query);
     if (it == subscription_set->end())
         return nullptr;
     return new realm_flx_sync_subscription_t(*it);
@@ -653,8 +669,9 @@ realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subs
 {
     REALM_ASSERT(subscription_set != nullptr && results != nullptr);
     return wrap_err([&]() {
-        const auto [it, successful] = name ? subscription_set->insert_or_assign(name, results->get_query())
-                                           : subscription_set->insert_or_assign(results->get_query());
+        auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
+        const auto [it, successful] = name ? subscription_set->insert_or_assign(name, realm_query)
+                                           : subscription_set->insert_or_assign(realm_query);
         *index = std::distance(subscription_set->begin(), it);
         *inserted = successful;
         return true;
@@ -668,8 +685,9 @@ realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscr
 {
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
     return wrap_err([&]() {
-        const auto [it, successful] = name ? subscription_set->insert_or_assign(name, query->get_query())
-                                           : subscription_set->insert_or_assign(query->get_query());
+        auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
+        const auto [it, successful] = name ? subscription_set->insert_or_assign(name, realm_query)
+                                           : subscription_set->insert_or_assign(realm_query);
         *index = std::distance(subscription_set->begin(), it);
         *inserted = successful;
         return true;
@@ -713,7 +731,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_s
     REALM_ASSERT(subscription_set != nullptr && query != nullptr);
     *erased = false;
     return wrap_err([&]() {
-        if (auto it = subscription_set->find(query->get_query()); it != subscription_set->end()) {
+        auto realm_query = add_ordering_to_realm_query(query->get_query(), query->get_ordering());
+        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
         }
@@ -727,7 +746,8 @@ RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable
     REALM_ASSERT(subscription_set != nullptr && results != nullptr);
     *erased = false;
     return wrap_err([&]() {
-        if (auto it = subscription_set->find(results->get_query()); it != subscription_set->end()) {
+        auto realm_query = add_ordering_to_realm_query(results->get_query(), results->get_ordering());
+        if (auto it = subscription_set->find(realm_query); it != subscription_set->end()) {
             subscription_set->erase(it);
             *erased = true;
         }
@@ -752,7 +772,7 @@ RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t* config)
 }
 
 RLM_API void realm_async_open_task_start(realm_async_open_task_t* task, realm_async_open_task_completion_func_t done,
-                                         void* userdata, realm_free_userdata_func_t userdata_free) noexcept
+                                         realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [done, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](ThreadSafeReference realm,
                                                                                        std::exception_ptr error) {
@@ -774,7 +794,7 @@ RLM_API void realm_async_open_task_cancel(realm_async_open_task_t* task) noexcep
 }
 
 RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
-    realm_async_open_task_t* task, realm_sync_progress_func_t notifier, void* userdata,
+    realm_async_open_task_t* task, realm_sync_progress_func_t notifier, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) noexcept
 {
     auto cb = [notifier, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](uint64_t transferred,
@@ -843,7 +863,7 @@ RLM_API bool realm_sync_immediately_run_file_actions(realm_app* app, const char*
 }
 
 RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
-    realm_sync_session_t* session, realm_sync_connection_state_changed_func_t callback, void* userdata,
+    realm_sync_session_t* session, realm_sync_connection_state_changed_func_t callback, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ConnectionStateChangeCallback> cb =
@@ -863,7 +883,7 @@ RLM_API void realm_sync_session_unregister_connection_state_change_callback(real
 RLM_API uint64_t realm_sync_session_register_progress_notifier(realm_sync_session_t* session,
                                                                realm_sync_progress_func_t notifier,
                                                                realm_sync_progress_direction_e direction,
-                                                               bool is_streaming, void* userdata,
+                                                               bool is_streaming, realm_userdata_t userdata,
                                                                realm_free_userdata_func_t userdata_free) noexcept
 {
     std::function<realm::SyncSession::ProgressNotifierCallback> cb =
@@ -882,7 +902,7 @@ RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
                                                              realm_sync_download_completion_func_t done,
-                                                             void* userdata,
+                                                             realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
     util::UniqueFunction<void(std::error_code)> cb =
@@ -900,7 +920,8 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t* session,
-                                                           realm_sync_upload_completion_func_t done, void* userdata,
+                                                           realm_sync_upload_completion_func_t done,
+                                                           realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
     util::UniqueFunction<void(std::error_code)> cb =

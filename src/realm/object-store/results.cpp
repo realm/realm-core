@@ -935,6 +935,11 @@ Query Results::get_query() const
     return do_get_query();
 }
 
+const DescriptorOrdering& Results::get_ordering() const REQUIRES(!m_mutex)
+{
+    return m_descriptor_ordering;
+}
+
 ConstTableRef Results::get_table() const
 {
     util::CheckedUniqueLock lock(m_mutex);
