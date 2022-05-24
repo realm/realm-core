@@ -416,6 +416,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
 
             parse_remote_changeset(changeset, changesets[i]); // Throws
 
+            changesets[i].transform_sequence = i;
             // It is possible that the synchronization history has been trimmed
             // to a point where a prefix of the merge window is no longer
             // available, but this can only happen if that prefix consisted
