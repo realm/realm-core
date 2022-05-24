@@ -562,7 +562,7 @@ void WatchStream::feed_sse(ServerSentEvent sse)
         m_state = HAVE_ERROR;
 
         // default error message if we have issues parsing the reply.
-        m_error = std::make_unique<AppError>(ErrorCodes::UnknownError, std::string(sse.data));
+        m_error = std::make_unique<AppError>(ErrorCodes::AppUnknownError, std::string(sse.data));
         try {
             auto parsed = parse(sse.data);
             if (parsed.type() != Bson::Type::Document)
@@ -574,8 +574,10 @@ void WatchStream::feed_sse(ServerSentEvent sse)
                 return;
             if (msg.type() != Bson::Type::String)
                 return;
-            m_error = std::make_unique<AppError>(ErrorCodes::from_string(static_cast<const std::string&>(code)),
-                                                 std::move(static_cast<std::string&>(msg)));
+            auto error_code = ErrorCodes::from_string(static_cast<const std::string&>(code));
+            if (error_code == ErrorCodes::UnknownError)
+                error_code = ErrorCodes::AppUnknownError;
+            m_error = std::make_unique<AppError>(error_code, std::move(static_cast<std::string&>(msg)));
         }
         catch (...) {
             return; // Use the default state.

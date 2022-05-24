@@ -26,6 +26,28 @@ namespace realm {
 ErrorCategory ErrorCodes::error_categories(Error code)
 {
     switch (code) {
+        case OK:
+        case GenericError:
+            break;
+        case RuntimeError:
+        case RangeError:
+        case BrokenInvariant:
+        case OutOfMemory:
+        case OutOfDiskSpace:
+        case AddressSpaceExhausted:
+        case MaximumFileSizeExceeded:
+        case IncompatibleSession:
+        case IncompatibleLockFile:
+        case InvalidQuery:
+        case DuplicatePrimaryKeyValue:
+        case UnsupportedFileFormatVersion:
+        case MultipleSyncAgents:
+        case ObjectAlreadyExists:
+        case CallbackFailed:
+        case NotCloneable:
+        case BadChangeset:
+        case SubscriptionFailed:
+            return ErrorCategory().set(ErrorCategory::runtime_error);
         case FileOperationFailed:
         case PermissionDenied:
         case FileNotFound:
@@ -37,72 +59,53 @@ ErrorCategory ErrorCodes::error_categories(Error code)
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::file_access);
         case SystemError:
             return ErrorCategory().set(ErrorCategory::runtime_error).set(ErrorCategory::system_error);
-        case RuntimeError:
-        case RangeError:
-        case IncompatibleSession:
-        case IncompatibleLockFile:
-        case InvalidQuery:
-        case BrokenInvariant:
-        case DuplicatePrimaryKeyValue:
-        case OutOfMemory:
-        case UnsupportedFileFormatVersion:
-        case MultipleSyncAgents:
-        case AddressSpaceExhausted:
-        case ObjectAlreadyExists:
-        case OutOfDiskSpace:
-        case CallbackFailed:
-        case NotCloneable:
-        case MaximumFileSizeExceeded:
-        case BadChangeset:
-        case SubscriptionFailed:
-            return ErrorCategory().set(ErrorCategory::runtime_error);
-        case InvalidArgument:
-        case PropertyNotNullable:
-        case InvalidProperty:
-        case InvalidName:
-        case InvalidDictionaryValue:
-        case InvalidSortDescriptor:
-        case SyntaxError:
-        case InvalidQueryArg:
-        case KeyNotFound:
-        case OutOfBounds:
-        case LimitExceeded:
-        case UnexpectedPrimaryKey:
-        case ModifyPrimaryKey:
-        case ReadOnlyProperty:
-        case TypeMismatch:
-        case ObjectTypeMismatch:
-        case MissingPrimaryKey:
-        case MissingPropertyValue:
-        case NoSuchTable:
-        case TableNameInUse:
-        case InvalidDictionaryKey:
-        case InvalidEncryptionKey:
-        case IllegalCombination:
-            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
         case LogicError:
+        case NotSupported:
         case BrokenPromise:
         case CrossTableLinkTarget:
         case KeyAlreadyUsed:
         case WrongTransactionState:
-        case SerializationError:
-        case IllegalOperation:
-        case StaleAccessor:
-        case ReadOnly:
-        case InvalidatedObject:
-        case NotSupported:
         case WrongThread:
-        case InvalidTableRef:
+        case IllegalOperation:
+        case SerializationError:
+        case StaleAccessor:
+        case InvalidatedObject:
+        case ReadOnlyDB:
         case DeleteOnOpenRealm:
         case MismatchedConfig:
         case ClosedRealm:
-        case InvalidSchemaVersion:
+        case InvalidTableRef:
         case SchemaValidationFailed:
         case SchemaMismatch:
+        case InvalidSchemaVersion:
         case InvalidAdditiveSchemaChange:
         case InvalidReadOnlySchemaChange:
         case InvalidExternalSchemaChange:
             return ErrorCategory().set(ErrorCategory::logic_error);
+        case InvalidArgument:
+        case PropertyNotNullable:
+        case ReadOnlyProperty:
+        case MissingPropertyValue:
+        case MissingPrimaryKey:
+        case UnexpectedPrimaryKey:
+        case ModifyPrimaryKey:
+        case SyntaxError:
+        case InvalidProperty:
+        case InvalidName:
+        case InvalidDictionaryValue:
+        case InvalidSortDescriptor:
+        case InvalidDictionaryKey:
+        case InvalidEncryptionKey:
+        case InvalidQueryArg:
+        case KeyNotFound:
+        case OutOfBounds:
+        case LimitExceeded:
+        case TypeMismatch:
+        case ObjectTypeMismatch:
+        case NoSuchTable:
+        case TableNameInUse:
+        case IllegalCombination:
+            return ErrorCategory().set(ErrorCategory::invalid_argument).set(ErrorCategory::logic_error);
         case CustomError:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::custom_error);
         case HTTPError:
@@ -166,11 +169,9 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case AccountNameInUse:
         case InvalidPassword:
         case SchemaValidationFailedWrite:
-        case UnknownError:
+        case AppUnknownError:
             return ErrorCategory().set(ErrorCategory::app_error).set(ErrorCategory::service_error);
-        case OK:
-        case GenericError:
-        case MaxError:
+        case UnknownError:
             break;
     }
     return {};
@@ -178,7 +179,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
 
 static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"OK", ErrorCodes::OK},
-    {"UnknownError", ErrorCodes::UnknownError},
+    {"AppUnknownError", ErrorCodes::AppUnknownError},
     {"GenericError", ErrorCodes::GenericError},
     {"RuntimeError", ErrorCodes::RuntimeError},
     {"LogicError", ErrorCodes::LogicError},
@@ -211,7 +212,7 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"UnexpectedPrimaryKey", ErrorCodes::UnexpectedPrimaryKey},
     {"ObjectAlreadyExists", ErrorCodes::ObjectAlreadyExists},
     {"ModifyPrimaryKey", ErrorCodes::ModifyPrimaryKey},
-    {"ReadOnly", ErrorCodes::ReadOnly},
+    {"ReadOnlyDB", ErrorCodes::ReadOnlyDB},
     {"PropertyNotNullable", ErrorCodes::PropertyNotNullable},
     {"TableNameInUse", ErrorCodes::TableNameInUse},
     {"InvalidTableRef", ErrorCodes::InvalidTableRef},

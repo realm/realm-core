@@ -167,7 +167,7 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
             SECTION("with unknown code") {
                 ws.feed_sse({R"({"error_code": "WhoKnows", "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == ":(");
             }
             SECTION("percent encoding") {
@@ -187,44 +187,44 @@ TEST_CASE("WatchStream SSE processing", "[mongo]") {
             SECTION("invalid json") {
                 ws.feed_sse({R"({"no closing: "}")", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == R"({"no closing: "}")");
             }
             SECTION("missing error") {
                 ws.feed_sse({R"({"error_code": "BadRequest"})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == R"({"error_code": "BadRequest"})");
             }
             SECTION("missing error_code") {
                 ws.feed_sse({R"({"error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == R"({"error": ":("})");
             }
             SECTION("error wrong type") {
                 ws.feed_sse({R"({"error_code": "BadRequest", "error": 1})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == R"({"error_code": "BadRequest", "error": 1})");
             }
             SECTION("error_code wrong type") {
                 ws.feed_sse({R"({"error_code": 1, "error": ":("})", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == R"({"error_code": 1, "error": ":("})");
             }
             SECTION("not an object") {
                 ws.feed_sse({R"("I'm just a string in the world")", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == R"("I'm just a string in the world")");
             }
             SECTION("a lot of percent encoding") {
                 // Note, trailing % is a special case that should be preserved if more is added.
                 ws.feed_sse({R"(%25%26%0A%0D%)", "error"});
                 REQUIRE(ws.state() == WatchStream::HAVE_ERROR);
-                CHECK(ws.error().code() == ErrorCodes::UnknownError);
+                CHECK(ws.error().code() == ErrorCodes::AppUnknownError);
                 CHECK(ws.error().reason() == "%%26\n\r%"); // NOTE: not a raw string so has real CR and LF bytes.
             }
         }
