@@ -226,12 +226,13 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
 
 void SyncReplication::create_object(const Table* table, GlobalKey oid)
 {
-    // TODO: maybe cut it here
     if (table->is_embedded()) {
         unsupported_instruction(); // FIXME: TODO
     }
 
-    Replication::create_object(table, oid);
+    if (!table->is_asymmetric()) {
+        Replication::create_object(table, oid);
+    }
     if (select_table(*table)) {
         if (table->get_primary_key_column()) {
             // Trying to create object without a primary key in a table that
@@ -270,13 +271,14 @@ Instruction::PrimaryKey SyncReplication::as_primary_key(Mixed value)
 
 void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey oid, Mixed value)
 {
-    // TODO: maybe cut it here
     if (table->is_embedded()) {
         // Trying to create an object with a primary key in an embedded table.
         unsupported_instruction();
     }
 
-    Replication::create_object_with_primary_key(table, oid, value);
+    if (!table->is_asymmetric()) {
+        Replication::create_object_with_primary_key(table, oid, value);
+    }
     if (select_table(*table)) {
         auto col = table->get_primary_key_column();
         if (col && ((value.is_null() && col.is_nullable()) || DataType(col.get_type()) == value.get_type())) {
@@ -477,7 +479,9 @@ void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed 
 
 void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fast64_t value)
 {
-    Replication::add_int(table, col, ndx, value);
+    if (!table->is_asymmetric()) {
+        Replication::add_int(table, col, ndx, value);
+    }
 
     if (select_table(*table)) {
         REALM_ASSERT(col != table->get_primary_key_column());
@@ -491,8 +495,9 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
 
 void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed value, _impl::Instruction variant)
 {
-    // TODO: maybe cut it here?
-    Replication::set(table, col, key, value, variant);
+    if (!table->is_asymmetric()) {
+        Replication::set(table, col, key, value, variant);
+    }
 
     if (key.is_unresolved()) {
         return;
