@@ -17,19 +17,20 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <catch2/catch.hpp>
+#include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
 #include <memory>
 
 #if REALM_ENABLE_SYNC
-#include "util/event_loop.hpp"
-#include <realm/util/ez_websocket.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/property.hpp>
+#include <realm/object-store/sync/async_open_task.hpp>
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
-#include <realm/object-store/sync/async_open_task.hpp>
+
+#include <realm/util/ez_websocket.hpp>
 
 using namespace realm;
 using namespace realm::sync;
@@ -86,7 +87,6 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
                                   }};
     config.schema = Schema{object_schema};
 
-    std::mutex mutex;
     SECTION("Can setup custom sockets factory") {
         bool called = false;
         auto task = Realm::get_synchronized_realm(config);
@@ -98,7 +98,6 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
         util::EventLoop::main().run_until([&] {
             return called;
         });
-        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(didCallConnect);
     }
 }
