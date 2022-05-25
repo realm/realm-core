@@ -85,7 +85,7 @@ public:
     /// Return true if the collection has changed since the last call to
     /// `has_changed()`. Note that this function is not idempotent and updates
     /// the internal state of the accessor if it has changed.
-    virtual bool has_changed(bool is_idempotent = false) const = 0;
+    virtual bool has_changed() const = 0;
 
     /// Returns true if the accessor is in the attached state. By default, this
     /// checks if the owning object is still valid.
@@ -319,31 +319,22 @@ public:
     /// Returns true if the accessor has changed since the last time
     /// `has_changed()` was called.
     ///
-    /// Note: This method is not idempotent by default.
+    /// Note: This method is not idempotent.
     ///
-    /// Note: This involves a call to `update_if_needed()` if `is_idempotent` is false.
+    /// Note: This involves a call to `update_if_needed()`.
     ///
     /// Note: This function does not return true for an accessor that became
     /// detached since the last call, even though it may look to the caller as
     /// if the size of the collection suddenly became zero.
-    bool has_changed(bool is_idempotent = false) const final
+    bool has_changed() const final
     {
-        if (is_idempotent) {
-            // We need to get the current storage version as multiple instances
-            // of `m_coll_base` can exist at one time for the same underlying collection
-            // due to how Cocoa's property accessors work,
-            // meaning that `m_content_version` can be out of date for this current instance.
-            auto current_version = m_obj.get_alloc().get_storage_version();
-            return m_last_content_version != current_version;
+        // `has_changed()` sneakily modifies internal state.
+        update_if_needed();
+        if (m_last_content_version != m_content_version) {
+            m_last_content_version = m_content_version;
+            return true;
         }
-        else {
-            update_if_needed();
-            if (m_last_content_version != m_content_version) {
-                m_last_content_version = m_content_version;
-                return true;
-            }
-            return false;
-        }
+        return false;
     }
 
     using Interface::get_owner_key;

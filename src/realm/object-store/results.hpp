@@ -379,6 +379,7 @@ private:
     Mode m_mode GUARDED_BY(m_mutex) = Mode::Empty;
     friend class SectionedResults;
     UpdatePolicy m_update_policy = UpdatePolicy::Auto;
+    uint64_t m_last_collection_content_version GUARDED_BY(m_mutex) = 0;
 
     void validate_read() const;
     void validate_write() const;
