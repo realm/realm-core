@@ -92,7 +92,7 @@ decrypted_memory_stats_t get_decrypted_memory_stats();
 void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id);
 void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noexcept;
 
-SharedFileInfo* get_file_info_for_file(File& file);
+SharedFileInfo* get_file_info_for_file(const File& file);
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.

@@ -721,6 +721,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // Note that get_size() may (will) return a different size before and after
     // the call below to set_encryption_key.
     m_file.set_encryption_key(cfg.encryption_key);
+    if (cfg.encryption_key && !cfg.read_only) {
+        std::unique_ptr<File> patch_file = std::make_unique<File>();
+        patch_file->open((path + ".patch").c_str(), access, File::create_Auto, File::flag_DSync);
+        m_file.set_encryption_patch_file(patch_file);
+    }
     File::CloseGuard fcg(m_file);
 
     size_t size = 0;

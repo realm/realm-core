@@ -47,6 +47,7 @@
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
+#include <realm/util/aes_cryptor.hpp>
 
 using namespace realm;
 using namespace realm::util;
@@ -467,6 +468,10 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         flags2 |= O_TRUNC;
     if (flags & flag_Append)
         flags2 |= O_APPEND;
+    if (flags & flag_Sync)
+        flags2 |= O_SYNC;
+    if (flags & flag_DSync)
+        flags2 |= O_DSYNC;
     int fd = ::open(path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
@@ -733,25 +738,29 @@ File::SizeType File::get_size() const
         return size;
 }
 
-
 void File::resize(SizeType size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
+    if (m_encryption_key)
+        size = data_size_to_encrypted_size(size);
+
+    File::resize_static(m_fd, size);
+}
+
+void File::resize_static(FileDesc fd, SizeType size)
+{
 #ifdef _WIN32 // Windows version
 
     // Save file position
-    SizeType p = get_file_pos(m_fd);
-
-    if (m_encryption_key)
-        size = data_size_to_encrypted_size(size);
+    SizeType p = get_file_pos(fd);
 
     // Windows docs say "it is not an error to set the file pointer to a position beyond the end of the file."
     // so seeking with SetFilePointerEx() will not error out even if there is no disk space left.
     // In this scenario though, the following call to SedEndOfFile() will fail if there is no disk space left.
-    seek(size);
+    seek_static(fd, size);
 
-    if (!SetEndOfFile(m_fd)) {
+    if (!SetEndOfFile(fd)) {
         DWORD err = GetLastError(); // Eliminate any risk of clobbering
         if (err == ERROR_HANDLE_DISK_FULL || err == ERROR_DISK_FULL) {
             std::string msg = get_last_error_msg("SetEndOfFile() failed: ", err);
@@ -761,12 +770,9 @@ void File::resize(SizeType size)
     }
 
     // Restore file position
-    seek(p);
+    seek_static(fd, p);
 
 #else // POSIX version
-
-    if (m_encryption_key)
-        size = data_size_to_encrypted_size(size);
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
@@ -774,7 +780,7 @@ void File::resize(SizeType size)
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
-    if (::ftruncate(m_fd, size2) != 0) {
+    if (::ftruncate(fd, size2) != 0) {
         int err = errno; // Eliminate any risk of clobbering
         if (err == ENOSPC || err == EDQUOT) {
             std::string msg = get_errno_msg("ftruncate() failed: ", err);
@@ -1014,29 +1020,33 @@ void File::seek_static(FileDesc fd, SizeType position)
 // actually written to disk. POSIX is rather vague on what fsync() has
 // to do unless _POSIX_SYNCHRONIZED_IO is defined. See also
 // http://www.humboldt.co.uk/2009/03/fsync-across-platforms.html.
-void File::sync()
+void File::sync_static(FileDesc fd)
 {
-    REALM_ASSERT_RELEASE(is_attached());
-
 #if defined _WIN32 // Windows version
 
-    if (FlushFileBuffers(m_fd))
+    if (FlushFileBuffers(fd))
         return;
     throw std::system_error(GetLastError(), std::system_category(), "FlushFileBuffers() failed");
 
 #elif REALM_PLATFORM_APPLE
 
-    if (::fcntl(m_fd, F_FULLFSYNC) == 0)
+    if (::fcntl(fd, F_FULLFSYNC) == 0)
         return;
     throw std::system_error(errno, std::system_category(), "fcntl() with F_FULLSYNC failed");
 
 #else // POSIX version
 
-    if (::fsync(m_fd) == 0)
+    if (::fsync(fd) == 0)
         return;
     throw std::system_error(errno, std::system_category(), "fsync() failed");
 
 #endif
+}
+
+void File::sync()
+{
+    REALM_ASSERT_RELEASE(is_attached());
+    File::sync_static(m_fd);
 }
 
 #ifndef _WIN32
@@ -1295,7 +1305,11 @@ void* File::map_reserve(AccessMode a, size_t size, size_t offset) const
 #if REALM_ENABLE_ENCRYPTION
 void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
 {
-    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+    auto retval = realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
+    if (mapping && m_patch_file) {
+        mapping->set_patch_file(m_patch_file->get_descriptor());
+    }
+    return retval;
 }
 
 void* File::map_fixed(AccessMode a, void* address, size_t size, EncryptedFileMapping* mapping, int /* map_flags */,
@@ -1666,6 +1680,24 @@ void File::set_encryption_key(const char* key)
     }
 #endif
 }
+
+void File::set_encryption_patch_file(std::unique_ptr<File>& patch_file)
+{
+#if REALM_ENABLE_ENCRYPTION
+    m_patch_file = std::move(patch_file);
+    if (m_patch_file) { // it could be nullptr
+        auto info = util::get_file_info_for_file(*this);
+        if (info) {
+            info->cryptor.apply_pending_patch(m_fd, info->patch_fd);
+        }
+    }
+#else
+    if (patch_file) {
+        throw util::runtime_error("Encryption not enabled");
+    }
+#endif
+}
+
 
 const char* File::get_encryption_key() const
 {

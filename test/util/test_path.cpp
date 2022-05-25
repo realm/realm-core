@@ -188,7 +188,7 @@ void do_clean_dir(const std::string& path, const std::string& guard_string)
         }
     }
 }
-}
+} // namespace
 
 void TestDirGuard::clean_dir(const std::string& path)
 {
@@ -216,6 +216,7 @@ void DBTestPathGuard::cleanup() const noexcept
         if (File::is_dir(m_path + ".management"))
             remove_dir(m_path + ".management");
         File::try_remove(get_lock_path());
+        File::try_remove(get_patch_path());
     }
     catch (...) {
         // Exception deliberately ignored

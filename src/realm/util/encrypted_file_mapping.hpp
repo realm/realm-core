@@ -84,9 +84,10 @@ public:
         return m_first_page;
     }
 
+    void set_patch_file(const FileDesc& patch);
+
 private:
     SharedFileInfo& m_file;
-
     size_t m_page_shift;
     size_t m_blocks_per_page;
 
@@ -96,10 +97,9 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
-        Touched = 1,           // a ref->ptr translation has taken place
-        UpToDate = 2,          // the page is fully up to date
-        PartiallyUpToDate = 4, // the page is valid for old translations, but requires re-decryption for new
-        Dirty = 8              // the page has been modified with respect to what's on file.
+        Touched = 1,  // a ref->ptr translation has taken place
+        UpToDate = 2, // the page is fully up to date
+        Dirty = 4     // the page has been modified with respect to what's on file.
     };
     std::vector<PageState> m_page_state;
     // little helpers:
@@ -132,10 +132,9 @@ private:
 
     char* page_addr(size_t local_page_ndx) const noexcept;
 
-    void mark_outdated(size_t local_page_ndx) noexcept;
     bool copy_up_to_date_page(size_t local_page_ndx) noexcept;
     void refresh_page(size_t local_page_ndx);
-    void write_page(size_t local_page_ndx) noexcept;
+    void flush_page(size_t local_page_ndx) noexcept;
     void write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept;
     void reclaim_page(size_t page_ndx);
     void validate_page(size_t local_page_ndx) noexcept;
@@ -146,7 +145,8 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
 {
     REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
 
-    size_t local_ndx = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
+    size_t local_ndx =
+        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
     REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
     return local_ndx;
 }
@@ -159,8 +159,8 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 }
 
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_ENABLE_ENCRYPTION
 
@@ -175,7 +175,7 @@ struct DecryptionFailed : util::File::AccessError {
     {
     }
 };
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP

@@ -201,8 +201,11 @@ public:
     };
 
     enum {
-        flag_Trunc = 1, ///< Truncate the file if it already exists.
-        flag_Append = 2 ///< Move to end of file before each write.
+        flag_Trunc = 1,  ///< Truncate the file if it already exists.
+        flag_Append = 2, ///< Move to end of file before each write.
+        flag_Direct = 4, ///< Bypass buffer cache (unused - reserved for Linux O_DIRECT)
+        flag_Sync = 8,   ///< Synchronize data+metadata to device immediately
+        flag_DSync = 16  ///< Synchronize data to device immediately
     };
 
     /// See open(const std::string&, Mode).
@@ -280,6 +283,7 @@ public:
     /// an open file has undefined behavior. Calling this function on
     /// a file that is opened in read-only mode, is an error.
     void resize(SizeType);
+    static void resize_static(FileDesc, SizeType);
 
     /// Same effect as prealloc_if_supported(original_size, new_size);
     ///
@@ -327,6 +331,7 @@ public:
     /// calls `fsync()`. On Apple platforms if calls `fcntl()` with command
     /// `F_FULLFSYNC`.
     void sync();
+    static void sync_static(FileDesc);
 
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released.
@@ -373,6 +378,15 @@ public:
     /// Get the encryption key set by set_encryption_key(),
     /// null_ptr if no key set.
     const char* get_encryption_key() const;
+
+    /// Set a patch file for full crash safety even on platforms where
+    /// a call to write() may be torn in case of app kill or platform crash.
+    /// - this File object takes ownership of the patch file.
+    /// - encryption key must have been installed.
+    /// - patch file given must not itself have encryption enabled (no recursive use)
+    ///   (patches will still be encrypted)
+    /// - in case a valid patch exists, it is immediately applied to the File and invalidated.
+    void set_encryption_patch_file(std::unique_ptr<File>& patch_file);
 
     /// Set the path used for emulating file locks. If not set explicitly,
     /// the emulation will use the path of the file itself suffixed by ".fifo"
@@ -626,6 +640,7 @@ private:
 #endif
 #endif
     std::unique_ptr<const char[]> m_encryption_key = nullptr;
+    std::unique_ptr<File> m_patch_file = nullptr;
     std::string m_path;
 
     bool lock(bool exclusive, bool non_blocking);

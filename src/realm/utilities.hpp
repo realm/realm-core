@@ -388,8 +388,10 @@ struct PlacementDelete {
 
 #ifdef _WIN32
 typedef void* FileDesc;
+constexpr FileDesc NoFileDesc = nullptr;
 #else
 typedef int FileDesc;
+constexpr FileDesc NoFileDesc = -1;
 #endif
 
 
