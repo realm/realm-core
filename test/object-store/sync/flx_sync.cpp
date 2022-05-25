@@ -42,17 +42,6 @@
 #include <iostream>
 #include <stdexcept>
 
-namespace realm {
-class TestHelper {
-public:
-    static DBRef& get_db(SharedRealm const& shared_realm)
-    {
-        return Realm::Internal::get_db(*shared_realm);
-    }
-};
-
-} // namespace realm
-
 namespace realm::app {
 
 namespace {
@@ -938,7 +927,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
                 REQUIRE(latest_sub_set.version() == active_sub_set.version());
                 REQUIRE(active_sub_set.state() == sync::SubscriptionSet::State::Complete);
 
-                auto db = TestHelper::get_db(realm);
+                auto db = SyncSession::OnlyForTesting::get_db(*session);
                 auto tr = db->start_read();
 
                 auto table = tr->get_table("class_TopLevel");

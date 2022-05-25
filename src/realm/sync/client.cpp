@@ -984,7 +984,6 @@ SubscriptionStore* SessionWrapper::get_flx_subscription_store()
 
 PendingBootstrapStore* SessionWrapper::get_flx_pending_bootstrap_store()
 {
-    REALM_ASSERT(m_initiated);
     return m_flx_pending_bootstrap_store.get();
 }
 
