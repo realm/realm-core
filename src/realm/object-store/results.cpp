@@ -186,7 +186,7 @@ bool Results::has_changed() REQUIRES(!m_mutex)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (m_collection)
-        return m_collection->has_changed(true);
+        return m_last_collection_content_version != m_collection->get_obj().get_table()->get_content_version();
 
     return m_table_view.has_changed();
 }
@@ -233,6 +233,9 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             }
             if (!needs_update)
                 return;
+
+           m_last_collection_content_version = m_collection->get_obj().get_table()->get_content_version();
+
             if (m_collection->is_empty()) {
                 m_list_indices->clear();
                 return;
