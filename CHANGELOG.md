@@ -12,6 +12,7 @@
 * OT may have failed with an assertion in debug builds for FLX sync bootstrap messages because changesets were being sorted by version number, which does not increase within a bootstrap. ([#5527](https://github.com/realm/realm-core/pull/5527))
 * Partially fix a performance regression in write performance on Apple platforms. Committing an empty write transaction is ~10x faster than 11.17.0, but still slower than pre-11.8.0 due to using more crash-safe file synchronization (since v11.8.0). (Swift issue [#7740](https://github.com/realm/realm-swift/issues/7740)).
 * FLX sync will now ensure that a bootstrap from the server will only be applied if the entire bootstrap is received - ensuring there are no orphaned objects as a result of changing the read snapshot on the server ([#5331](https://github.com/realm/realm-core/pull/5331))
+* Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
 
 ### Breaking changes
 * Bump the SharedInfo version to 12. This requires update of any app accessing the file in a multiprocess scenario, including Realm Studio.
