@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/sync/client_base.hpp"
 #include <realm/object-store/sync/sync_session.hpp>
 
 #include <realm/object-store/impl/realm_coordinator.hpp>
@@ -659,9 +660,18 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
     if (m_config.on_download_message_received_hook) {
-        session_config.on_download_message_received_hook = [hook = m_config.on_download_message_received_hook,
-                                                            anchor = weak_from_this()] {
-            hook(anchor);
+        session_config.on_download_message_received_hook =
+            [hook = m_config.on_download_message_received_hook, anchor = weak_from_this()](
+                const sync::SyncProgress& progress, int64_t query_version, sync::DownloadBatchState batch_state) {
+                hook(anchor, progress, query_version, batch_state);
+            };
+    }
+    if (m_config.on_bootstrap_message_processed_hook) {
+        session_config.on_bootstrap_message_processed_hook =
+            [hook = m_config.on_bootstrap_message_processed_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state) -> bool {
+            return hook(anchor, progress, query_version, batch_state);
         };
     }
 

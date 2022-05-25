@@ -77,6 +77,9 @@ public:
     // Returned query will not be valid if the current mode is Empty
     Query get_query() const REQUIRES(!m_mutex);
 
+    // Get ordering for thr query associated with the result
+    const DescriptorOrdering& get_ordering() const;
+
     // Get the Collection this Results is derived from, if any
     const std::shared_ptr<CollectionBase>& get_collection() const
     {

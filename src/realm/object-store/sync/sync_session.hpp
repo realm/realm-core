@@ -277,6 +277,10 @@ public:
         {
             session.nonsync_transact_notify(version);
         }
+        static std::shared_ptr<DB> get_db(SyncSession& session)
+        {
+            return session.m_db;
+        }
     };
 
 private:
