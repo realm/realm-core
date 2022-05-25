@@ -638,8 +638,7 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
-            if ((*get()).identity() == (*ptr->get()).identity())
-                return true;
+            return *get() == *(ptr->get());
         }
         return false;
     }
@@ -684,8 +683,7 @@ struct realm_flx_sync_subscription : realm::c_api::WrapC, realm::sync::Subscript
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_flx_sync_subscription*>(&other)) {
-            if (id() == ptr->id())
-                return true;
+            return *ptr == *this;
         }
         return false;
     }

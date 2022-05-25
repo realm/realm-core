@@ -61,6 +61,12 @@ public:
     // Returns a stringified version of the query associated with this subscription.
     std::string_view query_string() const;
 
+    // Returns whether the 2 subscriptions passed have the same id.
+    friend bool operator==(const Subscription& lhs, const Subscription& rhs)
+    {
+        return lhs.id() == rhs.id();
+    }
+
 private:
     friend class SubscriptionSet;
     friend class MutableSubscriptionSet;
