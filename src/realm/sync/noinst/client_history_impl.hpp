@@ -19,6 +19,7 @@
 #ifndef REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 #define REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 
+#include "realm/util/functional.hpp"
 #include <realm/util/optional.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
@@ -249,6 +250,7 @@ public:
     void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                      const RemoteChangeset* changesets, std::size_t num_changesets,
                                      VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
+                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,

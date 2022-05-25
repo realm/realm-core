@@ -22,6 +22,7 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/protocol.hpp>
 
 #include <functional>
 #include <memory>
@@ -52,7 +53,7 @@ enum class SimplifiedProtocolError {
 namespace sync {
 using port_type = std::uint_fast16_t;
 enum class ProtocolError;
-}
+} // namespace sync
 
 namespace util::websocket {
 class EZSocketFactory;
@@ -188,7 +189,12 @@ struct SyncConfig {
 
     // Will be called after a download message is received and validated by the client but befefore it's been
     // transformed or applied. To be used in testing only.
-    std::function<void(std::weak_ptr<SyncSession>)> on_download_message_received_hook;
+    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+        on_download_message_received_hook;
+    // Will be called after each bootstrap message is added to the pending bootstrap store, but before
+    // processing a finalized bootstrap. For testing only.
+    std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+        on_bootstrap_message_processed_hook;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

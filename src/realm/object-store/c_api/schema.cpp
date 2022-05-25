@@ -250,7 +250,7 @@ RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_clas
 
 RLM_API realm_callback_token_t* realm_add_schema_changed_callback(realm_t* realm,
                                                                   realm_on_schema_change_func_t callback,
-                                                                  void* userdata,
+                                                                  realm_userdata_t userdata,
                                                                   realm_free_userdata_func_t free_userdata)
 {
     util::UniqueFunction<void(const Schema&)> func =

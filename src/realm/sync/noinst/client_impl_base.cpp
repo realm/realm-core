@@ -16,6 +16,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
@@ -1391,7 +1392,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
-                                        download_batch_state, logger, get_transact_reporter()); // Throws
+                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
     if (num_changesets == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1501,6 +1502,8 @@ void Session::activate()
 
     reset_protocol_state();
     m_state = Active;
+
+    process_pending_flx_bootstrap();
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -2066,20 +2069,20 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
-    receive_download_message_hook();
+    receive_download_message_hook(progress, query_version, batch_state);
 
-    if (batch_state == DownloadBatchState::LastInBatch) {
-        update_progress(progress); // Throws
+    if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
+        clear_resumption_delay_state();
+        return;
     }
 
+    update_progress(progress);                                                           // Throws
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
     clear_resumption_delay_state();
 }
-
 
 std::error_code Session::receive_mark_message(request_ident_type request_ident)
 {
@@ -2192,14 +2195,13 @@ std::error_code Session::receive_error_message(int error_code_int, const Protoco
         // completes.
         complete_deactivation(); // Throws
         // Life cycle state is now Deactivated
-        return std::error_code{}; // Success
     }
 
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();      // Throws
-        on_suspended({info, make_error_code(error_code)}); // Throws
+        m_conn.one_less_active_unsuspended_session();                      // Throws
+        on_suspended(SessionErrorInfo{info, make_error_code(error_code)}); // Throws
     }
 
     if (info.try_again) {
@@ -2210,7 +2212,7 @@ std::error_code Session::receive_error_message(int error_code_int, const Protoco
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
 
-    return std::error_code{}; // Success
+    return {};
 }
 
 void Session::begin_resumption_delay()
