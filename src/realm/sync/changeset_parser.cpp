@@ -712,7 +712,8 @@ OwnedMixed parse_base64_encoded_primary_key(std::string_view str)
         case Type::UUID:
             return OwnedMixed{state.read_uuid()};
         default:
-            throw BadChangesetError("invalid primary key type");
+            throw BadChangesetError(util::format("invalid primary key type %1", type));
+
     }
 }
 

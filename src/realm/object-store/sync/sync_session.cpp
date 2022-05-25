@@ -737,18 +737,16 @@ void SyncSession::create_sync_session()
                 return;
             }
             using cs = sync::ConnectionState;
-            ConnectionState new_state;
-            switch (state) {
-                case cs::disconnected:
-                    new_state = ConnectionState::Disconnected;
-                    break;
-                case cs::connecting:
-                    new_state = ConnectionState::Connecting;
-                    break;
-                case cs::connected:
-                    new_state = ConnectionState::Connected;
-                    break;
-            }
+            ConnectionState new_state = [&] {
+                switch (state) {
+                    case cs::disconnected:
+                        return ConnectionState::Disconnected;
+                    case cs::connecting:
+                        return ConnectionState::Connecting;
+                    case cs::connected:
+                        return ConnectionState::Connected;
+                }
+            }();
             util::CheckedUniqueLock lock(self->m_connection_state_mutex);
             auto old_state = self->m_connection_state;
             self->m_connection_state = new_state;
