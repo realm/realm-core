@@ -22,7 +22,7 @@
 -----------
 
 ### Internals
-* None.
+* Evergreen builders for MacOS now build with Xcode 13.1 on MacOS 11.0
 
 ----------------------------------------------
 
