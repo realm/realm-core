@@ -47,6 +47,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case NotCloneable:
         case BadChangeset:
         case SubscriptionFailed:
+        case SchemaVersionMismatch:
             return ErrorCategory().set(ErrorCategory::runtime_error);
         case FileOperationFailed:
         case PermissionDenied:
@@ -313,6 +314,7 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"AccountNameInUse", ErrorCodes::AccountNameInUse},
     {"InvalidPassword", ErrorCodes::InvalidPassword},
     {"SchemaValidationFailedWrite", ErrorCodes::SchemaValidationFailedWrite},
+    {"SchemaVersionMismatch", ErrorCodes::SchemaVersionMismatch},
 };
 
 std::string_view ErrorCodes::error_string(Error code)

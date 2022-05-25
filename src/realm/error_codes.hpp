@@ -114,6 +114,7 @@ public:
         DecryptionFailed = RLM_ERR_DECRYPTION_FAILED,
         IncompatibleHistories = RLM_ERR_INCOMPATIBLE_HISTORIES,
         FileFormatUpgradeRequired = RLM_ERR_FILE_FORMAT_UPGRADE_REQUIRED,
+        SchemaVersionMismatch = RLM_ERR_SCHEMA_VERSION_MISMATCH,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 
