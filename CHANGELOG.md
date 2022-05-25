@@ -2,6 +2,7 @@
 
 ### Enhancements
 * Expose `SyncSession::OnlyForTesting::handle_error` in the C API. ([#5507](https://github.com/realm/realm-core/issues/5507))
+* Greatly improve the peformance of `Realm::get_number_of_versions()` and `RealmConfig::max_number_of_active_versions` on iOS.
 
 ### Fixed
 * In RQL 'NONE x BETWEEN ...' and 'ANY x BETWEEN ...' had incorrect behavior, so it is now disallowed ([#5508](https://github.com/realm/realm-core/issues/5508), since v11.3.0)
@@ -19,7 +20,7 @@
 -----------
 
 ### Internals
-* None.
+* Bump the SharedInfo version to 12.
 
 ----------------------------------------------
 
