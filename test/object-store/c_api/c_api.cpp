@@ -4058,7 +4058,9 @@ static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
 static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t*)
 {
-    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(realm_clone(user));
+    auto clone_ptr = realm_clone(user);
+    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(clone_ptr);
+    CHECK(realm_equals(user, clone_ptr));
 }
 
 static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t*)
@@ -4206,6 +4208,8 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             auto s = realm_sync_find_subscription_by_query(sub, c_wrap_query_foo);
             CHECK(s != nullptr);
+            auto cloned_s = realm_clone(s);
+            CHECK(realm_equals(s, cloned_s));
             bool erased = false;
             auto result = realm_sync_subscription_set_erase_by_query(mut_sub, c_wrap_query_foo, &erased);
             CHECK(erased);
@@ -4223,6 +4227,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             realm_release(s);
+            realm_release(cloned_s);
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);

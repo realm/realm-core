@@ -331,7 +331,7 @@ private:
 
     mutable util::CheckedMutex m_mutex;
 
-    // Set by the server. The unique ID of the user account on the Realm Applcication.
+    // Set by the server. The unique ID of the user account on the Realm Application.
     const std::string m_identity;
 
     // Sessions are owned by the SyncManager, but the user keeps a map of weak references
