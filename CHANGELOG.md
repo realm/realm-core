@@ -13,7 +13,7 @@
 * Partially fix a performance regression in write performance on Apple platforms. Committing an empty write transaction is ~10x faster than 11.17.0, but still slower than pre-11.8.0 due to using more crash-safe file synchronization (since v11.8.0).
 
 ### Breaking changes
-* None.
+* Bump the SharedInfo version to 12. This requires update of any app accessing the file in a multiprocess scenario, including Realm Studio.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -21,7 +21,7 @@
 -----------
 
 ### Internals
-* Bump the SharedInfo version to 12.
+* None.
 
 ----------------------------------------------
 
