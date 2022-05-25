@@ -400,19 +400,8 @@ public:
                 , key(k)
             {
             }
-            bool operator==(const row& r) const noexcept
-            {
-                return table_key == r.table_key && key == r.key;
-            }
-            bool operator!=(const row& r) const noexcept
-            {
-                return !(*this == r);
-            }
-            /// Trivial lexicographic order
-            bool operator<(const row& r) const noexcept
-            {
-                return table_key < r.table_key || (table_key == r.table_key && key < r.key);
-            }
+            bool operator==(const row&) const noexcept = default;
+            auto operator<=>(const row&) const noexcept = default;
         };
 
         struct link {
@@ -480,12 +469,6 @@ public:
     /// a table at index I in the other group that is equal to T.
     /// Tables are equal if they have the same content and the same table name.
     bool operator==(const Group&) const;
-
-    /// Compare two groups for inequality. See operator==().
-    bool operator!=(const Group& g) const
-    {
-        return !(*this == g);
-    }
 
     /// Control of what to include when computing memory usage
     enum SizeAggregateControl {
@@ -843,9 +826,9 @@ private:
 
 class TableKeyIterator {
 public:
-    bool operator!=(const TableKeyIterator& other)
+    bool operator==(const TableKeyIterator& other) const noexcept
     {
-        return m_pos != other.m_pos;
+        return m_pos == other.m_pos;
     }
     TableKeyIterator& operator++();
     TableKey operator*();

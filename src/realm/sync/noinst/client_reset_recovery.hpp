@@ -58,24 +58,8 @@ struct InternDictKey {
     {
         return m_pos == realm::npos && m_size == realm::npos;
     }
-    constexpr bool operator==(const InternDictKey& other) const noexcept
-    {
-        return m_pos == other.m_pos && m_size == other.m_size;
-    }
-    constexpr bool operator!=(const InternDictKey& other) const noexcept
-    {
-        return !operator==(other);
-    }
-    constexpr bool operator<(const InternDictKey& other) const noexcept
-    {
-        if (m_pos < other.m_pos) {
-            return true;
-        }
-        else if (m_pos == other.m_pos) {
-            return m_size < other.m_size;
-        }
-        return false;
-    }
+    constexpr bool operator==(const InternDictKey& other) const noexcept = default;
+    constexpr auto operator<=>(const InternDictKey& other) const noexcept = default;
 
 private:
     friend struct InterningBuffer;
@@ -118,14 +102,12 @@ struct ListPath {
         } type;
 
         bool operator==(const Element& other) const noexcept;
-        bool operator!=(const Element& other) const noexcept;
         bool operator<(const Element& other) const noexcept;
     };
 
     void append(const Element& item);
     bool operator<(const ListPath& other) const noexcept;
     bool operator==(const ListPath& other) const noexcept;
-    bool operator!=(const ListPath& other) const noexcept;
     std::string path_to_string(Transaction& remote, const InterningBuffer& buffer);
 
     using const_iterator = typename std::vector<Element>::const_iterator;

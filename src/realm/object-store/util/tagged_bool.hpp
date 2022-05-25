@@ -61,14 +61,7 @@ struct TaggedBool {
         return TaggedBool{!m_value};
     }
 
-    friend constexpr bool operator==(TaggedBool l, TaggedBool r) noexcept
-    {
-        return l.m_value == r.m_value;
-    }
-    friend constexpr bool operator!=(TaggedBool l, TaggedBool r) noexcept
-    {
-        return l.m_value != r.m_value;
-    }
+    friend constexpr bool operator==(TaggedBool l, TaggedBool r) noexcept = default;
 
 private:
     bool m_value;

@@ -59,8 +59,6 @@ public:
 
     template <typename Other>
     bool operator==(ChunkedRangeVectorIterator<Other> const& it) const noexcept;
-    template <typename Other>
-    bool operator!=(ChunkedRangeVectorIterator<Other> const& it) const noexcept;
 
     ChunkedRangeVectorIterator& operator++() noexcept;
     ChunkedRangeVectorIterator operator++(int) noexcept;
@@ -248,10 +246,6 @@ public:
         {
             return m_iterator == it.m_iterator;
         }
-        bool operator!=(IndexIterator const& it) const noexcept
-        {
-            return m_iterator != it.m_iterator;
-        }
 
         IndexIterator& operator++() noexcept
         {
@@ -326,14 +320,6 @@ inline bool
 ChunkedRangeVectorIterator<T>::operator==(ChunkedRangeVectorIterator<OtherIterator> const& it) const noexcept
 {
     return m_outer == it.outer() && m_inner == it.operator->();
-}
-
-template <typename T>
-template <typename OtherIterator>
-inline bool
-ChunkedRangeVectorIterator<T>::operator!=(ChunkedRangeVectorIterator<OtherIterator> const& it) const noexcept
-{
-    return !(*this == it);
 }
 
 template <typename T>

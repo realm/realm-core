@@ -371,11 +371,6 @@ protected:
                get_col_key() == other.get_col_key();
     }
 
-    bool operator!=(const Derived& other) const noexcept
-    {
-        return !(*this == other);
-    }
-
     /// Refresh the associated `Obj` (if needed), and update the internal
     /// content version number. This is meant to be called from a derived class
     /// before accessing its data.
@@ -713,12 +708,6 @@ struct CollectionIterator {
     friend CollectionIterator operator+(ptrdiff_t lhs, CollectionIterator rhs) noexcept
     {
         return rhs + lhs;
-    }
-
-    bool operator!=(const CollectionIterator& rhs) const noexcept
-    {
-        REALM_ASSERT_DEBUG(m_list == rhs.m_list);
-        return m_ndx != rhs.m_ndx;
     }
 
     bool operator==(const CollectionIterator& rhs) const noexcept

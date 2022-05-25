@@ -75,20 +75,8 @@ struct TransformerImpl::Discriminant {
     Discriminant(const Discriminant&) = default;
     Discriminant& operator=(const Discriminant&) = default;
 
-    bool operator<(const Discriminant& other) const
-    {
-        return timestamp == other.timestamp ? (client_file_ident < other.client_file_ident)
-                                            : timestamp < other.timestamp;
-    }
-
-    bool operator==(const Discriminant& other) const
-    {
-        return timestamp == other.timestamp && client_file_ident == other.client_file_ident;
-    }
-    bool operator!=(const Discriminant& other) const
-    {
-        return !((*this) == other);
-    }
+    auto operator<=>(const Discriminant& other) const = default;
+    bool operator==(const Discriminant& other) const = default;
 };
 
 struct TransformerImpl::Side {

@@ -240,7 +240,6 @@ public:
     std::string toJson() const;
 
     bool operator==(const Bson& other) const;
-    bool operator!=(const Bson& other) const;
 
 private:
     friend std::ostream& operator<<(std::ostream& out, const Bson& m);

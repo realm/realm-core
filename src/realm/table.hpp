@@ -613,11 +613,6 @@ public:
     /// invocation of `Table::operator==()`.
     bool operator==(const Table&) const;
 
-    /// \brief Compare two tables for inequality.
-    ///
-    /// See operator==().
-    bool operator!=(const Table& t) const;
-
     /// Compute the sum of the sizes in number of bytes of all the array nodes
     /// that currently make up this table. See also
     /// Group::compute_aggregate_byte_size().
@@ -880,9 +875,9 @@ inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
 
 class ColKeyIterator {
 public:
-    bool operator!=(const ColKeyIterator& other)
+    bool operator==(const ColKeyIterator& other) const
     {
-        return m_pos != other.m_pos;
+        return m_pos == other.m_pos;
     }
     ColKeyIterator& operator++()
     {
@@ -1301,11 +1296,6 @@ inline ConstTableRef Table::get_link_target(ColKey col_key) const noexcept
 inline bool Table::is_group_level() const noexcept
 {
     return bool(get_parent_group());
-}
-
-inline bool Table::operator!=(const Table& t) const
-{
-    return !(*this == t); // Throws
 }
 
 inline bool Table::is_link_type(ColumnType col_type) noexcept

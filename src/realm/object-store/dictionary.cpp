@@ -172,11 +172,6 @@ bool Dictionary::operator==(const Dictionary& rgt) const noexcept
     return dict() == rgt.dict();
 }
 
-bool Dictionary::operator!=(const Dictionary& rgt) const noexcept
-{
-    return !(*this == rgt);
-}
-
 Obj Dictionary::insert_embedded(StringData key)
 {
     return dict().create_and_insert_linked_object(key);

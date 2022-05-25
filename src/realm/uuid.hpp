@@ -57,14 +57,7 @@ public:
     {
     }
 
-    bool operator==(const UUID& other) const
-    {
-        return m_bytes == other.m_bytes;
-    }
-    bool operator!=(const UUID& other) const
-    {
-        return m_bytes != other.m_bytes;
-    }
+    bool operator==(const UUID& other) const = default;
     bool operator>(const UUID& other) const
     {
         return m_bytes > other.m_bytes;

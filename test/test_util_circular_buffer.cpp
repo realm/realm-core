@@ -675,10 +675,6 @@ TEST(Util_CircularBuffer_ExceptionSafetyInConstructFromIteratorPair)
         {
             return (m_ptr == i.m_ptr);
         }
-        bool operator!=(Iter i) const
-        {
-            return (m_ptr != i.m_ptr);
-        }
 
     private:
         pointer m_ptr = nullptr;

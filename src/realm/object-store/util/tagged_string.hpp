@@ -60,14 +60,7 @@ struct TaggedString {
         return m_value.data();
     }
 
-    friend constexpr bool operator==(TaggedString l, TaggedString r) noexcept
-    {
-        return l.m_value == r.m_value;
-    }
-    friend constexpr bool operator!=(TaggedString l, TaggedString r) noexcept
-    {
-        return l.m_value != r.m_value;
-    }
+    bool operator==(const TaggedString& r) const noexcept = default;
 
 private:
     std::string m_value;

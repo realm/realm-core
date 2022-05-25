@@ -154,19 +154,9 @@ inline bool operator==(const Status& lhs, const Status& rhs) noexcept
     return lhs.code() == rhs.code();
 }
 
-inline bool operator!=(const Status& lhs, const Status& rhs) noexcept
-{
-    return lhs.code() != rhs.code();
-}
-
 inline bool operator==(const Status& lhs, ErrorCodes::Error rhs) noexcept
 {
     return lhs.code() == rhs;
-}
-
-inline bool operator!=(const Status& lhs, ErrorCodes::Error rhs) noexcept
-{
-    return lhs.code() != rhs;
 }
 
 inline Status Status::OK()

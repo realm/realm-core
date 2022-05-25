@@ -91,9 +91,9 @@ struct Entry {
         , length(l)
     {
     }
-    bool operator<(const Entry& rhs) const
+    auto operator<=>(const Entry& rhs) const
     {
-        return start < rhs.start;
+        return start <=> rhs.start;
     }
     uint64_t start;
     uint64_t length;

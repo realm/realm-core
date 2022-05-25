@@ -1717,9 +1717,9 @@ private:
     struct Chunk {
         ref_type ref;
         size_t size;
-        bool operator<(const Chunk& c) const
+        std::strong_ordering operator<=>(const Chunk& c) const
         {
-            return ref < c.ref;
+            return ref <=> c.ref;
         }
     };
     std::vector<Chunk> m_chunks;

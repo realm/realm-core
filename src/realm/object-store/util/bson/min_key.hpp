@@ -33,11 +33,6 @@ inline bool operator==(const MinKey&, const MinKey&) noexcept
     return true;
 }
 
-inline bool operator!=(const MinKey&, const MinKey&) noexcept
-{
-    return false;
-}
-
 } // namespace bson
 } // namespace realm
 

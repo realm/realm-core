@@ -1519,11 +1519,6 @@ bool Decimal128::operator==(const Decimal128& rhs) const
     return ret != 0;
 }
 
-bool Decimal128::operator!=(const Decimal128& rhs) const
-{
-    return !(*this == rhs);
-}
-
 int Decimal128::compare(const Decimal128& rhs) const
 {
     unsigned flags = 0;
@@ -1557,24 +1552,9 @@ int Decimal128::compare(const Decimal128& rhs) const
     return lhs_is_nan ? -1 : 1;
 }
 
-bool Decimal128::operator<(const Decimal128& rhs) const
+std::strong_ordering Decimal128::operator<=>(const Decimal128& rhs) const
 {
-    return compare(rhs) < 0;
-}
-
-bool Decimal128::operator>(const Decimal128& rhs) const
-{
-    return compare(rhs) > 0;
-}
-
-bool Decimal128::operator<=(const Decimal128& rhs) const
-{
-    return compare(rhs) <= 0;
-}
-
-bool Decimal128::operator>=(const Decimal128& rhs) const
-{
-    return compare(rhs) >= 0;
+    return compare(rhs) <=> 0;
 }
 
 static Decimal128 do_multiply(BID_UINT128 x, BID_UINT128 mul)

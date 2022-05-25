@@ -88,7 +88,6 @@ struct GlobalID {
     PrimaryKey object_id;
 
     bool operator==(const GlobalID& other) const;
-    bool operator!=(const GlobalID& other) const;
     bool operator<(const GlobalID& other) const;
 };
 
@@ -98,11 +97,6 @@ struct GlobalID {
 inline bool GlobalID::operator==(const GlobalID& other) const
 {
     return object_id == other.object_id && table_name == other.table_name;
-}
-
-inline bool GlobalID::operator!=(const GlobalID& other) const
-{
-    return !(*this == other);
 }
 
 inline bool GlobalID::operator<(const GlobalID& other) const

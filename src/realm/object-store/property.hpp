@@ -156,11 +156,6 @@ inline constexpr bool operator==(PropertyType a, PropertyType b)
     return to_underlying(a & ~PropertyType::Flags) == to_underlying(b & ~PropertyType::Flags);
 }
 
-inline constexpr bool operator!=(PropertyType a, PropertyType b)
-{
-    return !(a == b);
-}
-
 inline PropertyType& operator&=(PropertyType& a, PropertyType b)
 {
     a = a & b;

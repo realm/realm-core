@@ -156,10 +156,6 @@ public:
     void copy_keys_from(Schema const&) noexcept;
 
     friend bool operator==(Schema const&, Schema const&) noexcept;
-    friend bool operator!=(Schema const& a, Schema const& b) noexcept
-    {
-        return !(a == b);
-    }
 
     using base::begin;
     using base::const_iterator;

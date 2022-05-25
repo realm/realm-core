@@ -57,10 +57,7 @@ struct CollectionChangeSet {
         size_t from;
         size_t to;
 
-        bool operator==(Move m) const noexcept
-        {
-            return from == m.from && to == m.to;
-        }
+        bool operator==(const Move& m) const noexcept = default;
     };
 
     // Indices which were removed from the _old_ collection

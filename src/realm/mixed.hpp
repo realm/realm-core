@@ -212,25 +212,9 @@ public:
     {
         return compare(other) == 0;
     }
-    bool operator!=(const Mixed& other) const
+    auto operator<=>(const Mixed& other) const
     {
-        return compare(other) != 0;
-    }
-    bool operator<(const Mixed& other) const
-    {
-        return compare(other) < 0;
-    }
-    bool operator>(const Mixed& other) const
-    {
-        return compare(other) > 0;
-    }
-    bool operator<=(const Mixed& other) const
-    {
-        return compare(other) <= 0;
-    }
-    bool operator>=(const Mixed& other) const
-    {
-        return compare(other) >= 0;
+        return compare(other) <=> 0;
     }
 
     Mixed operator+(const Mixed&) const;

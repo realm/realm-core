@@ -400,10 +400,7 @@ private:
             , col_id(c)
         {
         }
-        bool operator!=(const CollectionId& other)
-        {
-            return object_key != other.object_key || table_key != other.table_key || col_id != other.col_id;
-        }
+        bool operator==(const CollectionId& other) const noexcept = default;
     };
 
     _impl::TransactLogBufferStream m_stream;

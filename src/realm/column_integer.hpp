@@ -103,34 +103,14 @@ public:
         return m_pos - rhs.m_pos;
     }
 
-    bool operator!=(const IntegerColumnIterator& rhs) const
-    {
-        return m_pos != rhs.m_pos;
-    }
-
     bool operator==(const IntegerColumnIterator& rhs) const
     {
         return m_pos == rhs.m_pos;
     }
 
-    bool operator>(const IntegerColumnIterator& rhs) const
+    auto operator<=>(const IntegerColumnIterator& rhs) const
     {
-        return m_pos > rhs.m_pos;
-    }
-
-    bool operator<(const IntegerColumnIterator& rhs) const
-    {
-        return m_pos < rhs.m_pos;
-    }
-
-    bool operator>=(const IntegerColumnIterator& rhs) const
-    {
-        return m_pos >= rhs.m_pos;
-    }
-
-    bool operator<=(const IntegerColumnIterator& rhs) const
-    {
-        return m_pos <= rhs.m_pos;
+        return m_pos <=> rhs.m_pos;
     }
 
 private:

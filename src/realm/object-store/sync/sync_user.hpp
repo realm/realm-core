@@ -174,15 +174,7 @@ struct SyncUserIdentity {
 
     SyncUserIdentity(const std::string& id, const std::string& provider_type);
 
-    bool operator==(const SyncUserIdentity& other) const
-    {
-        return id == other.id && provider_type == other.provider_type;
-    }
-
-    bool operator!=(const SyncUserIdentity& other) const
-    {
-        return id != other.id || provider_type != other.provider_type;
-    }
+    bool operator==(const SyncUserIdentity& other) const noexcept = default;
 };
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that

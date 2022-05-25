@@ -74,7 +74,6 @@ public:
     //@{
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const noexcept;
-    bool operator!=(const Spec&) const noexcept;
     //@}
 
     void detach() noexcept;
@@ -264,11 +263,6 @@ inline StringData Spec::get_column_name(size_t ndx) const noexcept
 inline size_t Spec::get_column_index(StringData name) const noexcept
 {
     return m_names.find_first(name);
-}
-
-inline bool Spec::operator!=(const Spec& s) const noexcept
-{
-    return !(*this == s);
 }
 
 } // namespace realm

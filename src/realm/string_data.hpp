@@ -132,7 +132,6 @@ public:
     bool is_null() const noexcept;
 
     friend bool operator==(const StringData&, const StringData&) noexcept;
-    friend bool operator!=(const StringData&, const StringData&) noexcept;
 
     //@{
     /// Trivial bytewise lexicographical comparison.
@@ -264,11 +263,6 @@ inline bool StringData::is_null() const noexcept
 inline bool operator==(const StringData& a, const StringData& b) noexcept
 {
     return a.m_size == b.m_size && a.is_null() == b.is_null() && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
-}
-
-inline bool operator!=(const StringData& a, const StringData& b) noexcept
-{
-    return !(a == b);
 }
 
 inline bool operator<(const StringData& a, const StringData& b) noexcept

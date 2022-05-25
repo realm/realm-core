@@ -149,18 +149,6 @@ bool operator==(const T& val, const StatusWith<T>& sw)
     return sw.is_ok() && val == sw.get_value();
 }
 
-template <typename T>
-bool operator!=(const StatusWith<T>& sw, const T& val)
-{
-    return !(sw == val);
-}
-
-template <typename T>
-bool operator!=(const T& val, const StatusWith<T>& sw)
-{
-    return !(val == sw);
-}
-
 //
 // EqualityComparable(StatusWith<T>, Status)
 //
@@ -177,18 +165,6 @@ bool operator==(const Status& status, const StatusWith<T>& sw)
     return status == sw.get_status();
 }
 
-template <typename T>
-bool operator!=(const StatusWith<T>& sw, const Status& status)
-{
-    return !(sw == status);
-}
-
-template <typename T>
-bool operator!=(const Status& status, const StatusWith<T>& sw)
-{
-    return !(status == sw);
-}
-
 //
 // EqualityComparable(StatusWith<T>, ErrorCode)
 //
@@ -203,18 +179,6 @@ template <typename T>
 bool operator==(const ErrorCodes::Error code, const StatusWith<T>& sw)
 {
     return code == sw.get_status();
-}
-
-template <typename T>
-bool operator!=(const StatusWith<T>& sw, const ErrorCodes::Error code)
-{
-    return !(sw == code);
-}
-
-template <typename T>
-bool operator!=(const ErrorCodes::Error code, const StatusWith<T>& sw)
-{
-    return !(code == sw);
 }
 
 } // namespace realm

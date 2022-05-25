@@ -270,11 +270,6 @@ bool ListPath::Element::operator==(const Element& other) const noexcept
     return false;
 }
 
-bool ListPath::Element::operator!=(const Element& other) const noexcept
-{
-    return !(operator==(other));
-}
-
 bool ListPath::Element::operator<(const Element& other) const noexcept
 {
     if (type < other.type) {
@@ -323,11 +318,6 @@ bool ListPath::operator==(const ListPath& other) const noexcept
         return true;
     }
     return false;
-}
-
-bool ListPath::operator!=(const ListPath& other) const noexcept
-{
-    return !(operator==(other));
 }
 
 std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer& buffer)

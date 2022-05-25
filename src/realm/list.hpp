@@ -347,7 +347,6 @@ public:
     LnkLst& operator=(const LnkLst& other) = default;
     LnkLst& operator=(LnkLst&& other) = default;
     bool operator==(const LnkLst& other) const;
-    bool operator!=(const LnkLst& other) const;
 
     Obj operator[](size_t ndx) const
     {
@@ -925,11 +924,6 @@ T Lst<T>::remove(size_t ndx)
 inline bool LnkLst::operator==(const LnkLst& other) const
 {
     return m_list == other.m_list;
-}
-
-inline bool LnkLst::operator!=(const LnkLst& other) const
-{
-    return m_list != other.m_list;
 }
 
 inline size_t LnkLst::size() const

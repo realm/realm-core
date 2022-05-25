@@ -33,11 +33,6 @@ inline bool operator==(const MaxKey&, const MaxKey&) noexcept
     return true;
 }
 
-inline bool operator!=(const MaxKey&, const MaxKey&) noexcept
-{
-    return false;
-}
-
 } // namespace bson
 } // namespace realm
 

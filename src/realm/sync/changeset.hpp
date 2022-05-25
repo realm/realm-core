@@ -191,7 +191,6 @@ struct Changeset {
     /// same integer values, and there is the same number of interned strings,
     /// same topology of tombstones, etc.
     bool operator==(const Changeset& that) const noexcept;
-    bool operator!=(const Changeset& that) const noexcept;
 
 private:
     std::vector<Instruction> m_instructions;
@@ -296,42 +295,15 @@ struct Changeset::IteratorImpl {
         return nullptr;
     }
 
-    bool operator==(const IteratorImpl& other) const
-    {
-        return m_inner == other.m_inner && m_pos == other.m_pos;
-    }
+    bool operator==(const IteratorImpl& other) const = default;
 
-    bool operator!=(const IteratorImpl& other) const
-    {
-        return !(*this == other);
-    }
-
-    bool operator<(const IteratorImpl& other) const
+    auto operator<=>(const IteratorImpl& other) const
     {
         if (m_inner == other.m_inner)
-            return m_pos < other.m_pos;
-        return m_inner < other.m_inner;
-    }
-
-    bool operator<=(const IteratorImpl& other) const
-    {
-        if (m_inner == other.m_inner)
-            return m_pos <= other.m_pos;
-        return m_inner < other.m_inner;
-    }
-
-    bool operator>(const IteratorImpl& other) const
-    {
-        if (m_inner == other.m_inner)
-            return m_pos > other.m_pos;
-        return m_inner > other.m_inner;
-    }
-
-    bool operator>=(const IteratorImpl& other) const
-    {
-        if (m_inner == other.m_inner)
-            return m_pos >= other.m_pos;
-        return m_inner > other.m_inner;
+            return m_pos <=> other.m_pos;
+        if (m_inner < other.m_inner)
+            return std::strong_ordering::less;
+        return std::strong_ordering::greater;
     }
 
     inner_iterator_type m_inner;
@@ -619,11 +591,6 @@ inline auto Changeset::const_iterator_to_iterator(const_iterator cpos) -> iterat
 {
     size_t offset = cpos.m_inner - m_instructions.cbegin();
     return iterator{m_instructions.begin() + offset, cpos.m_pos};
-}
-
-inline bool Changeset::operator!=(const Changeset& that) const noexcept
-{
-    return !(*this == that);
 }
 
 } // namespace sync

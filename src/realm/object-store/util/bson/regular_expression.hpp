@@ -31,21 +31,18 @@ namespace bson {
 struct RegularExpression {
     enum class Option { None, IgnoreCase = 1, Multiline = 2, Dotall = 4, Extended = 8 };
 
-    RegularExpression()
-        : m_pattern("")
-        , m_options(Option::None)
-    {
-    }
-
+    RegularExpression() = default;
     RegularExpression(const std::string pattern, const std::string& options);
-
     RegularExpression(const std::string pattern, Option options);
 
     RegularExpression(const RegularExpression&) = default;
     RegularExpression(RegularExpression&&) = default;
     RegularExpression& operator=(const RegularExpression& regex) = default;
+    RegularExpression& operator=(RegularExpression&& regex) = default;
 
-    const std::string pattern() const;
+    bool operator==(const RegularExpression& rhs) const = default;
+
+    std::string pattern() const;
     Option options() const;
 
 private:
@@ -53,18 +50,8 @@ private:
 
     friend std::ostream& operator<<(std::ostream& out, const Option& o);
     std::string m_pattern;
-    Option m_options;
+    Option m_options = Option::None;
 };
-
-inline bool operator==(const RegularExpression& lhs, const RegularExpression& rhs) noexcept
-{
-    return lhs.pattern() == rhs.pattern() && lhs.options() == rhs.options();
-}
-
-inline bool operator!=(const RegularExpression& lhs, const RegularExpression& rhs) noexcept
-{
-    return !(lhs.pattern() == rhs.pattern() && lhs.options() == rhs.options());
-}
 
 inline RegularExpression::Option operator|(const RegularExpression::Option& lhs,
                                            const RegularExpression::Option& rhs) noexcept

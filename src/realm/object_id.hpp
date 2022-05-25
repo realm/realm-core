@@ -60,30 +60,8 @@ public:
      */
     static ObjectId gen();
 
-    bool operator==(const ObjectId& other) const
-    {
-        return m_bytes == other.m_bytes;
-    }
-    bool operator!=(const ObjectId& other) const
-    {
-        return m_bytes != other.m_bytes;
-    }
-    bool operator>(const ObjectId& other) const
-    {
-        return m_bytes > other.m_bytes;
-    }
-    bool operator<(const ObjectId& other) const
-    {
-        return m_bytes < other.m_bytes;
-    }
-    bool operator>=(const ObjectId& other) const
-    {
-        return m_bytes >= other.m_bytes;
-    }
-    bool operator<=(const ObjectId& other) const
-    {
-        return m_bytes <= other.m_bytes;
-    }
+    bool operator==(const ObjectId& other) const noexcept = default;
+    std::strong_ordering operator<=>(const ObjectId& other) const noexcept;
     explicit operator Timestamp() const
     {
         return get_timestamp();
@@ -95,7 +73,7 @@ public:
     size_t hash() const noexcept;
 
 private:
-    ObjectIdBytes m_bytes = {};
+    ObjectIdBytes m_bytes;
 };
 
 inline std::ostream& operator<<(std::ostream& ostr, const ObjectId& id)

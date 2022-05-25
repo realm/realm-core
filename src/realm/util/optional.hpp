@@ -512,12 +512,6 @@ bool operator==(const Optional<T>& lhs, const Optional<T>& rhs)
 }
 
 template <class T>
-bool operator!=(const Optional<T>& lhs, const Optional<T>& rhs)
-{
-    return !(lhs == rhs);
-}
-
-template <class T>
 bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 {
     if (!rhs) {
@@ -548,12 +542,6 @@ bool operator==(const Optional<T>& lhs, None)
 }
 
 template <class T>
-bool operator!=(const Optional<T>& lhs, None)
-{
-    return bool(lhs);
-}
-
-template <class T>
 bool operator<(const Optional<T>& lhs, None)
 {
     static_cast<void>(lhs);
@@ -564,12 +552,6 @@ template <class T>
 bool operator==(None, const Optional<T>& rhs)
 {
     return !bool(rhs);
-}
-
-template <class T>
-bool operator!=(None, const Optional<T>& rhs)
-{
-    return bool(rhs);
 }
 
 template <class T>

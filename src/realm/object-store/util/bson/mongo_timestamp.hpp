@@ -31,15 +31,7 @@ struct MongoTimestamp {
     {
     }
 
-    friend bool inline operator==(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
-    {
-        return lhs.seconds == rhs.seconds && lhs.increment == rhs.increment;
-    }
-
-    friend bool inline operator!=(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
-    {
-        return !(lhs == rhs);
-    }
+    bool operator==(const MongoTimestamp& rhs) const = default;
 
     uint32_t seconds;
     uint32_t increment;

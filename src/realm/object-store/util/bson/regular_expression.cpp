@@ -37,7 +37,7 @@ RegularExpression::RegularExpression(const std::string pattern, Option options)
 {
 }
 
-const std::string RegularExpression::pattern() const
+std::string RegularExpression::pattern() const
 {
     return m_pattern;
 }

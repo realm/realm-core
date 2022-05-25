@@ -60,9 +60,9 @@ public:
             , index_in_view(i)
         {
         }
-        bool operator<(const IndexPair& other) const
+        auto operator<=>(const IndexPair& other) const
         {
-            return index_in_view < other.index_in_view;
+            return index_in_view <=> other.index_in_view;
         }
         ObjKey key_for_object;
         size_t index_in_view;
@@ -76,9 +76,7 @@ public:
     public:
         Sorter(std::vector<std::vector<ColKey>> const& columns, std::vector<bool> const& ascending,
                Table const& root_table, const IndexPairs& indexes);
-        Sorter()
-        {
-        }
+        Sorter() = default;
 
         bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 

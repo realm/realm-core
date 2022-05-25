@@ -251,11 +251,6 @@ bool Bson::operator==(const Bson& other) const
     return false;
 }
 
-bool Bson::operator!=(const Bson& other) const
-{
-    return !(*this == other);
-}
-
 template <>
 bool holds_alternative<util::None>(const Bson& bson)
 {

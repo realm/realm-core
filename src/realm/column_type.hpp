@@ -56,14 +56,7 @@ struct ColumnType {
     {
     }
 
-    constexpr bool operator==(const ColumnType& rhs) const noexcept
-    {
-        return m_type == rhs.m_type;
-    }
-    constexpr bool operator!=(const ColumnType& rhs) const noexcept
-    {
-        return !(*this == rhs);
-    }
+    constexpr bool operator==(const ColumnType& rhs) const noexcept = default;
 
     // Allow switch statements over the struct.
     constexpr operator Type() const noexcept
@@ -171,10 +164,7 @@ enum ColumnAttr {
 
 class ColumnAttrMask {
 public:
-    constexpr ColumnAttrMask()
-        : m_value(0)
-    {
-    }
+    constexpr ColumnAttrMask() = default;
     bool test(ColumnAttr prop)
     {
         return (m_value & prop) != 0;
@@ -187,20 +177,13 @@ public:
     {
         m_value &= ~prop;
     }
-    bool operator==(const ColumnAttrMask& other) const
-    {
-        return m_value == other.m_value;
-    }
-    bool operator!=(const ColumnAttrMask& other) const
-    {
-        return m_value != other.m_value;
-    }
+    bool operator==(const ColumnAttrMask& other) const noexcept = default;
 
 private:
     friend class Spec;
     friend struct ColKey;
     friend class Table;
-    int m_value;
+    int m_value = 0;
     ColumnAttrMask(int64_t val)
         : m_value(int(val))
     {

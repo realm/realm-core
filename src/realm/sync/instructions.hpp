@@ -56,18 +56,8 @@ struct InternString {
 
     uint32_t value;
 
-    constexpr bool operator==(const InternString& other) const noexcept
-    {
-        return value == other.value;
-    }
-    constexpr bool operator!=(const InternString& other) const noexcept
-    {
-        return value != other.value;
-    }
-    constexpr bool operator<(const InternString& other) const noexcept
-    {
-        return value < other.value;
-    }
+    constexpr bool operator==(const InternString& other) const noexcept = default;
+    constexpr auto operator<=>(const InternString& other) const noexcept = default;
 
     explicit operator bool() const noexcept
     {
@@ -142,10 +132,7 @@ struct Path {
         m_path.push_back(element);
     }
 
-    friend bool operator==(const Path& lhs, const Path& rhs) noexcept
-    {
-        return lhs.m_path == rhs.m_path;
-    }
+    friend bool operator==(const Path& lhs, const Path& rhs) noexcept = default;
 
     using const_iterator = typename std::vector<Element>::const_iterator;
     const_iterator begin() const noexcept
@@ -213,10 +200,7 @@ struct Payload {
         InternString target_table;
         PrimaryKey target;
 
-        friend bool operator==(const Link& lhs, const Link& rhs) noexcept
-        {
-            return lhs.target_table == rhs.target_table && lhs.target == rhs.target;
-        }
+        friend bool operator==(const Link& lhs, const Link& rhs) noexcept = default;
     };
 
     union Data {
@@ -378,11 +362,6 @@ struct Payload {
             }
         }
         return false;
-    }
-
-    friend bool operator!=(const Payload& lhs, const Payload& rhs) noexcept
-    {
-        return !(lhs == rhs);
     }
 };
 
@@ -713,10 +692,6 @@ struct Instruction {
     }
 
     bool operator==(const Instruction& other) const noexcept;
-    bool operator!=(const Instruction& other) const noexcept
-    {
-        return !(*this == other);
-    }
 
     bool is_vector() const noexcept
     {

@@ -255,11 +255,6 @@ struct ChangesetIndex::RangeIterator {
         return false;
     }
 
-    bool operator!=(const RangeIterator& other) const noexcept
-    {
-        return !(*this == other);
-    }
-
     // FIXME: Quadruply nested iterators. This is madness.
     ChangesetIndex::Ranges* m_ranges = nullptr;
     ChangesetIndex::Ranges::iterator m_outer;

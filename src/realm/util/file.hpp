@@ -19,6 +19,7 @@
 #ifndef REALM_UTIL_FILE_HPP
 #define REALM_UTIL_FILE_HPP
 
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
@@ -572,20 +573,13 @@ public:
 #ifdef _WIN32 // Windows version
 // FIXME: This is not implemented for Windows
 #else
-        UniqueID()
-            : device(0)
-            , inode(0)
-        {
-        }
-        UniqueID(dev_t d, ino_t i)
-            : device(d)
-            , inode(i)
-        {
-        }
         // NDK r10e has a bug in sys/stat.h dev_t ino_t are 4 bytes,
         // but stat.st_dev and st_ino are 8 bytes. So we just use uint64 instead.
         dev_t device;
         uint_fast64_t inode;
+
+        bool operator==(const File::UniqueID&) const = default;
+        auto operator<=>(const File::UniqueID&) const = default;
 #endif
     };
     // Return the unique id for the current opened file descriptor.
@@ -1322,50 +1316,6 @@ inline File::NotFound::NotFound(const std::string& msg, const std::string& path)
 inline File::Exists::Exists(const std::string& msg, const std::string& path)
     : AccessError(msg, path)
 {
-}
-
-inline bool operator==(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-#ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
-#else // POSIX version
-    return lhs.device == rhs.device && lhs.inode == rhs.inode;
-#endif
-}
-
-inline bool operator!=(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return !(lhs == rhs);
-}
-
-inline bool operator<(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-#ifdef _WIN32 // Windows version
-    throw util::runtime_error("Not yet supported");
-#else // POSIX version
-    if (lhs.device < rhs.device)
-        return true;
-    if (lhs.device > rhs.device)
-        return false;
-    if (lhs.inode < rhs.inode)
-        return true;
-    return false;
-#endif
-}
-
-inline bool operator>(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return rhs < lhs;
-}
-
-inline bool operator<=(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return !(lhs > rhs);
-}
-
-inline bool operator>=(const File::UniqueID& lhs, const File::UniqueID& rhs)
-{
-    return !(lhs < rhs);
 }
 
 } // namespace util

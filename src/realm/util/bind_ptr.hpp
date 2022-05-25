@@ -21,15 +21,14 @@
 
 #include <algorithm>
 #include <atomic>
+#include <compare>
 #include <ostream>
 #include <utility>
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 
-
-namespace realm {
-namespace util {
+namespace realm::util {
 
 class bind_ptr_base {
 public:
@@ -142,34 +141,10 @@ public:
     bool operator==(U*) const noexcept;
 
     template <class U>
-    bool operator!=(const bind_ptr<U>&) const noexcept;
+    auto operator<=>(const bind_ptr<U>&) const noexcept;
 
     template <class U>
-    bool operator!=(U*) const noexcept;
-
-    template <class U>
-    bool operator<(const bind_ptr<U>&) const noexcept;
-
-    template <class U>
-    bool operator<(U*) const noexcept;
-
-    template <class U>
-    bool operator>(const bind_ptr<U>&) const noexcept;
-
-    template <class U>
-    bool operator>(U*) const noexcept;
-
-    template <class U>
-    bool operator<=(const bind_ptr<U>&) const noexcept;
-
-    template <class U>
-    bool operator<=(U*) const noexcept;
-
-    template <class U>
-    bool operator>=(const bind_ptr<U>&) const noexcept;
-
-    template <class U>
-    bool operator>=(U*) const noexcept;
+    auto operator<=>(U*) const noexcept;
     //@}
 
     // Dereference
@@ -275,23 +250,6 @@ inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const
 }
 
 
-//@{
-// Comparison
-template <class T, class U>
-bool operator==(T*, const bind_ptr<U>&) noexcept;
-template <class T, class U>
-bool operator!=(T*, const bind_ptr<U>&) noexcept;
-template <class T, class U>
-bool operator<(T*, const bind_ptr<U>&) noexcept;
-template <class T, class U>
-bool operator>(T*, const bind_ptr<U>&) noexcept;
-template <class T, class U>
-bool operator<=(T*, const bind_ptr<U>&) noexcept;
-template <class T, class U>
-bool operator>=(T*, const bind_ptr<U>&) noexcept;
-//@}
-
-
 /// Polymorphic convenience base class for reference counting objects.
 ///
 /// Together with bind_ptr, this class delivers simple instrusive
@@ -377,131 +335,6 @@ private:
     friend class bind_ptr;
 };
 
-
-// Implementation:
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator==(const bind_ptr<U>& p) const noexcept
-{
-    return m_ptr == p.m_ptr;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator==(U* p) const noexcept
-{
-    return m_ptr == p;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator!=(const bind_ptr<U>& p) const noexcept
-{
-    return m_ptr != p.m_ptr;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator!=(U* p) const noexcept
-{
-    return m_ptr != p;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator<(const bind_ptr<U>& p) const noexcept
-{
-    return m_ptr < p.m_ptr;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator<(U* p) const noexcept
-{
-    return m_ptr < p;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator>(const bind_ptr<U>& p) const noexcept
-{
-    return m_ptr > p.m_ptr;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator>(U* p) const noexcept
-{
-    return m_ptr > p;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator<=(const bind_ptr<U>& p) const noexcept
-{
-    return m_ptr <= p.m_ptr;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator<=(U* p) const noexcept
-{
-    return m_ptr <= p;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator>=(const bind_ptr<U>& p) const noexcept
-{
-    return m_ptr >= p.m_ptr;
-}
-
-template <class T>
-template <class U>
-bool bind_ptr<T>::operator>=(U* p) const noexcept
-{
-    return m_ptr >= p;
-}
-
-template <class T, class U>
-bool operator==(T* a, const bind_ptr<U>& b) noexcept
-{
-    return b == a;
-}
-
-template <class T, class U>
-bool operator!=(T* a, const bind_ptr<U>& b) noexcept
-{
-    return b != a;
-}
-
-template <class T, class U>
-bool operator<(T* a, const bind_ptr<U>& b) noexcept
-{
-    return b > a;
-}
-
-template <class T, class U>
-bool operator>(T* a, const bind_ptr<U>& b) noexcept
-{
-    return b < a;
-}
-
-template <class T, class U>
-bool operator<=(T* a, const bind_ptr<U>& b) noexcept
-{
-    return b >= a;
-}
-
-template <class T, class U>
-bool operator>=(T* a, const bind_ptr<U>& b) noexcept
-{
-    return b <= a;
-}
-
-
-} // namespace util
-} // namespace realm
+} // namespace realm::util
 
 #endif // REALM_UTIL_BIND_PTR_HPP

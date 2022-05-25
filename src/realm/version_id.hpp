@@ -23,6 +23,7 @@
 #define __STDC_LIMIT_MACROS
 #endif
 
+#include <compare>
 #include <cstdint>
 #include <limits>
 #include <ostream>
@@ -34,9 +35,7 @@ struct VersionID {
     version_type version = std::numeric_limits<version_type>::max();
     uint_fast32_t index = 0;
 
-    VersionID()
-    {
-    }
+    VersionID() = default;
     VersionID(version_type initial_version, uint_fast32_t initial_index)
     {
         version = initial_version;
@@ -47,25 +46,9 @@ struct VersionID {
     {
         return version == other.version;
     }
-    bool operator!=(const VersionID& other) const
+    auto operator<=>(const VersionID& other) const
     {
-        return version != other.version;
-    }
-    bool operator<(const VersionID& other) const
-    {
-        return version < other.version;
-    }
-    bool operator<=(const VersionID& other) const
-    {
-        return version <= other.version;
-    }
-    bool operator>(const VersionID& other) const
-    {
-        return version > other.version;
-    }
-    bool operator>=(const VersionID& other) const
-    {
-        return version >= other.version;
+        return version <=> other.version;
     }
 };
 

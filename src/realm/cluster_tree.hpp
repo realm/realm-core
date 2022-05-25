@@ -212,10 +212,6 @@ public:
     {
         return m_key == rhs.m_key;
     }
-    bool operator!=(const Iterator& rhs) const
-    {
-        return m_key != rhs.m_key;
-    }
 
 protected:
     const ClusterTree& m_tree;

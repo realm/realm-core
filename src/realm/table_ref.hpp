@@ -19,11 +19,11 @@
 #ifndef REALM_TABLE_REF_HPP
 #define REALM_TABLE_REF_HPP
 
+#include <compare>
 #include <cstddef>
 #include <ostream>
+
 namespace realm {
-
-
 class Table;
 class TableRef;
 
@@ -41,31 +41,8 @@ public:
         return m_table;
     }
 
-    bool operator==(const ConstTableRef& other) const
-    {
-        return m_table == other.m_table && m_instance_version == other.m_instance_version;
-    }
-
-    bool operator!=(const ConstTableRef& other) const
-    {
-        return !(*this == other);
-    }
-
-    bool operator<(const ConstTableRef& other) const
-    {
-        if (m_table == other.m_table)
-            return m_instance_version < other.m_instance_version;
-        else
-            return m_table < other.m_table;
-    }
-
-    bool operator>(const ConstTableRef& other) const
-    {
-        if (m_table == other.m_table)
-            return m_instance_version > other.m_instance_version;
-        else
-            return m_table > other.m_table;
-    }
+    bool operator==(const ConstTableRef& other) const noexcept = default;
+    auto operator<=>(const ConstTableRef& other) const noexcept = default;
 
     std::ostream& print(std::ostream& o) const
     {

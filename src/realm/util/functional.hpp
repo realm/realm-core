@@ -210,21 +210,9 @@ bool operator==(const UniqueFunction<Signature>& lhs, std::nullptr_t) noexcept
 }
 
 template <typename Signature>
-bool operator!=(const UniqueFunction<Signature>& lhs, std::nullptr_t) noexcept
-{
-    return static_cast<bool>(lhs);
-}
-
-template <typename Signature>
 bool operator==(std::nullptr_t, const UniqueFunction<Signature>& rhs) noexcept
 {
     return !rhs;
-}
-
-template <typename Signature>
-bool operator!=(std::nullptr_t, const UniqueFunction<Signature>& rhs) noexcept
-{
-    return static_cast<bool>(rhs);
 }
 
 } // namespace realm::util

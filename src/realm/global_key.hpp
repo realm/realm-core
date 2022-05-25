@@ -98,18 +98,8 @@ struct GlobalKey {
 
     std::string to_string() const;
 
-    constexpr bool operator<(const GlobalKey& other) const
-    {
-        return (m_hi == other.m_hi) ? (m_lo < other.m_lo) : (m_hi < other.m_hi);
-    }
-    constexpr bool operator==(const GlobalKey& other) const
-    {
-        return m_hi == other.m_hi && m_lo == other.m_lo;
-    }
-    constexpr bool operator!=(const GlobalKey& other) const
-    {
-        return !(*this == other);
-    }
+    constexpr auto operator<=>(const GlobalKey& other) const = default;
+    constexpr bool operator==(const GlobalKey& other) const = default;
 
     explicit constexpr operator bool() const noexcept
     {

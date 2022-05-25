@@ -129,5 +129,10 @@ size_t ObjectId::hash() const noexcept
     return murmur2_or_cityhash(m_bytes.data(), m_bytes.size());
 }
 
+std::strong_ordering ObjectId::operator<=>(const ObjectId& other) const noexcept
+{
+    return std::memcmp(m_bytes.data(), other.m_bytes.data(), num_bytes) <=> 0;
+}
+
 
 } // namespace realm

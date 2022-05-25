@@ -139,10 +139,6 @@ public:
 
         return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds;
     }
-    bool operator!=(const Timestamp& rhs) const
-    {
-        return !(*this == rhs);
-    }
     bool operator>(const Timestamp& rhs) const
     {
         if (is_null()) {

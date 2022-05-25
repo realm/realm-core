@@ -70,14 +70,7 @@ struct DataType {
     {
     }
 
-    constexpr bool operator==(const DataType& rhs) const noexcept
-    {
-        return m_type == rhs.m_type;
-    }
-    constexpr bool operator!=(const DataType& rhs) const noexcept
-    {
-        return !(*this == rhs);
-    }
+    constexpr bool operator==(const DataType& rhs) const noexcept = default;
 
     // Allow switch statements over the struct.
     constexpr operator Type() const noexcept

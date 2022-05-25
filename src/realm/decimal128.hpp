@@ -19,12 +19,12 @@
 #ifndef REALM_DECIMAL_HPP
 #define REALM_DECIMAL_HPP
 
+#include <realm/null.hpp>
 #include <realm/string_data.hpp>
 
-#include <string>
+#include <compare>
 #include <cstring>
-
-#include "null.hpp"
+#include <string>
 
 namespace realm {
 
@@ -71,11 +71,7 @@ public:
     bool to_int(int64_t& i) const;
 
     bool operator==(const Decimal128& rhs) const;
-    bool operator!=(const Decimal128& rhs) const;
-    bool operator<(const Decimal128& rhs) const;
-    bool operator>(const Decimal128& rhs) const;
-    bool operator<=(const Decimal128& rhs) const;
-    bool operator>=(const Decimal128& rhs) const;
+    std::strong_ordering operator<=>(const Decimal128& rhs) const;
 
     int compare(const Decimal128& rhs) const;
 

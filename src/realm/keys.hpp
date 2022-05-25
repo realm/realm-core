@@ -21,6 +21,8 @@
 
 #include <realm/util/to_string.hpp>
 #include <realm/column_type.hpp>
+
+#include <compare>
 #include <ostream>
 #include <vector>
 
@@ -39,22 +41,8 @@ struct TableKey {
         : value(val)
     {
     }
-    constexpr bool operator==(const TableKey& rhs) const noexcept
-    {
-        return value == rhs.value;
-    }
-    constexpr bool operator!=(const TableKey& rhs) const noexcept
-    {
-        return value != rhs.value;
-    }
-    constexpr bool operator<(const TableKey& rhs) const noexcept
-    {
-        return value < rhs.value;
-    }
-    constexpr bool operator>(const TableKey& rhs) const noexcept
-    {
-        return value > rhs.value;
-    }
+    constexpr bool operator==(const TableKey&) const noexcept = default;
+    constexpr auto operator<=>(const TableKey&) const noexcept = default;
 
     constexpr explicit operator bool() const noexcept
     {
@@ -128,22 +116,8 @@ struct ColKey {
     {
         return get_attrs().test(col_attr_Collection);
     }
-    bool operator==(const ColKey& rhs) const noexcept
-    {
-        return value == rhs.value;
-    }
-    bool operator!=(const ColKey& rhs) const noexcept
-    {
-        return value != rhs.value;
-    }
-    bool operator<(const ColKey& rhs) const noexcept
-    {
-        return value < rhs.value;
-    }
-    bool operator>(const ColKey& rhs) const noexcept
-    {
-        return value > rhs.value;
-    }
+    bool operator==(const ColKey& rhs) const noexcept = default;
+    auto operator<=>(const ColKey& rhs) const noexcept = default;
     explicit operator bool() const noexcept
     {
         return value != null_value;
@@ -192,30 +166,8 @@ struct ObjKey {
     {
         return ObjKey(-2 - value);
     }
-    bool operator==(const ObjKey& rhs) const noexcept
-    {
-        return value == rhs.value;
-    }
-    bool operator!=(const ObjKey& rhs) const noexcept
-    {
-        return value != rhs.value;
-    }
-    bool operator<(const ObjKey& rhs) const noexcept
-    {
-        return value < rhs.value;
-    }
-    bool operator<=(const ObjKey& rhs) const noexcept
-    {
-        return value <= rhs.value;
-    }
-    bool operator>(const ObjKey& rhs) const noexcept
-    {
-        return value > rhs.value;
-    }
-    bool operator>=(const ObjKey& rhs) const noexcept
-    {
-        return value >= rhs.value;
-    }
+    bool operator==(const ObjKey&) const noexcept = default;
+    auto operator<=>(const ObjKey&) const noexcept = default;
     explicit operator bool() const noexcept
     {
         return value != -1;
@@ -249,12 +201,12 @@ public:
             emplace_back(i);
         }
     }
-    ObjKeys() {}
+    ObjKeys() = default;
 };
 
 struct ObjLink {
 public:
-    ObjLink() {}
+    ObjLink() = default;
     ObjLink(TableKey table_key, ObjKey obj_key)
         : m_obj_key(obj_key)
         , m_table_key(table_key)
@@ -272,30 +224,14 @@ public:
     {
         return m_obj_key.is_unresolved();
     }
-    bool operator==(const ObjLink& other) const
+    bool operator==(const ObjLink&) const = default;
+    auto operator<=>(const ObjLink& rhs) const
     {
-        return m_obj_key == other.m_obj_key && m_table_key == other.m_table_key;
-    }
-    bool operator!=(const ObjLink& other) const
-    {
-        return m_obj_key != other.m_obj_key || m_table_key != other.m_table_key;
-    }
-    bool operator<(const ObjLink& rhs) const
-    {
-        if (m_table_key < rhs.m_table_key) {
-            return true;
+        // comparison order doesn't match declaration order
+        if (auto comp = m_table_key <=> rhs.m_table_key; comp != 0) {
+            return comp;
         }
-        else if (m_table_key == rhs.m_table_key) {
-            return m_obj_key < rhs.m_obj_key;
-        }
-        else {
-            // m_table_key >= rhs.m_table_key
-            return false;
-        }
-    }
-    bool operator>(const ObjLink& rhs) const
-    {
-        return (*this != rhs) && !(*this < rhs);
+        return m_obj_key <=> rhs.m_obj_key;
     }
     TableKey get_table_key() const
     {
