@@ -158,9 +158,7 @@ public:
     {
     }
 
-    ~Mixed() noexcept
-    {
-    }
+    ~Mixed() noexcept {}
 
     DataType get_type() const noexcept
     {
@@ -298,6 +296,7 @@ public:
     }
 
     using Mixed::Mixed;
+
 private:
     std::string m_owned_string;
 };
