@@ -16,6 +16,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/ez_websocket.hpp>
+#include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -61,7 +62,7 @@ public:
     class Session;
 
     using port_type = util::network::Endpoint::port_type;
-    using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
+    using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
 
@@ -860,6 +861,15 @@ private:
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
     void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
+    // Processes an FLX download message, if it's a bootstrap message. If it's not a bootstrap
+    // message then this is a noop and will return false. Otherwise this will return true
+    // and no further processing of the download message should take place.
+    bool process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
+                                       int64_t query_version, const ReceivedChangesets& received_changesets);
+
+    // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
+    void process_pending_flx_bootstrap();
+
     void begin_resumption_delay();
     void clear_resumption_delay_state();
 
@@ -894,12 +904,12 @@ private:
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
-    bool m_bind_message_sent;                   // Sending of BIND message has been initiated
-    bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
-    bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
-    bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
-    bool m_error_message_received;              // Session specific ERROR message received
-    bool m_unbound_message_received;            // UNBOUND message received
+    bool m_bind_message_sent;        // Sending of BIND message has been initiated
+    bool m_ident_message_sent;       // Sending of IDENT message has been initiated
+    bool m_unbind_message_sent;      // Sending of UNBIND message has been initiated
+    bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
+    bool m_error_message_received;   // Session specific ERROR message received
+    bool m_unbound_message_received; // UNBOUND message received
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
@@ -1057,7 +1067,7 @@ private:
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
-    void receive_download_message_hook();
+    void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState);
 
     friend class Connection;
 };
