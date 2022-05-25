@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <tuple>
@@ -11,27 +12,34 @@
 #include <condition_variable>
 #include <thread>
 
-#include <realm/util/features.h>
-#include <realm/util/parent_dir.hpp>
-#include <realm/util/uri.hpp>
-#include <realm/util/network.hpp>
-#include <realm/util/http.hpp>
-#include <realm/util/random.hpp>
-#include <realm/util/websocket.hpp>
-#include <realm/chunked_binary.hpp>
-#include <realm/sync/noinst/server/server_history.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
-#include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
+#include <realm/chunked_binary.hpp>
+#include <realm/data_type.hpp>
 #include <realm/history.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/transform.hpp>
-#include <realm/sync/history.hpp>
-#include <realm/sync/protocol.hpp>
-#include <realm/sync/client.hpp>
-#include <realm/sync/noinst/server/server.hpp>
+#include <realm/impl/simulated_failure.hpp>
 #include <realm/list.hpp>
+#include <realm/sync/changeset.hpp>
+#include <realm/sync/changeset_encoder.hpp>
+#include <realm/sync/client.hpp>
+#include <realm/sync/history.hpp>
+#include <realm/sync/instructions.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/server/server.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/object_id.hpp>
+#include <realm/sync/protocol.hpp>
+#include <realm/sync/transform.hpp>
+#include <realm/util/buffer.hpp>
+#include <realm/util/features.h>
+#include <realm/util/http.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/network.hpp>
+#include <realm/util/parent_dir.hpp>
+#include <realm/util/random.hpp>
+#include <realm/util/uri.hpp>
+#include <realm/util/websocket.hpp>
+#include <realm/version.hpp>
 
 #include "sync_fixtures.hpp"
 
@@ -7295,6 +7303,79 @@ TEST(Sync_MergeStringPrimaryKey)
         session_2.wait_for_upload_complete_or_client_stopped();
         // Download completion is not important.
     }
+}
+
+TEST(Sync_NonIncreasingServerVersions)
+{
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_verson = [&] {
+        auto tr = db->start_write();
+        tr->add_table_with_primary_key("class_foo", type_String, "_id")->add_column(type_Int, "int_col");
+        return tr->commit();
+    }();
+
+    std::vector<Changeset> server_changesets;
+    auto prep_changeset = [&](auto pk_name, auto int_col_val) {
+        Changeset changeset;
+        changeset.version = 10;
+        changeset.last_integrated_remote_version = latest_local_verson - 1;
+        changeset.origin_timestamp = ++timestamp;
+        changeset.origin_file_ident = 1;
+        instr::PrimaryKey pk{changeset.intern_string(pk_name)};
+        auto table_name = changeset.intern_string("foo");
+        auto col_name = changeset.intern_string("int_col");
+        instr::EraseObject erase_1;
+        erase_1.object = pk;
+        erase_1.table = table_name;
+        changeset.push_back(erase_1);
+        instr::CreateObject create_1;
+        create_1.object = pk;
+        create_1.table = table_name;
+        changeset.push_back(create_1);
+        instr::Update update_1;
+        update_1.table = table_name;
+        update_1.object = pk;
+        update_1.field = col_name;
+        update_1.value = instr::Payload{int64_t(int_col_val)};
+        changeset.push_back(update_1);
+        server_changesets.push_back(std::move(changeset));
+    };
+    prep_changeset("bizz", 1);
+    prep_changeset("buzz", 2);
+    prep_changeset("baz", 3);
+    prep_changeset("bar", 4);
+    ++server_changesets.back().version;
+
+    std::vector<ChangesetEncoder::Buffer> encoded;
+    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    for (const auto& changeset : server_changesets) {
+        encoded.emplace_back();
+        encode_changeset(changeset, encoded.back());
+        server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                               BinaryData(encoded.back().data(), encoded.back().size()),
+                                               changeset.origin_timestamp, changeset.origin_file_ident);
+    }
+
+    SyncProgress progress = {};
+    progress.download.server_version = server_changesets.back().version;
+    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.latest_server_version.version = server_changesets.back().version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded.data(),
+                                        server_changesets_encoded.size(), version_info,
+                                        DownloadBatchState::LastInBatch, logger, {});
 }
 
 } // unnamed namespace

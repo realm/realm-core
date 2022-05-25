@@ -163,7 +163,7 @@ RLM_API bool realm_rollback(realm_t* realm)
 
 RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t* realm,
                                                                  realm_on_realm_change_func_t callback,
-                                                                 void* userdata,
+                                                                 realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t free_userdata)
 {
     util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, free_userdata}]() {
