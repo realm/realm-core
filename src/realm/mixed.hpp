@@ -286,21 +286,6 @@ private:
     }
 };
 
-class OwnedMixed : public Mixed {
-public:
-    explicit OwnedMixed(std::string str)
-        : m_owned_string(std::move(str))
-    {
-        m_type = int(type_String);
-        string_val = m_owned_string;
-    }
-
-    using Mixed::Mixed;
-
-private:
-    std::string m_owned_string;
-};
-
 // Implementation:
 
 inline Mixed::Mixed(int64_t v) noexcept
