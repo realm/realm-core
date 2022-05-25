@@ -377,9 +377,10 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
     constexpr int num_pending_transactions = 20;
-    constexpr int num_transactions_created = 10000;
+    constexpr int num_iterations = 1;
     constexpr int num_objects = 20;
     constexpr int num_checks_pr_trans = 10;
+    constexpr int num_trans_forgotten_rapidly = 10000;
     struct Entry {
         SharedRealm realm;
         Object o;
@@ -410,65 +411,69 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     }
     realm->commit_transaction();
     int notifications = 0;
-    for (int j = 0; j < num_transactions_created; ++j) {
-        int trans_number = (unsigned)random_int() % num_pending_transactions;
+    SharedRealm captured = realm->freeze(); // Realm::get_shared_realm(config);
+    // force readlock allocation NOW!
+    captured->read_group();
+    for (int j = 0; j < num_iterations; ++j) {
 
-        // advance and notify for object in the previous realm before replacing it
-        if (refs[trans_number].realm) {
-            auto& r = refs[trans_number].realm;
+        // pick a random earlier transaction
+        int trans_number = (unsigned)random_int() % num_pending_transactions;
+        auto& entry = refs[trans_number];
+
+        // refresh chosen transaction so as to trigger notifications.
+        if (entry.realm) {
+            auto& r = entry.realm;
             REALM_ASSERT(r->is_in_read_transaction());
             auto before = r->current_transaction_version();
             r->refresh();
             auto after = r->current_transaction_version();
             REALM_ASSERT(before != after);
-            // advance_and_notify(*r);
         }
 
-        // set up and save a new realm for later refresh
-        auto realm2 = Realm::get_shared_realm(config);
-        refs[trans_number].realm = realm2;
-        // capture a random object and its current state
+        // set up and save a new realm for later refresh, replacing the old one
+        // which we refreshed above
+        auto realm2 = realm->freeze(); // Realm::get_shared_realm(config);
+        entry.realm = realm2;
         int key = (unsigned)random_int() % num_objects;
         auto table2 = realm2->read_group().get_table(table_key);
-        auto& o = refs[trans_number].o;
-        o = Object{};
+        auto& o = entry.o;
         o = std::move(Object(realm2, table2->get_object(key)));
-        refs[trans_number].value = o.obj().get<Int>(col);
-        refs[trans_number].link = o.obj().get<ObjKey>(link_col);
-        auto linked = table2->get_object(refs[trans_number].link);
-        refs[trans_number].linked_value = linked.get<Int>(col);
-        // add a dummy notification callback to exercise the notification machinery
-        refs[trans_number].token = o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-            ++notifications;
-        });
-        {
+        entry.value = o.obj().get<Int>(col);
+        entry.link = o.obj().get<ObjKey>(link_col);
+        auto linked = table2->get_object(entry.link);
+        entry.linked_value = linked.get<Int>(col);
+        // add a dummy notification callback to later exercise the notification machinery
+        if (!entry.realm->is_frozen()) {
+            entry.token = o.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                ++notifications;
+            });
+        }
+        // create a number of new transactions.....
+        for (int i = 0; i < num_trans_forgotten_rapidly; ++i) {
             realm->begin_transaction();
-            auto o = table->get_object(ObjKey(key));
+            auto key = ObjKey((unsigned)random_int() % num_objects);
+            auto o = table->get_object(key);
             o.set(col, o.get<Int>(col) + j + 42);
             int link = (unsigned)random_int() % num_objects;
             o.set(link_col, ObjKey(link));
             realm->commit_transaction();
         }
+        // verify a number of randomly selected saved transactions
         for (int k = 0; k < num_checks_pr_trans; ++k) {
-            int selected_trans = (unsigned)random_int() % num_pending_transactions;
-            if (refs[selected_trans].realm) {
-                CHECK(refs[selected_trans].value == refs[selected_trans].o.obj().get<Int>(col));
-                auto link = refs[selected_trans].o.obj().get<ObjKey>(link_col);
-                CHECK(link == refs[selected_trans].link);
-                auto table = refs[selected_trans].realm->read_group().get_table(table_key);
+            auto& entry = refs[(unsigned)random_int() % num_pending_transactions];
+            if (entry.realm) {
+                CHECK(entry.value == entry.o.obj().get<Int>(col));
+                auto link = entry.o.obj().get<ObjKey>(link_col);
+                CHECK(link == entry.link);
+                auto table = entry.realm->read_group().get_table(table_key);
                 auto linked_value = table->get_object(link).get<Int>(col);
-                CHECK(refs[selected_trans].linked_value == linked_value);
+                CHECK(entry.linked_value == linked_value);
             }
         }
     }
-    /*
-    for (auto& e : refs) {
-        if (e.realm)
-            advance_and_notify(*e.realm);
-        e.realm.reset();
-    }
-    */
     refs.clear();
+    realm->begin_transaction();
+    realm->commit_transaction();
     realm->begin_transaction();
     realm->commit_transaction();
 }
