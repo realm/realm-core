@@ -81,11 +81,9 @@ namespace {
 //         `write_fairness`
 // 10      Introducing SharedInfo::history_schema_version.
 // 11      New impl of InterprocessCondVar on windows.
-#ifdef _WIN32
-const uint_fast16_t g_shared_info_version = 11;
-#else
-const uint_fast16_t g_shared_info_version = 10; // version 11 didn't change anything on non-windows platforms
-#endif
+// 12      Change `number_of_versions` to an atomic rather than guarding it
+//         with a lock.
+const uint_fast16_t g_shared_info_version = 12;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -492,7 +490,7 @@ struct alignas(8) DB::SharedInfo {
     /// supported by our current encryption mechanisms.
     uint64_t session_initiator_pid = 0; // Offset 24
 
-    uint64_t number_of_versions; // Offset 32
+    std::atomic<uint64_t> number_of_versions; // Offset 32
 
     /// True (1) if there is a sync agent present (a session participant acting
     /// as sync client). It is an error to have a session with more than one
@@ -602,7 +600,7 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
             offsetof(SharedInfo, session_initiator_pid) == 24 &&
             std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
             offsetof(SharedInfo, number_of_versions) == 32 &&
-            std::is_same<decltype(number_of_versions), uint64_t>::value &&
+            std::is_same<decltype(number_of_versions), std::atomic<uint64_t>>::value &&
             offsetof(SharedInfo, sync_agent_present) == 40 &&
             std::is_same<decltype(sync_agent_present), uint8_t>::value &&
             offsetof(SharedInfo, daemon_started) == 41 && std::is_same<decltype(daemon_started), uint8_t>::value &&
@@ -613,6 +611,7 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
             std::is_same<decltype(filler_2), uint16_t>::value && offsetof(SharedInfo, shared_writemutex) == 48 &&
             std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
         "Caught layout change requiring SharedInfo file format bumping");
+    static_assert(std::atomic<uint64_t>::is_always_lock_free);
 #ifndef _WIN32
 #pragma GCC diagnostic pop
 #endif
@@ -1552,7 +1551,6 @@ uint_fast64_t DB::get_number_of_versions()
     if (m_fake_read_lock_if_immutable)
         return 1;
     SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
 }
 

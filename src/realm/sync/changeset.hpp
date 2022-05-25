@@ -177,6 +177,18 @@ struct Changeset {
     /// untransformed changeset was produced.
     file_ident_type origin_file_ident = 0;
 
+    /// Must be set before passing this Changeset to Transformer::transform_remote_changesets
+    /// to the index of this changeset within the received changesets.
+    ///
+    /// In FLX sync the server may send multiple idempotent changesets with the same server version
+    /// when bootstrapping data. Internal data structures within the OT Transformer require the
+    /// input changesets to be sortable in the order that they were received. If the version number
+    /// is not increasing, this will be used to determine the correct sort order.
+    ///
+    /// FIXME: This is a hack that we need to figure out a better way of fixing. This can maybe
+    /// be part of refactoring the ChangesetIndex
+    size_t transform_sequence = 0;
+
     /// Compare for exact equality, including that interned strings have the
     /// same integer values, and there is the same number of interned strings,
     /// same topology of tombstones, etc.
