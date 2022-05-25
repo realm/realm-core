@@ -130,84 +130,6 @@ void cpuid_init()
 
 #endif
 }
-} // namespace realm
-
-
-// popcount, counts number of set (1) bits in argument. Intrinsics has been disabled because it's just 10-20% faster
-// than fallback method, so a runtime-detection of support would be more expensive in total. Popcount is supported
-// with SSE42 but not with SSE3, and we don't want separate builds for each architecture - hence a runtime check would
-// be required.
-#if 0 // defined(_MSC_VER) && _MSC_VER >= 1500
-#include <intrin.h>
-
-namespace realm {
-
-int fast_popcount32(int32_t x)
-{
-    return __popcnt(x);
-}
-#if defined(_M_X64)
-int fast_popcount64(int64_t x)
-{
-    return int(__popcnt64(x));
-}
-#else
-int fast_popcount64(int64_t x)
-{
-    return __popcnt(unsigned(x)) + __popcnt(unsigned(x >> 32));
-}
-#endif
-
-} // namespace realm
-
-#elif 0 // defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-#define fast_popcount32 __builtin_popcount
-
-namespace realm {
-
-#if ULONG_MAX == 0xffffffff
-int fast_popcount64(int64_t x)
-{
-    return __builtin_popcount(unsigned(x)) + __builtin_popcount(unsigned(x >> 32));
-}
-#else
-int fast_popcount64(int64_t x)
-{
-    return __builtin_popcountll(x);
-}
-#endif
-
-} // namespace realm
-
-#else
-
-namespace {
-
-const char a_popcount_bits[256] = {
-    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2,
-    3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3,
-    3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5,
-    6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4,
-    3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4,
-    5, 5, 6, 5, 6, 6, 7, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6,
-    6, 7, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
-};
-
-} // anonymous namespace
-
-namespace realm {
-
-// Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this
-// automatically. Todo, investigate.
-int fast_popcount32(int32_t x)
-{
-    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] +
-           a_popcount_bits[255 & x >> 24];
-}
-int fast_popcount64(int64_t x)
-{
-    return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
-}
 
 // Mutex only to make Helgrind happy
 // If it was declared as a static inside fastrand() then it could have a race being initialised and
@@ -331,5 +253,3 @@ int64_t platform_timegm(tm time)
 
 
 } // namespace realm
-
-#endif // select best popcount implementations

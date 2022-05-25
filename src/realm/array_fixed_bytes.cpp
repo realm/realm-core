@@ -18,6 +18,8 @@
 
 #include <realm/array_fixed_bytes.hpp>
 
+#include <bit>
+
 namespace realm {
 
 // Intuitively the null T value could be a static member variable of the ArrayFixedBytesNull<T>
@@ -199,7 +201,7 @@ size_t ArrayFixedBytesNull<ObjectType, ElementSize>::find_first_null(size_t star
     while (ndx < end) {
         const auto bit_vec = uint8_t(*bit_ptr >> offset);
         if (bit_vec) {
-            ndx += ctz(bit_vec);
+            ndx += std::countr_zero(bit_vec);
             return ndx >= end ? realm::npos : ndx;
         }
 

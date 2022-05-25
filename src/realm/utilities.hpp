@@ -136,9 +136,6 @@ int64_t platform_timegm(tm time);
 #ifdef REALM_SLAB_ALLOC_TUNE
 void process_mem_usage(double& vm_usage, double& resident_set);
 #endif
-// popcount
-int fast_popcount32(int32_t x);
-int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL, bool is_seed = false);
 
 // Class to be used when a private generator is wanted.
@@ -177,36 +174,6 @@ inline int log2(size_t x)
 #else // not __GNUC__ and not _WIN32
     int r = 0;
     while (x >>= 1) {
-        r++;
-    }
-    return r;
-#endif
-}
-
-// count trailing zeros (from least-significant bit)
-inline int ctz(size_t x)
-{
-    if (x == 0)
-        return sizeof(x) * 8;
-
-#if defined(__GNUC__)
-#ifdef REALM_PTR_64
-    return __builtin_ctzll(x); // returns int
-#else
-    return __builtin_ctz(x);      // returns int
-#endif
-#elif defined(_WIN32)
-    unsigned long index = 0;
-#ifdef REALM_PTR_64
-    unsigned char c = _BitScanForward64(&index, x); // outputs unsigned long
-#else
-    unsigned char c = _BitScanForward(&index, x); // outputs unsigned long
-#endif
-    return static_cast<int>(index);
-#else // not __GNUC__ and not _WIN32
-    int r = 0;
-    while (r < sizeof(size_t) * 8 && (x & 1) == 0) {
-        x >>= 1;
         r++;
     }
     return r;

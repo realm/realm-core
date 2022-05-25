@@ -17,9 +17,11 @@
  **************************************************************************/
 
 #include <realm.hpp>
-#include <realm/uuid.hpp>
-#include <chrono>
 #include <realm/array_fixed_bytes.hpp>
+#include <realm/uuid.hpp>
+
+#include <bit>
+#include <chrono>
 
 #include "test.hpp"
 
@@ -486,7 +488,7 @@ TEST(UUID_ArrayNull_FindFirstNull_StressTest)
             for (int begin = 0; begin <= size; begin++) {
                 for (int end = begin; end <= size; end++) {
                     auto adjusted_mask = (mask & ~(unsigned(-1) << end)) >> begin;
-                    const size_t expected = adjusted_mask ? begin + ctz(adjusted_mask) : npos;
+                    const size_t expected = adjusted_mask ? begin + std::countr_zero(adjusted_mask) : npos;
                     CHECK_EQUAL(arr.find_first_null(begin, end), expected);
                 }
             }

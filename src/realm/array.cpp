@@ -27,6 +27,7 @@
 #include <realm/impl/array_writer.hpp>
 
 #include <array>
+#include <bit>
 #include <cstring> // std::memcpy
 #include <iomanip>
 #include <limits>
@@ -681,29 +682,12 @@ int64_t Array::sum(size_t start, size_t end) const
         const uint64_t m4 = 0x0f0f0f0f0f0f0f0fULL;
         const uint64_t h01 = 0x0101010101010101ULL;
 
-        int64_t* data = reinterpret_cast<int64_t*>(m_data + start * w / 8);
+        uint64_t* data = reinterpret_cast<uint64_t*>(m_data + start * w / 8);
         size_t chunks = (end - start) * w / 8 / sizeof(int64_t);
 
         for (size_t t = 0; t < chunks; t++) {
             if (w == 1) {
-
-#if 0
-#if defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)
-                s += __popcnt64(data[t]);
-#elif !defined(_MSC_VER) && defined(USE_SSE42) && defined(REALM_PTR_64)
-                s += __builtin_popcountll(data[t]);
-#else
-                uint64_t a = data[t];
-                const uint64_t m1  = 0x5555555555555555ULL;
-                a -= (a >> 1) & m1;
-                a = (a & m2) + ((a >> 2) & m2);
-                a = (a + (a >> 4)) & m4;
-                a = (a * h01) >> 56;
-                s += a;
-#endif
-#endif
-
-                s += fast_popcount64(data[t]);
+                s += std::popcount(data[t]);
             }
             else if (w == 2) {
                 uint64_t a = data[t];
@@ -847,15 +831,7 @@ size_t Array::count(int64_t value) const noexcept
             uint64_t a = next[i / chunkvals];
             if (value == 0)
                 a = ~a; // reverse
-
-            a -= (a >> 1) & m1;
-            a = (a & m2) + ((a >> 2) & m2);
-            a = (a + (a >> 4)) & m4;
-            a = (a * h01) >> 56;
-
-            // Could use intrinsic instead:
-            // a = __builtin_popcountll(a); // gcc intrinsic
-
+            a = std::popcount(a);
             value_count += to_size_t(a);
         }
     }
