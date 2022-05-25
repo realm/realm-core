@@ -28,7 +28,6 @@ namespace realm {
 
 struct ErrorCategory {
     enum Type {
-        generic_error = 1,
         logic_error = RLM_ERR_CAT_LOGIC,
         runtime_error = RLM_ERR_CAT_RUNTIME,
         invalid_argument = RLM_ERR_CAT_INVALID_ARG,
@@ -88,7 +87,6 @@ public:
     // like uassert codes, are valid.
     enum Error : std::int32_t {
         OK = RLM_ERR_NONE,
-        GenericError = RLM_ERR_OTHER_EXCEPTION,
         RuntimeError = RLM_ERR_RUNTIME,
         RangeError = RLM_ERR_RANGE_ERROR,
         BrokenInvariant = RLM_ERR_BROKEN_INVARIANT,

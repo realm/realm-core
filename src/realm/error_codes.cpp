@@ -27,7 +27,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
 {
     switch (code) {
         case OK:
-        case GenericError:
             break;
         case RuntimeError:
         case RangeError:
@@ -181,7 +180,6 @@ ErrorCategory ErrorCodes::error_categories(Error code)
 static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"OK", ErrorCodes::OK},
     {"AppUnknownError", ErrorCodes::AppUnknownError},
-    {"GenericError", ErrorCodes::GenericError},
     {"RuntimeError", ErrorCodes::RuntimeError},
     {"LogicError", ErrorCodes::LogicError},
     {"InvalidArgument", ErrorCodes::InvalidArgument},

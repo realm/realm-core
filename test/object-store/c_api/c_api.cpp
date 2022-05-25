@@ -285,7 +285,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
 
         realm_error_t err;
         CHECK(realm_get_last_error(&err));
-        CHECK(err.error == RLM_ERR_OTHER_EXCEPTION);
+        CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
         realm_clear_last_error();
     }
@@ -304,7 +304,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
         realm_error_t err;
         realm_get_async_error(async_err, &err);
 
-        CHECK(err.error == RLM_ERR_OTHER_EXCEPTION);
+        CHECK(err.error == RLM_ERR_RUNTIME);
         CHECK(std::string{err.message} == "Synthetic error");
 
         SECTION("realm_clone()") {
@@ -312,7 +312,7 @@ TEST_CASE("C API (non-database)", "[c_api]") {
             CHECK(realm_equals(async_err, cloned.get()));
             realm_error_t err2;
             realm_get_async_error(cloned.get(), &err2);
-            CHECK(err2.error == RLM_ERR_OTHER_EXCEPTION);
+            CHECK(err2.error == RLM_ERR_RUNTIME);
             CHECK(std::string{err2.message} == "Synthetic error");
         }
 

@@ -122,11 +122,14 @@ void ErrorStorage::assign(std::exception_ptr eptr) noexcept
     catch (const std::logic_error& ex) {
         populate_error(ex, ErrorCodes::LogicError);
     }
+    catch (const std::runtime_error& ex) {
+        populate_error(ex, ErrorCodes::RuntimeError);
+    }
     catch (const std::bad_alloc& ex) {
         populate_error(ex, ErrorCodes::OutOfMemory);
     }
     catch (const std::exception& ex) {
-        populate_error(ex, ErrorCodes::GenericError);
+        populate_error(ex, ErrorCodes::UnknownError);
     }
     // FIXME: Handle more exception types.
     catch (...) {
