@@ -316,7 +316,12 @@ public:
         // Will be called after a download message is received and validated by
         // the client but befefore it's been transformed or applied. To be used in
         // testing only.
-        std::function<void()> on_download_message_received_hook;
+        std::function<void(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+            on_download_message_received_hook;
+        // Will be called after each bootstrap message is added to the pending bootstrap store,
+        // but before processing a finalized bootstrap. For testing only.
+        std::function<bool(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+            on_bootstrap_message_processed_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.
