@@ -172,7 +172,7 @@ protected:
     };
     friend struct RecoveryResolver;
 
-    REALM_NORETURN void handle_error(const std::string& message) const;
+    [[noreturn]] void handle_error(const std::string& message) const;
     void copy_lists_with_unrecoverable_changes();
 
     bool resolve_path(ListPath& path, Obj remote_obj, Obj local_obj,

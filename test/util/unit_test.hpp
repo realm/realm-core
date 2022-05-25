@@ -536,7 +536,7 @@ private:
 
     TestContext(TestList::ThreadContextImpl&, const TestDetails&, size_t test_index, int recurrence_index);
 
-    REALM_NORETURN void abort();
+    [[noreturn]] void abort();
     void test_failed(const std::string& message);
     void check_failed(const char* file, long line, const std::string& message);
     void cond_failed(const char* file, long line, const char* macro_name, const char* cond_text);

@@ -282,7 +282,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
         case SchemaMode::Immutable:
             if (version != m_schema_version)
                 throw InvalidSchemaVersionException(m_schema_version, version);
-            REALM_FALLTHROUGH;
+            [[fallthrough]];
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             return false;
@@ -292,7 +292,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
                 return true;
             if (m_schema_version == version && !ObjectStore::needs_migration(changes))
                 return true;
-            REALM_FALLTHROUGH;
+            [[fallthrough]];
         case SchemaMode::HardResetFile:
             reset_file(schema, changes);
             return true;

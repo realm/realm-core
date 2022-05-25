@@ -121,12 +121,12 @@ bool Thread::get_name(std::string& name) noexcept
 }
 
 
-REALM_NORETURN void Thread::create_failed(int)
+[[noreturn]] void Thread::create_failed(int)
 {
     throw std::runtime_error("pthread_create() failed");
 }
 
-REALM_NORETURN void Thread::join_failed(int)
+[[noreturn]] void Thread::join_failed(int)
 {
     // It is intentional that the argument is ignored here.
     throw std::runtime_error("pthread_join() failed.");
@@ -160,7 +160,7 @@ void Mutex::init_as_process_shared(bool robust_if_available)
 #endif
 }
 
-REALM_NORETURN void Mutex::init_failed(int err)
+[[noreturn]] void Mutex::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
@@ -170,7 +170,7 @@ REALM_NORETURN void Mutex::init_failed(int err)
     }
 }
 
-REALM_NORETURN void Mutex::attr_init_failed(int err)
+[[noreturn]] void Mutex::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
@@ -180,7 +180,7 @@ REALM_NORETURN void Mutex::attr_init_failed(int err)
     }
 }
 
-REALM_NORETURN void Mutex::destroy_failed(int err) noexcept
+[[noreturn]] void Mutex::destroy_failed(int err) noexcept
 {
     if (err == EBUSY)
         REALM_TERMINATE("Destruction of mutex in use");
@@ -188,7 +188,7 @@ REALM_NORETURN void Mutex::destroy_failed(int err) noexcept
 }
 
 
-REALM_NORETURN void Mutex::lock_failed(int err) noexcept
+[[noreturn]] void Mutex::lock_failed(int err) noexcept
 {
     switch (err) {
         case EDEADLK:
@@ -291,7 +291,7 @@ CondVar::CondVar(process_shared_tag)
 #endif
 }
 
-REALM_NORETURN void CondVar::init_failed(int err)
+[[noreturn]] void CondVar::init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
@@ -320,7 +320,7 @@ void CondVar::handle_wait_error(int err)
     }
 }
 
-REALM_NORETURN void CondVar::attr_init_failed(int err)
+[[noreturn]] void CondVar::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM:
@@ -330,7 +330,7 @@ REALM_NORETURN void CondVar::attr_init_failed(int err)
     }
 }
 
-REALM_NORETURN void CondVar::destroy_failed(int err) noexcept
+[[noreturn]] void CondVar::destroy_failed(int err) noexcept
 {
     if (err == EBUSY)
         REALM_TERMINATE("Destruction of condition variable in use");

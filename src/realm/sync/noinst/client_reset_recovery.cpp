@@ -359,7 +359,7 @@ RecoverLocalChangesetsHandler::RecoverLocalChangesetsHandler(Transaction& remote
 
 RecoverLocalChangesetsHandler::~RecoverLocalChangesetsHandler() {}
 
-REALM_NORETURN void RecoverLocalChangesetsHandler::handle_error(const std::string& message) const
+[[noreturn]] void RecoverLocalChangesetsHandler::handle_error(const std::string& message) const
 {
     std::string full_message =
         util::format("Unable to automatically recover local changes during client reset: '%1'", message);

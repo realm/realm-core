@@ -84,8 +84,8 @@ struct State {
 
     BinaryData read_buffer(size_t size);
 
-    REALM_NORETURN void parser_error(const char* complaint); // Throws
-    REALM_NORETURN void parser_error()
+    [[noreturn]] void parser_error(const char* complaint); // Throws
+    [[noreturn]] void parser_error()
     {
         parser_error("Bad input");
     } // Throws

@@ -42,10 +42,10 @@
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 // prototype here to silence warning
-extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core();
+extern "C" [[noreturn]] REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core();
 
 // LCOV_EXCL_START
-extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core()
+extern "C" [[noreturn]] REALM_NOINLINE void please_report_this_issue_in_github_realm_realm_core()
 {
     std::abort();
 }
@@ -105,7 +105,7 @@ namespace realm {
 namespace util {
 
 // LCOV_EXCL_START
-REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
+[[noreturn]] static void terminate_internal(std::stringstream& ss) noexcept
 {
     util::Backtrace::capture().print(ss);
 
@@ -123,8 +123,8 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
     please_report_this_issue_in_github_realm_realm_core();
 }
 
-REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              std::initializer_list<Printable>&& values) noexcept
+[[noreturn]] void terminate(const char* message, const char* file, long line,
+                            std::initializer_list<Printable>&& values) noexcept
 {
     std::stringstream ss;
     ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message;
@@ -133,9 +133,8 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line,
     terminate_internal(ss);
 }
 
-REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
-                                        const char* interesting_names,
-                                        std::initializer_list<Printable>&& values) noexcept
+[[noreturn]] void terminate_with_info(const char* message, const char* file, long line, const char* interesting_names,
+                                      std::initializer_list<Printable>&& values) noexcept
 {
     std::stringstream ss;
     ss << file << ':' << line << ": " REALM_VER_CHUNK " " << message << " with " << interesting_names << " = ";

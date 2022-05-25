@@ -107,8 +107,8 @@ private:
     template <class>
     static void* entry_point(void*) noexcept;
 
-    REALM_NORETURN static void create_failed(int);
-    REALM_NORETURN static void join_failed(int);
+    [[noreturn]] static void create_failed(int);
+    [[noreturn]] static void join_failed(int);
 };
 
 
@@ -159,10 +159,10 @@ protected:
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
 
-    REALM_NORETURN static void init_failed(int);
-    REALM_NORETURN static void attr_init_failed(int);
-    REALM_NORETURN static void destroy_failed(int) noexcept;
-    REALM_NORETURN static void lock_failed(int) noexcept;
+    [[noreturn]] static void init_failed(int);
+    [[noreturn]] static void attr_init_failed(int);
+    [[noreturn]] static void destroy_failed(int) noexcept;
+    [[noreturn]] static void lock_failed(int) noexcept;
 
 private:
     friend class CondVar;
@@ -373,9 +373,9 @@ private:
     pthread_cond_t m_impl;
 #endif
 
-    REALM_NORETURN static void init_failed(int);
-    REALM_NORETURN static void attr_init_failed(int);
-    REALM_NORETURN static void destroy_failed(int) noexcept;
+    [[noreturn]] static void init_failed(int);
+    [[noreturn]] static void attr_init_failed(int);
+    [[noreturn]] static void destroy_failed(int) noexcept;
     void handle_wait_error(int error);
 };
 

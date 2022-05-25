@@ -71,16 +71,6 @@
 #define REALM_HAS_CPP_ATTRIBUTE(attr) 0
 #endif
 
-#if REALM_HAS_CPP_ATTRIBUTE(clang::fallthrough)
-#define REALM_FALLTHROUGH [[clang::fallthrough]]
-#elif REALM_HAS_CPP_ATTRIBUTE(gnu::fallthrough)
-#define REALM_FALLTHROUGH [[gnu::fallthrough]]
-#elif REALM_HAS_CPP_ATTRIBUTE(fallthrough)
-#define REALM_FALLTHROUGH [[fallthrough]]
-#else
-#define REALM_FALLTHROUGH
-#endif
-
 // This should be renamed to REALM_UNREACHABLE as soon as REALM_UNREACHABLE is renamed to
 // REALM_ASSERT_NOT_REACHED which will better reflect its nature
 #if defined(__GNUC__) || defined(__clang__)
@@ -136,32 +126,12 @@
 #endif
 
 
-/* The way to specify that a function never returns. */
-#if REALM_HAVE_AT_LEAST_GCC(4, 8) || REALM_HAVE_CLANG_FEATURE(cxx_attributes)
-#define REALM_NORETURN [[noreturn]]
-#elif __GNUC__
-#define REALM_NORETURN __attribute__((noreturn))
-#elif defined(_MSC_VER)
-#define REALM_NORETURN __declspec(noreturn)
-#else
-#define REALM_NORETURN
-#endif
-
-
 /* The way to specify that a variable or type is intended to possibly
  * not be used. Use it to suppress a warning from the compiler. */
 #if __GNUC__
 #define REALM_UNUSED __attribute__((unused))
 #else
 #define REALM_UNUSED
-#endif
-
-/* The way to specify that a function is deprecated
- * not be used. Use it to suppress a warning from the compiler. */
-#if __GNUC__
-#define REALM_DEPRECATED(x) [[deprecated(x)]]
-#else
-#define REALM_DEPRECATED(x) __declspec(deprecated(x))
 #endif
 
 
@@ -201,17 +171,7 @@
 #endif
 
 
-#if REALM_HAS_CPP_ATTRIBUTE(nodiscard)
 #define REALM_NODISCARD [[nodiscard]]
-#else
-#if defined(__GNUC__) || defined(__HP_aCC)
-#define REALM_NODISCARD __attribute__((warn_unused_result))
-#elif defined(_MSC_VER)
-#define REALM_NODISCARD _Check_return_
-#else
-#define REALM_NODISCARD
-#endif
-#endif
 
 /* Thread specific data (only for POD types) */
 #if defined __clang__

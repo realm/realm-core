@@ -143,9 +143,9 @@ private:
     template <class F>
     void visit_payload(const Instruction::Payload&, F&& visitor);
 
-    REALM_NORETURN void bad_transaction_log(const std::string& msg) const;
+    [[noreturn]] void bad_transaction_log(const std::string& msg) const;
     template <class... Params>
-    REALM_NORETURN void bad_transaction_log(const char* msg, Params&&... params) const;
+    [[noreturn]] void bad_transaction_log(const char* msg, Params&&... params) const;
 };
 
 

@@ -63,8 +63,7 @@ bool TransactLogEncoder::dictionary_erase(size_t ndx, Mixed key)
     return true;
 }
 
-REALM_NORETURN
-void TransactLogParser::parser_error() const
+[[noreturn]] void TransactLogParser::parser_error() const
 {
     throw BadTransactLog();
 }

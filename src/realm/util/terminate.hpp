@@ -30,15 +30,14 @@
 namespace realm {
 namespace util {
 
-REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              std::initializer_list<Printable>&& = {}) noexcept;
-REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
-                                        const char* interesting_names,
-                                        std::initializer_list<Printable>&& = {}) noexcept;
+[[noreturn]] void terminate(const char* message, const char* file, long line,
+                            std::initializer_list<Printable>&& = {}) noexcept;
+[[noreturn]] void terminate_with_info(const char* message, const char* file, long line, const char* interesting_names,
+                                      std::initializer_list<Printable>&& = {}) noexcept;
 
 // LCOV_EXCL_START
 template <class... Ts>
-REALM_NORETURN void terminate(const char* message, const char* file, long line, Ts... infos) noexcept
+[[noreturn]] void terminate(const char* message, const char* file, long line, Ts... infos) noexcept
 {
     static_assert(sizeof...(infos) == 2 || sizeof...(infos) == 4 || sizeof...(infos) == 6,
                   "Called realm::util::terminate() with wrong number of arguments");
@@ -46,8 +45,8 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line, 
 }
 
 template <class... Args>
-REALM_NORETURN void terminate_with_info(const char* assert_message, int line, const char* file,
-                                        const char* interesting_names, Args&&... interesting_values) noexcept
+[[noreturn]] void terminate_with_info(const char* assert_message, int line, const char* file,
+                                      const char* interesting_names, Args&&... interesting_values) noexcept
 {
     terminate_with_info(assert_message, file, line, interesting_names, {Printable(interesting_values)...});
 }

@@ -201,9 +201,7 @@ class TransactLogValidationMixin {
     // The currently selected table
     TableKey m_current_table;
 
-    REALM_NORETURN
-    REALM_NOINLINE
-    void schema_error()
+    [[noreturn]] REALM_NOINLINE void schema_error()
     {
         throw _impl::UnsupportedSchemaChange();
     }

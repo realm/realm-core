@@ -545,7 +545,7 @@ DataType Results::prepare_for_aggregate(ColKey column, const char* name)
                 break;
             m_query = do_get_query();
             m_mode = Mode::Query;
-            REALM_FALLTHROUGH;
+            [[fallthrough]];
         case Mode::Query:
         case Mode::TableView:
             ensure_up_to_date();
@@ -1177,7 +1177,7 @@ Results Results::snapshot() &&
             if (m_query.get_table()) {
                 m_mode = Mode::Query;
             }
-            REALM_FALLTHROUGH;
+            [[fallthrough]];
         case Mode::Query:
         case Mode::TableView:
             ensure_up_to_date(EvaluateMode::Snapshot);

@@ -114,7 +114,7 @@ private:
     // table should be emitted.
     bool select_table(const Table&);
 
-    REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
+    [[noreturn]] void unsupported_instruction() const; // Throws TransformError
 
     // Returns true and populates m_last_class_name if instructions for the
     // owning table should be emitted.

@@ -38,8 +38,7 @@ namespace {
 
 REALM_COLD
 REALM_NOINLINE
-REALM_NORETURN
-void throw_json_error(JSONErrorCode ec, std::string_view message)
+[[noreturn]] void throw_json_error(JSONErrorCode ec, std::string_view message)
 {
     throw AppError(make_error_code(ec), std::string(message));
 }

@@ -397,7 +397,7 @@ private:
     const char* m_input_end;
     std::string m_string_buffer;
 
-    REALM_NORETURN void parser_error() const;
+    [[noreturn]] void parser_error() const;
 
     template <class InstructionHandler>
     void parse_one(InstructionHandler&);

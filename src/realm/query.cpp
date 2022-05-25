@@ -264,7 +264,7 @@ Query& Query::like(ColKey column_key, BinaryData b, bool case_sensitive)
 
 namespace {
 
-REALM_NOINLINE REALM_COLD REALM_NORETURN void throw_type_mismatch_error()
+REALM_NOINLINE REALM_COLD [[noreturn]] void throw_type_mismatch_error()
 {
     throw LogicError{LogicError::type_mismatch};
 }

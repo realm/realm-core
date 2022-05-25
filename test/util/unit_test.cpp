@@ -809,7 +809,7 @@ void TestContext::check_succeeded()
 }
 
 
-REALM_NORETURN void TestContext::abort()
+[[noreturn]] void TestContext::abort()
 {
     const SharedContext& context = thread_context.shared_context;
     const char* format =

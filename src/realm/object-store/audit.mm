@@ -317,9 +317,7 @@ public:
     // clang-format on
 
 private:
-    REALM_NORETURN
-    REALM_NOINLINE
-    void unexpected_instruction()
+    [[noreturn]] REALM_NOINLINE void unexpected_instruction()
     {
         REALM_TERMINATE("Unexpected transaction log instruction encountered");
     }

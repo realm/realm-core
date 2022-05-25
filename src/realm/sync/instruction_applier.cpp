@@ -7,14 +7,14 @@
 namespace realm::sync {
 namespace {
 
-REALM_NORETURN void throw_bad_transaction_log(std::string msg)
+[[noreturn]] void throw_bad_transaction_log(std::string msg)
 {
     throw BadChangesetError{std::move(msg)};
 }
 
 } // namespace
 
-REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& msg) const
+[[noreturn]] void InstructionApplier::bad_transaction_log(const std::string& msg) const
 {
     if (m_last_object_key) {
         // If the last_object_key is valid then we should have a changeset and a current table
@@ -53,7 +53,7 @@ REALM_NORETURN void InstructionApplier::bad_transaction_log(const std::string& m
 }
 
 template <class... Params>
-REALM_NORETURN void InstructionApplier::bad_transaction_log(const char* msg, Params&&... params) const
+[[noreturn]] void InstructionApplier::bad_transaction_log(const char* msg, Params&&... params) const
 {
     // FIXME: Avoid throwing in normal program flow (since changesets can come
     // in over the network, defective changesets are part of normal program
