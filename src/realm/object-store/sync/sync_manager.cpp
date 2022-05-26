@@ -355,15 +355,13 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id, std:
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
     util::CheckedLockGuard lock(m_user_mutex);
-    m_users.erase(std::remove_if(m_users.begin(), m_users.end(),
-                                 [](auto& user) {
-                                     bool should_remove = (user->state() == SyncUser::State::Removed);
-                                     if (should_remove) {
-                                         user->detach_from_sync_manager();
-                                     }
-                                     return should_remove;
-                                 }),
-                  m_users.end());
+    std::erase_if(m_users, [](auto& user) {
+        bool should_remove = (user->state() == SyncUser::State::Removed);
+        if (should_remove) {
+            user->detach_from_sync_manager();
+        }
+        return should_remove;
+    });
     return m_users;
 }
 

@@ -77,7 +77,7 @@ void consolidate_lists(std::vector<T>& list, std::vector<T>& list2)
         }
 
         // Remove all of the now zero-size chunks from the free list
-        list.erase(std::remove_if(begin(list), end(list), [](T& chunk) { return chunk.length == 0; }), end(list));
+        std::erase_if(list, [](T& chunk) { return chunk.length == 0; });
     }
 }
 

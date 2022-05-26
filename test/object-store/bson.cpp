@@ -34,7 +34,7 @@ using namespace std::string_view_literals;
 static inline std::string remove_whitespace(const char* c)
 {
     std::string str(c);
-    str.erase(std::remove_if(str.begin(), str.end(), isspace), str.end());
+    std::erase_if(str, isspace);
     return str;
 }
 

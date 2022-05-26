@@ -665,12 +665,9 @@ void RealmCoordinator::unregister_realm(Realm* realm)
         util::CheckedLockGuard lock(m_notifier_mutex);
         clean_up_dead_notifiers();
     }
-    {
-        auto new_end = remove_if(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers), [=](auto& notifier) {
-            return notifier.expired() || notifier.is_for_realm(realm);
-        });
-        m_weak_realm_notifiers.erase(new_end, end(m_weak_realm_notifiers));
-    }
+    std::erase_if(m_weak_realm_notifiers, [=](auto& notifier) {
+        return notifier.expired() || notifier.is_for_realm(realm);
+    });
 }
 
 // Thread-safety analsys doesn't reasonably handle calling functions on different
@@ -1247,7 +1244,7 @@ void RealmCoordinator::process_available_async(Realm& realm)
         return !(notifier->has_run() && (!in_read || notifier->version() == version) &&
                  notifier->package_for_delivery());
     };
-    notifiers.erase(std::remove_if(begin(notifiers), end(notifiers), package), end(notifiers));
+    std::erase_if(notifiers, package);
     if (notifiers.empty())
         return;
     lock.unlock();

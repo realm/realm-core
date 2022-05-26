@@ -1322,9 +1322,8 @@ void SlabAlloc::purge_old_mappings(uint64_t oldest_live_version, uint64_t younge
     auto pred = [=](auto& oldie) {
         return oldie.replaced_at_version < oldest_live_version;
     };
-    m_old_mappings.erase(std::remove_if(m_old_mappings.begin(), m_old_mappings.end(), pred), m_old_mappings.end());
-    m_old_translations.erase(std::remove_if(m_old_translations.begin(), m_old_translations.end(), pred),
-                             m_old_translations.end());
+    std::erase_if(m_old_mappings, pred);
+    std::erase_if(m_old_translations, pred);
     m_youngest_live_version = youngest_live_version;
     verify_old_translations(youngest_live_version);
 }

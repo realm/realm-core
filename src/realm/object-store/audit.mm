@@ -187,11 +187,9 @@ public:
                 // exist in the previous version. We don't need to report anything
                 // for the insertion as the new embedded object will be reported as
                 // part of the modification on the parent.
-                changes.modifications.erase(std::remove_if(changes.modifications.begin(), changes.modifications.end(),
-                                                           [&](ObjKey obj_key) {
-                                                               return !table->is_valid(obj_key);
-                                                           }),
-                                            changes.modifications.end());
+                std::erase_if(changes.modifications, [&](ObjKey obj_key) {
+                    return !table->is_valid(obj_key);
+                });
 
                 // Deleting an embedded object is reported as a mutation on the
                 // parent object.
@@ -407,11 +405,9 @@ public:
     {
         std::sort(query.objects.begin(), query.objects.end());
         query.objects.erase(std::unique(query.objects.begin(), query.objects.end()), query.objects.end());
-        query.objects.erase(std::remove_if(query.objects.begin(), query.objects.end(),
-                                           [&](auto& obj) {
-                                               return !object_exists(query.version, query.table, obj);
-                                           }),
-                            query.objects.end());
+        std::erase_if(query.objects, [&](auto& obj) {
+            return !object_exists(query.version, query.table, obj);
+        });
         if (query.objects.empty())
             m_logger.trace("Audit: discarding empty query on %1", query.table);
         return query.objects.empty();
@@ -675,11 +671,9 @@ std::shared_ptr<AuditRealmPool> AuditRealmPool::get_pool(std::shared_ptr<SyncUse
     static std::mutex s_pool_mutex;
     std::lock_guard lock{s_pool_mutex};
     static std::vector<CachedPool> s_pools;
-    s_pools.erase(std::remove_if(s_pools.begin(), s_pools.end(),
-                                 [](auto& pool) {
-                                     return pool.pool.expired();
-                                 }),
-                  s_pools.end());
+    std::erase_if(s_pools, [](auto& pool) {
+        return pool.pool.expired();
+    });
 
     auto app_id = user->sync_manager()->app().lock()->config().app_id;
     auto it = std::find_if(s_pools.begin(), s_pools.end(), [&](auto& pool) {
@@ -1110,11 +1104,9 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
         {
             ReadCombiner combiner{*m_logger};
             auto& events = scope.events;
-            events.erase(std::remove_if(events.begin(), events.end(),
-                                        [&](auto& event) {
-                                            return mpark::visit(combiner, event);
-                                        }),
-                         events.end());
+            std::erase_if(events, [&](auto& event) {
+                return mpark::visit(combiner, event);
+            });
         }
 
         // Filter out queries which were made empty by the above pass and filter
@@ -1122,11 +1114,9 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
         {
             EmptyQueryFilter filter{*m_source_db, *m_logger};
             auto& events = scope.events;
-            events.erase(std::remove_if(events.begin(), events.end(),
-                                        [&](auto& event) {
-                                            return mpark::visit(filter, event);
-                                        }),
-                         events.end());
+            std::erase_if(events, [&](auto& event) {
+                return mpark::visit(filter, event);
+            });
         }
 
         // Gather information about link accesses so that we can include

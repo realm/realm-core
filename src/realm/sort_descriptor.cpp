@@ -219,10 +219,9 @@ void DistinctDescriptor::execute(IndexPairs& v, const Sorter& predicate, const B
     using IP = ColumnsDescriptor::IndexPair;
     // Remove all rows which have a null link along the way to the distinct columns
     if (predicate.has_links()) {
-        auto nulls = std::remove_if(v.begin(), v.end(), [&](const IP& index) {
+        std::erase_if(v, [&](const IP& index) {
             return predicate.any_is_null(index);
         });
-        v.erase(nulls, v.end());
     }
 
     // Sort by the columns to distinct on

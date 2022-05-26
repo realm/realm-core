@@ -73,7 +73,7 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
 
     // First update any old moves
     if (!c.moves.empty() || !c.deletions.empty() || !c.insertions.empty()) {
-        auto it = std::remove_if(begin(moves), end(moves), [&](auto& old) {
+        std::erase_if(moves, [&](auto& old) {
             // Check if the moved row was moved again, and if so just update the destination
             auto it = std::find_if(begin(c.moves), end(c.moves), [&](auto const& m) {
                 return old.to == m.from;
@@ -98,17 +98,14 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
             old.to = c.insertions.shift(c.deletions.unshift(old.to));
             return false;
         });
-        moves.erase(it, end(moves));
     }
 
     // Ignore new moves of rows which were previously inserted (the implicit
     // delete from the move will remove the insert)
     if (!insertions.empty() && !c.moves.empty()) {
-        c.moves.erase(std::remove_if(begin(c.moves), end(c.moves),
-                                     [&](auto const& m) {
-                                         return insertions.contains(m.from);
-                                     }),
-                      end(c.moves));
+        std::erase_if(c.moves, [&](auto const& m) {
+            return insertions.contains(m.from);
+        });
     }
 
     // Ensure that any previously modified rows which were moved are still modified
@@ -160,16 +157,14 @@ void CollectionChangeBuilder::clean_up_stale_moves()
     // Look for moves which are now no-ops, and remove them plus the associated
     // insert+delete. Note that this isn't just checking for from == to due to
     // that rows can also be shifted by other inserts and deletes
-    moves.erase(std::remove_if(begin(moves), end(moves),
-                               [&](auto const& move) {
-                                   if (move.from - deletions.count(0, move.from) !=
-                                       move.to - insertions.count(0, move.to))
-                                       return false;
-                                   deletions.remove(move.from);
-                                   insertions.remove(move.to);
-                                   return true;
-                               }),
-                end(moves));
+    std::erase_if(moves, [&](auto const& move) {
+        if (move.from - deletions.count(0, move.from) !=
+            move.to - insertions.count(0, move.to))
+            return false;
+        deletions.remove(move.from);
+        insertions.remove(move.to);
+        return true;
+    });
 }
 
 void CollectionChangeBuilder::modify(size_t ndx, size_t col)
@@ -609,11 +604,9 @@ void calculate(CollectionChangeBuilder& ret, std::vector<RowInfo> old_rows, std:
 
     // Filter out the new insertions since we don't need them for any of the
     // further calculations
-    new_rows.erase(std::remove_if(begin(new_rows), end(new_rows),
-                                  [](auto& row) {
-                                      return row.prev_tv_index == IndexSet::npos;
-                                  }),
-                   end(new_rows));
+    std::erase_if(new_rows, [](auto& row) {
+        return row.prev_tv_index == IndexSet::npos;
+    });
     std::sort(begin(new_rows), end(new_rows), [](auto& lft, auto& rgt) {
         return lft.tv_index < rgt.tv_index;
     });
