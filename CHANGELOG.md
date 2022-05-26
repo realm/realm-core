@@ -5,8 +5,8 @@
 * None.
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
+* Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
+
  
 ### Breaking changes
 * None.
