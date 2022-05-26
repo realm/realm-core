@@ -4095,6 +4095,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         auto current_user = realm_app_get_current_user(&app);
         CHECK(realm_equals(sync_user_2, current_user));
         CHECK(realm_equals(sync_user_1, current_user));
+        realm_release(current_user);
         realm_release(sync_user_1);
         realm_release(sync_user_2);
     }
@@ -4175,6 +4176,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         realm_app_get_all_users(&app, &out_users, 10, &out_n);
         CHECK(out_n == 2);
         realm_release(out_users);
+        realm_release(current_user);
         realm_release(sync_user_1);
         realm_release(sync_user_2);
     }
@@ -4197,6 +4199,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
             auto res =
                 realm_app_user_apikey_provider_client_fetch_apikeys(&app, sync_user_1, callback, nullptr, nullptr);
             REQUIRE(res == true);
+            realm_release(sync_user_1);
         }
 
         SECTION("Success") {
