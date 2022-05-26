@@ -1677,6 +1677,7 @@ void Session::send_ident_message()
                      active_query_body); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
                                         active_query_set.version(), active_query_body); // Throws
+        m_last_sent_flx_query_version = active_query_set.version();
     }
     else {
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
@@ -1720,8 +1721,6 @@ void Session::send_query_change_message()
     m_conn.initiate_write_message(out, this);
 
     m_last_sent_flx_query_version = latest_sub_set.version();
-    m_pending_flx_sub_set =
-        sub_store->get_next_pending_version(m_last_sent_flx_query_version, m_pending_flx_sub_set->snapshot_version);
 
     enlist_to_send(); // throws
 }
