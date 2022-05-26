@@ -638,8 +638,8 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 // ################ SessionImpl ################
 
 
-inline void SessionImpl::on_connection_state_changed(ConnectionState state,
-                                                     const util::Optional<SessionErrorInfo>& error_info)
+void SessionImpl::on_connection_state_changed(ConnectionState state,
+                                              const util::Optional<SessionErrorInfo>& error_info)
 {
     m_wrapper.on_connection_state_changed(state, error_info); // Throws
 }
