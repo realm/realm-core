@@ -795,14 +795,14 @@ buildvariants:
   display_name: "RHEL 7 x86_64"
   run_on: rhel70-small
   expansions:
-    c_compiler: /opt/mongodbtoolchain/v3/bin/gcc
-    cxx_compiler: /opt/mongodbtoolchain/v3/bin/g++
+    c_compiler: /opt/mongodbtoolchain/v4/bin/gcc
+    cxx_compiler: /opt/mongodbtoolchain/v4/bin/g++
     cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
     cmake_bindir: "./cmake_binaries/bin"
     fetch_missing_dependencies: On
-    curl: "/opt/mongodbtoolchain/v3/bin/curl"
+    curl: "/opt/mongodbtoolchain/v4/bin/curl"
     run_tests_against_baas: On
-    python3: "/opt/mongodbtoolchain/v3/bin/python3"
+    python3: "/opt/mongodbtoolchain/v4/bin/python3"
     ninja: "/opt/mongodbtoolchain/v4/bin/ninja"
   tasks:
   - name: compile_test_and_package
