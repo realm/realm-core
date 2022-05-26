@@ -90,14 +90,12 @@ struct State {
 };
 
 struct UnreachableInstructionHandler : public InstructionHandler {
-    void set_intern_string(uint32_t, StringBufferRange)
-    override
+    void set_intern_string(uint32_t, StringBufferRange) override
     {
         REALM_UNREACHABLE();
     }
 
-    StringBufferRange add_string_range(StringData)
-    override
+    StringBufferRange add_string_range(StringData) override
     {
         REALM_UNREACHABLE();
     }
