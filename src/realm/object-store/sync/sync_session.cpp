@@ -746,6 +746,7 @@ void SyncSession::create_sync_session()
                     case cs::connected:
                         return ConnectionState::Connected;
                 }
+                REALM_UNREACHABLE();
             }();
             util::CheckedUniqueLock lock(self->m_connection_state_mutex);
             auto old_state = self->m_connection_state;
