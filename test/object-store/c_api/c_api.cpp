@@ -4095,6 +4095,8 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         auto current_user = realm_app_get_current_user(&app);
         CHECK(realm_equals(sync_user_2, current_user));
         CHECK(realm_equals(sync_user_1, current_user));
+        realm_release(sync_user_1);
+        realm_release(sync_user_2);
     }
 
     SECTION("remove_user integration") {
@@ -4110,6 +4112,23 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         realm_app_remove_user(&app, sync_user_1, realm_app_void_completion, nullptr, nullptr);
         auto state = realm_user_get_state(sync_user_1);
         CHECK(state == RLM_USER_STATE_REMOVED);
+        realm_release(sync_user_1);
+    }
+
+    SECTION("delete_user integration") {
+        AutoVerifiedEmailCredentials creds;
+        realm_user_t* sync_user_1 = nullptr;
+        realm_string_t password{creds.password.c_str(), creds.password.length()};
+        realm_app_email_password_provider_client_register_email(&app, creds.email.c_str(), password,
+                                                                realm_app_void_completion, nullptr, nullptr);
+        realm_app_credentials anonymous(app::AppCredentials::anonymous());
+        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user_1, nullptr);
+
+        CHECK(realm_user_get_auth_provider(sync_user_1) == RLM_AUTH_PROVIDER_ANONYMOUS);
+        realm_app_delete_user(&app, sync_user_1, realm_app_void_completion, nullptr, nullptr);
+        auto state = realm_user_get_state(sync_user_1);
+        CHECK(state == RLM_USER_STATE_REMOVED);
+        realm_release(sync_user_1);
     }
 
     SECTION("link_user integration") {
@@ -4131,6 +4150,102 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
 
         CHECK(processed);
         realm_release(sync_user);
+    }
+
+    SECTION("realm_app_get_all_users integration") {
+        AutoVerifiedEmailCredentials creds;
+        realm_user_t* sync_user_1 = nullptr;
+        realm_user_t* sync_user_2 = nullptr;
+        realm_string_t password{creds.password.c_str(), creds.password.length()};
+        realm_app_email_password_provider_client_register_email(&app, creds.email.c_str(), password,
+                                                                realm_app_void_completion, nullptr, nullptr);
+        realm_app_credentials anonymous(app::AppCredentials::anonymous());
+        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user_1, nullptr);
+        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user_2, nullptr);
+
+        CHECK(realm_user_get_auth_provider(sync_user_1) == RLM_AUTH_PROVIDER_ANONYMOUS);
+        CHECK(realm_user_get_auth_provider(sync_user_2) == RLM_AUTH_PROVIDER_ANONYMOUS);
+        realm_app_switch_user(&app, sync_user_1, &sync_user_2);
+        auto current_user = realm_app_get_current_user(&app);
+        CHECK(realm_equals(sync_user_2, current_user));
+        CHECK(realm_equals(sync_user_1, current_user));
+
+        realm_user_t* out_users = (realm_user_t*)malloc(10 * sizeof(realm_user_t));
+        size_t out_n = 0;
+        realm_app_get_all_users(&app, &out_users, 10, &out_n);
+        CHECK(out_n == 2);
+        realm_release(out_users);
+        realm_release(sync_user_1);
+        realm_release(sync_user_2);
+    }
+
+    SECTION("realm_app_user_apikey_provider_client_fetch_apikeys") {
+        SECTION("Failure") {
+            AutoVerifiedEmailCredentials creds;
+            realm_user_t* sync_user_1 = nullptr;
+            realm_string_t password{creds.password.c_str(), creds.password.length()};
+            realm_app_email_password_provider_client_register_email(&app, creds.email.c_str(), password,
+                                                                    realm_app_void_completion, nullptr, nullptr);
+            realm_app_credentials anonymous(app::AppCredentials::anonymous());
+            realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user_1, nullptr);
+            CHECK(realm_user_get_auth_provider(sync_user_1) == RLM_AUTH_PROVIDER_ANONYMOUS);
+            auto callback = [](realm_userdata_t, realm_app_user_apikey_t[], size_t count, realm_app_error_t* error) {
+                CHECK(error);
+                CHECK(count == 0);
+            };
+            // Should fail with 403
+            auto res =
+                realm_app_user_apikey_provider_client_fetch_apikeys(&app, sync_user_1, callback, nullptr, nullptr);
+            REQUIRE(res == true);
+        }
+
+        SECTION("Success") {
+            TestAppSession session;
+            realm_app app(session.app());
+
+            class AppObject {
+            public:
+                static AppObject& create()
+                {
+                    static AppObject obj;
+                    return obj;
+                }
+                const char* key() const
+                {
+                    return api_key_name.c_str();
+                }
+
+            private:
+                AppObject()
+                {
+                    api_key_name = util::format("%1", random_string(15));
+                }
+                std::string api_key_name;
+            };
+
+            auto create_api_callback = [](realm_userdata_t, realm_app_user_apikey_t* api_key,
+                                          const realm_app_error_t* error) {
+                REQUIRE_FALSE(error);
+                REQUIRE(api_key);
+                CHECK(strcmp(api_key->name, AppObject::create().key()) == 0);
+            };
+            auto current_user = realm_app_get_current_user(&app);
+            auto state = realm_app_user_apikey_provider_client_create_apikey(
+                &app, current_user, AppObject::create().key(), create_api_callback, nullptr, nullptr);
+            REQUIRE(state);
+
+            auto fetch_apikey_callback = [](realm_userdata_t, realm_app_user_apikey_t* keys, size_t count,
+                                            realm_app_error_t* error) {
+                REQUIRE_FALSE(error);
+                REQUIRE(keys);
+                REQUIRE(count == 1);
+                CHECK(strcmp(keys[0].name, AppObject::create().key()) == 0);
+            };
+            state = realm_app_user_apikey_provider_client_fetch_apikeys(&app, current_user, fetch_apikey_callback,
+                                                                        nullptr, nullptr);
+            REQUIRE(state);
+            realm_release(current_user);
+        }
     }
 }
 
