@@ -321,8 +321,10 @@ public:
             else {
                 // This section previously existed
                 size_t old_index = it->second;
-                int64_t diff = m_sectioned_results.m_sections[section.index].indices.size() -
-                               m_prev_sections[old_index].indices.size();
+                // WIN32 requires a cast to `uint64_t` otherwise `SIZE_MAX` will be the value
+                // if the resulting subtraction yields a negative number.
+                int64_t diff = (uint64_t)m_sectioned_results.m_sections[section.index].indices.size() -
+                               (uint64_t)m_prev_sections[old_index].indices.size();
 
                 auto& i = insertions[section.index];
                 auto& d = deletions[old_index];

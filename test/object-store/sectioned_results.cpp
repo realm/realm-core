@@ -607,7 +607,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->create_object().set(name_col, "cake");
         r->commit_transaction();
 
-        sectioned_results.size();
         REQUIRE(sectioned_results.size() == 6);
         REQUIRE(algo_run_count == 10);
         std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "cake",
