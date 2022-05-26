@@ -234,7 +234,7 @@ void Results::ensure_up_to_date(EvaluateMode mode)
             if (!needs_update)
                 return;
 
-           m_last_collection_content_version = m_collection->get_obj().get_table()->get_content_version();
+            m_last_collection_content_version = m_collection->get_obj().get_table()->get_content_version();
 
             if (m_collection->is_empty()) {
                 m_list_indices->clear();
