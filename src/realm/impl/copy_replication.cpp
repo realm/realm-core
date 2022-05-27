@@ -31,17 +31,11 @@ void CopyReplication::add_class(TableKey, StringData name, Table::Type table_typ
             throw std::runtime_error(util::format("Incompatible class: %1", name));
         return;
     }
-    if (table_type == Table::Type::Embedded) {
-        m_tr->add_embedded_table(name);
-    }
-    else {
-        bool is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
-        m_tr->add_table(name, is_asymmetric);
-    }
+    m_tr->add_table(name, table_type);
 }
 
 void CopyReplication::add_class_with_primary_key(TableKey, StringData name, DataType type, StringData pk_name,
-                                                 bool nullable, bool asymmetric)
+                                                 bool nullable, Table::Type table_type)
 {
     if (auto existing_table = m_tr->get_table(name)) {
         auto pk_col = existing_table->get_primary_key_column();
@@ -49,7 +43,7 @@ void CopyReplication::add_class_with_primary_key(TableKey, StringData name, Data
             throw std::runtime_error(util::format("Incompatible class: %1", name));
         return;
     }
-    m_tr->add_table_with_primary_key(name, type, pk_name, nullable, asymmetric);
+    m_tr->add_table_with_primary_key(name, type, pk_name, nullable, table_type);
 }
 
 void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType type, StringData name, Table* dest)

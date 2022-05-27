@@ -333,22 +333,22 @@ TEST(Group_GetOrAddTable)
     CHECK_EQUAL(1, group.size());
 
     bool was_created = false;
-    group.get_or_add_table("foo", &was_created);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_created);
     CHECK(was_created);
     CHECK_EQUAL(2, group.size());
-    group.get_or_add_table("foo", &was_created);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(2, group.size());
-    group.get_or_add_table("bar", &was_created);
+    group.get_or_add_table("bar", Table::Type::TopLevel, &was_created);
     CHECK(was_created);
     CHECK_EQUAL(3, group.size());
-    group.get_or_add_table("baz", &was_created);
+    group.get_or_add_table("baz", Table::Type::TopLevel, &was_created);
     CHECK(was_created);
     CHECK_EQUAL(4, group.size());
-    group.get_or_add_table("bar", &was_created);
+    group.get_or_add_table("bar", Table::Type::TopLevel, &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(4, group.size());
-    group.get_or_add_table("baz", &was_created);
+    group.get_or_add_table("baz", Table::Type::TopLevel, &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(4, group.size());
 }
@@ -358,10 +358,10 @@ TEST(Group_GetOrAddTable2)
 {
     Group group;
     bool was_inserted;
-    group.get_or_add_table("foo", &was_inserted);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK(was_inserted);
-    group.get_or_add_table("foo", &was_inserted);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK_NOT(was_inserted);
 }
@@ -1301,7 +1301,7 @@ static void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int dep
 TEST(Group_CascadeNotify_TreeCascade)
 {
     Group g;
-    TableRef t = g.add_embedded_table("table");
+    TableRef t = g.add_table("table", Table::Type::Embedded);
     TableRef parent = g.add_table("parent");
     auto left = t->add_column(*t, "left");
     auto right = t->add_column(*t, "right");
@@ -1341,7 +1341,7 @@ TEST(Group_ChangeEmbeddedness)
     p1.set(col, obj1.get_key());
     p2.set(col, obj2.get_key());
 
-    // obj2 has no owner, so we can't make the table embedded
+    // obj3 has no owner, so we can't make the table embedded
     std::string message;
     CHECK_THROW_ANY_GET_MESSAGE(t->set_table_type(Table::Type::Embedded), message);
     CHECK_EQUAL(message, "At least one object in 'table' does not have a backlink (data would get lost).");

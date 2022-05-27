@@ -205,9 +205,9 @@ void SyncReplication::add_class(TableKey tk, StringData name, Table::Type table_
 }
 
 void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, DataType pk_type, StringData pk_field,
-                                                 bool nullable, bool is_asymmetric)
+                                                 bool nullable, Table::Type table_type)
 {
-    Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable, is_asymmetric);
+    Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable, table_type);
 
     bool is_class = name.begins_with("class_");
 
@@ -215,6 +215,7 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
         Instruction::AddTable instr;
         instr.table = emit_class_name(name);
         auto field = m_encoder.intern_string(pk_field);
+        auto is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
         auto spec = Instruction::AddTable::TopLevelTable{field, get_payload_type(pk_type), nullable, is_asymmetric};
         if (!is_valid_key_type(spec.pk_type)) {
             unsupported_instruction();
@@ -230,9 +231,7 @@ void SyncReplication::create_object(const Table* table, GlobalKey oid)
         unsupported_instruction(); // FIXME: TODO
     }
 
-    if (!table->is_asymmetric()) {
-        Replication::create_object(table, oid);
-    }
+    Replication::create_object(table, oid);
     if (select_table(*table)) {
         if (table->get_primary_key_column()) {
             // Trying to create object without a primary key in a table that
@@ -276,9 +275,7 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
         unsupported_instruction();
     }
 
-    if (!table->is_asymmetric()) {
-        Replication::create_object_with_primary_key(table, oid, value);
-    }
+    Replication::create_object_with_primary_key(table, oid, value);
     if (select_table(*table)) {
         auto col = table->get_primary_key_column();
         if (col && ((value.is_null() && col.is_nullable()) || DataType(col.get_type()) == value.get_type())) {
@@ -479,9 +476,7 @@ void SyncReplication::list_insert(const CollectionBase& list, size_t ndx, Mixed 
 
 void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fast64_t value)
 {
-    if (!table->is_asymmetric()) {
-        Replication::add_int(table, col, ndx, value);
-    }
+    Replication::add_int(table, col, ndx, value);
 
     if (select_table(*table)) {
         REALM_ASSERT(col != table->get_primary_key_column());
@@ -495,9 +490,7 @@ void SyncReplication::add_int(const Table* table, ColKey col, ObjKey ndx, int_fa
 
 void SyncReplication::set(const Table* table, ColKey col, ObjKey key, Mixed value, _impl::Instruction variant)
 {
-    if (!table->is_asymmetric()) {
-        Replication::set(table, col, key, value, variant);
-    }
+    Replication::set(table, col, key, value, variant);
 
     if (key.is_unresolved()) {
         return;

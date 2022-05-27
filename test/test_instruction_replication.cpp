@@ -253,7 +253,7 @@ TEST(InstructionReplication_CreateEmbedded)
     {
         WriteTransaction wt{fixture.sg_1};
         TableRef car = wt.get_group().add_table_with_primary_key("class_Car", type_String, "id", false);
-        auto wheel = wt.add_embedded_table("class_Wheel");
+        auto wheel = wt.add_table("class_Wheel", Table::Type::Embedded);
         auto col_position = wheel->add_column(type_String, "position");
         auto col_wheels = car->add_column_list(*wheel, "wheels");
         Obj volvo = car->create_object_with_primary_key("Volvo");

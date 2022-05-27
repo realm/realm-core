@@ -1306,7 +1306,7 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
                     util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
                                  Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
-                                            pk_col.is_nullable(), table->is_asymmetric());
+                                            pk_col.is_nullable(), table->get_table_type());
         }
         else {
             repl.add_class(tk, table_name, Table::Type::Embedded);

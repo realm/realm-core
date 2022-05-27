@@ -328,7 +328,7 @@ void ChangesetParser::State::parse_one()
                     break;
                 }
                 default:
-                    REALM_UNREACHABLE();
+                    parser_error("AddTable: unknown table type");
             }
             m_handler(instr);
             return;

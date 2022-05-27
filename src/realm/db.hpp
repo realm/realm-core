@@ -887,19 +887,15 @@ public:
         return trans->get_table(name); // Throws
     }
 
-    TableRef add_table(StringData name, bool asymmetric = false) const
+    TableRef add_table(StringData name, Table::Type table_type = Table::Type::TopLevel) const
     {
-        return trans->add_table(name, asymmetric); // Throws
+        return trans->add_table(name, table_type); // Throws
     }
 
-    TableRef add_embedded_table(StringData name) const
+    TableRef get_or_add_table(StringData name, Table::Type table_type = Table::Type::TopLevel,
+                              bool* was_added = nullptr) const
     {
-        return trans->add_embedded_table(name); // Throws
-    }
-
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr, bool asymmetric = false) const
-    {
-        return trans->get_or_add_table(name, was_added, asymmetric); // Throws
+        return trans->get_or_add_table(name, table_type, was_added); // Throws
     }
 
     Group& get_group() const noexcept

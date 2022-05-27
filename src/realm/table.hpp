@@ -86,7 +86,10 @@ enum class ExpressionComparisonType : unsigned char {
 
 class Table {
 public:
-    enum class Type : uint8_t { TopLevel, Embedded, TopLevelAsymmetric };
+    /// The type of tables supported by a realm.
+    /// Note: Any change to this enum is a file-format breaking change.
+    enum class Type : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
+    constexpr static uint8_t table_type_mask = 0x3;
 
     /// Construct a new freestanding top-level table with static
     /// lifetime. For debugging only.
@@ -858,6 +861,22 @@ private:
     friend class Dictionary;
     friend class IncludeDescriptor;
 };
+
+inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
+{
+    switch (table_type) {
+        case Table::Type::TopLevel:
+            o << "TopLevel";
+            break;
+        case Table::Type::Embedded:
+            o << "Embedded";
+            break;
+        case Table::Type::TopLevelAsymmetric:
+            o << "TopLevelAsymmetric";
+            break;
+    }
+    return o;
+}
 
 class ColKeyIterator {
 public:

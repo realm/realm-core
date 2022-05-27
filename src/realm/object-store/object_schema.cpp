@@ -314,6 +314,16 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
                                 object_name, prop.name, prop.object_type);
         return;
     }
+    if (parent_object_schema.is_asymmetric) {
+        exceptions.emplace_back("Asymmetric table with property '%1.%2' of type '%3' cannot have an object type.",
+                                object_name, prop.name, string_for_property_type(prop.type));
+        return;
+    }
+    if (it->is_asymmetric) {
+        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an asymmetric object type ('%4').",
+                                object_name, prop.name, string_for_property_type(prop.type), prop.object_type);
+        return;
+    }
     if (prop.type != PropertyType::LinkingObjects)
         return;
 
@@ -422,9 +432,6 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     if (!primary_key.empty() && !primary && !primary_key_property()) {
         exceptions.emplace_back("Specified primary key '%1.%2' does not exist.", name, primary_key);
     }
-    if (primary_key.empty() && is_asymmetric) {
-        exceptions.emplace_back("Asymmetric object type '%1' must have a primary key.", name);
-    }
 
     if (for_sync && !is_embedded) {
         if (primary_key.empty()) {
@@ -437,6 +444,10 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
                 "The primary key property on a synchronized Realm must be named '_id' but found '%1' for type '%2'",
                 primary_key, name));
         }
+    }
+
+    if (!for_sync && is_asymmetric) {
+        exceptions.emplace_back(util::format("Asymmetric table '%1' not allowed in a local Realm", name));
     }
 }
 

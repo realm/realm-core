@@ -304,13 +304,13 @@ public:
     TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
 
-    TableRef add_table(StringData name, bool asymmetric = false);
-    TableRef add_embedded_table(StringData name);
+    TableRef add_table(StringData name, Table::Type table_type = Table::Type::TopLevel);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false,
-                                        bool asymmetric = false);
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr, bool asymmetric = false);
+                                        Table::Type table_type = Table::Type::TopLevel);
+    TableRef get_or_add_table(StringData name, Table::Type table_typeb = Table::Type::TopLevel,
+                              bool* was_added = nullptr);
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
-                                               bool nullable = false, bool asymmetric = false);
+                                               bool nullable = false, Table::Type table_type = Table::Type::TopLevel);
 
     void remove_table(TableKey key);
     void remove_table(StringData name);
@@ -969,33 +969,23 @@ inline ConstTableRef Group::get_table(StringData name) const
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-inline TableRef Group::add_table(StringData name, bool asymmetric)
+inline TableRef Group::add_table(StringData name, Table::Type table_type)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
-    auto table_type = asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel;
     Table* table = do_add_table(name, table_type); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-inline TableRef Group::add_embedded_table(StringData name)
+inline TableRef Group::get_or_add_table(StringData name, Table::Type table_type, bool* was_added)
 {
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    check_table_name_uniqueness(name);
-    Table* table = do_add_table(name, Table::Type::Embedded); // Throws
-    return TableRef(table, table->m_alloc.get_instance_version());
-}
-
-inline TableRef Group::get_or_add_table(StringData name, bool* was_added, bool asymmetric)
-{
+    REALM_ASSERT(table_type != Table::Type::Embedded);
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
-    auto table_type = asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel;
     if (!table) {
         table = do_add_table(name, table_type);
     }
@@ -1003,17 +993,19 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added, bool a
 }
 
 inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
-                                                         bool nullable, bool asymmetric)
+                                                         bool nullable, Table::Type table_type)
 {
+    REALM_ASSERT(table_type != Table::Type::Embedded);
     if (TableRef table = get_table(name)) {
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
-            table->is_nullable(table->get_primary_key_column()) != nullable || table->is_asymmetric() != asymmetric) {
+            table->is_nullable(table->get_primary_key_column()) != nullable ||
+            table->get_table_type() != table_type) {
             throw std::runtime_error("Inconsistent schema");
         }
         return table;
     }
     else {
-        return add_table_with_primary_key(name, pk_type, pk_name, nullable, asymmetric);
+        return add_table_with_primary_key(name, pk_type, pk_name, nullable, table_type);
     }
 }
 

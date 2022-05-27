@@ -162,7 +162,7 @@ TEST(Unresolved_InvalidateObject)
 {
     Group g;
 
-    auto wheels = g.add_embedded_table("Wheels");
+    auto wheels = g.add_table("Wheels", Table::Type::Embedded);
     auto cars = g.add_table_with_primary_key("Car", type_String, "model");
     auto col_wheels = cars->add_column_list(*wheels, "wheels");
     auto col_price = cars->add_column(type_Decimal, "price");

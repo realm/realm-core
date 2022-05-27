@@ -42,7 +42,7 @@ public:
 
     void add_class(TableKey tk, StringData table_name, Table::Type table_type = Table::Type::TopLevel) final;
     void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
-                                    bool nullable, bool is_asymmetric) final;
+                                    bool nullable, Table::Type table_type) final;
     void create_object(const Table*, GlobalKey) final;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
     void prepare_erase_class(TableKey tk) final;

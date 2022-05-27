@@ -362,6 +362,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
             object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
     if (object_schema.is_asymmetric) {
+        obj.remove();
         return Object{};
     }
     return object;

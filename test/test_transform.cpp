@@ -2180,7 +2180,7 @@ TEST(Transform_SetInsert_Clear_same_path)
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
-        auto embedded_table = tr.add_embedded_table("class_Embedded");
+        auto embedded_table = tr.add_table("class_Embedded", Table::Type::Embedded);
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
         auto obj = table->create_object_with_primary_key(pk);
@@ -2237,7 +2237,7 @@ TEST(Transform_SetInsert_Clear_different_paths)
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
-        auto embedded_table = tr.add_embedded_table("class_Embedded");
+        auto embedded_table = tr.add_table("class_Embedded", Table::Type::Embedded);
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
         auto obj = table->create_object_with_primary_key(pk);
@@ -2301,7 +2301,7 @@ TEST(Transform_SetErase_Clear_same_path)
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
-        auto embedded_table = tr.add_embedded_table("class_Embedded");
+        auto embedded_table = tr.add_table("class_Embedded", Table::Type::Embedded);
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
         auto obj = table->create_object_with_primary_key(pk);
@@ -2362,7 +2362,7 @@ TEST(Transform_SetErase_Clear_different_paths)
     client_2->transaction([&](Peer& c) {
         auto& tr = *c.group;
         auto table = tr.add_table_with_primary_key("class_Table", type_Int, "_id");
-        auto embedded_table = tr.add_embedded_table("class_Embedded");
+        auto embedded_table = tr.add_table("class_Embedded", Table::Type::Embedded);
         auto link_col_key = table->add_column_list(*embedded_table, "embedded");
         auto set_col_key = embedded_table->add_column_set(type_Int, "set");
         auto obj = table->create_object_with_primary_key(pk);

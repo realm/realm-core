@@ -48,7 +48,7 @@ public:
     // Formerly Replication:
     virtual void add_class(TableKey table_key, StringData table_name, Table::Type table_type);
     virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
-                                            bool nullable, bool asymmetric);
+                                            bool nullable, Table::Type table_type);
     virtual void prepare_erase_class(TableKey table_key);
     virtual void erase_class(TableKey table_key, size_t num_tables);
     virtual void rename_class(TableKey table_key, StringData new_name);

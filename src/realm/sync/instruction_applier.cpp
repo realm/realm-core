@@ -120,9 +120,10 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 
     auto add_table = util::overload{
         [&](const Instruction::AddTable::TopLevelTable& spec) {
+            auto table_type = (spec.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
             if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
                 log("sync::create_table(group, \"%1\", %2);", table_name, spec.is_asymmetric);
-                m_transaction.get_or_add_table(table_name, nullptr, spec.is_asymmetric);
+                m_transaction.get_or_add_table(table_name, table_type);
             }
             else {
                 if (!is_valid_key_type(spec.pk_type)) {
@@ -136,7 +137,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
 
                 log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4, %5);", table_name,
                     pk_type, pk_field, nullable, asymmetric);
-                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable, asymmetric);
+                m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable, table_type);
             }
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {
@@ -147,7 +148,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
             }
             else {
                 log("group.add_embedded_table(\"%1\");", table_name);
-                m_transaction.add_embedded_table(table_name);
+                m_transaction.add_table(table_name, Table::Type::Embedded);
             }
         },
     };
@@ -245,7 +246,6 @@ void InstructionApplier::operator()(const Instruction::CreateObject& instr)
             },
         },
         instr.object);
-    // TODO: check here and skip asymetric object
 }
 
 void InstructionApplier::operator()(const Instruction::EraseObject& instr)
@@ -494,7 +494,6 @@ void InstructionApplier::operator()(const Instruction::Update& instr)
     };
     UpdateResolver resolver(this, instr);
     resolver.resolve();
-    // TODO: maybe here too
 }
 
 void InstructionApplier::operator()(const Instruction::AddInteger& instr)

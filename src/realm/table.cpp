@@ -630,7 +630,7 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     }
     else {
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-        m_table_type = Type(flags & 0x3);
+        m_table_type = Type(flags & table_type_mask);
     }
     m_has_any_embedded_objects.reset();
 
@@ -1056,20 +1056,8 @@ void Table::set_table_type(Type table_type)
         throw std::logic_error(util::format("Cannot change '%1' to/from asymmetric.", get_name()));
     }
 
-    switch (table_type) {
-        case Type::TopLevel: {
-            set_embedded(false);
-            break;
-        }
-        case Type::Embedded: {
-            set_embedded(true);
-            break;
-        }
-        default:
-            REALM_UNREACHABLE();
-    }
-
-    do_set_table_type(table_type);
+    REALM_ASSERT_EX(table_type == Type::TopLevel || table_type == Type::Embedded, table_type);
+    set_embedded(table_type == Type::Embedded);
 }
 
 void Table::set_embedded(bool embedded)
@@ -1126,7 +1114,7 @@ void Table::do_set_table_type(Type table_type)
 
     uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
     // reset bits 0-1
-    flags &= ~3;
+    flags &= ~table_type_mask;
     // set table type
     flags |= static_cast<uint8_t>(table_type);
     m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
@@ -2641,7 +2629,7 @@ void Table::update_from_parent() noexcept
         m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-            m_table_type = Type(flags & 0x3);
+            m_table_type = Type(flags & table_type_mask);
         }
         else {
             m_table_type = Type::TopLevel;
@@ -2832,7 +2820,7 @@ void Table::refresh_accessor_tree()
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
     if (m_top.size() > top_position_for_flags) {
         auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
-        m_table_type = Type(rot_flags.get_as_int() & 0x3);
+        m_table_type = Type(rot_flags.get_as_int() & table_type_mask);
     }
     else {
         m_table_type = Type::TopLevel;

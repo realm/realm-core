@@ -836,13 +836,12 @@ Table* Group::do_get_table(StringData name)
 }
 
 TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable,
-                                           bool asymmetric)
+                                           Table::Type table_type)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
 
-    auto table_type = asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel;
     auto table = do_add_table(name, table_type, false);
 
     // Add pk column - without replication
@@ -854,7 +853,7 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
     table->do_set_primary_key_column(pk_col);
 
     if (Replication* repl = *get_repl())
-        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable, asymmetric);
+        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable, table_type);
 
     return TableRef(table, table->m_alloc.get_instance_version());
 }
