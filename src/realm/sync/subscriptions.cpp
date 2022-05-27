@@ -119,11 +119,6 @@ std::string_view Subscription::query_string() const
     return m_query_string;
 }
 
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(std::move(mgr), *tr, std::move(obj))
-{
-}
-
 SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj)
     : m_mgr(mgr)
 {
@@ -218,7 +213,7 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
 }
 
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(mgr, tr, obj)
+    : SubscriptionSet(mgr, *tr, obj)
     , m_tr(std::move(tr))
     , m_obj(std::move(obj))
     , m_old_state(state())
@@ -615,31 +610,23 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
     }
 }
 
-SubscriptionSet SubscriptionStore::get_latest(util::Optional<Transaction&> tr) const
+SubscriptionSet SubscriptionStore::get_latest() const
 {
-    TransactionRef owned_tr;
-    if (!tr) {
-        owned_tr = m_db->start_frozen();
-        tr = *owned_tr;
-    }
-    auto sub_sets = tr.value().get_table(m_sub_set_table);
+    auto tr = m_db->start_frozen();
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), tr.value(), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
     auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
     auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
-    return SubscriptionSet(weak_from_this(), tr.value(), std::move(latest_obj));
+    return SubscriptionSet(weak_from_this(), *tr, std::move(latest_obj));
 }
 
-SubscriptionSet SubscriptionStore::get_active(util::Optional<Transaction&> tr) const
+SubscriptionSet SubscriptionStore::get_active() const
 {
-    TransactionRef owned_tr;
-    if (!tr) {
-        owned_tr = m_db->start_frozen();
-        tr = *owned_tr;
-    }
-    auto sub_sets = tr.value().get_table(m_sub_set_table);
+    auto tr = m_db->start_frozen();
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
         return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
@@ -652,9 +639,9 @@ SubscriptionSet SubscriptionStore::get_active(util::Optional<Transaction&> tr) c
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), tr.value(), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
-    return SubscriptionSet(weak_from_this(), tr.value(), res.get_object(0));
+    return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
 
 std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
@@ -731,8 +718,7 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_table);
     try {
-        return SubscriptionSet(weak_from_this(), std::move(tr),
-                               sub_sets->get_object_with_primary_key(Mixed{version_id}));
+        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(Mixed{version_id}));
     }
     catch (const KeyNotFound&) {
         std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);

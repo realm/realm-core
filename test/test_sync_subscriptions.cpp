@@ -497,7 +497,6 @@ TEST(Sync_SubscriptionStoreSubSetHasTable)
 
     auto read_tr = fixture.db->start_read();
     // We should have no subscriptions yet so this should return false.
-    auto latest = store->get_latest(*read_tr);
     auto table_set = store->get_tables_for_latest(*read_tr);
     CHECK(table_set.empty());
 

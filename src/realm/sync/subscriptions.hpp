@@ -179,9 +179,6 @@ public:
     const_iterator find(StringData name) const;
     const_iterator find(const Query& query) const;
 
-    // Returns true if at least one subscription exists for a given object_class_name
-    bool has_subscription_for_table(std::string_view object_class_name) const;
-
     // Returns this query set as extended JSON in a form suitable for transmitting to the server.
     std::string to_ext_json() const;
 
@@ -195,7 +192,6 @@ protected:
     };
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj);
 
     void load_from_database(const Transaction& tr, Obj obj);
@@ -304,12 +300,12 @@ public:
     // Get the latest subscription created by calling update_latest(). Once bootstrapping is complete,
     // this and get_active() will return the same thing. If no SubscriptionSet has been set, then
     // this returns an empty SubscriptionSet that you can clone() in order to mutate.
-    SubscriptionSet get_latest(util::Optional<Transaction&> tr = util::none) const;
+    SubscriptionSet get_latest() const;
 
     // Gets the subscription set that has been acknowledged by the server as having finished bootstrapping.
     // If no subscriptions have reached the complete stage, this returns an empty subscription with version
     // zero.
-    SubscriptionSet get_active(util::Optional<Transaction&> tr = util::none) const;
+    SubscriptionSet get_active() const;
 
     // Returns the version number of the current active and latest subscription sets. This function guarantees
     // that the versions will be read from the same underlying transaction and will thus be consistent.
