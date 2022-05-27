@@ -5596,4 +5596,14 @@ TEST(Query_NotWithEmptyGroup)
     CHECK_EQUAL(q.count(), 1);
 }
 
+TEST(Query_AsymmetricObjects)
+{
+    Group g;
+    TableRef table = g.add_table("table", Table::Type::TopLevelAsymmetric);
+    auto col = table->add_column(type_String, "type");
+    table->create_object().set(col, "hello");
+    CHECK_LOGIC_ERROR(table->where().equal(col, "hello").Or().Not().group().end_group(),
+                      LogicError::wrong_kind_of_table);
+}
+
 #endif // TEST_QUERY

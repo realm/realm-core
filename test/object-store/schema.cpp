@@ -112,7 +112,9 @@ TEST_CASE("ObjectSchema") {
 
         TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
         TableRef target = g.add_table("class_target");
-        TableRef embedded = g.add_embedded_table("class_embedded");
+        TableRef embedded = g.add_table("class_embedded", Table::Type::Embedded);
+        TableRef asymmetric =
+            g.add_table_with_primary_key("class_asymmetric", type_Int, "pk", false, Table::Type::TopLevelAsymmetric);
 
         table->add_column(type_Int, "int");
         table->add_column(type_Bool, "bool");
@@ -224,11 +226,18 @@ TEST_CASE("ObjectSchema") {
         for (auto col : indexed_cols)
             table->add_search_index(col);
 
+        asymmetric->add_column(type_Int, "int");
+
         ObjectSchema os(g, "table", table->get_key());
         REQUIRE(os.table_key == table->get_key());
         ObjectSchema os1(g, "embedded", {});
         REQUIRE(os1.table_key == embedded->get_key());
         REQUIRE(os1.is_embedded);
+        REQUIRE(!os1.is_asymmetric);
+        ObjectSchema os2(g, "asymmetric", asymmetric->get_key());
+        REQUIRE(os2.table_key == asymmetric->get_key());
+        REQUIRE(os2.is_asymmetric);
+        REQUIRE(!os2.is_embedded);
 
 #define REQUIRE_PROPERTY(name, type, ...)                                                                            \
     do {                                                                                                             \
@@ -354,6 +363,54 @@ TEST_CASE("Schema") {
             };
             REQUIRE_THROWS_CONTAINING(schema.validate(),
                                       "Property 'object.link' of type 'object' has unknown object type ''");
+        }
+
+        SECTION("allow asymmetric tables") {
+            Schema schema = {
+                {"sensor",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"reading", PropertyType::Int}}},
+                {"location",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
+            };
+            REQUIRE_NOTHROW(schema.validate(SchemaValidationMode::Sync));
+        }
+
+        SECTION("asymmetric tables not allowed in local realm") {
+            Schema schema = {
+                {"sensor",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"reading", PropertyType::Int}}},
+                {"location",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Asymmetric table 'location' not allowed on a local Realm");
+        }
+
+        SECTION("rejects link properties with asymmetric target object") {
+            Schema schema = {
+                {"object", {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
+                {"link target",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}}},
+            };
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(SchemaValidationMode::Sync),
+                "Property 'object.link' of type 'object' cannot have an asymmetric object type ('link target').");
+        }
+
+        SECTION("rejects link properties with asymmetric origin object") {
+            Schema schema = {
+                {"object",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
+                {"link target", {{"value", PropertyType::Int}}},
+            };
+            REQUIRE_THROWS_CONTAINING(
+                schema.validate(SchemaValidationMode::Sync),
+                "Asymmetric table with property 'object.link' of type 'object' cannot have an object type.");
         }
 
         SECTION("rejects array properties with no target object") {
@@ -1135,7 +1192,7 @@ TEST_CASE("Schema") {
     SECTION("find in attached schema") {
         Group g;
         TableRef table = g.add_table_with_primary_key("class_table", type_Int, "pk");
-        TableRef embedded = g.add_embedded_table("class_embedded");
+        TableRef embedded = g.add_table("class_embedded", Table::Type::Embedded);
         ObjectSchema os(g, "table", {});
         REQUIRE(os.table_key == table->get_key());
         ObjectSchema os1(g, "embedded", {});

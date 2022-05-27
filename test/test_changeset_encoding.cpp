@@ -40,6 +40,23 @@ TEST(ChangesetEncoding_AddTable)
     CHECK(**changeset.begin() == instr);
 }
 
+TEST(ChangesetEncoding_AddTable_Asymmetric)
+{
+    Changeset changeset;
+    AddTable instr;
+    instr.table = changeset.intern_string("Foo");
+    instr.type = AddTable::TopLevelTable{
+        changeset.intern_string("pk"), Payload::Type::Int, true,
+        true, // is_asymmetric
+    };
+    changeset.push_back(instr);
+    changeset.print();
+
+    auto parsed = encode_then_parse(changeset);
+    CHECK_EQUAL(changeset, parsed);
+    CHECK(**changeset.begin() == instr);
+}
+
 TEST(ChangesetEncoding_EraseTable)
 {
     Changeset changeset;
