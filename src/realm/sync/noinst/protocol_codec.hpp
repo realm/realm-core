@@ -261,7 +261,7 @@ public:
             }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
-                info.error_code = msg.read_next<int>();
+                info.raw_error_code = msg.read_next<int>();
                 auto message_size = msg.read_next<size_t>();
                 auto session_ident = msg.read_next<session_ident_type>('\n');
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
@@ -311,7 +311,7 @@ public:
                     // If any of the above json fields are not present, this is a fatal error
                     // however, additional optional fields may be added in the future.
                     return report_error(Error::bad_syntax, "Failed to parse 'json_error' with error_code %1: '%2'",
-                                        info.error_code, e.what());
+                                        info.raw_error_code, e.what());
                 }
                 connection.receive_error_message(info, session_ident); // Throws
             }

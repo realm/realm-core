@@ -1190,11 +1190,11 @@ void Connection::receive_error_message(const ProtocolErrorInfo& info, session_id
     }
 
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", info.message,
-                info.error_code, info.try_again, session_ident); // Throws
+                info.raw_error_code, info.try_again, session_ident); // Throws
 
-    bool known_error_code = bool(get_protocol_error_message(info.error_code));
+    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
-        ProtocolError error_code = ProtocolError(info.error_code);
+        ProtocolError error_code = ProtocolError(info.raw_error_code);
         if (REALM_LIKELY(!is_session_level_error(error_code))) {
             close_due_to_server_side_error(error_code, info); // Throws
             return;
@@ -2153,7 +2153,7 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, recovery_disabled=%4)", info.message,
-                info.error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
+                info.raw_error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2161,12 +2161,12 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_message_order;
     }
 
-    bool known_error_code = bool(get_protocol_error_message(info.error_code));
+    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_UNLIKELY(!known_error_code)) {
         logger.error("Unknown error code"); // Throws
         return ClientError::bad_error_code;
     }
-    ProtocolError error_code = ProtocolError(info.error_code);
+    ProtocolError error_code = ProtocolError(info.raw_error_code);
     if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
         logger.error("Not a session level error code"); // Throws
         return ClientError::bad_error_code;
@@ -2224,16 +2224,16 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
         m_try_again_delay_info = *error_info.resumption_delay_interval;
     }
     if (!m_current_try_again_delay_interval ||
-        (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.error_code))) {
+        (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.raw_error_code))) {
         m_current_try_again_delay_interval = m_try_again_delay_info.resumption_delay_interval;
     }
-    else if (ProtocolError(error_info.error_code) == ProtocolError::session_closed) {
+    else if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
         // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
         // backoff behavior would result in waiting up to 5 minutes in between each query change which is
         // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
         m_current_try_again_delay_interval = std::chrono::milliseconds{1000};
     }
-    m_try_again_error_code = ProtocolError(error_info.error_code);
+    m_try_again_error_code = ProtocolError(error_info.raw_error_code);
     logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
     m_try_again_activation_timer->async_wait(*m_current_try_again_delay_interval, [this](std::error_code ec) {
         if (ec == util::error::operation_aborted) {

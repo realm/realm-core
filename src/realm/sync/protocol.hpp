@@ -206,14 +206,14 @@ struct ResumptionDelayInfo {
 struct ProtocolErrorInfo {
     ProtocolErrorInfo() = default;
     ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
-        : error_code(error_code)
+        : raw_error_code(error_code)
         , message(msg)
         , try_again(do_try_again)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
     {
     }
-    int error_code = 0;
+    int raw_error_code = 0;
     std::string message;
     bool try_again = false;
     bool client_reset_recovery_is_disabled = false;
