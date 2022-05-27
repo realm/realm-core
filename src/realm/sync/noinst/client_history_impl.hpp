@@ -447,8 +447,9 @@ public:
     {
     }
 
-    // A write validator takes a read-able transaction and the table name minus the "class_" prefix.
-    // If a write is okay to proceed, then this function should have no side-effects. Otherwise, it should throw.
+    // A write validator factory takes a read-able transaction and returns a UniqueFunction containing a
+    // SyncReplication::WriteValidator. The factory will get called at the start of a write transaction
+    // and the WriteValidator it returns will be re-used for all mutations wit`hin the transaction.
     using WriteValidatorFactory = util::UniqueFunction<WriteValidator>(Transaction&);
     void set_write_validator_factory(util::UniqueFunction<WriteValidatorFactory> validator_factory)
     {

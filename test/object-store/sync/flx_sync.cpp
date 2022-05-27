@@ -214,6 +214,25 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
                 realm->commit_transaction();
             }(),
             NoSubscriptionForWrite);
+
+        auto realm = Realm::get_shared_realm(config);
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto col_key = table->get_column_key("queryable_str_field");
+        {
+            auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
+            new_subs.insert_or_assign(Query(table).equal(col_key, "foo"));
+            auto subs = std::move(new_subs).commit();
+            subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        }
+
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                         {"queryable_str_field", std::string{"foo"}},
+                                         {"queryable_int_field", static_cast<int64_t>(5)},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        realm->commit_transaction();
     });
 }
 

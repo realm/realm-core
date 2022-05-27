@@ -23,7 +23,6 @@
 #include "realm/obj.hpp"
 #include "realm/query.hpp"
 #include "realm/timestamp.hpp"
-#include "realm/util/flat_map.hpp"
 #include "realm/util/future.hpp"
 #include "realm/util/functional.hpp"
 #include "realm/util/optional.hpp"
@@ -211,7 +210,7 @@ protected:
     State m_state = State::Uncommitted;
     std::string m_error_str;
     DB::version_type m_snapshot_version;
-    util::FlatMap<std::string, int> m_tables;
+    std::map<std::string, int, std::less<>> m_tables;
     std::vector<Subscription> m_subs;
 };
 

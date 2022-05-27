@@ -29,6 +29,9 @@ namespace sync {
 
 class SyncReplication : public Replication {
 public:
+    // This will be called for any instruction that mutates an object (instead of instructions that mutates
+    // schema) with the class name (without the "class_" prefix) of the object being modified. If The
+    // validator needs to reject the write, it should throw an exception.
     using WriteValidator = void(std::string_view);
 
     void set_short_circuit(bool) noexcept;
