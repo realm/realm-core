@@ -275,10 +275,14 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             Object::create(c, realm, "TopLevel",
                            util::Any(AnyDict{{"_id", invalid_obj}, {"queryable_str_field", std::string{"bizz"}}}));
             realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
             validate_sync_error(
                 std::move(error_future).get(), invalid_obj,
                 util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
-            wait_for_download(*realm);
+
             realm->refresh();
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
@@ -317,11 +321,12 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             embedded_obj.set_property_value(c, "str_field", util::Any{std::string{"baz"}});
             realm->commit_transaction();
 
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
             validate_sync_error(
                 std::move(error_future).get(), invalid_obj,
                 util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            wait_for_download(*realm);
             realm->refresh();
 
             obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any(invalid_obj));
@@ -363,9 +368,10 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                            }));
             realm->commit_transaction();
 
-            validate_sync_error(std::move(error_future).get(), invalid_obj, "before opening a subscription on it");
-
+            wait_for_upload(*realm);
             wait_for_download(*realm);
+
+            validate_sync_error(std::move(error_future).get(), invalid_obj, "before opening a subscription on it");
             realm->refresh();
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
@@ -403,10 +409,11 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                            }));
             realm->commit_transaction();
 
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
             validate_sync_error(std::move(error_future).get(), invalid_obj,
                                 "object is outside of the current query view");
-
-            wait_for_download(*realm);
             realm->refresh();
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
