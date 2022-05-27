@@ -1066,6 +1066,17 @@ void File::sync()
 #endif
 }
 
+void File::barrier()
+{
+#if REALM_PLATFORM_APPLE
+    if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
+        return;
+    throw std::system_error(errno, std::system_category(), "fcntl() with F_BARRIERFSYNC failed");
+#else
+    sync();
+#endif
+}
+
 #ifndef _WIN32
 // little helper
 static void _unlock(int m_fd)

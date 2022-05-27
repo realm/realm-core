@@ -327,6 +327,11 @@ public:
     /// `F_FULLFSYNC`.
     void sync();
 
+    /// Issue a write barrier which forbids ordering writes after this call
+    /// before writes performed before this call. Equivalent to `sync()` on
+    /// non-Apple platforms.
+    void barrier();
+
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released.
     ///
