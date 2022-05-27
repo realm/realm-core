@@ -310,6 +310,19 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
 {
+    try {
+        open_and_init_realm(config, realm, version, realm_lock);
+    }
+    catch (const std::exception& e) {
+        if (realm)
+            realm->close();
+        util::File::remove(m_config.path);
+    }
+}
+
+void RealmCoordinator::open_and_init_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                                           util::Optional<VersionID> version, util::CheckedUniqueLock& realm_lock)
+{
     open_db();
 
     auto schema = std::move(config.schema);

@@ -252,6 +252,8 @@ private:
         REQUIRES(m_realm_mutex);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
                       util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
+    void open_and_init_realm(Realm::Config config, std::shared_ptr<Realm>& realm, util::Optional<VersionID> version,
+                             util::CheckedUniqueLock& realm_lock) REQUIRES(m_realm_mutex);
     void run_async_notifiers() REQUIRES(!m_notifier_mutex);
     void advance_helper_shared_group_to_latest();
     void clean_up_dead_notifiers() REQUIRES(m_notifier_mutex);
