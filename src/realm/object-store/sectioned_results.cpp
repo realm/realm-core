@@ -174,7 +174,6 @@ public:
 
          */
         struct ChangeBookkeeper {
-
             ChangeBookkeeper(size_t current_indice_count, size_t insertions_since_last_comparison,
                              size_t deletions_since_last_comparison, size_t change_insertion_count,
                              size_t change_deletion_count, bool is_new_section, bool is_deleted_section,
@@ -493,14 +492,14 @@ NotificationToken SectionedResults::add_notification_callback(SectionedResultsNo
                                                               KeyPathArray key_path_array) &
 {
     return m_results.add_notification_callback(SectionedResultsNotificationHandler(*this, std::move(callback)),
-                                               key_path_array);
+                                               std::move(key_path_array));
 }
 
 NotificationToken SectionedResults::add_notification_callback_for_section(
     size_t section_index, SectionedResultsNotificatonCallback callback, KeyPathArray key_path_array)
 {
     return m_results.add_notification_callback(
-        SectionedResultsNotificationHandler(*this, std::move(callback), section_index), key_path_array);
+        SectionedResultsNotificationHandler(*this, std::move(callback), section_index), std::move(key_path_array));
 }
 
 realm::ThreadSafeReference SectionedResults::thread_safe_reference()
@@ -517,6 +516,11 @@ SectionedResults SectionedResults::snapshot()
     sr.m_results = m_results.snapshot();
     sr.m_sections = m_sections;
     return sr;
+}
+
+bool SectionedResults::is_valid() const
+{
+    return m_results.is_valid();
 }
 
 } // namespace realm
