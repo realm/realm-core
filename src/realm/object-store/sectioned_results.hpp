@@ -112,6 +112,8 @@ public:
     /// The section key callback parameter will never be invoked.
     SectionedResults snapshot();
 
+    bool is_valid() const;
+
 private:
     friend class Results;
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.
