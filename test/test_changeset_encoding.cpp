@@ -50,7 +50,6 @@ TEST(ChangesetEncoding_AddTable_Asymmetric)
         true, // is_asymmetric
     };
     changeset.push_back(instr);
-    changeset.print();
 
     auto parsed = encode_then_parse(changeset);
     CHECK_EQUAL(changeset, parsed);
