@@ -57,7 +57,7 @@ set(REALM_PARSER_EXTRAS
 )
 
 if(NOT MSVC)
-    set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code")
+    set_source_files_properties(generated/query_flex.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unreachable-code;-Wno-sign-compare")
 endif()
 
 add_library(QueryParser STATIC ${REALM_PARSER_SOURCES} ${REALM_PARSER_HEADERS} ${REALM_PARSER_EXTRAS})
