@@ -28,6 +28,7 @@
 #include "realm/util/optional.hpp"
 
 #include <list>
+#include <set>
 #include <string_view>
 
 namespace realm::sync {
@@ -198,7 +199,6 @@ protected:
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj);
 
     void load_from_database(const Transaction& tr, Obj obj);
-    void increment_table_count(const Subscription& sub);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -210,7 +210,6 @@ protected:
     State m_state = State::Uncommitted;
     std::string m_error_str;
     DB::version_type m_snapshot_version;
-    std::map<std::string, int, std::less<>> m_tables;
     std::vector<Subscription> m_subs;
 };
 
@@ -323,6 +322,9 @@ public:
     // To be used internally by the sync client. This returns a read-only view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
+
+    using TableSet = std::set<std::string, std::less<>>;
+    TableSet get_tables_for_latest(const Transaction& tr) const;
 
     struct PendingSubscription {
         int64_t query_version;

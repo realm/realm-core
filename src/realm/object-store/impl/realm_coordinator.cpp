@@ -113,9 +113,9 @@ void RealmCoordinator::create_sync_session()
                     throw std::runtime_error("Subscription store was destroyed while user writes were on-going");
                 }
 
-                auto latest_sub_set = sub_mgr->get_latest(tr);
-                return [latest_sub_set, sub_mgr](std::string_view object_class_name) {
-                    if (!latest_sub_set.has_subscription_for_table(object_class_name)) {
+                auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
+                return [tables = std::move(latest_sub_tables), sub_mgr](std::string_view object_class_name) {
+                    if (tables.find(object_class_name) == tables.end()) {
                         throw NoSubscriptionForWrite(util::format(
                             "Cannot write to class %1 when no flexible sync subscription has been created.",
                             object_class_name));
