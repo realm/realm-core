@@ -379,14 +379,11 @@ TEST_CASE("Schema") {
 
         SECTION("asymmetric tables not allowed in local realm") {
             Schema schema = {
-                {"sensor",
-                 ObjectSchema::IsAsymmetric{true},
-                 {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"reading", PropertyType::Int}}},
                 {"location",
                  ObjectSchema::IsAsymmetric{true},
                  {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"street", PropertyType::String}}},
             };
-            REQUIRE_THROWS_CONTAINING(schema.validate(), "Asymmetric table 'location' not allowed on a local Realm");
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Asymmetric table 'location' not allowed in a local Realm");
         }
 
         SECTION("rejects link properties with asymmetric target object") {
