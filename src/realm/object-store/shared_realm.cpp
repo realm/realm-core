@@ -467,7 +467,14 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             std::swap(m_schema, schema);
             std::swap(m_schema_version, temp_version);
         });
-        initialization_function(shared_from_this());
+
+        try {
+            initialization_function(shared_from_this());
+        }
+        catch (const std::exception& e) {
+            close_and_delete_realm();
+            throw;
+        }
     }
 
     m_schema = std::move(schema);
@@ -1279,6 +1286,13 @@ void Realm::close()
     m_coordinator = nullptr;
     m_scheduler = nullptr;
     m_config = {};
+}
+
+void Realm::close_and_delete_realm()
+{
+    const auto path = m_config.path;
+    close();
+    util::File::remove(path);
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)

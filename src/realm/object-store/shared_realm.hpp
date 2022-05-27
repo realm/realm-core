@@ -395,6 +395,8 @@ public:
     // Closing a Realm will wait for any asynchronous writes which have been commited but not synced
     // to sync. Asynchronous writes which have not yet started are canceled.
     void close();
+    // close realm and delete all the realm files
+    void close_and_delete_realm();
     bool is_closed() const
     {
         return !m_transaction && !m_coordinator;
