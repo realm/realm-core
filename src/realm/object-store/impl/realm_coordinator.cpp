@@ -317,6 +317,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         if (realm)
             realm->close();
         util::File::remove(m_config.path);
+        throw;
     }
 }
 
