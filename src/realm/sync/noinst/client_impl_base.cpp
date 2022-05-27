@@ -1164,8 +1164,7 @@ void Connection::receive_pong(milliseconds_type timestamp)
 }
 
 
-void Connection::receive_error_message(const ProtocolErrorInfo& info,
-                                       session_ident_type session_ident)
+void Connection::receive_error_message(const ProtocolErrorInfo& info, session_ident_type session_ident)
 {
     Session* sess = nullptr;
     if (session_ident != 0) {
@@ -2227,7 +2226,11 @@ void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
     if (!m_current_try_again_delay_interval ||
         (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.error_code))) {
         m_current_try_again_delay_interval = m_try_again_delay_info.resumption_delay_interval;
-    } else if (ProtocolError(error_info.error_code) == ProtocolError::session_closed) {
+    }
+    else if (ProtocolError(error_info.error_code) == ProtocolError::session_closed) {
+        // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
+        // backoff behavior would result in waiting up to 5 minutes in between each query change which is
+        // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
         m_current_try_again_delay_interval = std::chrono::milliseconds{1000};
     }
     m_try_again_error_code = ProtocolError(error_info.error_code);
