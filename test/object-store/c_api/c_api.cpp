@@ -4093,7 +4093,6 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         CHECK(state == RLM_USER_STATE_REMOVED);
         realm_release(sync_user_1);
     }
-
     SECTION("delete_user integration") {
         AutoVerifiedEmailCredentials creds;
         realm_user_t* sync_user_1 = nullptr;
@@ -4109,7 +4108,6 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         CHECK(state == RLM_USER_STATE_REMOVED);
         realm_release(sync_user_1);
     }
-
     SECTION("link_user integration") {
         AutoVerifiedEmailCredentials creds;
         bool processed = false;
@@ -4130,7 +4128,6 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         CHECK(processed);
         realm_release(sync_user);
     }
-
     SECTION("realm_app_get_all_users integration") {
         AutoVerifiedEmailCredentials creds;
         realm_user_t* sync_user_1 = nullptr;
@@ -4158,7 +4155,6 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         realm_release(sync_user_1);
         realm_release(sync_user_2);
     }
-
     SECTION("realm_app_user_apikey_provider_client_fetch_apikeys") {
         SECTION("Failure") {
             AutoVerifiedEmailCredentials creds;
@@ -4179,7 +4175,6 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
             REQUIRE(res == true);
             realm_release(sync_user_1);
         }
-
         SECTION("Success") {
             TestAppSession session;
             realm_app app(session.app());
