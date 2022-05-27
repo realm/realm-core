@@ -197,27 +197,37 @@ struct CompensatingWriteErrorInfo {
     std::string reason;
 };
 
+struct ResumptionDelayInfo {
+    std::chrono::milliseconds max_resumption_delay_interval = std::chrono::minutes{5};
+    std::chrono::milliseconds resumption_delay_interval = std::chrono::seconds{1};
+    int resumption_delay_backoff_multiplier = 2;
+};
+
 struct ProtocolErrorInfo {
     ProtocolErrorInfo() = default;
-    ProtocolErrorInfo(const std::string& msg, bool do_try_again)
-        : message(msg)
+    ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
+        : error_code(error_code)
+        , message(msg)
         , try_again(do_try_again)
         , client_reset_recovery_is_disabled(false)
         , should_client_reset(util::none)
     {
     }
+    int error_code = 0;
     std::string message;
     bool try_again = false;
     bool client_reset_recovery_is_disabled = false;
     util::Optional<bool> should_client_reset;
     util::Optional<std::string> log_url;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
+    util::Optional<ResumptionDelayInfo> resumption_delay_interval;
 
     bool is_fatal() const
     {
         return !try_again;
     }
 };
+
 
 /// \brief Protocol errors discovered by the server, and reported to the client
 /// by way of ERROR messages.

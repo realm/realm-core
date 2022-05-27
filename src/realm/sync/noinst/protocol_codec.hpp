@@ -256,12 +256,12 @@ public:
 
                 auto message = msg.read_sized_data<StringData>(message_size);
 
-                connection.receive_error_message(error_code, sync::ProtocolErrorInfo{message, try_again},
+                connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, try_again},
                                                  session_ident); // Throws
             }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
-                int error_code = msg.read_next<int>();
+                info.error_code = msg.read_next<int>();
                 auto message_size = msg.read_next<size_t>();
                 auto session_ident = msg.read_next<session_ident_type>('\n');
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
@@ -273,6 +273,16 @@ public:
                     info.message = json["message"];
                     info.log_url = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+
+                    if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
+                        info.resumption_delay_interval.emplace();
+                        info.resumption_delay_interval->resumption_delay_interval =
+                            std::chrono::seconds{backoff_interval->get<int>()};
+                        info.resumption_delay_interval->max_resumption_delay_interval =
+                            std::chrono::seconds{json.at("backoffMaxDelaySec").get<int>()};
+                        info.resumption_delay_interval->resumption_delay_backoff_multiplier =
+                            json.at("backoffMultiplier").get<int>();
+                    }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
                         if (!rejected_updates->is_array()) {
@@ -301,9 +311,9 @@ public:
                     // If any of the above json fields are not present, this is a fatal error
                     // however, additional optional fields may be added in the future.
                     return report_error(Error::bad_syntax, "Failed to parse 'json_error' with error_code %1: '%2'",
-                                        error_code, e.what());
+                                        info.error_code, e.what());
                 }
-                connection.receive_error_message(error_code, info, session_ident); // Throws
+                connection.receive_error_message(info, session_ident); // Throws
             }
             else if (message_type == "query_error") {
                 auto error_code = msg.read_next<int>();
