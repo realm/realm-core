@@ -259,8 +259,7 @@ public:
     // Overriding member functions in realm::TransformHistory
     version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;
     ChunkedBinaryData get_reciprocal_transform(version_type, bool&) const override;
-    void set_reciprocal_transform(version_type, BinaryData)
-    override;
+    void set_reciprocal_transform(version_type, BinaryData) override;
 
 public: // Stuff in this section is only used by CLI tools.
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
@@ -435,8 +434,7 @@ private:
     void update_from_ref_and_version(ref_type ref, version_type version) override;
     void update_from_parent(version_type current_version) override;
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
-    void set_oldest_bound_version(version_type)
-    override;
+    void set_oldest_bound_version(version_type) override;
     void verify() const override;
     bool no_pending_local_changes(version_type version) const override;
 };
@@ -476,8 +474,7 @@ public:
     }
 
     // Overriding member functions in realm::Replication
-    version_type prepare_changeset(const char*, size_t, version_type)
-    override;
+    version_type prepare_changeset(const char*, size_t, version_type) override;
     void finalize_changeset() noexcept override;
 
     ClientHistory& get_history() noexcept
