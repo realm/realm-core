@@ -69,6 +69,10 @@ public:
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 
+    realm::ThreadSafeReference thread_safe_reference();
+    bool is_valid() const;
+    size_t hash() const;
+
 private:
     friend class SectionedResults;
     ResultsSection(SectionedResults* parent, size_t index)
