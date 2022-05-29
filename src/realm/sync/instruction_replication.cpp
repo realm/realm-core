@@ -535,6 +535,8 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
     Replication::remove_object(table, row_ndx);
     if (table->is_embedded())
         return;
+    if (table->is_asymmetric())
+        return;
     REALM_ASSERT(!row_ndx.is_unresolved());
 
     if (select_table(*table)) {
