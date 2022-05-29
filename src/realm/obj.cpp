@@ -1868,6 +1868,9 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {
         auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
+        if (m_table->is_asymmetric() || target_table->is_asymmetric()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
         ColKey backlink_col_key;
         auto type = col_key.get_type();
         if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {
