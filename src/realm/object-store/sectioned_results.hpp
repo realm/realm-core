@@ -44,9 +44,6 @@ public:
     /// Retrieve an element from the section for a given index.
     Mixed operator[](size_t idx) const;
 
-    template <typename Context>
-    auto get(Context&, size_t index);
-
     /// The key identifying this section.
     Mixed key();
 

@@ -51,13 +51,6 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
 
 struct SectionedResultsNotificationHandler {
 public:
-    // Cocoa requires specific information on when a section
-    // needs to be added or removed;
-    struct SectionChangeInfo {
-        IndexSet sections_to_insert;
-        IndexSet sections_to_delete;
-    };
-
     SectionedResultsNotificationHandler(SectionedResults& sectioned_results, SectionedResultsNotificatonCallback cb,
                                         util::Optional<size_t> section_filter = util::none)
         : m_cb(std::move(cb))
@@ -82,29 +75,97 @@ public:
         };
 
         m_sectioned_results.calculate_sections_if_required();
-        auto changes = c;
-        changes.deletions.add(changes.modifications);
-        changes.insertions.add(changes.modifications_new);
 
-        auto converted_insertions = convert_indices(changes.insertions, m_sectioned_results.m_row_to_index_path);
-        auto converted_modifications = convert_indices(changes.modifications, m_prev_row_to_index_path);
+        auto converted_insertions = convert_indices(c.insertions, m_sectioned_results.m_row_to_index_path);
+        auto converted_modifications = convert_indices(c.modifications, m_prev_row_to_index_path);
         auto converted_modifications_new =
-            convert_indices(changes.modifications_new, m_sectioned_results.m_row_to_index_path);
-        auto converted_deletions = convert_indices(changes.deletions, m_prev_row_to_index_path);
+            convert_indices(c.modifications_new, m_sectioned_results.m_row_to_index_path);
+        auto converted_deletions = convert_indices(c.deletions, m_prev_row_to_index_path);
 
-        auto section_changes = calculate_sections_to_insert_and_delete(
-            converted_insertions, converted_deletions, converted_modifications, converted_modifications_new);
+        auto section_changes = calculate_sections_to_insert_and_delete();
 
-        bool should_notify = true;
-        if (m_section_filter) {
-            bool has_insertions = converted_insertions.count(*m_section_filter) != 0;
-            bool has_modifications = converted_modifications.count(*m_section_filter) != 0;
-            bool has_deletions = converted_deletions.count(*m_section_filter) != 0;
-            should_notify = has_insertions || has_modifications || has_deletions;
+        std::map<size_t, IndexSet> modifications_to_keep;
+        std::map<size_t, IndexSet> modifications_to_keep_new;
+
+        for (auto [section_old, indexes_old] : converted_modifications) {
+            auto it = m_prev_sections.at(section_old);
+            auto old_hash = it.hash;
+            for (auto [section_new, indexes_new] : converted_modifications_new) {
+                auto it_new = m_sectioned_results.m_sections.at(section_new);
+                auto new_hash = it_new.hash;
+                if (old_hash == new_hash) {
+                    for (auto index_old : indexes_old.as_indexes()) {
+                        if (indexes_new.contains(index_old)) {
+                            modifications_to_keep[section_old].add(index_old);
+                            modifications_to_keep_new[section_new].add(index_old);
+                            converted_modifications[section_old].remove(index_old);
+                            converted_modifications_new[section_new].remove(index_old);
+                        }
+                    }
+                }
+            }
         }
-        if (should_notify) {
+
+        for (auto [section, indexes] : converted_modifications) {
+            if (!indexes.empty())
+                converted_deletions[section].add(indexes);
+        }
+
+        for (auto [section, indexes] : converted_modifications_new) {
+            if (!indexes.empty())
+                converted_insertions[section].add(indexes);
+        }
+
+        // Cocoa only requires the index of the deleted sections to remove all deleted rows.
+        // There is no need to pass back each individual deletion IndexPath.
+        for (auto section : section_changes.second.as_indexes()) {
+            converted_deletions.erase(section);
+        }
+
+        converted_modifications = modifications_to_keep;
+        converted_modifications_new = modifications_to_keep_new;
+
+        if (m_section_filter) {
+            bool should_notify = true;
+
+            std::map<size_t, IndexSet> filtered_insertions;
+            std::map<size_t, IndexSet> filtered_modifications;
+            std::map<size_t, IndexSet> filtered_deletions;
+
+            bool has_insertions = converted_insertions.count(*m_section_filter) != 0;
+            if (has_insertions) {
+                filtered_insertions[*m_section_filter] = converted_insertions[*m_section_filter];
+            }
+            bool has_modifications = converted_modifications.count(*m_section_filter) != 0;
+            if (has_modifications) {
+                filtered_modifications[*m_section_filter] = converted_modifications[*m_section_filter];
+            }
+
+            bool has_deletions = converted_deletions.count(*m_section_filter) != 0;
+            if (has_deletions) {
+                filtered_deletions[*m_section_filter] = converted_deletions[*m_section_filter];
+            }
+
+            IndexSet filtered_sections_to_insert;
+            IndexSet filtered_sections_to_delete;
+
+            if (section_changes.first.contains(*m_section_filter))
+                filtered_sections_to_insert.add(*m_section_filter);
+            if (section_changes.second.contains(*m_section_filter))
+                filtered_sections_to_delete.add(*m_section_filter);
+
+            should_notify = has_insertions || has_modifications || has_deletions ||
+                            !filtered_sections_to_insert.empty() || !filtered_sections_to_delete.empty();
+
+            if (should_notify) {
+                m_cb(SectionedResultsChangeSet{filtered_insertions, filtered_modifications, filtered_deletions,
+                                               filtered_sections_to_insert, filtered_sections_to_delete},
+                     {});
+            }
+        }
+        else {
             m_cb(SectionedResultsChangeSet{converted_insertions, converted_modifications, converted_deletions,
-                                           section_changes.sections_to_insert, section_changes.sections_to_delete},
+                                           section_changes.first, section_changes.second},
                  {});
         }
 
@@ -118,10 +179,7 @@ public:
         m_cb({}, ptr);
     }
 
-    SectionChangeInfo calculate_sections_to_insert_and_delete(std::map<size_t, IndexSet>& insertions,
-                                                              std::map<size_t, IndexSet>& deletions,
-                                                              std::map<size_t, IndexSet>& modifications,
-                                                              std::map<size_t, IndexSet>& modifications_new)
+    std::pair<IndexSet, IndexSet> calculate_sections_to_insert_and_delete()
     {
         IndexSet sections_to_insert, sections_to_remove;
         std::map<size_t, size_t> new_sections, old_sections;
@@ -144,54 +202,6 @@ public:
         diff(old_sections, new_sections, sections_to_insert);
         diff(new_sections, old_sections, sections_to_remove);
 
-        // Cocoa only requires the index of the deleted sections to remove all deleted rows.
-        // There is no need to pass back each individual deletion IndexPath.
-        for (auto section : sections_to_remove.as_indexes()) {
-            deletions.erase(section);
-        }
-
-        std::map<size_t, IndexSet> modifications_to_keep;
-        std::map<size_t, IndexSet> modifications_to_keep_new;
-
-        for (auto [section_old, indexes_old] : modifications) {
-            auto it = m_prev_sections.at(section_old);
-            auto old_hash = it.hash;
-            for (auto [section_new, indexes_new] : modifications_new) {
-                auto it_new = m_sectioned_results.m_sections.at(section_new);
-                auto new_hash = it_new.hash;
-                if (old_hash == new_hash) {
-                    for (auto index_old : indexes_old.as_indexes()) {
-                        if (indexes_new.contains(index_old)) {
-                            modifications_to_keep[section_old].add(index_old);
-                            modifications_to_keep_new[section_new].add(index_old);
-                        }
-                    }
-                }
-            }
-        }
-
-        modifications.clear();
-        modifications_new.clear();
-
-        modifications = modifications_to_keep;
-        modifications_new = modifications_to_keep_new;
-
-        for (auto [section, indexes] : modifications) {
-            auto& it = deletions[section];
-            it.remove(indexes);
-            if (it.empty()) {
-                deletions.erase(section);
-            }
-        }
-
-        for (auto [section, indexes] : modifications_new) {
-            auto& it = insertions[section];
-            it.remove(indexes);
-            if (it.empty()) {
-                insertions.erase(section);
-            }
-        }
-
         return {sections_to_insert, sections_to_remove};
     }
 
@@ -212,13 +222,6 @@ Mixed ResultsSection::operator[](size_t idx) const
 Mixed ResultsSection::key()
 {
     return m_parent->m_sections[m_index].key;
-}
-
-template <typename Context>
-auto ResultsSection::get(Context& ctx, size_t row_ndx)
-{
-    m_parent->calculate_sections_if_required();
-    return m_parent->m_results.get(ctx, m_parent->m_sections[m_index].indices[row_ndx]);
 }
 
 size_t ResultsSection::size()

@@ -1263,7 +1263,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_notification_calls == 3);
         REQUIRE(section2_notification_calls == 1);
         REQUIRE(section1_changes.modifications.empty());
-        REQUIRE_INDICES(section1_changes.insertions[3], 0);
+        REQUIRE(section1_changes.insertions.empty());
         REQUIRE_INDICES(section1_changes.deletions[0], 0);
         REQUIRE(algo_run_count == 7);
         algo_run_count = 0;
