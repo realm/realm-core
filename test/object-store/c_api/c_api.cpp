@@ -4060,7 +4060,7 @@ static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t
 {
     auto clone_ptr = realm_clone(user);
     CHECK(realm_equals(user, clone_ptr));
-    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(clone_ptr);
+    *(static_cast<realm_user_t**>(p)) = static_cast<realm_user_t*>(clone_ptr);
 }
 
 static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t*)
@@ -4146,11 +4146,13 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         CHECK(realm_equals(sync_user_2, current_user));
         CHECK(realm_equals(sync_user_1, current_user));
 
-        realm_user_t* out_users = (realm_user_t*)malloc(10 * sizeof(realm_user_t));
         size_t out_n = 0;
-        realm_app_get_all_users(&app, &out_users, 10, &out_n);
+        realm_app_get_all_users(&app, nullptr, 0, &out_n);
         CHECK(out_n == 2);
-        free(out_users);
+        auto out_users = (realm_user_t*)malloc(out_n * sizeof(realm_user_t));
+        realm_app_get_all_users(&app, &out_users, out_n, &out_n);
+
+        realm_free(out_users);
         realm_release(current_user);
         realm_release(sync_user_1);
         realm_release(sync_user_2);
