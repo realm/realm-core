@@ -472,7 +472,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             initialization_function(shared_from_this());
         }
         catch (const std::exception& e) {
-            close_and_delete_realm();
+            terminate_sync_and_delete_realm_files();
             throw;
         }
     }
@@ -1288,11 +1288,18 @@ void Realm::close()
     m_config = {};
 }
 
-void Realm::close_and_delete_realm()
+void Realm::terminate_sync_and_delete_realm_files()
 {
-    const auto path = m_config.path;
-    close();
-    util::File::remove(path);
+    try {
+        if (m_config.sync_config) {
+            m_coordinator->sync_session()->shutdown_and_wait();
+        }
+        const auto path = m_config.path;
+        close();
+        delete_files(path);
+    }
+    catch (const std::exception&) {
+    }
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
