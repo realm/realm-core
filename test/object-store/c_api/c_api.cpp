@@ -4155,7 +4155,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         realm_app_get_all_users(&app, out_users, out_n, &out_n);
 
         for (size_t i = 0; i < out_n; ++i)
-            realm_free(out_users[i]);
+            delete out_users[i];
         realm_free(out_users);
         realm_release(current_user);
         realm_release(sync_user_1);
