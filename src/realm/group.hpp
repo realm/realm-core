@@ -769,6 +769,8 @@ private:
     ///  22 Object keys are no longer generated from primary key values. Search index
     ///     reintroduced.
     ///
+    ///  23 Asymmetric tables.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and DB::do_open, the file
     /// format selection logic in
@@ -776,7 +778,7 @@ private:
     /// upgrade logic in Group::upgrade_file_format(), AND the lists of accepted
     /// file formats and the version deletion list residing in "backup_restore.cpp"
 
-    static constexpr int g_current_file_format_version = 22;
+    static constexpr int g_current_file_format_version = 23;
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;

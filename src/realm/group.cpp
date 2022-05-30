@@ -332,7 +332,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None) {
-        if (current_file_format_version == 22) {
+        if (current_file_format_version == 23) {
             // We are able to open these file formats in RO mode
             return current_file_format_version;
         }
@@ -400,7 +400,7 @@ void Transaction::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 22, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 23, target_file_format_version);
 
     // DB::do_open() must ensure that only supported version are allowed.
     // It does that by asking backup if the current file format version is
