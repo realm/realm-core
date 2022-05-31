@@ -269,7 +269,7 @@ struct VersionList {
                 // remove this return to reclaim ALL intermediate versions
                 // not supported yet, as notifications need access to data
                 // in intermediate versions...
-                return;
+                // return;
             }
             it = r.newer;
             if (r.count_frozen == 0 && r.count_live == 0) {

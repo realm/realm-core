@@ -377,10 +377,10 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
     constexpr int num_pending_transactions = 20;
-    constexpr int num_iterations = 1;
-    constexpr int num_objects = 20;
+    constexpr int num_iterations = 10;
+    constexpr int num_objects = 2;
     constexpr int num_checks_pr_trans = 10;
-    constexpr int num_trans_forgotten_rapidly = 10000;
+    constexpr int num_trans_forgotten_rapidly = 10;
     struct Entry {
         SharedRealm realm;
         Object o;
@@ -421,7 +421,7 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         auto& entry = refs[trans_number];
 
         // refresh chosen transaction so as to trigger notifications.
-        if (entry.realm) {
+        if (entry.realm && !entry.realm->is_frozen()) {
             auto& r = entry.realm;
             REALM_ASSERT(r->is_in_read_transaction());
             auto before = r->current_transaction_version();
@@ -432,7 +432,8 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
         // set up and save a new realm for later refresh, replacing the old one
         // which we refreshed above
-        auto realm2 = realm->freeze(); // Realm::get_shared_realm(config);
+        int should_freeze = (random_int() % 5) != 0; // freeze 80%
+        auto realm2 = should_freeze ? realm->freeze() : Realm::get_shared_realm(config);
         entry.realm = realm2;
         int key = (unsigned)random_int() % num_objects;
         auto table2 = realm2->read_group().get_table(table_key);
@@ -472,6 +473,11 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         }
     }
     refs.clear();
+    realm->begin_transaction();
+    realm->commit_transaction();
+    realm->begin_transaction();
+    realm->commit_transaction();
+    captured.reset();
     realm->begin_transaction();
     realm->commit_transaction();
     realm->begin_transaction();
