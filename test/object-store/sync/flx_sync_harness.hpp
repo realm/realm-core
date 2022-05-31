@@ -32,6 +32,7 @@ public:
         Schema schema;
         std::vector<std::string> queryable_fields;
         std::vector<AppCreateConfig::FLXSyncRole> default_roles;
+        std::vector<std::string> asymmetric_tables;
         bool dev_mode_enabled = false;
     };
 
@@ -58,6 +59,7 @@ public:
         AppCreateConfig::FLXSyncConfig flx_config;
         flx_config.queryable_fields = server_schema.queryable_fields;
         flx_config.default_roles = server_schema.default_roles;
+        flx_config.asymmetric_tables = server_schema.asymmetric_tables;
 
         server_app_config.flx_sync_config = std::move(flx_config);
         return create_app(server_app_config);
@@ -95,6 +97,9 @@ public:
         auto realm = Realm::get_shared_realm(config);
         auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
         for (const auto& table : realm->schema()) {
+            if (table.is_asymmetric) {
+                continue;
+            }
             Query query_for_table(realm->read_group().get_table(table.table_key));
             mut_subs.insert_or_assign(query_for_table);
         }
