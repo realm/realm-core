@@ -31,6 +31,7 @@ public:
     struct ServerSchema {
         Schema schema;
         std::vector<std::string> queryable_fields;
+        std::vector<AppCreateConfig::FLXSyncRole> default_roles;
         bool dev_mode_enabled = false;
     };
 
@@ -56,6 +57,7 @@ public:
         server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
         AppCreateConfig::FLXSyncConfig flx_config;
         flx_config.queryable_fields = server_schema.queryable_fields;
+        flx_config.default_roles = server_schema.default_roles;
 
         server_app_config.flx_sync_config = std::move(flx_config);
         return create_app(server_app_config);

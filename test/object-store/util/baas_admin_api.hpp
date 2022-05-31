@@ -21,11 +21,13 @@
 #include "realm/object-store/property.hpp"
 #include "realm/object-store/object_schema.hpp"
 #include "realm/object-store/schema.hpp"
+#include "realm/object-store/sync/app_credentials.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
 
 #include "sync/sync_test_utils.hpp"
 
 #include "external/json/json.hpp"
+#include "external/mpark/variant.hpp"
 
 #if REALM_ENABLE_AUTH_TESTS
 namespace realm {
@@ -150,8 +152,16 @@ struct AppCreateConfig {
         bool run_reset_function;
     };
 
+    struct FLXSyncRole {
+        std::string name;
+        nlohmann::json apply_when = nlohmann::json::object();
+        mpark::variant<bool, nlohmann::json> read;
+        mpark::variant<bool, nlohmann::json> write;
+    };
+
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
+        std::vector<FLXSyncRole> default_roles;
     };
 
     std::string app_name;

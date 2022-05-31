@@ -2468,8 +2468,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_list_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change, on_error, nullptr));
+                    auto token = cptr_checked(realm_list_add_notification_callback(strings.get(), &state, nullptr,
+                                                                                   nullptr, on_change, on_error));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2480,7 +2480,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -2526,7 +2526,7 @@ TEST_CASE("C API", "[c_api]") {
                     realm_key_path_t key_path_bar_strings[] = {{1, bar_strings}};
                     realm_key_path_array_t key_path_array = {1, key_path_bar_strings};
                     auto token = cptr_checked(realm_list_add_notification_callback(
-                        bars.get(), &state, nullptr, &key_path_array, on_change, on_error, nullptr));
+                        bars.get(), &state, nullptr, &key_path_array, on_change, on_error));
                     checked(realm_refresh(realm));
 
                     state.called = false;
@@ -2976,8 +2976,8 @@ TEST_CASE("C API", "[c_api]") {
                 auto null = rlm_null();
 
                 auto require_change = [&]() {
-                    auto token = cptr_checked(realm_set_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change, on_error, nullptr));
+                    auto token = cptr_checked(realm_set_add_notification_callback(strings.get(), &state, nullptr,
+                                                                                  nullptr, on_change, on_error));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -2988,7 +2988,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3499,7 +3499,7 @@ TEST_CASE("C API", "[c_api]") {
 
                 auto require_change = [&]() {
                     auto token = cptr_checked(realm_dictionary_add_notification_callback(
-                        strings.get(), &state, nullptr, nullptr, on_change, on_error, nullptr));
+                        strings.get(), &state, nullptr, nullptr, on_change, on_error));
                     checked(realm_refresh(realm));
                     return token;
                 };
@@ -3510,7 +3510,7 @@ TEST_CASE("C API", "[c_api]") {
                         [](void* p) {
                             static_cast<State*>(p)->destroyed = true;
                         },
-                        nullptr, nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr));
                     CHECK(!state.destroyed);
                     token.reset();
                     CHECK(state.destroyed);
@@ -3571,7 +3571,7 @@ TEST_CASE("C API", "[c_api]") {
 
             auto require_change = [&]() {
                 auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, nullptr,
-                                                                         on_change, on_error, nullptr));
+                                                                         on_change, on_error));
                 checked(realm_refresh(realm));
                 return token;
             };
@@ -3616,7 +3616,7 @@ TEST_CASE("C API", "[c_api]") {
                 realm_key_path_t key_path_origin_value[] = {{1, origin_value}};
                 realm_key_path_array_t key_path_array = {1, key_path_origin_value};
                 auto token = cptr(realm_object_add_notification_callback(obj1.get(), &state, nullptr, &key_path_array,
-                                                                         on_change, on_error, nullptr));
+                                                                         on_change, on_error));
                 checked(realm_refresh(realm));
                 state.called = false;
                 write([&]() {
@@ -4058,7 +4058,9 @@ static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
 static void realm_app_user1(void* p, realm_user_t* user, const realm_app_error_t*)
 {
-    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(realm_clone(user));
+    auto clone_ptr = realm_clone(user);
+    *static_cast<realm_user_t**>(p) = static_cast<realm_user_t*>(clone_ptr);
+    CHECK(realm_equals(user, clone_ptr));
 }
 
 static void realm_app_user2(void* p, realm_user_t* user, const realm_app_error_t*)
@@ -4206,6 +4208,8 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
             auto mut_sub = realm_sync_make_subscription_set_mutable(sub);
             auto s = realm_sync_find_subscription_by_query(sub, c_wrap_query_foo);
             CHECK(s != nullptr);
+            auto cloned_s = realm_clone(s);
+            CHECK(realm_equals(s, cloned_s));
             bool erased = false;
             auto result = realm_sync_subscription_set_erase_by_query(mut_sub, c_wrap_query_foo, &erased);
             CHECK(erased);
@@ -4223,6 +4227,7 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
                 sub_c, realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             CHECK(state == realm_flx_sync_subscription_set_state_e::RLM_SYNC_SUBSCRIPTION_COMPLETE);
             realm_release(s);
+            realm_release(cloned_s);
             realm_release(sub);
             realm_release(mut_sub);
             realm_release(sub_c);

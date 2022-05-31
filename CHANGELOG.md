@@ -2,8 +2,29 @@
 
 ### Enhancements
 * Allow flexible sync with discard local client resets. ([#5404](https://github.com/realm/realm-core/pull/5404))
+* The sync client will gracefully handle compensating write error messages from the server and pass detailed info to the SDK's sync error handler about which objects caused the compensating write to occur. ([#5528](https://github.com/realm/realm-core/pull/5528))
+
+### Fixed
+* Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
+
+### Breaking changes
+* Removed scheduler argument to the C API `realm_*_add_notification_callback` functions, because it wasn't actually used. (PR [#5541](https://github.com/realm/realm-core/pull/5541)).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The release package for Apple platforms is now built with Xcode 13 and the SPM package requires Xcode 13.
+
+----------------------------------------------
+
+# 12.0.0 Release notes
+
+### Enhancements
 * Expose `SyncSession::OnlyForTesting::handle_error` in the C API. ([#5507](https://github.com/realm/realm-core/issues/5507))
-* Greatly improve the performance of `Realm::get_number_of_versions()` and `RealmConfig::max_number_of_active_versions` on iOS.
+* Greatly improve the performance of `Realm::get_number_of_versions()` and `RealmConfig::max_number_of_active_versions` on iOS. ([#5530](https://github.com/realm/realm-core/pull/5530)).
 
 ### Fixed
 * In RQL 'NONE x BETWEEN ...' and 'ANY x BETWEEN ...' had incorrect behavior, so it is now disallowed ([#5508](https://github.com/realm/realm-core/issues/5508), since v11.3.0)
@@ -23,7 +44,7 @@
 -----------
 
 ### Internals
-* None.
+* Evergreen builders for MacOS now build with Xcode 13.1 on MacOS 11.0
 
 ----------------------------------------------
 
