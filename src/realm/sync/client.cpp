@@ -323,6 +323,7 @@ private:
     void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
     void on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state);
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
+    void on_flx_sync_version_complete(int64_t version);
 
     void report_progress();
 
@@ -822,7 +823,6 @@ void SessionImpl::process_pending_flx_bootstrap()
     m_wrapper.on_sync_progress();
 }
 
-
 void SessionImpl::on_new_flx_subscription_set(int64_t new_version)
 {
     // If m_state == State::Active then we know that we haven't sent an UNBIND message and all we need to
@@ -847,6 +847,11 @@ void SessionImpl::on_flx_sync_progress(int64_t version, DownloadBatchState batch
 SubscriptionStore* SessionImpl::get_flx_subscription_store()
 {
     return m_wrapper.get_flx_subscription_store();
+}
+
+void SessionImpl::non_sync_flx_completion(int64_t version)
+{
+    m_wrapper.on_flx_sync_version_complete(version);
 }
 
 void SessionImpl::receive_download_message_hook(const SyncProgress& progress, int64_t query_version,
@@ -944,6 +949,12 @@ void SessionWrapper::on_flx_sync_error(int64_t version, std::string_view err_msg
     std::move(mut_subs).commit();
 }
 
+void SessionWrapper::on_flx_sync_version_complete(int64_t version)
+{
+    m_flx_last_seen_version = version;
+    m_flx_active_version = version;
+}
+
 void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchState batch_state)
 {
     if (!has_flx_subscription_store()) {
@@ -958,8 +969,7 @@ void SessionWrapper::on_flx_sync_progress(int64_t new_version, DownloadBatchStat
                 return;
             }
 
-            m_flx_last_seen_version = new_version;
-            m_flx_active_version = new_version;
+            on_flx_sync_version_complete(new_version);
             new_state = SubscriptionSet::State::Complete;
             break;
         case DownloadBatchState::MoreToCome:

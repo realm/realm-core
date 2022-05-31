@@ -27,6 +27,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>
 #include <realm/util/flat_map.hpp>
@@ -935,7 +936,8 @@ static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode
 
 LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
                                           util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
-                                          bool* did_recover_out)
+                                          bool* did_recover_out, sync::SubscriptionStore* sub_store,
+                                          util::UniqueFunction<void(int64_t)> on_flx_version_complete)
 {
     REALM_ASSERT(db_local);
     REALM_ASSERT(db_remote);
@@ -945,6 +947,20 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
                 "remote = %4, mode = %5, recovery_is_allowed = %6",
                 db_local->get_path(), client_file_ident.ident, client_file_ident.salt, db_remote->get_path(), mode,
                 recovery_is_allowed);
+
+    auto remake_active_subscription = [&]() {
+        if (sub_store) {
+            auto mut_subs = sub_store->get_active().make_mutable_copy();
+            int64_t before_version = mut_subs.version();
+            mut_subs.update_state(sync::SubscriptionSet::State::Complete);
+            auto sub = std::move(mut_subs).commit();
+            if (on_flx_version_complete) {
+                on_flx_version_complete(sub.version());
+            }
+            logger.info("Recreated active subscription and set to complete (%1 -> %2)", before_version,
+                        sub.version());
+        }
+    };
 
     auto wt_local = db_local->start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
@@ -995,6 +1011,10 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
 
     // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
     wt_local->commit_and_continue_as_read();
+
+    // In DiscardLocal mode, only the active subscription set is preserved.
+    remake_active_subscription();
+
     if (did_recover_out) {
         *did_recover_out = recover_local_changes;
     }

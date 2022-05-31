@@ -313,7 +313,8 @@ struct FakeLocalClientReset : public TestClientReset {
             auto remote_db = TestHelper::get_db(remote_realm);
             using _impl::client_reset::perform_client_reset_diff;
             constexpr bool recovery_is_allowed = true;
-            perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr);
+            perform_client_reset_diff(local_db, remote_db, fake_ident, logger, m_mode, recovery_is_allowed, nullptr,
+                                      nullptr, nullptr);
 
             remote_realm->close();
             if (m_on_post_reset) {
@@ -569,6 +570,7 @@ struct BaasFLXClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
+        wait_for_upload(*realm);
         auto subs = realm->get_latest_subscription_set();
         subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         if (m_on_post_reset) {

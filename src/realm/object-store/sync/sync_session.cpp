@@ -400,7 +400,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // The download can fail for many reasons. For example:
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
-    // - in FLX mode a subscription was added while offline which causes an error
+    // - in FLX mode there was a problem fulfilling the previously active subscription
     if (error_message) {
         lock.unlock();
         if (m_flx_subscription_store) {
@@ -654,14 +654,6 @@ static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& s
             REALM_ASSERT(!active_after->is_frozen());
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
-            if (auto sub_store = active_after->sync_session()->get_flx_subscription_store()) {
-                // In DiscardLocal mode, only the active subscription set is preserved.
-                // Make a copy and set it to complete. This will cause all other subscription
-                // set to become superceded.
-                auto mut_subs = sub_store->get_active().make_mutable_copy();
-                mut_subs.update_state(sync::SubscriptionSet::State::Complete);
-                std::move(mut_subs).commit();
-            }
         }
         if (notify) {
             notify(frozen_before, active_after, did_recover);
