@@ -2009,4 +2009,21 @@ NONCONCURRENT_TEST(Upgrade_BackupAtoBbypassAtoC)
     _impl::GroupFriend::fake_target_file_format({});
 }
 
+TEST(Upgrade_RecoverAsymmetricTables)
+{
+    // This file has a table that is marked as asymmetric, but has 3 objects in it
+    std::string path = test_util::get_test_resource_path() + "downgrade_asymmetric.realm";
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    File::copy(path, temp_copy);
+    auto hist = make_in_realm_history();
+    auto db = DB::create(*hist, temp_copy);
+    auto rt = db->start_read();
+    auto t = rt->get_table("ephemeral");
+    CHECK(t->is_asymmetric());
+    CHECK_EQUAL(t->size(), 0);
+    t = rt->get_table("persistent");
+    CHECK(!t->is_asymmetric());
+    CHECK_EQUAL(t->size(), 3);
+}
+
 #endif // TEST_GROUP

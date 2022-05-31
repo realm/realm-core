@@ -389,6 +389,26 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
+void Transaction::check_consistency()
+{
+    // For the time being, we only check if asymmetric table are empty
+    std::vector<TableKey> needs_fix;
+    auto table_keys = get_table_keys();
+    for (auto tk : table_keys) {
+        auto table = get_table(tk);
+        if (table->is_asymmetric() && table->size() > 0) {
+            needs_fix.push_back(tk);
+        }
+    }
+    if (!needs_fix.empty()) {
+        promote_to_write();
+        for (auto tk : needs_fix) {
+            get_table(tk)->clear();
+        }
+        commit();
+    }
+}
+
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());

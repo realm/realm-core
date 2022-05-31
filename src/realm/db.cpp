@@ -667,12 +667,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
 
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
-
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
     if (Replication* repl = get_replication()) {
@@ -1176,11 +1170,17 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }
+        start_read()->check_consistency();
     }
     catch (...) {
         close();
         throw;
     }
+#if REALM_METRICS
+    if (options.enable_metrics) {
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
+    }
+#endif // REALM_METRICS
 
     m_alloc.set_read_only(true);
 }
