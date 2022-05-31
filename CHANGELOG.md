@@ -8,6 +8,7 @@
 
 ### Breaking changes
 * Removed scheduler argument to the C API `realm_*_add_notification_callback` functions, because it wasn't actually used. (PR [#5541](https://github.com/realm/realm-core/pull/5541)).
+* Merged the `realm_sync_upload_completion_func_t` and the `realm_sync_download_completion_func_t` typedefs in the C API because they were identical. The new typedef is `realm_sync_wait_for_completion_func_t`. (PR [#5548](https://github.com/realm/realm-core/pull/5548))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
