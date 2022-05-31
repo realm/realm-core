@@ -256,30 +256,64 @@ public:
 
                 auto message = msg.read_sized_data<StringData>(message_size);
 
-                connection.receive_error_message(error_code, sync::ProtocolErrorInfo{message, try_again},
+                connection.receive_error_message(sync::ProtocolErrorInfo{error_code, message, try_again},
                                                  session_ident); // Throws
             }
             else if (message_type == "json_error") { // introduced in protocol 4
                 sync::ProtocolErrorInfo info{};
-                int error_code = msg.read_next<int>();
+                info.raw_error_code = msg.read_next<int>();
                 auto message_size = msg.read_next<size_t>();
                 auto session_ident = msg.read_next<session_ident_type>('\n');
                 auto json_raw = msg.read_sized_data<std::string_view>(message_size);
                 try {
                     auto json = nlohmann::json::parse(json_raw);
+                    logger.trace("Error message encoded as json: %1", json_raw);
                     info.client_reset_recovery_is_disabled = json["isRecoveryModeDisabled"];
                     info.try_again = json["tryAgain"];
                     info.message = json["message"];
-                    info.logURL = util::make_optional<std::string>(json["logURL"]);
+                    info.log_url = util::make_optional<std::string>(json["logURL"]);
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
+
+                    if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
+                        info.resumption_delay_interval.emplace();
+                        info.resumption_delay_interval->resumption_delay_interval =
+                            std::chrono::seconds{backoff_interval->get<int>()};
+                        info.resumption_delay_interval->max_resumption_delay_interval =
+                            std::chrono::seconds{json.at("backoffMaxDelaySec").get<int>()};
+                        info.resumption_delay_interval->resumption_delay_backoff_multiplier =
+                            json.at("backoffMultiplier").get<int>();
+                    }
+
+                    if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {
+                        if (!rejected_updates->is_array()) {
+                            return report_error(
+                                Error::bad_syntax,
+                                "Compensating writes error list is not stored in an array as expected");
+                        }
+
+                        for (const auto& rejected_update : *rejected_updates) {
+                            if (!rejected_update.is_object()) {
+                                return report_error(
+                                    Error::bad_syntax,
+                                    "Compensating write error information is not stored in an object as expected");
+                            }
+
+                            sync::CompensatingWriteErrorInfo cwei;
+                            cwei.reason = rejected_update["reason"];
+                            cwei.object_name = rejected_update["table"];
+                            std::string_view pk = rejected_update["pk"].get<std::string_view>();
+                            cwei.primary_key = sync::parse_base64_encoded_primary_key(pk);
+                            info.compensating_writes.push_back(std::move(cwei));
+                        }
+                    }
                 }
                 catch (const nlohmann::json::exception& e) {
                     // If any of the above json fields are not present, this is a fatal error
                     // however, additional optional fields may be added in the future.
                     return report_error(Error::bad_syntax, "Failed to parse 'json_error' with error_code %1: '%2'",
-                                        error_code, e.what());
+                                        info.raw_error_code, e.what());
                 }
-                connection.receive_error_message(error_code, info, session_ident); // Throws
+                connection.receive_error_message(info, session_ident); // Throws
             }
             else if (message_type == "query_error") {
                 auto error_code = msg.read_next<int>();

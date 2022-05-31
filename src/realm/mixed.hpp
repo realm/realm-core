@@ -158,9 +158,7 @@ public:
     {
     }
 
-    ~Mixed() noexcept
-    {
-    }
+    ~Mixed() noexcept {}
 
     DataType get_type() const noexcept
     {
