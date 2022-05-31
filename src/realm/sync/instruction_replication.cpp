@@ -717,7 +717,7 @@ bool SyncReplication::select_table(const Table& table, SelectTableFor mode)
     }
 
     if (mode == SelectTableFor::ObjectInstruction && m_write_validator) {
-        m_write_validator(std::string_view(Group::table_name_to_class_name(name)));
+        m_write_validator(table);
     }
     m_last_class_name = emit_class_name(table);
     m_last_table = &table;

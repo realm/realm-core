@@ -114,7 +114,11 @@ void RealmCoordinator::create_sync_session()
                 }
 
                 auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
-                return [tables = std::move(latest_sub_tables), sub_mgr](std::string_view object_class_name) {
+                return [tables = std::move(latest_sub_tables), sub_mgr](const Table& table) {
+                    if (table.is_embedded()) {
+                        return;
+                    }
+                    auto object_class_name = Group::table_name_to_class_name(table.get_name());
                     if (tables.find(object_class_name) == tables.end()) {
                         throw NoSubscriptionForWrite(util::format(
                             "Cannot write to class %1 when no flexible sync subscription has been created.",

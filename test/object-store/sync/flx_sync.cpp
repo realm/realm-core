@@ -61,6 +61,18 @@ const Schema g_large_array_schema{
                  }),
 };
 
+const Schema g_simple_embedded_obj_schema{
+    {"TopLevel",
+     {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+      {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+      {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"}}},
+    {"TopLevel_embedded_obj",
+     ObjectSchema::IsEmbedded{true},
+     {
+         {"str_field", PropertyType::String | PropertyType::Nullable},
+     }},
+};
+
 // Populates a FLXSyncTestHarness with the g_large_array_schema with objects that are large enough that
 // they are guaranteed to fill multiple bootstrap download messages. Currently this means generating 5
 // objects each with 1024 array entries of 1024 bytes each.
@@ -191,7 +203,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 }
 
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
-    FLXSyncTestHarness harness("flx_bad_query");
+    FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
     harness.do_with_new_user([&](auto user) {
         SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
         auto [error_promise, error_future] = util::make_promise_future<SyncError>();
@@ -206,17 +218,17 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
                 auto realm = Realm::get_shared_realm(config);
                 CppContext c(realm);
                 realm->begin_transaction();
-                Object::create(c, realm, "TopLevel",
-                               util::Any(AnyDict{{"_id", ObjectId::gen()},
-                                                 {"queryable_str_field", std::string{"foo"}},
-                                                 {"queryable_int_field", static_cast<int64_t>(5)},
-                                                 {"non_queryable_field", std::string{"non queryable 1"}}}));
+                Object::create(
+                    c, realm, "TopLevel",
+                    util::Any(AnyDict{{"_id", ObjectId::gen()}, {"queryable_str_field", std::string{"foo"}}}));
                 realm->commit_transaction();
             }(),
             NoSubscriptionForWrite);
 
         auto realm = Realm::get_shared_realm(config);
         auto table = realm->read_group().get_table("class_TopLevel");
+
+        REQUIRE(table->is_empty());
         auto col_key = table->get_column_key("queryable_str_field");
         {
             auto new_subs = realm->get_latest_subscription_set().make_mutable_copy();
@@ -227,34 +239,30 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
 
         CppContext c(realm);
         realm->begin_transaction();
-        Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{{"_id", ObjectId::gen()},
-                                         {"queryable_str_field", std::string{"foo"}},
-                                         {"queryable_int_field", static_cast<int64_t>(5)},
-                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        auto obj = Object::create(c, realm, "TopLevel",
+                                  util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                                    {"queryable_str_field", std::string{"foo"}},
+                                                    {"embedded_obj", AnyDict{{"str_field", std::string{"bar"}}}}}));
         realm->commit_transaction();
+
+        realm->begin_transaction();
+        auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
+        embedded_obj.set_property_value(c, "str_field", util::Any{std::string{"baz"}});
+        realm->commit_transaction();
+
+        wait_for_upload(*realm);
+        wait_for_download(*realm);
     });
 }
 
 #if REALM_ENABLE_COMPENSATING_WRITES_TESTS
 TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app]") {
-    Schema schema{
-        {"TopLevel",
-         {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-          {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-          {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"}}},
-        {"TopLevel_embedded_obj",
-         ObjectSchema::IsEmbedded{true},
-         {
-             {"str_field", PropertyType::String | PropertyType::Nullable},
-         }},
-    };
     AppCreateConfig::FLXSyncRole role;
     role.name = "compensating_write_perms";
     role.read = true;
     role.write =
         nlohmann::json{{"queryable_str_field", nlohmann::json{{"$in", nlohmann::json::array({"foo", "bar"})}}}};
-    FLXSyncTestHarness::ServerSchema server_schema{schema, {"queryable_str_field"}, {role}};
+    FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
 
     // TODO(RCORE-912) When DiscardLocal is supported with FLX sync we should remove this check in favor of the
@@ -393,36 +401,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         });
     }
 
-    SECTION("compensating write before setting a query") {
-        harness.do_with_new_user([&](auto user) {
-            SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
-            auto&& [error_future, err_handler] = make_error_handler();
-            config.sync_config->error_handler = err_handler;
-
-            auto realm = Realm::get_shared_realm(config);
-            CppContext c(realm);
-            realm->begin_transaction();
-            auto invalid_obj = ObjectId::gen();
-            Object::create(c, realm, "TopLevel",
-                           util::Any(AnyDict{
-                               {"_id", invalid_obj},
-                               {"queryable_str_field", std::string{"foo"}},
-                           }));
-            realm->commit_transaction();
-
-            wait_for_upload(*realm);
-            wait_for_download(*realm);
-
-            validate_sync_error(std::move(error_future).get(), invalid_obj, "before opening a subscription on it");
-            realm->refresh();
-
-            auto top_level_table = realm->read_group().get_table("class_TopLevel");
-            REQUIRE(top_level_table->is_empty());
-        });
-    }
-
-
-    SECTION("compensating write after setting a query") {
+    SECTION("compensating write for writing a top-level object that is out-of-view") {
         harness.do_with_new_user([&](auto user) {
             SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
             auto&& [error_future, err_handler] = make_error_handler();
