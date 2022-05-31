@@ -1210,6 +1210,10 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     }
 
     if (value.is_type(type_TypedLink)) {
+        if (m_table->is_asymmetric()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+
         ObjLink new_link = value.template get<ObjLink>();
         Mixed old_value = get<Mixed>(col_key);
         ObjLink old_link;
@@ -1868,9 +1872,6 @@ void Obj::set_backlink(ColKey col_key, ObjLink new_link) const
 {
     if (new_link && new_link.get_obj_key()) {
         auto target_table = m_table->get_parent_group()->get_table(new_link.get_table_key());
-        if (m_table->is_asymmetric() || target_table->is_asymmetric()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
-        }
         ColKey backlink_col_key;
         auto type = col_key.get_type();
         if (type == col_type_TypedLink || type == col_type_Mixed || col_key.is_dictionary()) {

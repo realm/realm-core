@@ -1086,6 +1086,9 @@ void Group::validate(ObjLink link) const
         if (target_table->is_embedded()) {
             throw LogicError(LogicError::wrong_kind_of_table);
         }
+        if (target_table->is_asymmetric()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
     }
 }
 

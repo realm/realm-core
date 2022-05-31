@@ -359,6 +359,14 @@ ColKey Table::add_column(Table& target, StringData name)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
 
     m_has_any_embedded_objects.reset();
 
@@ -401,6 +409,14 @@ ColKey Table::add_column_list(Table& target, StringData name)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
 
     m_has_any_embedded_objects.reset();
 
@@ -422,6 +438,14 @@ ColKey Table::add_column_set(Table& target, StringData name)
         throw LogicError(LogicError::group_mismatch);
     if (target.is_embedded())
         throw LogicError(LogicError::wrong_kind_of_table);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
 
     ColumnAttrMask attr;
     attr.set(col_attr_Set);
@@ -463,6 +487,14 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
 
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
@@ -650,15 +682,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
 ColKey Table::do_insert_column(ColKey col_key, DataType type, StringData name, Table* target_table, DataType key_type)
 {
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric() && target_table) {
-        throw LogicError(LogicError::wrong_kind_of_table);
-    }
-    // Incoming links from an asymmetric table are not allowed.
-    if (target_table && target_table->is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
-    }
-
     col_key = do_insert_root_column(col_key, ColumnType(type), name, key_type); // Throws
 
     // When the inserted column is a link-type column, we must also add a
