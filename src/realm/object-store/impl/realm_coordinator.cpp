@@ -114,7 +114,7 @@ void RealmCoordinator::create_sync_session()
                 }
 
                 auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
-                return [tables = std::move(latest_sub_tables), sub_mgr](const Table& table) {
+                return [tables = std::move(latest_sub_tables)](const Table& table) {
                     if (table.is_embedded()) {
                         return;
                     }
