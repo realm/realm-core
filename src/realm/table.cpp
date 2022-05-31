@@ -3072,6 +3072,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
             m_tombstones->erase(unres_key, state);
         }
     }
+    if (is_asymmetric()) {
+        get_parent_group()->m_objects_to_delete.emplace_back(this->m_key, ret.get_key());
+    }
     return ret;
 }
 

@@ -2301,6 +2301,11 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     }
     version_type new_version = current_version + 1;
 
+    if (!transaction.m_objects_to_delete.empty()) {
+        for (auto it : transaction.m_objects_to_delete) {
+            transaction.get_table(it.table_key)->remove_object(it.obj_key);
+        }
+    }
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the

@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <chrono>
 
 #include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
@@ -533,6 +534,18 @@ private:
     static constexpr char g_class_name_prefix[] = "class_";
     static constexpr size_t g_class_name_prefix_len = 6;
 
+    struct ToDeleteRef {
+        ToDeleteRef(TableKey tk, ObjKey k)
+            : table_key(tk)
+            , obj_key(k)
+            , ttl(std::chrono::steady_clock::now())
+        {
+        }
+        TableKey table_key;
+        ObjKey obj_key;
+        std::chrono::steady_clock::time_point ttl;
+    };
+
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -597,6 +610,7 @@ private:
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
     std::shared_ptr<metrics::Metrics> m_metrics;
+    std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
 
     static constexpr size_t s_table_name_ndx = 0;
