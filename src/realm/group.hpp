@@ -308,7 +308,7 @@ public:
     TableRef add_table(StringData name, Table::Type table_type = Table::Type::TopLevel);
     TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false,
                                         Table::Type table_type = Table::Type::TopLevel);
-    TableRef get_or_add_table(StringData name, Table::Type table_typeb = Table::Type::TopLevel,
+    TableRef get_or_add_table(StringData name, Table::Type table_type = Table::Type::TopLevel,
                               bool* was_added = nullptr);
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
                                                bool nullable = false, Table::Type table_type = Table::Type::TopLevel);

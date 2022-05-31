@@ -122,7 +122,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
         [&](const Instruction::AddTable::TopLevelTable& spec) {
             auto table_type = (spec.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
             if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
-                log("sync::create_table(group, \"%1\", %2);", table_name, spec.is_asymmetric);
+                log("sync::create_table(group, \"%1\", %2);", table_name, table_type);
                 m_transaction.get_or_add_table(table_name, table_type);
             }
             else {
@@ -133,10 +133,9 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
                 DataType pk_type = get_data_type(spec.pk_type);
                 StringData pk_field = get_string(spec.pk_field);
                 bool nullable = spec.pk_nullable;
-                bool asymmetric = spec.is_asymmetric;
 
                 log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4, %5);", table_name,
-                    pk_type, pk_field, nullable, asymmetric);
+                    pk_type, pk_field, nullable, table_type);
                 m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable, table_type);
             }
         },
