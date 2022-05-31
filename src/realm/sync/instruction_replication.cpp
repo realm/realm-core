@@ -182,7 +182,7 @@ void SyncReplication::add_class(TableKey tk, StringData name, Table::Type table_
 {
     Replication::add_class(tk, name, table_type);
 
-    bool is_class = Transaction::table_name_is_class_name(name);
+    bool is_class = m_transaction->table_is_public(tk);
 
     if (is_class && !m_short_circuit) {
         Instruction::AddTable instr;
@@ -210,7 +210,7 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
 {
     Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable, table_type);
 
-    bool is_class = Transaction::table_name_is_class_name(name);
+    bool is_class = m_transaction->table_is_public(tk);
 
     if (is_class && !m_short_circuit) {
         Instruction::AddTable instr;
@@ -306,7 +306,7 @@ void SyncReplication::erase_class(TableKey table_key, size_t num_tables)
 
     StringData table_name = m_transaction->get_table_name(table_key);
 
-    bool is_class = Transaction::table_name_is_class_name(table_name);
+    bool is_class = m_transaction->table_is_public(table_key);
 
     if (is_class) {
         REALM_ASSERT(table_key == m_table_being_erased);
@@ -711,8 +711,7 @@ bool SyncReplication::select_table(const Table& table, SelectTableFor mode)
         return true;
     }
 
-    StringData name = table.get_name();
-    if (!Transaction::table_name_is_class_name(name)) {
+    if (!m_transaction->table_is_public(table.get_key())) {
         return false;
     }
 
