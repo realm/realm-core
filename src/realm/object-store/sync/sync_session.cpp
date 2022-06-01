@@ -1033,9 +1033,9 @@ std::string const& SyncSession::path() const
     return m_db->get_path();
 }
 
-sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
+const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscription_store()
 {
-    return m_flx_subscription_store.get();
+    return m_flx_subscription_store;
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)
