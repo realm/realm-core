@@ -1010,6 +1010,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
                                                 recovered_changeset);
 
     // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
+    wt_remote->rollback_and_continue_as_read();
     wt_local->commit_and_continue_as_read();
 
     // In DiscardLocal mode, only the active subscription set is preserved.
