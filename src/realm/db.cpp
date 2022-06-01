@@ -2305,6 +2305,7 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
         for (auto it : transaction.m_objects_to_delete) {
             transaction.get_table(it.table_key)->remove_object(it.obj_key);
         }
+        transaction.m_objects_to_delete.clear();
     }
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
