@@ -468,11 +468,22 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             std::swap(m_schema_version, temp_version);
         });
 
+        auto run_close_and_delete_files = [this]() {
+            // in this phase we ignore errors that may arise.
+            try {
+                close_and_delete_files();
+            }
+            // silence possible exceptions during file deletion
+            catch (const std::exception&) {
+            }
+        };
+
         try {
             initialization_function(shared_from_this());
         }
         catch (const std::exception& e) {
-            close_and_delete_files();
+            run_close_and_delete_files();
+            // re-throw callback errors
             throw;
         }
     }
