@@ -105,7 +105,7 @@ void RealmCoordinator::create_sync_session()
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
     if (m_config.sync_config && m_config.sync_config->flx_sync_requested) {
         std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_sync_session->get_flx_subscription_store());
-        sync::ClientReplication& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+        auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
         history.set_write_validator_factory(
             [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
                 auto sub_mgr = weak_sub_mgr.lock();
@@ -115,7 +115,7 @@ void RealmCoordinator::create_sync_session()
 
                 auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
                 return [tables = std::move(latest_sub_tables)](const Table& table) {
-                    if (table.is_embedded()) {
+                    if (table.get_table_type() != Table::Type::TopLevel) {
                         return;
                     }
                     auto object_class_name = Group::table_name_to_class_name(table.get_name());
