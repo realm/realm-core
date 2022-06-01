@@ -447,9 +447,9 @@ public:
     {
     }
 
-    // A write validator factory takes a read-able transaction and returns a UniqueFunction containing a
+    // A write validator factory takes a write transaction and returns a UniqueFunction containing a
     // SyncReplication::WriteValidator. The factory will get called at the start of a write transaction
-    // and the WriteValidator it returns will be re-used for all mutations wit`hin the transaction.
+    // and the WriteValidator it returns will be re-used for all mutations within the transaction.
     using WriteValidatorFactory = util::UniqueFunction<WriteValidator>(Transaction&);
     void set_write_validator_factory(util::UniqueFunction<WriteValidatorFactory> validator_factory)
     {
