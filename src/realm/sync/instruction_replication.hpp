@@ -110,10 +110,9 @@ private:
     template <class T>
     void emit(T instruction);
 
-    enum class SelectTableFor { SchemaInstruction, ObjectInstruction };
     // Returns true and populates m_last_table_name if instructions for the
     // table should be emitted.
-    bool select_table(const Table&, SelectTableFor mode = SelectTableFor::ObjectInstruction);
+    bool select_table(const Table&);
 
     REALM_NORETURN void unsupported_instruction() const; // Throws TransformError
 
