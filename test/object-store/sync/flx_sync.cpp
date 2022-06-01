@@ -42,6 +42,19 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace realm {
+
+class TestHelper {
+public:
+    static bool can_advance(const SharedRealm& realm)
+    {
+        auto& coord = Realm::Internal::get_coordinator(*realm);
+        return coord.can_advance(*realm);
+    }
+};
+
+} // namespace realm
+
 namespace realm::app {
 
 namespace {
@@ -121,6 +134,12 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
                                          {"non_queryable_field", std::string{"non queryable 2"}}}));
     });
 
+    auto wait_for_advance = [&](const SharedRealm& realm) {
+        timed_wait_for([&] {
+            return !TestHelper::can_advance(realm);
+        });
+    };
+
     harness.do_with_new_realm([&](SharedRealm realm) {
         wait_for_download(*realm);
         {
@@ -143,7 +162,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         wait_for_download(*realm);
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, table);
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -161,7 +180,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 2);
         }
@@ -179,7 +198,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -195,7 +214,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
