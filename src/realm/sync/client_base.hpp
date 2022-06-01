@@ -326,12 +326,12 @@ struct SessionErrorInfo : public ProtocolErrorInfo {
     {
     }
     SessionErrorInfo(const std::error_code& ec, bool try_again)
-        : ProtocolErrorInfo(ec.message(), try_again)
+        : ProtocolErrorInfo(ec.value(), ec.message(), try_again)
         , error_code(ec)
     {
     }
     SessionErrorInfo(const std::error_code& ec, const std::string& msg, bool try_again)
-        : ProtocolErrorInfo(msg, try_again)
+        : ProtocolErrorInfo(ec.value(), msg, try_again)
         , error_code(ec)
     {
     }
