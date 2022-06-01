@@ -129,6 +129,15 @@ RLM_API bool realm_close(realm_t* realm)
     });
 }
 
+RLM_API bool realm_close_and_delete_files(realm_t* realm)
+{
+    return wrap_err([&]() {
+        (*realm)->close_and_delete_files();
+        return true;
+    });
+}
+
+
 RLM_API bool realm_begin_read(realm_t* realm)
 {
     return wrap_err([&]() {

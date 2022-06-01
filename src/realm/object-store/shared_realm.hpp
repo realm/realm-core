@@ -395,12 +395,16 @@ public:
     // Closing a Realm will wait for any asynchronous writes which have been commited but not synced
     // to sync. Asynchronous writes which have not yet started are canceled.
     void close();
-    // close realm and delete all the realm files
-    void terminate_sync_and_delete_realm_files();
+    // Check if a realm is closed
     bool is_closed() const
     {
         return !m_transaction && !m_coordinator;
     }
+    /**
+     * Clean up the file system from realm files, closing all the handles associated to them.
+     * This function may block waiting for the sync session to be terminated.
+     */
+    void close_and_delete_files();
 
     /**
      * Deletes the following files for the given `realm_file_path` if they exist:
