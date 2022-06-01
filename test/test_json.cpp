@@ -683,7 +683,7 @@ TEST(Xjson_DictionaryEmbeddedObject1)
     Group group;
 
     TableRef table1 = group.add_table_with_primary_key("table1", type_String, "primaryKey");
-    TableRef table2 = group.add_embedded_table("table2");
+    TableRef table2 = group.add_table("table2", Table::Type::Embedded);
 
     // add some columns to table1 and table2
     ColKey table1Coll = table1->add_column(type_Int, "int1");
@@ -832,7 +832,7 @@ TEST(Json_Schema)
     Group group;
 
     TableRef persons = group.add_table("person");
-    TableRef dogs = group.add_embedded_table("dog");
+    TableRef dogs = group.add_table("dog", Table::Type::Embedded);
 
     constexpr bool is_nullable = true;
     persons->add_column(type_String, "name");

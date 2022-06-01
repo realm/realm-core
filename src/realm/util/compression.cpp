@@ -517,8 +517,8 @@ std::error_code decompress_libcompression(NoCopyInputStream& compressed, Span<co
     if (rc != COMPRESSION_STATUS_OK)
         return error::decompress_error;
 
-    // Using ScopeExit here hits a bug in Xcode 12's availability checking and
-    // produces an incorrect warning
+    // Using ScopeExit here warns about missing availability checking, but also
+    // complains about redundant availability checking if it's added.
     struct Cleanup {
         compression_stream* strm;
         ~Cleanup()

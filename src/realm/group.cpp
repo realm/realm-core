@@ -389,6 +389,26 @@ uint64_t Group::get_sync_file_id() const noexcept
     return 0;
 }
 
+void Transaction::check_consistency()
+{
+    // For the time being, we only check if asymmetric table are empty
+    std::vector<TableKey> needs_fix;
+    auto table_keys = get_table_keys();
+    for (auto tk : table_keys) {
+        auto table = get_table(tk);
+        if (table->is_asymmetric() && table->size() > 0) {
+            needs_fix.push_back(tk);
+        }
+    }
+    if (!needs_fix.empty()) {
+        promote_to_write();
+        for (auto tk : needs_fix) {
+            get_table(tk)->clear();
+        }
+        commit();
+    }
+}
+
 void Transaction::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
@@ -835,13 +855,14 @@ Table* Group::do_get_table(StringData name)
     return table;
 }
 
-TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable)
+TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable,
+                                           Table::Type table_type)
 {
     if (!is_attached())
         throw LogicError(LogicError::detached_accessor);
     check_table_name_uniqueness(name);
 
-    auto table = do_add_table(name, false, false);
+    auto table = do_add_table(name, table_type, false);
 
     // Add pk column - without replication
     ColumnAttrMask attr;
@@ -852,12 +873,12 @@ TableRef Group::add_table_with_primary_key(StringData name, DataType pk_type, St
     table->do_set_primary_key_column(pk_col);
 
     if (Replication* repl = *get_repl())
-        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable);
+        repl->add_class_with_primary_key(table->get_key(), name, pk_type, pk_name, nullable, table_type);
 
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
+Table* Group::do_add_table(StringData name, Table::Type table_type, bool do_repl)
 {
     if (!m_is_writable)
         throw LogicError(LogicError::wrong_transact_state);
@@ -899,13 +920,12 @@ Table* Group::do_add_table(StringData name, bool is_embedded, bool do_repl)
 
     Replication* repl = *get_repl();
     if (do_repl && repl)
-        repl->add_class(key, name, is_embedded);
+        repl->add_class(key, name, table_type);
 
     ++m_num_tables;
 
     Table* table = create_table_accessor(j);
-    if (is_embedded)
-        table->do_set_embedded(true);
+    table->do_set_table_type(table_type);
 
     return table;
 }
@@ -1084,6 +1104,9 @@ void Group::validate(ObjLink link) const
             throw LogicError(LogicError::target_row_index_out_of_range);
         }
         if (target_table->is_embedded()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+        if (target_table->is_asymmetric()) {
             throw LogicError(LogicError::wrong_kind_of_table);
         }
     }
