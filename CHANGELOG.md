@@ -1,14 +1,13 @@
 # NEXT RELEASE
 
 ### Enhancements
-* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* The sync client will gracefully handle compensating write error messages from the server and pass detailed info to the SDK's sync error handler about which objects caused the compensating write to occur. ([#5528](https://github.com/realm/realm-core/pull/5528))
 
 ### Fixed
 * Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
 
 ### Breaking changes
-* None.
+* Removed scheduler argument to the C API `realm_*_add_notification_callback` functions, because it wasn't actually used. (PR [#5541](https://github.com/realm/realm-core/pull/5541)).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.

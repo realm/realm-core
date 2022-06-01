@@ -48,6 +48,7 @@ enum class SimplifiedProtocolError {
     BadAuthentication,
     PermissionDenied,
     ClientResetRequested,
+    CompensatingWrite,
 };
 
 namespace sync {
@@ -79,9 +80,13 @@ struct SyncError {
     // the server may explicitly send down "IsClientReset" as part of an error
     // if this is set, it overrides the clients interpretation of the error
     util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
+    // If this error resulted from a compensating write, this vector will contain information about each object
+    // that caused a compensating write and why the write was illegal.
+    std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
     SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-              util::Optional<std::string> serverLog = util::none);
+              util::Optional<std::string> serverLog = util::none,
+              std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
     static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";
