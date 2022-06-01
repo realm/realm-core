@@ -991,8 +991,8 @@ RLM_API bool realm_close(realm_t*);
 /**
  * Forces the sync client to stop (blocking functionality) if required. Close the realm and delete all the files
  * associated to it from the file system.
- * @param realm, ptr to a valid realm instance
- * @param did_delete, indication whether files have been deleted or not.
+ * @param realm ptr to a valid realm instance
+ * @param did_delete indication whether files have been deleted or not.
  * @return True if no excpetion occured.
  */
 RLM_API bool realm_close_and_delete_files(realm_t* realm, bool* did_delete);
