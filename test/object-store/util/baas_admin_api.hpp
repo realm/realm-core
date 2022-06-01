@@ -150,7 +150,6 @@ struct AppCreateConfig {
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
         std::vector<FLXSyncRole> default_roles;
-        std::vector<std::string> asymmetric_tables;
     };
 
     std::string app_name;

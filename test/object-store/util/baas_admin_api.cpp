@@ -874,8 +874,11 @@ AppSession create_app(const AppCreateConfig& config)
         const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
         std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
         auto asymmetric_tables = nlohmann::json::array();
-        const auto& asymmetric_tables_src = config.flx_sync_config->asymmetric_tables;
-        std::copy(asymmetric_tables_src.begin(), asymmetric_tables_src.end(), std::back_inserter(asymmetric_tables));
+        for (const auto& obj_schema : config.schema) {
+            if (obj_schema.is_asymmetric) {
+                asymmetric_tables.emplace_back(obj_schema.name);
+            }
+        }
         auto default_roles = nlohmann::json::array();
         if (config.flx_sync_config->default_roles.empty()) {
             default_roles = nlohmann::json::array(

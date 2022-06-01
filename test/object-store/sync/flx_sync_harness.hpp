@@ -32,7 +32,6 @@ public:
         Schema schema;
         std::vector<std::string> queryable_fields;
         std::vector<AppCreateConfig::FLXSyncRole> default_roles;
-        std::vector<std::string> asymmetric_tables;
         bool dev_mode_enabled = false;
     };
 
@@ -59,7 +58,6 @@ public:
         AppCreateConfig::FLXSyncConfig flx_config;
         flx_config.queryable_fields = server_schema.queryable_fields;
         flx_config.default_roles = server_schema.default_roles;
-        flx_config.asymmetric_tables = server_schema.asymmetric_tables;
 
         server_app_config.flx_sync_config = std::move(flx_config);
         return create_app(server_app_config);
