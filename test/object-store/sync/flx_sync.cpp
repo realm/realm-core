@@ -1185,6 +1185,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 
+
     SECTION("update object") {
         harness.do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
@@ -1242,6 +1243,40 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
+        });
+    }
+
+    SECTION("open with schema mismatch on IsAsymmetric") {
+        auto foo_obj_id = ObjectId::gen();
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+        });
+
+        auto schema = server_schema.schema;
+        schema.find("Asymmetric")->is_asymmetric = ObjectSchema::IsAsymmetric{false};
+
+        harness.do_with_new_user([&](std::shared_ptr<SyncUser> user) {
+            SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
+            std::condition_variable cv;
+            std::mutex wait_mutex;
+            bool wait_flag(false);
+            std::error_code ec;
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                std::unique_lock<std::mutex> lock(wait_mutex);
+                wait_flag = true;
+                ec = error.error_code;
+                cv.notify_one();
+            };
+
+            auto realm = Realm::get_shared_realm(config);
+
+            std::unique_lock<std::mutex> lock(wait_mutex);
+            cv.wait(lock, [&wait_flag]() {
+                return wait_flag == true;
+            });
+            CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
     }
 }
