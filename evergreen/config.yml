@@ -112,6 +112,10 @@ functions:
               set_cmake_var realm_vars REALM_ENABLE_COMPENSATING_WRITES_TESTS BOOL On
           fi
 
+          if [ -n "${realm_enable_master_baas_tests|}" ]; then
+              set_cmake_var realm_vars REALM_ENABLE_MASTER_BAAS_TESTS BOOL On
+          fi
+
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
               GENERATOR="Ninja Multi-Config"
@@ -216,6 +220,7 @@ functions:
 
         if [[ ! -d realm-core ]]; then
           echo "No source directory exists. Not running hang analyzer"
+          exit 1
         fi
 
         TOP_DIR=$(pwd)/realm-core
@@ -679,6 +684,24 @@ buildvariants:
     fetch_missing_dependencies: On
     run_tests_against_baas: On
     realm_enable_compensating_writes_tests: On
+    c_compiler: "./clang_binaries/bin/clang"
+    cxx_compiler: "./clang_binaries/bin/clang++"
+    baas_branch: master
+  tasks:
+  - name: compile_test
+    distros:
+    - ubuntu2004-large
+
+- name: ubuntu2004-asymmetric-sync
+  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Asymmetric Sync)"
+  run_on: ubuntu2004-small
+  expansions:
+    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
+    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
+    cmake_bindir: "./cmake_binaries/bin"
+    fetch_missing_dependencies: On
+    run_tests_against_baas: On
+    realm_enable_master_baas_tests: On
     c_compiler: "./clang_binaries/bin/clang"
     cxx_compiler: "./clang_binaries/bin/clang++"
     baas_branch: master

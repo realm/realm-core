@@ -1123,6 +1123,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     }
 }
 
+#if REALM_ENABLE_MASTER_BAAS_TESTS
 TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
@@ -1185,6 +1186,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 }
+
+#endif // REALM_ENABLE_MASTER_BAAS_TESTS
 
 } // namespace realm::app
 
