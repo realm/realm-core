@@ -1291,9 +1291,11 @@ void Realm::close()
 void Realm::terminate_sync_and_delete_realm_files()
 {
     try {
+#if REALM_ENABLE_SYNC
         if (m_config.sync_config) {
             m_coordinator->sync_session()->shutdown_and_wait();
         }
+#endif
         const auto path = m_config.path;
         close();
         delete_files(path);
