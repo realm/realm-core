@@ -130,7 +130,6 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
             empty_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
         }
 
-        realm->set_auto_refresh(true);
         auto table = realm->read_group().get_table("class_TopLevel");
         auto col_key = table->get_column_key("queryable_str_field");
         Query query_foo(table);
@@ -144,6 +143,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         wait_for_download(*realm);
         {
+            realm->refresh();
             Results results(realm, table);
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -161,6 +161,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
+            realm->refresh();
             Results results(realm, Query(table));
             CHECK(results.size() == 2);
         }
@@ -178,6 +179,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
+            realm->refresh();
             Results results(realm, Query(table));
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -193,6 +195,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
+            realm->refresh();
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
