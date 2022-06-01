@@ -818,8 +818,8 @@ void SessionImpl::process_pending_flx_bootstrap()
     }
 
     REALM_ASSERT_3(query_version, !=, -1);
-    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
     m_wrapper.on_sync_progress();
+    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 }
 
 
