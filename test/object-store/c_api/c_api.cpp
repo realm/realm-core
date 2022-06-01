@@ -4095,18 +4095,18 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
     }
     SECTION("delete_user integration") {
         AutoVerifiedEmailCredentials creds;
-        realm_user_t* sync_user_1 = nullptr;
+        realm_user_t* sync_user = nullptr;
         realm_string_t password{creds.password.c_str(), creds.password.length()};
         realm_app_email_password_provider_client_register_email(&app, creds.email.c_str(), password,
                                                                 realm_app_void_completion, nullptr, nullptr);
         realm_app_credentials anonymous(app::AppCredentials::anonymous());
-        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user_1, nullptr);
+        realm_app_log_in_with_credentials(&app, &anonymous, realm_app_user1, &sync_user, nullptr);
 
-        CHECK(realm_user_get_auth_provider(sync_user_1) == RLM_AUTH_PROVIDER_ANONYMOUS);
-        realm_app_delete_user(&app, sync_user_1, realm_app_void_completion, nullptr, nullptr);
-        auto state = realm_user_get_state(sync_user_1);
+        CHECK(realm_user_get_auth_provider(sync_user) == RLM_AUTH_PROVIDER_ANONYMOUS);
+        realm_app_delete_user(&app, sync_user, realm_app_void_completion, nullptr, nullptr);
+        auto state = realm_user_get_state(sync_user);
         CHECK(state == RLM_USER_STATE_REMOVED);
-        realm_release(sync_user_1);
+        realm_release(sync_user);
     }
     SECTION("link_user integration") {
         AutoVerifiedEmailCredentials creds;
@@ -4129,6 +4129,7 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         realm_release(sync_user);
     }
     SECTION("realm_app_get_all_users integration") {
+#if 0
         AutoVerifiedEmailCredentials creds;
         realm_user_t* sync_user_1 = nullptr;
         realm_user_t* sync_user_2 = nullptr;
@@ -4155,11 +4156,12 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         realm_app_get_all_users(&app, out_users, out_n, &out_n);
 
         for (size_t i = 0; i < out_n; ++i)
-            delete out_users[i];
+            realm_release(out_users[i]);
         realm_free(out_users);
         realm_release(current_user);
         realm_release(sync_user_1);
         realm_release(sync_user_2);
+#endif
     }
     SECTION("realm_app_user_apikey_provider_client_fetch_apikeys") {
         SECTION("Failure") {
