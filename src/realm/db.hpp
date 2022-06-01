@@ -692,7 +692,7 @@ public:
     DB::TransactStage get_transact_stage() const noexcept;
 
     void upgrade_file_format(int target_file_format_version);
-    void check_consistency();
+    void check_consistency() REQUIRES(!m_async_mutex);
 
     /// Task oriented/async interface for continuous transactions.
     // true if this transaction already holds the write mutex
