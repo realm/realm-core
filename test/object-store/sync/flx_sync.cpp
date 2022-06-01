@@ -1164,7 +1164,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 
-    SECTION("do not allow objecs with same key") {
+    SECTION("do not allow objects with same key") {
         auto foo_obj_id = ObjectId::gen();
         harness.load_initial_data([&](SharedRealm realm) {
             CppContext c(realm);
