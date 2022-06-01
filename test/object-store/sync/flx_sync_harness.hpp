@@ -95,6 +95,9 @@ public:
         auto realm = Realm::get_shared_realm(config);
         auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
         for (const auto& table : realm->schema()) {
+            if (table.is_asymmetric) {
+                continue;
+            }
             Query query_for_table(realm->read_group().get_table(table.table_key));
             mut_subs.insert_or_assign(query_for_table);
         }

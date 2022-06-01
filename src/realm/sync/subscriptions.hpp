@@ -28,6 +28,7 @@
 #include "realm/util/optional.hpp"
 
 #include <list>
+#include <set>
 #include <string_view>
 
 namespace realm::sync {
@@ -191,9 +192,9 @@ protected:
     };
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj);
 
-    void load_from_database(TransactionRef tr, Obj obj);
+    void load_from_database(const Transaction& tr, Obj obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -323,6 +324,9 @@ public:
     // Fulfill all previous subscriptions by superceding them. This does not
     // affect the mutable subscription identified by the parameter.
     void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
+
+    using TableSet = std::set<std::string, std::less<>>;
+    TableSet get_tables_for_latest(const Transaction& tr) const;
 
     struct PendingSubscription {
         int64_t query_version;

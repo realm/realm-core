@@ -21,6 +21,7 @@
 #include "external/json/json.hpp"
 
 #include "realm/data_type.hpp"
+#include "realm/db.hpp"
 #include "realm/group.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
@@ -29,6 +30,7 @@
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
 #include "realm/util/flat_map.hpp"
+#include <algorithm>
 #include <initializer_list>
 #include <stdexcept>
 
@@ -117,11 +119,11 @@ std::string_view Subscription::query_string() const
     return m_query_string;
 }
 
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj)
     : m_mgr(mgr)
 {
     if (obj.is_valid()) {
-        load_from_database(std::move(tr), std::move(obj));
+        load_from_database(tr, std::move(obj));
     }
 }
 
@@ -132,11 +134,11 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(TransactionRef tr, Obj obj)
+void SubscriptionSet::load_from_database(const Transaction& tr, Obj obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    m_cur_version = tr->get_version();
+    m_cur_version = tr.get_version();
     m_version = obj.get_primary_key().get_int();
     m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_state));
     m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
@@ -211,7 +213,7 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
 }
 
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(mgr, tr, obj)
+    : SubscriptionSet(mgr, *tr, obj)
     , m_tr(std::move(tr))
     , m_obj(std::move(obj))
     , m_old_state(state())
@@ -238,6 +240,7 @@ MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     check_is_mutable();
+    REALM_ASSERT(it != end());
     return m_subs.erase(it);
 }
 
@@ -620,12 +623,12 @@ SubscriptionSet SubscriptionStore::get_latest() const
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
     auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
     auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
-    return SubscriptionSet(weak_from_this(), std::move(tr), std::move(latest_obj));
+    return SubscriptionSet(weak_from_this(), *tr, std::move(latest_obj));
 }
 
 SubscriptionSet SubscriptionStore::get_active() const
@@ -633,7 +636,7 @@ SubscriptionSet SubscriptionStore::get_active() const
     auto tr = m_db->start_frozen();
     auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
 
     DescriptorOrdering descriptor_ordering;
@@ -644,9 +647,9 @@ SubscriptionSet SubscriptionStore::get_active() const
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
-    return SubscriptionSet(weak_from_this(), std::move(tr), res.get_object(0));
+    return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
 
 std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
@@ -723,8 +726,7 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
     auto sub_sets = tr->get_table(m_sub_set_table);
     try {
-        return SubscriptionSet(weak_from_this(), std::move(tr),
-                               sub_sets->get_object_with_primary_key(Mixed{version_id}));
+        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(Mixed{version_id}));
     }
     catch (const KeyNotFound&) {
         std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
@@ -733,6 +735,25 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
         }
         throw;
     }
+}
+
+SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
+{
+    auto sub_sets = tr.get_table(m_sub_set_table);
+    if (sub_sets->is_empty()) {
+        return {};
+    }
+    auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
+
+    TableSet ret;
+    auto subs = latest_obj.get_linklist(m_sub_set_subscriptions);
+    for (size_t idx = 0; idx < subs.size(); ++idx) {
+        auto sub_obj = subs.get_object(idx);
+        ret.emplace(sub_obj.get<StringData>(m_sub_object_class_name));
+    }
+
+    return ret;
 }
 
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const

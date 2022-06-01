@@ -162,15 +162,17 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
         return table;
 
     if (auto* pk_property = object_schema.primary_key_property()) {
+        auto table_type = (object_schema.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
         table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
-                                                 is_nullable(pk_property->type));
+                                                 is_nullable(pk_property->type), table_type);
     }
     else {
         if (object_schema.is_embedded) {
-            table = group.add_embedded_table(name);
+            table = group.add_table(name, Table::Type::Embedded);
         }
         else {
-            table = group.get_or_add_table(name);
+            auto table_type = (object_schema.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
+            table = group.get_or_add_table(name, table_type);
         }
     }
 
@@ -601,7 +603,15 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_embedded(op.object->is_embedded);
+            if (op.object->is_embedded) {
+                table(op.object).set_table_type(Table::Type::Embedded);
+            }
+            else if (op.object->is_asymmetric) {
+                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
+            }
+            else {
+                table(op.object).set_table_type(Table::Type::TopLevel);
+            }
         }
         void operator()(AddProperty op)
         {
@@ -817,7 +827,15 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            table(op.object).set_embedded(op.object->is_embedded);
+            if (op.object->is_embedded) {
+                table(op.object).set_table_type(Table::Type::Embedded);
+            }
+            else if (op.object->is_asymmetric) {
+                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
+            }
+            else {
+                table(op.object).set_table_type(Table::Type::TopLevel);
+            }
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}

@@ -1775,6 +1775,12 @@ TEST_CASE("audit integration tests") {
             config.sync_config->partition_value.clear();
 
             auto realm = Realm::get_shared_realm(config);
+            {
+                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+                mut_subs.insert_or_assign(Query(realm->read_group().get_table("class_object")));
+                std::move(mut_subs).commit();
+            }
+
             realm->sync_session()->log_out();
             generate_event(realm, 0);
             get_audit_events_from_baas(session, *config.audit_config->audit_user, 1);
