@@ -87,21 +87,29 @@ public:
         std::map<size_t, IndexSet> modifications_to_keep;
         std::map<size_t, IndexSet> modifications_to_keep_new;
 
+        std::map<size_t, size_t> section_identifier;
+
+        for (auto& section : m_sectioned_results.m_sections) {
+            section_identifier[section.hash] = section.index;
+        }
+
         for (auto [section_old, indexes_old] : converted_modifications) {
             auto it = m_prev_sections.at(section_old);
             auto old_hash = it.hash;
-            for (auto [section_new, indexes_new] : converted_modifications_new) {
-                auto it_new = m_sectioned_results.m_sections.at(section_new);
-                auto new_hash = it_new.hash;
-                if (old_hash == new_hash) {
-                    for (auto index_old : indexes_old.as_indexes()) {
-                        if (indexes_new.contains(index_old)) {
-                            modifications_to_keep[section_old].add(index_old);
-                            modifications_to_keep_new[section_new].add(index_old);
-                            converted_modifications[section_old].remove(index_old);
-                            converted_modifications_new[section_new].remove(index_old);
-                        }
-                    }
+            auto si = section_identifier.find(old_hash);
+            if (si != section_identifier.end()) {
+                auto old_indexes = indexes_old.as_indexes();
+                auto new_indexes = converted_modifications_new[si->second].as_indexes();
+                std::vector<size_t> out_indexes;
+                std::set_intersection(old_indexes.begin(), old_indexes.end(),
+                                      new_indexes.begin(), new_indexes.end(),
+                                      std::back_inserter(out_indexes));
+
+                for (auto& i : out_indexes) {
+                    modifications_to_keep[section_old].add(i);
+                    modifications_to_keep_new[si->second].add(i);
+                    converted_modifications[section_old].remove(i);
+                    converted_modifications_new[si->second].remove(i);
                 }
             }
         }
@@ -208,7 +216,7 @@ public:
 private:
     SectionedResultsNotificatonCallback m_cb;
     SectionedResults& m_sectioned_results;
-    std::vector<SectionRange> m_prev_sections;
+    std::vector<Section> m_prev_sections;
     std::vector<std::pair<size_t, size_t>> m_prev_row_to_index_path;
     util::Optional<size_t> m_section_filter;
 };
@@ -305,7 +313,7 @@ void SectionedResults::calculate_sections()
         auto it = key_to_section_index.find(key);
         if (it == key_to_section_index.end()) {
             auto idx = m_sections.size();
-            SectionRange section;
+            Section section;
             section.key = key;
             section.index = idx;
             section.indices.push_back(i);
@@ -366,6 +374,11 @@ SectionedResults SectionedResults::snapshot()
 bool SectionedResults::is_valid() const
 {
     return m_results.is_valid();
+}
+
+bool SectionedResults::is_frozen() const
+{
+    return m_results.is_frozen();
 }
 
 } // namespace realm

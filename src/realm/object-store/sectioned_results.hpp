@@ -25,7 +25,7 @@ namespace realm {
 class Mixed;
 class Results;
 class SectionedResults;
-struct SectionRange;
+struct Section;
 struct SectionedResultsChangeSet;
 
 using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
@@ -114,6 +114,7 @@ public:
     SectionedResults snapshot();
 
     bool is_valid() const;
+    bool is_frozen() const;
 
 private:
     friend class Results;
@@ -132,7 +133,7 @@ private:
 
     friend class realm::ResultsSection;
     Results m_results;
-    std::vector<SectionRange> m_sections;
+    std::vector<Section> m_sections;
     // Key: Original index in Results, Value: <section_index, section_size>
     std::vector<std::pair<size_t, size_t>> m_row_to_index_path;
     SectionKeyFunc m_callback;
@@ -146,13 +147,14 @@ struct SectionedResultsChangeSet {
     std::map<size_t, IndexSet> modifications;
     /// Sections and indices which were removed from the _old_ collection
     std::map<size_t, IndexSet> deletions;
-
+    /// Indexes of sections which are newly inserted.
     IndexSet sections_to_insert;
+    /// Indexes of sections which are deleted from the _old_ collection.
     IndexSet sections_to_delete;
 };
 
 /// For internal use only. Used to track the indicies for a given section.
-struct SectionRange {
+struct Section {
     size_t index;
     Mixed key;
     // A unique id which helps us calculate what section has changed in the notification callback.
