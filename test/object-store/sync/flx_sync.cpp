@@ -1164,7 +1164,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 
-    SECTION("do not allow objects with same key") {
+    SECTION("do not allow objects with same key within the same transaction") {
         auto foo_obj_id = ObjectId::gen();
         harness.load_initial_data([&](SharedRealm realm) {
             CppContext c(realm);
@@ -1185,8 +1185,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 
-
-    SECTION("update object") {
+    SECTION("replace object") {
         harness.do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             auto foo_obj_id = ObjectId::gen();
@@ -1208,7 +1207,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 
-    SECTION("create multiple objects - same commit") {
+    SECTION("create multiple objects - separate commits") {
         harness.do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             for (int i = 0; i < 100; ++i) {
@@ -1227,7 +1226,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 
-    SECTION("create multiple objects - separate commits") {
+    SECTION("create multiple objects - same commit") {
         harness.do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             realm->begin_transaction();
