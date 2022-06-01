@@ -481,7 +481,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         try {
             initialization_function(shared_from_this());
         }
-        catch (const std::exception& e) {
+        catch (const std::exception&) {
             run_close_and_delete_files();
             // re-throw callback errors
             throw;
