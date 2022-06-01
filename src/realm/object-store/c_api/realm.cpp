@@ -129,10 +129,10 @@ RLM_API bool realm_close(realm_t* realm)
     });
 }
 
-RLM_API bool realm_close_and_delete_files(realm_t* realm)
+RLM_API bool realm_close_and_delete_files(realm_t* realm, bool* did_delete)
 {
     return wrap_err([&]() {
-        (*realm)->close_and_delete_files();
+        (*realm)->close_and_delete_files(did_delete);
         return true;
     });
 }

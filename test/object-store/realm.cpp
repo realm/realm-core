@@ -2393,6 +2393,17 @@ TEST_CASE("Realm::delete_files()") {
     // be created during a Realm's life cycle.
     util::File(path + ".log", util::File::mode_Write);
 
+    SECTION("Same of calling close + delete files") {
+        bool did_delete = false;
+        realm->close_and_delete_files(&did_delete);
+        REQUIRE(did_delete);
+        REQUIRE_FALSE(util::File::exists(path));
+        REQUIRE_FALSE(util::File::exists(path + ".management"));
+        REQUIRE_FALSE(util::File::exists(path + ".note"));
+        REQUIRE_FALSE(util::File::exists(path + ".log"));
+        REQUIRE(util::File::exists(path + ".lock"));
+    }
+
     SECTION("Deleting files of a closed Realm succeeds.") {
         realm->close();
         bool did_delete = false;

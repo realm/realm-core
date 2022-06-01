@@ -1278,7 +1278,23 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
     }
-}
+
+    SECTION("Force synced realm to close") {
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            realm->begin_transaction();
+            for (int i = 0; i < 100; ++i) {
+                auto obj_id = ObjectId::gen();
+                Object::create(c, realm, "Asymmetric",
+                               util::Any(AnyDict{{"_id", obj_id}, {"location", util::format("foo_%1", i)}}));
+            }
+            realm->commit_transaction();
+
+            bool did_delete = false;
+            realm->close_and_delete_files(&did_delete);
+            REQUIRE(did_delete);
+    }
+    }
 
 #endif // REALM_ENABLE_MASTER_BAAS_TESTS
 

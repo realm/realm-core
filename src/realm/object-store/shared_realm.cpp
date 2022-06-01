@@ -1299,7 +1299,7 @@ void Realm::close()
     m_config = {};
 }
 
-void Realm::close_and_delete_files()
+void Realm::close_and_delete_files(bool* did_delete)
 {
 #if REALM_ENABLE_SYNC
     if (m_config.sync_config) {
@@ -1308,7 +1308,7 @@ void Realm::close_and_delete_files()
 #endif
     const auto path = m_config.path;
     close();
-    delete_files(path);
+    delete_files(path, did_delete);
 }
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)

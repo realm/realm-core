@@ -403,8 +403,9 @@ public:
     /**
      * Clean up the file system from realm files, closing all the handles associated to them.
      * This function may block waiting for the sync session to be terminated.
+     * @param did_delete indication that files have been deleted.
      */
-    void close_and_delete_files();
+    void close_and_delete_files(bool* did_delete = nullptr);
 
     /**
      * Deletes the following files for the given `realm_file_path` if they exist:
