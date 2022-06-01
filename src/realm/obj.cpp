@@ -1210,6 +1210,10 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
     }
 
     if (value.is_type(type_TypedLink)) {
+        if (m_table->is_asymmetric()) {
+            throw LogicError(LogicError::wrong_kind_of_table);
+        }
+
         ObjLink new_link = value.template get<ObjLink>();
         Mixed old_value = get<Mixed>(col_key);
         ObjLink old_link;
@@ -1532,6 +1536,8 @@ Obj& Obj::set<ObjLink>(ColKey col_key, ObjLink target_link, bool is_default)
 Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
 {
     update_if_needed();
+    // Outgoing links from asymmetric objects are disallowed.
+    REALM_ASSERT(!get_table()->is_asymmetric());
     get_table()->check_column(col_key);
     ColKey::Idx col_ndx = col_key.get_index();
     ColumnType type = col_key.get_type();
@@ -1539,6 +1545,8 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
     Table& t = *target_table;
+    // Incoming links to asymmetric objects are disallowed.
+    REALM_ASSERT(!t.is_asymmetric());
     TableKey target_table_key = t.get_key();
     auto result = t.is_embedded() ? t.create_linked_object() : t.create_object();
     auto target_key = result.get_key();

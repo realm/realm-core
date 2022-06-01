@@ -86,6 +86,11 @@ enum class ExpressionComparisonType : unsigned char {
 
 class Table {
 public:
+    /// The type of tables supported by a realm.
+    /// Note: Any change to this enum is a file-format breaking change.
+    enum class Type : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
+    constexpr static uint8_t table_type_mask = 0x3;
+
     /// Construct a new freestanding top-level table with static
     /// lifetime. For debugging only.
     Table(Allocator& = Allocator::get_default());
@@ -118,7 +123,9 @@ public:
     //@{
     /// Conventience functions for inspecting the dynamic table type.
     ///
-    bool is_embedded() const noexcept; // true if table holds embedded objects
+    bool is_embedded() const noexcept;   // true if table holds embedded objects
+    bool is_asymmetric() const noexcept; // true if table is asymmetric
+    Type get_table_type() const noexcept;
     size_t get_column_count() const noexcept;
     DataType get_column_type(ColKey column_key) const;
     StringData get_column_name(ColKey column_key) const;
@@ -164,9 +171,9 @@ public:
         if (REALM_UNLIKELY(!valid_column(col_key)))
             throw LogicError(LogicError::column_does_not_exist);
     }
-    // Change the embedded property of a table. If switching to being embedded, the table must
-    // not have a primary key and all objects must have exactly 1 backlink.
-    void set_embedded(bool embedded);
+    // Change the type of a table. Only allowed to switch to/from TopLevel from/to Embedded.
+    // Called only when updating the schema.
+    void set_table_type(Type table_tpe);
     //@}
 
     /// True for `col_type_Link` and `col_type_LinkList`.
@@ -516,8 +523,11 @@ private:
     template <class F, class T>
     void change_nullability_list(ColKey from, ColKey to, bool throw_on_null);
     Obj create_linked_object(GlobalKey = {});
-    /// Changes embeddedness unconditionally. Called only from Group::do_get_or_add_table()
-    void do_set_embedded(bool embedded);
+    // Change the embedded property of a table. If switching to being embedded, the table must
+    // not have a primary key and all objects must have exactly 1 backlink.
+    void set_embedded(bool embedded);
+    /// Changes type unconditionally. Called only from Group::do_get_or_add_table()
+    void do_set_table_type(Type table_type);
 
 public:
     // mapping between index used in leaf nodes (leaf_ndx) and index used in spec (spec_ndx)
@@ -802,7 +812,7 @@ private:
     std::vector<ColKey> m_leaf_ndx2colkey;
     std::vector<ColKey::Idx> m_spec_ndx2leaf_ndx;
     std::vector<size_t> m_leaf_ndx2spec_ndx;
-    bool m_is_embedded = false;
+    Type m_table_type = Type::TopLevel;
     uint64_t m_in_file_version_at_transaction_boundary = 0;
     AtomicLifeCycleCookie m_cookie;
 
@@ -819,7 +829,7 @@ private:
     static constexpr int top_position_for_collision_map = 10;
     static constexpr int top_position_for_pk_col = 11;
     static constexpr int top_position_for_flags = 12;
-    // flags contents: bit 0 - is table embedded?
+    // flags contents: bit 0-1 - table type
     static constexpr int top_position_for_tombstones = 13;
     static constexpr int top_array_size = 14;
 
@@ -851,6 +861,22 @@ private:
     friend class Dictionary;
     friend class IncludeDescriptor;
 };
+
+inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
+{
+    switch (table_type) {
+        case Table::Type::TopLevel:
+            o << "TopLevel";
+            break;
+        case Table::Type::Embedded:
+            o << "Embedded";
+            break;
+        case Table::Type::TopLevelAsymmetric:
+            o << "TopLevelAsymmetric";
+            break;
+    }
+    return o;
+}
 
 class ColKeyIterator {
 public:
@@ -1101,7 +1127,17 @@ inline size_t Table::get_column_count() const noexcept
 
 inline bool Table::is_embedded() const noexcept
 {
-    return m_is_embedded;
+    return m_table_type == Type::Embedded;
+}
+
+inline bool Table::is_asymmetric() const noexcept
+{
+    return m_table_type == Type::TopLevelAsymmetric;
+}
+
+inline Table::Type Table::get_table_type() const noexcept
+{
+    return m_table_type;
 }
 
 inline StringData Table::get_column_name(ColKey column_key) const

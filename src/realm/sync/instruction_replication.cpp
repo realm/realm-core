@@ -177,25 +177,27 @@ Instruction::Payload::Type SyncReplication::get_payload_type(DataType type) cons
     return Type::Int; // Make compiler happy
 }
 
-void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
+void SyncReplication::add_class(TableKey tk, StringData name, Table::Type table_type)
 {
-    Replication::add_class(tk, name, is_embedded);
+    Replication::add_class(tk, name, table_type);
 
     bool is_class = name.begins_with("class_");
 
     if (is_class && !m_short_circuit) {
         Instruction::AddTable instr;
         instr.table = emit_class_name(name);
-        if (is_embedded) {
+        if (table_type == Table::Type::Embedded) {
             instr.type = Instruction::AddTable::EmbeddedTable{};
         }
         else {
             auto field = m_encoder.intern_string(""); // FIXME: Should this be "_id"?
             const bool is_nullable = false;
-            instr.type = Instruction::AddTable::PrimaryKeySpec{
+            bool is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
+            instr.type = Instruction::AddTable::TopLevelTable{
                 field,
                 Instruction::Payload::Type::GlobalKey,
                 is_nullable,
+                is_asymmetric,
             };
         }
         emit(instr);
@@ -203,9 +205,9 @@ void SyncReplication::add_class(TableKey tk, StringData name, bool is_embedded)
 }
 
 void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, DataType pk_type, StringData pk_field,
-                                                 bool nullable)
+                                                 bool nullable, Table::Type table_type)
 {
-    Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable);
+    Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable, table_type);
 
     bool is_class = name.begins_with("class_");
 
@@ -213,8 +215,9 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
         Instruction::AddTable instr;
         instr.table = emit_class_name(name);
         auto field = m_encoder.intern_string(pk_field);
-        auto spec = Instruction::AddTable::PrimaryKeySpec{field, get_payload_type(pk_type), nullable};
-        if (!is_valid_key_type(spec.type)) {
+        auto is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
+        auto spec = Instruction::AddTable::TopLevelTable{field, get_payload_type(pk_type), nullable, is_asymmetric};
+        if (!is_valid_key_type(spec.pk_type)) {
             unsupported_instruction();
         }
         instr.type = std::move(spec);
@@ -531,6 +534,8 @@ void SyncReplication::remove_object(const Table* table, ObjKey row_ndx)
 {
     Replication::remove_object(table, row_ndx);
     if (table->is_embedded())
+        return;
+    if (table->is_asymmetric())
         return;
     REALM_ASSERT(!row_ndx.is_unresolved());
 

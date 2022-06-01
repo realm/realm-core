@@ -27,10 +27,27 @@ TEST(ChangesetEncoding_AddTable)
     Changeset changeset;
     AddTable instr;
     instr.table = changeset.intern_string("Foo");
-    instr.type = AddTable::PrimaryKeySpec{
+    instr.type = AddTable::TopLevelTable{
         changeset.intern_string("pk"),
         Payload::Type::Int,
         true,
+        false,
+    };
+    changeset.push_back(instr);
+
+    auto parsed = encode_then_parse(changeset);
+    CHECK_EQUAL(changeset, parsed);
+    CHECK(**changeset.begin() == instr);
+}
+
+TEST(ChangesetEncoding_AddTable_Asymmetric)
+{
+    Changeset changeset;
+    AddTable instr;
+    instr.table = changeset.intern_string("Foo");
+    instr.type = AddTable::TopLevelTable{
+        changeset.intern_string("pk"), Payload::Type::Int, true,
+        true, // is_asymmetric
     };
     changeset.push_back(instr);
 

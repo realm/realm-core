@@ -1123,6 +1123,165 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     }
 }
 
+#if REALM_ENABLE_MASTER_BAAS_TESTS
+TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
+    FLXSyncTestHarness::ServerSchema server_schema;
+    server_schema.dev_mode_enabled = true;
+    server_schema.queryable_fields = {"queryable_str_field"};
+    server_schema.schema = {
+        {"Asymmetric",
+         ObjectSchema::IsAsymmetric{true},
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"location", PropertyType::String | PropertyType::Nullable},
+         }},
+        {"TopLevel",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+         }},
+    };
+
+    FLXSyncTestHarness harness("asymmetric_sync", server_schema);
+
+    SECTION("basic object construction") {
+        auto foo_obj_id = ObjectId::gen();
+        auto bar_obj_id = ObjectId::gen();
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", bar_obj_id}, {"location", std::string{"bar"}}}));
+        });
+
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+            // Cannot query asymmetric tables.
+            CHECK_THROWS_AS(new_query.insert_or_assign(Query(table)), LogicError);
+        });
+    }
+
+    SECTION("do not allow objects with same key within the same transaction") {
+        auto foo_obj_id = ObjectId::gen();
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+            CHECK_THROWS_WITH(
+                Object::create(c, realm, "Asymmetric",
+                               util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"bar"}}})),
+                "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
+                "implemented'.");
+        });
+
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
+
+    SECTION("replace object") {
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            auto foo_obj_id = ObjectId::gen();
+            realm->begin_transaction();
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+            realm->commit_transaction();
+            realm->begin_transaction();
+            // Update `location` field.
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"bar"}}}));
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
+
+    SECTION("create multiple objects - separate commits") {
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            for (int i = 0; i < 100; ++i) {
+                realm->begin_transaction();
+                auto obj_id = ObjectId::gen();
+                Object::create(c, realm, "Asymmetric",
+                               util::Any(AnyDict{{"_id", obj_id}, {"location", util::format("foo_%1", i)}}));
+                realm->commit_transaction();
+            }
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
+
+    SECTION("create multiple objects - same commit") {
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            realm->begin_transaction();
+            for (int i = 0; i < 100; ++i) {
+                auto obj_id = ObjectId::gen();
+                Object::create(c, realm, "Asymmetric",
+                               util::Any(AnyDict{{"_id", obj_id}, {"location", util::format("foo_%1", i)}}));
+            }
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
+
+    SECTION("open with schema mismatch on IsAsymmetric") {
+        auto foo_obj_id = ObjectId::gen();
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+        });
+
+        auto schema = server_schema.schema;
+        schema.find("Asymmetric")->is_asymmetric = ObjectSchema::IsAsymmetric{false};
+
+        harness.do_with_new_user([&](std::shared_ptr<SyncUser> user) {
+            SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
+            std::condition_variable cv;
+            std::mutex wait_mutex;
+            bool wait_flag(false);
+            std::error_code ec;
+            config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
+                std::unique_lock<std::mutex> lock(wait_mutex);
+                wait_flag = true;
+                ec = error.error_code;
+                cv.notify_one();
+            };
+
+            auto realm = Realm::get_shared_realm(config);
+
+            std::unique_lock<std::mutex> lock(wait_mutex);
+            cv.wait(lock, [&wait_flag]() {
+                return wait_flag == true;
+            });
+            CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
+        });
+    }
+}
+
+#endif // REALM_ENABLE_MASTER_BAAS_TESTS
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS

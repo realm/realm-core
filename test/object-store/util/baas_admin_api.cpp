@@ -352,7 +352,7 @@ AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 
 app::Response AdminAPIEndpoint::do_request(app::Request request) const
 {
-    request.url = util::format("%1?bypass_service_change=SyncProtocolVersionIncrease", request.url);
+    request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
     request.headers["Content-Type"] = "application/json;charset=utf-8";
     request.headers["Accept"] = "application/json";
     request.headers["Authorization"] = util::format("Bearer %1", m_access_token);
@@ -873,6 +873,12 @@ AppSession create_app(const AppCreateConfig& config)
         auto queryable_fields = nlohmann::json::array();
         const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
         std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
+        auto asymmetric_tables = nlohmann::json::array();
+        for (const auto& obj_schema : config.schema) {
+            if (obj_schema.is_asymmetric) {
+                asymmetric_tables.emplace_back(obj_schema.name);
+            }
+        }
         auto default_roles = nlohmann::json::array();
         if (config.flx_sync_config->default_roles.empty()) {
             default_roles = nlohmann::json::array(
@@ -900,6 +906,7 @@ AppSession create_app(const AppCreateConfig& config)
         mongo_service_def["config"]["flexible_sync"] = nlohmann::json{{"state", "enabled"},
                                                                       {"database_name", config.mongo_dbname},
                                                                       {"queryable_fields_names", queryable_fields},
+                                                                      {"asymmetric_tables", asymmetric_tables},
                                                                       {"permissions",
                                                                        {{"rules", nlohmann::json::object()},
                                                                         {

@@ -204,7 +204,9 @@ template <>
 void Set<Mixed>::do_insert(size_t ndx, Mixed value)
 {
     if (value.is_type(type_TypedLink)) {
-        m_obj.set_backlink(m_col_key, value.get<ObjLink>());
+        auto target_link = value.get<ObjLink>();
+        m_obj.get_table()->get_parent_group()->validate(target_link);
+        m_obj.set_backlink(m_col_key, target_link);
     }
     m_tree->insert(ndx, value);
 }
