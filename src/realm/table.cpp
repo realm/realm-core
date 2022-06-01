@@ -3052,7 +3052,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     ObjKey key = get_next_valid_key();
 
-    if (auto repl = get_repl()) {
+    auto repl = get_repl();
+    if (repl) {
         repl->create_object_with_primary_key(this, key, primary_key);
     }
     if (did_create) {
@@ -3072,7 +3073,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
             m_tombstones->erase(unres_key, state);
         }
     }
-    if (is_asymmetric()) {
+    if (is_asymmetric() && repl && repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
         get_parent_group()->m_objects_to_delete.emplace_back(this->m_key, ret.get_key());
     }
     return ret;
