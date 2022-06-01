@@ -124,16 +124,17 @@ enum KeyType = Int | String | ObjectId | GlobalKey;
 ~~~
 struct AddTable {
     table: InternString,
-    spec: PrimaryKeySpec | IsEmbedded
+    spec: TopLevelTable | EmbeddedTable
 }
 
-struct PrimaryKeySpec {
-    field: InternString,
-    type: KeyType,
-    nullable: bool,
+struct TopLevelTable {
+    pk_field: InternString,
+    pk_type: KeyType,
+    pk_nullable: bool,
+    asymmetric: bool,
 }
 
-struct IsEmbedded {}
+struct EmbeddedTable {}
 ~~~
 
 ### EraseTable (`0x1`)

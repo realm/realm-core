@@ -268,7 +268,8 @@ public:
             }
             if (size() > 12) {
                 auto flags = get_val(12);
-                m_is_embedded = flags & 0x1;
+                m_is_embedded = (flags & 0x3) == 1;
+                m_is_asymmetric = (flags & 0x3) == 2;
             }
         }
     }
@@ -301,6 +302,7 @@ private:
     Array m_opposite_table;
     realm::ColKey m_pk_col;
     bool m_is_embedded = false;
+    bool m_is_asymmetric = false;
 };
 
 class Group : public Array {
@@ -455,6 +457,8 @@ void Table::print_columns(const Group& group) const
 {
     if (m_is_embedded)
         std::cout << "        <embedded>" << std::endl;
+    if (m_is_asymmetric)
+        std::cout << "        <asymmetric>" << std::endl;
     for (unsigned i = 0; i < m_column_names.size(); i++) {
         auto type = realm::ColumnType(m_column_types.get_val(i) & 0xFFFF);
         auto attr = realm::ColumnAttr(m_column_attributes.get_val(i));

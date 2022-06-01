@@ -43,14 +43,16 @@ Replication::version_type Replication::prepare_commit(version_type orig_version)
     return new_version;
 }
 
-void Replication::add_class(TableKey table_key, StringData, bool)
+void Replication::add_class(TableKey table_key, StringData, Table::Type)
 {
     unselect_all();
     m_encoder.insert_group_level_table(table_key); // Throws
 }
 
-void Replication::add_class_with_primary_key(TableKey tk, StringData, DataType, StringData, bool)
+void Replication::add_class_with_primary_key(TableKey tk, StringData, DataType, StringData, bool,
+                                             Table::Type table_type)
 {
+    REALM_ASSERT(table_type != Table::Type::Embedded);
     unselect_all();
     m_encoder.insert_group_level_table(tk); // Throws
 }

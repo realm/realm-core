@@ -28,12 +28,14 @@ namespace sync {
 //
 //   5 Introduces compensating write errors.
 //
+//   6 Support for asymmetric tables.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 5;
+    return 6;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
