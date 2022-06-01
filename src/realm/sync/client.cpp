@@ -634,7 +634,6 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 }
 
 
-
 // ################ SessionImpl ################
 
 
@@ -800,9 +799,11 @@ void SessionImpl::process_pending_flx_bootstrap()
 
             history.integrate_server_changesets(
                 *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
-                pending_batch.changesets.size(), new_version, batch_state, logger, [&](const TransactionRef& tr) {
+                pending_batch.changesets.size(), new_version, batch_state, logger,
+                [&](const TransactionRef& tr) {
                     bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
-                });
+                },
+                get_transact_reporter());
             download_cursor = pending_batch.progress->download;
 
             logger.info(
@@ -818,8 +819,8 @@ void SessionImpl::process_pending_flx_bootstrap()
     }
 
     REALM_ASSERT_3(query_version, !=, -1);
-    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
     m_wrapper.on_sync_progress();
+    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 }
 
 
