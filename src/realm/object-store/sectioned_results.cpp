@@ -84,39 +84,40 @@ public:
 
         auto section_changes = calculate_sections_to_insert_and_delete();
 
-        std::map<size_t, IndexSet> modifications_to_keep;
-        std::map<size_t, IndexSet> modifications_to_keep_new;
-
-        std::map<size_t, size_t> section_identifier;
+        std::map<size_t, IndexSet> modifications_to_keep, modifications_to_keep_new;
+        std::map<size_t, size_t> section_identifiers;
 
         for (auto& section : m_sectioned_results.m_sections) {
-            section_identifier[section.hash] = section.index;
+            section_identifiers[section.hash] = section.index;
         }
 
         for (auto [section_old, indexes_old] : converted_modifications) {
             auto it = m_prev_sections.at(section_old);
             auto old_hash = it.hash;
-            auto si = section_identifier.find(old_hash);
-            if (si != section_identifier.end()) {
+            auto si = section_identifiers.find(old_hash);
+            // This section still exists.
+            if (si != section_identifiers.end()) {
                 auto old_indexes = indexes_old.as_indexes();
                 auto new_indexes = converted_modifications_new[si->second].as_indexes();
                 std::vector<size_t> out_indexes;
-                std::set_intersection(old_indexes.begin(), old_indexes.end(),
-                                      new_indexes.begin(), new_indexes.end(),
+                std::set_intersection(old_indexes.begin(), old_indexes.end(), new_indexes.begin(), new_indexes.end(),
                                       std::back_inserter(out_indexes));
 
+                auto& old_modifications = converted_modifications[section_old];
+                // These are the indexes which are still in the
+                // same position as they were in the old collection.
                 for (auto& i : out_indexes) {
                     modifications_to_keep[section_old].add(i);
                     modifications_to_keep_new[si->second].add(i);
-                    converted_modifications[section_old].remove(i);
+                    // Anything remaining in converted_modifications will be added to deletions.
+                    old_modifications.remove(i);
+                    // Anything remaining in converted_modifications_new will be added to insertions.
                     converted_modifications_new[si->second].remove(i);
                 }
-            }
-        }
 
-        for (auto [section, indexes] : converted_modifications) {
-            if (!indexes.empty())
-                converted_deletions[section].add(indexes);
+                if (!old_modifications.empty())
+                    converted_deletions[section_old].add(converted_modifications[section_old]);
+            }
         }
 
         for (auto [section, indexes] : converted_modifications_new) {
