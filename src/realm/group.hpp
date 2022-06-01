@@ -283,9 +283,10 @@ public:
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
-        REALM_ASSERT(table_name.begins_with(g_class_name_prefix));
+        REALM_ASSERT(table_name.begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len)));
         return table_name.substr(g_class_name_prefix_len);
     }
+
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
@@ -925,7 +926,7 @@ inline StringData Group::get_table_name(TableKey key) const
 
 inline bool Group::table_is_public(TableKey key) const
 {
-    return get_table_name(key).begins_with(g_class_name_prefix);
+    return get_table_name(key).begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len));
 }
 
 inline bool Group::has_table(StringData name) const noexcept
