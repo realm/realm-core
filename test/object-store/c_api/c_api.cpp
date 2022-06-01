@@ -4153,10 +4153,12 @@ TEST_CASE("C API app: link_user integration", "[c_api][sync][app]") {
         for (size_t i = 0; i < out_n; ++i)
             out_users[i] = (realm_user_t*)malloc(sizeof(realm_user_t));
         realm_app_get_all_users(&app, out_users, out_n, &out_n);
+
         CHECK(realm_equals(out_users[0], sync_user_1));
+
         for (size_t i = 0; i < out_n; ++i)
             free((realm_user_t*)out_users[i]);
-        free((realm_user_t**)out_users);
+        free(out_users);
         realm_release(sync_user_1);
         realm_release(sync_user_2);
     }
