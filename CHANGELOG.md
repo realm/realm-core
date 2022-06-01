@@ -6,7 +6,7 @@
 
 ### Fixed
 * Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
-
+* Changed `realm_sync_session_handle_error_for_testing` in order to support all SDKs. (Issue [#5550])(https://github.com/realm/realm-core/issues/5550).
  
 ### Breaking changes
 * None.
