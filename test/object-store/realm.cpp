@@ -267,7 +267,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         Realm::get_shared_realm(config);
 
         {
-            Group g(config.path);
+            Group g(config.path, config.encryption_key.data());
             auto table = ObjectStore::table_for_object_type(g, "object");
             REQUIRE(table);
             REQUIRE(table->get_column_count() == 1);
@@ -840,7 +840,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        auto db = DB::create(sync::make_client_replication(), config.path);
+        DBOptions options;
+        options.encryption_key = config.encryption_key.data();
+        auto db = DB::create(sync::make_client_replication(), config.path, options);
         auto write = db->start_write(); // block sync from writing until we cancel
 
         std::shared_ptr<AsyncOpenTask> task = Realm::get_synchronized_realm(config);
@@ -1108,11 +1110,13 @@ TEST_CASE("SharedRealm: async writes") {
         SECTION(close_function_names[i]) {
             bool persisted = false;
             SECTION("before write lock is acquired") {
+                DBOptions options;
+                options.encryption_key = config.encryption_key.data();
                 // Acquire the write lock with a different DB instance so that we'll
                 // be stuck in the Requesting stage
                 realm::test_util::BowlOfStonesSemaphore sema;
                 JoiningThread thread([&] {
-                    auto db = DB::create(make_in_realm_history(), config.path);
+                    auto db = DB::create(make_in_realm_history(), config.path, options);
                     auto write = db->start_write();
                     sema.add_stone();
 
@@ -1139,7 +1143,7 @@ TEST_CASE("SharedRealm: async writes") {
 
                 {
                     // Verify that we released the write lock
-                    auto db = DB::create(make_in_realm_history(), config.path);
+                    auto db = DB::create(make_in_realm_history(), config.path, options);
                     REQUIRE(db->start_write(/* nonblocking */ true));
                 }
 
@@ -1755,7 +1759,8 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i] {
                 // The top ref in the Realm file should only be updated once every 20 commits
-                CHECK(Group(config.path).get_table("class_object")->size() == (i / 20) * 20);
+                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
+                      (i / 20) * 20);
 
                 table->create_object();
                 realm->async_commit_transaction(
@@ -1775,7 +1780,8 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i] {
                 // The top ref in the Realm file should only be updated once every 6 commits
-                CHECK(Group(config.path).get_table("class_object")->size() == (i / 6) * 6);
+                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
+                      (i / 6) * 6);
 
                 table->create_object();
                 realm->async_commit_transaction(

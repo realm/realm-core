@@ -24,6 +24,7 @@
 #include <catch2/catch.hpp>
 #include <external/json/json.hpp>
 #include <realm/util/to_string.hpp>
+#include "../util/crypt_key.hpp"
 
 #include <limits.h>
 
@@ -71,6 +72,16 @@ int main(int argc, char** argv)
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         config.reporterName = "junit";
         config.outputFilename = "unit-test-report.xml";
+    }
+
+    if (const char* env = getenv("UNITTEST_ENCRYPT_ALL")) {
+        std::string str(env);
+        for (auto& c : str) {
+            c = tolower(c);
+        }
+        if (str == "1" || str == "on" || str == "yes") {
+            realm::test_util::enable_always_encrypt();
+        }
     }
 
     Catch::Session session;
