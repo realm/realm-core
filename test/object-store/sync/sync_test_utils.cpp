@@ -359,7 +359,7 @@ static void wait_for_object_to_persist(std::shared_ptr<SyncUser> user, const App
             }
             return count_external > 0;
         },
-        std::chrono::minutes(5));
+        std::chrono::minutes(15));
 }
 
 struct BaasClientReset : public TestClientReset {

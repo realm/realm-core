@@ -895,7 +895,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_pt
     return handle;
 }
 
-void Realm::async_cancel_transaction(AsyncHandle handle)
+bool Realm::async_cancel_transaction(AsyncHandle handle)
 {
     verify_thread();
     auto compare = [handle](auto& elem) {
@@ -905,14 +905,16 @@ void Realm::async_cancel_transaction(AsyncHandle handle)
     auto it1 = std::find_if(m_async_write_q.begin(), m_async_write_q.end(), compare);
     if (it1 != m_async_write_q.end()) {
         m_async_write_q.erase(it1);
-        return;
+        return true;
     }
     auto it2 = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), compare);
     if (it2 != m_async_commit_q.end()) {
         // Just delete the callback. It is important that we know
         // that there are still commits pending.
         it2->when_completed = nullptr;
+        return true;
     }
+    return false;
 }
 
 void Realm::begin_transaction()
