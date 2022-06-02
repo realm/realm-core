@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Changed signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). The method returned void before.
 
 ----------------------------------------------
 
