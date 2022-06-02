@@ -275,10 +275,11 @@ public:
     AsyncHandle async_commit_transaction(util::UniqueFunction<void(std::exception_ptr)>&& the_done_block = nullptr,
                                          bool allow_grouping = false);
 
-    // Cancel a queued code block (either for an async_transaction or for an async_commit)
+    // Returns true when a queued code block (either for an async_transaction or for an async_commit)
+    // is found and cancelled (dequeued). False, if not found.
     // * Cancelling a commit will not abort the commit, it will only cancel the callback
     //   informing of commit completion.
-    void async_cancel_transaction(AsyncHandle);
+    bool async_cancel_transaction(AsyncHandle);
 
     // Returns true when async transactiona has been created and the result of the last
     // commit has not yet reached permanent storage.
