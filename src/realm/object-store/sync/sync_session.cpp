@@ -370,7 +370,6 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
                     }
                 }
             });
-        sync_session->revive_if_needed();
     }
     else { // pbs
         sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
@@ -386,8 +385,8 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
                 }
             }
         });
-        sync_session->revive_if_needed();
     }
+    sync_session->revive_if_needed();
 }
 
 void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
