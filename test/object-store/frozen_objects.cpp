@@ -376,11 +376,11 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
-    constexpr int num_pending_transactions = 20;
-    constexpr int num_iterations = 10;
-    constexpr int num_objects = 2;
+    constexpr int num_pending_transactions = 100;
+    constexpr int num_iterations = 10000;
+    constexpr int num_objects = 20;
     constexpr int num_checks_pr_trans = 10;
-    constexpr int num_trans_forgotten_rapidly = 10;
+    constexpr int num_trans_forgotten_rapidly = 5;
     struct Entry {
         SharedRealm realm;
         Object o;
@@ -411,9 +411,9 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
     }
     realm->commit_transaction();
     int notifications = 0;
-    SharedRealm captured = realm->freeze(); // Realm::get_shared_realm(config);
+    // SharedRealm captured = realm->freeze(); // Realm::get_shared_realm(config);
     // force readlock allocation NOW!
-    captured->read_group();
+    // captured->read_group();
     for (int j = 0; j < num_iterations; ++j) {
 
         // pick a random earlier transaction
@@ -472,12 +472,12 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
             }
         }
     }
+    // captured.reset();
+    realm->begin_transaction();
+    realm->commit_transaction();
+    realm->begin_transaction();
+    realm->commit_transaction();
     refs.clear();
-    realm->begin_transaction();
-    realm->commit_transaction();
-    realm->begin_transaction();
-    realm->commit_transaction();
-    captured.reset();
     realm->begin_transaction();
     realm->commit_transaction();
     realm->begin_transaction();

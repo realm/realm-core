@@ -167,7 +167,7 @@ TEST(Transactions_ConcurrentFrozenTableGetByName)
         threads[j].join();
 }
 
-ONLY(Transactions_ReclaimFrozen)
+TEST(Transactions_ReclaimFrozen)
 {
     struct Entry {
         TransactionRef frozen;
@@ -198,7 +198,7 @@ ONLY(Transactions_ReclaimFrozen)
     for (int j = 0; j < num_transactions_created; ++j) {
         int trans_number = random.draw_int_mod(num_pending_transactions);
         auto frozen = wt->freeze();
-        //auto frozen = wt->duplicate();
+        // auto frozen = wt->duplicate();
         refs[trans_number].frozen = frozen;
         refs[trans_number].o = frozen->import_copy_of(o);
         refs[trans_number].value = o.get<Int>(col);
