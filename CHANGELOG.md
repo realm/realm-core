@@ -3,7 +3,6 @@
 ### Enhancements
 * The sync client will gracefully handle compensating write error messages from the server and pass detailed info to the SDK's sync error handler about which objects caused the compensating write to occur. ([#5528](https://github.com/realm/realm-core/pull/5528))
 * Support for asymmetric sync. Tables can be marked as Asymmetric when opening the realm. Upon creation, asymmetric objects are synched unidirectionally. ([#5505](https://github.com/realm/realm-core/pull/5505))
-* Creating an object for a class that has no subscriptions opened for it will now throw a NoSubscriptionForWrite exception ([#5488](https://github.com/realm/realm-core/pull/5488)).
 
 ### Fixed
 * Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).

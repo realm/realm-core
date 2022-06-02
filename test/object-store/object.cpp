@@ -2195,11 +2195,6 @@ TEST_CASE("Asymmetric Object") {
     SyncTestFile config(harness.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
 
     auto realm = Realm::get_shared_realm(config);
-    {
-        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-        mut_subs.insert_or_assign(Query(realm->read_group().get_table("class_table")));
-        std::move(mut_subs).commit();
-    }
     CppContext ctx(realm);
 
     auto create = [&](util::Any&& value, std::string table_name, CreatePolicy policy = CreatePolicy::ForceCreate) {

@@ -22,7 +22,6 @@ void SyncReplication::do_initiate_transact(Group& group, version_type current_ve
 {
     Replication::do_initiate_transact(group, current_version, history_updated);
     m_transaction = dynamic_cast<Transaction*>(&group); // FIXME: Is this safe?
-    m_write_validator = make_write_validator(*m_transaction);
     reset();
 }
 
@@ -182,7 +181,7 @@ void SyncReplication::add_class(TableKey tk, StringData name, Table::Type table_
 {
     Replication::add_class(tk, name, table_type);
 
-    bool is_class = m_transaction->table_is_public(tk);
+    bool is_class = name.begins_with("class_");
 
     if (is_class && !m_short_circuit) {
         Instruction::AddTable instr;
@@ -210,7 +209,7 @@ void SyncReplication::add_class_with_primary_key(TableKey tk, StringData name, D
 {
     Replication::add_class_with_primary_key(tk, name, pk_type, pk_field, nullable, table_type);
 
-    bool is_class = m_transaction->table_is_public(tk);
+    bool is_class = name.begins_with("class_");
 
     if (is_class && !m_short_circuit) {
         Instruction::AddTable instr;
@@ -278,10 +277,6 @@ void SyncReplication::create_object_with_primary_key(const Table* table, ObjKey 
 
     Replication::create_object_with_primary_key(table, oid, value);
     if (select_table(*table)) {
-        if (m_write_validator) {
-            m_write_validator(*table);
-        }
-
         auto col = table->get_primary_key_column();
         if (col && ((value.is_null() && col.is_nullable()) || DataType(col.get_type()) == value.get_type())) {
             Instruction::CreateObject instr;
@@ -310,7 +305,7 @@ void SyncReplication::erase_class(TableKey table_key, size_t num_tables)
 
     StringData table_name = m_transaction->get_table_name(table_key);
 
-    bool is_class = m_transaction->table_is_public(table_key);
+    bool is_class = table_name.begins_with("class_");
 
     if (is_class) {
         REALM_ASSERT(table_key == m_table_being_erased);
@@ -714,17 +709,18 @@ bool SyncReplication::select_table(const Table& table)
     if (&table == m_last_table) {
         return true;
     }
-
-    if (!m_transaction->table_is_public(table.get_key())) {
+    else {
+        StringData name = table.get_name();
+        if (name.begins_with("class_")) {
+            m_last_class_name = emit_class_name(table);
+            m_last_table = &table;
+            m_last_field = ColKey{};
+            m_last_object = ObjKey{};
+            m_last_primary_key.reset();
+            return true;
+        }
         return false;
     }
-
-    m_last_class_name = emit_class_name(table);
-    m_last_table = &table;
-    m_last_field = ColKey{};
-    m_last_object = ObjKey{};
-    m_last_primary_key.reset();
-    return true;
 }
 
 bool SyncReplication::select_collection(const CollectionBase& view)

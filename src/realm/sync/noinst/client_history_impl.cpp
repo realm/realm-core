@@ -228,15 +228,6 @@ void ClientReplication::finalize_changeset() noexcept
     m_history.m_changeset_from_server = util::none;
 }
 
-util::UniqueFunction<SyncReplication::WriteValidator> ClientReplication::make_write_validator(Transaction& tr)
-{
-    if (!m_write_validator_factory) {
-        return {};
-    }
-
-    return m_write_validator_factory(tr);
-}
-
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
                                SyncProgress& progress) const
 {
