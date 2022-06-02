@@ -68,11 +68,12 @@ int main(int argc, char** argv)
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
         config.name = "evergreen";
         config.defaultOutputFilename = str;
-        config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs
+        config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs in Evergreen
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
-        config.name = "junit";
-        config.defaultOutputFilename = "unit-test-report.xml";
+        config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs in Jenkins
+        config.reporterSpecifications.push_back(Catch::ReporterSpec{"console", {}, {}, {}});
+        config.reporterSpecifications.push_back(Catch::ReporterSpec{"junit", {"unit-test-report.xml"}, {}, {}});
     }
 
     Catch::Session session;
