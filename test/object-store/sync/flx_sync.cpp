@@ -18,7 +18,7 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "flx_sync_harness.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
@@ -324,7 +324,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         CHECK(write_info.primary_key.is_type(type_ObjectId));
         CHECK(write_info.primary_key.get_object_id() == invalid_obj);
         CHECK(write_info.object_name == "TopLevel");
-        CHECK_THAT(write_info.reason, Catch::Matchers::Contains(error_msg_fragment));
+        CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring(error_msg_fragment));
     };
 
     SECTION("compensating write because of permission violation") {

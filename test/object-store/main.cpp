@@ -16,15 +16,16 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define CATCH_CONFIG_RUNNER
 #include "realm/util/features.h"
-#if REALM_PLATFORM_APPLE
-#define CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS
-#endif
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
+#include <catch2/reporters/catch_reporter_cumulative_base.hpp>
+#include <catch2/catch_test_case_info.hpp>
+#include <catch2/reporters/catch_reporter_registrars.hpp>
+
 #include <external/json/json.hpp>
 #include <realm/util/to_string.hpp>
 
+#include <iostream>
 #include <limits.h>
 
 #ifdef _MSC_VER
@@ -35,6 +36,7 @@
 #pragma comment(lib, "Pathcch.lib")
 #else
 #include <libgen.h>
+#include <unistd.h>
 #endif
 
 int main(int argc, char** argv)
@@ -64,13 +66,13 @@ int main(int argc, char** argv)
 
     if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
-        config.reporterName = "evergreen";
-        config.outputFilename = str;
+        config.name = "evergreen";
+        config.defaultOutputFilename = str;
         config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
-        config.reporterName = "junit";
-        config.outputFilename = "unit-test-report.xml";
+        config.name = "junit";
+        config.defaultOutputFilename = "unit-test-report.xml";
     }
 
     Catch::Session session;
@@ -80,7 +82,7 @@ int main(int argc, char** argv)
 }
 
 namespace Catch {
-class EvergreenReporter : public CumulativeReporterBase<EvergreenReporter> {
+class EvergreenReporter : public CumulativeReporterBase {
 public:
     struct TestResult {
         TestResult()
@@ -94,20 +96,12 @@ public:
         std::string status;
     };
 
-    using Base = CumulativeReporterBase<EvergreenReporter>;
-    explicit EvergreenReporter(ReporterConfig const& config)
-        : Base(config)
-    {
-    }
-    ~EvergreenReporter() = default;
+    using Base = CumulativeReporterBase;
+    using CumulativeReporterBase::CumulativeReporterBase;
     static std::string getDescription()
     {
         return "Reports test results in a format consumable by Evergreen.";
     }
-    void noMatchingTestCases(std::string const& /*spec*/) override {}
-    using Base::testGroupEnded;
-    using Base::testGroupStarting;
-    using Base::testRunStarting;
 
     void print_duration(std::map<std::string, TestResult>::const_iterator it) const
     {
@@ -118,7 +112,7 @@ public:
         }
     }
 
-    bool assertionEnded(AssertionStats const& assertionStats) override
+    void assertionEnded(AssertionStats const& assertionStats) override
     {
         if (!assertionStats.assertionResult.isOk()) {
             std::cerr << "Assertion failure: " << assertionStats.assertionResult.getSourceInfo() << std::endl;
@@ -130,7 +124,6 @@ public:
             }
             std::cerr << std::endl;
         }
-        return true;
     }
     void testCaseStarting(TestCaseInfo const& testCaseInfo) override
     {
@@ -139,10 +132,10 @@ public:
     }
     void testCaseEnded(TestCaseStats const& testCaseStats) override
     {
-        auto it = m_results.find(testCaseStats.testInfo.name);
+        auto it = m_results.find(testCaseStats.testInfo->name);
         if (it == m_results.end()) {
             throw std::runtime_error("logic error in Evergreen section reporter, could not end test case '" +
-                                     testCaseStats.testInfo.name + "' which was never tracked as started.");
+                                     testCaseStats.testInfo->name + "' which was never tracked as started.");
         }
         if (testCaseStats.totals.assertions.allPassed()) {
             it->second.status = "pass";
@@ -202,7 +195,7 @@ public:
             results_arr.push_back(std::move(cur_result_obj));
         }
         auto result_file_obj = nlohmann::json{{"results", std::move(results_arr)}};
-        stream << result_file_obj << std::endl;
+        m_stream << result_file_obj << std::endl;
     }
 
     TestResult m_pending_test;

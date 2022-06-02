@@ -16,7 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
@@ -259,8 +260,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             Schema{{"object",
                     {{"value", PropertyType::Int}},
                     {{"invalid backlink", PropertyType::LinkingObjects | PropertyType::Array, "object", "value"}}}};
-        REQUIRE_THROWS_WITH(Realm::get_shared_realm(config),
-                            Catch::Matchers::Contains("origin of linking objects property"));
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "origin of linking objects property");
     }
 
     SECTION("should apply the schema if one is supplied") {
@@ -2294,24 +2294,22 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         SECTION("removing a property") {
             table.remove_column(table.get_column_key("value"));
             wt.commit();
-            REQUIRE_THROWS_WITH(r->refresh(), Catch::Matchers::Contains("Property 'object.value' has been removed."));
+            REQUIRE_THROWS_CONTAINING(r->refresh(), "Property 'object.value' has been removed.");
         }
 
         SECTION("change property type") {
             table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Float, "value 2");
             wt.commit();
-            REQUIRE_THROWS_WITH(
-                r->refresh(),
-                Catch::Matchers::Contains("Property 'object.value 2' has been changed from 'int' to 'float'"));
+            REQUIRE_THROWS_CONTAINING(r->refresh(),
+                                      "Property 'object.value 2' has been changed from 'int' to 'float'");
         }
 
         SECTION("make property optional") {
             table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Int, "value 2", true);
             wt.commit();
-            REQUIRE_THROWS_WITH(r->refresh(),
-                                Catch::Matchers::Contains("Property 'object.value 2' has been made optional"));
+            REQUIRE_THROWS_CONTAINING(r->refresh(), "Property 'object.value 2' has been made optional");
         }
 
         SECTION("recreate column with no changes") {

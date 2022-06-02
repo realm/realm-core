@@ -304,7 +304,6 @@ if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
 
-set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/single_include)
 set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 
 # Tell the build system where to find the sources (and generated sources)
@@ -313,6 +312,15 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 
 # Include additional CMakeLists
 add_subdirectory(src)
+add_subdirectory(external/catch)
+
+# This disables a c++17 feature that Apple doesn't support yet and Catch2 uses
+# The following define could be removed if we drop support for MacOS 10.12
+target_compile_definitions(Catch2 PRIVATE
+    CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS=1
+    PRIVATE _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
+)
+
 
 if (REALM_BUILD_DOGLESS)
     set(REALM_HAVE_DOGLESS ON)

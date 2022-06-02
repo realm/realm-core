@@ -75,7 +75,7 @@ if(MSVC)
     target_compile_options(ObjectStoreTests PRIVATE /bigobj)
 endif()
 
-target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
+target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
