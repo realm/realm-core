@@ -237,7 +237,7 @@ public:
         return m_server_url;
     }
 
-    sync::SubscriptionStore* get_flx_subscription_store();
+    const std::shared_ptr<sync::SubscriptionStore>& get_flx_subscription_store();
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
@@ -277,6 +277,10 @@ public:
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
             session.nonsync_transact_notify(version);
+        }
+        static std::shared_ptr<DB> get_db(SyncSession& session)
+        {
+            return session.m_db;
         }
     };
 

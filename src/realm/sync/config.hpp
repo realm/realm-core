@@ -22,7 +22,7 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/protocol.hpp>
 
 #include <functional>
 #include <memory>
@@ -48,12 +48,13 @@ enum class SimplifiedProtocolError {
     BadAuthentication,
     PermissionDenied,
     ClientResetRequested,
+    CompensatingWrite,
 };
 
 namespace sync {
 using port_type = std::uint_fast16_t;
 enum class ProtocolError;
-}
+} // namespace sync
 
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
@@ -79,9 +80,13 @@ struct SyncError {
     // the server may explicitly send down "IsClientReset" as part of an error
     // if this is set, it overrides the clients interpretation of the error
     util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
+    // If this error resulted from a compensating write, this vector will contain information about each object
+    // that caused a compensating write and why the write was illegal.
+    std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
     SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-              util::Optional<std::string> serverLog = util::none);
+              util::Optional<std::string> serverLog = util::none,
+              std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
     static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";
@@ -125,6 +130,17 @@ enum class SyncSessionStopPolicy {
     Immediately,          // Immediately stop the session as soon as all Realms/Sessions go out of scope.
     LiveIndefinitely,     // Never stop the session.
     AfterChangesUploaded, // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
+};
+
+enum class ClientResyncMode : unsigned char {
+    // Fire a client reset error
+    Manual,
+    // Discard local changes, without disrupting accessors or closing the Realm
+    DiscardLocal,
+    // Attempt to recover unsynchronized but committed changes.
+    Recover,
+    // Attempt recovery and if that fails, discard local.
+    RecoverOrDiscard,
 };
 
 struct SyncConfig {
@@ -171,7 +187,12 @@ struct SyncConfig {
 
     // Will be called after a download message is received and validated by the client but befefore it's been
     // transformed or applied. To be used in testing only.
-    std::function<void(std::weak_ptr<SyncSession>)> on_download_message_received_hook;
+    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+        on_download_message_received_hook;
+    // Will be called after each bootstrap message is added to the pending bootstrap store, but before
+    // processing a finalized bootstrap. For testing only.
+    std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+        on_bootstrap_message_processed_hook;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

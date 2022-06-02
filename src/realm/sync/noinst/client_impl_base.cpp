@@ -1,3 +1,4 @@
+#include "realm/sync/protocol.hpp"
 #include <system_error>
 #include <sstream>
 
@@ -16,6 +17,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_impl_base.hpp>
 #include <realm/sync/noinst/compact_changesets.hpp>
+#include <realm/sync/protocol.hpp>
 #include <realm/version.hpp>
 #include <realm/sync/changeset_parser.hpp>
 
@@ -1162,8 +1164,7 @@ void Connection::receive_pong(milliseconds_type timestamp)
 }
 
 
-void Connection::receive_error_message(int raw_error_code, const ProtocolErrorInfo& info,
-                                       session_ident_type session_ident)
+void Connection::receive_error_message(const ProtocolErrorInfo& info, session_ident_type session_ident)
 {
     Session* sess = nullptr;
     if (session_ident != 0) {
@@ -1174,7 +1175,7 @@ void Connection::receive_error_message(int raw_error_code, const ProtocolErrorIn
             close_due_to_protocol_error(ClientError::bad_session_ident); // Throws
             return;
         }
-        std::error_code ec = sess->receive_error_message(raw_error_code, info); // Throws
+        std::error_code ec = sess->receive_error_message(info); // Throws
         if (ec) {
             close_due_to_protocol_error(ec); // Throws
             return;
@@ -1189,11 +1190,11 @@ void Connection::receive_error_message(int raw_error_code, const ProtocolErrorIn
     }
 
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, session_ident=%4)", info.message,
-                raw_error_code, info.try_again, session_ident); // Throws
+                info.raw_error_code, info.try_again, session_ident); // Throws
 
-    bool known_error_code = bool(get_protocol_error_message(raw_error_code));
+    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_LIKELY(known_error_code)) {
-        ProtocolError error_code = ProtocolError(raw_error_code);
+        ProtocolError error_code = ProtocolError(info.raw_error_code);
         if (REALM_LIKELY(!is_session_level_error(error_code))) {
             close_due_to_server_side_error(error_code, info); // Throws
             return;
@@ -1388,7 +1389,7 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
-                                        download_batch_state, logger, get_transact_reporter()); // Throws
+                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
     if (num_changesets == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -1498,6 +1499,8 @@ void Session::activate()
 
     reset_protocol_state();
     m_state = Active;
+
+    process_pending_flx_bootstrap();
 
     REALM_ASSERT(!m_suspended);
     m_conn.one_more_active_unsuspended_session(); // Throws
@@ -1673,6 +1676,7 @@ void Session::send_ident_message()
                      active_query_body); // Throws
         protocol.make_flx_ident_message(out, session_ident, m_client_file_ident, m_progress,
                                         active_query_set.version(), active_query_body); // Throws
+        m_last_sent_flx_query_version = active_query_set.version();
     }
     else {
         logger.debug("Sending: IDENT(client_file_ident=%1, client_file_ident_salt=%2, "
@@ -1716,8 +1720,6 @@ void Session::send_query_change_message()
     m_conn.initiate_write_message(out, this);
 
     m_last_sent_flx_query_version = latest_sub_set.version();
-    m_pending_flx_sub_set =
-        sub_store->get_next_pending_version(m_last_sent_flx_query_version, m_pending_flx_sub_set->snapshot_version);
 
     enlist_to_send(); // throws
 }
@@ -2063,20 +2065,20 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
         }
     }
 
-    receive_download_message_hook();
+    receive_download_message_hook(progress, query_version, batch_state);
 
-    if (batch_state == DownloadBatchState::LastInBatch) {
-        update_progress(progress); // Throws
+    if (process_flx_bootstrap_message(progress, batch_state, query_version, received_changesets)) {
+        clear_resumption_delay_state();
+        return;
     }
 
+    update_progress(progress);                                                           // Throws
     initiate_integrate_changesets(downloadable_bytes, batch_state, received_changesets); // Throws
-    on_flx_sync_progress(query_version, batch_state);
 
     // When we receive a DOWNLOAD message successfully, we can clear the backoff timer value used to reconnect
     // after a retryable session error.
     clear_resumption_delay_state();
 }
-
 
 std::error_code Session::receive_mark_message(request_ident_type request_ident)
 {
@@ -2148,10 +2150,10 @@ std::error_code Session::receive_query_error_message(int error_code, std::string
 
 // The caller (Connection) must discard the session if the session has become
 // deactivated upon return.
-std::error_code Session::receive_error_message(int error_code_int, const ProtocolErrorInfo& info)
+std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
 {
     logger.info("Received: ERROR \"%1\" (error_code=%2, try_again=%3, recovery_disabled=%4)", info.message,
-                error_code_int, info.try_again, info.client_reset_recovery_is_disabled); // Throws
+                info.raw_error_code, info.try_again, info.client_reset_recovery_is_disabled); // Throws
 
     bool legal_at_this_time = (m_bind_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
@@ -2159,15 +2161,20 @@ std::error_code Session::receive_error_message(int error_code_int, const Protoco
         return ClientError::bad_message_order;
     }
 
-    bool known_error_code = bool(get_protocol_error_message(error_code_int));
+    bool known_error_code = bool(get_protocol_error_message(info.raw_error_code));
     if (REALM_UNLIKELY(!known_error_code)) {
         logger.error("Unknown error code"); // Throws
         return ClientError::bad_error_code;
     }
-    ProtocolError error_code = ProtocolError(error_code_int);
+    ProtocolError error_code = ProtocolError(info.raw_error_code);
     if (REALM_UNLIKELY(!is_session_level_error(error_code))) {
         logger.error("Not a session level error code"); // Throws
         return ClientError::bad_error_code;
+    }
+
+    if (!session_level_error_requires_suspend(error_code)) {
+        on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
+        return {}; // Success
     }
 
     REALM_ASSERT(!m_suspended);
@@ -2189,40 +2196,53 @@ std::error_code Session::receive_error_message(int error_code_int, const Protoco
         // completes.
         complete_deactivation(); // Throws
         // Life cycle state is now Deactivated
-        return std::error_code{}; // Success
     }
 
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();      // Throws
-        on_suspended({info, make_error_code(error_code)}); // Throws
+        m_conn.one_less_active_unsuspended_session();                      // Throws
+        on_suspended(SessionErrorInfo{info, make_error_code(error_code)}); // Throws
     }
 
     if (info.try_again) {
-        begin_resumption_delay();
+        begin_resumption_delay(info);
     }
 
     // Ready to send the UNBIND message, if it has not been sent already
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
 
-    return std::error_code{}; // Success
+    return {};
 }
 
-void Session::begin_resumption_delay()
+void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
     m_try_again_activation_timer.emplace(m_conn.get_client().get_service());
-    logger.debug("Will attempt to resume session after %1 milliseconds", m_try_again_activation_delay.count());
-    m_try_again_activation_timer->async_wait(m_try_again_activation_delay, [this](std::error_code ec) {
+    if (error_info.resumption_delay_interval) {
+        m_try_again_delay_info = *error_info.resumption_delay_interval;
+    }
+    if (!m_current_try_again_delay_interval ||
+        (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.raw_error_code))) {
+        m_current_try_again_delay_interval = m_try_again_delay_info.resumption_delay_interval;
+    }
+    else if (ProtocolError(error_info.raw_error_code) == ProtocolError::session_closed) {
+        // FIXME With compensating writes the server sends this error after completing a bootstrap. Doing the normal
+        // backoff behavior would result in waiting up to 5 minutes in between each query change which is
+        // not acceptable latency. So for this error code alone, we hard-code a 1 second retry interval.
+        m_current_try_again_delay_interval = std::chrono::milliseconds{1000};
+    }
+    m_try_again_error_code = ProtocolError(error_info.raw_error_code);
+    logger.debug("Will attempt to resume session after %1 milliseconds", m_current_try_again_delay_interval->count());
+    m_try_again_activation_timer->async_wait(*m_current_try_again_delay_interval, [this](std::error_code ec) {
         if (ec == util::error::operation_aborted) {
             return;
         }
 
         m_try_again_activation_timer.reset();
-        if (m_try_again_activation_delay < std::chrono::minutes{5}) {
-            m_try_again_activation_delay *= 2;
+        if (m_current_try_again_delay_interval < m_try_again_delay_info.max_resumption_delay_interval) {
+            *m_current_try_again_delay_interval *= m_try_again_delay_info.resumption_delay_backoff_multiplier;
         }
         cancel_resumption_delay();
     });
@@ -2232,7 +2252,7 @@ void Session::clear_resumption_delay_state()
 {
     if (m_try_again_activation_timer) {
         logger.debug("Clearing resumption delay state after successful download");
-        m_try_again_activation_delay = std::chrono::milliseconds{1000};
+        m_current_try_again_delay_interval = util::none;
     }
 }
 

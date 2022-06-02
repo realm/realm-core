@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "realm/util/functional.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 
 #include <realm/util/compression.hpp>
@@ -25,6 +26,7 @@
 #include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/instruction_applier.hpp>
 #include <realm/sync/instruction_replication.hpp>
+#include <realm/sync/noinst/client_reset.hpp>
 #include <realm/version.hpp>
 
 #include <algorithm>
@@ -226,6 +228,15 @@ void ClientReplication::finalize_changeset() noexcept
     m_history.m_changeset_from_server = util::none;
 }
 
+util::UniqueFunction<SyncReplication::WriteValidator> ClientReplication::make_write_validator(Transaction& tr)
+{
+    if (!m_write_validator_factory) {
+        return {};
+    }
+
+    return m_write_validator_factory(tr);
+}
+
 void ClientHistory::get_status(version_type& current_client_version, SaltedFileIdent& client_file_ident,
                                SyncProgress& progress) const
 {
@@ -322,7 +333,7 @@ void ClientHistory::find_uploadable_changesets(UploadCursor& upload_progress, ve
     const auto sync_history_size = arrays.changesets.size();
     const auto sync_history_base_version = rt->get_version() - sync_history_size;
 
-    std::size_t accum_byte_size_soft_limit = 0x20000; // 128 KB
+    std::size_t accum_byte_size_soft_limit = 0x20000;  // 128 KB
     std::size_t accum_byte_size_hard_limit = 16777216; // server-imposed limit
     std::size_t accum_byte_size = 0;
 
@@ -379,6 +390,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
                                                 const RemoteChangeset* incoming_changesets,
                                                 std::size_t num_changesets, VersionInfo& version_info,
                                                 DownloadBatchState batch_state, util::Logger& logger,
+                                                util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
                                                 SyncTransactReporter* transact_reporter)
 {
     REALM_ASSERT(num_changesets != 0);
@@ -415,6 +427,7 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
 
             parse_remote_changeset(changeset, changesets[i]); // Throws
 
+            changesets[i].transform_sequence = i;
             // It is possible that the synchronization history has been trimmed
             // to a point where a prefix of the merge window is no longer
             // available, but this can only happen if that prefix consisted
@@ -505,6 +518,9 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
     // synthetic server version that represents synthetic changesets generated from state on the server.
     if (batch_state == DownloadBatchState::LastInBatch) {
         update_sync_progress(progress, downloadable_bytes, transact); // Throws
+    }
+    if (run_in_write_tr) {
+        run_in_write_tr(transact);
     }
 
     version_type new_version = transact->commit_and_continue_as_read().version; // Throws

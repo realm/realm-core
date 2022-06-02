@@ -39,6 +39,7 @@
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
+#include "realm/sync/subscriptions.hpp"
 #endif
 
 #include <realm/db.hpp>
@@ -102,6 +103,30 @@ void RealmCoordinator::create_sync_session()
         return;
 
     m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
+    if (m_config.sync_config && m_config.sync_config->flx_sync_requested) {
+        std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_sync_session->get_flx_subscription_store());
+        auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+        history.set_write_validator_factory(
+            [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
+                auto sub_mgr = weak_sub_mgr.lock();
+                if (!sub_mgr) {
+                    throw std::runtime_error("Subscription store was destroyed while user writes were on-going");
+                }
+
+                auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
+                return [tables = std::move(latest_sub_tables)](const Table& table) {
+                    if (table.get_table_type() != Table::Type::TopLevel) {
+                        return;
+                    }
+                    auto object_class_name = Group::table_name_to_class_name(table.get_name());
+                    if (tables.find(object_class_name) == tables.end()) {
+                        throw NoSubscriptionForWrite(util::format(
+                            "Cannot write to class %1 when no flexible sync subscription has been created.",
+                            object_class_name));
+                    }
+                };
+            });
+    }
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {
@@ -350,10 +375,14 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         create_sync_session();
 
     if (realm->config().audit_config) {
+#ifdef REALM_ENABLE_SYNC
         if (m_audit_context)
             m_audit_context->update_metadata(realm->config().audit_config->metadata);
         else
             m_audit_context = make_audit_context(m_db, realm->config());
+#else
+        REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
+#endif
     }
 
     realm_lock.unlock_unchecked();

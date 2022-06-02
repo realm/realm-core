@@ -171,6 +171,11 @@ private:
     std::string m_property;
 };
 
+class NoSubscriptionForWrite : public std::runtime_error {
+public:
+    NoSubscriptionForWrite(const std::string& msg);
+};
+
 
 /// The \c LogicError exception class is intended to be thrown only when
 /// applications (or bindings) violate rules that are stated (or ought to have
@@ -369,6 +374,11 @@ inline SerialisationError::SerialisationError(const std::string& msg)
 
 inline InvalidPathError::InvalidPathError(const std::string& msg)
     : runtime_error(msg)
+{
+}
+
+inline NoSubscriptionForWrite::NoSubscriptionForWrite(const std::string& msg)
+    : std::runtime_error(msg)
 {
 }
 

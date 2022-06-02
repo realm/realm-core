@@ -28,6 +28,7 @@
 
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
+#include <realm/sync/config.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
@@ -456,6 +457,8 @@ void SyncSession::handle_error(SyncError error)
                 // The SDK doesn't need to be aware of these because they are strictly informational, and do not
                 // represent actual errors.
                 return;
+            case SimplifiedProtocolError::CompensatingWrite:
+                break; // not fatal, but should be bubbled up to the user below.
             case SimplifiedProtocolError::BadAuthentication:
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
@@ -658,9 +661,18 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
     if (m_config.on_download_message_received_hook) {
-        session_config.on_download_message_received_hook = [hook = m_config.on_download_message_received_hook,
-                                                            anchor = weak_from_this()] {
-            hook(anchor);
+        session_config.on_download_message_received_hook =
+            [hook = m_config.on_download_message_received_hook, anchor = weak_from_this()](
+                const sync::SyncProgress& progress, int64_t query_version, sync::DownloadBatchState batch_state) {
+                hook(anchor, progress, query_version, batch_state);
+            };
+    }
+    if (m_config.on_bootstrap_message_processed_hook) {
+        session_config.on_bootstrap_message_processed_hook =
+            [hook = m_config.on_bootstrap_message_processed_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state) -> bool {
+            return hook(anchor, progress, query_version, batch_state);
         };
     }
 
@@ -716,33 +728,38 @@ void SyncSession::create_sync_session()
 
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
-    m_session->set_connection_state_change_listener([weak_self](sync::ConnectionState state,
-                                                                util::Optional<sync::Session::ErrorInfo> error) {
-        // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
-        // nothing useful we can do with them.
-        if (auto self = weak_self.lock()) {
+    m_session->set_connection_state_change_listener(
+        [weak_self](sync::ConnectionState state, util::Optional<sync::Session::ErrorInfo> error) {
+            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+            // nothing useful we can do with them.
+            auto self = weak_self.lock();
+            if (!self) {
+                return;
+            }
+            using cs = sync::ConnectionState;
+            ConnectionState new_state = [&] {
+                switch (state) {
+                    case cs::disconnected:
+                        return ConnectionState::Disconnected;
+                    case cs::connecting:
+                        return ConnectionState::Connecting;
+                    case cs::connected:
+                        return ConnectionState::Connected;
+                }
+                REALM_UNREACHABLE();
+            }();
             util::CheckedUniqueLock lock(self->m_connection_state_mutex);
             auto old_state = self->m_connection_state;
-            using cs = sync::ConnectionState;
-            switch (state) {
-                case cs::disconnected:
-                    self->m_connection_state = ConnectionState::Disconnected;
-                    break;
-                case cs::connecting:
-                    self->m_connection_state = ConnectionState::Connecting;
-                    break;
-                case cs::connected:
-                    self->m_connection_state = ConnectionState::Connected;
-                    break;
-                default:
-                    REALM_UNREACHABLE();
-            }
-            auto new_state = self->m_connection_state;
+            self->m_connection_state = new_state;
             lock.unlock();
-            self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
+
+            if (old_state != new_state) {
+                self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
+            }
+
             if (error) {
                 SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal(),
-                                     error->logURL};
+                                     error->log_url, std::move(error->compensating_writes)};
                 if (error->should_client_reset) {
                     if (*error->should_client_reset) {
                         sync_error.server_requests_client_reset =
@@ -756,8 +773,7 @@ void SyncSession::create_sync_session()
                 }
                 self->handle_error(std::move(sync_error));
             }
-        }
-    });
+        });
 }
 
 void SyncSession::set_sync_transact_callback(util::UniqueFunction<sync::Session::SyncTransactCallback> callback)
@@ -1017,9 +1033,9 @@ std::string const& SyncSession::path() const
     return m_db->get_path();
 }
 
-sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
+const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscription_store()
 {
-    return m_flx_subscription_store.get();
+    return m_flx_subscription_store;
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

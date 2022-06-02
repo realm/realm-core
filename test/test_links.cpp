@@ -1177,7 +1177,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_embedded_table("target");
+        TableRef target = group.add_table("target", Table::Type::Embedded);
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         ColKey col_link;
@@ -1300,7 +1300,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_embedded_table("target");
+        TableRef target = group.add_table("target", Table::Type::Embedded);
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         std::vector<LnkLstPtr> linklists;
@@ -1646,5 +1646,7 @@ TEST(Unresolved_Mixed_links)
         CHECK(link.is_unresolved_link());
     }
 }
+
+// TODO: add tests here
 
 #endif // TEST_LINKS

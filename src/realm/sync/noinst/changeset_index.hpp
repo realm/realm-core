@@ -31,6 +31,9 @@ struct ChangesetIndex {
     struct CompareChangesetPointersByVersion {
         bool operator()(const Changeset* a, const Changeset* b) const noexcept
         {
+            if (a->version == b->version) {
+                return a->transform_sequence < b->transform_sequence;
+            }
             return a->version < b->version;
         }
     };
