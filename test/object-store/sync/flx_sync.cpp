@@ -42,6 +42,19 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace realm {
+
+class TestHelper {
+public:
+    static bool can_advance(const SharedRealm& realm)
+    {
+        auto& coord = Realm::Internal::get_coordinator(*realm);
+        return coord.can_advance(*realm);
+    }
+};
+
+} // namespace realm
+
 namespace realm::app {
 
 namespace {
@@ -100,6 +113,13 @@ std::vector<ObjectId> fill_large_array_schema(FLXSyncTestHarness& harness)
     });
     return ret;
 }
+
+void wait_for_advance(const SharedRealm& realm)
+{
+    timed_wait_for([&] {
+        return !TestHelper::can_advance(realm);
+    });
+}
 } // namespace
 
 TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
@@ -120,6 +140,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
                                          {"queryable_int_field", static_cast<int64_t>(10)},
                                          {"non_queryable_field", std::string{"non queryable 2"}}}));
     });
+
 
     harness.do_with_new_realm([&](SharedRealm realm) {
         wait_for_download(*realm);
@@ -143,7 +164,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
 
         wait_for_download(*realm);
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, table);
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -161,7 +182,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 2);
         }
@@ -179,7 +200,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, Query(table));
             CHECK(results.size() == 1);
             auto obj = results.get<Obj>(0);
@@ -195,7 +216,7 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
         }
 
         {
-            realm->refresh();
+            wait_for_advance(realm);
             Results results(realm, table);
             CHECK(results.size() == 0);
         }
@@ -333,7 +354,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                 std::move(error_future).get(), invalid_obj,
                 util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            realm->refresh();
+            wait_for_advance(realm);
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
             REQUIRE(top_level_table->is_empty());
@@ -377,7 +398,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
                 std::move(error_future).get(), invalid_obj,
                 util::format("write to '%1' in table \"TopLevel\" not allowed", invalid_obj.to_string()));
 
-            realm->refresh();
+            wait_for_advance(realm);
 
             obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any(invalid_obj));
             embedded_obj = util::any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
@@ -393,7 +414,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
             wait_for_upload(*realm);
             wait_for_download(*realm);
 
-            realm->refresh();
+            wait_for_advance(realm);
             obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any(invalid_obj));
             embedded_obj = util::any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
             REQUIRE(util::any_cast<std::string&&>(embedded_obj.get_property_value<util::Any>(c, "str_field")) ==
@@ -435,7 +456,8 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
             validate_sync_error(std::move(error_future).get(), invalid_obj,
                                 "object is outside of the current query view");
-            realm->refresh();
+
+            wait_for_advance(realm);
 
             auto top_level_table = realm->read_group().get_table("class_TopLevel");
             REQUIRE(top_level_table->size() == 1);
@@ -554,7 +576,7 @@ TEST_CASE("flx: interrupted bootstrap restarts/recovers on reconnect", "[sync][f
     wait_for_upload(*realm);
     wait_for_download(*realm);
 
-    realm->refresh();
+    wait_for_advance(realm);
     REQUIRE(table->size() == obj_ids_at_end.size());
     for (auto& id : obj_ids_at_end) {
         REQUIRE(table->find_primary_key(Mixed{id}));
@@ -947,7 +969,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     auto mutate_realm = [&] {
         harness.load_initial_data([&](SharedRealm realm) {
             auto table = realm->read_group().get_table("class_TopLevel");
-            realm->refresh();
+            wait_for_advance(realm);
             Results res(realm, Query(table).greater(table->get_column_key("queryable_int_field"), int64_t(10)));
             REQUIRE(res.size() == 2);
             res.clear();
@@ -1020,7 +1042,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         wait_for_upload(*realm);
         wait_for_download(*realm);
 
-        realm->refresh();
+        wait_for_advance(realm);
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
 
         REQUIRE(table->size() == expected_obj_ids.size());
@@ -1132,8 +1154,8 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
             .get();
         wait_for_upload(*realm);
         wait_for_download(*realm);
+        wait_for_advance(realm);
 
-        realm->refresh();
         auto expected_obj_ids = util::Span<ObjectId>(obj_ids_at_end).sub_span(0, 3);
 
         // After we've downloaded all the mutations there should only by 3 objects left.

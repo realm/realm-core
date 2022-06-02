@@ -2920,6 +2920,7 @@ RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(
 RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(
     realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free);
+
 /**
  * Retries the custom confirmation function on a user for a given email.
  * @param app ptr to realm_app
@@ -2930,6 +2931,7 @@ RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(
 RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(
     realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free);
+
 /**
  * Resets the password of an email identity using the password reset token emailed to a user.
  * @param app ptr to realm_app
@@ -2955,44 +2957,75 @@ RLM_API bool realm_app_email_password_provider_client_call_reset_password_functi
     realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
     realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
-
+/**
+ * Creates a user API key that can be used to authenticate as the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
     const realm_app_t*, const realm_user_t*, const char* name,
     void (*)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
+/**
+ * Fetches a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
     const realm_app_t*, const realm_user_t*, realm_object_id_t id,
     void (*)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
+/**
+ * Fetches the user API keys associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
     const realm_app_t*, const realm_user_t*,
     void (*)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count, realm_app_error_t*),
     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
+/**
+ * Deletes a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_delete_apikey(const realm_app_t*, const realm_user_t*,
                                                                  realm_object_id_t id,
                                                                  realm_app_void_completion_func_t,
                                                                  realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t userdata_free);
 
+/**
+ * Enables a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_enable_apikey(const realm_app_t*, const realm_user_t*,
                                                                  realm_object_id_t id,
                                                                  realm_app_void_completion_func_t,
                                                                  realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t userdata_free);
 
+/**
+ * Disables a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_disable_apikey(const realm_app_t*, const realm_user_t*,
                                                                   realm_object_id_t id,
                                                                   realm_app_void_completion_func_t,
                                                                   realm_userdata_t userdata,
                                                                   realm_free_userdata_func_t userdata_free);
 
+/**
+ * Register a device for push notifications.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_push_notification_client_register_device(
     const realm_app_t*, const realm_user_t*, const char* service_name, const char* registration_token,
     realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
+/**
+ * Deregister a device for push notificatons
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_push_notification_client_deregister_device(const realm_app_t*, const realm_user_t*,
                                                                   const char* service_name,
                                                                   realm_app_void_completion_func_t,

@@ -398,7 +398,7 @@ struct BaasClientReset : public TestClientReset {
                     }
                     return count_external > 0;
                 },
-                std::chrono::minutes(5));
+                std::chrono::minutes(15));
             session->log_out();
 
             realm->begin_transaction();
