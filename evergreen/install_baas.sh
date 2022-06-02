@@ -43,7 +43,7 @@ case $(uname -s) in
             DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "$DISTRO_VERSION" )"
         fi
         case $DISTRO_NAME in
-            ubuntu)
+            ubuntu | linuxmint)
                 MONGODB_DOWNLOAD_URL="http://downloads.10gen.com/linux/mongodb-linux-$(uname -m)-enterprise-ubuntu${DISTRO_VERSION_MAJOR}04-5.0.3.tgz"
                 STITCH_ASSISTED_AGG_LIB_URL="https://stitch-artifacts.s3.amazonaws.com/stitch-mongo-libs/stitch_mongo_libs_ubuntu2004_x86_64_0bdbed3d42ea136e166b3aad8f6fd09f336b1668_22_03_29_14_36_02/libmongo-ubuntu2004-x86_64.so"
                 STITCH_SUPPORT_LIB_URL="https://mciuploads.s3.amazonaws.com/mongodb-mongo-v4.4/stitch-support/ubuntu2004/58971da1ef93435a9f62bf4708a81713def6e88c/stitch-support-4.4.9-73-g58971da.tgz"
@@ -174,6 +174,11 @@ fi
 cd baas
 echo "Checking out baas version $BAAS_VERSION"
 git checkout "$BAAS_VERSION"
+echo "Check if we can pull"
+git rev-parse --verify @{upstream} 2> /dev/null
+if [ $? -eq 0 ]; then
+    git pull
+fi
 cd -
 
 if [[ ! -d $WORK_PATH/baas/etc/dylib/lib ]]; then
