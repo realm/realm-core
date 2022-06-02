@@ -3,6 +3,7 @@ set(HEADERS
     util/index_helpers.hpp
     util/test_file.hpp
     util/test_utils.hpp
+    ../util/crypt_key.hpp
     collection_fixtures.hpp
 )
 
@@ -31,6 +32,7 @@ set(SOURCES
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
+    ../util/crypt_key.cpp
 )
 
 if(REALM_ENABLE_AUTH_TESTS)

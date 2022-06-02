@@ -63,6 +63,7 @@ TEST_CASE("Automated backup") {
     TestFile config;
     std::string copy_from_file_name = "test_backup-olden-and-golden.realm";
     config.path = "test_backup.realm";
+    config.encryption_key.clear();
     REQUIRE(util::File::exists(copy_from_file_name));
     util::File::copy(copy_from_file_name, config.path);
     REQUIRE(util::File::exists(config.path));
