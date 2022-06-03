@@ -1296,7 +1296,10 @@ void Realm::close()
     do_invalidate();
 
     m_binding_context = nullptr;
+
+    m_coordinator->close();
     m_coordinator = nullptr;
+
     m_scheduler = nullptr;
     m_config = {};
 }

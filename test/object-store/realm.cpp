@@ -3229,6 +3229,19 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[
             REQUIRE(schema_in_callback.compare(schema).size() == 0);
         }
     }
+
+    SECTION("initialization function that throws ... all realm files should be deleted") {
+        config.initialization_function = [](auto) {
+            throw std::runtime_error{"ops"};
+        };
+        const auto& path = config.path;
+        REQUIRE_THROWS(Realm::get_shared_realm(config));
+        REQUIRE_FALSE(util::File::exists(path));
+        REQUIRE_FALSE(util::File::exists(path + ".management"));
+        REQUIRE_FALSE(util::File::exists(path + ".note"));
+        REQUIRE_FALSE(util::File::exists(path + ".log"));
+        REQUIRE(util::File::exists(path + ".lock"));
+    }
 }
 
 TEST_CASE("BindingContext is notified about delivery of change notifications") {

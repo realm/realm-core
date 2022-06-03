@@ -591,8 +591,10 @@ void RealmCoordinator::open_db()
 
 void RealmCoordinator::close()
 {
-    m_db->close();
-    m_db = nullptr;
+    if (m_db) {
+        m_db->close();
+        m_db = nullptr;
+    }
 }
 
 TransactionRef RealmCoordinator::begin_read(VersionID version, bool frozen_transaction)
