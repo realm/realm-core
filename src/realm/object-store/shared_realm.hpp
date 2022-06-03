@@ -489,6 +489,16 @@ public:
     };
 
 private:
+    enum class ClosePolicy { ManualReleaseRealmHandle, AutomaticReleaseRealmHandle };
+
+    /**
+     * Close Realm. Explicitely specify if release file handle or not.
+     * By default, file handle is released automatically when the Realm object goes out of scope.
+     * Only in case of failures during initialization callbacks, the handle is released explicitely.
+     * @param policy automatically or manually release file handle for realm
+     */
+    void do_close(ClosePolicy policy = ClosePolicy::AutomaticReleaseRealmHandle);
+
     struct MakeSharedTag {
     };
 

@@ -1286,22 +1286,7 @@ SharedRealm Realm::freeze()
 
 void Realm::close()
 {
-    if (is_closed()) {
-        return;
-    }
-    if (m_coordinator) {
-        m_coordinator->unregister_realm(this);
-    }
-
-    do_invalidate();
-
-    m_binding_context = nullptr;
-
-    m_coordinator->close();
-    m_coordinator = nullptr;
-
-    m_scheduler = nullptr;
-    m_config = {};
+    do_close();
 }
 
 void Realm::close_and_delete_files(bool* did_delete)
@@ -1312,9 +1297,30 @@ void Realm::close_and_delete_files(bool* did_delete)
     }
 #endif
     const auto path = m_config.path;
-    close();
+    do_close(Realm::ClosePolicy::ManualReleaseRealmHandle);
     delete_files(path, did_delete);
 }
+
+void Realm::do_close(Realm::ClosePolicy policy)
+{
+    if (is_closed()) {
+        return;
+    }
+    if (m_coordinator) {
+        m_coordinator->unregister_realm(this);
+    }
+
+    do_invalidate();
+
+    m_binding_context = nullptr;
+    if (policy == Realm::ClosePolicy::ManualReleaseRealmHandle) {
+        m_coordinator->close();
+    }
+    m_coordinator = nullptr;
+    m_scheduler = nullptr;
+    m_config = {};
+}
+
 
 void Realm::delete_files(const std::string& realm_file_path, bool* did_delete_realm)
 {
