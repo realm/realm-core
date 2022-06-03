@@ -235,7 +235,6 @@ public:
     /// bound (AKA tethered) snapshot.
     struct BadVersion;
 
-
     /// Transactions are obtained from one of the following 3 methods:
     TransactionRef start_read(VersionID = VersionID());
     TransactionRef start_frozen(VersionID = VersionID());

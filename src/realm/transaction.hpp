@@ -189,6 +189,8 @@ private:
     void complete_async_commit();
     void acquire_write_lock() REQUIRES(!m_async_mutex);
 
+    void cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit);
+
     DBRef db;
     mutable std::unique_ptr<_impl::History> m_history_read;
     mutable _impl::History* m_history = nullptr;

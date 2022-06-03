@@ -494,7 +494,8 @@ void Group::validate_top_array(const Array& arr, const SlabAlloc& alloc)
         case 7:
         case 9:
         case 10:
-        case 11: {
+        case 11:
+        case 12: {
             ref_type table_names_ref = arr.get_as_ref_or_tagged(s_table_name_ndx).get_as_ref();
             ref_type tables_ref = arr.get_as_ref_or_tagged(s_table_refs_ndx).get_as_ref();
             auto logical_file_size = arr.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();

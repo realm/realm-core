@@ -2227,6 +2227,14 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     // info->readers.dump();
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version);
+
+    if (auto limit = out.get_evacuation_limit()) {
+        // Get a work limit based on the size of the transaction we're about to commit
+        // Assume at least 4K on top of that for the top arrays
+        uint64_t work_limit = 4 * 1024 + m_alloc.get_commit_size();
+        transaction.cow_outliers(out.get_evacuation_progress(), limit, work_limit);
+    }
+
     ref_type new_top_ref;
     // Recursively write all changed arrays to end of file
     {
@@ -2239,7 +2247,7 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         std::lock_guard<std::recursive_mutex> lock_guard(m_mutex);
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
-        m_used_space = out.get_file_size() - m_free_space;
+        m_used_space = out.get_logical_size() - m_free_space;
         // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
         //     << " Read lock at version " << oldest_version << std::endl;
         switch (Durability(info->durability)) {

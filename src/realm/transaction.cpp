@@ -24,6 +24,8 @@
 #include <realm/table_view.hpp>
 #include <realm/group_writer.hpp>
 
+#include <iostream>
+
 namespace {
 
 using namespace realm;
@@ -909,6 +911,92 @@ void Transaction::set_transact_stage(DB::TransactStage stage) noexcept
 #endif
 
     m_transact_stage = stage;
+}
+
+class NodeTree {
+public:
+    NodeTree(size_t evac_limit, size_t& work_limit)
+        : m_evac_limit(evac_limit)
+        , m_work_limit(work_limit)
+        , m_moved(0)
+    {
+    }
+    ~NodeTree()
+    {
+        // std::cout << "Moved: " << m_moved << std::endl;
+    }
+    bool trv(Array& parent, unsigned level, std::vector<size_t>& progress)
+    {
+        if (parent.is_read_only()) {
+            auto byte_size = parent.get_byte_size();
+            if ((parent.get_ref() + byte_size) > m_evac_limit) {
+                parent.copy_on_write();
+                m_moved++;
+                if (m_work_limit > byte_size) {
+                    m_work_limit -= byte_size;
+                }
+                else {
+                    m_work_limit = 0;
+                    return false;
+                }
+            }
+        }
+
+        if (parent.has_refs()) {
+            auto sz = parent.size();
+            if (progress.size() == level) {
+                progress.push_back(0);
+            }
+            size_t& ndx = progress[level];
+            while (ndx < sz) {
+                auto val = parent.get(ndx);
+                if (val && !(val & 1)) {
+                    Array arr(parent.get_alloc());
+                    arr.set_parent(&parent, ndx);
+                    arr.init_from_parent();
+                    if (!trv(arr, level + 1, progress)) {
+                        return false;
+                    }
+                }
+                ndx++;
+            }
+            while (progress.size() > level)
+                progress.pop_back();
+        }
+        return true;
+    }
+
+private:
+    size_t m_evac_limit;
+    size_t m_work_limit;
+    size_t m_moved;
+};
+
+
+void Transaction::cow_outliers(std::vector<size_t>& progress, size_t evac_limit, size_t& work_limit)
+{
+    NodeTree node_tree(evac_limit, work_limit);
+    if (progress.empty()) {
+        progress.push_back(s_table_name_ndx);
+    }
+    if (progress[0] == s_table_name_ndx) {
+        if (!node_tree.trv(m_table_names, 1, progress))
+            return;
+        progress.back() = s_table_refs_ndx; // Handle tables next
+    }
+    if (progress[0] == s_table_refs_ndx) {
+        if (!node_tree.trv(m_tables, 1, progress))
+            return;
+        progress.back() = s_hist_ref_ndx; // Handle history next
+    }
+    if (progress[0] == s_hist_ref_ndx) {
+        Array hist_arr(m_top.get_alloc());
+        hist_arr.set_parent(&m_top, s_hist_ref_ndx);
+        hist_arr.init_from_parent();
+        if (!node_tree.trv(hist_arr, 1, progress))
+            return;
+    }
+    progress.clear();
 }
 
 } // namespace realm
