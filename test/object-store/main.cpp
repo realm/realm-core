@@ -66,9 +66,9 @@ int main(int argc, char** argv)
 
     if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
-        config.name = "evergreen";
-        config.defaultOutputFilename = str;
         config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs in Evergreen
+        config.reporterSpecifications.push_back(Catch::ReporterSpec{"console", {}, {}, {}});
+        config.reporterSpecifications.push_back(Catch::ReporterSpec{"evergreen", {str}, {}, {}});
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs in Jenkins
@@ -104,15 +104,6 @@ public:
         return "Reports test results in a format consumable by Evergreen.";
     }
 
-    void print_duration(std::map<std::string, TestResult>::const_iterator it) const
-    {
-        if (m_config->showDurations() == Catch::ShowDurations::Always) {
-            using namespace std::literals;
-            auto duration = (it->second.end_time - it->second.start_time) / 1ms;
-            std::cout << realm::util::format("%1 ms : %2\n", duration, it->first);
-        }
-    }
-
     void assertionEnded(AssertionStats const& assertionStats) override
     {
         if (!assertionStats.assertionResult.isOk()) {
@@ -145,7 +136,6 @@ public:
             it->second.status = "fail";
         }
         it->second.end_time = std::chrono::system_clock::now();
-        print_duration(it);
         Base::testCaseEnded(testCaseStats);
     }
     void sectionStarting(SectionInfo const& sectionInfo) override
@@ -170,7 +160,6 @@ public:
             }
             m_pending_test.end_time = std::chrono::system_clock::now();
             auto it = m_results.emplace(std::make_pair(m_pending_name, m_pending_test)).first;
-            print_duration(it);
             m_pending_name = "";
         }
         Base::sectionEnded(sectionStats);
