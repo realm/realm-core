@@ -323,7 +323,7 @@ target_compile_definitions(Catch2 PRIVATE
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-    target_compile_definitions(Catch2 PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
+    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
 endif()
 
 if (REALM_BUILD_DOGLESS)

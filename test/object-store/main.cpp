@@ -159,7 +159,7 @@ public:
                 m_pending_test.status = "fail";
             }
             m_pending_test.end_time = std::chrono::system_clock::now();
-            auto it = m_results.emplace(std::make_pair(m_pending_name, m_pending_test)).first;
+            m_results.emplace(std::make_pair(m_pending_name, m_pending_test));
             m_pending_name = "";
         }
         Base::sectionEnded(sectionStats);
