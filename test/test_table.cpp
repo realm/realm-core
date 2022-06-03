@@ -31,7 +31,6 @@
 using namespace std::chrono;
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/base64.hpp>

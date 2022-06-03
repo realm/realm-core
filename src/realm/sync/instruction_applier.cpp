@@ -2,7 +2,7 @@
 #include <realm/set.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#include <realm/group.hpp>
+#include <realm/transaction.hpp>
 
 namespace realm::sync {
 namespace {

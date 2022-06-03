@@ -24,7 +24,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/util/functional.hpp>
 #include <realm/binary_data.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/version_id.hpp>
 
 #include <memory>

@@ -26,7 +26,6 @@
 #include <cwchar>
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 
 #include "util/misc.hpp"
 

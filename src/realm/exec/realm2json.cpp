@@ -1,6 +1,5 @@
 #include <realm.hpp>
 #include <iostream>
-#include <realm/history.hpp>
 
 const char* legend =
     "Simple tool to output the JSON representation of a Realm:\n"

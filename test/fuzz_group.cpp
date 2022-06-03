@@ -19,7 +19,6 @@
 #include "fuzz_group.hpp"
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 #include <realm/index_string.hpp>
 
 #include <ctime>

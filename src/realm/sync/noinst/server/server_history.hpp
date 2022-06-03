@@ -14,7 +14,7 @@
 #include <realm/chunked_binary.hpp>
 #include <realm/impl/cont_transact_hist.hpp>
 #include <realm/replication.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/sync/noinst/server/clock.hpp>
 #include <realm/sync/history.hpp>
 #include <realm/sync/object_id.hpp>
