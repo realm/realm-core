@@ -19,7 +19,7 @@
 #include <realm/table_view.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/index_string.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 
 #include <unordered_set>
 

@@ -21,8 +21,7 @@
 #include "external/json/json.hpp"
 
 #include "realm/data_type.hpp"
-#include "realm/db.hpp"
-#include "realm/group.hpp"
+#include "realm/transaction.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
 #include "realm/sort_descriptor.hpp"

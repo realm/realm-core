@@ -20,7 +20,7 @@
 #define REALM_COPY_REPLICATION_HPP
 
 #include <realm/replication.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 
 namespace realm::_impl {
 

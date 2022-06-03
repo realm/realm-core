@@ -22,7 +22,6 @@
 #include <iostream>
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"

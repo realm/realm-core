@@ -22,7 +22,6 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 #include <realm/array_key.hpp>
-#include <realm/history.hpp>
 
 #include "test.hpp"
 

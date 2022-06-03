@@ -26,7 +26,6 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/replication.hpp>
-#include <realm/history.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"

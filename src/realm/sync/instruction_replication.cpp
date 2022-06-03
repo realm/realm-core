@@ -1,5 +1,5 @@
 #include <realm/sync/instruction_replication.hpp>
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/sync/transform.hpp> // TransformError
 #include <realm/list.hpp>
 

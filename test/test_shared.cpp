@@ -40,7 +40,6 @@
 #include <windows.h>
 #endif
 
-#include <realm/history.hpp>
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
