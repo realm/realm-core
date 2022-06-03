@@ -8,18 +8,19 @@ void ChangesetEncoder::operator()(const Instruction::AddTable& instr)
 {
     auto spec = mpark::get_if<Instruction::AddTable::TopLevelTable>(&instr.type);
     const bool is_embedded = (spec == nullptr);
-    auto convert = util::overload{
-        [&](const Instruction::AddTable::TopLevelTable& spec) {
-            if (spec.is_asymmetric) {
-                return Table::Type::TopLevelAsymmetric;
-            }
-            return Table::Type::TopLevel;
-        },
-        [&](const Instruction::AddTable::EmbeddedTable&) {
-            return Table::Type::Embedded;
-        },
-    };
-    auto table_type_int = static_cast<uint8_t>(mpark::visit(convert, instr.type));
+    Table::Type table_type;
+    if (!is_embedded) {
+        if (spec->is_asymmetric) {
+            table_type = Table::Type::TopLevelAsymmetric;
+        }
+        else {
+            table_type = Table::Type::TopLevel;
+        }
+    }
+    else {
+        table_type = Table::Type::Embedded;
+    }
+    auto table_type_int = static_cast<uint8_t>(table_type);
     append(Instruction::Type::AddTable, instr.table, table_type_int);
     if (!is_embedded) {
         append_value(spec->pk_field);
