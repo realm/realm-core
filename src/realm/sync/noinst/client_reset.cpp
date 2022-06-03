@@ -958,7 +958,7 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             if (on_flx_version_complete) {
                 on_flx_version_complete(sub.version());
             }
-            logger.info("Recreated active subscription and set to complete (%1 -> %2)", before_version,
+            logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
                         sub.version());
         }
     };
