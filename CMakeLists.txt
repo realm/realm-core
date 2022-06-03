@@ -321,6 +321,10 @@ target_compile_definitions(Catch2 PRIVATE
     PRIVATE _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
 )
 
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+    target_compile_definitions(Catch2 PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
+endif()
 
 if (REALM_BUILD_DOGLESS)
     set(REALM_HAVE_DOGLESS ON)
