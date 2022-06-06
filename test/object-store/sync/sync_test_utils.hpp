@@ -97,6 +97,14 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 namespace reset_utils {
 
+struct Partition {
+    std::string property_name;
+    std::string value;
+};
+
+Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId> primary_key = util::none,
+                  util::Optional<Partition> partition = util::none);
+
 struct TestClientReset {
     using Callback = util::UniqueFunction<void(const SharedRealm&)>;
     TestClientReset(const Realm::Config& local_config, const Realm::Config& remote_config);
@@ -106,6 +114,8 @@ struct TestClientReset {
     TestClientReset* make_remote_changes(Callback&& changes_remote);
     TestClientReset* on_post_local_changes(Callback&& post_local);
     TestClientReset* on_post_reset(Callback&& post_reset);
+    void set_pk_of_object_driving_reset(const ObjectId& pk);
+    ObjectId get_pk_of_object_driving_reset() const;
 
     virtual void run() = 0;
 
@@ -119,6 +129,7 @@ protected:
     Callback m_on_post_local;
     Callback m_on_post_reset;
     bool m_did_run = false;
+    ObjectId m_pk_driving_reset = ObjectId::gen();
 };
 
 #if REALM_ENABLE_SYNC
