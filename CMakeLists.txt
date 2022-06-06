@@ -330,17 +330,9 @@ endif()
 
 add_subdirectory(external/catch EXCLUDE_FROM_ALL)
 
-# This disables a c++17 feature that Apple doesn't support yet and Catch2 uses
-# The following define could be removed if we drop support for MacOS 10.12
-target_compile_definitions(Catch2 PRIVATE
-    CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS=1
-    _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
-)
-if (NOT MSVC)
-    target_compile_options(Catch2 PRIVATE
-        -Wno-deprecated-declarations
-    )
-endif()
+# Cmake does not let us easily set the deployment target per-target, but Catch2
+# can use modern features because we only run tests on recent OS versions.
+target_compile_definitions(Catch2 PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
 
 # Enable CTest and include unit tests
 enable_testing()

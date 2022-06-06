@@ -246,14 +246,8 @@ CPtr<T> clone_cptr(const T* ptr)
     } while (false);
 
 TEST_CASE("C API (C)", "[c_api]") {
-    const char* file_name = "c_api_test_c.realm";
-
-    // FIXME: Use a better test file guard.
-    if (realm::util::File::exists(file_name)) {
-        CHECK(realm::util::File::try_remove(file_name));
-    }
-
-    CHECK(realm_c_api_tests(file_name) == 0);
+    TestFile file;
+    CHECK(realm_c_api_tests(file.path.c_str()) == 0);
 }
 
 TEST_CASE("C API (non-database)", "[c_api]") {

@@ -16,52 +16,24 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "realm/util/features.h"
+#include "util/crypt_key.hpp"
+#include "util/test_path.hpp"
+
+#include <realm/util/features.h>
+#include <realm/util/to_string.hpp>
+
 #include <catch2/catch_all.hpp>
 #include <catch2/reporters/catch_reporter_cumulative_base.hpp>
 #include <catch2/catch_test_case_info.hpp>
 #include <catch2/reporters/catch_reporter_registrars.hpp>
-
 #include <external/json/json.hpp>
-#include <realm/util/to_string.hpp>
-#include "../util/crypt_key.hpp"
 
 #include <iostream>
 #include <limits.h>
 
-#ifdef _MSC_VER
-#include <Windows.h>
-
-// PathCchRemoveFileSpec()
-#include <pathcch.h>
-#pragma comment(lib, "Pathcch.lib")
-#else
-#include <libgen.h>
-#include <unistd.h>
-#endif
-
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
-#ifdef _MSC_VER
-    wchar_t path[MAX_PATH];
-    if (GetModuleFileName(NULL, path, MAX_PATH) == 0) {
-        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
-        return 1;
-    }
-    PathCchRemoveFileSpec(path, MAX_PATH);
-    SetCurrentDirectory(path);
-#else
-    char executable[PATH_MAX];
-    if (realpath(argv[0], executable) == NULL) {
-        fprintf(stderr, "Failed to resolve path to exectuable.\n");
-        return 1;
-    }
-    const char* directory = dirname(executable);
-    if (chdir(directory) < 0) {
-        fprintf(stderr, "Failed to change directory.\n");
-        return 1;
-    }
-#endif
+    realm::test_util::initialize_test_path(argc, argv);
 
     Catch::ConfigData config;
 

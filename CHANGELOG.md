@@ -2,12 +2,12 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* Add support for building with Xcode 14 using the CMake project (PR [#5577](https://github.com/realm/realm-core/pull/5577)).
+* Add support for building with Xcode 14 using the CMake project ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix exception when decoding interned strings in realm-apply-to-state tool. ([#5628](https://github.com/realm/realm-core/pull/5628))
-* Fix some warnings when building with Xcode 14 (PR [#5577](https://github.com/realm/realm-core/pull/5577)).
+* Fix some warnings when building with Xcode 14 ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 
 ### Breaking changes
 * None.
@@ -18,7 +18,7 @@
 -----------
 
 ### Internals
-* None.
+* Add support for running the object store tests and some of the benchmarks on iOS ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 
 ----------------------------------------------
 

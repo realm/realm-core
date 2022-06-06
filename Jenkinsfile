@@ -806,7 +806,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
                         sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
                         def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
                         withEnv(env) {
-                            runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.core.CoreTests', '$WORKSPACE/')
+                            runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.CoreTests', '$WORKSPACE/')
                         }
                         sh '''
                             mkdir -p $WORKSPACE/build-dir/test

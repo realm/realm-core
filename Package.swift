@@ -403,13 +403,8 @@ let package = Package(
             path: "src/realm/parser",
             exclude: [
                 "CMakeLists.txt",
-                "driver.hpp",
-                "generated/query_bison.hpp",
-                "generated/query_flex.hpp",
-                "keypath_mapping.hpp",
                 "query_bison.yy",
                 "query_flex.ll",
-                "query_parser.hpp",
             ],
             publicHeadersPath: ".",
             cxxSettings: [
@@ -444,13 +439,7 @@ let package = Package(
             path: "src/realm/object-store/c_api",
             exclude: [
                 "CMakeLists.txt",
-                "conversion.hpp",
-                "error.hpp",
-                "realm.hpp",
-                "logging.hpp",
                 "realm.c",
-                "types.hpp",
-                "util.hpp",
             ],
             publicHeadersPath: ".",
             cxxSettings: (cxxSettings) as [CXXSetting]),
@@ -492,13 +481,6 @@ let package = Package(
             name: "ObjectStoreTestUtils",
             dependencies: ["RealmCore", "SyncServer", "Catch2", "CoreTestUtils"],
             path: "test/object-store/util",
-            exclude: [
-                "baas_admin_api.hpp",
-                "event_loop.hpp",
-                "index_helpers.hpp",
-                "test_file.hpp",
-                "test_utils.hpp",
-            ],
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath(".."),
@@ -506,27 +488,24 @@ let package = Package(
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(
             name: "ObjectStoreTests",
-            dependencies: ["RealmCore", "RealmQueryParser", "ObjectStoreTestUtils"],
+            dependencies: ["RealmQueryParser", "ObjectStoreTestUtils"],
             path: "test/object-store",
             exclude: [
                 "CMakeLists.txt",
                 "backup.cpp",
                 "benchmarks",
                 "c_api",
-                "collection_fixtures.hpp",
                 "mongodb",
                 "notifications-fuzzer",
                 "query.json",
                 "sync-metadata-v4.realm",
                 "sync-metadata-v5.realm",
-                "sync/flx_sync_harness.hpp",
-                "sync/session/session_util.hpp",
-                "sync/sync_test_utils.hpp",
                 "test_backup-olden-and-golden.realm",
                 "util",
             ],
             cxxSettings: ([
                 .headerSearchPath("."),
+                .headerSearchPath(".."),
                 .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(
