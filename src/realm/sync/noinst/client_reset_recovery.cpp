@@ -914,7 +914,6 @@ void RecoverLocalChangesetsHandler::operator()(const Instruction::ArrayErase& in
         }
         Status on_list_index(LstBase& list, uint32_t index) override
         {
-            auto obj = list.get_obj();
             uint32_t translated_index;
             bool allowed_to_delete =
                 m_recovery_applier->m_lists.at(m_list_path).remove(static_cast<uint32_t>(index), translated_index);

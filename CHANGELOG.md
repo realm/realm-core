@@ -21,6 +21,7 @@
 
 ### Internals
 * Add support for running the object store tests and some of the benchmarks on iOS ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* MemRef is now trivially copyable.
 
 ----------------------------------------------
 
