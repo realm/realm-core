@@ -910,7 +910,7 @@ RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
-                                                             realm_sync_download_completion_func_t done,
+                                                             realm_sync_wait_for_completion_func_t done,
                                                              realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -929,7 +929,7 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t* session,
-                                                           realm_sync_upload_completion_func_t done,
+                                                           realm_sync_wait_for_completion_func_t done,
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -947,13 +947,14 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
     (*session)->wait_for_upload_completion(std::move(cb));
 }
 
-RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
-                                                         const realm_sync_error_t* error)
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
+                                                         int error_category, const char* error_message, bool is_fatal)
 {
     REALM_ASSERT(session);
-    REALM_ASSERT(error);
-    auto err = sync_error_to_error_code(error->error_code);
-    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error->error_code.message, error->is_fatal});
+    realm_sync_error_code_t sync_error{static_cast<realm_sync_error_category_e>(error_category), error_code,
+                                       error_message};
+    auto err = sync_error_to_error_code(sync_error);
+    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
 }
 
 } // namespace realm::c_api

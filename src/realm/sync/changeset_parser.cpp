@@ -1,13 +1,20 @@
 
-#include <realm/util/metered/set.hpp>
+#include "realm/global_key.hpp"
+#include "realm/mixed.hpp"
+#include "realm/sync/changeset.hpp"
+#include "realm/sync/instructions.hpp"
+#include "realm/util/base64.hpp"
+#include <realm/sync/changeset_parser.hpp>
 #include <realm/sync/noinst/integer_codec.hpp>
 #include <realm/table.hpp>
-#include <realm/sync/changeset_parser.hpp>
+#include <realm/util/metered/set.hpp>
 
 using namespace realm;
 using namespace realm::sync;
 
-struct ChangesetParser::State {
+namespace {
+
+struct State {
     util::NoCopyInputStream& m_input;
     InstructionHandler& m_handler;
 
@@ -82,16 +89,51 @@ struct ChangesetParser::State {
     } // Throws
 };
 
+struct UnreachableInstructionHandler : public InstructionHandler {
+    void set_intern_string(uint32_t, StringBufferRange) override
+    {
+        REALM_UNREACHABLE();
+    }
 
-void ChangesetParser::parse(util::NoCopyInputStream& input, InstructionHandler& handler)
-{
-    State state{input, handler};
+    StringBufferRange add_string_range(StringData) override
+    {
+        REALM_UNREACHABLE();
+    }
 
-    while (state.has_next())
-        state.parse_one();
-}
+    void operator()(const Instruction&) override
+    {
+        REALM_UNREACHABLE();
+    }
+};
 
-Instruction::Payload::Type ChangesetParser::State::read_payload_type()
+struct InstructionBuilder : InstructionHandler {
+    explicit InstructionBuilder(Changeset& log)
+        : m_log(log)
+    {
+    }
+    Changeset& m_log;
+
+    void operator()(const Instruction& instr) final
+    {
+        m_log.push_back(instr);
+    }
+
+    StringBufferRange add_string_range(StringData string) final
+    {
+        return m_log.append_string(string);
+    }
+
+    void set_intern_string(uint32_t index, StringBufferRange range) final
+    {
+        InternStrings& strings = m_log.interned_strings();
+        if (strings.size() <= index) {
+            strings.resize(index + 1, StringBufferRange{0, 0});
+        }
+        strings[index] = range;
+    }
+};
+
+Instruction::Payload::Type State::read_payload_type()
 {
     using Type = Instruction::Payload::Type;
     auto type = Instruction::Payload::Type(read_int());
@@ -133,7 +175,7 @@ Instruction::Payload::Type ChangesetParser::State::read_payload_type()
     parser_error("Unsupported data type");
 }
 
-Instruction::AddColumn::CollectionType ChangesetParser::State::read_collection_type()
+Instruction::AddColumn::CollectionType State::read_collection_type()
 {
     using CollectionType = Instruction::AddColumn::CollectionType;
     auto type = Instruction::AddColumn::CollectionType(read_int<uint8_t>());
@@ -151,7 +193,7 @@ Instruction::AddColumn::CollectionType ChangesetParser::State::read_collection_t
     parser_error("Unsupported collection type");
 }
 
-Instruction::Payload ChangesetParser::State::read_payload()
+Instruction::Payload State::read_payload()
 {
     using Type = Instruction::Payload::Type;
 
@@ -222,7 +264,7 @@ Instruction::Payload ChangesetParser::State::read_payload()
     parser_error("Unsupported payload type");
 }
 
-Instruction::PrimaryKey ChangesetParser::State::read_object_key()
+Instruction::PrimaryKey State::read_object_key()
 {
     using Type = Instruction::Payload::Type;
     Type type = read_payload_type();
@@ -245,14 +287,14 @@ Instruction::PrimaryKey ChangesetParser::State::read_object_key()
     parser_error("Unsupported object key type");
 }
 
-Instruction::Payload::Link ChangesetParser::State::read_link()
+Instruction::Payload::Link State::read_link()
 {
     auto target_class = read_intern_string();
     auto key = read_object_key();
     return Instruction::Payload::Link{target_class, key};
 }
 
-Instruction::Path ChangesetParser::State::read_path()
+Instruction::Path State::read_path()
 {
     Instruction::Path path;
     size_t path_len = read_int<uint32_t>();
@@ -276,7 +318,7 @@ Instruction::Path ChangesetParser::State::read_path()
     return path;
 }
 
-void ChangesetParser::State::read_path_instr(Instruction::PathInstruction& instr)
+void State::read_path_instr(Instruction::PathInstruction& instr)
 {
     instr.table = read_intern_string();
     instr.object = read_object_key();
@@ -284,7 +326,7 @@ void ChangesetParser::State::read_path_instr(Instruction::PathInstruction& instr
     instr.path = read_path();
 }
 
-void ChangesetParser::State::parse_one()
+void State::parse_one()
 {
     uint64_t t = read_int<uint64_t>();
 
@@ -308,19 +350,27 @@ void ChangesetParser::State::parse_one()
         case Instruction::Type::AddTable: {
             Instruction::AddTable instr;
             instr.table = read_intern_string();
-            bool is_embedded = read_bool();
-            if (!is_embedded) {
-                Instruction::AddTable::PrimaryKeySpec spec;
-                spec.field = read_intern_string();
-                spec.type = read_payload_type();
-                if (!is_valid_key_type(spec.type)) {
-                    parser_error("Invalid primary key type in AddTable");
+            auto table_type = Table::Type(read_int<uint8_t>());
+            switch (table_type) {
+                case Table::Type::TopLevel:
+                case Table::Type::TopLevelAsymmetric: {
+                    Instruction::AddTable::TopLevelTable spec;
+                    spec.pk_field = read_intern_string();
+                    spec.pk_type = read_payload_type();
+                    if (!is_valid_key_type(spec.pk_type)) {
+                        parser_error("Invalid primary key type in AddTable");
+                    }
+                    spec.pk_nullable = read_bool();
+                    spec.is_asymmetric = (table_type == Table::Type::TopLevelAsymmetric);
+                    instr.type = spec;
+                    break;
                 }
-                spec.nullable = read_bool();
-                instr.type = spec;
-            }
-            else {
-                instr.type = Instruction::AddTable::EmbeddedTable{};
+                case Table::Type::Embedded: {
+                    instr.type = Instruction::AddTable::EmbeddedTable{};
+                    break;
+                }
+                default:
+                    parser_error("AddTable: unknown table type");
             }
             m_handler(instr);
             return;
@@ -454,12 +504,12 @@ void ChangesetParser::State::parse_one()
 }
 
 
-bool ChangesetParser::State::has_next() noexcept
+bool State::has_next() noexcept
 {
     return m_input_begin != m_input_end || next_input_buffer();
 }
 
-bool ChangesetParser::State::next_input_buffer() noexcept
+bool State::next_input_buffer() noexcept
 {
     auto next = m_input.next_block();
     m_input_begin = next.begin();
@@ -468,7 +518,7 @@ bool ChangesetParser::State::next_input_buffer() noexcept
 }
 
 template <class T>
-T ChangesetParser::State::read_int()
+T State::read_int()
 {
     T value = 0;
     if (REALM_LIKELY(_impl::decode_int(*this, value)))
@@ -476,7 +526,7 @@ T ChangesetParser::State::read_int()
     parser_error("bad changeset - integer decoding failure");
 }
 
-bool ChangesetParser::State::read_char(char& c) noexcept
+bool State::read_char(char& c) noexcept
 {
     if (m_input_begin == m_input_end && !next_input_buffer())
         return false;
@@ -484,7 +534,7 @@ bool ChangesetParser::State::read_char(char& c) noexcept
     return true;
 }
 
-void ChangesetParser::State::read_bytes(char* data, size_t size)
+void State::read_bytes(char* data, size_t size)
 {
     for (;;) {
         const size_t avail = m_input_end - m_input_begin;
@@ -501,12 +551,12 @@ void ChangesetParser::State::read_bytes(char* data, size_t size)
     m_input_begin = to;
 }
 
-bool ChangesetParser::State::read_bool()
+bool State::read_bool()
 {
     return read_int<uint8_t>(); // Throws
 }
 
-float ChangesetParser::State::read_float()
+float State::read_float()
 {
     static_assert(std::numeric_limits<float>::is_iec559 &&
                       sizeof(float) * std::numeric_limits<unsigned char>::digits == 32,
@@ -516,7 +566,7 @@ float ChangesetParser::State::read_float()
     return value;
 }
 
-double ChangesetParser::State::read_double()
+double State::read_double()
 {
     static_assert(std::numeric_limits<double>::is_iec559 &&
                       sizeof(double) * std::numeric_limits<unsigned char>::digits == 64,
@@ -526,7 +576,7 @@ double ChangesetParser::State::read_double()
     return value;
 }
 
-InternString ChangesetParser::State::read_intern_string()
+InternString State::read_intern_string()
 {
     uint32_t index = read_int<uint32_t>(); // Throws
     if (m_valid_interned_strings.find(index) == m_valid_interned_strings.end())
@@ -534,14 +584,14 @@ InternString ChangesetParser::State::read_intern_string()
     return InternString{index};
 }
 
-GlobalKey ChangesetParser::State::read_global_key()
+GlobalKey State::read_global_key()
 {
     uint64_t hi = read_int<uint64_t>(); // Throws
     uint64_t lo = read_int<uint64_t>(); // Throws
     return GlobalKey{hi, lo};
 }
 
-Timestamp ChangesetParser::State::read_timestamp()
+Timestamp State::read_timestamp()
 {
     int64_t seconds = read_int<int64_t>();     // Throws
     int64_t nanoseconds = read_int<int64_t>(); // Throws
@@ -550,7 +600,7 @@ Timestamp ChangesetParser::State::read_timestamp()
     return Timestamp{seconds, int32_t(nanoseconds)};
 }
 
-ObjectId ChangesetParser::State::read_object_id()
+ObjectId State::read_object_id()
 {
     // FIXME: This is completely wrong and unsafe.
     ObjectId id;
@@ -558,14 +608,14 @@ ObjectId ChangesetParser::State::read_object_id()
     return id;
 }
 
-UUID ChangesetParser::State::read_uuid()
+UUID State::read_uuid()
 {
     UUID::UUIDBytes bytes{};
     read_bytes(reinterpret_cast<char*>(bytes.data()), bytes.size());
     return UUID(bytes);
 }
 
-Decimal128 ChangesetParser::State::read_decimal()
+Decimal128 State::read_decimal()
 {
     _impl::Bid128 cx;
     if (!_impl::decode_int(*this, cx))
@@ -578,7 +628,7 @@ Decimal128 ChangesetParser::State::read_decimal()
     return Decimal128(tmp, exp, sign);
 }
 
-StringData ChangesetParser::State::read_string()
+StringData State::read_string()
 {
     uint64_t size = read_int<uint64_t>(); // Throws
 
@@ -591,7 +641,7 @@ StringData ChangesetParser::State::read_string()
     return StringData{buffer.data(), size_t(size)};
 }
 
-BinaryData ChangesetParser::State::read_binary()
+BinaryData State::read_binary()
 {
     uint64_t size = read_int<uint64_t>(); // Throws
 
@@ -601,7 +651,7 @@ BinaryData ChangesetParser::State::read_binary()
     return read_buffer(size_t(size));
 }
 
-BinaryData ChangesetParser::State::read_buffer(size_t size)
+BinaryData State::read_buffer(size_t size)
 {
     const size_t avail = m_input_end - m_input_begin;
     if (avail >= size) {
@@ -615,39 +665,12 @@ BinaryData ChangesetParser::State::read_buffer(size_t size)
     return BinaryData(m_buffer.data(), size);
 }
 
-void ChangesetParser::State::parser_error(const char* complaints)
+void State::parser_error(const char* complaints)
 {
     throw BadChangesetError{complaints};
 }
 
-namespace {
-struct InstructionBuilder : InstructionHandler {
-    explicit InstructionBuilder(Changeset& log)
-        : m_log(log)
-    {
-    }
-    Changeset& m_log;
-
-    void operator()(const Instruction& instr) final
-    {
-        m_log.push_back(instr);
-    }
-
-    StringBufferRange add_string_range(StringData string) final
-    {
-        return m_log.append_string(string);
-    }
-
-    void set_intern_string(uint32_t index, StringBufferRange range) final
-    {
-        InternStrings& strings = m_log.interned_strings();
-        if (strings.size() <= index) {
-            strings.resize(index + 1, StringBufferRange{0, 0});
-        }
-        strings[index] = range;
-    }
-};
-} // unnamed namespace
+} // anonymous namespace
 
 namespace realm {
 namespace sync {
@@ -661,9 +684,44 @@ void parse_changeset(util::InputStream& input, Changeset& out_log)
 
 void parse_changeset(util::NoCopyInputStream& input, Changeset& out_log)
 {
-    ChangesetParser parser;
     InstructionBuilder builder{out_log};
-    parser.parse(input, builder);
+    State state{input, builder};
+
+    while (state.has_next())
+        state.parse_one();
+}
+
+OwnedMixed parse_base64_encoded_primary_key(std::string_view str)
+{
+    auto bin_encoded = util::base64_decode_to_vector(str);
+    if (!bin_encoded) {
+        throw BadChangesetError("invalid base64 in base64-encoded primary key");
+    }
+    util::SimpleNoCopyInputStream stream(*bin_encoded);
+    UnreachableInstructionHandler fake_encoder;
+    State state{stream, fake_encoder};
+    using Type = Instruction::Payload::Type;
+    Type type = state.read_payload_type();
+    switch (type) {
+        case Type::Null:
+            return OwnedMixed{};
+        case Type::Int:
+            return OwnedMixed{state.read_int()};
+        case Type::String: {
+            auto str = state.read_string();
+            return OwnedMixed{std::string{str.data(), str.size()}};
+        }
+        case Type::GlobalKey:
+            // GlobalKey's are not actually used as primary keys in sync. We currently have wire protocol support
+            // for them, but we've never sent them to the sync server.
+            REALM_UNREACHABLE();
+        case Type::ObjectId:
+            return OwnedMixed{state.read_object_id()};
+        case Type::UUID:
+            return OwnedMixed{state.read_uuid()};
+        default:
+            throw BadChangesetError(util::format("invalid primary key type %1", static_cast<int>(type)));
+    }
 }
 
 } // namespace sync

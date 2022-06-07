@@ -457,7 +457,7 @@ private:
     void change_state_to_disconnected() noexcept;
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
-    void receive_error_message(int error_code, const ProtocolErrorInfo& info, session_ident_type);
+    void receive_error_message(const ProtocolErrorInfo& info, session_ident_type);
     void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
                                      session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
@@ -870,7 +870,7 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
-    void begin_resumption_delay();
+    void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
 private:
@@ -888,7 +888,9 @@ private:
     bool m_suspended = false;
 
     util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
-    std::chrono::milliseconds m_try_again_activation_delay{1000};
+    ResumptionDelayInfo m_try_again_delay_info;
+    util::Optional<ProtocolError> m_try_again_error_code;
+    util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
 
     DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
 
@@ -1055,7 +1057,7 @@ private:
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_unbound_message();
-    std::error_code receive_error_message(int error_code, const ProtocolErrorInfo& info);
+    std::error_code receive_error_message(const ProtocolErrorInfo& info);
     std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
 
     void initiate_rebind();

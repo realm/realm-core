@@ -90,7 +90,12 @@ add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)
-
+    option(REALM_ENABLE_COMPENSATING_WRITES_TESTS "" OFF)
+    if (REALM_ENABLE_COMPENSATING_WRITES_TESTS)
+        target_compile_definitions(ObjectStoreTests PRIVATE
+            REALM_ENABLE_COMPENSATING_WRITES_TESTS=1
+        )
+    endif()
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
         if(NOT REALM_MONGODB_ENDPOINT)

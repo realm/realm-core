@@ -29,6 +29,11 @@ namespace sync {
 
 class SyncReplication : public Replication {
 public:
+    // This will be called for any instruction that mutates an object (instead of instructions that mutates
+    // schema) with the class name (without the "class_" prefix) of the object being modified. If The
+    // validator needs to reject the write, it should throw an exception.
+    using WriteValidator = void(const Table&);
+
     void set_short_circuit(bool) noexcept;
     bool is_short_circuited() const noexcept;
 
@@ -40,11 +45,12 @@ public:
     ChangesetEncoder& get_instruction_encoder() noexcept;
     const ChangesetEncoder& get_instruction_encoder() const noexcept;
 
-    void add_class(TableKey tk, StringData table_name, bool is_embedded) final;
+    void add_class(TableKey tk, StringData table_name, Table::Type table_type = Table::Type::TopLevel) final;
     void add_class_with_primary_key(TableKey tk, StringData table_name, DataType pk_type, StringData pk_field,
-                                    bool nullable) final;
+                                    bool nullable, Table::Type table_type) final;
     void create_object(const Table*, GlobalKey) final;
     void create_object_with_primary_key(const Table*, ObjKey, Mixed) final;
+
     void prepare_erase_class(TableKey tk) final;
     void erase_class(TableKey table_key, size_t num_tables) final;
     void rename_class(TableKey table_key, StringData new_name) final;
@@ -87,6 +93,11 @@ public:
 protected:
     // Replication interface:
     void do_initiate_transact(Group& group, version_type current_version, bool history_updated) override;
+
+    virtual util::UniqueFunction<WriteValidator> make_write_validator(Transaction&)
+    {
+        return {};
+    }
 
 private:
     bool m_short_circuit = false;
@@ -133,6 +144,7 @@ private:
     InternString m_last_class_name;
     util::Optional<Instruction::PrimaryKey> m_last_primary_key;
     InternString m_last_field_name;
+    util::UniqueFunction<WriteValidator> m_write_validator;
 };
 
 inline void SyncReplication::set_short_circuit(bool b) noexcept

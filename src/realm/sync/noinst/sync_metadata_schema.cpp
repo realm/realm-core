@@ -44,7 +44,7 @@ void create_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetad
         }
         TableRef table_ref;
         if (table.is_embedded) {
-            table_ref = tr->add_embedded_table(table.name);
+            table_ref = tr->add_table(table.name, Table::Type::Embedded);
         }
         else if (table.pk_info) {
             table_ref = tr->add_table_with_primary_key(table.name, table.pk_info->data_type, table.pk_info->name,

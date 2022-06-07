@@ -7156,7 +7156,7 @@ TEST(Sync_UpgradeToClientHistory)
     {
         auto tr = db_1->start_write();
 
-        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto embedded = tr->add_table("class_Embedded", Table::Type::Embedded);
         auto col_float = embedded->add_column(type_Float, "float");
         auto col_additional = embedded->add_column_dictionary(*embedded, "additional");
 

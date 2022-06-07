@@ -1409,10 +1409,10 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
 {
     if (same_table(left, right)) {
         StringData left_name = left_side.get_string(left.table);
-        if (auto left_spec = mpark::get_if<Instruction::AddTable::PrimaryKeySpec>(&left.type)) {
-            if (auto right_spec = mpark::get_if<Instruction::AddTable::PrimaryKeySpec>(&right.type)) {
-                StringData left_pk_name = left_side.get_string(left_spec->field);
-                StringData right_pk_name = right_side.get_string(right_spec->field);
+        if (auto left_spec = mpark::get_if<Instruction::AddTable::TopLevelTable>(&left.type)) {
+            if (auto right_spec = mpark::get_if<Instruction::AddTable::TopLevelTable>(&right.type)) {
+                StringData left_pk_name = left_side.get_string(left_spec->pk_field);
+                StringData right_pk_name = right_side.get_string(right_spec->pk_field);
                 if (left_pk_name != right_pk_name) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
@@ -1422,18 +1422,24 @@ DEFINE_MERGE(Instruction::AddTable, Instruction::AddTable)
                     throw SchemaMismatchError(ss.str());
                 }
 
-                if (left_spec->type != right_spec->type) {
+                if (left_spec->pk_type != right_spec->pk_type) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
-                       << "', which is of type " << get_type_name(left_spec->type) << " on one side and type "
-                       << get_type_name(right_spec->type) << " on the other.";
+                       << "', which is of type " << get_type_name(left_spec->pk_type) << " on one side and type "
+                       << get_type_name(right_spec->pk_type) << " on the other.";
                     throw SchemaMismatchError(ss.str());
                 }
 
-                if (left_spec->nullable != right_spec->nullable) {
+                if (left_spec->pk_nullable != right_spec->pk_nullable) {
                     std::stringstream ss;
                     ss << "Schema mismatch: '" << left_name << "' has primary key '" << left_pk_name
                        << "', which is nullable on one side, but not the other";
+                    throw SchemaMismatchError(ss.str());
+                }
+
+                if (left_spec->is_asymmetric != right_spec->is_asymmetric) {
+                    std::stringstream ss;
+                    ss << "Schema mismatch: '" << left_name << "' is asymmetric on one side, but not on the other.";
                     throw SchemaMismatchError(ss.str());
                 }
             }

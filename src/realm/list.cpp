@@ -340,6 +340,7 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
     }
     if (value.is_type(type_TypedLink)) {
         target_link = value.get<ObjLink>();
+        m_obj.get_table()->get_parent_group()->validate(target_link);
     }
 
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);

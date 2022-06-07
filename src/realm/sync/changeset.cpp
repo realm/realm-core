@@ -304,9 +304,9 @@ void Changeset::verify() const
             }
             else if (auto add_table_instr = instr->get_if<Instruction::AddTable>()) {
                 mpark::visit(util::overload{
-                                 [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-                                     REALM_ASSERT(is_valid_key_type(spec.type));
-                                     verify_intern_string(spec.field);
+                                 [&](const Instruction::AddTable::TopLevelTable& spec) {
+                                     REALM_ASSERT(is_valid_key_type(spec.pk_type));
+                                     verify_intern_string(spec.pk_field);
                                  },
                                  [](const Instruction::AddTable::EmbeddedTable&) {},
                              },
@@ -333,10 +333,11 @@ void Changeset::Reflector::operator()(const Instruction::AddTable& p) const
     m_tracer.name("AddTable");
     table_instr(p);
     auto trace = util::overload{
-        [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-            m_tracer.field("pk_field", spec.field);
-            m_tracer.field("pk_type", spec.type);
-            m_tracer.field("pk_nullable", spec.nullable);
+        [&](const Instruction::AddTable::TopLevelTable& spec) {
+            m_tracer.field("pk_field", spec.pk_field);
+            m_tracer.field("pk_type", spec.pk_type);
+            m_tracer.field("pk_nullable", spec.pk_nullable);
+            m_tracer.field("is_asymmetric", spec.is_asymmetric);
         },
         [&](const Instruction::AddTable::EmbeddedTable&) {
             m_tracer.field("embedded", true);
