@@ -910,7 +910,7 @@ RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
-                                                             realm_sync_download_completion_func_t done,
+                                                             realm_sync_wait_for_completion_func_t done,
                                                              realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -929,7 +929,7 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t* session,
-                                                           realm_sync_upload_completion_func_t done,
+                                                           realm_sync_wait_for_completion_func_t done,
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
