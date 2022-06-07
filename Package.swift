@@ -517,7 +517,6 @@ let package = Package(
                 "mongodb",
                 "notifications-fuzzer",
                 "query.json",
-                "sync-1.x.realm",
                 "sync-metadata-v4.realm",
                 "sync-metadata-v5.realm",
                 "sync/flx_sync_harness.hpp",

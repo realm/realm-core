@@ -4798,43 +4798,6 @@ TEST(Sync_ReadOnlyClientSideHistoryTrim)
     CHECK_LESS(util::File{db_1_path}.get_size(), 0x400000);
 }
 
-#if 0 // FIXME: enable when history and file format upgrade is implemented
-TEST(Sync_DownloadLogCompactionClassUnderScorePrefix)
-{
-    TEST_DIR(server_dir);
-    TEST_CLIENT_DB(db);
-
-    std::string virtual_path = "/test";
-    std::string origin_server_path =
-        util::File::resolve("admin_realm_issue_1794.realm", "resources");
-    std::string target_server_path;
-    {
-        ClientServerFixture fixture{server_dir, test_context};
-        target_server_path = fixture.map_virtual_to_real_path(virtual_path);
-        fixture.start();
-    }
-    util::File::copy(origin_server_path, target_server_path);
-
-    // Synchronize a client with the migrated server file
-    {
-        ClientServerFixture fixture{server_dir, test_context};
-        fixture.start();
-        Session session = fixture.make_bound_session(client_path, virtual_path);
-        session.wait_for_download_complete_or_client_stopped();
-    }
-
-    {
-        // Verify the migrated server file
-        TestServerHistoryContext context;
-        _impl::ServerHistory::DummyCompactionControl compaction_control;
-        _impl::ServerHistory history{context, compaction_control};
-        SharedGroup db{history, target_server_path};
-        ReadTransaction rt{db};
-        rt.get_group().verify();
-    }
-}
-#endif
-
 // This test creates two objects in a target table and a link list
 // in a source table. The first target object is inserted in the link list,
 // and later the link is set to the second target object.
