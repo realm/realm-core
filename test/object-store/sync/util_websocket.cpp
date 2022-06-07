@@ -30,24 +30,24 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
 
-#include <realm/util/ez_websocket.hpp>
+#include <realm/util/util_websocket.hpp>
 
 using namespace realm;
 using namespace realm::sync;
 using namespace realm::util::websocket;
 
-class TestSocketFactory : public EZSocketFactory {
+class TestSocketFactory : public SocketFactory {
 public:
-    TestSocketFactory(EZConfig config, std::function<void()> factoryCallback)
-        : EZSocketFactory(config)
+    TestSocketFactory(SocketConfig config, std::function<void()> factoryCallback)
+        : SocketFactory(config)
         , didCallHandler(factoryCallback)
     {
     }
 
-    std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint) override
+    std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override
     {
         didCallHandler();
-        return EZSocketFactory::connect(observer, std::move(endpoint));
+        return SocketFactory::connect(observer, std::move(endpoint));
     }
     std::function<void()> didCallHandler;
 };
@@ -72,8 +72,8 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     sc_config.metadata_mode = testConfig.metadata_mode;
     sc_config.log_level =
         testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
-    sc_config.socket_factory = [&factoryCallHandler](EZConfig&& config) {
-        return std::unique_ptr<EZSocketFactory>(new TestSocketFactory(std::move(config), factoryCallHandler));
+    sc_config.socket_factory = [&factoryCallHandler](SocketConfig&& config) {
+        return std::unique_ptr<SocketFactory>(new TestSocketFactory(std::move(config), factoryCallHandler));
     };
 
     TestSyncManager init_sync_manager(sc_config, testConfig);

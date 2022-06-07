@@ -119,7 +119,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_service{}                                         // Throws
     , m_socket_factory([&] {
         REALM_ASSERT(config.socket_factory);
-        return config.socket_factory(websocket::EZConfig{
+        return config.socket_factory(websocket::SocketConfig{
             logger,
             m_random,
             m_service,
@@ -650,7 +650,7 @@ void Connection::initiate_reconnect()
     }
 
     m_websocket =
-        m_client.m_socket_factory->connect(this, util::websocket::EZEndpoint{
+        m_client.m_socket_factory->connect(this, util::websocket::Endpoint{
                                                      m_address,
                                                      m_port,
                                                      get_http_request_path(),

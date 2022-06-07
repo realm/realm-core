@@ -56,8 +56,8 @@ enum class ProtocolError;
 } // namespace sync
 
 namespace util::websocket {
-class EZSocketFactory;
-struct EZConfig;
+class SocketFactory;
+struct SocketConfig;
 } // namespace util::websocket
 
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
@@ -177,7 +177,7 @@ struct SyncConfig {
     util::Optional<std::string> authorization_header_name;
     std::map<std::string, std::string> custom_http_headers;
 
-    std::function<std::unique_ptr<realm::util::websocket::EZSocketFactory>(util::websocket::EZConfig&&)>
+    std::function<std::unique_ptr<realm::util::websocket::SocketFactory>(util::websocket::SocketConfig&&)>
         socket_factory;
     // The name of the directory which Realms should be backed up to following
     // a client reset in ClientResyncMode::Manual mode

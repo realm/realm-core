@@ -59,7 +59,7 @@ if(REALM_ENABLE_SYNC)
         sync/sync_test_utils.cpp
         sync/user.cpp
         sync/app.cpp
-        sync/ez_websocket.cpp
+        sync/util_websocket.cpp
     )
     if(APPLE)
         list(APPEND SOURCES audit.cpp)

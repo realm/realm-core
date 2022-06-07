@@ -602,7 +602,7 @@ let headers: [String] = [
     "realm/util/encrypted_file_mapping.hpp",
     "realm/util/enum.hpp",
     "realm/util/errno.hpp",
-    "realm/util/ez_websocket.hpp",
+    "realm/util/util_websocket.hpp",
     "realm/util/fifo_helper.hpp",
     "realm/util/file.hpp",
     "realm/util/file_is_regular.hpp",

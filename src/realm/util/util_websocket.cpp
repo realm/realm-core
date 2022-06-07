@@ -1,4 +1,4 @@
-#include <realm/util/ez_websocket.hpp>
+#include <realm/util/util_websocket.hpp>
 
 #include <realm/util/websocket.hpp>
 #include <realm/util/network.hpp>
@@ -7,9 +7,9 @@
 namespace realm::util::websocket {
 
 namespace {
-class EZSocketImpl final : public EZSocket, public websocket::Config {
+class SocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
-    EZSocketImpl(EZConfig& config, EZObserver& observer, EZEndpoint&& endpoint)
+    SocketImpl(SocketConfig& config, SocketObserver& observer, Endpoint&& endpoint)
         : m_config(config)
         , m_observer(observer)
         , m_endpoint(std::move(endpoint))
@@ -23,7 +23,7 @@ public:
         m_websocket.async_write_binary(data, size, std::move(handler));
     }
 
-    // public for HTTPClient CRTP, but not on the EZSocket interface, so de-facto private
+    // public for HTTPClient CRTP, but not on the WebSocket interface, so de-facto private
     void async_read(char*, std::size_t, ReadCompletionHandler) override;
     void async_read_until(char*, std::size_t, char, ReadCompletionHandler) override;
     void async_write(const char*, std::size_t, WriteCompletionHandler) override;
@@ -97,21 +97,20 @@ private:
         return m_config.logger;
     }
 
-    EZConfig& m_config;
-    EZObserver& m_observer;
+    SocketConfig& m_config;
+    SocketObserver& m_observer;
 
-    const EZEndpoint m_endpoint;
+    const Endpoint m_endpoint;
     util::Optional<util::network::Resolver> m_resolver;
     util::Optional<util::network::Socket> m_socket;
     util::Optional<util::network::ssl::Context> m_ssl_context;
     util::Optional<util::network::ssl::Stream> m_ssl_stream;
     util::network::ReadAheadBuffer m_read_ahead_buffer;
     util::websocket::Socket m_websocket;
-    util::Optional<util::HTTPClient<EZSocketImpl>> m_proxy_client;
+    util::Optional<util::HTTPClient<SocketImpl>> m_proxy_client;
 };
 
-
-void EZSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
+void SocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -122,8 +121,7 @@ void EZSocketImpl::async_read(char* buffer, std::size_t size, ReadCompletionHand
     }
 }
 
-
-void EZSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
+void SocketImpl::async_read_until(char* buffer, std::size_t size, char delim, ReadCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -134,8 +132,7 @@ void EZSocketImpl::async_read_until(char* buffer, std::size_t size, char delim, 
     }
 }
 
-
-void EZSocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
+void SocketImpl::async_write(const char* data, std::size_t size, WriteCompletionHandler handler)
 {
     REALM_ASSERT(m_socket);
     if (m_ssl_stream) {
@@ -146,8 +143,7 @@ void EZSocketImpl::async_write(const char* data, std::size_t size, WriteCompleti
     }
 }
 
-
-void EZSocketImpl::initiate_resolve()
+void SocketImpl::initiate_resolve()
 {
     const std::string& address = m_endpoint.proxy ? m_endpoint.proxy->address : m_endpoint.address;
     const port_type& port = m_endpoint.proxy ? m_endpoint.proxy->port : m_endpoint.port;
@@ -169,8 +165,7 @@ void EZSocketImpl::initiate_resolve()
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 
-
-void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
+void SocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::List endpoints)
 {
     if (ec) {
         logger().error("Failed to resolve '%1:%2': %3", m_endpoint.address, m_endpoint.port, ec.message()); // Throws
@@ -181,8 +176,7 @@ void EZSocketImpl::handle_resolve(std::error_code ec, util::network::Endpoint::L
     initiate_tcp_connect(std::move(endpoints), 0); // Throws
 }
 
-
-void EZSocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
+void SocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
 
@@ -198,8 +192,7 @@ void EZSocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints,
     logger().detail("Connecting to endpoint '%1:%2' (%3/%4)", ep.address(), ep.port(), (i + 1), n); // Throws
 }
 
-
-void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
+void SocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoint::List endpoints, std::size_t i)
 {
     REALM_ASSERT(i < endpoints.size());
     const util::network::Endpoint& ep = *(endpoints.begin() + i);
@@ -231,7 +224,7 @@ void EZSocketImpl::handle_tcp_connect(std::error_code ec, util::network::Endpoin
     initiate_websocket_or_ssl_handshake(); // Throws
 }
 
-void EZSocketImpl::initiate_websocket_or_ssl_handshake()
+void SocketImpl::initiate_websocket_or_ssl_handshake()
 {
     if (m_endpoint.is_ssl) {
         initiate_ssl_handshake(); // Throws
@@ -241,7 +234,7 @@ void EZSocketImpl::initiate_websocket_or_ssl_handshake()
     }
 }
 
-void EZSocketImpl::initiate_http_tunnel()
+void SocketImpl::initiate_http_tunnel()
 {
     HTTPRequest req;
     req.method = HTTPMethod::Connect;
@@ -270,7 +263,7 @@ void EZSocketImpl::initiate_http_tunnel()
     m_proxy_client->async_request(req, std::move(handler)); // Throws
 }
 
-void EZSocketImpl::initiate_ssl_handshake()
+void SocketImpl::initiate_ssl_handshake()
 {
     using namespace util::network::ssl;
 
@@ -317,8 +310,7 @@ void EZSocketImpl::initiate_ssl_handshake()
     // FIXME: We also need to perform the SSL shutdown operation somewhere
 }
 
-
-void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
+void SocketImpl::handle_ssl_handshake(std::error_code ec)
 {
     if (ec) {
         REALM_ASSERT(ec != util::error::operation_aborted);
@@ -329,8 +321,7 @@ void EZSocketImpl::handle_ssl_handshake(std::error_code ec)
     initiate_websocket_handshake(); // Throws
 }
 
-
-void EZSocketImpl::initiate_websocket_handshake()
+void SocketImpl::initiate_websocket_handshake()
 {
     auto headers = util::HTTPHeaders(m_endpoint.headers.begin(), m_endpoint.headers.end());
     headers["User-Agent"] = m_config.user_agent;
@@ -345,11 +336,11 @@ void EZSocketImpl::initiate_websocket_handshake()
 }
 } // namespace
 
-EZSocket::~EZSocket() = default;
+WebSocket::~WebSocket() = default;
 
-std::unique_ptr<EZSocket> EZSocketFactory::connect(EZObserver* observer, EZEndpoint&& endpoint)
+std::unique_ptr<WebSocket> SocketFactory::connect(SocketObserver* observer, Endpoint&& endpoint)
 {
-    return std::make_unique<EZSocketImpl>(m_config, *observer, std::move(endpoint));
+    return std::make_unique<SocketImpl>(m_config, *observer, std::move(endpoint));
 }
 
 } // namespace realm::util::websocket

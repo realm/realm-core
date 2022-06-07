@@ -75,7 +75,7 @@ set(UTIL_SOURCES
     util/cli_args.cpp
     util/compression.cpp
     util/encrypted_file_mapping.cpp
-    util/ez_websocket.cpp
+    util/util_websocket.cpp
     util/fifo_helper.cpp
     util/file.cpp
     util/file_mapper.cpp
@@ -224,7 +224,7 @@ set(REALM_INSTALL_HEADERS
     util/compression.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
-    util/ez_websocket.hpp
+    util/util_websocket.hpp
     util/features.h
     util/flat_map.hpp
     util/fifo_helper.hpp

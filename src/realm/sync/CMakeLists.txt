@@ -25,7 +25,7 @@ set(SYNC_SOURCES
     ../util/network_ssl.cpp
     ../util/network.cpp
     ../util/websocket.cpp
-    ../util/ez_websocket.cpp
+    ../util/util_websocket.cpp
 )
 
 set(IMPL_INSTALL_HEADERS

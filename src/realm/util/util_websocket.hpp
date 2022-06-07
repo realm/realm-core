@@ -1,5 +1,5 @@
-#ifndef REALM_UTIL_EZ_WEBSOCKET_HPP
-#define REALM_UTIL_EZ_WEBSOCKET_HPP
+#ifndef REALM_UTIL_PL_WEBSOCKET_HPP
+#define REALM_UTIL_PL_WEBSOCKET_HPP
 
 #include <random>
 #include <system_error>
@@ -16,14 +16,14 @@ namespace realm::util::websocket {
 using port_type = sync::port_type;
 
 // TODO figure out what belongs on config and what belongs on endpoint.
-struct EZConfig {
+struct SocketConfig {
     util::Logger& logger;
     std::mt19937_64& random;
     util::network::Service& service;
     std::string user_agent;
 };
 
-struct EZEndpoint {
+struct Endpoint {
     std::string address;
     port_type port;
     std::string path;      // Includes auth token in query.
@@ -40,7 +40,7 @@ struct EZEndpoint {
     util::Optional<SyncConfig::ProxyConfig> proxy;
 };
 
-class EZObserver {
+class SocketObserver {
 public:
     /// websocket_handshake_completion_handler() is called when the websocket is connected, .i.e.
     /// after the handshake is done. It is not allowed to send messages on the socket before the
@@ -82,36 +82,36 @@ public:
     //@}
 
 protected:
-    ~EZObserver() = default;
+    ~SocketObserver() = default;
 };
 
-class EZSocket {
+class WebSocket {
 public:
-    virtual ~EZSocket();
+    virtual ~WebSocket();
 
     virtual void async_write_binary(const char* data, size_t size, util::UniqueFunction<void()>&& handler) = 0;
 };
 
-class EZSocketFactory {
+class SocketFactory {
 public:
-    EZSocketFactory(EZConfig config)
+    SocketFactory(SocketConfig config)
         : m_config(config)
     {
     }
 
-    virtual ~EZSocketFactory() {}
+    virtual ~SocketFactory() {}
 
-    virtual std::unique_ptr<EZSocket> connect(EZObserver* observer, EZEndpoint&& endpoint);
+    virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint);
 
-    static std::unique_ptr<EZSocketFactory> defaultSocketFactory(EZConfig&& config)
+    static std::unique_ptr<SocketFactory> defaultSocketFactory(SocketConfig&& config)
     {
-        return std::unique_ptr<EZSocketFactory>(new EZSocketFactory(std::move(config)));
+        return std::unique_ptr<SocketFactory>(new SocketFactory(std::move(config)));
     }
 
 private:
-    EZConfig m_config;
+    SocketConfig m_config;
 };
 
 } // namespace realm::util::websocket
 
-#endif // REALM_UTIL_EZ_WEBSOCKET_HPP
+#endif // REALM_UTIL_PL_WEBSOCKET_HPP

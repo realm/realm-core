@@ -15,7 +15,7 @@
 #include <realm/util/buffer_stream.hpp>
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
-#include <realm/util/ez_websocket.hpp>
+#include <realm/util/util_websocket.hpp>
 #include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
@@ -157,7 +157,7 @@ private:
     const std::string m_user_agent_string;
     util::network::Service m_service;
     std::mt19937_64 m_random;
-    std::unique_ptr<util::websocket::EZSocketFactory> m_socket_factory;
+    std::unique_ptr<util::websocket::SocketFactory> m_socket_factory;
     ClientProtocol m_client_protocol;
     session_ident_type m_prev_session_ident = 0;
 
@@ -298,7 +298,7 @@ enum class ClientImpl::ConnectionTerminationReason {
 
 /// All use of connection objects, including construction and destruction, must
 /// occur on behalf of the event loop thread of the associated client object.
-class ClientImpl::Connection final : public util::websocket::EZObserver {
+class ClientImpl::Connection final : public util::websocket::SocketObserver {
 public:
     using connection_ident_type = std::int_fast64_t;
     using SSLVerifyCallback = SyncConfig::SSLVerifyCallback;
@@ -370,7 +370,7 @@ public:
     /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
-    // Overriding methods in util::websocket::EZObserver
+    // Overriding methods in util::websocket::SocketObserverSocketObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
     void websocket_connect_error_handler(std::error_code) override;
     void websocket_ssl_handshake_error_handler(std::error_code) override;
@@ -484,7 +484,7 @@ private:
     friend class Session;
 
     ClientImpl& m_client;
-    std::unique_ptr<util::websocket::EZSocket> m_websocket;
+    std::unique_ptr<util::websocket::WebSocket> m_websocket;
     const ProtocolEnvelope m_protocol_envelope;
     const std::string m_address;
     const port_type m_port;
