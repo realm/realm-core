@@ -503,7 +503,9 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
         realm_t r1{before_realm};
-        return callback(userdata.get(), &r1);
+        if (!callback(userdata.get(), &r1)) {
+            throw CallbackFailed();
+        }
     };
     config->notify_before_client_reset = std::move(cb);
 }
@@ -517,7 +519,9 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                   SharedRealm before_realm, SharedRealm after_realm, bool did_recover) {
         realm_t r1{before_realm};
         realm_t r2{after_realm};
-        return callback(userdata.get(), &r1, &r2, did_recover);
+        if (!callback(userdata.get(), &r1, &r2, did_recover)) {
+            throw CallbackFailed();
+        }
     };
     config->notify_after_client_reset = std::move(cb);
 }
