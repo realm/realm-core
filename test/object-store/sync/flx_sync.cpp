@@ -1321,7 +1321,6 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 
 TEST_CASE("flx: asymmetric sync with embedded objects") {
     FLXSyncTestHarness::ServerSchema server_schema;
-    // server_schema.queryable_fields = {"queryable_str_field"};
     server_schema.schema = {
         {"Asymmetric",
          ObjectSchema::IsAsymmetric{true},
@@ -1338,12 +1337,43 @@ TEST_CASE("flx: asymmetric sync with embedded objects") {
 
     FLXSyncTestHarness harness("asymmetric_sync", server_schema);
 
-    harness.load_initial_data([&](SharedRealm realm) {
-        CppContext c(realm);
-        Object::create(
-            c, realm, "Asymmetric",
-            util::Any(AnyDict{{"_id", ObjectId::gen()}, {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
-    });
+    SECTION("basic object construction") {
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                             {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+        });
+    }
+
+    SECTION("replace object") {
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            auto foo_obj_id = ObjectId::gen();
+            realm->begin_transaction();
+            Object::create(
+                c, realm, "Asymmetric",
+                util::Any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+            realm->commit_transaction();
+            // Update embedded field to `null`.
+            realm->begin_transaction();
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", util::Any()}}));
+            realm->commit_transaction();
+            // Update embedded field again to a new value.
+            realm->begin_transaction();
+            Object::create(
+                c, realm, "Asymmetric",
+                util::Any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", std::string{"bar"}}}}}));
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
 }
 
 } // namespace realm::app
