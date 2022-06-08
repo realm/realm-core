@@ -69,7 +69,7 @@ jobWrapper {
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
-        echo "Is Realm cron job": $(isRealmCronJobBuild ? 'yes' : 'no')
+        echo "Is Realm cron job": ${isRealmCronJobBuild ? 'yes' : 'no'}
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
         if (isMaster) {
