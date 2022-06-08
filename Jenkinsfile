@@ -28,7 +28,7 @@ jobWrapper {
 
             dependencies = readProperties file: 'dependencies.list'
             echo "Version in dependencies.list: ${dependencies.VERSION}"
-
+            
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
             gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
@@ -58,14 +58,18 @@ jobWrapper {
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
+        isRealmCronJobBuild = isRealmCronUpstreamProject()
         isPublishingRun = false
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
         }
-
+        else if(isRealmCronJobBuild) {
+            isPublishingRun = true
+        }
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
+        echo "Is Realm cron job": $(isRealmCronJobBuild ? 'yes' : 'no')
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
         if (isMaster) {
@@ -929,6 +933,11 @@ def readGitTag() {
         return null
     }
     return sh(returnStdout: true, script: command).trim()
+}
+
+def isRealmCronUpstreamProject() {
+    def upstream = currentBuild.rawBuild.getCause(hudson.model.Cause$UpstreamCause)
+    return upstream?.upstreamProject.contains("realm-core-cron")     
 }
 
 def setBuildName(newBuildName) {
