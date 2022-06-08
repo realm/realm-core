@@ -2196,62 +2196,61 @@ Obj& Obj::set_null(ColKey col_key, bool is_default)
     // Links need special handling
     if (col_type == col_type_Link) {
         set(col_key, null_key);
-        return *this;
     }
-    if (col_type == col_type_Mixed) {
+    else if (col_type == col_type_Mixed) {
         set(col_key, Mixed{});
-        return *this;
     }
+    else {
+        auto attrs = col_key.get_attrs();
+        if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
+            throw LogicError(LogicError::column_not_nullable);
+        }
 
-    auto attrs = col_key.get_attrs();
-    if (REALM_UNLIKELY(!attrs.test(col_attr_Nullable))) {
-        throw LogicError(LogicError::column_not_nullable);
-    }
+        update_if_needed();
 
-    update_if_needed();
+        StringIndex* index = m_table->get_search_index(col_key);
+        if (index && !m_key.is_unresolved()) {
+            index->set(m_key, null{});
+        }
 
-    StringIndex* index = m_table->get_search_index(col_key);
-    if (index && !m_key.is_unresolved()) {
-        index->set(m_key, null{});
-    }
-
-    switch (col_type) {
-        case col_type_Int:
-            do_set_null<ArrayIntNull>(col_key);
-            break;
-        case col_type_Bool:
-            do_set_null<ArrayBoolNull>(col_key);
-            break;
-        case col_type_Float:
-            do_set_null<ArrayFloatNull>(col_key);
-            break;
-        case col_type_Double:
-            do_set_null<ArrayDoubleNull>(col_key);
-            break;
-        case col_type_ObjectId:
-            do_set_null<ArrayObjectIdNull>(col_key);
-            break;
-        case col_type_String:
-            do_set_null<ArrayString>(col_key);
-            break;
-        case col_type_Binary:
-            do_set_null<ArrayBinary>(col_key);
-            break;
-        case col_type_Timestamp:
-            do_set_null<ArrayTimestamp>(col_key);
-            break;
-        case col_type_Decimal:
-            do_set_null<ArrayDecimal128>(col_key);
-            break;
-        case col_type_UUID:
-            do_set_null<ArrayUUIDNull>(col_key);
-            break;
-        case col_type_Mixed:
-        case col_type_Link:
-        case col_type_LinkList:
-        case col_type_BackLink:
-        case col_type_TypedLink:
-            REALM_UNREACHABLE();
+        switch (col_type) {
+            case col_type_Int:
+                do_set_null<ArrayIntNull>(col_key);
+                break;
+            case col_type_Bool:
+                do_set_null<ArrayBoolNull>(col_key);
+                break;
+            case col_type_Float:
+                do_set_null<ArrayFloatNull>(col_key);
+                break;
+            case col_type_Double:
+                do_set_null<ArrayDoubleNull>(col_key);
+                break;
+            case col_type_ObjectId:
+                do_set_null<ArrayObjectIdNull>(col_key);
+                break;
+            case col_type_String:
+                do_set_null<ArrayString>(col_key);
+                break;
+            case col_type_Binary:
+                do_set_null<ArrayBinary>(col_key);
+                break;
+            case col_type_Timestamp:
+                do_set_null<ArrayTimestamp>(col_key);
+                break;
+            case col_type_Decimal:
+                do_set_null<ArrayDecimal128>(col_key);
+                break;
+            case col_type_UUID:
+                do_set_null<ArrayUUIDNull>(col_key);
+                break;
+            case col_type_Mixed:
+            case col_type_Link:
+            case col_type_LinkList:
+            case col_type_BackLink:
+            case col_type_TypedLink:
+                REALM_UNREACHABLE();
+        }
     }
 
     if (Replication* repl = get_replication())
