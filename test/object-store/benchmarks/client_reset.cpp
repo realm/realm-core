@@ -27,16 +27,18 @@
 #include <realm/object-store/object_store.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/schema.hpp>
+#include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
+#include <realm/sync/noinst/client_reset_recovery.hpp>
 
 namespace realm {
 
-TableRef get_table(Realm& realm, StringData object_type)
+static TableRef get_table(Realm& realm, StringData object_type)
 {
     return ObjectStore::table_for_object_type(realm.read_group(), object_type);
 }
 
-Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> primary_key = util::none)
+static Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> primary_key = util::none)
 {
     auto table = get_table(realm, object_type);
     REQUIRE(table);
@@ -50,10 +52,12 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
         : reset_utils::TestClientReset(local_config, remote_config)
     {
         REALM_ASSERT(m_local_config.sync_config);
-        REALM_ASSERT(m_local_config.sync_config->client_resync_mode == ClientResyncMode::DiscardLocal);
+        m_mode = m_local_config.sync_config->client_resync_mode;
+        REALM_ASSERT(m_mode == ClientResyncMode::DiscardLocal || m_mode == ClientResyncMode::Recover);
         // turn off sync, we only fake it
         m_local_config.sync_config = {};
         m_remote_config.sync_config = {};
+        m_local_config.force_sync_history = true; // A SyncClientHistory is needed for recovery
     }
 
     void prepare()
@@ -64,6 +68,20 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
             m_on_setup(m_local);
         }
         m_local->commit_transaction();
+        // Update the sync history to mark this initial setup state as if it
+        // has been uploaded so that it doesn't replay during recovery.
+        auto history_local =
+            dynamic_cast<sync::ClientHistory*>(m_local->read_group().get_replication()->_get_history_write());
+        REALM_ASSERT(history_local);
+        sync::version_type current_version;
+        sync::SaltedFileIdent file_ident;
+        sync::SyncProgress progress;
+        history_local->get_status(current_version, file_ident, progress);
+        progress.upload.client_version = current_version;
+        progress.upload.last_integrated_server_version = current_version;
+        sync::VersionInfo info_out;
+        history_local->set_sync_progress(progress, nullptr, info_out);
+
         constexpr int64_t shared_pk = -42;
         {
             m_local->begin_transaction();
@@ -113,12 +131,23 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
     {
         m_did_run = true;
         REALM_ASSERT(m_did_setup);
+        auto frozen_local_realm = m_local->freeze();
+        Transaction& frozen_local = (Transaction&)frozen_local_realm->read_group();
         m_local->begin_transaction();
         m_remote->begin_transaction();
+        Transaction& wt_remote = (Transaction&)m_remote->read_group();
+        Transaction& wt_local = (Transaction&)m_local->read_group();
+        VersionID current_local_version = wt_local.get_version_of_current_transaction();
 
         TestLogger logger;
-        _impl::client_reset::transfer_group((Transaction&)m_remote->read_group(), (Transaction&)m_local->read_group(),
-                                            logger);
+        if (m_mode == ClientResyncMode::Recover) {
+            auto history_local = dynamic_cast<sync::ClientHistory*>(wt_local.get_replication()->_get_history_write());
+            std::vector<sync::ClientHistory::LocalChange> local_changes =
+                history_local->get_local_changes(current_local_version.version);
+            _impl::client_reset::RecoverLocalChangesetsHandler handler{wt_remote, frozen_local, logger};
+            handler.process_changesets(local_changes, {}); // throws on error
+        }
+        _impl::client_reset::transfer_group(wt_remote, wt_local, logger);
         if (m_on_post_reset) {
             m_on_post_reset(m_local);
         }
@@ -128,9 +157,10 @@ struct BenchmarkLocalClientReset : public reset_utils::TestClientReset {
     bool m_did_setup = false;
     SharedRealm m_local;
     SharedRealm m_remote;
+    ClientResyncMode m_mode;
 };
 
-TEST_CASE("client reset: discard local", "[benchmark]") {
+TEST_CASE("client reset", "[benchmark]") {
     const std::string valid_pk_name = "_id";
     const std::string partition_value = "partition_foo";
     Property partition_prop = {"realm_id", PropertyType::String | PropertyType::Nullable};
@@ -167,18 +197,9 @@ TEST_CASE("client reset: discard local", "[benchmark]") {
     config.cache = false;
     config.automatic_change_notifications = false;
     config.schema = schema;
-    config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
+    ClientResyncMode reset_mode = GENERATE(ClientResyncMode::DiscardLocal, ClientResyncMode::Recover);
+    config.sync_config->client_resync_mode = reset_mode;
     SyncTestFile config2(init_sync_manager.app(), "default");
-
-    BenchmarkLocalClientReset test_reset(config, config2);
-
-    SECTION("empty") {
-        test_reset.prepare();
-        BENCHMARK("no changes") {
-            test_reset.run();
-        };
-    }
 
     auto populate_objects = [&](SharedRealm realm, size_t num_objects) {
         TableRef table = get_table(*realm, "object");
@@ -252,16 +273,24 @@ TEST_CASE("client reset: discard local", "[benchmark]") {
         }
     };
 
-
+    BenchmarkLocalClientReset test_reset(config, config2);
     constexpr size_t num_objects = 10000;
-    SECTION(util::format("populated with %1 simple objects", num_objects)) {
+
+    SECTION(util::format("%1: from empty initial state", reset_mode)) {
+        test_reset.prepare();
+        BENCHMARK("no changes") {
+            test_reset.run();
+        };
+    }
+
+    SECTION(util::format("%1: populated with %2 simple objects", reset_mode, num_objects)) {
         test_reset.setup([&](SharedRealm realm) {
             populate_objects(realm, num_objects);
         });
 
         SECTION("no change") {
             test_reset.prepare();
-            BENCHMARK("reset with no changes") {
+            BENCHMARK("reset") {
                 test_reset.run();
             };
         }
@@ -270,22 +299,22 @@ TEST_CASE("client reset: discard local", "[benchmark]") {
                 remove_odd_objects(get_table(*remote, "object"));
             });
             test_reset.prepare();
-            BENCHMARK("reset will remove half the local data") {
+            BENCHMARK("reset") {
                 test_reset.run();
             };
         }
-        SECTION("remote will double the amount of local data ") {
+        SECTION("local removes half the objects") {
             test_reset.make_local_changes([&](SharedRealm local) {
                 remove_odd_objects(get_table(*local, "object"));
             });
             test_reset.prepare();
-            BENCHMARK("reset will double the amount of local data") {
+            BENCHMARK("reset") {
                 test_reset.run();
             };
         }
     }
 
-    SECTION(util::format("with %1 source objects linked to %1 dest objects", num_objects / 2)) {
+    SECTION(util::format("%1: %2 source objects linked to %2 dest objects", reset_mode, num_objects / 2)) {
         test_reset.setup([&](SharedRealm realm) {
             populate_objects(realm, num_objects / 2);
             populate_source_objects_with_links(realm);
@@ -293,7 +322,7 @@ TEST_CASE("client reset: discard local", "[benchmark]") {
 
         SECTION("no change") {
             test_reset.prepare();
-            BENCHMARK("reset with no changes") {
+            BENCHMARK("reset") {
                 test_reset.run();
             };
         }
@@ -303,17 +332,17 @@ TEST_CASE("client reset: discard local", "[benchmark]") {
                 remove_odd_objects(get_table(*remote, "source"));
             });
             test_reset.prepare();
-            BENCHMARK("reset will remove half the local data") {
+            BENCHMARK("reset") {
                 test_reset.run();
             };
         }
-        SECTION("remote will double the amount of local data ") {
+        SECTION("local removes half the objects") {
             test_reset.make_local_changes([&](SharedRealm local) {
                 remove_odd_objects(get_table(*local, "object"));
                 remove_odd_objects(get_table(*local, "source"));
             });
             test_reset.prepare();
-            BENCHMARK("reset will double the amount of local data") {
+            BENCHMARK("reset") {
                 test_reset.run();
             };
         }

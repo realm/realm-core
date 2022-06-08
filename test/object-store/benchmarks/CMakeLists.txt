@@ -10,6 +10,7 @@ set(SOURCES
     object.cpp
     results.cpp
 
+    ../../util/crypt_key.cpp
     ../util/event_loop.cpp
     ../util/test_file.cpp
     ../util/test_utils.cpp
@@ -38,7 +39,7 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(object-store-benchmarks SyncServer)
 endif()
 
-target_link_libraries(object-store-benchmarks ObjectStore)
+target_link_libraries(object-store-benchmarks ObjectStore Catch2::Catch2)
 set_target_properties(object-store-benchmarks PROPERTIES
       EXCLUDE_FROM_ALL 1
       EXCLUDE_FROM_DEFAULT_BUILD 1)
