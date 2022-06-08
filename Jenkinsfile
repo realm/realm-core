@@ -153,6 +153,13 @@ jobWrapper {
     }
 
     if (isPublishingRun) {
+
+
+        if(isRealmCronUpstreamProject) {
+            echo "Cron job build... disable publishing for now"
+            return
+        }
+
         stage('BuildPackages') {
             def buildOptions = [
                 enableSync: "ON",
