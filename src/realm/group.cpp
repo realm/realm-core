@@ -1288,7 +1288,7 @@ void Group::write(std::ostream& out, int file_format_version, TableWriter& table
         bool only_if_modified = false;            // Always
         top.write(out_2, deep, only_if_modified); // Throws
         REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
-
+        // std::cout << "Final file size: " << final_file_size << std::endl;
         dg_top.reset(nullptr); // Destroy now
     }
 

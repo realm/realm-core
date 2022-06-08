@@ -790,7 +790,7 @@ private:
     static void get_version_and_history_info(const Array& top, _impl::History::version_type& version,
                                              int& history_type, int& history_schema_version) noexcept;
     static ref_type get_history_ref(const Array& top) noexcept;
-
+    static size_t get_logical_file_size(const Array& top) noexcept;
     void clear_history();
     void set_history_schema_version(int version);
     template <class Accessor>
@@ -1074,6 +1074,15 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
     }
     return 0;
 }
+
+inline size_t Group::get_logical_file_size(const Array& top) noexcept
+{
+    if (top.is_attached() && top.size() > s_file_size_ndx) {
+        return top.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+    }
+    return 0;
+}
+
 
 inline void Group::set_sync_file_id(uint64_t id)
 {

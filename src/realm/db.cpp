@@ -1099,7 +1099,12 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 info->latest_version_number = version;
                 alloc.init_mapping_management(version);
 
-                size_t file_size = alloc.get_baseline();
+                size_t file_size = 24;
+                if (top_ref) {
+                    Array top(alloc);
+                    top.init_from_ref(top_ref);
+                    file_size = Group::get_logical_file_size(top);
+                }
                 // REALM_ASSERT(m_alloc.matches_section_boundary(file_size));
                 version_manager->init_versioning(top_ref, file_size, version);
             }
@@ -1484,7 +1489,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // in the VersionList. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
         TransactionRef tr = start_read();
-
+        size_t logical_file_size;
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
         try {
@@ -1497,6 +1502,7 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
                 file.sync(); // Throws
+            logical_file_size = file.get_size() - sizeof(SlabAlloc::StreamingFooter);
         }
         catch (...) {
             // If writing the compact version failed in any way, delete the partially written file to clean up disk
@@ -1534,8 +1540,9 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         top_ref = m_alloc.attach_file(m_db_path, cfg);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
-        size_t file_size = m_alloc.get_baseline();
-        m_version_manager->init_versioning(top_ref, file_size, info->latest_version_number);
+        // std::cout << "Compacted to " << logical_file_size << std::endl;
+        // size_t file_size = m_alloc.get_file().get_size(); // get_baseline();
+        m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
     }
     return true;
 }

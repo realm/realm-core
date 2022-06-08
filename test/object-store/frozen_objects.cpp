@@ -376,9 +376,15 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 
 TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
 
+#ifdef REALM_DEBUG
+    constexpr int num_pending_transactions = 10;
+    constexpr int num_iterations = 100;
+    constexpr int num_objects = 5;
+#else
     constexpr int num_pending_transactions = 100;
     constexpr int num_iterations = 10000;
     constexpr int num_objects = 20;
+#endif
     constexpr int num_checks_pr_trans = 10;
     constexpr int num_trans_forgotten_rapidly = 5;
     struct Entry {
