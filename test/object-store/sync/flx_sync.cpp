@@ -1195,6 +1195,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
 
         harness.do_with_new_realm([&](SharedRealm realm) {
+            wait_for_download(*realm);
+
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
             auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
@@ -1343,6 +1345,13 @@ TEST_CASE("flx: asymmetric sync with embedded objects") {
             Object::create(c, realm, "Asymmetric",
                            util::Any(AnyDict{{"_id", ObjectId::gen()},
                                              {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+        });
+
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
         });
     }
 
