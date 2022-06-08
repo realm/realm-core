@@ -155,7 +155,7 @@ jobWrapper {
     if (isPublishingRun) {
 
 
-        if(isRealmCronUpstreamProject) {
+        if(isRealmCronJobBuild) {
             echo "Cron job build... disable publishing for now"
             return
         }
