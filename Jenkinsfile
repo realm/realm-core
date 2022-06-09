@@ -71,8 +71,17 @@ jobWrapper {
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
-        echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
-        echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
+        if(isCoreCronJob)
+        {
+            echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
+            echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
+            if(!requireNightlyBuild)
+            {
+                echo "Build is not needed because there are no new commits to build"
+                currentBuild.result = 'SUCCESS'
+                sh 'exit 1'
+            }
+        }
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
         if (isMaster) {
@@ -80,6 +89,7 @@ jobWrapper {
             // cache registry
             env.DOCKER_PUSH = "1"
         }
+
     }
 
     if (isPullRequest) {
@@ -956,16 +966,13 @@ def isCronJob() {
 }
 
 def isNightlyBuildNeeded() {
-
     def command = 'git log -1 --format=%cI'
     def lastCommitTime = sh(returnStdout: true, script:command).trim()
     def current_dt = java.time.LocalDateTime.now()
     def last_commit_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-    echo "Last Commit Time = ${last_commit_dt}"    
-    echo "Current time = ${current_dt}"
-    requireNightlyBuild = java.Math.abs(current_dt.getDayOfYear(), last_commit_dt.getDayOfYear()) <= 1
-    echo "Nightly build required: ${requireNightlyBuild ? 'yes' : 'no'}"
-    returno requireNightlyBuild 
+    def nightlyBuildRequired = java.Math.abs(current_dt.getDayOfYear(), last_commit_dt.getDayOfYear()) <= 1
+    echo "Nightly build required: ${nightlyBuildRequired}. Last Commit Time: ${last_commit_dt} - Current time: ${current_dt}"    
+    return nightlyBuildRequired 
 }
 
 def setBuildName(newBuildName) {
