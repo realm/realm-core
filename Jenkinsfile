@@ -943,8 +943,12 @@ def readGitTag() {
 }
 
 def isRealmCronUpstreamProject() {
-    def upstream = currentBuild.rawBuild.getCause(hudson.model.Cause$UpstreamCause)
-    return upstream?.upstreamProject.contains("realm-core-cron")     
+    echo currentBuild.displayName
+    return false;
+    //def cause = currentBuild.rawBuild.getCause()
+    //cause.
+    //def upstream = currentBuild.rawBuild.getCause(hudson.model.Cause$UpstreamCause)
+    //return upstream?.upstreamProject.contains("realm-core-cron")     
 }
 
 def setBuildName(newBuildName) {
