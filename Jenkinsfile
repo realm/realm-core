@@ -55,8 +55,9 @@ jobWrapper {
             {
                 def command = 'git log -1 --format=%ci'
                 def lastCommitTime = sh(returnStdout: true, script:command).trim()
-                def dt = LocalDateTime.now()
-                def parsed_dt = LocalDateTime.parse(lastCommitTime)
+                echo "Time last commit: ${lastCommitTime}"
+                def parsed_dt = LocalDate.parse(lastCommitTime, "yyyy/MM/dd")
+                def dt = LocalDate.now().format('yyyy/MM/dd')
                 echo "Last Commit Time = ${parse_dt.toString()}"    
                 echo "Current time = ${dt.toString()}"
                 requireNightlyBuild = false
