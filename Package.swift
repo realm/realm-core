@@ -473,6 +473,7 @@ let package = Package(
             path: "external/catch/src",
             exclude: [
                 "CMakeLists.txt",
+                "catch2/catch_user_config.hpp.in",
                 "catch2/internal/catch_main.cpp"
                 ],
             publicHeadersPath: ".",
@@ -484,6 +485,9 @@ let package = Package(
             name: "CoreTestUtils",
             dependencies: ["RealmCore"],
             path: "test/util",
+            exclude: [
+                "CMakeLists.txt"
+            ],
             publicHeadersPath: ".",
             cxxSettings: (cxxSettings) as [CXXSetting]),
         .target(
