@@ -481,8 +481,14 @@ let package = Package(
                 .define("CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS")
             ] + cxxSettings) as [CXXSetting]),
         .target(
+            name: "CoreTestUtils",
+            dependencies: ["RealmCore"],
+            path: "test/util",
+            publicHeadersPath: ".",
+            cxxSettings: (cxxSettings) as [CXXSetting]),
+        .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["RealmCore", "SyncServer", "Catch2"],
+            dependencies: ["RealmCore", "SyncServer", "Catch2", "CoreTestUtils"],
             path: "test/object-store/util",
             exclude: [
                 "baas_admin_api.hpp",
