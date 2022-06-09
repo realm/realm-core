@@ -276,7 +276,6 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
     });
 }
 
-#if REALM_ENABLE_COMPENSATING_WRITES_TESTS
 TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app]") {
     AppCreateConfig::FLXSyncRole role;
     role.name = "compensating_write_perms";
@@ -476,7 +475,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         });
     }
 }
-#endif
 
 TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
@@ -1166,7 +1164,6 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     }
 }
 
-#if REALM_ENABLE_MASTER_BAAS_TESTS
 TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
@@ -1322,8 +1319,6 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
     }
 }
-
-#endif // REALM_ENABLE_MASTER_BAAS_TESTS
 
 } // namespace realm::app
 
