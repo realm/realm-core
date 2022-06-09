@@ -29,6 +29,7 @@ jobWrapper {
             dependencies = readProperties file: 'dependencies.list'
             echo "Version in dependencies.list: ${dependencies.VERSION}"
             
+            isCoreCronJob = isCronJob()            
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
             gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
@@ -49,6 +50,18 @@ jobWrapper {
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
             }
+
+            if(isCoreCronJob)
+            {
+                def command =  'git log -1 --format=%ci'
+                def lastCommitTime = sh(returnStdout: false, script:command).trim()
+                def dt = LocalDateTime.now()
+                def parsed_dt = LocalDateTime.parse(lastCommitTime)
+                echo "Last Commit Time = ${parse_dt.toString()}"    
+                echo "Current time = ${dt.toString()}"
+                requireNightlyBuild = false
+            }
+
         }
 
         currentBranch = env.BRANCH_NAME
@@ -58,7 +71,6 @@ jobWrapper {
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
-        isRealmCronJobBuild = isRealmCronUpstreamProject()
         isPublishingRun = false
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
@@ -69,7 +81,7 @@ jobWrapper {
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
-        echo "Is Realm cron job: ${isRealmCronJobBuild ? 'yes' : 'no'}"
+        echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
         if (isMaster) {
@@ -77,6 +89,11 @@ jobWrapper {
             // cache registry
             env.DOCKER_PUSH = "1"
         }
+    }
+
+    if(isCoreCronJob && requireNightlyBuild)
+    {
+        echo "No nightly build is required ... "
     }
 
     if (isPullRequest) {
@@ -942,16 +959,7 @@ def readGitTag() {
     return sh(returnStdout: true, script: command).trim()
 }
 
-def isRealmCronUpstreamProject() {
-
-    def command =  'git log -1 --format=%ci'
-    def lastCommitTime = sh(returnStdout: false, script:command).trim()
-    def dt = LocalDateTime.now()
-    def parsed_dt = LocalDateTime.parse(lastCommitTime)
-    echo "Last Commit Time = ${parse_dt.toString()}"    
-    echo "Current time = ${dt.toString()}"  
-     
-
+def isCronJob() {
     def upstreams = currentBuild.getUpstreamBuilds()
     for(upstream in upstreams)
     {
