@@ -943,7 +943,13 @@ def readGitTag() {
 }
 
 def isRealmCronUpstreamProject() {
-    echo currentBuild.displayName
+    echo "Display name: ${currentBuild.displayName} "
+    echo "Full Display name: ${currentBuild.fullDisplayName} "
+    echo "Project name: ${currentBuild.projectName} "
+    echo "Full Project name: ${currentBuild.fullProjectName} "
+    echo "Description: ${currentBuild.description} "
+    for(upstream in currentBuild.upstreamBuilds())
+        echo "Upstream build name: ${upstream.getFullProjectName()}"
     return false;
     //def cause = currentBuild.rawBuild.getCause()
     //cause.
