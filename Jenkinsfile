@@ -949,9 +949,9 @@ def isRealmCronUpstreamProject() {
     echo "Full Project name: ${currentBuild.fullProjectName} "
     echo "Description: ${currentBuild.description} "
     def upstreams = currentBuild.getUpstreamBuilds()
-    echo "Upstreams: $upstreams.size()}"
+    echo "Upstreams: ${upstreams.size()}"
     for(upstream in upstreams)
-        echo "Upstream build name: $upstream.getFullProjectName()"
+        echo "Upstream build name: ${upstream.getFullProjectName()}"
     return false;
     //def cause = currentBuild.rawBuild.getCause()
     //cause.
