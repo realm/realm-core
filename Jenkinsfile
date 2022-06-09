@@ -53,8 +53,8 @@ jobWrapper {
 
             if(isCoreCronJob)
             {
-                def command =  'git log -1 --format=%ci'
-                def lastCommitTime = sh(returnStdout: false, script:command).trim()
+                def command = 'git log -1 --format=%ci'
+                def lastCommitTime = sh(returnStdout: true, script:command).trim()
                 def dt = LocalDateTime.now()
                 def parsed_dt = LocalDateTime.parse(lastCommitTime)
                 echo "Last Commit Time = ${parse_dt.toString()}"    
