@@ -48,18 +48,7 @@ jobWrapper {
             targetSHA1 = 'NONE'
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
-            }
-
-            if(isCoreCronJob)
-            {
-                def command = 'git log -1 --format=%cI'
-                def lastCommitTime = sh(returnStdout: true, script:command).trim()
-                def dt = java.time.LocalDateTime.now()
-                def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-                echo "Last Commit Time = ${parsed_dt}"    
-                echo "Current time = ${dt}"
-                requireNightlyBuild = false
-            }
+            } 
         }
 
         currentBranch = env.BRANCH_NAME
@@ -87,6 +76,18 @@ jobWrapper {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
             env.DOCKER_PUSH = "1"
+        }
+
+        if(isCoreCronJob) {
+            rlmNode('commit to build') {
+                def command = 'git log -1 --format=%cI'
+                def lastCommitTime = sh(returnStdout: true, script:command).trim()
+                def dt = java.time.LocalDateTime.now()
+                def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+                echo "Last Commit Time = ${parsed_dt}"    
+                echo "Current time = ${dt}"
+                requireNightlyBuild = false
+            }
         }
     }
 
