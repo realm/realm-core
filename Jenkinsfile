@@ -943,6 +943,14 @@ def readGitTag() {
 }
 
 def isRealmCronUpstreamProject() {
+
+    def lastCommitTime = sh(returnStdout: false, 'git log -1 --format=%ci ').trim()
+    def dt = LocalDateTime.now()
+    def parsed_dt = LocalDateTime.parse(lastCommitTime)
+    echo "Last Commit Time = ${parse_dt.toString()}"    
+    echo "Current time = ${dt.toString()}"  
+     
+
     def upstreams = currentBuild.getUpstreamBuilds()
     for(upstream in upstreams)
     {
