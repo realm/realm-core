@@ -62,7 +62,7 @@ jobWrapper {
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
         }
-        else if(isRealmCronJobBuild) {
+        else if(isCoreCronJob) {
             isPublishingRun = true
         }
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
