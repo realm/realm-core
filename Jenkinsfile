@@ -28,8 +28,7 @@ jobWrapper {
 
             dependencies = readProperties file: 'dependencies.list'
             echo "Version in dependencies.list: ${dependencies.VERSION}"
-            
-            isCoreCronJob = isCronJob()            
+                       
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
             gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
@@ -53,12 +52,12 @@ jobWrapper {
 
             if(isCoreCronJob)
             {
-               // def command =  'git log -1 --format=%cI'
-               // def lastCommitTime = sh(returnStdout: true, script:command).trim()
-               // def dt = java.time.LocalDateTime.now()
-               // def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-               // echo "Last Commit Time = ${parsed_dt}"    
-               // echo "Current time = ${dt}"
+                def command = 'git log -1 --format=%cI'
+                def lastCommitTime = sh(returnStdout: true, script:command).trim()
+                def dt = java.time.LocalDateTime.now()
+                def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+                echo "Last Commit Time = ${parsed_dt}"    
+                echo "Current time = ${dt}"
                 requireNightlyBuild = false
             }
         }
@@ -67,6 +66,7 @@ jobWrapper {
         println "Building branch: ${currentBranch}"
         println "Target branch: ${targetBranch}"
 
+        isCoreCronJob = isCronJob() 
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
