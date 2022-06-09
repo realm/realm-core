@@ -48,13 +48,23 @@ jobWrapper {
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
             } 
-        }
+
+            isCoreCronJob = isCronJob()
+            if(isCoreCronJob) {
+                def command = 'git log -1 --format=%cI'
+                def lastCommitTime = sh(returnStdout: true, script:command).trim()
+                def dt = java.time.LocalDateTime.now()
+                def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+                echo "Last Commit Time = ${parsed_dt}"    
+                echo "Current time = ${dt}"
+                requireNightlyBuild = false
+                echo "Nightly build required: ${requireNightlyBuild ? 'yes' : 'no'}"
+            }
+        }   
 
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
-        println "Target branch: ${targetBranch}"
-
-        isCoreCronJob = isCronJob() 
+        println "Target branch: ${targetBranch}"        
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
@@ -75,18 +85,6 @@ jobWrapper {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
             env.DOCKER_PUSH = "1"
-        }
-
-        if(isCoreCronJob) {
-            rlmNode('commit to build') {
-                def command = 'git log -1 --format=%cI'
-                def lastCommitTime = sh(returnStdout: true, script:command).trim()
-                def dt = java.time.LocalDateTime.now()
-                def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-                echo "Last Commit Time = ${parsed_dt}"    
-                echo "Current time = ${dt}"
-                requireNightlyBuild = false
-            }
         }
     }
 
@@ -170,8 +168,7 @@ jobWrapper {
 
     if (isPublishingRun) {
 
-
-        if(isRealmCronJobBuild) {
+        if(isCoreCronJob) {
             echo "Cron job build... disable publishing for now"
             return
         }
