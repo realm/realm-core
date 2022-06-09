@@ -50,6 +50,7 @@ jobWrapper {
             } 
 
             isCoreCronJob = isCronJob()
+            requireNightlyBuild = false
             if(isCoreCronJob) {
                 requireNightlyBuild = isNightlyBuildNeeded()
             }
@@ -970,7 +971,7 @@ def isNightlyBuildNeeded() {
     def lastCommitTime = sh(returnStdout: true, script:command).trim()
     def current_dt = java.time.LocalDateTime.now()
     def last_commit_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-    def nightlyBuildRequired = java.lang.Math.abs(current_dt.getDayOfYear(), last_commit_dt.getDayOfYear()) <= 1
+    def nightlyBuildRequired = Math.abs(current_dt.getDayOfYear(), last_commit_dt.getDayOfYear()) <= 1
     echo "Last Commit Time: ${last_commit_dt}"
     echo "Current time: ${current_dt}" 
     echo "Nightly build required: ${nightlyBuildRequired}"
