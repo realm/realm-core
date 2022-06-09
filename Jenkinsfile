@@ -66,7 +66,7 @@ jobWrapper {
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
         }
-        else if(isCoreCronJob) {
+        else if(isCoreCronJob && requireNightlyBuild) {
             isPublishingRun = true
         }
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
@@ -79,7 +79,7 @@ jobWrapper {
             if(!requireNightlyBuild)
             {
                 echo "Build is not needed because there are no new commits to build"
-                currentBuild.result = 'SUCCESS'
+                currentBuild.result = 'SUCCESS (No realm-core nightly build needed)'
                 sh 'exit 1'
             }
         }
@@ -243,9 +243,16 @@ jobWrapper {
                             unstash name: publishingStash
                             def path = publishingStash.replaceAll('___', '/')
                             def files = findFiles(glob: '**')
-                            for (file in files) {
-                                rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
-                                rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+
+                            if(requireNightlyBuild)
+                            {
+                                def local_date = java.time.LocalDateTime.now().toLocalDate().toString()
+                                def beta_version = "${gitDescribeVersion}_beta_${local_date}"  
+                                publishBuildArtifactsToS3(false, beta_version, path, files)
+                            }
+                            else
+                            {
+                                publishBuildArtifactsToS3(true,gitDescribeVersion,path,files)
                             }
                             deleteDir()
                         }
@@ -254,6 +261,15 @@ jobWrapper {
             }
         }
     }
+}
+
+def publishBuildArtifactsToS3(release, version, path, files)
+{
+    for (file in files) {
+        rlmS3Put file: file.path, path: "downloads/core/${version}/${path}/${file.name}"
+        if(release)
+            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+    } 
 }
 
 def doCheckInDocker(Map options = [:]) {
