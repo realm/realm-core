@@ -49,17 +49,10 @@ jobWrapper {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
             } 
 
-            isCoreCronJob = false
-            //if(isCoreCronJob) {
-            //    def command = 'git log -1 --format=%cI'
-            //    def lastCommitTime = sh(returnStdout: true, script:command).trim()
-            //    def dt = java.time.LocalDateTime.now()
-           //     def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-           //     echo "Last Commit Time = ${parsed_dt}"    
-           //     echo "Current time = ${dt}"
-           //     requireNightlyBuild = false
-           //     echo "Nightly build required: ${requireNightlyBuild ? 'yes' : 'no'}"
-           // }
+            isCoreCronJob = isCronJob()
+            if(isCoreCronJob) {
+                requireNightlyBuild = isNightlyBuildNeeded()
+            }
         }   
 
         currentBranch = env.BRANCH_NAME
@@ -79,6 +72,7 @@ jobWrapper {
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
         echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
+        echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
         if (isMaster) {
@@ -86,11 +80,6 @@ jobWrapper {
             // cache registry
             env.DOCKER_PUSH = "1"
         }
-    }
-
-    if(isCoreCronJob && requireNightlyBuild)
-    {
-        echo "No nightly build is required ... "
     }
 
     if (isPullRequest) {
@@ -964,6 +953,19 @@ def isCronJob() {
             return true;
     }
     return false;
+}
+
+def isNightlyBuildNeeded() {
+
+    def command = 'git log -1 --format=%cI'
+    def lastCommitTime = sh(returnStdout: true, script:command).trim()
+    def current_dt = java.time.LocalDateTime.now()
+    def last_commit_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+    echo "Last Commit Time = ${last_commit_dt}"    
+    echo "Current time = ${current_dt}"
+    requireNightlyBuild = java.Math.abs(current_dt.getDayOfYear(), last_commit_dt.getDayOfYear()) <= 1
+    echo "Nightly build required: ${requireNightlyBuild ? 'yes' : 'no'}"
+    returno requireNightlyBuild 
 }
 
 def setBuildName(newBuildName) {
