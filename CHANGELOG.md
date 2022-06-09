@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* Upgraded to Catch from v2.13.8 to v3.0.1. ([#5559](https://github.com/realm/realm-core/pull/5559))
 
 ----------------------------------------------
 

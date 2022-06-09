@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "collection_fixtures.hpp"
 #include "sync/sync_test_utils.hpp"

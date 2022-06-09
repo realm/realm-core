@@ -19,7 +19,8 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/optional.hpp>
 
@@ -99,7 +100,7 @@ std::string get_parent_directory(const std::string& path);
         REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management");                                                    \
     } while (0)
 
-#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
+#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::ContainsSubstring(msg))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 

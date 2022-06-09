@@ -77,7 +77,7 @@ if(MSVC)
     target_compile_options(ObjectStoreTests PRIVATE /bigobj)
 endif()
 
-target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
+target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
@@ -120,11 +120,6 @@ if(REALM_TEST_SYNC_LOGGING)
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-    target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
-endif()
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
