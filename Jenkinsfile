@@ -53,12 +53,12 @@ jobWrapper {
 
             if(isCoreCronJob)
             {
-                def command =  'git log -1 --format=%cI'
-                def lastCommitTime = sh(returnStdout: true, script:command).trim()
-                def dt = java.time.LocalDateTime.now()
-                def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
-                echo "Last Commit Time = ${parsed_dt}"    
-                echo "Current time = ${dt}"
+               // def command =  'git log -1 --format=%cI'
+               // def lastCommitTime = sh(returnStdout: true, script:command).trim()
+               // def dt = java.time.LocalDateTime.now()
+               // def parsed_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+               // echo "Last Commit Time = ${parsed_dt}"    
+               // echo "Current time = ${dt}"
                 requireNightlyBuild = false
             }
         }
