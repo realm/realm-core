@@ -197,31 +197,26 @@ public:
 };
 
 namespace reset_utils {
-namespace {
 
-struct Partition {
-    std::string property_name;
-    std::string value;
-};
-
-TableRef get_table(Realm& realm, StringData object_type)
+Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId> primary_key,
+                  util::Optional<Partition> partition)
 {
-    return realm::ObjectStore::table_for_object_type(realm.read_group(), object_type);
-}
-
-Obj create_object(Realm& realm, StringData object_type, util::Optional<int64_t> primary_key = util::none,
-                  util::Optional<Partition> partition = util::none)
-{
-    auto table = get_table(realm, object_type);
+    auto table = realm::ObjectStore::table_for_object_type(realm.read_group(), object_type);
     REQUIRE(table);
-    static int64_t pk = 0;
     FieldValues values = {};
     if (partition) {
         ColKey col = table->get_column_key(partition->property_name);
         REALM_ASSERT(col);
         values.insert(col, Mixed{partition->value});
     }
-    return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
+    return table->create_object_with_primary_key(primary_key ? *primary_key : ObjectId::gen(), std::move(values));
+}
+
+namespace {
+
+TableRef get_table(Realm& realm, StringData object_type)
+{
+    return realm::ObjectStore::table_for_object_type(realm.read_group(), object_type);
 }
 
 // Run through the client reset steps manually without involving a sync server.
@@ -267,10 +262,9 @@ struct FakeLocalClientReset : public TestClientReset {
             sync::VersionInfo info_out;
             history_local->set_sync_progress(progress, nullptr, info_out);
         }
-        constexpr int64_t shared_pk = -42;
         {
             local_realm->begin_transaction();
-            auto obj = create_object(*local_realm, "object", shared_pk);
+            auto obj = create_object(*local_realm, "object", m_pk_driving_reset);
             auto col = obj.get_table()->get_column_key("value");
             obj.set(col, 1);
             obj.set(col, 2);
@@ -296,7 +290,7 @@ struct FakeLocalClientReset : public TestClientReset {
             }
 
             // fake a sync by creating an object with the same pk
-            create_object(*remote_realm, "object", shared_pk);
+            create_object(*remote_realm, "object", m_pk_driving_reset);
 
             for (int i = 0; i < 2; ++i) {
                 auto table = get_table(*remote_realm, "object");
@@ -354,7 +348,6 @@ struct BaasClientReset : public TestClientReset {
 
         auto realm = Realm::get_shared_realm(m_local_config);
         auto session = sync_manager->get_existing_session(realm->config().path);
-        constexpr int64_t pk = 0;
         const std::string object_schema_name = "object";
         {
             wait_for_download(*realm);
@@ -364,7 +357,7 @@ struct BaasClientReset : public TestClientReset {
                 m_on_setup(realm);
             }
 
-            auto obj = create_object(*realm, object_schema_name, {pk}, {partition});
+            auto obj = create_object(*realm, object_schema_name, {m_pk_driving_reset}, {partition});
             auto table = obj.get_table();
             auto col = table->get_column_key("value");
             std::string pk_col_name = table->get_column_name(table->get_primary_key_column());
@@ -389,7 +382,7 @@ struct BaasClientReset : public TestClientReset {
             timed_sleeping_wait_for(
                 [&]() -> bool {
                     if (count_external == 0) {
-                        object_coll.count({{pk_col_name, pk}},
+                        object_coll.count({{pk_col_name, m_pk_driving_reset}},
                                           [&](uint64_t count, util::Optional<app::AppError> error) {
                                               REQUIRE(!error);
                                               count_external = count;
@@ -432,7 +425,7 @@ struct BaasClientReset : public TestClientReset {
                 [&]() -> bool {
                     realm2->begin_transaction();
                     auto table = get_table(*realm2, object_schema_name);
-                    auto objkey = table->find_primary_key({pk});
+                    auto objkey = table->find_primary_key({m_pk_driving_reset});
                     realm2->cancel_transaction();
                     return bool(objkey);
                 },
@@ -442,7 +435,7 @@ struct BaasClientReset : public TestClientReset {
             realm2->begin_transaction();
             auto table = get_table(*realm2, object_schema_name);
             REQUIRE(table->size() >= 1);
-            auto obj = table->get_object_with_primary_key({pk});
+            auto obj = table->get_object_with_primary_key({m_pk_driving_reset});
             REQUIRE(obj.is_valid());
             auto col = table->get_column_key("value");
             REQUIRE(obj.get_any(col) == Mixed{3});
@@ -525,6 +518,16 @@ TestClientReset* TestClientReset::on_post_reset(Callback&& post_reset)
 {
     m_on_post_reset = std::move(post_reset);
     return this;
+}
+
+void TestClientReset::set_pk_of_object_driving_reset(const ObjectId& pk)
+{
+    m_pk_driving_reset = pk;
+}
+
+ObjectId TestClientReset::get_pk_of_object_driving_reset() const
+{
+    return m_pk_driving_reset;
 }
 
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,
