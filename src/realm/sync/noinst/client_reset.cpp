@@ -1060,10 +1060,11 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             // reset is triggered on the next open of the Realm. If we did not do this, the
             // Realm may continue sync with only partially recovered state while having lost
             // the history of any offline modifications.
-            logger.error("Could not recover FLX changesets, restoring original ident", e.what());
-            if (wt_local->get_transact_stage() != DB::TransactStage::transact_Writing) {
-                wt_local->promote_to_write();
+            logger.error("Could not recover local FLX changesets, restoring original ident", e.what());
+            if (wt_local->get_transact_stage() == DB::TransactStage::transact_Writing) {
+                wt_local->rollback_and_continue_as_read(); // avoid committing inconsistent state by rolling back
             }
+            wt_local->promote_to_write();
             history_local->set_client_file_ident_in_wt(current_version_local, orig_file_ident);
             wt_local->commit();
             logger.error("Restored original ident successfully");

@@ -259,7 +259,7 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
          }},
     };
 
-    // some of these tests makde additive schema changes which is only allowed in dev mode
+    // some of these tests make additive schema changes which is only allowed in dev mode
     constexpr bool dev_mode = true;
     FLXSyncTestHarness harness("flx_client_reset",
                                {schema, {"queryable_str_field", "queryable_int_field"}, {}, dev_mode});
@@ -336,6 +336,14 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     const std::string str_field_value = "foo";
     const int64_t local_added_int = 100;
     const int64_t remote_added_int = 200;
+    size_t before_reset_count = 0;
+    size_t after_reset_count = 0;
+    config_local.sync_config->notify_before_client_reset = [&before_reset_count](SharedRealm) {
+        ++before_reset_count;
+    };
+    config_local.sync_config->notify_after_client_reset = [&after_reset_count](SharedRealm, SharedRealm, bool) {
+        ++after_reset_count;
+    };
 
     SECTION("Recover: offline writes and subscriptions") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
@@ -434,14 +442,6 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
 
     SECTION("Recover: incompatible property changes are rejected") {
         config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
-        size_t before_reset_count = 0;
-        size_t after_reset_count = 0;
-        config_local.sync_config->notify_before_client_reset = [&before_reset_count](SharedRealm) {
-            ++before_reset_count;
-        };
-        config_local.sync_config->notify_after_client_reset = [&after_reset_count](SharedRealm, SharedRealm, bool) {
-            ++after_reset_count;
-        };
         auto&& [error_future, err_handler] = make_error_handler();
         config_local.sync_config->error_handler = err_handler;
         auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
@@ -495,6 +495,93 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 REQUIRE(count_of_valid_array_data == num_objects_added_before + num_objects_added_after);
             })
             ->run();
+    }
+
+    SECTION("unsuccessful replay of local changes") {
+        constexpr size_t num_objects_added_before = 2;
+        constexpr size_t num_objects_added_after = 2;
+        constexpr size_t num_objects_added_by_harness = 1; // BaasFLXClientReset.run()
+        constexpr std::string_view added_property_name = "new_property";
+        auto&& [error_future, err_handler] = make_error_handler();
+        config_local.sync_config->error_handler = err_handler;
+
+        // The local changes here are a bit contrived because removing a column is disallowed
+        // at the object store layer for sync'd Realms. The only reason a recovery should fail in production
+        // during the apply stage is due to programmer error or external factors such as out of disk space.
+        // Any schema discrepencies are caught by the initial diff, so the way to make a recovery fail here is
+        // to add and remove a column at the core level such that the schema diff passes, but instructions are
+        // generated which will fail when applied.
+        reset_utils::TestClientReset::Callback make_local_changes_that_will_fail = [&](SharedRealm local_realm) {
+            subscribe_to_and_add_objects(local_realm, num_objects_added_before);
+            auto table = local_realm->read_group().get_table("class_TopLevel");
+            REQUIRE(table->size() == num_objects_added_before + num_objects_added_by_harness);
+            size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
+            REQUIRE(count_of_valid_array_data == num_objects_added_before);
+            local_realm->begin_transaction();
+            ColKey added = table->add_column(type_Int, added_property_name);
+            table->remove_column(added);
+            local_realm->commit_transaction();
+            subscribe_to_and_add_objects(local_realm, num_objects_added_after); // these are lost!
+        };
+
+        reset_utils::TestClientReset::Callback verify_post_reset_state = [&, err_future = std::move(error_future)](
+                                                                             SharedRealm local_realm) {
+            auto sync_error = std::move(err_future).get();
+            REQUIRE(before_reset_count == 1);
+            REQUIRE(after_reset_count == 0);
+            REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.is_client_reset_requested());
+            local_realm->refresh();
+            auto table = local_realm->read_group().get_table("class_TopLevel");
+            ColKey added = table->get_column_key(added_property_name);
+            REQUIRE(!added); // partial recovery halted at remove_column() but rolled back everything in the change
+            // table is missing num_objects_added_after and the last commit after the latest subscription
+            // this is due to how recovery batches together changesets up until a subscription
+            constexpr size_t expected_added_objects = num_objects_added_before - 1;
+            REQUIRE(table->size() == expected_added_objects + num_objects_added_by_harness);
+            size_t count_of_valid_array_data = validate_integrity_of_arrays(table);
+            REQUIRE(count_of_valid_array_data == expected_added_objects);
+        };
+
+        SECTION("Recover: unsuccessful recovery leads to a manual reset") {
+            config_local.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+            test_reset->make_local_changes(std::move(make_local_changes_that_will_fail))
+                ->on_post_reset(std::move(verify_post_reset_state))
+                ->run();
+            auto config_copy = config_local;
+            auto&& [error_future2, err_handler2] = make_error_handler();
+            config_copy.sync_config->error_handler = err_handler2;
+            auto realm_post_reset = Realm::get_shared_realm(config_copy);
+            auto sync_error = std::move(error_future2).get();
+            REQUIRE(before_reset_count == 2);
+            REQUIRE(after_reset_count == 0);
+            REQUIRE(sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure));
+            REQUIRE(sync_error.is_client_reset_requested());
+        }
+
+        SECTION("RecoverOrDiscard: unsuccessful reapply leads to discard") {
+            config_local.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
+            auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+            test_reset->make_local_changes(std::move(make_local_changes_that_will_fail))
+                ->on_post_reset(std::move(verify_post_reset_state))
+                ->run();
+
+            auto config_copy = config_local;
+            auto&& [client_reset_future, reset_handler] = make_client_reset_handler();
+            config_copy.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError err) {
+                REALM_ASSERT_EX(!err.is_fatal, err.message);
+            };
+            config_copy.sync_config->notify_after_client_reset = reset_handler;
+            auto realm_post_reset = Realm::get_shared_realm(config_copy);
+            ClientResyncMode mode = client_reset_future.get();
+            REQUIRE(mode == ClientResyncMode::DiscardLocal);
+            realm_post_reset->refresh();
+            auto table = realm_post_reset->read_group().get_table("class_TopLevel");
+            ColKey added = table->get_column_key(added_property_name);
+            REQUIRE(!added);                                        // reverted local changes
+            REQUIRE(table->size() == num_objects_added_by_harness); // discarded all offline local changes
+        }
     }
 
     SECTION("DiscardLocal: offline writes and subscriptions are lost") {
