@@ -1543,7 +1543,7 @@ Obj Obj::create_and_set_linked_object(ColKey col_key, bool is_default)
         throw LogicError(LogicError::illegal_type);
     TableRef target_table = get_target_table(col_key);
     Table& t = *target_table;
-    // Outgoing links from asymmetric objects are disallowed.
+    // Only links to embedded objects are allowed.
     REALM_ASSERT(t.is_embedded() || !get_table()->is_asymmetric());
     // Incoming links to asymmetric objects are disallowed.
     REALM_ASSERT(!t.is_asymmetric());
