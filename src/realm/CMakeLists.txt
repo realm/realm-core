@@ -75,7 +75,6 @@ set(UTIL_SOURCES
     util/cli_args.cpp
     util/compression.cpp
     util/encrypted_file_mapping.cpp
-    util/util_websocket.cpp
     util/fifo_helper.cpp
     util/file.cpp
     util/file_mapper.cpp
