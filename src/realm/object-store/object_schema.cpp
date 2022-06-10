@@ -314,14 +314,14 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
                                 object_name, prop.name, prop.object_type);
         return;
     }
-    if (parent_object_schema.is_asymmetric) {
+    if (parent_object_schema.is_asymmetric && !it->is_embedded) {
         exceptions.emplace_back("Asymmetric table with property '%1.%2' of type '%3' cannot have an object type.",
                                 object_name, prop.name, string_for_property_type(prop.type));
         return;
     }
     if (it->is_asymmetric) {
-        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an asymmetric object type ('%4').",
-                                object_name, prop.name, string_for_property_type(prop.type), prop.object_type);
+        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be a link to an asymmetric object.",
+                                object_name, prop.name, string_for_property_type(prop.type));
         return;
     }
     if (prop.type != PropertyType::LinkingObjects)
