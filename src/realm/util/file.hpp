@@ -71,8 +71,12 @@ void make_dir(const std::string& path);
 
 /// Same as make_dir() except that this one returns false, rather than throwing
 /// an exception, if the specified directory already existed. If the directory
-// did not already exist and was newly created, this returns true.
+/// did not already exist and was newly created, this returns true.
 bool try_make_dir(const std::string& path);
+
+/// Recursively create each of the directories in the given absolute path. Existing directories are ignored, and
+/// File::AccessError is thrown for any other errors that occur.
+void make_dir_recursive(std::string path);
 
 /// Remove the specified empty directory path from the file system. It is an
 /// error if the specified path is not a directory, or if it is a nonempty
@@ -323,6 +327,11 @@ public:
     /// calls `fsync()`. On Apple platforms if calls `fcntl()` with command
     /// `F_FULLFSYNC`.
     void sync();
+
+    /// Issue a write barrier which forbids ordering writes after this call
+    /// before writes performed before this call. Equivalent to `sync()` on
+    /// non-Apple platforms.
+    void barrier();
 
     /// Place an exclusive lock on this file. This blocks the caller
     /// until all other locks have been released.

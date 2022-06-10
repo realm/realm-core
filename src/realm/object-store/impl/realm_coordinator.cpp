@@ -22,6 +22,7 @@
 #include <realm/object-store/impl/external_commit_helper.hpp>
 #include <realm/object-store/impl/transact_log_handler.hpp>
 #include <realm/object-store/impl/weak_realm_notifier.hpp>
+#include <realm/object-store/audit.hpp>
 #include <realm/object-store/binding_context.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
@@ -314,7 +315,6 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     auto schema = std::move(config.schema);
     auto migration_function = std::move(config.migration_function);
     auto initialization_function = std::move(config.initialization_function);
-    auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
 
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
@@ -349,8 +349,16 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     if (realm->config().sync_config)
         create_sync_session();
 
-    if (!m_audit_context && audit_factory)
-        m_audit_context = audit_factory();
+    if (realm->config().audit_config) {
+#ifdef REALM_ENABLE_SYNC
+        if (m_audit_context)
+            m_audit_context->update_metadata(realm->config().audit_config->metadata);
+        else
+            m_audit_context = make_audit_context(m_db, realm->config());
+#else
+        REALM_TERMINATE("Cannot use Audit interface if Realm Core is built without Sync");
+#endif
+    }
 
     realm_lock.unlock_unchecked();
     if (schema) {
@@ -492,7 +500,8 @@ void RealmCoordinator::open_db()
         std::unique_ptr<Replication> history;
         if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-            history = sync::make_client_replication();
+            bool apply_server_changes = !m_config.sync_config || m_config.sync_config->apply_server_changes;
+            history = std::make_unique<sync::ClientReplication>(apply_server_changes);
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
@@ -1264,9 +1273,9 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
-void RealmCoordinator::write_copy(StringData path, BinaryData key, bool allow_overwrite)
+void RealmCoordinator::write_copy(StringData path, const char* key)
 {
-    m_db->write_copy(path, key.data(), allow_overwrite);
+    m_db->write_copy(path, key);
 }
 
 void RealmCoordinator::async_request_write_mutex(Realm& realm)

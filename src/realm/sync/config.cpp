@@ -22,12 +22,34 @@
 #include <realm/object-store/util/bson/bson.hpp>
 #include <realm/util/network.hpp>
 
+#include <ostream>
+
 namespace realm {
 
 // sync defines its own copy of port_type to avoid depending on network.hpp, but they should be the same.
 static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type>);
 
 using ProtocolError = realm::sync::ProtocolError;
+
+SyncError::SyncError(std::error_code error_code, std::string msg, bool is_fatal,
+                     util::Optional<std::string> serverLog,
+                     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
+    : error_code(std::move(error_code))
+    , is_fatal(is_fatal)
+    , message(std::move(msg))
+    , compensating_writes_info(std::move(compensating_writes))
+{
+    if (serverLog) {
+        size_t msg_length = message.size();
+        static constexpr std::string_view middle(" Logs: ");
+        message = util::format("%1%2%3", message, middle, *serverLog);
+        simple_message = std::string_view(message.data(), msg_length);
+        logURL = std::string_view(message.data() + msg_length + middle.size(), serverLog->size());
+    }
+    else {
+        simple_message = message;
+    }
+}
 
 bool SyncError::is_client_error() const
 {
@@ -55,6 +77,9 @@ bool SyncError::is_session_level_protocol_error() const
 /// The error indicates a client reset situation.
 bool SyncError::is_client_reset_requested() const
 {
+    if (server_requests_client_reset) {
+        return *server_requests_client_reset != SyncError::ClientResetModeAllowed::DoNotClientReset;
+    }
     if (error_code == make_error_code(sync::Client::Error::auto_client_reset_failure)) {
         return true;
     }
@@ -123,7 +148,6 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         // Session errors
         case ProtocolError::session_closed:
         case ProtocolError::other_session_error:
-        case ProtocolError::disabled_session:
         case ProtocolError::initial_sync_not_completed:
             // The binding doesn't need to be aware of these because they are strictly informational, and do not
             // represent actual errors.
@@ -150,6 +174,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::server_permissions_changed:
         case ProtocolError::write_not_allowed:
             return SimplifiedProtocolError::ClientResetRequested;
+        case ProtocolError::compensating_write:
+            return SimplifiedProtocolError::CompensatingWrite;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
 }

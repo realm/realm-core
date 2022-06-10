@@ -31,8 +31,8 @@
 #include <deque>
 
 namespace realm {
-class AsyncOpenTask;
 class AuditInterface;
+class AsyncOpenTask;
 class BindingContext;
 class DB;
 class Group;
@@ -43,8 +43,9 @@ class StringData;
 class Table;
 class ThreadSafeReference;
 class Transaction;
-struct SyncConfig;
 class SyncSession;
+struct AuditConfig;
+struct SyncConfig;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -63,22 +64,56 @@ class RealmCoordinator;
 class RealmFriend;
 } // namespace _impl
 
-class Realm : public std::enable_shared_from_this<Realm> {
-public:
-    // A callback function to be called during a migration for Automatic and
-    // Manual schema modes. It is passed a SharedRealm at the version before
-    // the migration, the SharedRealm in the migration, and a mutable reference
-    // to the realm's Schema. Updating the schema with changes made within the
-    // migration function is only required if you wish to use the ObjectStore
-    // functions which take a Schema from within the migration function.
-    using MigrationFunction = std::function<void(SharedRealm old_realm, SharedRealm realm, Schema&)>;
+// A callback function to be called during a migration for Automatic and
+// Manual schema modes. It is passed a SharedRealm at the version before
+// the migration, the SharedRealm in the migration, and a mutable reference
+// to the realm's Schema. Updating the schema with changes made within the
+// migration function is only required if you wish to use the ObjectStore
+// functions which take a Schema from within the migration function.
+using MigrationFunction = std::function<void(SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
-    // A callback function to be called the first time when a schema is created.
-    // It is passed a SharedRealm which is in a write transaction with the schema
-    // initialized. So it is possible to create some initial objects inside the callback
-    // with the given SharedRealm. Those changes will be committed together with the
-    // schema creation in a single transaction.
-    using DataInitializationFunction = std::function<void(SharedRealm realm)>;
+// A callback function to be called the first time when a schema is created.
+// It is passed a SharedRealm which is in a write transaction with the schema
+// initialized. So it is possible to create some initial objects inside the callback
+// with the given SharedRealm. Those changes will be committed together with the
+// schema creation in a single transaction.
+using DataInitializationFunction = std::function<void(SharedRealm realm)>;
+
+// A callback function called when opening a SharedRealm when no cached
+// version of this Realm exists. It is passed the total bytes allocated for
+// the file (file size) and the total bytes used by data in the file.
+// Return `true` to indicate that an attempt to compact the file should be made
+// if it is possible to do so.
+// Won't compact the file if another process is accessing it.
+//
+// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
+// because it's not crash safe! It may corrupt your database if something fails
+using ShouldCompactOnLaunchFunction = std::function<bool(uint64_t total_bytes, uint64_t used_bytes)>;
+
+struct RealmConfig {
+    // Path and binary data are mutually exclusive
+    std::string path;
+    BinaryData realm_data;
+    // User-supplied encryption key. Must be either empty or 64 bytes.
+    std::vector<char> encryption_key;
+
+    // Core and Object Store will in some cases need to create named pipes alongside the Realm file.
+    // But on some filesystems this can be a problem (e.g. external storage on Android that uses FAT32).
+    // In order to work around this, a separate path can be specified for these files.
+    std::string fifo_files_fallback_path;
+
+    bool in_memory = false;
+    SchemaMode schema_mode = SchemaMode::Automatic;
+
+    // Optional schema for the file.
+    // If the schema and schema version are supplied, update_schema() is
+    // called with the supplied schema, version and migration function when
+    // the Realm is actually opened and not just retrieved from the cache
+    util::Optional<Schema> schema;
+    uint64_t schema_version = uint64_t(-1);
+    MigrationFunction migration_function;
+
+    DataInitializationFunction initialization_function;
 
     // A callback function called when opening a SharedRealm when no cached
     // version of this Realm exists. It is passed the total bytes allocated for
@@ -89,94 +124,62 @@ public:
     //
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
-    using ShouldCompactOnLaunchFunction = std::function<bool(uint64_t total_bytes, uint64_t used_bytes)>;
+    ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
-    struct Config {
-        // Path and binary data are mutually exclusive
-        std::string path;
-        BinaryData realm_data;
-        // User-supplied encryption key. Must be either empty or 64 bytes.
-        std::vector<char> encryption_key;
+    // WARNING: The original read_only() has been renamed to immutable().
+    bool immutable() const
+    {
+        return schema_mode == SchemaMode::Immutable;
+    }
+    bool read_only() const
+    {
+        return schema_mode == SchemaMode::ReadOnly;
+    }
 
-        // Core and Object Store will in some cases need to create named pipes alongside the Realm file.
-        // But on some filesystems this can be a problem (e.g. external storage on Android that uses FAT32).
-        // In order to work around this, a separate path can be specified for these files.
-        std::string fifo_files_fallback_path;
+    // The following are intended for internal/testing purposes and
+    // should not be publicly exposed in binding APIs
 
-        bool in_memory = false;
-        SchemaMode schema_mode = SchemaMode::Automatic;
+    // If false, always return a new Realm instance, and don't return
+    // that Realm instance for other requests for a cached Realm. Useful
+    // for dynamic Realms and for tests that need multiple instances on
+    // one thread
+    bool cache = false;
 
-        // Optional schema for the file.
-        // If the schema and schema version are supplied, update_schema() is
-        // called with the supplied schema, version and migration function when
-        // the Realm is actually opened and not just retrieved from the cache
-        util::Optional<Schema> schema;
-        uint64_t schema_version = uint64_t(-1);
-        MigrationFunction migration_function;
+    // Throw an exception rather than automatically upgrading the file
+    // format. Used by the browser to warn the user that it'll modify
+    // the file.
+    bool disable_format_upgrade = false;
+    // Disable the background worker thread for producing change
+    // notifications. Useful for tests for those notifications so that
+    // everything can be done deterministically on one thread, and
+    // speeds up tests that don't need notifications.
+    bool automatic_change_notifications = true;
 
-        DataInitializationFunction initialization_function;
+    // The Scheduler which this Realm should be bound to. If not supplied,
+    // a default one for the current thread will be used.
+    std::shared_ptr<util::Scheduler> scheduler;
 
-        // A callback function called when opening a SharedRealm when no cached
-        // version of this Realm exists. It is passed the total bytes allocated for
-        // the file (file size) and the total bytes used by data in the file.
-        // Return `true` to indicate that an attempt to compact the file should be made
-        // if it is possible to do so.
-        // Won't compact the file if another process is accessing it.
-        //
-        // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
-        // because it's not crash safe! It may corrupt your database if something fails
-        ShouldCompactOnLaunchFunction should_compact_on_launch_function;
+    /// A data structure storing data used to configure the Realm for sync support.
+    std::shared_ptr<SyncConfig> sync_config;
 
-        // WARNING: The original read_only() has been renamed to immutable().
-        bool immutable() const
-        {
-            return schema_mode == SchemaMode::Immutable;
-        }
-        bool read_only() const
-        {
-            return schema_mode == SchemaMode::ReadOnly;
-        }
+    // Open the Realm using the sync history mode even if a sync
+    // configuration is not supplied.
+    bool force_sync_history = false;
 
-        // The following are intended for internal/testing purposes and
-        // should not be publicly exposed in binding APIs
+    // A factory function which produces an audit implementation.
+    std::shared_ptr<AuditConfig> audit_config;
 
-        // If false, always return a new Realm instance, and don't return
-        // that Realm instance for other requests for a cached Realm. Useful
-        // for dynamic Realms and for tests that need multiple instances on
-        // one thread
-        bool cache = false;
+    // Maximum number of active versions in the Realm file allowed before an exception
+    // is thrown.
+    uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
 
-        // Throw an exception rather than automatically upgrading the file
-        // format. Used by the browser to warn the user that it'll modify
-        // the file.
-        bool disable_format_upgrade = false;
-        // Disable the background worker thread for producing change
-        // notifications. Useful for tests for those notifications so that
-        // everything can be done deterministically on one thread, and
-        // speeds up tests that don't need notifications.
-        bool automatic_change_notifications = true;
+    // Disable automatic backup at file format upgrade by setting to false
+    bool backup_at_file_format_change = true;
+};
 
-        // The Scheduler which this Realm should be bound to. If not supplied,
-        // a default one for the current thread will be used.
-        std::shared_ptr<util::Scheduler> scheduler;
-
-        /// A data structure storing data used to configure the Realm for sync support.
-        std::shared_ptr<SyncConfig> sync_config;
-
-        // Open the Realm using the sync history mode even if a sync
-        // configuration is not supplied.
-        bool force_sync_history = false;
-
-        // A factory function which produces an audit implementation.
-        std::function<std::shared_ptr<AuditInterface>()> audit_factory;
-
-        // Maximum number of active versions in the Realm file allowed before an exception
-        // is thrown.
-        uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
-
-        // Disable automatic backup at file format upgrade by setting to false
-        bool backup_at_file_format_change = true;
-    };
+class Realm : public std::enable_shared_from_this<Realm> {
+public:
+    using Config = RealmConfig;
 
     // Returns a thread-confined live Realm for the given configuration
     static SharedRealm get_shared_realm(Config config);
@@ -209,6 +212,8 @@ public:
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version = 0, MigrationFunction migration_function = nullptr,
                        DataInitializationFunction initialization_function = nullptr, bool in_transaction = false);
+
+    void rename_property(Schema schema, StringData object_type, StringData old_name, StringData new_name);
 
     // Set the schema used for this Realm, but do not update the file's schema
     // if it is not compatible (and instead throw an error).
@@ -270,10 +275,11 @@ public:
     AsyncHandle async_commit_transaction(util::UniqueFunction<void(std::exception_ptr)>&& the_done_block = nullptr,
                                          bool allow_grouping = false);
 
-    // Cancel a queued code block (either for an async_transaction or for an async_commit)
+    // Returns true when a queued code block (either for an async_transaction or for an async_commit)
+    // is found and cancelled (dequeued). False, if not found.
     // * Cancelling a commit will not abort the commit, it will only cancel the callback
     //   informing of commit completion.
-    void async_cancel_transaction(AsyncHandle);
+    bool async_cancel_transaction(AsyncHandle);
 
     // Returns true when async transactiona has been created and the result of the last
     // commit has not yet reached permanent storage.
@@ -339,16 +345,40 @@ public:
     // WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     // because it's not crash safe! It may corrupt your database if something fails
     bool compact();
-    // For synchronized realms, the file written will have the client file ident removed. Furthermore
-    // it is required that all local changes are synchronized with the server before the copy can
-    // be written. This is to be sure that the file can be used as a stating point for a newly
-    // installed application. The function will throw if there are pending uploads.
-    void write_copy(StringData path, BinaryData encryption_key);
-    // Will export data to a file that is supposed to be opened with a sync configuration.
-    // If the file is already existing, data will be copied over object per object. If the file
-    // does not exist, the local realm file will exported to the new location and if the configuration
-    // object contains a sync part, a sync history will be synthesized
-    void export_to(const Config& config);
+
+    /**
+     * Copy this Realm's data into another Realm file.
+     *
+     * If the file at `config.path` already exists and \a merge_into_existing
+     * is true, the contents of this Realm will be copied into the existing
+     * Realm at that path. If \a merge_into_existing is false, an exception
+     * will be thrown instead.
+     *
+     * If the destination file does not exist, the action performed depends on
+     * the type of the source and destimation files. If the destination
+     * configuration is a non-sync local Realm configuration, a compacted copy
+     * of the current Transaction's data (which includes uncommitted changes if
+     * applicable!) is written in streaming form, with no history.
+     *
+     * If the target configuration is a sync configuration and the source Realm
+     * is a local Realm, a sync Realm with no file identifier is created and
+     * sync history is synthesized for all of the current objects in the Realm.
+     *
+     * If the target configuration is a sync configuration and the source Realm
+     * is also a sync Realm, a sync Realm with no file identifier is created,
+     * but the existing history is retained instead of synthesizing new
+     * history. This mode requires that the source Realm does not have any
+     * unuploaded changesets, and will thrown an exception if that is not the
+     * case.
+     *
+     * @param config The realm configuration that specifies what file should be
+     *               produced. This can be a local or a synced Realm, encrypted or not.
+     * @param merge_into_existing If true, converting into an existing file
+     *                            will write this Realm's data into that file
+     *                            rather than throwing an exception.
+     */
+    void convert(const Config& config, bool merge_into_existing = true);
+
     OwnedBinaryData write_copy();
 
     void verify_thread() const;

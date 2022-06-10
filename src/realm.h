@@ -47,12 +47,20 @@
 #define RLM_ANON_UNION_MEMBER(name)
 #endif
 
+// Some platforms can benefit from redefining the userdata type to another type known to the tooling.
+// For example, Dart with its ffigen utility can generate cleaner code if we define realm_userdata_t as Dart_Handle,
+// which is a pointer to an opaque struct treated specially by the Dart code generator.
+// WARNING: only define this to a pointer type, anything else breaks the ABI.
+#ifndef realm_userdata_t
+#define realm_userdata_t void*
+#endif
+
 typedef struct shared_realm realm_t;
 typedef struct realm_schema realm_schema_t;
 typedef struct realm_scheduler realm_scheduler_t;
 typedef struct realm_thread_safe_reference realm_thread_safe_reference_t;
-typedef void (*realm_free_userdata_func_t)(void*);
-typedef void* (*realm_clone_userdata_func_t)(const void*);
+typedef void (*realm_free_userdata_func_t)(realm_userdata_t userdata);
+typedef realm_userdata_t (*realm_clone_userdata_func_t)(const realm_userdata_t userdata);
 
 /* Accessor types */
 typedef struct realm_object realm_object_t;
@@ -69,10 +77,11 @@ typedef struct realm_config realm_config_t;
 typedef struct realm_app_config realm_app_config_t;
 typedef struct realm_sync_client_config realm_sync_client_config_t;
 typedef struct realm_sync_config realm_sync_config_t;
-typedef bool (*realm_migration_func_t)(void* userdata, realm_t* old_realm, realm_t* new_realm,
+typedef bool (*realm_migration_func_t)(realm_userdata_t userdata, realm_t* old_realm, realm_t* new_realm,
                                        const realm_schema_t* schema);
-typedef bool (*realm_data_initialization_func_t)(void* userdata, realm_t* realm);
-typedef bool (*realm_should_compact_on_launch_func_t)(void* userdata, uint64_t total_bytes, uint64_t used_bytes);
+typedef bool (*realm_data_initialization_func_t)(realm_userdata_t userdata, realm_t* realm);
+typedef bool (*realm_should_compact_on_launch_func_t)(realm_userdata_t userdata, uint64_t total_bytes,
+                                                      uint64_t used_bytes);
 typedef enum realm_schema_mode {
     RLM_SCHEMA_MODE_AUTOMATIC,
     RLM_SCHEMA_MODE_IMMUTABLE,
@@ -237,6 +246,7 @@ typedef enum realm_errno {
     RLM_ERR_FILE_PERMISSION_DENIED,
 
     RLM_ERR_DELETE_OPENED_REALM,
+    RLM_ERR_ILLEGAL_OPERATION,
 
     RLM_ERR_CALLBACK = 1000000, /**< A user-provided callback failed. */
 } realm_errno_e;
@@ -250,6 +260,9 @@ typedef enum realm_logic_error_kind {
 typedef struct realm_error {
     realm_errno_e error;
     const char* message;
+    // When error is RLM_ERR_CALLBACK this is an opaque pointer to an SDK-owned error object
+    // thrown by user code inside a callback with realm_register_user_code_callback_error(), otherwise null.
+    void* usercode_error;
     union {
         int code;
         realm_logic_error_kind_e logic_error_kind;
@@ -334,10 +347,10 @@ typedef struct realm_notification_token realm_notification_token_t;
 typedef struct realm_callback_token realm_callback_token_t;
 typedef struct realm_object_changes realm_object_changes_t;
 typedef struct realm_collection_changes realm_collection_changes_t;
-typedef void (*realm_on_object_change_func_t)(void* userdata, const realm_object_changes_t*);
-typedef void (*realm_on_collection_change_func_t)(void* userdata, const realm_collection_changes_t*);
-typedef void (*realm_callback_error_func_t)(void* userdata, const realm_async_error_t*);
-typedef void (*realm_on_realm_change_func_t)(void* userdata);
+typedef void (*realm_on_object_change_func_t)(realm_userdata_t userdata, const realm_object_changes_t*);
+typedef void (*realm_on_collection_change_func_t)(realm_userdata_t userdata, const realm_collection_changes_t*);
+typedef void (*realm_callback_error_func_t)(realm_userdata_t userdata, const realm_async_error_t*);
+typedef void (*realm_on_realm_change_func_t)(realm_userdata_t userdata);
 
 /**
  * Callback for realm schema changed notifications.
@@ -345,14 +358,15 @@ typedef void (*realm_on_realm_change_func_t)(void* userdata);
  * @param new_schema The new schema. This object is released after the callback returns.
  *                   Preserve it with realm_clone() if you wish to keep it around for longer.
  */
-typedef void (*realm_on_schema_change_func_t)(void* userdata, const realm_schema_t* new_schema);
+typedef void (*realm_on_schema_change_func_t)(realm_userdata_t userdata, const realm_schema_t* new_schema);
 
 /* Scheduler types */
-typedef void (*realm_scheduler_notify_func_t)(void* userdata);
-typedef bool (*realm_scheduler_is_on_thread_func_t)(void* userdata);
-typedef bool (*realm_scheduler_is_same_as_func_t)(const void* userdata1, const void* userdata2);
-typedef bool (*realm_scheduler_can_deliver_notifications_func_t)(void* userdata);
-typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(void* userdata);
+typedef void (*realm_scheduler_notify_func_t)(realm_userdata_t userdata);
+typedef bool (*realm_scheduler_is_on_thread_func_t)(realm_userdata_t userdata);
+typedef bool (*realm_scheduler_is_same_as_func_t)(const realm_userdata_t scheduler_userdata_1,
+                                                  const realm_userdata_t scheduler_userdata_2);
+typedef bool (*realm_scheduler_can_deliver_notifications_func_t)(realm_userdata_t userdata);
+typedef realm_scheduler_t* (*realm_scheduler_default_factory_func_t)(realm_userdata_t userdata);
 
 /**
  * Get the VersionID of the current transaction.
@@ -642,7 +656,8 @@ RLM_API void realm_config_set_schema_mode(realm_config_t*, realm_schema_mode_e);
  *
  * This function cannot fail.
  */
-RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, void* userdata);
+RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migration_func_t, realm_userdata_t userdata,
+                                                 realm_free_userdata_func_t userdata_free);
 
 /**
  * Set the data initialization function.
@@ -655,7 +670,8 @@ RLM_API void realm_config_set_migration_function(realm_config_t*, realm_migratio
  * This function cannot fail.
  */
 RLM_API void realm_config_set_data_initialization_function(realm_config_t*, realm_data_initialization_func_t,
-                                                           void* userdata);
+                                                           realm_userdata_t userdata,
+                                                           realm_free_userdata_func_t userdata_free);
 
 /**
  * Set the should-compact-on-launch callback.
@@ -669,7 +685,8 @@ RLM_API void realm_config_set_data_initialization_function(realm_config_t*, real
  */
 RLM_API void realm_config_set_should_compact_on_launch_function(realm_config_t*,
                                                                 realm_should_compact_on_launch_func_t,
-                                                                void* userdata);
+                                                                realm_userdata_t userdata,
+                                                                realm_free_userdata_func_t userdata_free);
 
 /**
  * True if file format upgrades on open are disabled.
@@ -787,7 +804,6 @@ RLM_API bool realm_config_get_cached(realm_config_t*) RLM_API_NOEXCEPT;
 /**
  * Create a custom scheduler object from callback functions.
  *
- * @param userdata Pointer passed to all callbacks.
  * @param notify Function which will be called whenever the scheduler has work
  *               to do. Each call to this should trigger a call to
  *               `realm_scheduler_perform_work()` from within the scheduler's
@@ -801,16 +817,17 @@ RLM_API bool realm_config_get_cached(realm_config_t*) RLM_API_NOEXCEPT;
  *                                  need to be thread-safe.
  */
 RLM_API realm_scheduler_t*
-realm_scheduler_new(void* userdata, realm_free_userdata_func_t, realm_scheduler_notify_func_t notify,
-                    realm_scheduler_is_on_thread_func_t is_on_thread, realm_scheduler_is_same_as_func_t is_same_as,
+realm_scheduler_new(realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
+                    realm_scheduler_notify_func_t notify, realm_scheduler_is_on_thread_func_t is_on_thread,
+                    realm_scheduler_is_same_as_func_t is_same_as,
                     realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications);
 
 /**
  * Performs all of the pending work for the given scheduler.
  *
  * This function must be called from within the scheduler's event loop. It must
- * be called after each time that the notify function passed to the scheduler
- * is involved.
+ * be called each time the notify callback passed to the scheduler
+ * is invoked.
  */
 RLM_API void realm_scheduler_perform_work(realm_scheduler_t*);
 /**
@@ -851,7 +868,7 @@ RLM_API bool realm_scheduler_has_default_factory(void);
  *
  * This function is thread-safe, but should generally only be called once.
  */
-RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t,
+RLM_API bool realm_scheduler_set_default_factory(realm_userdata_t userdata, realm_free_userdata_func_t userdata_free,
                                                  realm_scheduler_default_factory_func_t);
 
 /**
@@ -863,6 +880,41 @@ RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_user
  * @return If successful, the Realm object. Otherwise, NULL.
  */
 RLM_API realm_t* realm_open(const realm_config_t* config);
+
+/**
+ * The overloaded Realm::convert function offers a way to copy and/or convert a realm.
+ *
+ * The following options are supported:
+ * - local -> local (config or path)
+ * - local -> sync (config only)
+ * - sync -> local (config only)
+ * - sync -> sync  (config or path)
+ * - sync -> bundlable sync (client file identifier removed)
+ *
+ * Note that for bundled realms it is required that all local changes are synchronized with the
+ * server before the copy can be written. This is to be sure that the file can be used as a
+ * stating point for a newly installed application. The function will throw if there are
+ * pending uploads.
+ */
+/**
+ * Copy or convert a Realm using a config.
+ *
+ * If the file already exists, data will be copied over object per object.
+ * If the file does not exist, the realm file will be exported to the new location and if the
+ * configuration object contains a sync part, a sync history will be synthesized.
+ *
+ * @param config The realm configuration that should be used to create a copy.
+ *               This can be a local or a synced Realm, encrypted or not.
+ */
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config);
+/**
+ * Copy a Realm using a path.
+ *
+ * @param path The path the realm should be copied to. Local realms will remain local, synced
+ *             realms will remain synced realms.
+ * @param encryption_key The optional encryption key for the new realm.
+ */
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key);
 
 /**
  * Deletes the following files for the given `realm_file_path` if they exist:
@@ -987,7 +1039,8 @@ RLM_API bool realm_rollback(realm_t*);
  * @return a registration token used to remove the callback.
  */
 RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t*, realm_on_realm_change_func_t,
-                                                                 void* userdata, realm_free_userdata_func_t);
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
 /**
  * Refresh the view of the realm file.
@@ -1075,9 +1128,21 @@ RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema);
  *                          migration in its own write transaction.
  */
 RLM_API bool realm_update_schema_advanced(realm_t* realm, const realm_schema_t* schema, uint64_t version,
-                                          realm_migration_func_t migration_func, void* migration_func_userdata,
+                                          realm_migration_func_t migration_func,
+                                          realm_userdata_t migration_func_userdata,
                                           realm_data_initialization_func_t data_init_func,
-                                          void* data_init_func_userdata, bool is_in_transaction);
+                                          realm_userdata_t data_init_func_userdata, bool is_in_transaction);
+
+/**
+ *  Rename a property for the schame  of the open realm.
+ *  @param realm The realm for which the property schema has to be renamed
+ *  @param schema The schema to modifies
+ *  @param object_type type of the object to modify
+ *  @param old_name old name of the property
+ *  @param new_name new name of the property
+ */
+RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type,
+                                          const char* old_name, const char* new_name);
 
 /**
  * Get the `realm::Schema*` pointer for this realm.
@@ -1094,7 +1159,8 @@ RLM_API const void* _realm_get_schema_native(const realm_t*);
  * @return a registration token used to remove the callback.
  */
 RLM_API realm_callback_token_t* realm_add_schema_changed_callback(realm_t*, realm_on_schema_change_func_t,
-                                                                  void* userdata, realm_free_userdata_func_t);
+                                                                  realm_userdata_t userdata,
+                                                                  realm_free_userdata_func_t userdata_free);
 
 
 /**
@@ -1118,10 +1184,12 @@ RLM_API size_t realm_get_num_classes(const realm_t*);
 
 /**
  * Get the table keys for classes in the schema.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param out_keys An array that will contain the keys of each class in the
- *                 schema. May be NULL, in which case `out_n` can be used to
- *                 determine the number of classes in the schema.
+ *                 schema. Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of keys to write to `out_keys`.
  * @param out_n The actual number of classes. May be NULL.
  * @return True if no exception occurred.
@@ -1156,15 +1224,14 @@ RLM_API bool realm_get_class(const realm_t*, realm_class_key_t key, realm_class_
 
 /**
  * Get the list of properties for the class with this @a key.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
- * @param out_properties A pointer to an array of `realm_property_info_t`, which
+ * @param out_properties  A pointer to an array of `realm_property_info_t`, which
  *                       will be populated with the information about the
- *                       properties. To see all properties, the length of the
- *                       array should be at least the number of properties in
- *                       the class, as reported in the sum of persisted and
- *                       computed properties for the class. May be NULL, in
- *                       which case this function can be used to discover the
- *                       number of properties in the class.
+ *                       properties.  Array may be NULL, in this case no data will be copied and `out_n` set if not
+ * NULL.
  * @param max The maximum number of entries to write to `out_properties`.
  * @param out_n The actual number of properties written to `out_properties`.
  * @return True if no exception occurred.
@@ -1174,19 +1241,21 @@ RLM_API bool realm_get_class_properties(const realm_t*, realm_class_key_t key, r
 
 /**
  * Get the property keys for the class with this @a key.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param key The class key.
- * @param out_col_keys An array of property keys. May be NULL, in which case
- *                     this function can be used to discover the number of
- *                     properties for this class.
+ * @param out_col_keys An array of property keys. Array may be NULL,
+ *                     in this case no data will be copied and `out_n` set if not NULL.
  * @param max The maximum number of keys to write to `out_col_keys`. Ignored if
  *            `out_col_keys == NULL`.
  * @param out_n The actual number of properties written to `out_col_keys` (if
  *              non-NULL), or number of properties in the class.
+ * @return True if no exception occurred.
  **/
 RLM_API bool realm_get_property_keys(const realm_t*, realm_class_key_t key, realm_property_key_t* out_col_keys,
                                      size_t max, size_t* out_n);
-
 
 /**
  * Find a property by its column key.
@@ -1377,10 +1446,11 @@ RLM_API realm_link_t realm_object_as_link(const realm_object_t* object);
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t*
-realm_object_add_notification_callback(realm_object_t*, void* userdata, realm_free_userdata_func_t free,
-                                       realm_key_path_array_t*, realm_on_object_change_func_t on_change,
-                                       realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_object_add_notification_callback(realm_object_t*, realm_userdata_t userdata,
+                                                                           realm_free_userdata_func_t userdata_free,
+                                                                           realm_key_path_array_t*,
+                                                                           realm_on_object_change_func_t on_change,
+                                                                           realm_callback_error_func_t on_error);
 
 /**
  * Get an object from a thread-safe reference, potentially originating in a
@@ -1429,6 +1499,26 @@ RLM_API bool realm_get_values(const realm_object_t*, size_t num_values, const re
  * @return True if no exception occurred.
  */
 RLM_API bool realm_set_value(realm_object_t*, realm_property_key_t, realm_value_t new_value, bool is_default);
+
+/**
+ * Create an embedded object in a given property.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_set_embedded(realm_object_t*, realm_property_key_t);
+
+/** Return the object linked by the given property
+ *
+ * @return A non-NULL pointer if an object is found.
+ */
+RLM_API realm_object_t* realm_get_linked_object(realm_object_t*, realm_property_key_t);
+
+/**
+ * Serializes an object to json and returns it as string. Serializes a single level of properties only.
+ *
+ * @return a json-serialized representation of the object.
+ */
+RLM_API char* realm_object_to_string(realm_object_t*);
 
 /**
  * Set the values for several properties.
@@ -1550,6 +1640,27 @@ RLM_API bool realm_list_set(realm_list_t*, size_t index, realm_value_t value);
 RLM_API bool realm_list_insert(realm_list_t*, size_t index, realm_value_t value);
 
 /**
+ * Insert an embedded object at a given position.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_list_insert_embedded(realm_list_t*, size_t index);
+
+/**
+ * Create an embedded object at a given position.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_list_set_embedded(realm_list_t*, size_t index);
+
+/**
+ * Get object identified at index
+ *
+ * @return A non-NULL pointer if value is an object.
+ */
+RLM_API realm_object_t* realm_list_get_linked_object(realm_list_t*, size_t index);
+
+/**
  * Erase the element at @a index.
  *
  * @return True if no exception occurred.
@@ -1587,10 +1698,11 @@ RLM_API bool realm_list_assign(realm_list_t*, const realm_value_t* values, size_
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t*
-realm_list_add_notification_callback(realm_list_t*, void* userdata, realm_free_userdata_func_t free,
-                                     realm_key_path_array_t*, realm_on_collection_change_func_t on_change,
-                                     realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_list_add_notification_callback(realm_list_t*, realm_userdata_t userdata,
+                                                                         realm_free_userdata_func_t userdata_free,
+                                                                         realm_key_path_array_t*,
+                                                                         realm_on_collection_change_func_t on_change,
+                                                                         realm_callback_error_func_t on_error);
 
 /**
  * Get an list from a thread-safe reference, potentially originating in a
@@ -1863,10 +1975,11 @@ RLM_API bool realm_set_assign(realm_set_t*, const realm_value_t* values, size_t 
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t*
-realm_set_add_notification_callback(realm_set_t*, void* userdata, realm_free_userdata_func_t free,
-                                    realm_key_path_array_t*, realm_on_collection_change_func_t on_change,
-                                    realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_set_add_notification_callback(realm_set_t*, realm_userdata_t userdata,
+                                                                        realm_free_userdata_func_t userdata_free,
+                                                                        realm_key_path_array_t*,
+                                                                        realm_on_collection_change_func_t on_change,
+                                                                        realm_callback_error_func_t on_error);
 /**
  * Get an set from a thread-safe reference, potentially originating in a
  * different `realm_t` instance
@@ -1982,6 +2095,20 @@ RLM_API bool realm_dictionary_insert(realm_dictionary_t*, realm_value_t key, rea
                                      bool* out_inserted);
 
 /**
+ * Insert an embedded object.
+ *
+ * @return A non-NULL pointer if the object was created successfully.
+ */
+RLM_API realm_object_t* realm_dictionary_insert_embedded(realm_dictionary_t*, realm_value_t key);
+
+/**
+ * Get object identified by key
+ *
+ * @return A non-NULL pointer if the value associated with key is an object.
+ */
+RLM_API realm_object_t* realm_dictionary_get_linked_object(realm_dictionary_t*, realm_value_t key);
+
+/**
  * Erase a dictionary element.
  *
  * @param key The key of the element to erase.
@@ -2017,10 +2144,9 @@ RLM_API bool realm_dictionary_assign(realm_dictionary_t*, size_t num_pairs, cons
  *
  * @return A non-null pointer if no exception occurred.
  */
-RLM_API realm_notification_token_t*
-realm_dictionary_add_notification_callback(realm_dictionary_t*, void* userdata, realm_free_userdata_func_t free,
-                                           realm_key_path_array_t*, realm_on_collection_change_func_t on_change,
-                                           realm_callback_error_func_t on_error, realm_scheduler_t*);
+RLM_API realm_notification_token_t* realm_dictionary_add_notification_callback(
+    realm_dictionary_t*, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
+    realm_on_collection_change_func_t on_change, realm_callback_error_func_t on_error);
 
 /**
  * Get an dictionary from a thread-safe reference, potentially originating in a
@@ -2290,9 +2416,9 @@ RLM_API bool realm_results_average(realm_results_t*, realm_property_key_t, realm
                                    bool* out_found);
 
 RLM_API realm_notification_token_t*
-realm_results_add_notification_callback(realm_results_t*, void* userdata, realm_free_userdata_func_t,
-                                        realm_key_path_array_t*, realm_on_collection_change_func_t,
-                                        realm_callback_error_func_t, realm_scheduler_t*);
+realm_results_add_notification_callback(realm_results_t*, realm_userdata_t userdata,
+                                        realm_free_userdata_func_t userdata_free, realm_key_path_array_t*,
+                                        realm_on_collection_change_func_t, realm_callback_error_func_t);
 
 /**
  * Get an results object from a thread-safe reference, potentially originating
@@ -2314,7 +2440,7 @@ typedef enum realm_log_level {
     RLM_LOG_LEVEL_OFF = 8,
 } realm_log_level_e;
 
-typedef void (*realm_log_func_t)(void* userdata, realm_log_level_e level, const char* message);
+typedef void (*realm_log_func_t)(realm_userdata_t userdata, realm_log_level_e level, const char* message);
 
 /* HTTP transport */
 typedef enum realm_http_request_method {
@@ -2356,19 +2482,19 @@ typedef struct realm_http_response {
  * passing in the request_context pointer here and the received response.
  * Network request are expected to be asynchronous and can be completed on any thread.
  *
- * @param userdata The userdata pointer passed to realm_http_transport_new().
  * @param request The request to send.
  * @param request_context Internal state pointer of Core, needed by realm_http_transport_complete_request().
  */
-typedef void (*realm_http_request_func_t)(void* userdata, const realm_http_request_t request, void* request_context);
+typedef void (*realm_http_request_func_t)(realm_userdata_t userdata, const realm_http_request_t request,
+                                          void* request_context);
 
 typedef struct realm_http_transport realm_http_transport_t;
 
 /**
  * Create a new HTTP transport with these callbacks implementing its functionality.
  */
-RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func_t, void* userdata,
-                                                         realm_free_userdata_func_t);
+RLM_API realm_http_transport_t* realm_http_transport_new(realm_http_request_func_t, realm_userdata_t userdata,
+                                                         realm_free_userdata_func_t userdata_free);
 
 /**
  * Complete a HTTP request with the given response.
@@ -2528,24 +2654,34 @@ typedef struct realm_app_error {
     const char* link_to_server_logs;
 } realm_app_error_t;
 
+typedef struct realm_user_identity {
+    /**
+     * Ptr to null terminated string representing user identity (memory has to be freed by SDK)
+     */
+    char* id;
+    /**
+     * Enum representing the list of auth providers
+     */
+    realm_auth_provider_e provider_type;
+} realm_user_identity_t;
+
 /**
  * Generic completion callback for asynchronous Realm App operations.
  *
- * @param userdata The userdata pointer the asynchronous operation was started with.
  * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
  */
-typedef void (*realm_app_void_completion_func_t)(void* userdata, const realm_app_error_t* error);
+typedef void (*realm_app_void_completion_func_t)(realm_userdata_t userdata, const realm_app_error_t* error);
 
 /**
  * Completion callback for asynchronous Realm App operations that yield a user object.
  *
- * @param userdata The userdata pointer the asynchronous operation was started with.
  * @param user User object produced by the operation, or null if it failed.
  *             The pointer is alive only for the duration of the callback,
  *             if you wish to use it further make a copy with realm_clone().
  * @param error Pointer to an error object if the operation failed, otherwise null if it completed successfully.
  */
-typedef void (*realm_app_user_completion_func_t)(void* userdata, realm_user_t* user, const realm_app_error_t* error);
+typedef void (*realm_app_user_completion_func_t)(realm_userdata_t userdata, realm_user_t* user,
+                                                 const realm_app_error_t* error);
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token) RLM_API_NOEXCEPT;
@@ -2621,11 +2757,13 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
 
 /**
  * Get the list of active users in this @a app.
+ * In case of errors this function will return false (errors to be fetched via `realm_get_last_error()`).
+ * If data is not copied the function will return true and set  `out_n` with the capacity needed.
+ * Data is only copied if the input array has enough capacity, otherwise the needed  array capacity will be set.
  *
  * @param out_users A pointer to an array of `realm_user_t*`, which
  *                  will be populated with the list of active users in the app.
- *                  May be NULL, in which case this function can be used to
- *                  discover the number of active users by passing in just `out_n`.
+ *                  Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param capacity The maximum number of elements `out_users` can hold.
  * @param out_n The actual number of entries written to `out_users`.
  *              May be NULL.
@@ -2634,56 +2772,170 @@ RLM_API realm_user_t* realm_app_get_current_user(const realm_app_t*) RLM_API_NOE
 RLM_API bool realm_app_get_all_users(const realm_app_t* app, realm_user_t** out_users, size_t capacity,
                                      size_t* out_n);
 
-RLM_API bool realm_app_log_in_with_credentials(realm_app_t*, realm_app_credentials_t*,
-                                               realm_app_user_completion_func_t, void* userdata,
-                                               realm_free_userdata_func_t);
+/**
+ * Log in a user and asynchronously retrieve a user object. Inform caller via callback once operation completes.
+ * @param app ptr to realm_app
+ * @param credentials sync credentials
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_log_in_with_credentials(realm_app_t* app, realm_app_credentials_t* credentials,
+                                               realm_app_user_completion_func_t callback, realm_userdata_t userdata,
+                                               realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_log_out_current_user(realm_app_t*, realm_app_void_completion_func_t, void* userdata,
-                                            realm_free_userdata_func_t);
+/**
+ * Logout the current user.
+ * @param app ptr to realm_app
+ * @param callback invoked once operation has completed
+ * @param userdata custom userdata ptr
+ * @param userdata_free deleter for custom userdata
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_log_out_current_user(realm_app_t* app, realm_app_void_completion_func_t callback,
+                                            void* userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_refresh_custom_data(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t,
-                                           void* userdata, realm_free_userdata_func_t);
+/**
+ * Refreshes the custom data for a specified user.
+ * @param app ptr to realm_app
+ * @param user ptr to user
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_refresh_custom_data(realm_app_t* app, realm_user_t* user,
+                                           realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+                                           realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_log_out(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, void* userdata,
-                               realm_free_userdata_func_t);
+/**
+ * Log out the given user if they are not already logged out.
+ * @param app ptr to realm_app
+ * @param user ptr to user
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_log_out(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                               realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_link_user(realm_app_t*, realm_user_t*, realm_app_credentials_t*,
-                                 realm_app_user_completion_func_t, void* userdata, realm_free_userdata_func_t);
+/**
+ * Links the currently authenticated user with a new identity, where the identity is defined by the credentia
+ * specified as a parameter.
+ * @param app ptr to realm_app
+ * @param user ptr to the user to link
+ * @param credentials sync credentials
+ * @param callback invoked once operation has completed
+ * @param userdata custom userdata ptr
+ * @param userdata_free deleter for custom userdata
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_link_user(realm_app_t* app, realm_user_t* user, realm_app_credentials_t* credentials,
+                                 realm_app_user_completion_func_t callback, void* userdata,
+                                 realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_switch_user(realm_app_t*, realm_user_t*, realm_user_t** new_user);
+/**
+ * Switches the active user with the specified one. The user must exist in the list of all users who have logged into
+ * this application.
+ * @param app ptr to realm_app
+ * @param user ptr to current user
+ * @param new_user ptr to the new user to switch
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_switch_user(realm_app_t* app, realm_user_t* user, realm_user_t** new_user);
 
-RLM_API bool realm_app_remove_user(realm_app_t*, realm_user_t*, realm_app_void_completion_func_t, void* userdata,
-                                   realm_free_userdata_func_t);
+/**
+ * Logs out and removes the provided user.
+ * @param app ptr to realm_app
+ * @param user ptr to the user to remove
+ * @param callback invoked once operation has completed
+ * @param userdata custom userdata ptr
+ * @param userdata_free deleter for custom userdata
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_remove_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   void* userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t*, const char* email,
+/**
+ * Deletes a user and all its data from the server.
+ * @param app ptr to realm_app
+ * @param user ptr to the user to delete
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_delete_user(realm_app_t* app, realm_user_t* user, realm_app_void_completion_func_t callback,
+                                   realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
+
+/**
+ * Registers a new email identity with the username/password provider and send confirmation email.
+ * @param app ptr to realm_app
+ * @param email identity email
+ * @param password associated to the identity
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_register_email(realm_app_t* app, const char* email,
                                                                      realm_string_t password,
-                                                                     realm_app_void_completion_func_t, void* userdata,
-                                                                     realm_free_userdata_func_t);
+                                                                     realm_app_void_completion_func_t callback,
+                                                                     realm_userdata_t userdata,
+                                                                     realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t*, const char* token,
+/**
+ * Confirms an email identity with the username/password provider.
+ * @param app ptr to realm_app
+ * @param token string emailed
+ * @param token_id string emailed
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_confirm_user(realm_app_t* app, const char* token,
                                                                    const char* token_id,
-                                                                   realm_app_void_completion_func_t, void* userdata,
-                                                                   realm_free_userdata_func_t);
+                                                                   realm_app_void_completion_func_t callback,
+                                                                   realm_userdata_t userdata,
+                                                                   realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(realm_app_t*, const char* email,
-                                                                                realm_app_void_completion_func_t,
-                                                                                void* userdata,
-                                                                                realm_free_userdata_func_t);
+/**
+ * Re-sends a confirmation email to a user that has registered but not yet confirmed their email address.
+ * @param app ptr to realm_app
+ * @param email to use
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_resend_confirmation_email(
+    realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+    realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(realm_app_t*, const char* email,
-                                                                                realm_app_void_completion_func_t,
-                                                                                void* userdata,
-                                                                                realm_free_userdata_func_t);
+/**
+ * Send reset password to the email specified in the parameter passed to the function.
+ * @param app ptr to realm_app
+ * @param email where to send the reset instructions
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_send_reset_password_email(
+    realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+    realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(realm_app_t*, const char* email,
-                                                                                realm_app_void_completion_func_t,
-                                                                                void* userdata,
-                                                                                realm_free_userdata_func_t);
+/**
+ * Retries the custom confirmation function on a user for a given email.
+ * @param app ptr to realm_app
+ * @param email email for the user
+ * @param callback invoked once operation has completed
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_retry_custom_confirmation(
+    realm_app_t* app, const char* email, realm_app_void_completion_func_t callback, realm_userdata_t userdata,
+    realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t*, realm_string_t password,
+/**
+ * Resets the password of an email identity using the password reset token emailed to a user.
+ * @param app ptr to realm_app
+ * @param password new password to set
+ * @param token ptr to token string emailed to the user
+ * @param token_id ptr to token_id emailed to the user
+ * @return True if no error has been recorded, False otherwise
+ */
+RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t* app, realm_string_t password,
                                                                      const char* token, const char* token_id,
-                                                                     realm_app_void_completion_func_t, void* userdata,
-                                                                     realm_free_userdata_func_t);
+                                                                     realm_app_void_completion_func_t callback,
+                                                                     realm_userdata_t userdata,
+                                                                     realm_free_userdata_func_t userdata_free);
 
 /**
  * Run the Email/Password Authentication provider's password reset function.
@@ -2694,51 +2946,82 @@ RLM_API bool realm_app_email_password_provider_client_reset_password(realm_app_t
  */
 RLM_API bool realm_app_email_password_provider_client_call_reset_password_function(
     realm_app_t*, const char* email, realm_string_t password, const char* serialized_ejson_payload,
-    realm_app_void_completion_func_t, void* userdata, realm_free_userdata_func_t);
+    realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
+/**
+ * Creates a user API key that can be used to authenticate as the current user.
+ * @return True if no error was recorded. False otherwise
+ */
+RLM_API bool realm_app_user_apikey_provider_client_create_apikey(
+    const realm_app_t*, const realm_user_t*, const char* name,
+    void (*)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
+    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_user_apikey_provider_client_create_apikey(const realm_app_t*, const realm_user_t*,
-                                                                 const char* name,
-                                                                 void (*)(void* userdata, realm_app_user_apikey_t*,
-                                                                          const realm_app_error_t*),
-                                                                 void* userdata, realm_free_userdata_func_t);
+/**
+ * Fetches a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(
+    const realm_app_t*, const realm_user_t*, realm_object_id_t id,
+    void (*)(realm_userdata_t userdata, realm_app_user_apikey_t*, const realm_app_error_t*),
+    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikey(const realm_app_t*, const realm_user_t*,
-                                                                realm_object_id_t id,
-                                                                void (*)(void* userdata, realm_app_user_apikey_t*,
-                                                                         const realm_app_error_t*),
-                                                                void* userdata, realm_free_userdata_func_t);
+/**
+ * Fetches the user API keys associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
+RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(
+    const realm_app_t*, const realm_user_t*,
+    void (*)(realm_userdata_t userdata, realm_app_user_apikey_t[], size_t count, realm_app_error_t*),
+    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_user_apikey_provider_client_fetch_apikeys(const realm_app_t*, const realm_user_t*,
-                                                                 void (*)(void* userdata, realm_app_user_apikey_t[],
-                                                                          size_t count, realm_app_error_t*),
-                                                                 void* userdata, realm_free_userdata_func_t);
-
+/**
+ * Deletes a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_delete_apikey(const realm_app_t*, const realm_user_t*,
                                                                  realm_object_id_t id,
-                                                                 realm_app_void_completion_func_t, void* userdata,
-                                                                 realm_free_userdata_func_t);
+                                                                 realm_app_void_completion_func_t,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
+/**
+ * Enables a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_enable_apikey(const realm_app_t*, const realm_user_t*,
                                                                  realm_object_id_t id,
-                                                                 realm_app_void_completion_func_t, void* userdata,
-                                                                 realm_free_userdata_func_t);
+                                                                 realm_app_void_completion_func_t,
+                                                                 realm_userdata_t userdata,
+                                                                 realm_free_userdata_func_t userdata_free);
 
+/**
+ * Disables a user API key associated with the current user.
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_user_apikey_provider_client_disable_apikey(const realm_app_t*, const realm_user_t*,
                                                                   realm_object_id_t id,
-                                                                  realm_app_void_completion_func_t, void* userdata,
-                                                                  realm_free_userdata_func_t);
+                                                                  realm_app_void_completion_func_t,
+                                                                  realm_userdata_t userdata,
+                                                                  realm_free_userdata_func_t userdata_free);
 
-RLM_API bool realm_app_push_notification_client_register_device(const realm_app_t*, const realm_user_t*,
-                                                                const char* service_name,
-                                                                const char* registration_token,
-                                                                realm_app_void_completion_func_t, void* userdata,
-                                                                realm_free_userdata_func_t);
+/**
+ * Register a device for push notifications.
+ * @return True if no error was recorded. False otherwise
+ */
+RLM_API bool realm_app_push_notification_client_register_device(
+    const realm_app_t*, const realm_user_t*, const char* service_name, const char* registration_token,
+    realm_app_void_completion_func_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
+/**
+ * Deregister a device for push notificatons
+ * @return True if no error was recorded. False otherwise
+ */
 RLM_API bool realm_app_push_notification_client_deregister_device(const realm_app_t*, const realm_user_t*,
                                                                   const char* service_name,
-                                                                  realm_app_void_completion_func_t, void* userdata,
-                                                                  realm_free_userdata_func_t);
+                                                                  realm_app_void_completion_func_t,
+                                                                  realm_userdata_t userdata,
+                                                                  realm_free_userdata_func_t userdata_free);
 
 /**
  * Run a named MongoDB Realm function.
@@ -2749,9 +3032,9 @@ RLM_API bool realm_app_push_notification_client_deregister_device(const realm_ap
  */
 RLM_API bool realm_app_call_function(const realm_app_t*, const realm_user_t*, const char* function_name,
                                      const char* serialized_ejson_args,
-                                     void (*)(void* userdata, const char* serialized_ejson_response,
+                                     void (*)(realm_userdata_t userdata, const char* serialized_ejson_response,
                                               const realm_app_error_t*),
-                                     void* userdata, realm_free_userdata_func_t);
+                                     realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  * Instruct this app's sync client to immediately reconnect.
@@ -2782,25 +3065,28 @@ RLM_API void realm_app_sync_client_wait_for_sessions_to_terminate(realm_app_t*) 
  *
  * Return value must be manually released with realm_free().
  */
-RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_app_t*, const realm_sync_config_t*,
-                                                                    const char* custom_filename) RLM_API_NOEXCEPT;
-RLM_API const char* realm_user_get_identity(const realm_user_t*) RLM_API_NOEXCEPT;
+RLM_API char* realm_app_sync_client_get_default_file_path_for_realm(const realm_sync_config_t*,
+                                                                    const char* custom_filename);
+/**
+ * Return the identiy for the user passed as argument
+ * @param user ptr to the user for which the identiy has to be retrieved
+ * @return a ptr to the identity string
+ */
+RLM_API const char* realm_user_get_identity(const realm_user_t* user) RLM_API_NOEXCEPT;
 
-RLM_API realm_user_state_e realm_user_get_state(const realm_user_t*) RLM_API_NOEXCEPT;
-
-typedef struct {
-    const char* id;
-    realm_auth_provider_e provider_type;
-} realm_user_identity_t;
+/**
+ * Retrieve the state for the user passed as argument
+ * @param user ptr to the user for which the state has to be retrieved
+ * @return realm_user_state_e value
+ */
+RLM_API realm_user_state_e realm_user_get_state(const realm_user_t* user) RLM_API_NOEXCEPT;
 
 /**
  * Get the list of identities of this @a user.
  *
  * @param out_identities A pointer to an array of `realm_user_identity_t`, which
  *                       will be populated with the list of identities of this user.
- *                       May be NULL, in which case this function can be used to
- *                       discover the number of identities of this user by passing in NULL here
- *                       and examining `*out_n`.
+ *                       Array may be NULL, in this case no data will be copied and `out_n` set if not NULL.
  * @param capacity The maximum number of elements `out_identities` can hold.
  * @param out_n The actual number of entries written to `out_identities`. May be NULL.
  * @return true, if no errors occurred.
@@ -2845,6 +3131,25 @@ RLM_API char* realm_user_get_custom_data(const realm_user_t*) RLM_API_NOEXCEPT;
  *         or null if an error occurred.
  */
 RLM_API char* realm_user_get_profile_data(const realm_user_t*);
+
+/**
+ * Return the access token associated with the user.
+ * @return a string that rapresents the access token
+ */
+RLM_API char* realm_user_get_access_token(const realm_user_t*);
+
+/**
+ * Return the refresh token associated with the user.
+ * @return a string that represents the refresh token
+ */
+RLM_API char* realm_user_get_refresh_token(const realm_user_t*);
+
+/**
+ * Return the realm app for the user passed as parameter.
+ * @return a ptr to the app for the user.
+ */
+RLM_API realm_app_t* realm_user_get_app(const realm_user_t*) RLM_API_NOEXCEPT;
+
 
 /* Sync */
 typedef enum realm_sync_client_metadata_mode {
@@ -2937,6 +3242,7 @@ typedef enum realm_sync_errno_client {
     RLM_SYNC_ERR_CLIENT_BAD_STATE_MESSAGE = 127,
     RLM_SYNC_ERR_CLIENT_MISSING_PROTOCOL_FEATURE = 128,
     RLM_SYNC_ERR_CLIENT_HTTP_TUNNEL_FAILED = 131,
+    RLM_SYNC_ERR_CLIENT_AUTO_CLIENT_RESET_FAILURE = 132,
 } realm_sync_errno_client_e;
 
 typedef enum realm_sync_errno_connection {
@@ -2971,8 +3277,6 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_BAD_CLIENT_VERSION = 210,
     RLM_SYNC_ERR_SESSION_DIVERGING_HISTORIES = 211,
     RLM_SYNC_ERR_SESSION_BAD_CHANGESET = 212,
-    RLM_SYNC_ERR_SESSION_SUPERSEDED = 213,
-    RLM_SYNC_ERR_SESSION_DISABLED_SESSION = 213,
     RLM_SYNC_ERR_SESSION_PARTIAL_SYNC_DISABLED = 214,
     RLM_SYNC_ERR_SESSION_UNSUPPORTED_SESSION_FEATURE = 215,
     RLM_SYNC_ERR_SESSION_BAD_ORIGIN_FILE_IDENT = 216,
@@ -2985,6 +3289,11 @@ typedef enum realm_sync_errno_session {
     RLM_SYNC_ERR_SESSION_USER_MISMATCH = 223,
     RLM_SYNC_ERR_SESSION_TOO_MANY_SESSIONS = 224,
     RLM_SYNC_ERR_SESSION_INVALID_SCHEMA_CHANGE = 225,
+    RLM_SYNC_ERR_SESSION_BAD_QUERY = 226,
+    RLM_SYNC_ERR_SESSION_OBJECT_ALREADY_EXISTS = 227,
+    RLM_SYNC_ERR_SESSION_SERVER_PERMISSIONS_CHANGED = 228,
+    RLM_SYNC_ERR_SESSION_INITIAL_SYNC_NOT_COMPLETED = 229,
+    RLM_SYNC_ERR_SESSION_WRITE_NOT_ALLOWED = 230,
 } realm_sync_errno_session_e;
 
 typedef struct realm_sync_session realm_sync_session_t;
@@ -3012,23 +3321,41 @@ typedef struct realm_sync_error_user_info {
 typedef struct realm_sync_error {
     realm_sync_error_code_t error_code;
     const char* detailed_message;
+    const char* c_original_file_path_key;
+    const char* c_recovery_file_path_key;
     bool is_fatal;
     bool is_unrecognized_by_client;
+    bool is_client_reset_requested;
 
     realm_sync_error_user_info_t* user_info_map;
     size_t user_info_length;
 } realm_sync_error_t;
 
-typedef void (*realm_sync_upload_completion_func_t)(void* userdata, realm_sync_error_code_t*);
-typedef void (*realm_sync_download_completion_func_t)(void* userdata, realm_sync_error_code_t*);
-typedef void (*realm_sync_connection_state_changed_func_t)(void* userdata, realm_sync_connection_state_e old_state,
+/**
+ * Callback function invoked by the sync session once it has uploaded or download
+ * all available changesets. See @a realm_sync_session_wait_for_upload and
+ * @a realm_sync_session_wait_for_download.
+ *
+ * This callback is invoked on the sync client's worker thread.
+ *
+ * @param error Null, if the operation completed successfully.
+ */
+typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t* error);
+typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
+                                                           realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
-typedef void (*realm_sync_session_state_changed_func_t)(void* userdata, realm_sync_session_state_e old_state,
+typedef void (*realm_sync_session_state_changed_func_t)(realm_userdata_t userdata,
+                                                        realm_sync_session_state_e old_state,
                                                         realm_sync_session_state_e new_state);
-typedef void (*realm_sync_progress_func_t)(void* userdata, uint64_t transferred_bytes, uint64_t total_bytes);
-typedef void (*realm_sync_error_handler_func_t)(void* userdata, realm_sync_session_t*, const realm_sync_error_t);
-typedef bool (*realm_sync_ssl_verify_func_t)(void* userdata, const char* server_address, short server_port,
+typedef void (*realm_sync_progress_func_t)(realm_userdata_t userdata, uint64_t transferred_bytes,
+                                           uint64_t total_bytes);
+typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm_sync_session_t*,
+                                                const realm_sync_error_t);
+typedef bool (*realm_sync_ssl_verify_func_t)(realm_userdata_t userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
+typedef void (*realm_sync_before_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm);
+typedef void (*realm_sync_after_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm,
+                                                     realm_t* after_realm, bool did_recover);
 
 typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
 typedef struct realm_flx_sync_subscription_set realm_flx_sync_subscription_set_t;
@@ -3042,8 +3369,8 @@ typedef enum realm_flx_sync_subscription_set_state {
     RLM_SYNC_SUBSCRIPTION_ERROR,
     RLM_SYNC_SUBSCRIPTION_SUPERSEDED,
 } realm_flx_sync_subscription_set_state_e;
-typedef void (*realm_sync_on_subscription_state_changed)(const realm_flx_sync_subscription_set_t* subscription,
-                                                         realm_flx_sync_subscription_set_state_e state);
+typedef void (*realm_sync_on_subscription_state_changed_t)(realm_userdata_t userdata,
+                                                           realm_flx_sync_subscription_set_state_e state);
 
 /**
  * Callback function invoked by the async open task once the realm is open and fully synchronized.
@@ -3053,9 +3380,12 @@ typedef void (*realm_sync_on_subscription_state_changed)(const realm_flx_sync_su
  * @param realm Downloaded realm instance, or null if an error occurred.
  *              Move to the thread you want to use it on and
  *              thaw with @a realm_from_thread_safe_reference().
+ *              Be aware that once received through this call, you own
+ *              the object and must release it when used.
  * @param error Null, if the operation complete successfully.
  */
-typedef void (*realm_async_open_task_completion_func_t)(void* userdata, realm_thread_safe_reference_t* realm,
+typedef void (*realm_async_open_task_completion_func_t)(realm_userdata_t userdata,
+                                                        realm_thread_safe_reference_t* realm,
                                                         const realm_async_error_t* error);
 
 RLM_API realm_sync_client_config_t* realm_sync_client_config_new(void) RLM_API_NOEXCEPT;
@@ -3064,8 +3394,9 @@ RLM_API void realm_sync_client_config_set_metadata_mode(realm_sync_client_config
                                                         realm_sync_client_metadata_mode_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_metadata_encryption_key(realm_sync_client_config_t*,
                                                                   const uint8_t[64]) RLM_API_NOEXCEPT;
-RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t*, realm_log_func_t, void* userdata,
-                                                       realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+RLM_API void realm_sync_client_config_set_log_callback(realm_sync_client_config_t*, realm_log_func_t,
+                                                       realm_userdata_t userdata,
+                                                       realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_log_level(realm_sync_client_config_t*, realm_log_level_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_client_config_set_reconnect_mode(realm_sync_client_config_t*,
                                                          realm_sync_client_reconnect_mode_e) RLM_API_NOEXCEPT;
@@ -3089,11 +3420,13 @@ RLM_API realm_sync_config_t* realm_flx_sync_config_new(const realm_user_t*) RLM_
 RLM_API void realm_sync_config_set_session_stop_policy(realm_sync_config_t*,
                                                        realm_sync_session_stop_policy_e) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t*, realm_sync_error_handler_func_t,
-                                                 void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+                                                 realm_userdata_t userdata,
+                                                 realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_client_validate_ssl(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_ssl_trust_certificate_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_ssl_verify_callback(realm_sync_config_t*, realm_sync_ssl_verify_func_t,
-                                                       void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+                                                       realm_userdata_t userdata,
+                                                       realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_cancel_waits_on_nonfatal_error(realm_sync_config_t*, bool) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_authorization_header_name(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, const char* name,
@@ -3101,21 +3434,71 @@ RLM_API void realm_sync_config_set_custom_http_header(realm_sync_config_t*, cons
 RLM_API void realm_sync_config_set_recovery_directory_path(realm_sync_config_t*, const char*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_config_set_resync_mode(realm_sync_config_t*,
                                                realm_sync_session_resync_mode_e) RLM_API_NOEXCEPT;
+RLM_API void
+realm_sync_config_set_before_client_reset_handler(realm_sync_config_t*, realm_sync_before_client_reset_func_t,
+                                                  realm_userdata_t userdata,
+                                                  realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+RLM_API void
+realm_sync_config_set_after_client_reset_handler(realm_sync_config_t*, realm_sync_after_client_reset_func_t,
+                                                 realm_userdata_t userdata,
+                                                 realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+
+/**
+ * Fetch subscription id for the subscription passed as argument.
+ * @return realm_object_id_t for the subscription passed as argument
+ */
+RLM_API realm_object_id_t realm_sync_subscription_id(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+/**
+ * Fetch subscription name for the subscription passed as argument.
+ * @return realm_string_t which contains the name of the subscription.
+ */
+RLM_API realm_string_t realm_sync_subscription_name(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+/**
+ * Fetch object class name for the subscription passed as argument.
+ * @return a realm_string_t which contains the class name of the subscription.
+ */
+RLM_API realm_string_t realm_sync_subscription_object_class_name(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+/**
+ * Fetch the query string associated with the subscription passed as argument.
+ * @return realm_string_t which contains the query associated with the subscription.
+ */
+RLM_API realm_string_t realm_sync_subscription_query_string(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+/**
+ * Fetch the timestamp in which the subscription was created for the subscription passed as argument.
+ * @return realm_timestamp_t representing the timestamp in which the subscription for created.
+ */
+RLM_API realm_timestamp_t realm_sync_subscription_created_at(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
+
+/**
+ * Fetch the timestamp in which the subscription was updated for the subscription passed as argument.
+ * @return realm_timestamp_t representing the timestamp in which the subscription was updated.
+ */
+RLM_API realm_timestamp_t realm_sync_subscription_updated_at(const realm_flx_sync_subscription_t* subscription)
+    RLM_API_NOEXCEPT;
 
 /**
  * Get latest subscription set
  * @return a non null subscription set pointer if such it exists.
  */
-RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_latest_subscription_set(const realm_t*);
 
 /**
  * Get active subscription set
  * @return a non null subscription set pointer if such it exists.
  */
-RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*) RLM_API_NOEXCEPT;
+RLM_API realm_flx_sync_subscription_set_t* realm_sync_get_active_subscription_set(const realm_t*);
 
 /**
- * Wait uptill subscripton set state is equal to the state passed as parameter.
+ * Wait until subscripton set state is equal to the state passed as parameter.
  * This is a blocking operation.
  * @return the current subscription state
  */
@@ -3127,10 +3510,9 @@ RLM_API realm_flx_sync_subscription_set_state_e realm_sync_on_subscription_set_s
  * This is an asynchronous operation.
  * @return true/false if the handler was registered correctly
  */
-RLM_API bool
-realm_sync_on_subscription_set_state_change_async(const realm_flx_sync_subscription_set_t*,
-                                                  realm_flx_sync_subscription_set_state_e,
-                                                  realm_sync_on_subscription_state_changed) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_on_subscription_set_state_change_async(
+    const realm_flx_sync_subscription_set_t* subscription_set, realm_flx_sync_subscription_set_state_e notify_when,
+    realm_sync_on_subscription_state_changed_t, realm_userdata_t userdata, realm_free_userdata_func_t userdata_free);
 
 /**
  *  Retrieve version for the subscription set passed as parameter
@@ -3162,65 +3544,96 @@ RLM_API size_t realm_sync_subscription_set_size(const realm_flx_sync_subscriptio
  *  @return the subscription or nullptr if the index is not valid
  */
 RLM_API realm_flx_sync_subscription_t* realm_sync_subscription_at(const realm_flx_sync_subscription_set_t*,
-                                                                  size_t index) RLM_API_NOEXCEPT;
-/**
- *  Find subscription by name
- *  @return a pointer to the subscription with the name passed as parameter
- */
-RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*,
-                                                                            const char* name) RLM_API_NOEXCEPT;
+                                                                  size_t index);
 /**
  *  Find subscription associated to the query passed as parameter
  *  @return a pointer to the subscription or nullptr if not found
  */
 RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_query(const realm_flx_sync_subscription_set_t*,
                                                                              realm_query_t*) RLM_API_NOEXCEPT;
+
+/**
+ *  Find subscription associated to the results set  passed as parameter
+ *  @return a pointer to the subscription or nullptr if not found
+ */
+RLM_API realm_flx_sync_subscription_t*
+realm_sync_find_subscription_by_results(const realm_flx_sync_subscription_set_t*, realm_results_t*) RLM_API_NOEXCEPT;
+
+
+/**
+ *  Find subscription by name passed as parameter
+ *  @return a pointer to the subscription or nullptr if not found
+ */
+RLM_API realm_flx_sync_subscription_t* realm_sync_find_subscription_by_name(const realm_flx_sync_subscription_set_t*,
+                                                                            const char* name) RLM_API_NOEXCEPT;
+
 /**
  *  Refresh subscription
  *  @return true/false if the operation was successful or not
  */
-RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_refresh(realm_flx_sync_subscription_set_t*);
 
 /**
  *  Convert a subscription into a mutable one in order to alter the subscription itself
  *  @return a pointer to a mutable subscription
  */
 RLM_API realm_flx_sync_mutable_subscription_set_t*
-realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*) RLM_API_NOEXCEPT;
+realm_sync_make_subscription_set_mutable(realm_flx_sync_subscription_set_t*);
 
 /**
  *  Clear the subscription set passed as parameter
  *  @return true/false if operation was successful
  */
-RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_clear(realm_flx_sync_mutable_subscription_set_t*);
 
 /**
- *  Insert ot update a query for the subscription set passed as parameter, if successful the index where the query was
- * inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
+ * Insert ot update the query contained inside a result object for the subscription set passed as parameter, if
+ * successful the index where the query was inserted or updated is returned along with the info whether a new query
+ * was inserted or not. It is possible to specify a name for the query inserted (optional).
+ *  @return true/false if operation was successful
+ */
+RLM_API bool realm_sync_subscription_set_insert_or_assign_results(realm_flx_sync_mutable_subscription_set_t*,
+                                                                  realm_results_t*, const char* name,
+                                                                  size_t* out_index, bool* out_inserted);
+/**
+ * Insert ot update a query for the subscription set passed as parameter, if successful the index where the query
+ * was inserted or updated is returned along with the info whether a new query was inserted or not. It is possible to
  * specify a name for the query inserted (optional).
  *  @return true/false if operation was successful
  */
-RLM_API bool realm_sync_subscription_set_insert_or_assign(realm_flx_sync_mutable_subscription_set_t*, realm_query_t*,
-                                                          const char* name, size_t* out_index,
-                                                          bool* out_inserted) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_insert_or_assign_query(realm_flx_sync_mutable_subscription_set_t*,
+                                                                realm_query_t*, const char* name, size_t* out_index,
+                                                                bool* out_inserted);
 /**
- *  Erase from subscription set by name
- *  @return true/false if operation was successful
+ *  Erase from subscription set by id. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error).
  */
-RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*,
-                                                       const char*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_erase_by_id(realm_flx_sync_mutable_subscription_set_t*,
+                                                     const realm_object_id_t*, bool* erased);
 /**
- *  Erase from subscription set by query
- *  @return true/false if operation was successful
+ *  Erase from subscription set by name. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
  */
-RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*,
-                                                        realm_query_t*) RLM_API_NOEXCEPT;
+RLM_API bool realm_sync_subscription_set_erase_by_name(realm_flx_sync_mutable_subscription_set_t*, const char*,
+                                                       bool* erased);
+/**
+ *  Erase from subscription set by query. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_query(realm_flx_sync_mutable_subscription_set_t*, realm_query_t*,
+                                                        bool* erased);
+/**
+ *  Erase from subscription set by results. If operation completes successfully set the bool out param.
+ *  @return true if no error occurred, false otherwise (use realm_get_last_error for fetching the error)
+ */
+RLM_API bool realm_sync_subscription_set_erase_by_results(realm_flx_sync_mutable_subscription_set_t*,
+                                                          realm_results_t*, bool* erased);
 /**
  *  Commit the subscription_set passed as parameter (in order that all the changes made will take effect)
  *  @return pointer to a valid immutable subscription if commit was successful
  */
 RLM_API realm_flx_sync_subscription_set_t*
-realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*) RLM_API_NOEXCEPT;
+realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*);
 
 /**
  * Create a task that will open a realm with the specific configuration
@@ -3230,11 +3643,12 @@ realm_sync_subscription_set_commit(realm_flx_sync_mutable_subscription_set_t*) R
  */
 RLM_API realm_async_open_task_t* realm_open_synchronized(realm_config_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_start(realm_async_open_task_t*, realm_async_open_task_completion_func_t,
-                                         void* userdata, realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+                                         realm_userdata_t userdata,
+                                         realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_cancel(realm_async_open_task_t*) RLM_API_NOEXCEPT;
 RLM_API uint64_t realm_async_open_task_register_download_progress_notifier(
-    realm_async_open_task_t*, realm_sync_progress_func_t, void* userdata,
-    realm_free_userdata_func_t) RLM_API_NOEXCEPT;
+    realm_async_open_task_t*, realm_sync_progress_func_t, realm_userdata_t userdata,
+    realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_async_open_task_t*,
                                                                          uint64_t token) RLM_API_NOEXCEPT;
 
@@ -3248,14 +3662,34 @@ RLM_API void realm_async_open_task_unregister_download_progress_notifier(realm_a
  */
 RLM_API realm_sync_session_t* realm_sync_session_get(const realm_t*) RLM_API_NOEXCEPT;
 
-RLM_API realm_sync_session_state_e realm_sync_session_get_state(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+/**
+ * Fetch state for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the state for
+ * @return realm_sync_session_state_e value
+ */
+RLM_API realm_sync_session_state_e realm_sync_session_get_state(const realm_sync_session_t* session) RLM_API_NOEXCEPT;
 
-RLM_API realm_sync_connection_state_e realm_sync_session_get_connection_state(const realm_sync_session_t*)
+/**
+ * Fetch connection state for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the state for
+ * @return realm_sync_connection_state_e value
+ */
+RLM_API realm_sync_connection_state_e realm_sync_session_get_connection_state(const realm_sync_session_t* session)
     RLM_API_NOEXCEPT;
 
-RLM_API realm_user_t* realm_sync_session_get_user(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+/**
+ * Fetch user for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the user for
+ * @return ptr to realm_user_t
+ */
+RLM_API realm_user_t* realm_sync_session_get_user(const realm_sync_session_t* session) RLM_API_NOEXCEPT;
 
-RLM_API const char* realm_sync_session_get_partition_value(const realm_sync_session_t*) RLM_API_NOEXCEPT;
+/**
+ * Fetch partition value for the session passed as parameter
+ * @param session ptr to the sync session to retrieve the partition value for
+ * @return a string containing the partition value
+ */
+RLM_API const char* realm_sync_session_get_partition_value(const realm_sync_session_t* session) RLM_API_NOEXCEPT;
 
 /**
  * Get the filesystem path of the realm file backing this session.
@@ -3277,15 +3711,31 @@ RLM_API void realm_sync_session_pause(realm_sync_session_t*) RLM_API_NOEXCEPT;
 RLM_API void realm_sync_session_resume(realm_sync_session_t*) RLM_API_NOEXCEPT;
 
 /**
+ * In case manual reset is needed, run this function in order to reset sync client files.
+ * The sync_path is going to passed into realm_sync_error_handler_func_t, if manual reset is needed.
+ * This function is supposed to be called inside realm_sync_error_handler_func_t callback, if sync client reset is
+ * needed
+ * @param realm_app ptr to realm app.
+ * @param sync_path path where the sync files are.
+ * @return true if operation was succesful
+ */
+RLM_API bool realm_sync_immediately_run_file_actions(realm_app_t* realm_app, const char* sync_path) RLM_API_NOEXCEPT;
+
+/**
  * Register a callback that will be invoked every time the session's connection state changes.
  *
  * @return A token value that can be used to unregiser the callback.
  */
 RLM_API uint64_t realm_sync_session_register_connection_state_change_callback(
-    realm_sync_session_t*, realm_sync_connection_state_changed_func_t, void* userdata,
+    realm_sync_session_t*, realm_sync_connection_state_changed_func_t, realm_userdata_t userdata,
     realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
-RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t*,
+/**
+ * Unregister a callback that will be invoked every time the session's connection state changes.
+ * @param session ptr to a valid sync session
+ * @param token the token returned by `realm_sync_session_register_connection_state_change_callback`
+ */
+RLM_API void realm_sync_session_unregister_connection_state_change_callback(realm_sync_session_t* session,
                                                                             uint64_t token) RLM_API_NOEXCEPT;
 
 /**
@@ -3300,24 +3750,50 @@ RLM_API void realm_sync_session_unregister_connection_state_change_callback(real
  */
 RLM_API uint64_t realm_sync_session_register_progress_notifier(
     realm_sync_session_t*, realm_sync_progress_func_t, realm_sync_progress_direction_e, bool is_streaming,
-    void* userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
+    realm_userdata_t userdata, realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
-RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t*, uint64_t token) RLM_API_NOEXCEPT;
+
+/**
+ * Unregister a callback that will be invoked every time the session reports progress.
+ * @param session ptr to a valid sync session
+ * @param token the token returned by `realm_sync_session_register_progress_notifier`
+ */
+RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_t* session,
+                                                             uint64_t token) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending downloads have completed.
  */
 RLM_API void
-realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_sync_download_completion_func_t,
-                                                void* userdata,
+realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_sync_wait_for_completion_func_t,
+                                                realm_userdata_t userdata,
                                                 realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending uploads have completed.
  */
-RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*, realm_sync_upload_completion_func_t,
-                                                           void* userdata,
+RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*,
+                                                           realm_sync_wait_for_completion_func_t,
+                                                           realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
+/**
+ * Wrapper for SyncSession::OnlyForTesting::handle_error. This routine should be used only for testing.
+ * @param session ptr to a valid sync session
+ * @param error_code error code to simulate
+ * @param category category of the error to simulate
+ * @param error_message string representing the error
+ * @param is_fatal boolean to signal if the error is fatal or not
+ */
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
+                                                         int category, const char* error_message, bool is_fatal);
+
+/**
+ * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
+ * and retrieve a it later via realm_get_last_error.
+ * Most importantly the SDK is responsible to handle the memory pointed by usercode_error.
+ * @param usercode_error pointer representing whatever object the SDK treats as exception/error.
+ */
+RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
 
 #endif // REALM_H

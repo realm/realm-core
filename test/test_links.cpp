@@ -1177,7 +1177,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_embedded_table("target");
+        TableRef target = group.add_table("target", Table::Type::Embedded);
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         ColKey col_link;
@@ -1300,7 +1300,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     struct Fixture {
         Group group;
         TableRef origin = group.add_table("origin");
-        TableRef target = group.add_embedded_table("target");
+        TableRef target = group.add_table("target", Table::Type::Embedded);
         std::vector<ObjKey> origin_keys;
         std::vector<ObjKey> target_keys;
         std::vector<LnkLstPtr> linklists;
@@ -1604,5 +1604,49 @@ TEST(Links_DetachedAccessor)
     CHECK_EQUAL(link_list.size(), 0);
     CHECK_NOT(link_list.is_attached());
 }
+
+TEST(Unresolved_Mixed_links)
+{
+    Group g;
+
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "source_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "dest_id");
+    auto list_mixed_col = source_table->add_column_list(type_Mixed, "list of mixed");
+    auto set_of_mixed_col = source_table->add_column_set(type_Mixed, "set of mixed");
+
+    auto source_obj = source_table->create_object_with_primary_key(0);
+    auto dest_obj = dest_table->create_object_with_primary_key(1);
+
+    Lst<Mixed> list_mixed = source_obj.get_list<Mixed>(list_mixed_col);
+    Set<Mixed> set_mixed = source_obj.get_set<Mixed>(set_of_mixed_col);
+
+    list_mixed.add(ObjLink{dest_table->get_key(), dest_obj.get_key()});
+    set_mixed.insert(ObjLink{dest_table->get_key(), dest_obj.get_key()});
+
+    size_t expected_size = 1;
+    CHECK_EQUAL(list_mixed.size(), expected_size);
+    CHECK_EQUAL(set_mixed.size(), expected_size);
+
+    dest_obj.invalidate(); // send to graveyard, and transform all incoming links to be unresolved
+
+    // difference between list/set of links and lst/set of Mixed, size returns the whole list of links also the
+    // null/unresolved ones
+    expected_size = 1;
+    CHECK_EQUAL(list_mixed.size(), expected_size);
+    CHECK_EQUAL(set_mixed.size(), expected_size);
+
+    if (list_mixed.size()) {
+        auto link = list_mixed.get(0);
+        CHECK(link.is_null());
+    }
+    if (set_mixed.size()) {
+        auto link = set_mixed.get(0);
+        // set do not hide unresolved links
+        CHECK(!link.is_null());
+        CHECK(link.is_unresolved_link());
+    }
+}
+
+// TODO: add tests here
 
 #endif // TEST_LINKS

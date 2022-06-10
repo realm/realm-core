@@ -28,6 +28,7 @@
 #include "realm/util/optional.hpp"
 
 #include <list>
+#include <set>
 #include <string_view>
 
 namespace realm::sync {
@@ -60,6 +61,12 @@ public:
 
     // Returns a stringified version of the query associated with this subscription.
     std::string_view query_string() const;
+
+    // Returns whether the 2 subscriptions passed have the same id.
+    friend bool operator==(const Subscription& lhs, const Subscription& rhs)
+    {
+        return lhs.id() == rhs.id();
+    }
 
 private:
     friend class SubscriptionSet;
@@ -185,9 +192,9 @@ protected:
     };
 
     explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int64_t version, SupersededTag);
-    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj);
+    explicit SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj);
 
-    void load_from_database(TransactionRef tr, Obj obj);
+    void load_from_database(const Transaction& tr, Obj obj);
 
     // Get a reference to the SubscriptionStore. It may briefly extend the lifetime of the store.
     std::shared_ptr<const SubscriptionStore> get_flx_subscription_store() const;
@@ -312,6 +319,9 @@ public:
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
 
+    using TableSet = std::set<std::string, std::less<>>;
+    TableSet get_tables_for_latest(const Transaction& tr) const;
+
     struct PendingSubscription {
         int64_t query_version;
         DB::version_type snapshot_version;
@@ -326,24 +336,6 @@ private:
 
 protected:
     explicit SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set);
-
-    struct SubscriptionKeys {
-        TableKey table;
-        ColKey id;
-        ColKey created_at;
-        ColKey updated_at;
-        ColKey name;
-        ColKey object_class_name;
-        ColKey query_str;
-    };
-
-    struct SubscriptionSetKeys {
-        TableKey table;
-        ColKey snapshot_version;
-        ColKey state;
-        ColKey error_str;
-        ColKey subscriptions;
-    };
 
     struct NotificationRequest {
         NotificationRequest(int64_t version, util::Promise<SubscriptionSet::State> promise,
@@ -368,9 +360,22 @@ protected:
     friend class Subscription;
     friend class SubscriptionSet;
 
+    TableKey m_sub_table;
+    ColKey m_sub_id;
+    ColKey m_sub_created_at;
+    ColKey m_sub_updated_at;
+    ColKey m_sub_name;
+    ColKey m_sub_object_class_name;
+    ColKey m_sub_query_str;
+
+    TableKey m_sub_set_table;
+    ColKey m_sub_set_version_num;
+    ColKey m_sub_set_snapshot_version;
+    ColKey m_sub_set_state;
+    ColKey m_sub_set_error_str;
+    ColKey m_sub_set_subscriptions;
+
     util::UniqueFunction<void(int64_t)> m_on_new_subscription_set;
-    std::unique_ptr<SubscriptionSetKeys> m_sub_set_keys;
-    std::unique_ptr<SubscriptionKeys> m_sub_keys;
 
     mutable std::mutex m_pending_notifications_mutex;
     mutable std::condition_variable m_pending_notifications_cv;

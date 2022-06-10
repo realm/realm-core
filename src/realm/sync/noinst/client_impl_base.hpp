@@ -16,6 +16,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/ez_websocket.hpp>
+#include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
@@ -61,7 +62,7 @@ public:
     class Session;
 
     using port_type = util::network::Endpoint::port_type;
-    using OutputBuffer         = util::ResettableExpandableBufferOutputStream;
+    using OutputBuffer = util::ResettableExpandableBufferOutputStream;
     using ClientProtocol = _impl::ClientProtocol;
     using ClientResetOperation = _impl::ClientResetOperation;
 
@@ -449,15 +450,14 @@ private:
     void close_due_to_protocol_error(std::error_code);
     void close_due_to_missing_protocol_feature();
     void close_due_to_client_side_error(std::error_code, bool is_fatal);
-    void close_due_to_server_side_error(ProtocolError, StringData message, bool try_again);
+    void close_due_to_server_side_error(ProtocolError, const ProtocolErrorInfo& info);
     void voluntary_disconnect();
-    void involuntary_disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
-    void disconnect(std::error_code ec, bool is_fatal, StringData* custom_message);
+    void involuntary_disconnect(const SessionErrorInfo& info);
+    void disconnect(const SessionErrorInfo& info);
     void change_state_to_disconnected() noexcept;
-
     // These are only called from ClientProtocol class.
     void receive_pong(milliseconds_type timestamp);
-    void receive_error_message(int error_code, StringData message, bool try_again, session_ident_type);
+    void receive_error_message(const ProtocolErrorInfo& info, session_ident_type);
     void receive_query_error_message(int error_code, std::string_view message, int64_t query_version,
                                      session_ident_type);
     void receive_ident_message(session_ident_type, SaltedFileIdent);
@@ -478,7 +478,7 @@ private:
 
     static std::string make_logger_prefix(connection_ident_type);
 
-    void report_connection_state_change(ConnectionState, const SessionErrorInfo*);
+    void report_connection_state_change(ConnectionState, util::Optional<SessionErrorInfo> error_info = util::none);
 
     friend ClientProtocol;
     friend class Session;
@@ -735,7 +735,7 @@ public:
 
     void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
 
-    void on_connection_state_changed(ConnectionState, const SessionErrorInfo*);
+    void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
 
     /// The application must ensure that the new session object is either
     /// activated (Connection::activate_session()) or destroyed before the
@@ -762,7 +762,7 @@ private:
     const std::string& get_virt_path() const noexcept;
 
     const std::string& get_realm_path() const noexcept;
-    DB& get_db() const noexcept;
+    DBRef get_db() const noexcept;
     SyncTransactReporter* get_transact_reporter() noexcept;
 
     /// The implementation need only ensure that the returned reference stays valid
@@ -854,14 +854,23 @@ private:
     ///
     /// These functions are guaranteed to not be called before activation, and also
     /// not after initiation of deactivation.
-    void on_suspended(std::error_code ec, StringData message, bool is_fatal);
+    void on_suspended(const SessionErrorInfo& error_info);
     void on_resumed();
     //@}
 
     void on_flx_sync_error(int64_t version, std::string_view err_msg);
     void on_flx_sync_progress(int64_t version, DownloadBatchState batch_state);
 
-    void begin_resumption_delay();
+    // Processes an FLX download message, if it's a bootstrap message. If it's not a bootstrap
+    // message then this is a noop and will return false. Otherwise this will return true
+    // and no further processing of the download message should take place.
+    bool process_flx_bootstrap_message(const SyncProgress& progress, DownloadBatchState batch_state,
+                                       int64_t query_version, const ReceivedChangesets& received_changesets);
+
+    // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
+    void process_pending_flx_bootstrap();
+
+    void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
 private:
@@ -879,7 +888,9 @@ private:
     bool m_suspended = false;
 
     util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
-    std::chrono::milliseconds m_try_again_activation_delay{1000};
+    ResumptionDelayInfo m_try_again_delay_info;
+    util::Optional<ProtocolError> m_try_again_error_code;
+    util::Optional<std::chrono::milliseconds> m_current_try_again_delay_interval;
 
     DownloadBatchState m_download_batch_state = DownloadBatchState::LastInBatch;
 
@@ -895,12 +906,12 @@ private:
     // These are reset when the session is activated, and again whenever the
     // connection is lost or the rebinding process is initiated.
     bool m_enlisted_to_send;
-    bool m_bind_message_sent;                   // Sending of BIND message has been initiated
-    bool m_ident_message_sent;                  // Sending of IDENT message has been initiated
-    bool m_unbind_message_sent;                 // Sending of UNBIND message has been initiated
-    bool m_unbind_message_sent_2;               // Sending of UNBIND message has been completed
-    bool m_error_message_received;              // Session specific ERROR message received
-    bool m_unbound_message_received;            // UNBOUND message received
+    bool m_bind_message_sent;        // Sending of BIND message has been initiated
+    bool m_ident_message_sent;       // Sending of IDENT message has been initiated
+    bool m_unbind_message_sent;      // Sending of UNBIND message has been initiated
+    bool m_unbind_message_sent_2;    // Sending of UNBIND message has been completed
+    bool m_error_message_received;   // Session specific ERROR message received
+    bool m_unbound_message_received; // UNBOUND message received
 
     // True when there is a new FLX sync query we need to send to the server.
     util::Optional<SubscriptionStore::PendingSubscription> m_pending_flx_sub_set;
@@ -1046,7 +1057,7 @@ private:
                                   DownloadBatchState last_in_batch, int64_t query_version, const ReceivedChangesets&);
     std::error_code receive_mark_message(request_ident_type);
     std::error_code receive_unbound_message();
-    std::error_code receive_error_message(int error_code, StringData message, bool try_again);
+    std::error_code receive_error_message(const ProtocolErrorInfo& info);
     std::error_code receive_query_error_message(int error_code, std::string_view message, int64_t query_version);
 
     void initiate_rebind();
@@ -1058,6 +1069,7 @@ private:
     bool check_received_sync_progress(const SyncProgress&, int&) noexcept;
     void check_for_upload_completion();
     void check_for_download_completion();
+    void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState);
 
     friend class Connection;
 };
@@ -1148,17 +1160,14 @@ void ClientImpl::Connection::for_each_active_session(H handler)
 inline void ClientImpl::Connection::voluntary_disconnect()
 {
     REALM_ASSERT(m_reconnect_info.m_reason && was_voluntary(*m_reconnect_info.m_reason));
-    std::error_code ec = ClientError::connection_closed;
-    bool is_fatal = false;
-    StringData* custom_message = nullptr;
-    disconnect(ec, is_fatal, custom_message); // Throws
+    constexpr bool try_again = true;
+    disconnect(SessionErrorInfo{ClientError::connection_closed, try_again}); // Throws
 }
 
-inline void ClientImpl::Connection::involuntary_disconnect(std::error_code ec, bool is_fatal,
-                                                           StringData* custom_message)
+inline void ClientImpl::Connection::involuntary_disconnect(const SessionErrorInfo& info)
 {
     REALM_ASSERT(m_reconnect_info.m_reason && !was_voluntary(*m_reconnect_info.m_reason));
-    disconnect(ec, is_fatal, custom_message); // Throws
+    disconnect(info); // Throws
 }
 
 inline void ClientImpl::Connection::change_state_to_disconnected() noexcept

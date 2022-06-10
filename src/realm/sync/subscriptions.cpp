@@ -20,13 +20,19 @@
 
 #include "external/json/json.hpp"
 
+#include "realm/data_type.hpp"
+#include "realm/db.hpp"
 #include "realm/group.hpp"
 #include "realm/keys.hpp"
 #include "realm/list.hpp"
 #include "realm/sort_descriptor.hpp"
+#include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/table.hpp"
 #include "realm/table_view.hpp"
 #include "realm/util/flat_map.hpp"
+#include <algorithm>
+#include <initializer_list>
+#include <stdexcept>
 
 namespace realm::sync {
 namespace {
@@ -34,11 +40,9 @@ namespace {
 //   v2: Initial public beta.
 
 constexpr static int c_flx_schema_version = 2;
-constexpr static std::string_view c_flx_metadata_table("flx_metadata");
 constexpr static std::string_view c_flx_subscription_sets_table("flx_subscription_sets");
 constexpr static std::string_view c_flx_subscriptions_table("flx_subscriptions");
 
-constexpr static std::string_view c_flx_meta_schema_version_field("schema_version");
 constexpr static std::string_view c_flx_sub_sets_state_field("state");
 constexpr static std::string_view c_flx_sub_sets_version_field("version");
 constexpr static std::string_view c_flx_sub_sets_error_str_field("error");
@@ -57,13 +61,13 @@ using OptionalString = util::Optional<std::string>;
 } // namespace
 
 Subscription::Subscription(const SubscriptionStore* parent, Obj obj)
-    : m_id(obj.get<ObjectId>(parent->m_sub_keys->id))
-    , m_created_at(obj.get<Timestamp>(parent->m_sub_keys->created_at))
-    , m_updated_at(obj.get<Timestamp>(parent->m_sub_keys->updated_at))
-    , m_name(obj.is_null(parent->m_sub_keys->name) ? OptionalString(util::none)
-                                                   : OptionalString{obj.get<String>(parent->m_sub_keys->name)})
-    , m_object_class_name(obj.get<String>(parent->m_sub_keys->object_class_name))
-    , m_query_string(obj.get<String>(parent->m_sub_keys->query_str))
+    : m_id(obj.get<ObjectId>(parent->m_sub_id))
+    , m_created_at(obj.get<Timestamp>(parent->m_sub_created_at))
+    , m_updated_at(obj.get<Timestamp>(parent->m_sub_updated_at))
+    , m_name(obj.is_null(parent->m_sub_name) ? OptionalString(util::none)
+                                             : OptionalString{obj.get<String>(parent->m_sub_name)})
+    , m_object_class_name(obj.get<String>(parent->m_sub_object_class_name))
+    , m_query_string(obj.get<String>(parent->m_sub_query_str))
 {
 }
 
@@ -115,11 +119,11 @@ std::string_view Subscription::query_string() const
     return m_query_string;
 }
 
-SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
+SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, const Transaction& tr, Obj obj)
     : m_mgr(mgr)
 {
     if (obj.is_valid()) {
-        load_from_database(std::move(tr), std::move(obj));
+        load_from_database(tr, std::move(obj));
     }
 }
 
@@ -130,16 +134,16 @@ SubscriptionSet::SubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, int
 {
 }
 
-void SubscriptionSet::load_from_database(TransactionRef tr, Obj obj)
+void SubscriptionSet::load_from_database(const Transaction& tr, Obj obj)
 {
     auto mgr = get_flx_subscription_store(); // Throws
 
-    m_cur_version = tr->get_version();
+    m_cur_version = tr.get_version();
     m_version = obj.get_primary_key().get_int();
-    m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_keys->state));
-    m_error_str = obj.get<String>(mgr->m_sub_set_keys->error_str);
-    m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_keys->snapshot_version));
-    auto sub_list = obj.get_linklist(mgr->m_sub_set_keys->subscriptions);
+    m_state = static_cast<State>(obj.get<int64_t>(mgr->m_sub_set_state));
+    m_error_str = obj.get<String>(mgr->m_sub_set_error_str);
+    m_snapshot_version = static_cast<DB::version_type>(obj.get<int64_t>(mgr->m_sub_set_snapshot_version));
+    auto sub_list = obj.get_linklist(mgr->m_sub_set_subscriptions);
     m_subs.clear();
     for (size_t idx = 0; idx < sub_list.size(); ++idx) {
         m_subs.push_back(Subscription(mgr.get(), sub_list.get_object(idx)));
@@ -209,7 +213,7 @@ SubscriptionSet::const_iterator SubscriptionSet::find(const Query& query) const
 }
 
 MutableSubscriptionSet::MutableSubscriptionSet(std::weak_ptr<const SubscriptionStore> mgr, TransactionRef tr, Obj obj)
-    : SubscriptionSet(mgr, tr, obj)
+    : SubscriptionSet(mgr, *tr, obj)
     , m_tr(std::move(tr))
     , m_obj(std::move(obj))
     , m_old_state(state())
@@ -236,6 +240,7 @@ MutableSubscriptionSet::iterator MutableSubscriptionSet::end()
 MutableSubscriptionSet::iterator MutableSubscriptionSet::erase(const_iterator it)
 {
     check_is_mutable();
+    REALM_ASSERT(it != end());
     return m_subs.erase(it);
 }
 
@@ -456,26 +461,26 @@ SubscriptionSet MutableSubscriptionSet::commit() &&
         if (m_state == State::Uncommitted) {
             m_state = State::Pending;
         }
-        m_obj.set(mgr->m_sub_set_keys->snapshot_version, static_cast<int64_t>(m_tr->get_version()));
+        m_obj.set(mgr->m_sub_set_snapshot_version, static_cast<int64_t>(m_tr->get_version()));
 
-        auto obj_sub_list = m_obj.get_linklist(mgr->m_sub_set_keys->subscriptions);
+        auto obj_sub_list = m_obj.get_linklist(mgr->m_sub_set_subscriptions);
         obj_sub_list.clear();
         for (const auto& sub : m_subs) {
             auto new_sub =
                 obj_sub_list.create_and_insert_linked_object(obj_sub_list.is_empty() ? 0 : obj_sub_list.size());
-            new_sub.set(mgr->m_sub_keys->id, sub.id());
-            new_sub.set(mgr->m_sub_keys->created_at, sub.created_at());
-            new_sub.set(mgr->m_sub_keys->updated_at, sub.updated_at());
+            new_sub.set(mgr->m_sub_id, sub.id());
+            new_sub.set(mgr->m_sub_created_at, sub.created_at());
+            new_sub.set(mgr->m_sub_updated_at, sub.updated_at());
             if (sub.m_name) {
-                new_sub.set(mgr->m_sub_keys->name, StringData(sub.name()));
+                new_sub.set(mgr->m_sub_name, StringData(sub.name()));
             }
-            new_sub.set(mgr->m_sub_keys->object_class_name, StringData(sub.object_class_name()));
-            new_sub.set(mgr->m_sub_keys->query_str, StringData(sub.query_string()));
+            new_sub.set(mgr->m_sub_object_class_name, StringData(sub.object_class_name()));
+            new_sub.set(mgr->m_sub_query_str, StringData(sub.query_string()));
         }
     }
-    m_obj.set(mgr->m_sub_set_keys->state, static_cast<int64_t>(m_state));
+    m_obj.set(mgr->m_sub_set_state, static_cast<int64_t>(m_state));
     if (!m_error_str.empty()) {
-        m_obj.set(mgr->m_sub_set_keys->error_str, StringData(m_error_str));
+        m_obj.set(mgr->m_sub_set_error_str, StringData(m_error_str));
     }
 
     const auto flx_version = version();
@@ -553,100 +558,54 @@ SubscriptionStoreRef SubscriptionStore::create(DBRef db, util::UniqueFunction<vo
 SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t)> on_new_subscription_set)
     : m_db(std::move(db))
     , m_on_new_subscription_set(std::move(on_new_subscription_set))
-    , m_sub_set_keys(std::make_unique<SubscriptionSetKeys>())
-    , m_sub_keys(std::make_unique<SubscriptionKeys>())
 {
-    auto tr = m_db->start_read();
-
-    auto schema_metadata_key = tr->find_table(c_flx_metadata_table);
-    auto create_schema_if_needed = [&] {
-        tr->promote_to_write();
-
-        if (tr->find_table(c_flx_metadata_table)) {
-            return false;
-        }
-
-        auto schema_metadata = tr->add_table(c_flx_metadata_table);
-        auto version_col = schema_metadata->add_column(type_Int, c_flx_meta_schema_version_field);
-        schema_metadata->create_object().set(version_col, int64_t(c_flx_schema_version));
-
-        auto sub_sets_table =
-            tr->add_table_with_primary_key(c_flx_subscription_sets_table, type_Int, c_flx_sub_sets_version_field);
-        auto subs_table = tr->add_embedded_table(c_flx_subscriptions_table);
-        m_sub_keys->table = subs_table->get_key();
-        m_sub_keys->id = subs_table->add_column(type_ObjectId, c_flx_sub_id_field);
-        m_sub_keys->created_at = subs_table->add_column(type_Timestamp, c_flx_sub_created_at_field);
-        m_sub_keys->updated_at = subs_table->add_column(type_Timestamp, c_flx_sub_updated_at_field);
-        m_sub_keys->name = subs_table->add_column(type_String, c_flx_sub_name_field, true);
-        m_sub_keys->object_class_name = subs_table->add_column(type_String, c_flx_sub_object_class_field);
-        m_sub_keys->query_str = subs_table->add_column(type_String, c_flx_sub_query_str_field);
-
-        m_sub_set_keys->table = sub_sets_table->get_key();
-        m_sub_set_keys->state = sub_sets_table->add_column(type_Int, c_flx_sub_sets_state_field);
-        m_sub_set_keys->snapshot_version =
-            sub_sets_table->add_column(type_Int, c_flx_sub_sets_snapshot_version_field);
-        m_sub_set_keys->error_str = sub_sets_table->add_column(type_String, c_flx_sub_sets_error_str_field, true);
-        m_sub_set_keys->subscriptions =
-            sub_sets_table->add_column_list(*subs_table, c_flx_sub_sets_subscriptions_field);
-        tr->commit_and_continue_as_read();
-        return true;
+    std::vector<SyncMetadataTable> internal_tables{
+        {&m_sub_set_table,
+         c_flx_subscription_sets_table,
+         {&m_sub_set_version_num, c_flx_sub_sets_version_field, type_Int},
+         {
+             {&m_sub_set_state, c_flx_sub_sets_state_field, type_Int},
+             {&m_sub_set_snapshot_version, c_flx_sub_sets_snapshot_version_field, type_Int},
+             {&m_sub_set_error_str, c_flx_sub_sets_error_str_field, type_String, true},
+             {&m_sub_set_subscriptions, c_flx_sub_sets_subscriptions_field, c_flx_subscriptions_table, true},
+         }},
+        {&m_sub_table,
+         c_flx_subscriptions_table,
+         SyncMetadataTable::IsEmbeddedTag{},
+         {
+             {&m_sub_id, c_flx_sub_id_field, type_ObjectId},
+             {&m_sub_created_at, c_flx_sub_created_at_field, type_Timestamp},
+             {&m_sub_updated_at, c_flx_sub_updated_at_field, type_Timestamp},
+             {&m_sub_name, c_flx_sub_name_field, type_String, true},
+             {&m_sub_object_class_name, c_flx_sub_object_class_field, type_String},
+             {&m_sub_query_str, c_flx_sub_query_str_field, type_String},
+         }},
     };
 
-    if (schema_metadata_key || !create_schema_if_needed()) {
-        auto lookup_and_validate_column = [&](TableRef& table, StringData col_name, DataType col_type) -> ColKey {
-            auto ret = table->get_column_key(col_name);
-            if (!ret) {
-                throw std::runtime_error(util::format("Flexible Sync metadata missing %1 column in %2 table",
-                                                      col_name, table->get_name()));
-            }
-            auto found_col_type = table->get_column_type(ret);
-            if (found_col_type != col_type) {
-                throw std::runtime_error(util::format(
-                    "column %1 in Flexible Sync metadata table %2 is the wrong type", col_name, table->get_name()));
-            }
-            return ret;
-        };
+    auto tr = m_db->start_read();
+    SyncMetadataSchemaVersions schema_versions(tr);
 
-        auto schema_metadata = tr->get_table(schema_metadata_key);
-        auto version_obj = schema_metadata->get_object(0);
-        auto version = version_obj.get<int64_t>(
-            lookup_and_validate_column(schema_metadata, c_flx_meta_schema_version_field, type_Int));
-        if (version != c_flx_schema_version) {
+    if (auto schema_version = schema_versions.get_version_for(tr, internal_schema_groups::c_flx_subscription_store);
+        !schema_version) {
+        tr->promote_to_write();
+        schema_versions.set_version_for(tr, internal_schema_groups::c_flx_subscription_store, c_flx_schema_version);
+        create_sync_metadata_schema(tr, &internal_tables);
+        tr->commit_and_continue_as_read();
+    }
+    else {
+        if (*schema_version != c_flx_schema_version) {
             throw std::runtime_error("Invalid schema version for flexible sync metadata");
         }
-
-        m_sub_set_keys->table = tr->find_table(c_flx_subscription_sets_table);
-        auto sub_sets = tr->get_table(m_sub_set_keys->table);
-        m_sub_set_keys->state = lookup_and_validate_column(sub_sets, c_flx_sub_sets_state_field, type_Int);
-        m_sub_set_keys->error_str = lookup_and_validate_column(sub_sets, c_flx_sub_sets_error_str_field, type_String);
-        m_sub_set_keys->snapshot_version =
-            lookup_and_validate_column(sub_sets, c_flx_sub_sets_snapshot_version_field, type_Int);
-        m_sub_set_keys->subscriptions =
-            lookup_and_validate_column(sub_sets, c_flx_sub_sets_subscriptions_field, type_LinkList);
-        if (!m_sub_set_keys->subscriptions) {
-            throw std::runtime_error("Flexible Sync metadata missing subscriptions table");
-        }
-
-        auto subs = sub_sets->get_opposite_table(m_sub_set_keys->subscriptions);
-        if (!subs->is_embedded()) {
-            throw std::runtime_error("Flexible Sync subscriptions table should be an embedded object");
-        }
-        m_sub_keys->table = subs->get_key();
-        m_sub_keys->id = lookup_and_validate_column(subs, c_flx_sub_id_field, type_ObjectId);
-        m_sub_keys->created_at = lookup_and_validate_column(subs, c_flx_sub_created_at_field, type_Timestamp);
-        m_sub_keys->updated_at = lookup_and_validate_column(subs, c_flx_sub_updated_at_field, type_Timestamp);
-        m_sub_keys->query_str = lookup_and_validate_column(subs, c_flx_sub_query_str_field, type_String);
-        m_sub_keys->object_class_name = lookup_and_validate_column(subs, c_flx_sub_object_class_field, type_String);
-        m_sub_keys->name = lookup_and_validate_column(subs, c_flx_sub_name_field, type_String);
+        load_sync_metadata_schema(tr, &internal_tables);
     }
 
     // There should always be at least one subscription set so that the user can always wait for synchronizationon
     // on the result of get_latest().
-    if (auto sub_sets = tr->get_table(m_sub_set_keys->table); sub_sets->is_empty()) {
+    if (auto sub_sets = tr->get_table(m_sub_set_table); sub_sets->is_empty()) {
         tr->promote_to_write();
         auto zero_sub = sub_sets->create_object_with_primary_key(Mixed{int64_t(0)});
-        zero_sub.set(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Pending));
-        zero_sub.set(m_sub_set_keys->snapshot_version, tr->get_version());
+        zero_sub.set(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending));
+        zero_sub.set(m_sub_set_snapshot_version, tr->get_version());
         tr->commit();
     }
 }
@@ -654,41 +613,41 @@ SubscriptionStore::SubscriptionStore(DBRef db, util::UniqueFunction<void(int64_t
 SubscriptionSet SubscriptionStore::get_latest() const
 {
     auto tr = m_db->start_frozen();
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
     auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
     auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
 
-    return SubscriptionSet(weak_from_this(), std::move(tr), std::move(latest_obj));
+    return SubscriptionSet(weak_from_this(), *tr, std::move(latest_obj));
 }
 
 SubscriptionSet SubscriptionStore::get_active() const
 {
     auto tr = m_db->start_frozen();
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
 
     DescriptorOrdering descriptor_ordering;
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
     auto res = sub_sets->where()
-                   .equal(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        return SubscriptionSet(weak_from_this(), std::move(tr), Obj{});
+        return SubscriptionSet(weak_from_this(), *tr, Obj{});
     }
-    return SubscriptionSet(weak_from_this(), std::move(tr), res.get_object(0));
+    return SubscriptionSet(weak_from_this(), *tr, res.get_object(0));
 }
 
 std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() const
 {
     auto tr = m_db->start_read();
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
         return {0, 0};
     }
@@ -698,11 +657,11 @@ std::pair<int64_t, int64_t> SubscriptionStore::get_active_and_latest_versions() 
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {false}});
     descriptor_ordering.append_limit(LimitDescriptor{1});
     auto res = sub_sets->where()
-                   .equal(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Complete))
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Complete))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
-        return {0, latest_id};
+        return {-1, latest_id};
     }
 
     auto active_id = res.get_object(0).get_primary_key();
@@ -713,7 +672,7 @@ util::Optional<SubscriptionStore::PendingSubscription>
 SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::version_type after_client_version) const
 {
     auto tr = m_db->start_read();
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     if (sub_sets->is_empty()) {
         return util::none;
     }
@@ -722,8 +681,12 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
     descriptor_ordering.append_sort(SortDescriptor{{{sub_sets->get_primary_key_column()}}, {true}});
     auto res = sub_sets->where()
                    .greater(sub_sets->get_primary_key_column(), last_query_version)
-                   .equal(m_sub_set_keys->state, static_cast<int64_t>(SubscriptionSet::State::Pending))
-                   .greater_equal(m_sub_set_keys->snapshot_version, static_cast<int64_t>(after_client_version))
+                   .group()
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Pending))
+                   .Or()
+                   .equal(m_sub_set_state, static_cast<int64_t>(SubscriptionSet::State::Bootstrapping))
+                   .end_group()
+                   .greater_equal(m_sub_set_snapshot_version, static_cast<int64_t>(after_client_version))
                    .find_all(descriptor_ordering);
 
     if (res.is_empty()) {
@@ -732,14 +695,14 @@ SubscriptionStore::get_next_pending_version(int64_t last_query_version, DB::vers
 
     auto obj = res.get_object(0);
     auto query_version = obj.get_primary_key().get_int();
-    auto snapshot_version = obj.get<int64_t>(m_sub_set_keys->snapshot_version);
+    auto snapshot_version = obj.get<int64_t>(m_sub_set_snapshot_version);
     return PendingSubscription{query_version, static_cast<DB::version_type>(snapshot_version)};
 }
 
 MutableSubscriptionSet SubscriptionStore::get_mutable_by_version(int64_t version_id)
 {
     auto tr = m_db->start_write();
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     return MutableSubscriptionSet(weak_from_this(), std::move(tr),
                                   sub_sets->get_object_with_primary_key(Mixed{version_id}));
 }
@@ -753,10 +716,9 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
                                                        util::Optional<DB::VersionID> db_version) const
 {
     auto tr = m_db->start_frozen(db_version.value_or(VersionID{}));
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     try {
-        return SubscriptionSet(weak_from_this(), std::move(tr),
-                               sub_sets->get_object_with_primary_key(Mixed{version_id}));
+        return SubscriptionSet(weak_from_this(), *tr, sub_sets->get_object_with_primary_key(Mixed{version_id}));
     }
     catch (const KeyNotFound&) {
         std::lock_guard<std::mutex> lk(m_pending_notifications_mutex);
@@ -767,9 +729,28 @@ SubscriptionSet SubscriptionStore::get_by_version_impl(int64_t version_id,
     }
 }
 
+SubscriptionStore::TableSet SubscriptionStore::get_tables_for_latest(const Transaction& tr) const
+{
+    auto sub_sets = tr.get_table(m_sub_set_table);
+    if (sub_sets->is_empty()) {
+        return {};
+    }
+    auto latest_id = sub_sets->maximum_int(sub_sets->get_primary_key_column());
+    auto latest_obj = sub_sets->get_object_with_primary_key(Mixed{latest_id});
+
+    TableSet ret;
+    auto subs = latest_obj.get_linklist(m_sub_set_subscriptions);
+    for (size_t idx = 0; idx < subs.size(); ++idx) {
+        auto sub_obj = subs.get_object(idx);
+        ret.emplace(sub_obj.get<StringData>(m_sub_object_class_name));
+    }
+
+    return ret;
+}
+
 void SubscriptionStore::supercede_prior_to(TransactionRef tr, int64_t version_id) const
 {
-    auto sub_sets = tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = tr->get_table(m_sub_set_table);
     Query remove_query(sub_sets);
     remove_query.less(sub_sets->get_primary_key_column(), version_id);
     remove_query.remove();
@@ -779,7 +760,7 @@ MutableSubscriptionSet SubscriptionStore::make_mutable_copy(const SubscriptionSe
 {
     auto new_tr = m_db->start_write();
 
-    auto sub_sets = new_tr->get_table(m_sub_set_keys->table);
+    auto sub_sets = new_tr->get_table(m_sub_set_table);
     auto new_pk = sub_sets->maximum_int(sub_sets->get_primary_key_column()) + 1;
 
     MutableSubscriptionSet new_set_obj(weak_from_this(), std::move(new_tr),

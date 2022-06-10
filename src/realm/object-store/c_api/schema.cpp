@@ -71,6 +71,15 @@ RLM_API bool realm_update_schema(realm_t* realm, const realm_schema_t* schema)
     });
 }
 
+RLM_API bool realm_schema_rename_property(realm_t* realm, realm_schema_t* schema, const char* object_type,
+                                          const char* old_name, const char* new_name)
+{
+    return wrap_err([&]() {
+        realm->get()->rename_property(*schema->ptr, object_type, old_name, new_name);
+        return true;
+    });
+}
+
 RLM_API size_t realm_get_num_classes(const realm_t* realm)
 {
     size_t max = std::numeric_limits<size_t>::max();
@@ -85,19 +94,12 @@ RLM_API bool realm_get_class_keys(const realm_t* realm, realm_class_key_t* out_k
     return wrap_err([&]() {
         const auto& shared_realm = **realm;
         const auto& schema = shared_realm.schema();
-        if (out_keys) {
+        set_out_param(out_n, schema.size());
+
+        if (out_keys && max >= schema.size()) {
             size_t i = 0;
             for (auto& os : schema) {
-                if (i >= max)
-                    break;
                 out_keys[i++] = os.table_key.value;
-            }
-            if (out_n)
-                *out_n = i;
-        }
-        else {
-            if (out_n) {
-                *out_n = schema.size();
             }
         }
         return true;
@@ -138,29 +140,16 @@ RLM_API bool realm_get_class_properties(const realm_t* realm, realm_class_key_t 
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
+        const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
+        set_out_param(out_n, prop_size);
 
-        if (out_properties) {
+        if (out_properties && max >= prop_size) {
             size_t i = 0;
-
             for (auto& prop : os.persisted_properties) {
-                if (i >= max)
-                    break;
                 out_properties[i++] = to_capi(prop);
             }
-
             for (auto& prop : os.computed_properties) {
-                if (i >= max)
-                    break;
                 out_properties[i++] = to_capi(prop);
-            }
-
-            if (out_n) {
-                *out_n = i;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;
@@ -172,29 +161,15 @@ RLM_API bool realm_get_property_keys(const realm_t* realm, realm_class_key_t key
 {
     return wrap_err([&]() {
         auto& os = schema_for_table(*realm, TableKey(key));
-
-        if (out_keys) {
+        const size_t prop_size = os.persisted_properties.size() + os.computed_properties.size();
+        set_out_param(out_n, prop_size);
+        if (out_keys && max >= prop_size) {
             size_t i = 0;
-
             for (auto& prop : os.persisted_properties) {
-                if (i >= max)
-                    break;
                 out_keys[i++] = prop.column_key.value;
             }
-
             for (auto& prop : os.computed_properties) {
-                if (i >= max)
-                    break;
                 out_keys[i++] = prop.column_key.value;
-            }
-
-            if (out_n) {
-                *out_n = i;
-            }
-        }
-        else {
-            if (out_n) {
-                *out_n = os.persisted_properties.size() + os.computed_properties.size();
             }
         }
         return true;
@@ -275,7 +250,7 @@ RLM_API bool realm_find_property_by_public_name(const realm_t* realm, realm_clas
 
 RLM_API realm_callback_token_t* realm_add_schema_changed_callback(realm_t* realm,
                                                                   realm_on_schema_change_func_t callback,
-                                                                  void* userdata,
+                                                                  realm_userdata_t userdata,
                                                                   realm_free_userdata_func_t free_userdata)
 {
     util::UniqueFunction<void(const Schema&)> func =

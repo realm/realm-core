@@ -19,7 +19,8 @@
 #ifndef REALM_TEST_UTILS_HPP
 #define REALM_TEST_UTILS_HPP
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_all.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/optional.hpp>
 
@@ -70,9 +71,19 @@ std::string get_parent_directory(const std::string& path);
         CHECK(util::File::is_dir(macro_path) == true);                                                               \
     } while (0)
 
+#define REQUIRE_DIR_PATH_EXISTS(macro_path)                                                                          \
+    do {                                                                                                             \
+        REQUIRE(util::File::is_dir((macro_path).string()));                                                          \
+    } while (0)
+
 #define REQUIRE_DIR_DOES_NOT_EXIST(macro_path)                                                                       \
     do {                                                                                                             \
         CHECK(util::File::exists(macro_path) == false);                                                              \
+    } while (0)
+
+#define REQUIRE_DIR_PATH_DOES_NOT_EXIST(macro_path)                                                                  \
+    do {                                                                                                             \
+        REQUIRE_FALSE(util::File::exists((macro_path).string()));                                                    \
     } while (0)
 
 #define REQUIRE_REALM_EXISTS(macro_path)                                                                             \
@@ -89,7 +100,7 @@ std::string get_parent_directory(const std::string& path);
         REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management");                                                    \
     } while (0)
 
-#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
+#define REQUIRE_THROWS_CONTAINING(expr, msg) REQUIRE_THROWS_WITH(expr, Catch::Matchers::ContainsSubstring(msg))
 
 #define ENCODE_FAKE_JWT(in) realm::encode_fake_jwt(in)
 

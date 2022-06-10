@@ -1211,7 +1211,7 @@ void GroupWriter::commit(ref_type new_top_ref)
                                      sizeof(file_header.m_top_ref[slot_selector]));
     flush_all_mappings();
     if (!disable_sync)
-        m_alloc.get_file().sync();
+        m_alloc.get_file().barrier();
     // Flip the slot selector bit.
     using type_2 = std::remove_reference<decltype(file_header.m_flags)>::type;
     file_header.m_flags = type_2(new_flags);

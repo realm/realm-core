@@ -892,15 +892,9 @@ void ClusterTree::insert_fast(ObjKey k, const FieldValues& init_values, ClusterN
     m_size++;
 }
 
-ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& values)
+ClusterNode::State ClusterTree::insert(ObjKey k, const FieldValues& init_values)
 {
     ClusterNode::State state;
-    FieldValues init_values(values);
-
-    // Sort ColKey according to index
-    std::sort(init_values.begin(), init_values.end(), [](auto& a, auto& b) {
-        return a.col_key.get_index().val < b.col_key.get_index().val;
-    });
 
     insert_fast(k, init_values, state);
     update_indexes(k, init_values);

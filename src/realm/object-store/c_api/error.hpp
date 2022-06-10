@@ -46,9 +46,13 @@ public:
     bool get_as_realm_error_t(realm_error_t* out) const noexcept;
     bool clear() noexcept;
 
+    void set_usercode_error(void* usercode_error);
+    void* get_and_clear_usercode_error();
+
 private:
     util::Optional<realm_error_t> m_err;
     std::string m_message_buf;
+    void* m_usercode_error;
 };
 
 } // namespace realm::c_api

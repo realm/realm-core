@@ -135,13 +135,7 @@ public:
     }
     util::Any box(object_store::Dictionary v) const
     {
-        AnyDict ret;
-        for (const auto& it : v) {
-            std::string key{it.first.get_string()};
-            auto value = box(it.second);
-            ret.emplace(key, value);
-        }
-        return ret;
+        return v;
     }
 
     util::Any box(Object v) const

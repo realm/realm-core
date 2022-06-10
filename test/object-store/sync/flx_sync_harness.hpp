@@ -31,19 +31,20 @@ public:
     struct ServerSchema {
         Schema schema;
         std::vector<std::string> queryable_fields;
+        std::vector<AppCreateConfig::FLXSyncRole> default_roles;
         bool dev_mode_enabled = false;
     };
 
     static ServerSchema default_server_schema()
     {
         Schema schema{
-            ObjectSchema("TopLevel",
-                         {
-                             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-                             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-                             {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
-                             {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
-                         }),
+            {"TopLevel",
+             {
+                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                 {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                 {"queryable_int_field", PropertyType::Int | PropertyType::Nullable},
+                 {"non_queryable_field", PropertyType::String | PropertyType::Nullable},
+             }},
         };
 
         return ServerSchema{std::move(schema), {"queryable_str_field", "queryable_int_field"}};
@@ -56,6 +57,7 @@ public:
         server_app_config.dev_mode_enabled = server_schema.dev_mode_enabled;
         AppCreateConfig::FLXSyncConfig flx_config;
         flx_config.queryable_fields = server_schema.queryable_fields;
+        flx_config.default_roles = server_schema.default_roles;
 
         server_app_config.flx_sync_config = std::move(flx_config);
         return create_app(server_app_config);
@@ -63,8 +65,7 @@ public:
 
     FLXSyncTestHarness(const std::string& test_name, ServerSchema server_schema = default_server_schema(),
                        std::shared_ptr<GenericNetworkTransport> transport = instance_of<SynchronousTestTransport>)
-        : m_app_session(make_app_from_server_schema(test_name, server_schema))
-        , m_app_config(get_config(std::move(transport), m_app_session))
+        : m_test_session(make_app_from_server_schema(test_name, server_schema), std::move(transport))
         , m_schema(std::move(server_schema.schema))
     {
     }
@@ -73,9 +74,8 @@ public:
     template <typename Func>
     void do_with_new_user(Func&& func)
     {
-        auto sync_mgr = make_sync_manager();
-        auto creds = create_user_and_log_in(sync_mgr.app());
-        func(sync_mgr.app()->current_user());
+        create_user_and_log_in(m_test_session.app());
+        func(m_test_session.app()->current_user());
     }
 
     template <typename Func>
@@ -91,24 +91,23 @@ public:
     template <typename Func>
     void load_initial_data(Func&& func)
     {
-        do_with_new_realm([&](SharedRealm realm) {
-            {
-                auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
-                for (const auto& table : realm->schema()) {
-                    Query query_for_table(realm->read_group().get_table(table.table_key));
-                    mut_subs.insert_or_assign(query_for_table);
-                }
-                auto subs = std::move(mut_subs).commit();
-                subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+        SyncTestFile config(m_test_session.app()->current_user(), schema(), SyncConfig::FLXSyncEnabled{});
+        auto realm = Realm::get_shared_realm(config);
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        for (const auto& table : realm->schema()) {
+            if (table.is_asymmetric) {
+                continue;
             }
-            func(realm);
-        });
-    }
+            Query query_for_table(realm->read_group().get_table(table.table_key));
+            mut_subs.insert_or_assign(query_for_table);
+        }
+        auto subs = std::move(mut_subs).commit();
+        subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
 
-    TestSyncManager make_sync_manager()
-    {
-        TestSyncManager::Config smc(m_app_config);
-        return TestSyncManager(std::move(smc), {});
+        realm->begin_transaction();
+        func(realm);
+        realm->commit_transaction();
+        wait_for_upload(*realm);
     }
 
     const Schema& schema() const
@@ -116,9 +115,13 @@ public:
         return m_schema;
     }
 
+    std::shared_ptr<App> app() const noexcept
+    {
+        return m_test_session.app();
+    }
+
 private:
-    AppSession m_app_session;
-    app::App::Config m_app_config;
+    TestAppSession m_test_session;
     Schema m_schema;
 };
 } // namespace realm::app

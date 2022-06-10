@@ -26,14 +26,14 @@
 #include "util/test_utils.hpp"
 
 #include <realm/util/logger.hpp>
+#include <realm/util/optional.hpp>
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const std::string base_path =
-    fs::path{util::make_temp_dir() + "/realm_objectstore_sync_manager"}.make_preferred().string();
+static const auto base_path = fs::path{util::make_temp_dir()}.make_preferred() / "realm_objectstore_sync_manager";
 static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
@@ -71,150 +71,123 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
 TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
-    using Cfg = TestSyncManager::Config;
-
-    // Get a sync user
-    TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-    auto sync_manager = init_sync_manager.app()->sync_manager();
-    const std::string identity = "foobarbaz";
-    auto user = sync_manager->get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"),
-                                       auth_server_url, dummy_device_id);
-    auto server_identity = user->identity();
-    REQUIRE(server_identity == identity);
 
     SECTION("should work properly without metadata") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const auto expected =
-            fs::path{
-                base_path +
-                "/mongodb-realm/app_id/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm"}
-                .make_preferred()
-                .string();
-        auto user = init_sync_manager.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
-                                                                      ENCODE_FAKE_JWT("not_a_real_token"),
-                                                                      auth_server_url, dummy_device_id);
+        TestSyncManager tsm(SyncManager::MetadataMode::NoMetadata);
+        auto sync_manager = tsm.app()->sync_manager();
+        const std::string identity = random_string(10);
+        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
+        const auto expected = base_path / "realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
+        auto user = tsm.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
+                                                        ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url,
+                                                        dummy_device_id);
+        REQUIRE(user->identity() == identity);
         SyncConfig config(user, bson::Bson{});
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
+        REQUIRE(tsm.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
+        REQUIRE_DIR_PATH_EXISTS(base_path);
     }
 
     SECTION("should work properly with metadata") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoEncryption));
-        const auto expected = fs::path{base_path + "/mongodb-realm/app_id/" + server_identity +
-                                       "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm"}
-                                  .make_preferred()
-                                  .string();
+        TestSyncManager tsm(SyncManager::MetadataMode::NoEncryption);
+        auto sync_manager = tsm.app()->sync_manager();
+        const std::string identity = random_string(10);
+        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
+        const auto expected = base_path / "realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
+        auto user = tsm.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
+                                                        ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url,
+                                                        dummy_device_id);
+        REQUIRE(user->identity() == identity);
         SyncConfig config(user, bson::Bson{});
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
-
+        REQUIRE(tsm.app()->sync_manager()->path_for_realm(config, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(
-            fs::path{base_path + "/mongodb-realm/app_id/" + server_identity}.make_preferred().string());
+        REQUIRE_DIR_PATH_EXISTS(base_path);
     }
 
-    SECTION("should produce the expected path for a string partition") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const bson::Bson partition("string-partition-value&^#");
-        SyncConfig config(user, partition);
-        const auto expected =
-            fs::path(base_path + "/mongodb-realm/app_id/foobarbaz/s_string-partition-value%26%5E%23.realm")
-                .make_preferred()
-                .string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
-    }
+    SECTION("should produce the expected path for all partition key types") {
+        TestSyncManager tsm(SyncManager::MetadataMode::NoMetadata);
+        auto sync_manager = tsm.app()->sync_manager();
+        const std::string identity = random_string(10);
+        auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id" / identity;
+        auto user = tsm.app()->sync_manager()->get_user(identity, ENCODE_FAKE_JWT("dummy_token"),
+                                                        ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url,
+                                                        dummy_device_id);
 
-    SECTION("should produce a hashed path for string partitions which exceed file system path length limits") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const std::string name_too_long(500, 'b');
-        REQUIRE(name_too_long.length() == 500);
-        const bson::Bson partition(name_too_long);
-        SyncConfig config(user, partition);
-        const std::string expected_prefix = fs::path{base_path + "/mongodb-realm/app_id"}.make_preferred().string();
-        const std::string expected_suffix = ".realm";
-        std::string actual = init_sync_manager.app()->sync_manager()->path_for_realm(config);
-        size_t expected_length = expected_prefix.length() + 64 + expected_suffix.length();
-        // std::fs does not include path terminator
-        REQUIRE(actual.length() == 1 + expected_length);
-        REQUIRE(actual.find(expected_prefix) == 0);
-        REQUIRE(actual.find(expected_suffix) != std::string::npos);
-    }
+        // Directory should not be created until we get the path
+        REQUIRE_DIR_PATH_DOES_NOT_EXIST(base_path);
 
-    SECTION("should produce the expected path for a int32 partition") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const bson::Bson partition(int32_t(-25));
-        SyncConfig config(user, partition);
-        const auto expected =
-            fs::path{base_path + "/mongodb-realm/app_id/foobarbaz/i_-25.realm"}.make_preferred().string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
-    }
+        SECTION("string") {
+            const bson::Bson partition("string-partition-value&^#");
+            SyncConfig config(user, partition);
+            REQUIRE(sync_manager->path_for_realm(config) == base_path / "s_string-partition-value%26%5E%23.realm");
+        }
 
-    SECTION("should produce the expected path for a int64 partition") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const bson::Bson partition(int64_t(1.15e18)); // > 32 bits
-        SyncConfig config(user, partition);
-        const auto expected = fs::path{base_path + "/mongodb-realm/app_id/foobarbaz/l_1150000000000000000.realm"}
-                                  .make_preferred()
-                                  .string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
-    }
+        SECTION("string which exeecds the file system path length limit") {
+            const std::string name_too_long(500, 'b');
+            REQUIRE(name_too_long.length() == 500);
+            const bson::Bson partition(name_too_long);
+            SyncConfig config(user, partition);
 
-    SECTION("should produce the expected path for a ObjectId partition") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const bson::Bson partition(ObjectId("0123456789abcdefffffffff"));
-        SyncConfig config(user, partition);
-        const auto expected = fs::path{base_path + "/mongodb-realm/app_id/foobarbaz/o_0123456789abcdefffffffff.realm"}
-                                  .make_preferred()
-                                  .string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path(base_path + "/mongodb-realm/app_id/foobarbaz").make_preferred().string());
-    }
+            // Note: does not include `identity` as that's in the hashed part
+            auto base_path = fs::path{tsm.base_file_path()}.make_preferred() / "mongodb-realm" / "app_id";
+            const std::string expected_suffix = ".realm";
+            std::string actual = sync_manager->path_for_realm(config);
+            size_t expected_length = base_path.string().length() + 1 + 64 + expected_suffix.length();
+            REQUIRE(actual.length() == expected_length);
+            REQUIRE(StringData(actual).begins_with(base_path.string()));
+            REQUIRE(StringData(actual).ends_with(expected_suffix));
+        }
 
-    SECTION("should produce the expected path for a UUID partition") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const bson::Bson partition(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
-        SyncConfig config(user, partition);
-        const auto expected =
-            fs::path{base_path + "/mongodb-realm/app_id/foobarbaz/u_3b241101-e2bb-4255-8caf-4136c566a961.realm"}
-                .make_preferred()
-                .string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
-    }
+        SECTION("int32") {
+            const bson::Bson partition(int32_t(-25));
+            SyncConfig config(user, partition);
+            REQUIRE(sync_manager->path_for_realm(config) == base_path / "i_-25.realm");
+        }
 
-    SECTION("should produce the expected path for a Null partition") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        const bson::Bson partition;
-        REQUIRE(partition.type() == bson::Bson::Type::Null);
-        SyncConfig config(user, partition);
-        const auto expected =
-            fs::path{base_path + "/mongodb-realm/app_id/foobarbaz/null.realm"}.make_preferred().string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
-    }
+        SECTION("int64") {
+            const bson::Bson partition(int64_t(1.15e18)); // > 32 bits
+            SyncConfig config(user, partition);
+            REQUIRE(sync_manager->path_for_realm(config) == base_path / "l_1150000000000000000.realm");
+        }
 
-    SECTION("should produce the FLX sync path when FLX sync is enabled") {
-        TestSyncManager init_sync_manager(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
-        SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
-        const auto expected =
-            fs::path{base_path + "/mongodb-realm/app_id/foobarbaz/flx_sync_default.realm"}.make_preferred().string();
-        REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(config) == expected);
-        // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(fs::path{base_path + "/mongodb-realm/app_id/foobarbaz"}.make_preferred().string());
+        SECTION("UUID") {
+            const bson::Bson partition(UUID("3b241101-e2bb-4255-8caf-4136c566a961"));
+            SyncConfig config(user, partition);
+            REQUIRE(sync_manager->path_for_realm(config) ==
+                    base_path / "u_3b241101-e2bb-4255-8caf-4136c566a961.realm");
+        }
+
+        SECTION("ObjectId") {
+            const bson::Bson partition(ObjectId("0123456789abcdefffffffff"));
+            SyncConfig config(user, partition);
+            REQUIRE(sync_manager->path_for_realm(config) == base_path / "o_0123456789abcdefffffffff.realm");
+        }
+
+        SECTION("Null") {
+            const bson::Bson partition;
+            REQUIRE(partition.type() == bson::Bson::Type::Null);
+            SyncConfig config(user, partition);
+            REQUIRE(sync_manager->path_for_realm(config) == base_path / "null.realm");
+        }
+
+        SECTION("Flexible sync") {
+            SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+            REQUIRE(sync_manager->path_for_realm(config) == base_path / "flx_sync_default.realm");
+        }
+
+        SECTION("Custom filename for Flexible Sync") {
+            SyncConfig config(user, SyncConfig::FLXSyncEnabled{});
+            REQUIRE(sync_manager->path_for_realm(config, util::make_optional<std::string>("custom")) ==
+                    base_path / "custom.realm");
+        }
+
+        // Should now exist after getting the path
+        REQUIRE_DIR_PATH_EXISTS(base_path);
     }
 }
 
 TEST_CASE("sync_manager: user state management", "[sync]") {
-    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path, SyncManager::MetadataMode::NoEncryption));
+    TestSyncManager init_sync_manager(SyncManager::MetadataMode::NoEncryption);
     auto sync_manager = init_sync_manager.app()->sync_manager();
 
     const std::string url_1 = "https://realm.example.org/1/";
@@ -313,13 +286,15 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
 }
 
 TEST_CASE("sync_manager: persistent user state management", "[sync]") {
-
-    reset_test_directory(base_path);
-    const std::string app_id = "test_app_id*$#@!%1";
-    auto file_manager = SyncFileManager(base_path, app_id);
+    TestSyncManager::Config config;
+    auto app_id = config.app_config.app_id = "app_id-" + random_string(10);
+    config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+    TestSyncManager tsm(config);
+    config.base_path = tsm.base_file_path();
+    config.should_teardown_test_directory = false;
+    auto file_manager = SyncFileManager(tsm.base_file_path(), app_id);
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
-    using Cfg = TestSyncManager::Config;
 
     const std::string url_1 = "https://realm.example.org/1/";
     const std::string url_2 = "https://realm.example.org/2/";
@@ -353,7 +328,8 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
-            TestSyncManager tsm(Cfg(app_id, base_path, SyncManager::MetadataMode::NoEncryption));
+            config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+            TestSyncManager tsm(config);
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 3);
             REQUIRE(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
@@ -362,18 +338,15 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         }
 
         SECTION("they should not be added to the active users list when metadata is disabled") {
-            TestSyncManager tsm(Cfg(base_path, SyncManager::MetadataMode::NoMetadata));
+            config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
+            TestSyncManager tsm(config);
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 0);
         }
     }
 
-    const std::string expected_clean_app_id = "test_app_id%2A%24%23%40%21%251";
-    const std::string manager_path =
-        fs::path{base_path + "/mongodb-realm/" + expected_clean_app_id}.make_preferred().string();
-
     struct TestPath {
-        std::string partition;
+        bson::Bson partition;
         std::string expected_path;
         bool pre_create = true;
     };
@@ -393,10 +366,11 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         auto u3 = manager.get_or_make_user_metadata(identity_3, provider_type);
 
         {
-            auto expected_u1_path = [&](std::string partition) {
-                return ExpectedRealmPaths(base_path, app_id, u1->identity(), u1->local_uuid(), partition);
+            auto expected_u1_path = [&](const bson::Bson& partition) {
+                return ExpectedRealmPaths(tsm.base_file_path(), app_id, u1->identity(), u1->local_uuid(),
+                                          partition.to_string());
             };
-            std::string partition = "partition1";
+            bson::Bson partition = "partition1";
             auto expected_paths = expected_u1_path(partition);
             paths_under_test.push_back({partition, expected_paths.current_preferred_path, false});
 
@@ -421,19 +395,17 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
                                   expected_paths.legacy_sync_directories_to_make.end());
         }
 
-        auto shared_test_config = Cfg(app_id, base_path, SyncManager::MetadataMode::NoEncryption);
         std::vector<std::string> paths;
         {
-            shared_test_config.should_teardown_test_directory = false;
-            TestSyncManager tsm(shared_test_config);
+            auto sync_manager = tsm.app()->sync_manager();
 
             // Pre-populate the user directories.
-            auto user1 = tsm.app()->sync_manager()->get_user(u1->identity(), r_token_1, a_token_1,
-                                                             u1->provider_type(), dummy_device_id);
-            auto user2 = tsm.app()->sync_manager()->get_user(u2->identity(), r_token_2, a_token_2,
-                                                             u2->provider_type(), dummy_device_id);
-            auto user3 = tsm.app()->sync_manager()->get_user(u3->identity(), r_token_3, a_token_3,
-                                                             u3->provider_type(), dummy_device_id);
+            auto user1 =
+                sync_manager->get_user(u1->identity(), r_token_1, a_token_1, u1->provider_type(), dummy_device_id);
+            auto user2 =
+                sync_manager->get_user(u2->identity(), r_token_2, a_token_2, u2->provider_type(), dummy_device_id);
+            auto user3 =
+                sync_manager->get_user(u3->identity(), r_token_3, a_token_3, u3->provider_type(), dummy_device_id);
             for (auto& dir : dirs_to_create) {
                 try_make_dir(dir);
             }
@@ -443,15 +415,15 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
                 }
             }
 
-            paths = {tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, "123456789"}),
-                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, "foo"}),
-                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user2, "partition"}, {"123456789"}),
-                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user3, "foo"}),
-                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user3, "bar"}),
-                     tsm.app()->sync_manager()->path_for_realm(SyncConfig{user3, "baz"})};
+            paths = {sync_manager->path_for_realm(SyncConfig{user1, bson::Bson("123456789")}),
+                     sync_manager->path_for_realm(SyncConfig{user1, bson::Bson("foo")}),
+                     sync_manager->path_for_realm(SyncConfig{user2, bson::Bson("partition")}, {"123456789"}),
+                     sync_manager->path_for_realm(SyncConfig{user3, bson::Bson("foo")}),
+                     sync_manager->path_for_realm(SyncConfig{user3, bson::Bson("bar")}),
+                     sync_manager->path_for_realm(SyncConfig{user3, bson::Bson("baz")})};
 
             for (auto& test : paths_under_test) {
-                std::string actual = tsm.app()->sync_manager()->path_for_realm(SyncConfig{user1, test.partition});
+                std::string actual = sync_manager->path_for_realm(SyncConfig{user1, test.partition});
                 REQUIRE(actual == test.expected_path);
                 paths.push_back(actual);
             }
@@ -459,16 +431,16 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
             for (auto& path : paths) {
                 create_dummy_realm(path);
             }
-            tsm.app()->sync_manager()->remove_user(u1->identity());
-            tsm.app()->sync_manager()->remove_user(u2->identity());
+            sync_manager->remove_user(u1->identity());
+            sync_manager->remove_user(u2->identity());
         }
         for (auto& path : paths) {
             REQUIRE_REALM_EXISTS(path);
         }
-        app::App::clear_cached_apps();
 
+        config.should_teardown_test_directory = false;
         SECTION("they should be cleaned up if metadata is enabled") {
-            TestSyncManager tsm(shared_test_config);
+            TestSyncManager tsm(config);
             auto users = tsm.app()->sync_manager()->all_users();
             REQUIRE(users.size() == 1);
             REQUIRE(validate_user_in_vector(users, identity_3, provider_type, r_token_3, a_token_3, dummy_device_id));
@@ -484,9 +456,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
             }
         }
         SECTION("they should be left alone if metadata is disabled") {
-            shared_test_config.should_teardown_test_directory = true;
-            shared_test_config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
-            TestSyncManager tsm(shared_test_config);
+            config.should_teardown_test_directory = true;
+            config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
+            TestSyncManager tsm(config);
             auto users = tsm.app()->sync_manager()->all_users();
             for (auto& path : paths) {
                 REQUIRE_REALM_EXISTS(path);
@@ -497,12 +469,17 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
 TEST_CASE("sync_manager: file actions", "[sync]") {
     using Action = SyncFileActionMetadata::Action;
-    using Cfg = TestSyncManager::Config;
-    reset_test_directory(base_path);
+    reset_test_directory(base_path.string());
 
-    auto file_manager = SyncFileManager(base_path, "bar_app_id");
+    auto file_manager = SyncFileManager(base_path.string(), "bar_app_id");
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
+
+    TestSyncManager::Config config;
+    config.app_config.app_id = "bar_app_id";
+    config.base_path = base_path.string();
+    config.metadata_mode = SyncManager::MetadataMode::NoEncryption;
+    config.should_teardown_test_directory = false;
 
     const std::string realm_url = "https://example.realm.com/~/1";
     const std::string partition = "partition_foo";
@@ -533,7 +510,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
             // File actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
@@ -548,7 +525,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
         }
@@ -558,7 +535,8 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoMetadata));
+            config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
+            TestSyncManager tsm(config);
             // All file actions should still be present.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 3);
@@ -587,7 +565,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
             // File actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
@@ -616,7 +594,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE(pending_actions.size() == 4);
 
             // Simulate client launch.
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
 
             CHECK(pending_actions.size() == 0);
             CHECK(File::exists(recovery_path));
@@ -628,7 +606,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
             // File actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
@@ -643,7 +621,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             // Create a Realm file
             create_dummy_realm(realm_path_4);
             // Configure the system
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
             REQUIRE(manager.all_pending_actions().size() == 0);
             // Add a file action after the system is configured.
             REQUIRE_REALM_EXISTS(realm_path_4);
@@ -665,7 +643,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
             create_dummy_realm(recovery_1);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption));
+            TestSyncManager tsm(config);
             // Most file actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 1);
@@ -679,7 +657,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
         }
 
         SECTION("should change the action to delete if copy succeeds but delete fails") {
-            if (!chmod_supported(base_path)) {
+            if (!chmod_supported(base_path.string())) {
                 return;
             }
             // Create some Realms
@@ -695,7 +673,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             int original_perms = get_permissions(realm3_dir);
             realm::chmod(realm3_dir, original_perms & (~0b010000000)); // without owner_write
             // run the actions
-            TestSyncManager tsm({"bar_app_id", base_path, SyncManager::MetadataMode::NoEncryption});
+            TestSyncManager tsm(config);
             // restore write permissions to the directory
             realm::chmod(realm3_dir, original_perms);
             // Everything succeeded except deleting realm_path_3
@@ -723,7 +701,8 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            TestSyncManager tsm(Cfg("bar_app_id", base_path, SyncManager::MetadataMode::NoMetadata));
+            config.metadata_mode = SyncManager::MetadataMode::NoMetadata;
+            TestSyncManager tsm(config);
             // All file actions should still be present.
             auto pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 3);
@@ -740,10 +719,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 }
 
 TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
-    reset_test_directory(base_path);
-
-    TestSyncManager init_sync_manager(TestSyncManager::Config(base_path, SyncManager::MetadataMode::NoEncryption),
-                                      {false});
+    TestSyncManager init_sync_manager({}, {false});
     auto sync_manager = init_sync_manager.app()->sync_manager();
 
     SECTION("no active sessions") {

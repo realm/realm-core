@@ -197,7 +197,7 @@ public:
 
     void close();
     bool compact();
-    void write_copy(StringData path, BinaryData key, bool allow_overwrite);
+    void write_copy(StringData path, const char* key);
 
     template <typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);

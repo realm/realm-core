@@ -100,7 +100,7 @@ struct DefaultFactory {
     // which must be copyable.
     std::shared_ptr<Inner> m_inner;
 
-    DefaultFactory(void* userdata, realm_free_userdata_func_t free_func,
+    DefaultFactory(realm_userdata_t userdata, realm_free_userdata_func_t free_func,
                    realm_scheduler_default_factory_func_t factory_func)
         : m_inner(std::make_shared<Inner>())
     {
@@ -124,8 +124,8 @@ struct DefaultFactory {
 } // namespace
 
 RLM_API realm_scheduler_t*
-realm_scheduler_new(void* userdata, realm_free_userdata_func_t free_func, realm_scheduler_notify_func_t notify_func,
-                    realm_scheduler_is_on_thread_func_t is_on_thread_func,
+realm_scheduler_new(realm_userdata_t userdata, realm_free_userdata_func_t free_func,
+                    realm_scheduler_notify_func_t notify_func, realm_scheduler_is_on_thread_func_t is_on_thread_func,
                     realm_scheduler_is_same_as_func_t is_same_as,
                     realm_scheduler_can_deliver_notifications_func_t can_deliver_notifications_func)
 {
@@ -178,7 +178,7 @@ RLM_API bool realm_scheduler_has_default_factory()
 #endif
 }
 
-RLM_API bool realm_scheduler_set_default_factory(void* userdata, realm_free_userdata_func_t free_func,
+RLM_API bool realm_scheduler_set_default_factory(realm_userdata_t userdata, realm_free_userdata_func_t free_func,
                                                  realm_scheduler_default_factory_func_t factory_func)
 {
     return wrap_err([&]() {

@@ -22,6 +22,7 @@
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/object_schema.hpp>
 #include <realm/object-store/object_store.hpp>
+#include <realm/object-store/audit.hpp>
 
 #include <realm/table.hpp>
 
@@ -85,48 +86,66 @@ ModifyPrimaryKeyException::ModifyPrimaryKeyException(const std::string& object_t
 {
 }
 
-Object::Object(SharedRealm r, ObjectSchema const& s, Obj const& o)
+template <typename Key>
+static const ObjectSchema* find_object_schema(Realm& realm, Key key)
+{
+    auto object_schema = realm.schema().find(key);
+    REALM_ASSERT(object_schema != realm.schema().end());
+    return &*object_schema;
+}
+
+static const ObjectSchema* find_object_schema(Realm& realm, Obj const& o)
+{
+    auto table = o.get_table();
+    if (!table) {
+        return nullptr;
+    }
+    REALM_ASSERT(&realm.read_group() == _impl::TableFriend::get_parent_group(*table));
+    auto object_schema = realm.schema().find(ObjectStore::object_type_for_table_name(table->get_name()));
+    REALM_ASSERT(object_schema != realm.schema().end());
+    return &*object_schema;
+}
+
+Object::Object(std::shared_ptr<Realm> r, const ObjectSchema* s, Obj const& o, Obj const& parent,
+               ColKey incoming_column)
     : m_realm(std::move(r))
-    , m_object_schema(&s)
     , m_obj(o)
+    , m_object_schema(s)
+{
+    if (auto audit = m_realm->audit_context())
+        audit->record_read(m_realm->read_transaction_version(), m_obj, parent, incoming_column);
+}
+
+Object::Object(const std::shared_ptr<Realm>& r, ObjectSchema const& s, Obj const& o, Obj const& parent,
+               ColKey incoming_column)
+    : Object(r, &s, o, parent, incoming_column)
 {
 }
 
-Object::Object(SharedRealm r, Obj const& o)
-    : m_realm(std::move(r))
-    , m_object_schema(
-          o.is_valid() ? &*m_realm->schema().find(ObjectStore::object_type_for_table_name(o.get_table()->get_name()))
-                       : nullptr)
-    , m_obj(o)
+Object::Object(const std::shared_ptr<Realm>& r, Obj const& o)
+    : Object(r, find_object_schema(*r, o), o)
 {
-    REALM_ASSERT(!m_obj.get_table() ||
-                 (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
-Object::Object(SharedRealm r, StringData object_type, ObjKey key)
-    : m_realm(std::move(r))
-    , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(key))
+template <typename Key>
+Object::Object(const std::shared_ptr<Realm>& r, const ObjectSchema* s, Key key)
+    : Object(r, s, r->read_group().get_table(s->table_key)->get_object(key))
 {
-    REALM_ASSERT(!m_obj.get_table() ||
-                 (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
-Object::Object(SharedRealm r, StringData object_type, size_t index)
-    : m_realm(std::move(r))
-    , m_object_schema(&*m_realm->schema().find(object_type))
-    , m_obj(m_realm->read_group().get_table(m_object_schema->table_key)->get_object(index))
+Object::Object(const std::shared_ptr<Realm>& r, StringData object_type, ObjKey key)
+    : Object(r, find_object_schema(*r, object_type), key)
 {
-    REALM_ASSERT(!m_obj.get_table() ||
-                 (&m_realm->read_group() == _impl::TableFriend::get_parent_group(*m_obj.get_table())));
 }
 
-Object::Object(std::shared_ptr<Realm> r, ObjLink link)
-    : m_realm(std::move(r))
-    , m_obj(m_realm->read_group().get_object(link))
+Object::Object(const std::shared_ptr<Realm>& r, StringData object_type, size_t index)
+    : Object(r, find_object_schema(*r, object_type), index)
 {
-    m_object_schema =
-        &*m_realm->schema().find(ObjectStore::object_type_for_table_name(m_obj.get_table()->get_name()));
+}
+
+Object::Object(const std::shared_ptr<Realm>& r, ObjLink link)
+    : Object(r, find_object_schema(*r, link.get_table_key()), r->read_group().get_object(link))
+{
 }
 
 Object::Object() = default;

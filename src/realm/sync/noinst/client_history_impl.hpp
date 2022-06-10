@@ -19,6 +19,7 @@
 #ifndef REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 #define REALM_NOINST_CLIENT_HISTORY_IMPL_HPP
 
+#include "realm/util/functional.hpp"
 #include <realm/util/optional.hpp>
 #include <realm/sync/client_base.hpp>
 #include <realm/sync/history.hpp>
@@ -111,6 +112,12 @@ public:
     /// is called.
     void set_client_reset_adjustments(version_type current_version, SaltedFileIdent client_file_ident,
                                       SaltedVersion server_version, BinaryData uploadable_changeset);
+
+    /// get_local_changes returns a list of changes which have not been uploaded yet
+    /// 'current_version' is the version that the history should be updated to.
+    ///
+    /// The history must be in a transaction when this function is called.
+    std::vector<ChunkedBinaryData> get_local_changes(version_type current_version) const;
 
     /// Get the version of the latest snapshot of the associated Realm, as well
     /// as the client file identifier and the synchronization progress as they
@@ -243,15 +250,16 @@ public:
     void integrate_server_changesets(const SyncProgress& progress, const std::uint_fast64_t* downloadable_bytes,
                                      const RemoteChangeset* changesets, std::size_t num_changesets,
                                      VersionInfo& new_version, DownloadBatchState download_type, util::Logger&,
+                                     util::UniqueFunction<void(const TransactionRef&)> run_in_write_tr,
                                      SyncTransactReporter* transact_reporter = nullptr);
 
     static void get_upload_download_bytes(DB*, std::uint_fast64_t&, std::uint_fast64_t&, std::uint_fast64_t&,
                                           std::uint_fast64_t&, std::uint_fast64_t&);
 
     // Overriding member functions in realm::TransformHistory
-    version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override final;
-    ChunkedBinaryData get_reciprocal_transform(version_type, bool&) const override final;
-    void set_reciprocal_transform(version_type, BinaryData) override final;
+    version_type find_history_entry(version_type, version_type, HistoryEntry&) const noexcept override;
+    ChunkedBinaryData get_reciprocal_transform(version_type, bool&) const override;
+    void set_reciprocal_transform(version_type, BinaryData) override;
 
 public: // Stuff in this section is only used by CLI tools.
     /// set_local_origin_timestamp_override() allows you to override the origin timestamp of new changesets
@@ -268,12 +276,12 @@ private:
     friend class ClientReplication;
     static constexpr version_type s_initial_version = 1;
 
-    ClientHistory(ClientReplication* owner)
+    ClientHistory(ClientReplication& owner)
         : m_replication(owner)
     {
     }
 
-    ClientReplication* m_replication;
+    ClientReplication& m_replication;
     DB* m_db = nullptr;
 
     // FIXME: All history objects belonging to a particular client object
@@ -401,7 +409,7 @@ private:
     void prepare_for_write();
     Replication::version_type add_changeset(BinaryData changeset, BinaryData sync_changeset);
     void add_sync_history_entry(HistoryEntry);
-    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes);
+    void update_sync_progress(const SyncProgress&, const std::uint_fast64_t* downloadable_bytes, TransactionRef);
     void trim_ct_history();
     void trim_sync_history();
     void do_trim_sync_history(std::size_t n);
@@ -422,28 +430,38 @@ private:
     }
 
     // Overriding member functions in realm::_impl::History
-    void set_group(Group* group, bool updated = false) override final;
-    void update_from_ref_and_version(ref_type ref, version_type version) override final;
-    void update_from_parent(version_type current_version) override final;
-    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override final;
-    void set_oldest_bound_version(version_type) override final;
-    void verify() const override final;
-    bool no_pending_local_changes(version_type version) const final;
+    void set_group(Group* group, bool updated = false) override;
+    void update_from_ref_and_version(ref_type ref, version_type version) override;
+    void update_from_parent(version_type current_version) override;
+    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
+    void set_oldest_bound_version(version_type) override;
+    void verify() const override;
+    bool no_pending_local_changes(version_type version) const override;
 };
 
 class ClientReplication final : public SyncReplication {
 public:
-    ClientReplication()
-        : m_history(this)
+    ClientReplication(bool apply_server_changes = true)
+        : m_history(*this)
+        , m_apply_server_changes(apply_server_changes)
     {
     }
 
+    // A write validator factory takes a write transaction and returns a UniqueFunction containing a
+    // SyncReplication::WriteValidator. The factory will get called at the start of a write transaction
+    // and the WriteValidator it returns will be re-used for all mutations within the transaction.
+    using WriteValidatorFactory = util::UniqueFunction<WriteValidator>(Transaction&);
+    void set_write_validator_factory(util::UniqueFunction<WriteValidatorFactory> validator_factory)
+    {
+        m_write_validator_factory = std::move(validator_factory);
+    }
+
     // Overriding member functions in realm::Replication
-    void initialize(DB& sg) override final;
-    HistoryType get_history_type() const noexcept override final;
-    int get_history_schema_version() const noexcept override final;
-    bool is_upgradable_history_schema(int) const noexcept override final;
-    void upgrade_history_schema(int) override final;
+    void initialize(DB& sg) override;
+    HistoryType get_history_type() const noexcept override;
+    int get_history_schema_version() const noexcept override;
+    bool is_upgradable_history_schema(int) const noexcept override;
+    void upgrade_history_schema(int) override;
 
     _impl::History* _get_history_write() override
     {
@@ -451,27 +469,37 @@ public:
     }
     std::unique_ptr<_impl::History> _create_history_read() override
     {
-        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(this));
+        auto hist = std::unique_ptr<ClientHistory>(new ClientHistory(*this));
         hist->initialize(*m_history.m_db);
         return hist;
     }
 
     // Overriding member functions in realm::Replication
-    version_type prepare_changeset(const char*, size_t, version_type) override final;
-    void finalize_changeset() noexcept override final;
+    version_type prepare_changeset(const char*, size_t, version_type) override;
+    void finalize_changeset() noexcept override;
 
-    ClientHistory& get_history()
+    ClientHistory& get_history() noexcept
     {
         return m_history;
     }
 
-    const ClientHistory& get_history() const
+    const ClientHistory& get_history() const noexcept
     {
         return m_history;
     }
+
+    bool apply_server_changes() const noexcept
+    {
+        return m_apply_server_changes;
+    }
+
+protected:
+    util::UniqueFunction<WriteValidator> make_write_validator(Transaction& tr) override;
 
 private:
     ClientHistory m_history;
+    const bool m_apply_server_changes;
+    util::UniqueFunction<WriteValidatorFactory> m_write_validator_factory;
 };
 
 

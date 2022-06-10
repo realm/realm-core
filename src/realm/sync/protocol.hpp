@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <system_error>
 
+#include <realm/mixed.hpp>
 #include <realm/replication.hpp>
 
 
@@ -22,12 +23,19 @@ namespace sync {
 //
 //   3 Support for Mixed, TypeLinks, Set, and Dictionary columns.
 //
+//   4 Error messaging format accepts a flexible JSON field in 'json_error'.
+//     JSONErrorMessage.IsClientReset controls recovery mode.
+//
+//   5 Introduces compensating write errors.
+//
+//   6 Support for asymmetric tables.
+//
 //  XX Changes:
 //     - TBD
 //
 constexpr int get_current_protocol_version() noexcept
 {
-    return 3;
+    return 6;
 }
 
 constexpr std::string_view get_pbs_websocket_protocol_prefix() noexcept
@@ -185,6 +193,43 @@ struct SyncProgress {
     UploadCursor upload = {0, 0};
 };
 
+struct CompensatingWriteErrorInfo {
+    std::string object_name;
+    Mixed primary_key;
+    std::string reason;
+};
+
+struct ResumptionDelayInfo {
+    std::chrono::milliseconds max_resumption_delay_interval = std::chrono::minutes{5};
+    std::chrono::milliseconds resumption_delay_interval = std::chrono::seconds{1};
+    int resumption_delay_backoff_multiplier = 2;
+};
+
+struct ProtocolErrorInfo {
+    ProtocolErrorInfo() = default;
+    ProtocolErrorInfo(int error_code, const std::string& msg, bool do_try_again)
+        : raw_error_code(error_code)
+        , message(msg)
+        , try_again(do_try_again)
+        , client_reset_recovery_is_disabled(false)
+        , should_client_reset(util::none)
+    {
+    }
+    int raw_error_code = 0;
+    std::string message;
+    bool try_again = false;
+    bool client_reset_recovery_is_disabled = false;
+    util::Optional<bool> should_client_reset;
+    util::Optional<std::string> log_url;
+    std::vector<CompensatingWriteErrorInfo> compensating_writes;
+    util::Optional<ResumptionDelayInfo> resumption_delay_interval;
+
+    bool is_fatal() const
+    {
+        return !try_again;
+    }
+};
+
 
 /// \brief Protocol errors discovered by the server, and reported to the client
 /// by way of ERROR messages.
@@ -228,8 +273,6 @@ enum class ProtocolError {
     bad_client_version           = 210, // Bad client version (IDENT, UPLOAD)
     diverging_histories          = 211, // Diverging histories (IDENT)
     bad_changeset                = 212, // Bad changeset (UPLOAD)
-    superseded                   = 213, // Superseded by new session for same client-side file (deprecated)
-    disabled_session             = 213, // Alias for `superseded` (deprecated)
     partial_sync_disabled        = 214, // Partial sync disabled (BIND)
     unsupported_session_feature  = 215, // Unsupported session-level feature
     bad_origin_file_ident        = 216, // Bad origin file identifier (UPLOAD)
@@ -250,6 +293,9 @@ enum class ProtocolError {
     initial_sync_not_completed   = 229, // Client tried to open a session before initial sync is complete (BIND)
     write_not_allowed            = 230, // Client attempted a write that is disallowed by permissions, or modifies an
                                         // object outside the current query - requires client reset (UPLOAD)
+    compensating_write           = 231, // Client attempted a write that is disallowed by permissions, or modifies and
+                                        // object outside the current query, and the server undid the modification
+                                        // (UPLOAD)
 
     // clang-format on
 };
@@ -313,6 +359,16 @@ inline bool are_mutually_consistent(UploadCursor a, UploadCursor b) noexcept
 constexpr bool is_session_level_error(ProtocolError error)
 {
     return int(error) >= 200 && int(error) <= 299;
+}
+
+constexpr bool session_level_error_requires_suspend(ProtocolError error)
+{
+    switch (error) {
+        case ProtocolError::compensating_write:
+            return false;
+        default:
+            return true;
+    }
 }
 
 } // namespace sync

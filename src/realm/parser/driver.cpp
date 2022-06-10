@@ -234,6 +234,16 @@ private:
     const std::vector<Mixed>& m_args;
 };
 
+Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
+{
+    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+    if (both_non_negative || both_non_positive) {
+        return Timestamp(seconds, nanoseconds);
+    }
+    throw SyntaxError("Invalid timestamp format");
+}
+
 } // namespace
 
 namespace realm {
@@ -245,16 +255,6 @@ query_parser::KeyPathMapping ParserDriver::s_default_mapping;
 using util::serializer::get_printable_table_name;
 
 Arguments::~Arguments() {}
-
-Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
-{
-    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
-    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
-    if (both_non_negative || both_non_positive) {
-        return Timestamp(seconds, nanoseconds);
-    }
-    throw SyntaxError("Invalid timestamp format");
-}
 
 ParserNode::~ParserNode() {}
 
@@ -290,7 +290,7 @@ Query AndNode::visit(ParserDriver* drv)
     return q;
 }
 
-void verify_only_string_types(DataType type, const std::string& op_string)
+static void verify_only_string_types(DataType type, const std::string& op_string)
 {
     if (type != type_String && type != type_Binary && type != type_Mixed) {
         throw InvalidQueryError(util::format(
@@ -505,13 +505,23 @@ Query BetweenNode::visit(ParserDriver* drv)
         throw InvalidQueryError("Operator 'BETWEEN' requires list with 2 elements.");
     }
 
+    if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
+        // It's a list!
+        if (dynamic_cast<PropNode*>(prop->prop)->comp_type != ExpressionComparisonType::All) {
+            throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
+        }
+    }
+
     ValueNode min(limits->elements.at(0));
     ValueNode max(limits->elements.at(1));
     RelationalNode cmp1(prop, CompareNode::GREATER_EQUAL, &min);
     RelationalNode cmp2(prop, CompareNode::LESS_EQUAL, &max);
-    AndNode and_node(&cmp1, &cmp2);
 
-    return and_node.visit(drv);
+    Query q(drv->m_base_table);
+    q.and_query(cmp1.visit(drv));
+    q.and_query(cmp2.visit(drv));
+
+    return q;
 }
 
 Query RelationalNode::visit(ParserDriver* drv)
@@ -1288,7 +1298,7 @@ std::unique_ptr<DescriptorOrdering> DescriptorOrderingNode::visit(ParserDriver* 
 }
 
 // If one of the expresions is constant, it should be right
-void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::SerialisationState& state)
+static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::SerialisationState& state)
 {
     if (dynamic_cast<ColumnListBase*>(left) && dynamic_cast<ColumnListBase*>(right)) {
         throw InvalidQueryError(

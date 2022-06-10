@@ -396,8 +396,8 @@ TEST(Parser_invalid_queries)
     }
 }
 
-Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                   size_t num_results, query_parser::KeyPathMapping mapping = {})
+static Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                          size_t num_results, query_parser::KeyPathMapping mapping = {})
 {
     realm::query_parser::NoArguments args;
     Query q = t->query(query_string, args, mapping);
@@ -416,8 +416,8 @@ Query verify_query(test_util::unit_test::TestContext& test_context, TableRef t, 
     return q2;
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      const util::Any* arg_list, size_t num_args, size_t num_results)
+static void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                             const util::Any* arg_list, size_t num_args, size_t num_results)
 {
     query_parser::AnyContext ctx;
     realm::query_parser::ArgumentConverter<util::Any, query_parser::AnyContext> args(ctx, arg_list, num_args);
@@ -437,8 +437,8 @@ void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef 
     }
 }
 
-void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
-                      std::vector<Mixed> args, size_t num_results)
+static void verify_query_sub(test_util::unit_test::TestContext& test_context, TableRef t, std::string query_string,
+                             std::vector<Mixed> args, size_t num_results)
 {
     Query q = t->query(query_string, args, {});
     size_t q_count = q.count();
@@ -2595,7 +2595,7 @@ TEST(Parser_SortAndDistinctSerialisation)
     CHECK(description.find("SORT(account.balance ASC, account.num_transactions DESC)") != std::string::npos);
 }
 
-TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
+static TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
 {
     Query q = t->query(query_string, {}, mapping);
     std::string query_description = q.get_description(mapping.get_backlink_class_prefix());
@@ -5206,6 +5206,31 @@ TEST_TYPES(Parser_Arithmetic, Prop<int64_t>, Prop<float>, Prop<double>, Prop<Dec
 
     std::vector<Mixed> args = {2, 50};
     verify_query_sub(test_context, person, "age * $0 == $1", args, 1);
+}
+
+TEST(Parser_Between)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col_age = table->add_column(type_Int, "age");
+    auto col_scores = table->add_column_list(type_Int, "scores");
+    for (int i = 0; i < 3; ++i) {
+        auto list = table->create_object().set(col_age, 5 * i + 30).get_list<Int>(col_scores);
+        for (int j = 0; j < 5; j++) {
+            list.add(j + i * 5);
+        }
+        for (int j = 0; j < 5; j++) {
+            list.add(j + i * 5 + 10);
+        }
+    }
+
+    // g.to_json(std::cout);
+    verify_query(test_context, table, "age between {30, 37}", 2);
+    CHECK_THROW_ANY(verify_query(test_context, table, "NONE age between {30, 37}", 2));
+    verify_query(test_context, table, "ALL scores between {5, 19}", 1);
+    CHECK_THROW_ANY(verify_query(test_context, table, "scores between {5, 9}", 1));
+    CHECK_THROW_ANY(verify_query(test_context, table, "ANY scores between {5, 9}", 1));
+    CHECK_THROW_ANY(verify_query(test_context, table, "NONE scores between {10, 12}", 1));
 }
 
 #endif // TEST_PARSER

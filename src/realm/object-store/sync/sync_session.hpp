@@ -122,7 +122,7 @@ public:
 
     ~SyncSession();
     State state() const REQUIRES(!m_state_mutex);
-    ConnectionState connection_state() const REQUIRES(!m_state_mutex);
+    ConnectionState connection_state() const REQUIRES(!m_connection_state_mutex);
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const;
@@ -136,6 +136,18 @@ public:
     // Works the same way as `wait_for_upload_completion()`.
     void wait_for_download_completion(util::UniqueFunction<void(std::error_code)>&& callback)
         REQUIRES(!m_state_mutex);
+
+    // Block until upload completion occurs. Prefer the async version of this
+    // which takes a callback outside of test code.
+    // Returns true if upload completion actually occurred, and false if the
+    // session does not exist or the client was stopped.
+    bool wait_for_upload_completion() REQUIRES(!m_state_mutex);
+
+    // Block until download completion occurs. Prefer the async version of this
+    // which takes a callback outside of test code.
+    // Returns true if download completion actually occurred, and false if the
+    // session does not exist or the client was stopped.
+    bool wait_for_download_completion() REQUIRES(!m_state_mutex);
 
     // Register a notifier that updates the app regarding progress.
     //
@@ -181,14 +193,14 @@ public:
     void handle_reconnect() REQUIRES(!m_state_mutex);
 
     // Inform the sync session that it should close.
-    void close() REQUIRES(!m_state_mutex, !m_config_mutex);
+    void close() REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
 
     // Inform the sync session that it should log out.
-    void log_out() REQUIRES(!m_state_mutex);
+    void log_out() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // Shut down the synchronization session (sync::Session) and wait for the Realm file to no
     // longer be open on behalf of it.
-    void shutdown_and_wait() REQUIRES(!m_state_mutex);
+    void shutdown_and_wait() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
 
     // The access token needs to periodically be refreshed and this is how to
     // let the sync session know to update it's internal copy.
@@ -200,7 +212,8 @@ public:
     // Update the sync configuration used for this session. The new configuration must have the
     // same user and reference realm url as the old configuration. The session will immediately
     // disconnect (if it was active), and then attempt to connect using the new configuration.
-    void update_configuration(SyncConfig new_config) REQUIRES(!m_state_mutex, !m_config_mutex);
+    void update_configuration(SyncConfig new_config)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
 
     // An object representing the user who owns the Realm this `SyncSession` represents.
     std::shared_ptr<SyncUser> user() const REQUIRES(!m_config_mutex)
@@ -224,7 +237,7 @@ public:
         return m_server_url;
     }
 
-    sync::SubscriptionStore* get_flx_subscription_store();
+    const std::shared_ptr<sync::SubscriptionStore>& get_flx_subscription_store();
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
@@ -264,6 +277,10 @@ public:
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
         {
             session.nonsync_transact_notify(version);
+        }
+        static std::shared_ptr<DB> get_db(SyncSession& session)
+        {
+            return session.m_db;
         }
     };
 
@@ -315,10 +332,12 @@ private:
 
     SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, SyncConfig, SyncManager* sync_manager);
 
-    void download_fresh_realm() REQUIRES(!m_config_mutex, !m_state_mutex);
-    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
-        REQUIRES(!m_state_mutex, !m_config_mutex);
-    void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex);
+    void download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+        REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
+    void handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+                                       util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
+    void handle_error(SyncError) REQUIRES(!m_state_mutex, !m_config_mutex, !m_connection_state_mutex);
     void handle_bad_auth(const std::shared_ptr<SyncUser>& user, std::error_code error_code,
                          const std::string& context_message) REQUIRES(!m_state_mutex, !m_config_mutex);
     void cancel_pending_waits(util::CheckedUniqueLock, std::error_code) RELEASE(m_state_mutex);
@@ -331,13 +350,15 @@ private:
     void nonsync_transact_notify(VersionID::version_type) REQUIRES(!m_state_mutex);
 
     void create_sync_session() REQUIRES(m_state_mutex, !m_config_mutex);
-    void did_drop_external_reference() REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex);
-    void detach_from_sync_manager() REQUIRES(!m_state_mutex);
-    void close(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex);
+    void did_drop_external_reference()
+        REQUIRES(!m_state_mutex, !m_config_mutex, !m_external_reference_mutex, !m_connection_state_mutex);
+    void detach_from_sync_manager() REQUIRES(!m_state_mutex, !m_connection_state_mutex);
+    void close(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_config_mutex, !m_connection_state_mutex);
 
     void become_active() REQUIRES(m_state_mutex, !m_config_mutex);
-    void become_dying(util::CheckedUniqueLock) RELEASE(m_state_mutex);
-    void become_inactive(util::CheckedUniqueLock, std::error_code ec = {}) RELEASE(m_state_mutex);
+    void become_dying(util::CheckedUniqueLock) RELEASE(m_state_mutex) REQUIRES(!m_connection_state_mutex);
+    void become_inactive(util::CheckedUniqueLock, std::error_code ec = {}) RELEASE(m_state_mutex)
+        REQUIRES(!m_connection_state_mutex);
     void become_waiting_for_access_token() REQUIRES(m_state_mutex);
 
     void add_completion_callback(util::UniqueFunction<void(std::error_code)> callback, ProgressDirection direction)
@@ -355,20 +376,21 @@ private:
     void assert_mutex_unlocked() ASSERT_CAPABILITY(!m_state_mutex) ASSERT_CAPABILITY(!m_config_mutex) {}
 
     mutable util::CheckedMutex m_state_mutex;
+    mutable util::CheckedMutex m_connection_state_mutex;
 
     State m_state GUARDED_BY(m_state_mutex) = State::Inactive;
 
     // The underlying state of the connection. Even when sharing connections, the underlying session
     // will always start out as disconnected and then immediately transition to the correct state when calling
     // bind().
-    ConnectionState m_connection_state GUARDED_BY(m_state_mutex) = ConnectionState::Disconnected;
+    ConnectionState m_connection_state GUARDED_BY(m_connection_state_mutex) = ConnectionState::Disconnected;
     size_t m_death_count GUARDED_BY(m_state_mutex) = 0;
 
     mutable util::CheckedMutex m_config_mutex;
     SyncConfig m_config GUARDED_BY(m_config_mutex);
     const std::shared_ptr<DB> m_db;
     const std::shared_ptr<sync::SubscriptionStore> m_flx_subscription_store;
-    bool m_force_client_reset GUARDED_BY(m_state_mutex) = false;
+    util::Optional<SyncError::ClientResetModeAllowed> m_force_client_reset GUARDED_BY(m_state_mutex) = util::none;
     DBRef m_client_reset_fresh_copy GUARDED_BY(m_state_mutex);
     _impl::SyncClient& m_client;
     SyncManager* m_sync_manager GUARDED_BY(m_state_mutex) = nullptr;

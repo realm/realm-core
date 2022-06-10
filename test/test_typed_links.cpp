@@ -133,6 +133,38 @@ TEST(TypedLinks_Mixed)
     CHECK(john.get<Mixed>(col_pet).is_null());
 }
 
+TEST(TypedLinks_Mixed_AsymmetricIncoming)
+{
+    Group g;
+    auto dog = g.add_table("dog", Table::Type::TopLevelAsymmetric);
+    auto cat = g.add_table("cat", Table::Type::TopLevelAsymmetric);
+    auto person = g.add_table("person");
+    auto col_pet = person->add_column(type_Mixed, "pet");
+
+    auto pluto = dog->create_object();
+    auto tom = cat->create_object();
+    CHECK_THROW(person->create_object(ObjKey{}, {{col_pet, Mixed(ObjLink{dog->get_key(), pluto.get_key()})}}),
+                LogicError);
+    auto sam = person->create_object();
+    CHECK_THROW(sam.set(col_pet, Mixed(ObjLink{cat->get_key(), tom.get_key()})), LogicError);
+}
+
+TEST(TypedLinks_Mixed_AsymmetricOutgoing)
+{
+    Group g;
+    auto dog = g.add_table("dog");
+    auto cat = g.add_table("cat");
+    auto person = g.add_table("person", Table::Type::TopLevelAsymmetric);
+    auto col_pet = person->add_column(type_Mixed, "pet");
+
+    auto pluto = dog->create_object();
+    auto tom = cat->create_object();
+    CHECK_THROW(person->create_object(ObjKey{}, {{col_pet, Mixed(ObjLink{dog->get_key(), pluto.get_key()})}}),
+                LogicError);
+    auto sam = person->create_object();
+    CHECK_THROW(sam.set(col_pet, Mixed(ObjLink{cat->get_key(), tom.get_key()})), LogicError);
+}
+
 TEST(TypedLinks_MixedList)
 {
     Group g;

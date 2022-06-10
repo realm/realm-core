@@ -68,6 +68,27 @@ RLM_API realm_t* realm_open(const realm_config_t* config)
     });
 }
 
+RLM_API bool realm_convert_with_config(const realm_t* realm, const realm_config_t* config)
+{
+    return wrap_err([&]() {
+        (*realm)->convert(*config);
+        return true;
+    });
+}
+
+RLM_API bool realm_convert_with_path(const realm_t* realm, const char* path, realm_binary_t encryption_key)
+{
+    return wrap_err([&]() {
+        Realm::Config config;
+        config.path = path;
+        if (encryption_key.data) {
+            config.encryption_key.assign(encryption_key.data, encryption_key.data + encryption_key.size);
+        }
+        (*realm)->convert(config);
+        return true;
+    });
+}
+
 RLM_API bool realm_delete_files(const char* realm_file_path, bool* did_delete_realm)
 {
     return wrap_err([&]() {
@@ -142,7 +163,7 @@ RLM_API bool realm_rollback(realm_t* realm)
 
 RLM_API realm_callback_token_t* realm_add_realm_changed_callback(realm_t* realm,
                                                                  realm_on_realm_change_func_t callback,
-                                                                 void* userdata,
+                                                                 realm_userdata_t userdata,
                                                                  realm_free_userdata_func_t free_userdata)
 {
     util::UniqueFunction<void()> func = [callback, userdata = UserdataPtr{userdata, free_userdata}]() {

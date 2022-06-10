@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "util/test_file.hpp"
 
@@ -1656,7 +1656,7 @@ TEST_CASE("migration: Automatic") {
             StringData new_name;
         };
 
-        auto apply_renames = [&](std::initializer_list<Rename> renames) -> Realm::MigrationFunction {
+        auto apply_renames = [&](std::initializer_list<Rename> renames) -> MigrationFunction {
             return [=](SharedRealm, SharedRealm realm, Schema& schema) {
                 for (auto rename : renames) {
                     ObjectStore::rename_property(realm->read_group(), schema, rename.object_type, rename.old_name,
@@ -2517,12 +2517,12 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("can have different subsets of columns in different Realm instances" << mode_string) {
-            auto config2 = config;
+            Realm::Config config2 = config;
             config2.schema = add_property(schema, "object", {"value 3", PropertyType::Int});
-            auto config3 = config;
+            Realm::Config config3 = config;
             config3.schema = remove_property(schema, "object", "value 2");
 
-            auto config4 = config;
+            Realm::Config config4 = config;
             config4.schema = util::none;
 
             auto realm2 = Realm::get_shared_realm(config2);
@@ -2542,7 +2542,7 @@ TEST_CASE("migration: AdditiveDiscovered") {
         }
 
         DYNAMIC_SECTION("updating a schema to include already-present column" << mode_string) {
-            auto config2 = config;
+            Realm::Config config2 = config;
             config2.schema = add_property(schema, "object", {"value 3", PropertyType::Int});
             auto realm2 = Realm::get_shared_realm(config2);
             auto& properties2 = realm2->schema().find("object")->persisted_properties;
@@ -2567,14 +2567,14 @@ TEST_CASE("migration: AdditiveDiscovered") {
             Schema schema1 = realm1->schema();
             realm1->close();
 
-            auto config2 = config1;
+            Realm::Config config2 = config1;
             config2.schema_version = 1;
             auto realm2 = Realm::get_shared_realm(config2);
             REQUIRE(realm2->schema() == schema1);
         }
 
         DYNAMIC_SECTION("invalid schema update leaves the schema untouched" << mode_string) {
-            auto config2 = config;
+            Realm::Config config2 = config;
             config2.schema = add_property(schema, "object", {"value 3", PropertyType::Int});
             auto realm2 = Realm::get_shared_realm(config2);
 

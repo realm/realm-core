@@ -46,9 +46,9 @@ public:
     virtual ~Replication() = default;
 
     // Formerly Replication:
-    virtual void add_class(TableKey table_key, StringData table_name, bool is_embedded);
+    virtual void add_class(TableKey table_key, StringData table_name, Table::Type table_type);
     virtual void add_class_with_primary_key(TableKey, StringData table_name, DataType pk_type, StringData pk_field,
-                                            bool nullable);
+                                            bool nullable, Table::Type table_type);
     virtual void prepare_erase_class(TableKey table_key);
     virtual void erase_class(TableKey table_key, size_t num_tables);
     virtual void rename_class(TableKey table_key, StringData new_name);
@@ -540,13 +540,13 @@ inline void Replication::nullify_link(const Table* t, ColKey col_key, ObjKey key
 
 inline void Replication::list_set(const CollectionBase& list, size_t list_ndx, Mixed)
 {
-    select_collection(list);      // Throws
+    select_collection(list);                            // Throws
     m_encoder.list_set(list.translate_index(list_ndx)); // Throws
 }
 
 inline void Replication::list_insert(const CollectionBase& list, size_t list_ndx, Mixed, size_t)
 {
-    select_collection(list);         // Throws
+    select_collection(list);                               // Throws
     m_encoder.list_insert(list.translate_index(list_ndx)); // Throws
 }
 
@@ -576,13 +576,13 @@ inline void Replication::remove_object(const Table* t, ObjKey key)
 
 inline void Replication::list_move(const CollectionBase& list, size_t from_link_ndx, size_t to_link_ndx)
 {
-    select_collection(list);                         // Throws
+    select_collection(list);                                                                     // Throws
     m_encoder.list_move(list.translate_index(from_link_ndx), list.translate_index(to_link_ndx)); // Throws
 }
 
 inline void Replication::list_erase(const CollectionBase& list, size_t link_ndx)
 {
-    select_collection(list);        // Throws
+    select_collection(list);                              // Throws
     m_encoder.list_erase(list.translate_index(link_ndx)); // Throws
 }
 

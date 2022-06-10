@@ -24,10 +24,10 @@ each of our major platforms:
     sudo apt-get install zlib1g-dev
     sudo apt-get install cmake
 
-### OS X 10.10, 10.11, 10.12
+### macOS
 
-On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
-as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
+On macOS, Clang is used as the C/C++ compiler by default. Clang is installed
+as part of Xcode. Xcode 13.1 or newer is required, and can be installed via
 the Mac App Store.
 
 Setting up a development environment can convienently be achieved using a
@@ -171,7 +171,7 @@ Once authorized, run the following docker command from the top directory to star
 
 ```
 export MDBREALM_TEST_SERVER_TAG=$(grep MDBREALM_TEST_SERVER_TAG dependencies.list |cut -f 2 -d=)
-docker run --rm -p 9090:9090 -v ~/.aws/credentials:/root/.aws/credentials -it docker.pkg.github.com/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
+docker run --rm -p 9090:9090 -v ~/.aws/credentials:/root/.aws/credentials -it ghcr.io/realm/ci/mongodb-realm-test-server:${MDBREALM_TEST_SERVER_TAG}
 ```
 
 This will make the stitch UI available in your browser at `localhost:9090` where you can login with "unique_user@domain.com" and "password".

@@ -174,7 +174,6 @@ REALM_PRIMITIVE_SET_TYPE(ObjKey)
 REALM_PRIMITIVE_SET_TYPE(ObjectId)
 REALM_PRIMITIVE_SET_TYPE(Decimal)
 REALM_PRIMITIVE_SET_TYPE(UUID)
-REALM_PRIMITIVE_SET_TYPE(Mixed)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<float>)
@@ -183,6 +182,10 @@ REALM_PRIMITIVE_SET_TYPE(util::Optional<ObjectId>)
 REALM_PRIMITIVE_SET_TYPE(util::Optional<UUID>)
 
 #undef REALM_PRIMITIVE_SET_TYPE
+
+template size_t Set::find<Mixed>(const Mixed&) const;
+template std::pair<size_t, bool> Set::remove<Mixed>(Mixed const&);
+template std::pair<size_t, bool> Set::insert<Mixed>(Mixed);
 
 template <>
 std::pair<size_t, bool> Set::insert<int>(int value)
@@ -205,7 +208,9 @@ std::pair<size_t, bool> Set::insert_any(Mixed value)
 Mixed Set::get_any(size_t ndx) const
 {
     verify_valid_row(ndx);
-    return set_base().get_any(ndx);
+    auto value = set_base().get_any(ndx);
+    record_audit_read(value);
+    return value;
 }
 
 std::pair<size_t, bool> Set::remove_any(Mixed value)
@@ -241,11 +246,23 @@ size_t Set::find<int>(const int& value) const
 }
 
 template <>
+Mixed Set::get<Mixed>(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    auto& set = as<Mixed>();
+    auto value = set.get(row_ndx);
+    record_audit_read(value);
+    return value;
+}
+
+template <>
 Obj Set::get<Obj>(size_t row_ndx) const
 {
     verify_valid_row(row_ndx);
     auto& set = as<Obj>();
-    return set.get_object(row_ndx);
+    auto obj = set.get_object(row_ndx);
+    record_audit_read(obj);
+    return obj;
 }
 
 template <>

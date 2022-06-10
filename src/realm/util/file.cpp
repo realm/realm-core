@@ -220,6 +220,29 @@ void make_dir(const std::string& path)
 }
 
 
+void make_dir_recursive(std::string path)
+{
+    // Skip the first separator as we're assuming an absolute path
+    size_t pos = path.find_first_of("/\\");
+    if (pos == std::string::npos)
+        return;
+    pos += 1;
+
+    while (pos < path.size()) {
+        auto sep = path.find_first_of("/\\", pos);
+        char c = 0;
+        if (sep < path.size()) {
+            c = path[sep];
+            path[sep] = 0;
+        }
+        try_make_dir(path);
+        if (sep < path.size())
+            path[sep] = c;
+        pos = sep + 1;
+    }
+}
+
+
 void remove_dir(const std::string& path)
 {
     if (try_remove_dir(path)) // Throws
@@ -1013,6 +1036,17 @@ void File::sync()
         return;
     throw std::system_error(errno, std::system_category(), "fsync() failed");
 
+#endif
+}
+
+void File::barrier()
+{
+#if REALM_PLATFORM_APPLE
+    if (::fcntl(m_fd, F_BARRIERFSYNC) == 0)
+        return;
+    throw std::system_error(errno, std::system_category(), "fcntl() with F_BARRIERFSYNC failed");
+#else
+    sync();
 #endif
 }
 

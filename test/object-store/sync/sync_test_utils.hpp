@@ -19,7 +19,7 @@
 #ifndef REALM_SYNC_TEST_UTILS_HPP
 #define REALM_SYNC_TEST_UTILS_HPP
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
@@ -54,8 +54,7 @@ void timed_sleeping_wait_for(util::FunctionRef<bool()> condition,
 
 struct ExpectedRealmPaths {
     ExpectedRealmPaths(const std::string& base_path, const std::string& app_id, const std::string& user_identity,
-                       const std::string& local_identity, const std::string& partition,
-                       util::Optional<std::string> name = util::none);
+                       const std::string& local_identity, const std::string& partition);
     std::string current_preferred_path;
     std::string fallback_hashed_path;
     std::string legacy_local_id_path;
@@ -65,25 +64,17 @@ struct ExpectedRealmPaths {
 
 #if REALM_ENABLE_SYNC
 
-void wait_for_sync_changes(std::shared_ptr<SyncSession> session);
-
 template <typename Transport>
 const std::shared_ptr<app::GenericNetworkTransport> instance_of = std::make_shared<Transport>();
 
 std::ostream& operator<<(std::ostream& os, util::Optional<app::AppError> error);
 
-template <typename Factory>
-app::App::Config get_config(Factory factory)
+template <typename Transport>
+TestSyncManager::Config get_config(Transport&& transport)
 {
-    return {"app name",
-            factory,
-            util::none,
-            util::none,
-            util::Optional<std::string>("A Local App Version"),
-            util::none,
-            "Object Store Platform Tests",
-            "Object Store Platform Version Blah",
-            "An sdk version"};
+    TestSyncManager::Config config;
+    config.transport = transport;
+    return config;
 }
 
 #if REALM_ENABLE_AUTH_TESTS
@@ -106,6 +97,14 @@ AutoVerifiedEmailCredentials create_user_and_log_in(app::SharedApp app);
 
 namespace reset_utils {
 
+struct Partition {
+    std::string property_name;
+    std::string value;
+};
+
+Obj create_object(Realm& realm, StringData object_type, util::Optional<ObjectId> primary_key = util::none,
+                  util::Optional<Partition> partition = util::none);
+
 struct TestClientReset {
     using Callback = util::UniqueFunction<void(const SharedRealm&)>;
     TestClientReset(const Realm::Config& local_config, const Realm::Config& remote_config);
@@ -115,6 +114,8 @@ struct TestClientReset {
     TestClientReset* make_remote_changes(Callback&& changes_remote);
     TestClientReset* on_post_local_changes(Callback&& post_local);
     TestClientReset* on_post_reset(Callback&& post_reset);
+    void set_pk_of_object_driving_reset(const ObjectId& pk);
+    ObjectId get_pk_of_object_driving_reset() const;
 
     virtual void run() = 0;
 
@@ -128,6 +129,7 @@ protected:
     Callback m_on_post_local;
     Callback m_on_post_reset;
     bool m_did_run = false;
+    ObjectId m_pk_driving_reset = ObjectId::gen();
 };
 
 #if REALM_ENABLE_SYNC
@@ -135,7 +137,7 @@ protected:
 #if REALM_ENABLE_AUTH_TESTS
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
-                                                        TestSyncManager& test_sync_manager);
+                                                        TestAppSession& test_app_session);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC

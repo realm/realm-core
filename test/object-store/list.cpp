@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "util/test_file.hpp"
 #include "util/event_loop.hpp"
@@ -1776,9 +1776,6 @@ TEST_CASE("list with unresolved links") {
 
     auto r1 = Realm::get_shared_realm(config1);
     auto r2 = Realm::get_shared_realm(config2);
-
-    auto coordinator = _impl::RealmCoordinator::get_coordinator(config2.path);
-    coordinator->enable_wait_for_change();
 
     auto origin = r1->read_group().get_table("class_origin");
     auto target = r1->read_group().get_table("class_target");

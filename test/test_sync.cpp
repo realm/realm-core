@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <tuple>
@@ -11,27 +12,34 @@
 #include <condition_variable>
 #include <thread>
 
-#include <realm/util/features.h>
-#include <realm/util/parent_dir.hpp>
-#include <realm/util/uri.hpp>
-#include <realm/util/network.hpp>
-#include <realm/util/http.hpp>
-#include <realm/util/random.hpp>
-#include <realm/util/websocket.hpp>
-#include <realm/chunked_binary.hpp>
-#include <realm/sync/noinst/server/server_history.hpp>
-#include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/sync/noinst/server/server_dir.hpp>
-#include <realm/impl/simulated_failure.hpp>
 #include <realm.hpp>
+#include <realm/chunked_binary.hpp>
+#include <realm/data_type.hpp>
 #include <realm/history.hpp>
-#include <realm/version.hpp>
-#include <realm/sync/transform.hpp>
-#include <realm/sync/history.hpp>
-#include <realm/sync/protocol.hpp>
-#include <realm/sync/client.hpp>
-#include <realm/sync/noinst/server/server.hpp>
+#include <realm/impl/simulated_failure.hpp>
 #include <realm/list.hpp>
+#include <realm/sync/changeset.hpp>
+#include <realm/sync/changeset_encoder.hpp>
+#include <realm/sync/client.hpp>
+#include <realm/sync/history.hpp>
+#include <realm/sync/instructions.hpp>
+#include <realm/sync/noinst/protocol_codec.hpp>
+#include <realm/sync/noinst/server/server.hpp>
+#include <realm/sync/noinst/server/server_dir.hpp>
+#include <realm/sync/noinst/server/server_history.hpp>
+#include <realm/sync/object_id.hpp>
+#include <realm/sync/protocol.hpp>
+#include <realm/sync/transform.hpp>
+#include <realm/util/buffer.hpp>
+#include <realm/util/features.h>
+#include <realm/util/http.hpp>
+#include <realm/util/logger.hpp>
+#include <realm/util/network.hpp>
+#include <realm/util/parent_dir.hpp>
+#include <realm/util/random.hpp>
+#include <realm/util/uri.hpp>
+#include <realm/util/websocket.hpp>
+#include <realm/version.hpp>
 
 #include "sync_fixtures.hpp"
 
@@ -133,12 +141,12 @@ TEST(Sync_BadVirtualPath)
     int nerrors = 0;
 
     using ErrorInfo = Session::ErrorInfo;
-    auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal;
+        bool is_fatal = error_info->is_fatal();
         CHECK_EQUAL(sync::ProtocolError::illegal_realm_path, ec);
         CHECK(is_fatal);
         ++nerrors;
@@ -545,7 +553,7 @@ TEST(Sync_TokenWithoutExpirationAllowed)
         ClientServerFixture fixture(dir, test_context);
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
@@ -758,12 +766,12 @@ TEST(Sync_DetectSchemaMismatch_ColumnType)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
@@ -810,12 +818,12 @@ TEST(Sync_DetectSchemaMismatch_Nullability)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
@@ -864,12 +872,12 @@ TEST(Sync_DetectSchemaMismatch_Links)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
@@ -916,12 +924,12 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Name)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
@@ -964,12 +972,12 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Type)
         fixture.start();
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
@@ -1014,12 +1022,12 @@ TEST(Sync_DetectSchemaMismatch_PrimaryKeys_Nullability)
         bool error_did_occur = false;
 
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK(ec == sync::Client::Error::bad_changeset || ec == sync::ProtocolError::invalid_schema_change);
             CHECK(is_fatal);
             // FIXME: Check that the message in the log is user-friendly.
@@ -3461,7 +3469,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_2)
         std::string pem(pem_data, pem_size);
 
         std::string expected = "-----BEGIN CERTIFICATE-----\n"
-                               "MIIF0zCCA7ugAwIBAgIBBjANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
+                               "MIIF0zCCA7ugAwIBAgIBCDANBgkqhkiG9w0BAQsFADB1MRIwEAYKCZImiZPyLGQB\n";
 
         CHECK_EQUAL(expected, pem.substr(0, expected.size()));
 
@@ -3519,7 +3527,7 @@ TEST(Sync_SSL_Certificate_Verify_Callback_3)
         else {
             CHECK_EQUAL(pem_size, 1700);
             CHECK_EQUAL(preverify_ok, 1);
-            CHECK_EQUAL(pem_data[1667], 'h');
+            CHECK_EQUAL(pem_data[1667], '2');
             CHECK_EQUAL(pem_data[1698], '-');
             CHECK_EQUAL(pem_data[1699], '\n');
         }
@@ -4383,8 +4391,8 @@ TEST(Sync_CancelReconnectDelay)
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec, bool, const std::string&) {
-            if (CHECK_EQUAL(ec, ProtocolError::connection_closed))
+        auto handler = [&](const SessionErrorInfo& info) {
+            if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db);
@@ -4405,8 +4413,8 @@ TEST(Sync_CancelReconnectDelay)
         fixture.start();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec, bool, const std::string&) {
-            if (CHECK_EQUAL(ec, ProtocolError::connection_closed))
+        auto handler = [&](const SessionErrorInfo& info) {
+            if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db);
@@ -4428,8 +4436,8 @@ TEST(Sync_CancelReconnectDelay)
 
         {
             BowlOfStonesSemaphore bowl;
-            auto handler = [&](std::error_code ec, bool, const std::string&) {
-                if (CHECK_EQUAL(ec, ProtocolError::connection_closed))
+            auto handler = [&](const SessionErrorInfo& info) {
+                if (CHECK_EQUAL(info.error_code, ProtocolError::connection_closed))
                     bowl.add_stone();
             };
             Session session = fixture.make_session(db);
@@ -4464,8 +4472,8 @@ TEST(Sync_CancelReconnectDelay)
         session_x.wait_for_download_complete_or_client_stopped();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec, bool, const std::string&) {
-            if (CHECK_EQUAL(ec, ProtocolError::illegal_realm_path))
+        auto handler = [&](const SessionErrorInfo& info) {
+            if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db);
@@ -4487,8 +4495,8 @@ TEST(Sync_CancelReconnectDelay)
         session_x.wait_for_download_complete_or_client_stopped();
 
         BowlOfStonesSemaphore bowl;
-        auto handler = [&](std::error_code ec, bool, const std::string&) {
-            if (CHECK_EQUAL(ec, ProtocolError::illegal_realm_path))
+        auto handler = [&](const SessionErrorInfo& info) {
+            if (CHECK_EQUAL(info.error_code, ProtocolError::illegal_realm_path))
                 bowl.add_stone();
         };
         Session session = fixture.make_session(db);
@@ -5411,13 +5419,13 @@ TEST(Sync_ConnectionStateChange)
         fixture.start();
 
         BowlOfStonesSemaphore bowl_1, bowl_2;
-        auto listener_1 = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener_1 = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             CHECK_EQUAL(state == ConnectionState::disconnected, bool(error_info));
             states_1.push_back(state);
             if (state == ConnectionState::disconnected)
                 bowl_1.add_stone();
         };
-        auto listener_2 = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener_2 = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             CHECK_EQUAL(state == ConnectionState::disconnected, bool(error_info));
             states_2.push_back(state);
             if (state == ConnectionState::disconnected)
@@ -5453,7 +5461,7 @@ TEST(Sync_ClientErrorHandler)
     fixture.start();
 
     BowlOfStonesSemaphore bowl;
-    auto handler = [&](std::error_code, bool, const std::string&) {
+    auto handler = [&](const SessionErrorInfo&) {
         bowl.add_stone();
     };
 
@@ -5631,12 +5639,12 @@ TEST_IF(Sync_SSL_Certificates, false)
 
         Session session{client, db, nullptr, std::move(session_config)};
 
-        auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>& error_info) {
             if (state == ConnectionState::disconnected) {
                 CHECK(error_info);
                 client_logger.debug(
                     "State change: disconnected, error_code = %1, is_fatal = %2, detailed_message = %3",
-                    error_info->error_code, error_info->is_fatal, error_info->detailed_message);
+                    error_info->error_code, error_info->is_fatal(), error_info->message);
                 // We expect to get through the SSL handshake but will hit an error due to the wrong token.
                 CHECK_NOT_EQUAL(error_info->error_code, Client::Error::ssl_server_cert_rejected);
                 client.stop();
@@ -5710,12 +5718,12 @@ TEST(Sync_BadChangeset)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const Session::ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>& error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK_EQUAL(sync::ProtocolError::bad_changeset, ec);
             CHECK(is_fatal);
             did_fail = true;
@@ -5759,7 +5767,7 @@ TEST(Sync_GoodChangeset_AccentCharacterInFieldName)
             wt.commit();
         }
 
-        auto listener = [&](ConnectionState state, const Session::ErrorInfo*) {
+        auto listener = [&](ConnectionState state, const util::Optional<Session::ErrorInfo>) {
             if (state != ConnectionState::disconnected)
                 return;
             did_fail = true;
@@ -6320,12 +6328,12 @@ TEST(Sync_ClientFileBlacklisting)
         fixture.start();
         using ConnectionState = ConnectionState;
         using ErrorInfo = Session::ErrorInfo;
-        auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+        auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
             if (state != ConnectionState::disconnected)
                 return;
             REALM_ASSERT(error_info);
             std::error_code ec = error_info->error_code;
-            bool is_fatal = error_info->is_fatal;
+            bool is_fatal = error_info->is_fatal();
             CHECK_EQUAL(sync::ProtocolError::client_file_blacklisted, ec);
             CHECK(is_fatal);
             did_fail = true;
@@ -6418,12 +6426,12 @@ TEST(Sync_ResumeAfterClientSideFailureToIntegrate)
     bool failed_twice = false;
     using ConnectionState = ConnectionState;
     using ErrorInfo = Session::ErrorInfo;
-    auto listener = [&](ConnectionState state, const ErrorInfo* error_info) {
+    auto listener = [&](ConnectionState state, util::Optional<ErrorInfo> error_info) {
         if (state != ConnectionState::disconnected)
             return;
         REALM_ASSERT(error_info);
         std::error_code ec = error_info->error_code;
-        bool is_fatal = error_info->is_fatal;
+        bool is_fatal = error_info->is_fatal();
         CHECK_EQUAL(Client::Error::bad_changeset, ec);
         CHECK(is_fatal);
         if (!failed_once) {
@@ -7130,13 +7138,13 @@ TEST(Sync_BundledRealmFile)
     });
 
     // We cannot write out file if changes are not synced to server
-    CHECK_THROW_ANY(db->write_copy(path.c_str()));
+    CHECK_THROW_ANY(db->write_copy(path.c_str(), nullptr));
 
     session.wait_for_upload_complete_or_client_stopped();
     session.wait_for_download_complete_or_client_stopped();
 
     // Now we can
-    db->write_copy(path.c_str());
+    db->write_copy(path.c_str(), nullptr);
 }
 
 TEST(Sync_UpgradeToClientHistory)
@@ -7148,7 +7156,7 @@ TEST(Sync_UpgradeToClientHistory)
     {
         auto tr = db_1->start_write();
 
-        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto embedded = tr->add_table("class_Embedded", Table::Type::Embedded);
         auto col_float = embedded->add_column(type_Float, "float");
         auto col_additional = embedded->add_column_dictionary(*embedded, "additional");
 
@@ -7295,6 +7303,79 @@ TEST(Sync_MergeStringPrimaryKey)
         session_2.wait_for_upload_complete_or_client_stopped();
         // Download completion is not important.
     }
+}
+
+TEST(Sync_NonIncreasingServerVersions)
+{
+    TEST_CLIENT_DB(db);
+
+    auto& history = get_history(db);
+    history.set_client_file_ident(SaltedFileIdent{2, 0x1234567812345678}, false);
+    timestamp_type timestamp{1};
+    history.set_local_origin_timestamp_source([&] {
+        return ++timestamp;
+    });
+
+    auto latest_local_verson = [&] {
+        auto tr = db->start_write();
+        tr->add_table_with_primary_key("class_foo", type_String, "_id")->add_column(type_Int, "int_col");
+        return tr->commit();
+    }();
+
+    std::vector<Changeset> server_changesets;
+    auto prep_changeset = [&](auto pk_name, auto int_col_val) {
+        Changeset changeset;
+        changeset.version = 10;
+        changeset.last_integrated_remote_version = latest_local_verson - 1;
+        changeset.origin_timestamp = ++timestamp;
+        changeset.origin_file_ident = 1;
+        instr::PrimaryKey pk{changeset.intern_string(pk_name)};
+        auto table_name = changeset.intern_string("foo");
+        auto col_name = changeset.intern_string("int_col");
+        instr::EraseObject erase_1;
+        erase_1.object = pk;
+        erase_1.table = table_name;
+        changeset.push_back(erase_1);
+        instr::CreateObject create_1;
+        create_1.object = pk;
+        create_1.table = table_name;
+        changeset.push_back(create_1);
+        instr::Update update_1;
+        update_1.table = table_name;
+        update_1.object = pk;
+        update_1.field = col_name;
+        update_1.value = instr::Payload{int64_t(int_col_val)};
+        changeset.push_back(update_1);
+        server_changesets.push_back(std::move(changeset));
+    };
+    prep_changeset("bizz", 1);
+    prep_changeset("buzz", 2);
+    prep_changeset("baz", 3);
+    prep_changeset("bar", 4);
+    ++server_changesets.back().version;
+
+    std::vector<ChangesetEncoder::Buffer> encoded;
+    std::vector<Transformer::RemoteChangeset> server_changesets_encoded;
+    for (const auto& changeset : server_changesets) {
+        encoded.emplace_back();
+        encode_changeset(changeset, encoded.back());
+        server_changesets_encoded.emplace_back(changeset.version, changeset.last_integrated_remote_version,
+                                               BinaryData(encoded.back().data(), encoded.back().size()),
+                                               changeset.origin_timestamp, changeset.origin_file_ident);
+    }
+
+    SyncProgress progress = {};
+    progress.download.server_version = server_changesets.back().version;
+    progress.download.last_integrated_client_version = latest_local_verson - 1;
+    progress.latest_server_version.version = server_changesets.back().version;
+    progress.latest_server_version.salt = 0x7876543217654321;
+
+    uint_fast64_t downloadable_bytes = 0;
+    VersionInfo version_info;
+    util::StderrLogger logger;
+    history.integrate_server_changesets(progress, &downloadable_bytes, server_changesets_encoded.data(),
+                                        server_changesets_encoded.size(), version_info,
+                                        DownloadBatchState::LastInBatch, logger, {});
 }
 
 } // unnamed namespace

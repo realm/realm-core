@@ -18,6 +18,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
+#include <realm/object-store/sync/sync_user.hpp>
 #endif
 
 #include <stdexcept>
@@ -52,8 +53,18 @@ struct InvalidPropertyKeyException : std::logic_error {
     using std::logic_error::logic_error;
 };
 struct CallbackFailed : std::runtime_error {
+    // SDK-provided opaque error value when error == RLM_ERR_CALLBACK with a callout to
+    // realm_register_user_code_callback_error()
+    void* usercode_error{nullptr};
+
     CallbackFailed()
         : std::runtime_error("User-provided callback failed")
+    {
+    }
+
+    CallbackFailed(void* usercode_error)
+        : std::runtime_error("User-provided callback failed")
+        , usercode_error(usercode_error)
     {
     }
 };
@@ -153,8 +164,17 @@ protected:
     realm_thread_safe_reference() {}
 };
 
-struct realm_config : realm::c_api::WrapC, realm::Realm::Config {
-    using Config::Config;
+struct realm_config : realm::c_api::WrapC, realm::RealmConfig {
+    using RealmConfig::RealmConfig;
+    std::map<void*, realm_free_userdata_func_t> free_functions;
+    realm_config(const realm_config&) = delete;
+    realm_config& operator=(const realm_config&) = delete;
+    ~realm_config()
+    {
+        for (auto& f : free_functions) {
+            f.second(f.first);
+        }
+    }
 };
 
 // LCOV_EXCL_START
@@ -618,7 +638,7 @@ struct realm_user : realm::c_api::WrapC, std::shared_ptr<realm::SyncUser> {
     bool equals(const WrapC& other) const noexcept final
     {
         if (auto ptr = dynamic_cast<const realm_user*>(&other)) {
-            return get() == ptr->get();
+            return *get() == *(ptr->get());
         }
         return false;
     }
@@ -649,9 +669,23 @@ struct realm_flx_sync_subscription : realm::c_api::WrapC, realm::sync::Subscript
         : realm::sync::Subscription(std::move(subscription))
     {
     }
+
     realm_flx_sync_subscription(const realm::sync::Subscription& subscription)
         : realm::sync::Subscription(subscription)
     {
+    }
+
+    realm_flx_sync_subscription* clone() const override
+    {
+        return new realm_flx_sync_subscription{*this};
+    }
+
+    bool equals(const WrapC& other) const noexcept final
+    {
+        if (auto ptr = dynamic_cast<const realm_flx_sync_subscription*>(&other)) {
+            return *ptr == *this;
+        }
+        return false;
     }
 };
 

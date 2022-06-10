@@ -190,6 +190,13 @@ SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync
     return app;
 }
 
+SharedApp App::get_uncached_app(const Config& config, const SyncClientConfig& sync_client_config)
+{
+    auto app = std::make_shared<App>(config);
+    app->configure(sync_client_config);
+    return app;
+}
+
 std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
@@ -204,6 +211,14 @@ void App::clear_cached_apps()
 {
     std::lock_guard<std::mutex> lock(s_apps_mutex);
     s_apps_cache.clear();
+}
+
+void App::close_all_sync_sessions()
+{
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
+    for (auto& app : s_apps_cache) {
+        app.second->sync_manager()->close_all_sessions();
+    }
 }
 
 App::App(const Config& config)
@@ -647,14 +662,18 @@ void App::remove_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 
 void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void(Optional<AppError>)>&& completion)
 {
-    if (!user || user->state() != SyncUser::State::LoggedIn) {
+    if (!user) {
         return completion(AppError(make_client_error_code(ClientErrorCode::user_not_found),
+                                   "The specified user could not be found."));
+    }
+    if (user->state() != SyncUser::State::LoggedIn) {
+        return completion(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
                                    "User must be logged in to be deleted."));
     }
 
     if (!verify_user_present(user)) {
         return completion(
-            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+            AppError(make_client_error_code(ClientErrorCode::user_not_found), "No user has been found."));
     }
 
     Request req;
@@ -676,13 +695,17 @@ void App::delete_user(const std::shared_ptr<SyncUser>& user, UniqueFunction<void
 void App::link_user(const std::shared_ptr<SyncUser>& user, const AppCredentials& credentials,
                     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
-    if (!user || user->state() != SyncUser::State::LoggedIn) {
+    if (!user) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user is not logged in"));
+                                            "The specified user could not be found."));
+    }
+    if (user->state() != SyncUser::State::LoggedIn) {
+        return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
+                                            "The specified user is not logged in."));
     }
     if (!verify_user_present(user)) {
         return completion(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
-                                            "The specified user was not found"));
+                                            "The specified user was not found."));
     }
 
     App::log_in_with_credentials(credentials, user, std::move(completion));

@@ -30,7 +30,8 @@
 #include <mutex>
 #include <unordered_map>
 
-struct TestSyncManager;
+class TestAppSession;
+class TestSyncManager;
 
 namespace realm {
 
@@ -89,7 +90,8 @@ struct SyncClientConfig {
 
 class SyncManager : public std::enable_shared_from_this<SyncManager> {
     friend class SyncSession;
-    friend struct ::TestSyncManager;
+    friend class ::TestSyncManager;
+    friend class ::TestAppSession;
 
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
@@ -136,6 +138,7 @@ public:
 
     util::Logger::Level log_level() const noexcept REQUIRES(!m_mutex);
 
+    std::vector<std::shared_ptr<SyncSession>> get_all_sessions() const REQUIRES(!m_session_mutex);
     std::shared_ptr<SyncSession> get_session(std::shared_ptr<DB> db, const SyncConfig& config)
         REQUIRES(!m_mutex, !m_session_mutex);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const REQUIRES(!m_session_mutex);
@@ -203,6 +206,9 @@ public:
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const REQUIRES(!m_file_system_mutex);
 
+    // Immediately closes any open sync sessions for this sync manager
+    void close_all_sessions() REQUIRES(!m_mutex, !m_session_mutex);
+
     void set_sync_route(std::string sync_route) REQUIRES(!m_mutex)
     {
         util::CheckedLockGuard lock(m_mutex);
@@ -220,6 +226,15 @@ public:
         util::CheckedLockGuard lock(m_mutex);
         return m_app;
     }
+
+    SyncClientConfig config() const REQUIRES(!m_mutex)
+    {
+        util::CheckedLockGuard lock(m_mutex);
+        return m_config;
+    }
+
+    // Create a new logger of the type which will be used by the sync client
+    std::unique_ptr<util::Logger> make_logger() const REQUIRES(!m_mutex);
 
     SyncManager();
     SyncManager(const SyncManager&) = delete;
@@ -257,7 +272,7 @@ private:
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Create a new logger of the type which will be used by the sync client
-    std::unique_ptr<util::Logger> make_logger() const REQUIRES(m_mutex);
+    std::unique_ptr<util::Logger> do_make_logger() const REQUIRES(m_mutex);
 
     // Protects m_users
     mutable util::CheckedMutex m_user_mutex;

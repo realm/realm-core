@@ -484,6 +484,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     notify_schema_changed();
 }
 
+void Realm::rename_property(Schema schema, StringData object_type, StringData old_name, StringData new_name)
+{
+    ObjectStore::rename_property(read_group(), schema, object_type, old_name, new_name);
+}
+
 void Realm::add_schema_change_handler()
 {
     if (m_config.immutable())
@@ -890,7 +895,7 @@ auto Realm::async_commit_transaction(util::UniqueFunction<void(std::exception_pt
     return handle;
 }
 
-void Realm::async_cancel_transaction(AsyncHandle handle)
+bool Realm::async_cancel_transaction(AsyncHandle handle)
 {
     verify_thread();
     auto compare = [handle](auto& elem) {
@@ -900,14 +905,16 @@ void Realm::async_cancel_transaction(AsyncHandle handle)
     auto it1 = std::find_if(m_async_write_q.begin(), m_async_write_q.end(), compare);
     if (it1 != m_async_write_q.end()) {
         m_async_write_q.erase(it1);
-        return;
+        return true;
     }
     auto it2 = std::find_if(m_async_commit_q.begin(), m_async_commit_q.end(), compare);
     if (it2 != m_async_commit_q.end()) {
         // Just delete the callback. It is important that we know
         // that there are still commits pending.
         it2->when_completed = nullptr;
+        return true;
     }
+    return false;
 }
 
 void Realm::begin_transaction()
@@ -1045,50 +1052,47 @@ bool Realm::compact()
     return m_coordinator->compact();
 }
 
-void Realm::write_copy(StringData path, BinaryData key)
+void Realm::convert(const Config& config, bool merge_into_existing)
 {
-    if (key.data() && key.size() != 64) {
-        throw InvalidEncryptionKeyException();
-    }
     verify_thread();
-    try {
-        Transaction& tr = transaction();
-        auto repl = tr.get_replication();
-        if (repl && repl->get_history_type() == Replication::hist_SyncClient) {
-            m_coordinator->write_copy(path, key, false);
-        }
-        else {
-            tr.write(path, key.data());
-        }
-    }
-    catch (...) {
-        _impl::translate_file_exception(path);
-    }
-}
-
-void Realm::export_to(const Config& config)
-{
-    std::string new_location = config.path;
-    BinaryData encryption_key(config.encryption_key.data(), config.encryption_key.size());
-    if (util::File::exists(new_location)) {
+    if (merge_into_existing && util::File::exists(config.path)) {
         auto destination_realm = Realm::get_shared_realm(config);
         destination_realm->begin_transaction();
         auto destination = destination_realm->transaction_ref();
         m_transaction->copy_to(destination);
         destination_realm->commit_transaction();
+        return;
     }
-    else {
-        write_copy(new_location, encryption_key);
-        if (config.sync_config) {
+
+    if (config.encryption_key.size() && config.encryption_key.size() != 64) {
+        throw InvalidEncryptionKeyException();
+    }
+
+    try {
+        auto& tr = transaction();
+        auto repl = tr.get_replication();
+        bool src_is_sync = repl && repl->get_history_type() == Replication::hist_SyncClient;
+        bool dst_is_sync = config.sync_config || config.force_sync_history;
+
+        if (dst_is_sync) {
+            m_coordinator->write_copy(config.path, config.encryption_key.data());
+            if (!src_is_sync) {
 #if REALM_ENABLE_SYNC
-            DBOptions options;
-            if (encryption_key.size()) {
-                options.encryption_key = encryption_key.data();
-            }
-            auto db = DB::create(make_in_realm_history(), new_location, options);
-            db->create_new_history(sync::make_client_replication());
+                DBOptions options;
+                if (config.encryption_key.size()) {
+                    options.encryption_key = config.encryption_key.data();
+                }
+                auto db = DB::create(make_in_realm_history(), config.path, options);
+                db->create_new_history(sync::make_client_replication());
 #endif
+            }
         }
+        else {
+            tr.write(config.path, config.encryption_key.data());
+        }
+    }
+    catch (...) {
+        _impl::translate_file_exception(config.path);
     }
 }
 

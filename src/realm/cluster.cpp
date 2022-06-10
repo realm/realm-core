@@ -39,6 +39,32 @@
 
 namespace realm {
 
+/******************************* FieldValues *********************************/
+
+FieldValues::FieldValues(std::initializer_list<FieldValue> init)
+    : m_values(init)
+{
+    if (m_values.size() > 1) {
+        // Sort according to ColKey index
+        std::sort(m_values.begin(), m_values.end(), [](const auto& a, const auto& b) {
+            return a.col_key.get_index().val < b.col_key.get_index().val;
+        });
+    }
+}
+
+void FieldValues::insert(ColKey k, Mixed val, bool is_default)
+{
+    if (m_values.empty()) {
+        m_values.emplace_back(k, val, is_default);
+        return;
+    }
+    unsigned int idx = k.get_index().val;
+    auto it = std::lower_bound(m_values.begin(), m_values.end(), idx, [](const auto& a, unsigned int i) {
+        return a.col_key.get_index().val < i;
+    });
+    m_values.insert(it, {k, val, is_default});
+}
+
 /******************************* ClusterNode *********************************/
 
 void ClusterNode::IteratorState::clear()
@@ -284,9 +310,14 @@ inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_valu
         // In case we are inserting in a Dictionary cluster, the backlink will
         // be handled in Dictionary::insert function
         if (Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table())) {
+            if (origin_table->is_asymmetric()) {
+                throw LogicError(LogicError::wrong_kind_of_table);
+            }
             ObjLink link = init_value.get<ObjLink>();
             auto target_table = origin_table->get_parent_group()->get_table(link.get_table_key());
-
+            if (target_table->is_asymmetric()) {
+                throw LogicError(LogicError::wrong_kind_of_table);
+            }
             ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
             target_table->get_object(link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
         }

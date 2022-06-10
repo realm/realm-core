@@ -2,14 +2,149 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Changed the signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). Previously, the method returned void. (PR [#5546](https://github.com/realm/realm-core/pull/5546))
 
 ### Fixed
-* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
+* Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)
+* Fix a data race when opening a flexible sync Realm (since v12.1.0).
  
 ### Breaking changes
 * None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Upgraded to Catch from v2.13.8 to v3.0.1. ([#5559](https://github.com/realm/realm-core/pull/5559))
+
+----------------------------------------------
+
+# 12.1.0 Release notes
+
+### Enhancements
+* The sync client will gracefully handle compensating write error messages from the server and pass detailed info to the SDK's sync error handler about which objects caused the compensating write to occur. ([#5528](https://github.com/realm/realm-core/pull/5528))
+* Support for asymmetric sync. Tables can be marked as Asymmetric when opening the realm. Upon creation, asymmetric objects are sync'd unidirectionally. ([#5505](https://github.com/realm/realm-core/pull/5505))
+* Creating an object for a class that has no subscriptions opened for it will now throw a `NoSubscriptionForWrite` exception ([#5488](https://github.com/realm/realm-core/pull/5488)).
+
+### Fixed
+* Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`. (Issue [#5522](https://github.com/realm/realm-core/issues/5522)).
+* Changed `realm_sync_session_handle_error_for_testing` in order to support all SDKs. (Issue [#5550](https://github.com/realm/realm-core/issues/5550)).
+* FLX sync subscription state changes will now correctly be reported after sync progress is reported ([#5553](https://github.com/realm/realm-core/pull/5553), since v12.0.0)
+
+### Breaking changes
+* Removed scheduler argument to the C API `realm_*_add_notification_callback` functions, because it wasn't actually used. (PR [#5541](https://github.com/realm/realm-core/pull/5541)).
+* Merged the `realm_sync_upload_completion_func_t` and the `realm_sync_download_completion_func_t` typedefs in the C API because they were identical. The new typedef is `realm_sync_wait_for_completion_func_t`. (PR [#5548](https://github.com/realm/realm-core/pull/5548))
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The release package for Apple platforms is now built with Xcode 13 and the SPM package requires Xcode 13. ([5538](https://github.com/realm/realm-core/pull/5538))
+* The sync protocol is now version 6.
+
+----------------------------------------------
+
+# 12.0.0 Release notes
+
+### Enhancements
+* Expose `SyncSession::OnlyForTesting::handle_error` in the C API. ([#5507](https://github.com/realm/realm-core/issues/5507))
+* Greatly improve the performance of `Realm::get_number_of_versions()` and `RealmConfig::max_number_of_active_versions` on iOS. ([#5530](https://github.com/realm/realm-core/pull/5530)).
+
+### Fixed
+* In RQL 'NONE x BETWEEN ...' and 'ANY x BETWEEN ...' had incorrect behavior, so it is now disallowed ([#5508](https://github.com/realm/realm-core/issues/5508), since v11.3.0)
+* `SyncManager::path_for_realm` now allows custom file names for Flexible Sync enabled Realms. (Issue [#5473](https://github.com/realm/realm-core/issues/5473)).
+* Fix ignoring ordering for queries passed into sync subscriptions in the C API. (Issue [#5504](https://github.com/realm/realm-core/issues/5504)).
+* Fix adding Flx Sync error codes to the C API. (Issue [#5519](https://github.com/realm/realm-core/issues/5519)).
+* OT may have failed with an assertion in debug builds for FLX sync bootstrap messages because changesets were being sorted by version number, which does not increase within a bootstrap. ([#5527](https://github.com/realm/realm-core/pull/5527))
+* Partially fix a performance regression in write performance on Apple platforms. Committing an empty write transaction is ~10x faster than 11.17.0, but still slower than pre-11.8.0 due to using more crash-safe file synchronization (since v11.8.0). (Swift issue [#7740](https://github.com/realm/realm-swift/issues/7740)).
+* FLX sync will now ensure that a bootstrap from the server will only be applied if the entire bootstrap is received - ensuring there are no orphaned objects as a result of changing the read snapshot on the server ([#5331](https://github.com/realm/realm-core/pull/5331))
+
+### Breaking changes
+* Bump the SharedInfo version to 12. This requires update of any app accessing the file in a multiprocess scenario, including Realm Studio.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Evergreen builders for MacOS now build with Xcode 13.1 on MacOS 11.0
+
+----------------------------------------------
+
+# 11.17.0 Release notes
+
+### Enhancements
+* Move the implementation of the Audit API to the open-source repo and update it to work with MongoDB Realm. ([#5436](https://github.com/realm/realm-core/pull/5436))
+* Expose delete app user for C API. ([#5490](https://github.com/realm/realm-core/issues/5490))
+* Expose an API to get the app from user in the C API. ([#5478](https://github.com/realm/realm-core/issues/5478))
+
+### Fixed
+* C API `realm_user_get_all_identities` does not support identity id deep copy. ([#5467](https://github.com/realm/realm-core/issues/5467))
+
+### Breaking changes
+* `realm::Realm::Config` has been renamed to `realm::RealmConfig`. ([#5436](https://github.com/realm/realm-core/pull/5436))
+* C API `realm_get_class_keys`, `realm_get_class_properties`, `realm_get_property_keys`, `realm_app_get_all_users`, `realm_user_get_all_identities` will immediately return and report how big the SDK allocated array should be, if no enough space is found to accomadate core's array data. No `realm_error_t` is going to be set if memory is not copied. ([#5430](https://github.com/realm/realm-core/issues/5430))
+* `realm_app_sync_client_get_default_file_path_for_realm` should not have app as input argument C API.([#5486](https://github.com/realm/realm-core/issues/5486))
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+----------------------------------------------
+
+# 11.16.0 Release notes
+
+### Enhancements
+* Adding recovery mode to new automatic client reset handling. In this mode, local unsynced changes which would otherwise be lost during a client reset are replayed on the seamlessly reset Realm. ([#5323](https://github.com/realm/realm-core/pull/5323))
+* Client reset in recovery mode is controlled by the server's protocol 4 json error format. ([#5382](https://github.com/realm/realm-core/pull/5382))
+* Added `Realm::convert` which consolidates `Realm::write_copy` and `Realm::export_to`. Also added to the C API. ([#5432](https://github.com/realm/realm-core/pull/5432))
+* Expose client reset functionalities for C API. ([#5425](https://github.com/realm/realm-core/issues/5425))
+* Add missing `userdata` and `userdata_free` arguments to `realm_sync_on_subscription_set_state_change_async` ([#5438](https://github.com/realm/realm-core/pull/5438))
+* Added callbacks for freeing userdata used in callbacks set on RealmConfiguration via C API. ([#5222](https://github.com/realm/realm-core/issues/5222))
+* Expose Subscription properties on C API. ([#5454](https://github.com/realm/realm-core/pull/5454))
+* Added in the C API the possibility for SDKs to catch user code callback excpetions, store them in core and retrieve via `realm_get_last_error()` ([#5406](https://github.com/realm/realm-core/issues/5406))
+* Erase Subscription by id for C API. ([#5475](https://github.com/realm/realm-core/issues/5475))
+* Erase and Find Subscription by Results for C API. ([#5470](https://github.com/realm/realm-core/issues/5470))
+
+### Fixed
+* C API client reset callbacks don't leak the `realm_t` parameter. ([#5464](https://github.com/realm/realm-core/pull/5464))
+* The sync client may have sent a corrupted upload cursor leading to a fatal error from the server due to an uninitialized variable. ([#5460](https://github.com/realm/realm-core/pull/5460), since v11.14.0)
+* The realm_async_open_task_start() in C API was not really useful as the received realm reference could not be transferred to another thread. ([#5465](https://github.com/realm/realm-core/pull/5465), since v11.5.0)
+* FLX sync would not correctly resume syncing if a bootstrap was interrupted ([#5466](https://github.com/realm/realm-core/pull/5466), since v11.8.0)
+
+### Breaking changes
+* Extra `realm_free_userdata_func_t` parameter added on some realm_config_set_... functions in the C API. The userdata will be freed when the config object is freed ([#5452](https://github.com/realm/realm-core/pull/5452)).
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Sync protocol version bumped to 4. ([#5382](https://github.com/realm/realm-core/pull/5382))
+* Internal sync metadata tables were abstracted into a new schema management framework and their schema versions are now tracked in the `sync_internal_schemas` table. ([#5455](https://github.com/realm/realm-core/pull/5455)) 
+
+----------------------------------------------
+
+# 11.15.0 Release notes
+
+### Enhancements
+* `App::link_user()` and `App::delete_user()` now correctly report `ClientErrorCode::user_not_found` and `ClientErrorCode::user_not_logged_in` instead of only using `ClientErrorCode::user_not_found` for both error cases. ([#5402](https://github.com/realm/realm-core/issues/5402))
+* Avoid leaking unresolved mixed links for Lst<Mixed>. ([#5418](https://github.com/realm/realm-core/pull/5418))
+* Add support for embedded objects in the C API. ([#5408](https://github.com/realm/realm-core/issues/5408))
+* Added `realm_object_to_string()` support for C API. ([#5414](https://github.com/realm/realm-core/issues/5414))
+* Added `ObjectStore::rename_property()` support for C API. ([#5424]https://github.com/realm/realm-core/issues/5424)
+* Removed deprecated sync protocol errors `disabled_session` and `superseded`. ([#5421]https://github.com/realm/realm-core/issues/5421)
+* Support `realm_results_t` and `realm_query_t` for `realm_sync_subscription_set_insert_or_assign` in the c_api. ([#5431]https://github.com/realm/realm-core/issues/5431) 
+* Added `access_token()` and `refresh_token()` to C API. ([#5419]https://github.com/realm/realm-core/issues/5419)
+
+### Fixed
+* Adding an object to a Set, deleting the parent object, and then deleting the previously mentioned object causes crash ([#5387](https://github.com/realm/realm-core/issues/5387), since 11.0.0)
+* Synchronized Realm files which were first created using SDK version released in the second half of August 2020 would be redownloaded instead of using the existing file, possibly resulting in the loss of any unsynchronized data in those files (since v11.6.1).
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -28,6 +163,7 @@
 * Added a new flag to `CollectionChangeSet` to indicate when collections are cleared. ([#5340](https://github.com/realm/realm-core/pull/5340))
 * Added auth code and id token support for google c_api ([#5347](https://github.com/realm/realm-core/issues/5347))
 * Added AppCredentials::serialize_as_json() support for c_api ([#5348](https://github.com/realm/realm-core/issues/5348))
+* Added `App::close_all_sync_sessions` static method and `SyncManager::close_all_sessions` method ([#5411](https://github.com/realm/realm-core/pull/5411))
 
 ### Fixed
 * Fixed potential future bug in how async write/commit used encryption ([#5369](https://github.com/realm/realm-core/pull/5369))

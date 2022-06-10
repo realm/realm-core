@@ -114,6 +114,8 @@ public:
     Obj set_embedded(size_t list_ndx);
     Obj insert_embedded(size_t list_ndx);
 
+    Obj get_object(size_t list_ndx);
+
     // Replace the values in this list with the values from an enumerable object
     template <typename T, typename Context>
     void assign(Context&, T&& value, CreatePolicy = CreatePolicy::SetLink);

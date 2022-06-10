@@ -46,10 +46,13 @@ struct InstructionApplier {
     void end_apply() noexcept;
 
 protected:
+    util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&,
+                                       const std::string_view& instr = "(unspecified)");
+    static std::unique_ptr<LstBase> get_list_from_path(Obj& obj, ColKey col);
     StringData get_string(InternString) const;
     StringData get_string(StringBufferRange) const;
     BinaryData get_binary(StringBufferRange) const;
-#define REALM_DECLARE_INSTRUCTION_HANDLER(X) void operator()(const Instruction::X&);
+#define REALM_DECLARE_INSTRUCTION_HANDLER(X) virtual void operator()(const Instruction::X&);
     REALM_FOR_EACH_INSTRUCTION_TYPE(REALM_DECLARE_INSTRUCTION_HANDLER)
 #undef REALM_DECLARE_INSTRUCTION_HANDLER
     friend struct Instruction; // to allow visitor
@@ -73,8 +76,48 @@ protected:
         }
     }
 
-    using ListCallback = util::UniqueFunction<void(LstBase&, size_t)>;
-    void resolve_list(const Instruction::PathInstruction& instr, const char* instr_name, ListCallback&& callback);
+    bool check_links_exist(const Instruction::Payload& payload);
+    bool allows_null_links(const Instruction::PathInstruction& instr, const std::string_view& instr_name);
+    std::string to_string(const Instruction::PathInstruction& instr) const;
+
+    struct PathResolver {
+        enum class Status { Pending, Success, DidNotResolve };
+        PathResolver(InstructionApplier* applier, const Instruction::PathInstruction& instr,
+                     const std::string_view& instr_name);
+        virtual ~PathResolver();
+        virtual Status resolve();
+
+        virtual void on_property(Obj&, ColKey);
+        virtual void on_list(LstBase&);
+        [[nodiscard]] virtual Status on_list_index(LstBase&, uint32_t);
+        virtual void on_dictionary(Dictionary&);
+        [[nodiscard]] virtual Status on_dictionary_key(Dictionary&, Mixed);
+        virtual void on_set(SetBase&);
+        virtual void on_error(const std::string&);
+        virtual void on_column_advance(ColKey);
+        virtual void on_dict_key_advance(StringData);
+        [[nodiscard]] virtual Status on_list_index_advance(uint32_t);
+        [[nodiscard]] virtual Status on_null_link_advance(StringData, StringData);
+        [[nodiscard]] virtual Status on_begin(const util::Optional<Obj>& obj);
+        virtual void on_finish();
+        virtual StringData get_string(InternString);
+        const std::string_view& instruction_name() const noexcept
+        {
+            return m_instr_name;
+        }
+
+    protected:
+        [[nodiscard]] Status resolve_field(Obj& obj, InternString field);
+        [[nodiscard]] Status resolve_list_element(LstBase& list, uint32_t index);
+        [[nodiscard]] Status resolve_dictionary_element(Dictionary& dict, InternString key);
+
+        InstructionApplier* m_applier;
+        const Instruction::PathInstruction& m_path_instr;
+        std::string_view m_instr_name;
+        Instruction::Path::const_iterator m_it_begin;
+        Instruction::Path::const_iterator m_it_end;
+    };
+    friend struct PathResolver;
 
 private:
     const Changeset* m_log = nullptr;
@@ -90,35 +133,12 @@ private:
     util::Optional<Obj> m_last_object;
     std::unique_ptr<LstBase> m_last_list;
 
-    StringData get_table_name(const Instruction::TableInstruction&, const char* instr = "(unspecified)");
-    TableRef get_table(const Instruction::TableInstruction&, const char* instr = "(unspecified)");
+    StringData get_table_name(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
+    TableRef get_table(const Instruction::TableInstruction&, const std::string_view& instr = "(unspecified)");
 
     // Note: This may return a non-invalid ObjKey if the key is dangling.
-    ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&, const char* instr = "(unspecified)") const;
-    util::Optional<Obj> get_top_object(const Instruction::ObjectInstruction&, const char* instr = "(unspecified)");
-
-    /// Resolve the path of an instruction, and invoke the callback in one of the following ways:
-    ///
-    /// - If the path refers to a plain field of an object, invoke as `callback(Obj&, ColKey)`.
-    ///   - Note: This also covers fields where an embedded object is placed.
-    /// - If the path refers to a list, invoke as `callback(LstBase&)`.
-    /// - If the path refers to a list element, invoke as `callback(LstBase&, size_t index)`.
-    /// - If the path refers to a dictionary, invoke as `callback(Dictionary&)`.
-    /// - If the path refers to a dictionary element, invoke as `callback(Dictionary&, Mixed key)`.
-    template <class F>
-    void resolve_path(const Instruction::PathInstruction& instr, const char* instr_name, F&& callback);
-
-    template <class F>
-    void resolve_field(Obj& obj, InternString field, Instruction::Path::const_iterator begin,
-                       Instruction::Path::const_iterator end, const char* instr_name, F&& callback);
-
-    template <class F>
-    void resolve_list_element(LstBase& list, size_t index, Instruction::Path::const_iterator begin,
-                              Instruction::Path::const_iterator end, const char* instr_name, F&& callback);
-
-    template <class F>
-    void resolve_dictionary_element(Dictionary& dict, InternString key, Instruction::Path::const_iterator begin,
-                                    Instruction::Path::const_iterator end, const char* instr_name, F&& callback);
+    ObjKey get_object_key(Table& table, const Instruction::PrimaryKey&,
+                          const std::string_view& instr = "(unspecified)") const;
 
     template <class F>
     void visit_payload(const Instruction::Payload&, F&& visitor);

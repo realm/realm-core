@@ -21,11 +21,13 @@
 #include "realm/object-store/property.hpp"
 #include "realm/object-store/object_schema.hpp"
 #include "realm/object-store/schema.hpp"
+#include "realm/object-store/sync/app_credentials.hpp"
 #include "realm/object-store/sync/generic_network_transport.hpp"
 
 #include "sync/sync_test_utils.hpp"
 
 #include "external/json/json.hpp"
+#include "external/mpark/variant.hpp"
 
 #if REALM_ENABLE_AUTH_TESTS
 namespace realm {
@@ -66,12 +68,12 @@ public:
                                  const std::string& password);
 
     AdminAPIEndpoint apps() const;
-    void revoke_user_sessions(const std::string& user_id, const std::string& app_id);
-    void disable_user_sessions(const std::string& user_id, const std::string& app_id);
-    void enable_user_sessions(const std::string& user_id, const std::string& app_id);
-    bool verify_access_token(const std::string& access_token, const std::string& app_id);
-    void set_development_mode_to(const std::string& app_id, bool enable);
-    void delete_app(const std::string& app_id);
+    void revoke_user_sessions(const std::string& user_id, const std::string& app_id) const;
+    void disable_user_sessions(const std::string& user_id, const std::string& app_id) const;
+    void enable_user_sessions(const std::string& user_id, const std::string& app_id) const;
+    bool verify_access_token(const std::string& access_token, const std::string& app_id) const;
+    void set_development_mode_to(const std::string& app_id, bool enable) const;
+    void delete_app(const std::string& app_id) const;
 
     struct Service {
         std::string id;
@@ -84,14 +86,20 @@ public:
         std::string database_name;
         nlohmann::json partition;
         std::string state;
+        bool recovery_is_disabled = false;
     };
-    std::vector<Service> get_services(const std::string& app_id);
-    Service get_sync_service(const std::string& app_id);
-    ServiceConfig get_config(const std::string& app_id, const Service& service);
-    ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
-    ServiceConfig pause_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
-    ServiceConfig enable_sync(const std::string& app_id, const std::string& service_id, ServiceConfig sync_config);
-    bool is_sync_enabled(const std::string& app_id);
+    std::vector<Service> get_services(const std::string& app_id) const;
+    Service get_sync_service(const std::string& app_id) const;
+    ServiceConfig get_config(const std::string& app_id, const Service& service) const;
+    ServiceConfig disable_sync(const std::string& app_id, const std::string& service_id,
+                               ServiceConfig sync_config) const;
+    ServiceConfig pause_sync(const std::string& app_id, const std::string& service_id,
+                             ServiceConfig sync_config) const;
+    ServiceConfig enable_sync(const std::string& app_id, const std::string& service_id,
+                              ServiceConfig sync_config) const;
+    ServiceConfig set_disable_recovery_to(const std::string& app_id, const std::string& service_id,
+                                          ServiceConfig sync_config, bool disable) const;
+    bool is_sync_enabled(const std::string& app_id) const;
 
     const std::string& base_url() const noexcept
     {
@@ -106,7 +114,7 @@ private:
     {
     }
 
-    AdminAPIEndpoint service_config_endpoint(const std::string& app_id, const std::string& service_id);
+    AdminAPIEndpoint service_config_endpoint(const std::string& app_id, const std::string& service_id) const;
 
     std::string m_base_url;
     std::string m_access_token;
@@ -132,8 +140,16 @@ struct AppCreateConfig {
         bool run_reset_function;
     };
 
+    struct FLXSyncRole {
+        std::string name;
+        nlohmann::json apply_when = nlohmann::json::object();
+        mpark::variant<bool, nlohmann::json> read;
+        mpark::variant<bool, nlohmann::json> write;
+    };
+
     struct FLXSyncConfig {
         std::vector<std::string> queryable_fields;
+        std::vector<FLXSyncRole> default_roles;
     };
 
     std::string app_name;
@@ -210,9 +226,6 @@ inline app::App::Config get_config(Factory factory, const AppSession& app_sessio
             "Object Store Platform Version Blah",
             "An sdk version"};
 }
-
-// Get an App config suitable for integration testing against BaaS
-app::App::Config get_integration_config();
 
 } // namespace realm
 

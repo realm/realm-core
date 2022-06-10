@@ -22,6 +22,7 @@
 #include <realm/db.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/sync/protocol.hpp>
 
 #include <functional>
 #include <memory>
@@ -47,32 +48,45 @@ enum class SimplifiedProtocolError {
     BadAuthentication,
     PermissionDenied,
     ClientResetRequested,
+    CompensatingWrite,
 };
 
 namespace sync {
 using port_type = std::uint_fast16_t;
 enum class ProtocolError;
-}
+} // namespace sync
 
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError {
+    enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
 
     std::error_code error_code;
-    std::string message;
     bool is_fatal;
+    /// A consolidated explanation of the error, including a link to the server logs if applicable.
+    std::string message;
+    // Just the minimal error message, without any log URL.
+    std::string_view simple_message;
+    // The URL to the associated server log if any. If not supplied by the server, this will be `empty()`.
+    std::string_view logURL;
+    /// A dictionary of extra user information associated with this error.
+    /// If this is a client reset error, the keys for c_original_file_path_key and c_recovery_file_path_key will be
+    /// populated with the relevant filesystem paths.
     std::unordered_map<std::string, std::string> user_info;
     /// The sync server may send down an error that the client does not recognize,
     /// whether because of a version mismatch or an oversight. It is still valuable
     /// to expose these errors so that users can do something about them.
     bool is_unrecognized_by_client = false;
+    // the server may explicitly send down "IsClientReset" as part of an error
+    // if this is set, it overrides the clients interpretation of the error
+    util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
+    // If this error resulted from a compensating write, this vector will contain information about each object
+    // that caused a compensating write and why the write was illegal.
+    std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
 
-    SyncError(std::error_code error_code, std::string message, bool is_fatal)
-        : error_code(std::move(error_code))
-        , message(std::move(message))
-        , is_fatal(is_fatal)
-    {
-    }
+    SyncError(std::error_code error_code, std::string msg, bool is_fatal,
+              util::Optional<std::string> serverLog = util::none,
+              std::vector<sync::CompensatingWriteErrorInfo> compensating_writes = {});
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
     static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";
@@ -91,13 +105,6 @@ struct SyncError {
 };
 
 using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
-
-enum class ClientResyncMode : unsigned char {
-    // Fire a client reset error
-    Manual,
-    // Discard local changes, without disrupting accessors or closing the Realm
-    DiscardLocal,
-};
 
 enum class ReconnectMode {
     /// This is the mode that should always be used in production. In this
@@ -125,6 +132,17 @@ enum class SyncSessionStopPolicy {
     AfterChangesUploaded, // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
 };
 
+enum class ClientResyncMode : unsigned char {
+    // Fire a client reset error
+    Manual,
+    // Discard local changes, without disrupting accessors or closing the Realm
+    DiscardLocal,
+    // Attempt to recover unsynchronized but committed changes.
+    Recover,
+    // Attempt recovery and if that fails, discard local.
+    RecoverOrDiscard,
+};
+
 struct SyncConfig {
     struct FLXSyncEnabled {
     };
@@ -140,16 +158,21 @@ struct SyncConfig {
 
     std::shared_ptr<SyncUser> user;
     std::string partition_value;
-    bool flx_sync_requested = false;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
-    bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<SSLVerifyCallback> ssl_verify_callback;
     util::Optional<ProxyConfig> proxy_config;
+    bool flx_sync_requested = false;
+    bool client_validate_ssl = true;
 
     // If true, upload/download waits are canceled on any sync error and not just fatal ones
     bool cancel_waits_on_nonfatal_error = false;
+
+    // If false, changesets incoming from the server are discarded without
+    // applying them to the Realm file. This is required when writing objects
+    // directly to replication, and will break horribly otherwise
+    bool apply_server_changes = true;
 
     util::Optional<std::string> authorization_header_name;
     std::map<std::string, std::string> custom_http_headers;
@@ -159,7 +182,17 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after)> notify_after_client_reset;
+    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after, bool did_recover)>
+        notify_after_client_reset;
+
+    // Will be called after a download message is received and validated by the client but befefore it's been
+    // transformed or applied. To be used in testing only.
+    std::function<void(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+        on_download_message_received_hook;
+    // Will be called after each bootstrap message is added to the pending bootstrap store, but before
+    // processing a finalized bootstrap. For testing only.
+    std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
+        on_bootstrap_message_processed_hook;
 
     explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition);
     explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition);

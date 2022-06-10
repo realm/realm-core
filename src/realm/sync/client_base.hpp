@@ -58,10 +58,12 @@ class SessionWrapper;
 /// either void async_wait_for_download_completion(WaitOperCompletionHandler) or
 /// bool wait_for_download_complete_or_client_stopped().
 struct ClientReset {
-    bool discard_local = false;
+    realm::ClientResyncMode mode;
     DBRef fresh_copy;
+    bool recovery_is_allowed = true;
     util::UniqueFunction<void(std::string path)> notify_before_client_reset;
-    util::UniqueFunction<void(std::string path, VersionID before_version)> notify_after_client_reset;
+    util::UniqueFunction<void(std::string path, VersionID before_version, bool did_recover)>
+        notify_after_client_reset;
 };
 
 /// \brief Protocol errors discovered by the client.
@@ -317,10 +319,23 @@ struct ClientConfig {
 /// sufficient.
 ///
 /// \sa set_connection_state_change_listener().
-struct SessionErrorInfo {
+struct SessionErrorInfo : public ProtocolErrorInfo {
+    SessionErrorInfo(const ProtocolErrorInfo& info, const std::error_code& ec)
+        : ProtocolErrorInfo(info)
+        , error_code(ec)
+    {
+    }
+    SessionErrorInfo(const std::error_code& ec, bool try_again)
+        : ProtocolErrorInfo(ec.value(), ec.message(), try_again)
+        , error_code(ec)
+    {
+    }
+    SessionErrorInfo(const std::error_code& ec, const std::string& msg, bool try_again)
+        : ProtocolErrorInfo(ec.value(), msg, try_again)
+        , error_code(ec)
+    {
+    }
     std::error_code error_code;
-    bool is_fatal;
-    const std::string& detailed_message;
 };
 
 enum class ConnectionState { disconnected, connecting, connected };

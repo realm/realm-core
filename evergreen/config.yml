@@ -174,6 +174,7 @@ functions:
           TEST_FLAGS="$TEST_FLAGS ${test_flags|}"
 
           export UNITTEST_EVERGREEN_TEST_RESULTS="$(./evergreen/abspath.sh ${task_name}_results.json)"
+          export UNITTEST_PROGRESS=1
           if [[ -n "${report_test_progress|}" ]]; then
               export UNITTEST_PROGRESS=${report_test_progress|}
           fi
@@ -200,6 +201,17 @@ functions:
       content_type: text/text
       display_name: baas server logs
       optional: true
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/install_baas_output.log'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/install_baas_output.log'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: install baas output
+      optional: true
 
   "run hang analyzer":
   - command: shell.exec
@@ -209,8 +221,28 @@ functions:
         set -o errexit
         set -o verbose
 
+        if [[ -z "{run_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        BAAS_PID=$(pgrep baas_server)
+        if [[ -z "$BAAS_PID" ]]; then
+          echo "No baas pid found"
+          exit 0
+        fi
+
+        kill -3 $BAAS_PID
+
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
         if [[ ! -d realm-core ]]; then
           echo "No source directory exists. Not running hang analyzer"
+          exit 1
         fi
 
         TOP_DIR=$(pwd)/realm-core
@@ -503,7 +535,12 @@ tasks:
                 export DEVELOPER_DIR="${xcode_developer_dir}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir
+            INSTALL_BAAS_BRANCH=""
+            if [ -n "${baas_branch}" ]; then
+                INSTALL_BAAS_BRANCH="-b ${baas_branch}"
+            fi
+
+            ./evergreen/install_baas.sh -w ./baas-work-dir $INSTALL_BAAS_BRANCH 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
@@ -799,7 +836,7 @@ buildvariants:
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
   - name: compile_test
@@ -815,7 +852,7 @@ buildvariants:
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
     run_with_encryption: On
   tasks:
@@ -832,7 +869,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
     cmake_build_type: Release
-    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=x86_64
   tasks:
   - name: compile_test_and_package
@@ -850,7 +887,7 @@ buildvariants:
     cmake_generator: Xcode
     max_jobs: $(sysctl -n hw.logicalcpu)
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test
@@ -869,7 +906,7 @@ buildvariants:
     max_jobs: $(sysctl -n hw.logicalcpu)
     cmake_build_type: Release
     run_tests_against_baas: On
-    xcode_developer_dir: /Applications/Xcode12.4.app/Contents/Developer
+    xcode_developer_dir: /Applications/Xcode13.1.app/Contents/Developer
     extra_flags: -DCMAKE_SYSTEM_NAME=Darwin -DCMAKE_OSX_ARCHITECTURES=arm64
   tasks:
   - name: compile_test_and_package

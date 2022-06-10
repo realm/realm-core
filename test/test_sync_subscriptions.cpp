@@ -1,9 +1,13 @@
 #include "realm/exceptions.hpp"
+#include "realm/object_id.hpp"
+#include "realm/sync/noinst/sync_metadata_schema.hpp"
 #include "realm/sync/subscriptions.hpp"
 #include "realm/sync/noinst/client_history_impl.hpp"
 
 #include "test.hpp"
 #include "util/test_path.hpp"
+
+#include <filesystem>
 
 namespace realm::sync {
 
@@ -396,7 +400,7 @@ TEST(Sync_SubscriptionStoreNotifications)
     CHECK_EQUAL(std::move(fut).get(), SubscriptionSet::State::Complete);
 }
 
-TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
+TEST(Sync_SubscriptionStoreRefreshSubscriptionSetInvalid)
 {
     SHARED_GROUP_TEST_PATH(sub_store_path)
     SubscriptionStoreFixture fixture(sub_store_path);
@@ -409,6 +413,124 @@ TEST(Sync_RefreshSubscriptionSetInvalidSubscriptionStore)
 
     // Throws since the SubscriptionStore is gone.
     CHECK_THROW(latest->refresh(), std::logic_error);
+}
+
+TEST(Sync_SubscriptionStoreInternalSchemaMigration)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+
+    // This test file was created using the FLXSyncTestHarness in the object store tests like this:
+    //   FLXSyncTestHarness harness("flx_generate_meta_tables");
+    //     harness.load_initial_data([&](SharedRealm realm) {
+    //     auto config = realm->config();
+    //     config.path = "test_flx_metadata_tables_v1.realm";
+    //     config.cache = false;
+    //     realm->convert(config, false);
+    //   });
+    auto path = std::filesystem::path(test_util::get_test_resource_path()) / "test_flx_metadata_tables_v1.realm";
+    CHECK(util::File::exists(path.string()));
+    util::File::copy(path.string(), sub_store_path);
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+    auto [active_version, latest_version] = store->get_active_and_latest_versions();
+    CHECK_EQUAL(active_version, latest_version);
+    auto active = store->get_active();
+    CHECK_EQUAL(active.version(), 1);
+    CHECK_EQUAL(active.state(), SubscriptionSet::State::Complete);
+    CHECK_EQUAL(active.size(), 1);
+    auto sub = active.at(0);
+    CHECK_EQUAL(sub.id(), ObjectId("62742ab959d7f2e48f59f75d"));
+    CHECK_EQUAL(sub.object_class_name(), "TopLevel");
+
+    auto tr = fixture.db->start_read();
+    SyncMetadataSchemaVersions versions(tr);
+    auto flx_sub_store_version = versions.get_version_for(tr, sync::internal_schema_groups::c_flx_subscription_store);
+    CHECK(flx_sub_store_version);
+    CHECK_EQUAL(*flx_sub_store_version, 2);
+
+    CHECK(!versions.get_version_for(tr, "non_existent_table"));
+}
+
+TEST(Sync_SubscriptionStoreNextPendingVersion)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    auto mut_sub_set = store->get_latest().make_mutable_copy();
+    auto sub_set = std::move(mut_sub_set).commit();
+    auto complete_set = sub_set.version();
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    sub_set = std::move(mut_sub_set).commit();
+    auto bootstrapping_set = sub_set.version();
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    sub_set = std::move(mut_sub_set).commit();
+    auto pending_set = sub_set.version();
+
+    mut_sub_set = store->get_mutable_by_version(complete_set);
+    mut_sub_set.update_state(SubscriptionSet::State::Complete);
+    std::move(mut_sub_set).commit();
+
+    mut_sub_set = store->get_mutable_by_version(bootstrapping_set);
+    mut_sub_set.update_state(SubscriptionSet::State::Bootstrapping);
+    std::move(mut_sub_set).commit();
+
+    auto pending_version = store->get_next_pending_version(0, DB::version_type{});
+    CHECK(pending_version);
+    CHECK_EQUAL(pending_version->query_version, bootstrapping_set);
+
+    pending_version = store->get_next_pending_version(bootstrapping_set, DB::version_type{});
+    CHECK(pending_set);
+    CHECK_EQUAL(pending_version->query_version, pending_set);
+
+    pending_version = store->get_next_pending_version(pending_set, DB::version_type{});
+    CHECK(!pending_version);
+}
+
+TEST(Sync_SubscriptionStoreSubSetHasTable)
+{
+    SHARED_GROUP_TEST_PATH(sub_store_path)
+    SubscriptionStoreFixture fixture(sub_store_path);
+    auto store = SubscriptionStore::create(fixture.db, [](int64_t) {});
+
+    auto read_tr = fixture.db->start_read();
+    // We should have no subscriptions yet so this should return false.
+    auto table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.empty());
+
+    Query query_a(read_tr->get_table(fixture.a_table_key));
+    query_a.equal(fixture.foo_col, StringData("JBR")).greater_equal(fixture.bar_col, int64_t(1));
+    Query query_b(read_tr->get_table(fixture.a_table_key));
+    query_b.equal(fixture.foo_col, "Realm");
+
+    auto mut_sub_set = store->get_latest().make_mutable_copy();
+    mut_sub_set.insert_or_assign(query_a);
+    mut_sub_set.insert_or_assign(query_b);
+    auto sub_set = std::move(mut_sub_set).commit();
+
+    read_tr->advance_read();
+    table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.find("a") != table_set.end());
+    CHECK(table_set.find("fake_table_that_doesnt_exist") == table_set.end());
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    mut_sub_set.erase(mut_sub_set.find(query_a));
+    sub_set = std::move(mut_sub_set).commit();
+
+    read_tr->advance_read();
+    table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.find("a") != table_set.end());
+    CHECK(table_set.find("fake_table_that_doesnt_exist") == table_set.end());
+
+    mut_sub_set = sub_set.make_mutable_copy();
+    mut_sub_set.erase(mut_sub_set.find(query_b));
+    sub_set = std::move(mut_sub_set).commit();
+
+    read_tr->advance_read();
+    table_set = store->get_tables_for_latest(*read_tr);
+    CHECK(table_set.empty());
 }
 
 } // namespace realm::sync

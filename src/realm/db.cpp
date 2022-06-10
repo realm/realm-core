@@ -81,8 +81,10 @@ namespace {
 //         `write_fairness`
 // 10      Introducing SharedInfo::history_schema_version.
 // 11      New impl of InterprocessCondVar on windows.
-// 12      New impl of VersionList and added mutex for it (former RingBuffer)
-const uint_fast16_t g_shared_info_version = 12;
+// 12      Change `number_of_versions` to an atomic rather than guarding it
+//         with a lock.
+// 13      New impl of VersionList and added mutex for it (former RingBuffer)
+const uint_fast16_t g_shared_info_version = 13;
 
 
 // VersionList
@@ -399,7 +401,7 @@ struct alignas(8) DB::SharedInfo {
     /// supported by our current encryption mechanisms.
     uint64_t session_initiator_pid = 0; // Offset 24
 
-    uint64_t number_of_versions; // Offset 32
+    std::atomic<uint64_t> number_of_versions; // Offset 32
 
     /// True (1) if there is a sync agent present (a session participant acting
     /// as sync client). It is an error to have a session with more than one
@@ -505,7 +507,7 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
             offsetof(SharedInfo, session_initiator_pid) == 24 &&
             std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
             offsetof(SharedInfo, number_of_versions) == 32 &&
-            std::is_same<decltype(number_of_versions), uint64_t>::value &&
+            std::is_same<decltype(number_of_versions), std::atomic<uint64_t>>::value &&
             offsetof(SharedInfo, sync_agent_present) == 40 &&
             std::is_same<decltype(sync_agent_present), uint8_t>::value &&
             offsetof(SharedInfo, daemon_started) == 41 && std::is_same<decltype(daemon_started), uint8_t>::value &&
@@ -516,6 +518,7 @@ DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv
             std::is_same<decltype(filler_2), uint16_t>::value && offsetof(SharedInfo, shared_writemutex) == 48 &&
             std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
         "Caught layout change requiring SharedInfo file format bumping");
+    static_assert(std::atomic<uint64_t>::is_always_lock_free);
 #ifndef _WIN32
 #pragma GCC diagnostic pop
 #endif
@@ -709,12 +712,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     m_coordination_dir = get_core_file(path, CoreFileType::Management);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
-
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
@@ -1214,11 +1211,17 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }
+        start_read()->check_consistency();
     }
     catch (...) {
         close();
         throw;
     }
+#if REALM_METRICS
+    if (options.enable_metrics) {
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
+    }
+#endif // REALM_METRICS
 
     m_alloc.set_read_only(true);
 }
@@ -1344,10 +1347,10 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
                     util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
                                  Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
-                                            pk_col.is_nullable());
+                                            pk_col.is_nullable(), table->get_table_type());
         }
         else {
-            repl.add_class(tk, table_name, true);
+            repl.add_class(tk, table_name, Table::Type::Embedded);
         }
     }
     // Create columns
@@ -1394,7 +1397,7 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
 
 void Transaction::copy_to(TransactionRef dest) const
 {
-    impl::CopyReplication repl(dest);
+    _impl::CopyReplication repl(dest);
     replicate(dest.get(), repl);
 }
 
@@ -1547,10 +1550,9 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
     return true;
 }
 
-void DB::write_copy(StringData path, util::Optional<const char*> output_encryption_key, bool allow_overwrite)
+void DB::write_copy(StringData path, const char* output_encryption_key)
 {
     SharedInfo* info = m_file_map.get_addr();
-    const char* write_key = bool(output_encryption_key) ? *output_encryption_key : m_key;
 
     auto tr = start_read();
     if (auto hist = tr->get_history()) {
@@ -1574,10 +1576,10 @@ void DB::write_copy(StringData path, util::Optional<const char*> output_encrypti
     } writer;
 
     File file;
-    file.open(path, File::access_ReadWrite, allow_overwrite ? File::create_Auto : File::create_Must, 0);
+    file.open(path, File::access_ReadWrite, File::create_Must, 0);
     file.resize(0);
 
-    tr->write(file, write_key, info->latest_version_number, writer);
+    tr->write(file, output_encryption_key, info->latest_version_number, writer);
 }
 
 uint_fast64_t DB::get_number_of_versions()
@@ -1585,7 +1587,6 @@ uint_fast64_t DB::get_number_of_versions()
     if (m_fake_read_lock_if_immutable)
         return 1;
     SharedInfo* info = m_file_map.get_addr();
-    std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
     return info->number_of_versions;
 }
 
@@ -2277,6 +2278,12 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     }
     version_type new_version = current_version + 1;
 
+    if (!transaction.m_objects_to_delete.empty()) {
+        for (auto it : transaction.m_objects_to_delete) {
+            transaction.get_table(it.table_key)->remove_object(it.obj_key);
+        }
+        transaction.m_objects_to_delete.clear();
+    }
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the

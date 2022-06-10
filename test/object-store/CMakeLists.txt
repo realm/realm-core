@@ -3,14 +3,16 @@ set(HEADERS
     util/index_helpers.hpp
     util/test_file.hpp
     util/test_utils.hpp
+    ../util/crypt_key.hpp
     collection_fixtures.hpp
 )
 
 set(SOURCES
+    backup.cpp
     collection_change_indices.cpp
+    dictionary.cpp
     frozen_objects.cpp
     index_set.cpp
-    dictionary.cpp
     list.cpp
     main.cpp
     migrations.cpp
@@ -19,18 +21,18 @@ set(SOURCES
     primitive_list.cpp
     realm.cpp
     results.cpp
-    set.cpp
     schema.cpp
+    set.cpp
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
     uuid.cpp
-    backup.cpp
     c_api/c_api.cpp
     c_api/c_api.c
 
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
+    ../util/crypt_key.cpp
 )
 
 if(REALM_ENABLE_AUTH_TESTS)
@@ -39,9 +41,10 @@ endif()
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
-        sync/sync_test_utils.hpp
         sync/flx_sync_harness.hpp
         sync/session/session_util.hpp
+        sync/sync_test_utils.hpp
+        util/baas_admin_api.hpp
     )
     list(APPEND SOURCES
         bson.cpp
@@ -59,7 +62,9 @@ if(REALM_ENABLE_SYNC)
         sync/user.cpp
         sync/app.cpp
     )
-
+    if(APPLE)
+        list(APPEND SOURCES audit.cpp)
+    endif()
 endif()
 
 add_executable(ObjectStoreTests ${SOURCES} ${HEADERS})
@@ -72,7 +77,7 @@ if(MSVC)
     target_compile_options(ObjectStoreTests PRIVATE /bigobj)
 endif()
 
-target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
+target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
@@ -86,7 +91,6 @@ add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)
-
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
         if(NOT REALM_MONGODB_ENDPOINT)
@@ -110,9 +114,6 @@ if(REALM_TEST_SYNC_LOGGING)
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-# Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES

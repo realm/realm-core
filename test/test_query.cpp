@@ -2325,7 +2325,7 @@ TEST(Query_TwoSameCols)
     CHECK_EQUAL(2, q8.count());
 }
 
-void construct_all_types_table(Table& table)
+static void construct_all_types_table(Table& table)
 {
     table.add_column(type_Int, "int");
     table.add_column(type_Float, "float");
@@ -5594,6 +5594,16 @@ TEST(Query_NotWithEmptyGroup)
     CHECK_EQUAL(q.count(), 1);
     q = table->where().Not().group().end_group().Or().equal(col, "hello");
     CHECK_EQUAL(q.count(), 1);
+}
+
+TEST(Query_AsymmetricObjects)
+{
+    Group g;
+    TableRef table = g.add_table("table", Table::Type::TopLevelAsymmetric);
+    auto col = table->add_column(type_String, "type");
+    table->create_object().set(col, "hello");
+    CHECK_LOGIC_ERROR(table->where().equal(col, "hello").Or().Not().group().end_group(),
+                      LogicError::wrong_kind_of_table);
 }
 
 #endif // TEST_QUERY

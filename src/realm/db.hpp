@@ -300,8 +300,7 @@ public:
     /// WARNING: Compact() is not thread-safe with respect to a concurrent close()
     bool compact(bool bump_version_number = false, util::Optional<const char*> output_encryption_key = util::none);
 
-    void write_copy(StringData path, util::Optional<const char*> output_encryption_key = util::none,
-                    bool allow_overwrite = false);
+    void write_copy(StringData path, const char* output_encryption_key);
 
 #ifdef REALM_DEBUG
     void test_ringbuf();
@@ -635,6 +634,7 @@ public:
 
     // Live transactions state changes, often taking an observer functor:
     VersionID commit_and_continue_as_read(bool commit_to_disk = true) REQUIRES(!m_async_mutex);
+    void commit_and_continue_writing();
     template <class O>
     void rollback_and_continue_as_read(O* observer) REQUIRES(!m_async_mutex);
     void rollback_and_continue_as_read() REQUIRES(!m_async_mutex)
@@ -693,6 +693,7 @@ public:
     DB::TransactStage get_transact_stage() const noexcept;
 
     void upgrade_file_format(int target_file_format_version);
+    void check_consistency() REQUIRES(!m_async_mutex);
 
     /// Task oriented/async interface for continuous transactions.
     // true if this transaction already holds the write mutex
@@ -753,7 +754,6 @@ private:
     bool internal_advance_read(O* observer, VersionID target_version, _impl::History&, bool);
     void set_transact_stage(DB::TransactStage stage) noexcept;
     void do_end_read() noexcept REQUIRES(!m_async_mutex);
-    void commit_and_continue_writing();
     void initialize_replication();
 
     void replicate(Transaction* dest, Replication& repl) const;
@@ -889,19 +889,15 @@ public:
         return trans->get_table(name); // Throws
     }
 
-    TableRef add_table(StringData name) const
+    TableRef add_table(StringData name, Table::Type table_type = Table::Type::TopLevel) const
     {
-        return trans->add_table(name); // Throws
+        return trans->add_table(name, table_type); // Throws
     }
 
-    TableRef add_embedded_table(StringData name) const
+    TableRef get_or_add_table(StringData name, Table::Type table_type = Table::Type::TopLevel,
+                              bool* was_added = nullptr) const
     {
-        return trans->add_embedded_table(name); // Throws
-    }
-
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
-    {
-        return trans->get_or_add_table(name, was_added); // Throws
+        return trans->get_or_add_table(name, table_type, was_added); // Throws
     }
 
     Group& get_group() const noexcept

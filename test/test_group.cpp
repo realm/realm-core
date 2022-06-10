@@ -333,22 +333,22 @@ TEST(Group_GetOrAddTable)
     CHECK_EQUAL(1, group.size());
 
     bool was_created = false;
-    group.get_or_add_table("foo", &was_created);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_created);
     CHECK(was_created);
     CHECK_EQUAL(2, group.size());
-    group.get_or_add_table("foo", &was_created);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(2, group.size());
-    group.get_or_add_table("bar", &was_created);
+    group.get_or_add_table("bar", Table::Type::TopLevel, &was_created);
     CHECK(was_created);
     CHECK_EQUAL(3, group.size());
-    group.get_or_add_table("baz", &was_created);
+    group.get_or_add_table("baz", Table::Type::TopLevel, &was_created);
     CHECK(was_created);
     CHECK_EQUAL(4, group.size());
-    group.get_or_add_table("bar", &was_created);
+    group.get_or_add_table("bar", Table::Type::TopLevel, &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(4, group.size());
-    group.get_or_add_table("baz", &was_created);
+    group.get_or_add_table("baz", Table::Type::TopLevel, &was_created);
     CHECK_NOT(was_created);
     CHECK_EQUAL(4, group.size());
 }
@@ -358,10 +358,10 @@ TEST(Group_GetOrAddTable2)
 {
     Group group;
     bool was_inserted;
-    group.get_or_add_table("foo", &was_inserted);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK(was_inserted);
-    group.get_or_add_table("foo", &was_inserted);
+    group.get_or_add_table("foo", Table::Type::TopLevel, &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK_NOT(was_inserted);
 }
@@ -1288,7 +1288,7 @@ TEST(Group_CascadeNotify_TableViewClearWeak)
 
 
 // more levels of cascade delete.... this does not seem to add any additional coverage
-void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int depth)
+static void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int depth)
 {
     if (depth < 4) {
         auto o_l = obj.create_and_set_linked_object(left);
@@ -1301,7 +1301,7 @@ void make_tree(Table& table, Obj& obj, ColKey left, ColKey right, int depth)
 TEST(Group_CascadeNotify_TreeCascade)
 {
     Group g;
-    TableRef t = g.add_embedded_table("table");
+    TableRef t = g.add_table("table", Table::Type::Embedded);
     TableRef parent = g.add_table("parent");
     auto left = t->add_column(*t, "left");
     auto right = t->add_column(*t, "right");
@@ -1341,24 +1341,24 @@ TEST(Group_ChangeEmbeddedness)
     p1.set(col, obj1.get_key());
     p2.set(col, obj2.get_key());
 
-    // obj2 has no owner, so we can't make the table embedded
+    // obj3 has no owner, so we can't make the table embedded
     std::string message;
-    CHECK_THROW_ANY_GET_MESSAGE(t->set_embedded(true), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->set_table_type(Table::Type::Embedded), message);
     CHECK_EQUAL(message, "At least one object in 'table' does not have a backlink (data would get lost).");
     CHECK_NOT(t->is_embedded());
 
     // Now it has owner
     p3.set(col, obj3.get_key());
-    CHECK_NOTHROW(t->set_embedded(true));
+    CHECK_NOTHROW(t->set_table_type(Table::Type::Embedded));
     CHECK(t->is_embedded());
 
-    CHECK_NOTHROW(t->set_embedded(false));
+    CHECK_NOTHROW(t->set_table_type(Table::Type::TopLevel));
     p3.set(col, obj2.get_key());
     obj3.remove();
 
     // Now obj2 has 2 parents
     CHECK_EQUAL(obj2.get_backlink_count(), 2);
-    CHECK_THROW_ANY_GET_MESSAGE(t->set_embedded(true), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->set_table_type(Table::Type::Embedded), message);
     CHECK_EQUAL(message, "At least one object in 'table' does have multiple backlinks.");
     CHECK_NOT(t->is_embedded());
 }
@@ -1627,11 +1627,15 @@ TEST(Group_StringPrimaryKeyCol)
     CHECK(primary_key_column);
     ColKey col1 = primary_key_column;
     ColKey col2 = table->add_column(type_String, "secondary");
+    ColKey col3 = table->add_column(type_Int, "another");
     ColKey list_col = table->add_column_list(type_Float, "floats");
     CHECK_NOT(table->find_first(primary_key_column, StringData("Exactly!")));
     CHECK(table->has_search_index(primary_key_column));
 
-    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col2, "first"}});
+    auto obj1 = table->create_object_with_primary_key("Exactly!", {{col3, 5}, {col2, "last"}});
+    CHECK_THROW_ANY(table->create_object_with_primary_key("Exactly!", {{}}, Table::UpdateMode::never));
+    table->create_object_with_primary_key("Exactly!", {{col2, "first"}}, Table::UpdateMode::changed);
+
     table->create_object_with_primary_key("Paul", {{col2, "John"}});
     table->create_object_with_primary_key("John", {{col2, "Paul"}});
     table->create_object_with_primary_key("George", {{col2, "George"}});

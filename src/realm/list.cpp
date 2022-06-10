@@ -135,16 +135,31 @@ template <class T>
 void Lst<T>::sort(std::vector<size_t>& indices, bool ascending) const
 {
     update_if_needed();
-    auto tree = m_tree.get();
-    if (ascending) {
-        do_sort(indices, size(), [tree](size_t i1, size_t i2) noexcept {
-            return tree->get(i1) < tree->get(i2);
-        });
+
+    if constexpr (std::is_same_v<T, Mixed>) {
+        if (ascending) {
+            do_sort(indices, size(), [this](size_t i1, size_t i2) {
+                return get(i1) < get(i2);
+            });
+        }
+        else {
+            do_sort(indices, size(), [this](size_t i1, size_t i2) {
+                return get(i1) > get(i2);
+            });
+        }
     }
     else {
-        do_sort(indices, size(), [tree](size_t i1, size_t i2) noexcept {
-            return tree->get(i1) > tree->get(i2);
-        });
+        auto tree = m_tree.get();
+        if (ascending) {
+            do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+                return tree->get(i1) < tree->get(i2);
+            });
+        }
+        else {
+            do_sort(indices, size(), [tree](size_t i1, size_t i2) {
+                return tree->get(i1) > tree->get(i2);
+            });
+        }
     }
 }
 
@@ -153,10 +168,20 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
 {
     indices.clear();
     sort(indices, sort_order.value_or(true));
-    auto tree = m_tree.get();
-    auto duplicates = std::unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
-        return tree->get(i1) == tree->get(i2);
-    });
+    auto duplicates = indices.end();
+
+    if constexpr (std::is_same_v<T, Mixed>) {
+        duplicates = std::unique(indices.begin(), indices.end(), [this](size_t i1, size_t i2) noexcept {
+            return get(i1) == get(i2);
+        });
+    }
+    else {
+        auto tree = m_tree.get();
+        duplicates = std::unique(indices.begin(), indices.end(), [tree](size_t i1, size_t i2) noexcept {
+            return tree->get(i1) == tree->get(i2);
+        });
+    }
+
     // Erase the duplicates
     indices.erase(duplicates, indices.end());
 
@@ -165,7 +190,6 @@ void Lst<T>::distinct(std::vector<size_t>& indices, util::Optional<bool> sort_or
         std::sort(indices.begin(), indices.end(), std::less<size_t>());
     }
 }
-
 
 /********************************* Lst<Key> *********************************/
 
@@ -309,13 +333,14 @@ void Lst<Mixed>::do_set(size_t ndx, Mixed value)
 {
     ObjLink old_link;
     ObjLink target_link;
-    Mixed old_value = get(ndx);
+    Mixed old_value = m_tree->get(ndx);
 
     if (old_value.is_type(type_TypedLink)) {
         old_link = old_value.get<ObjLink>();
     }
     if (value.is_type(type_TypedLink)) {
         target_link = value.get<ObjLink>();
+        m_obj.get_table()->get_parent_group()->validate(target_link);
     }
 
     CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All : CascadeState::Mode::Strong);
@@ -341,7 +366,7 @@ void Lst<Mixed>::do_insert(size_t ndx, Mixed value)
 template <>
 void Lst<Mixed>::do_remove(size_t ndx)
 {
-    if (Mixed old_value = get(ndx); old_value.is_type(type_TypedLink)) {
+    if (Mixed old_value = m_tree->get(ndx); old_value.is_type(type_TypedLink)) {
         auto old_link = old_value.get<ObjLink>();
 
         CascadeState state(old_link.get_obj_key().is_unresolved() ? CascadeState::Mode::All

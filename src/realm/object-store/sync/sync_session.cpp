@@ -28,6 +28,7 @@
 
 #include <realm/db_options.hpp>
 #include <realm/sync/client.hpp>
+#include <realm/sync/config.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/protocol.hpp>
@@ -132,8 +133,10 @@ void SyncSession::become_inactive(util::CheckedUniqueLock lock, std::error_code 
     // Manually set the disconnected state. Sync would also do this, but
     // since the underlying SyncSession object already have been destroyed,
     // we are not able to get the callback.
+    util::CheckedUniqueLock connection_state_lock(m_connection_state_mutex);
     auto old_state = m_connection_state;
     auto new_state = m_connection_state = SyncSession::ConnectionState::Disconnected;
+    connection_state_lock.unlock();
 
     SyncSession::CompletionCallbacks waits;
     std::swap(waits, m_completion_callbacks);
@@ -253,6 +256,27 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig 
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
+    if (m_config.flx_sync_requested) {
+        std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
+        auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+        history.set_write_validator_factory(
+            [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
+                auto sub_mgr = weak_sub_mgr.lock();
+                REALM_ASSERT_RELEASE(sub_mgr);
+                auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
+                return [tables = std::move(latest_sub_tables)](const Table& table) {
+                    if (table.get_table_type() != Table::Type::TopLevel) {
+                        return;
+                    }
+                    auto object_class_name = Group::table_name_to_class_name(table.get_name());
+                    if (tables.find(object_class_name) == tables.end()) {
+                        throw NoSubscriptionForWrite(util::format(
+                            "Cannot write to class %1 when no flexible sync subscription has been created.",
+                            object_class_name));
+                    }
+                };
+            });
+    }
 }
 
 std::shared_ptr<SyncManager> SyncSession::sync_manager() const
@@ -292,8 +316,17 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 }
 
 
-void SyncSession::download_fresh_realm()
+void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
 {
+    // first check that recovery will not be prevented
+    if (allowed_mode && *allowed_mode == SyncError::ClientResetModeAllowed::RecoveryNotPermitted) {
+        auto mode = config(&SyncConfig::client_resync_mode);
+        if (mode == ClientResyncMode::Recover) {
+            handle_fresh_realm_downloaded(
+                nullptr, {"A client reset is required but the server does not permit recovery for this client"},
+                allowed_mode);
+        }
+    }
     DBOptions options;
     options.encryption_key = m_db->get_encryption_key();
     options.allow_file_format_upgrade = false;
@@ -319,19 +352,23 @@ void SyncSession::download_fresh_realm()
     catch (std::exception const& e) {
         // Failed to open the fresh path after attempting to delete it, so we
         // just can't do automatic recovery.
-        handle_fresh_realm_downloaded(nullptr, std::string(e.what()));
+        handle_fresh_realm_downloaded(nullptr, std::string(e.what()), allowed_mode);
         return;
     }
 
+    util::CheckedLockGuard state_lock(m_state_mutex);
+    if (m_state != State::Active) {
+        return;
+    }
     std::shared_ptr<SyncSession> sync_session;
     {
-        util::CheckedLockGuard state_lock(m_state_mutex);
         util::CheckedLockGuard config_lock(m_config_mutex);
         SyncConfig config = m_config;
         config.stop_policy = SyncSessionStopPolicy::Immediately;
         config.client_resync_mode = ClientResyncMode::Manual;
         sync_session = create(m_client, db, config, m_sync_manager);
     }
+
     sync_session->assert_mutex_unlocked();
     sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
         // Keep the sync session alive while it's downloading, but then close
@@ -339,17 +376,18 @@ void SyncSession::download_fresh_realm()
         sync_session->close();
         if (auto strong_self = weak_self.lock()) {
             if (ec) {
-                strong_self->handle_fresh_realm_downloaded(nullptr, ec.message());
+                strong_self->handle_fresh_realm_downloaded(nullptr, ec.message(), allowed_mode);
             }
             else {
-                strong_self->handle_fresh_realm_downloaded(db, none);
+                strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
             }
         }
     });
     sync_session->revive_if_needed();
 }
 
-void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message)
+void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::string> error_message,
+                                                util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
 {
     util::CheckedUniqueLock lock(m_state_mutex);
     if (m_state != State::Active) {
@@ -377,7 +415,7 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // that moving to the inactive state doesn't clear them - they will be
     // re-registered when the session becomes active again.
     {
-        m_force_client_reset = true;
+        m_force_client_reset = allowed_mode.value_or(SyncError::ClientResetModeAllowed::RecoveryPermitted);
         m_client_reset_fresh_copy = db;
         CompletionCallbacks callbacks;
         std::swap(m_completion_callbacks, callbacks);
@@ -413,6 +451,23 @@ void SyncSession::handle_error(SyncError error)
     else if (error_code.category() == realm::sync::protocol_error_category()) {
         SimplifiedProtocolError simplified =
             get_simplified_error(static_cast<sync::ProtocolError>(error_code.value()));
+        if (error.server_requests_client_reset) {
+            // we have specific instructions from the server concerning client resets
+            switch (*error.server_requests_client_reset) {
+                case SyncError::ClientResetModeAllowed::DoNotClientReset:
+                    if (simplified == SimplifiedProtocolError::ClientResetRequested) {
+                        // Server says not to do a client reset, but the client wants
+                        // to do one; make a fatal (non-reset) error instead.
+                        simplified = SimplifiedProtocolError::UnexpectedInternalIssue;
+                    }
+                    break;
+                case SyncError::ClientResetModeAllowed::RecoveryPermitted:
+                    [[fallthrough]];
+                case SyncError::ClientResetModeAllowed::RecoveryNotPermitted:
+                    simplified = SimplifiedProtocolError::ClientResetRequested;
+                    break;
+            }
+        }
         switch (simplified) {
             case SimplifiedProtocolError::ConnectionIssue:
                 // Not real errors, don't need to be reported to the binding.
@@ -423,6 +478,8 @@ void SyncSession::handle_error(SyncError error)
                 // The SDK doesn't need to be aware of these because they are strictly informational, and do not
                 // represent actual errors.
                 return;
+            case SimplifiedProtocolError::CompensatingWrite:
+                break; // not fatal, but should be bubbled up to the user below.
             case SimplifiedProtocolError::BadAuthentication:
                 next_state = NextStateAfterError::inactive;
                 log_out_user = true;
@@ -437,10 +494,13 @@ void SyncSession::handle_error(SyncError error)
                         next_state = NextStateAfterError::inactive;
                         delete_file = ShouldBackup::yes;
                         break;
-                    case ClientResyncMode::DiscardLocal: {
-                        download_fresh_realm();
+                    case ClientResyncMode::DiscardLocal:
+                        [[fallthrough]];
+                    case ClientResyncMode::RecoverOrDiscard:
+                        [[fallthrough]];
+                    case ClientResyncMode::Recover:
+                        download_fresh_realm(error.server_requests_client_reset);
                         return; // do not propgate the error to the user at this point
-                    }
                 }
                 break;
         }
@@ -560,28 +620,30 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
 }
 
-sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy)
+static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_config, DBRef&& fresh_copy,
+                                                                   bool recovery_is_allowed)
 {
     sync::Session::Config::ClientReset config;
-    config.discard_local = (session_config.client_resync_mode == ClientResyncMode::DiscardLocal);
-    config.notify_after_client_reset =
-        [notify = session_config.notify_after_client_reset](std::string local_path, VersionID previous_version) {
-            REALM_ASSERT(!local_path.empty());
-            SharedRealm frozen_before, active_after;
-            if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
-                auto local_config = local_coordinator->get_config();
-                active_after = local_coordinator->get_realm(local_config, util::none);
-                local_config.scheduler = nullptr;
-                frozen_before = local_coordinator->get_realm(local_config, previous_version);
-                REALM_ASSERT(active_after);
-                REALM_ASSERT(!active_after->is_frozen());
-                REALM_ASSERT(frozen_before);
-                REALM_ASSERT(frozen_before->is_frozen());
-            }
-            if (notify) {
-                notify(frozen_before, active_after);
-            }
-        };
+    REALM_ASSERT(session_config.client_resync_mode != ClientResyncMode::Manual);
+    config.mode = session_config.client_resync_mode;
+    config.notify_after_client_reset = [notify = session_config.notify_after_client_reset](
+                                           std::string local_path, VersionID previous_version, bool did_recover) {
+        REALM_ASSERT(!local_path.empty());
+        SharedRealm frozen_before, active_after;
+        if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
+            auto local_config = local_coordinator->get_config();
+            active_after = local_coordinator->get_realm(local_config, util::none);
+            local_config.scheduler = nullptr;
+            frozen_before = local_coordinator->get_realm(local_config, previous_version);
+            REALM_ASSERT(active_after);
+            REALM_ASSERT(!active_after->is_frozen());
+            REALM_ASSERT(frozen_before);
+            REALM_ASSERT(frozen_before->is_frozen());
+        }
+        if (notify) {
+            notify(frozen_before, active_after, did_recover);
+        }
+    };
     config.notify_before_client_reset = [notify = session_config.notify_before_client_reset](std::string local_path) {
         REALM_ASSERT(!local_path.empty());
         SharedRealm frozen_local;
@@ -598,6 +660,7 @@ sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& session_
         }
     };
     config.fresh_copy = std::move(fresh_copy);
+    config.recovery_is_allowed = recovery_is_allowed;
     return config;
 }
 
@@ -618,6 +681,21 @@ void SyncSession::create_sync_session()
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
+    if (m_config.on_download_message_received_hook) {
+        session_config.on_download_message_received_hook =
+            [hook = m_config.on_download_message_received_hook, anchor = weak_from_this()](
+                const sync::SyncProgress& progress, int64_t query_version, sync::DownloadBatchState batch_state) {
+                hook(anchor, progress, query_version, batch_state);
+            };
+    }
+    if (m_config.on_bootstrap_message_processed_hook) {
+        session_config.on_bootstrap_message_processed_hook =
+            [hook = m_config.on_bootstrap_message_processed_hook,
+             anchor = weak_from_this()](const sync::SyncProgress& progress, int64_t query_version,
+                                        sync::DownloadBatchState batch_state) -> bool {
+            return hook(anchor, progress, query_version, batch_state);
+        };
+    }
 
     {
         std::string sync_route = m_sync_manager->sync_route();
@@ -638,8 +716,10 @@ void SyncSession::create_sync_session()
     session_config.custom_http_headers = m_config.custom_http_headers;
 
     if (m_force_client_reset) {
-        session_config.client_reset_config = make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy));
-        m_force_client_reset = false;
+        const bool allowed_to_recover = *m_force_client_reset == SyncError::ClientResetModeAllowed::RecoveryPermitted;
+        session_config.client_reset_config =
+            make_client_reset_config(m_config, std::move(m_client_reset_fresh_copy), allowed_to_recover);
+        m_force_client_reset = util::none;
     }
 
     m_session = m_client.make_session(m_db, m_flx_subscription_store, std::move(session_config));
@@ -669,35 +749,52 @@ void SyncSession::create_sync_session()
 
     // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to
     // the connection state.
-    m_session->set_connection_state_change_listener([weak_self](sync::ConnectionState state,
-                                                                const sync::Session::ErrorInfo* error) {
-        // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
-        // nothing useful we can do with them.
-        if (auto self = weak_self.lock()) {
-            util::CheckedUniqueLock lock(self->m_state_mutex);
-            auto old_state = self->m_connection_state;
+    m_session->set_connection_state_change_listener(
+        [weak_self](sync::ConnectionState state, util::Optional<sync::Session::ErrorInfo> error) {
+            // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+            // nothing useful we can do with them.
+            auto self = weak_self.lock();
+            if (!self) {
+                return;
+            }
             using cs = sync::ConnectionState;
-            switch (state) {
-                case cs::disconnected:
-                    self->m_connection_state = ConnectionState::Disconnected;
-                    break;
-                case cs::connecting:
-                    self->m_connection_state = ConnectionState::Connecting;
-                    break;
-                case cs::connected:
-                    self->m_connection_state = ConnectionState::Connected;
-                    break;
-                default:
-                    REALM_UNREACHABLE();
-            }
-            auto new_state = self->m_connection_state;
+            ConnectionState new_state = [&] {
+                switch (state) {
+                    case cs::disconnected:
+                        return ConnectionState::Disconnected;
+                    case cs::connecting:
+                        return ConnectionState::Connecting;
+                    case cs::connected:
+                        return ConnectionState::Connected;
+                }
+                REALM_UNREACHABLE();
+            }();
+            util::CheckedUniqueLock lock(self->m_connection_state_mutex);
+            auto old_state = self->m_connection_state;
+            self->m_connection_state = new_state;
             lock.unlock();
-            self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
-            if (error) {
-                self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
+
+            if (old_state != new_state) {
+                self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
             }
-        }
-    });
+
+            if (error) {
+                SyncError sync_error{error->error_code, std::string(error->message), error->is_fatal(),
+                                     error->log_url, std::move(error->compensating_writes)};
+                if (error->should_client_reset) {
+                    if (*error->should_client_reset) {
+                        sync_error.server_requests_client_reset =
+                            error->client_reset_recovery_is_disabled
+                                ? SyncError::ClientResetModeAllowed::RecoveryNotPermitted
+                                : SyncError::ClientResetModeAllowed::RecoveryPermitted;
+                    }
+                    else {
+                        sync_error.server_requests_client_reset = SyncError::ClientResetModeAllowed::DoNotClientReset;
+                    }
+                }
+                self->handle_error(std::move(sync_error));
+            }
+        });
 }
 
 void SyncSession::set_sync_transact_callback(util::UniqueFunction<sync::Session::SyncTransactCallback> callback)
@@ -899,6 +996,24 @@ void SyncSession::wait_for_download_completion(util::UniqueFunction<void(std::er
     add_completion_callback(std::move(callback), ProgressDirection::download);
 }
 
+bool SyncSession::wait_for_upload_completion()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    if (m_session) {
+        return m_session->wait_for_upload_complete_or_client_stopped();
+    }
+    return false;
+}
+
+bool SyncSession::wait_for_download_completion()
+{
+    util::CheckedUniqueLock lock(m_state_mutex);
+    if (m_session) {
+        return m_session->wait_for_download_complete_or_client_stopped();
+    }
+    return false;
+}
+
 uint64_t SyncSession::register_progress_notifier(std::function<ProgressNotifierCallback>&& notifier,
                                                  ProgressDirection direction, bool is_streaming)
 {
@@ -930,7 +1045,7 @@ SyncSession::State SyncSession::state() const
 
 SyncSession::ConnectionState SyncSession::connection_state() const
 {
-    util::CheckedUniqueLock lock(m_state_mutex);
+    util::CheckedUniqueLock lock(m_connection_state_mutex);
     return m_connection_state;
 }
 
@@ -939,9 +1054,9 @@ std::string const& SyncSession::path() const
     return m_db->get_path();
 }
 
-sync::SubscriptionStore* SyncSession::get_flx_subscription_store()
+const std::shared_ptr<sync::SubscriptionStore>& SyncSession::get_flx_subscription_store()
 {
-    return m_flx_subscription_store.get();
+    return m_flx_subscription_store;
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)
