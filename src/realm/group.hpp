@@ -1088,7 +1088,7 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
 inline size_t Group::get_logical_file_size(const Array& top) noexcept
 {
     if (top.is_attached() && top.size() > s_file_size_ndx) {
-        return top.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
+        return (size_t)top.get_as_ref_or_tagged(s_file_size_ndx).get_as_int();
     }
     return 0;
 }

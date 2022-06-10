@@ -192,7 +192,7 @@ TEST(Transactions_ReclaimFrozen)
     Obj o;
     for (int j = 0; j < num_objects; ++j) {
         o = tbl->create_object(ObjKey(j));
-        o.set(col, 10000000000 + j);
+        o.set<Int>(col, 10000000000 + j);
     }
     wt->commit_and_continue_as_read();
     for (int j = 0; j < num_transactions_created; ++j) {
@@ -205,7 +205,7 @@ TEST(Transactions_ReclaimFrozen)
         wt->promote_to_write();
         int key = random.draw_int_mod(num_objects);
         o = tbl->get_object(ObjKey(key));
-        o.set(col, o.get<Int>(col) + 42);
+        o.set<Int>(col, o.get<Int>(col) + 42);
         wt->commit_and_continue_as_read();
         for (int k = 0; k < num_checks_pr_trans; ++k) {
             int selected_trans = random.draw_int_mod(num_pending_transactions);

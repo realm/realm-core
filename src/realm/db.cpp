@@ -253,7 +253,7 @@ struct VersionList {
         auto it = oldest;
         while (it != -1) {
             auto& r = get(it);
-            top_refs[r.version] = {r.current_top, r.filesize};
+            top_refs[r.version] = {to_ref(r.current_top), to_ref(r.filesize)};
             it = r.newer;
         }
         // run through list of versions and reclaim unused entries until a live entry is met
