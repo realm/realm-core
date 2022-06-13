@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
 
@@ -395,7 +395,7 @@ TEST_CASE("Schema") {
             };
             REQUIRE_THROWS_CONTAINING(
                 schema.validate(SchemaValidationMode::Sync),
-                "Property 'object.link' of type 'object' cannot have an asymmetric object type ('link target').");
+                "Property 'object.link' of type 'object' cannot be a link to an asymmetric object.");
         }
 
         SECTION("rejects link properties with asymmetric origin object") {
@@ -408,6 +408,17 @@ TEST_CASE("Schema") {
             REQUIRE_THROWS_CONTAINING(
                 schema.validate(SchemaValidationMode::Sync),
                 "Asymmetric table with property 'object.link' of type 'object' cannot have an object type.");
+        }
+
+        SECTION("allow embedded objects with asymmetric sync") {
+            Schema schema = {
+                {"object",
+                 ObjectSchema::IsAsymmetric{true},
+                 {{"_id", PropertyType::Int, Property::IsPrimary{true}},
+                  {"link", PropertyType::Object | PropertyType::Nullable, "link target"}}},
+                {"link target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+            };
+            schema.validate(SchemaValidationMode::Sync);
         }
 
         SECTION("rejects array properties with no target object") {

@@ -3,6 +3,7 @@ set(HEADERS
     util/index_helpers.hpp
     util/test_file.hpp
     util/test_utils.hpp
+    ../util/crypt_key.hpp
     collection_fixtures.hpp
 )
 
@@ -31,6 +32,7 @@ set(SOURCES
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
+    ../util/crypt_key.cpp
 )
 
 if(REALM_ENABLE_AUTH_TESTS)
@@ -76,7 +78,7 @@ if(MSVC)
     target_compile_options(ObjectStoreTests PRIVATE /bigobj)
 endif()
 
-target_link_libraries(ObjectStoreTests ObjectStore RealmFFIStatic)
+target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
@@ -90,12 +92,6 @@ add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)
-    option(REALM_ENABLE_COMPENSATING_WRITES_TESTS "" OFF)
-    if (REALM_ENABLE_COMPENSATING_WRITES_TESTS)
-        target_compile_definitions(ObjectStoreTests PRIVATE
-            REALM_ENABLE_COMPENSATING_WRITES_TESTS=1
-        )
-    endif()
     option(REALM_ENABLE_AUTH_TESTS "" OFF)
     if(REALM_ENABLE_AUTH_TESTS)
         if(NOT REALM_MONGODB_ENDPOINT)
@@ -119,11 +115,6 @@ if(REALM_TEST_SYNC_LOGGING)
 endif()
 
 target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
-    target_compile_definitions(ObjectStoreTests PRIVATE -DCATCH_CONFIG_CONSOLE_WIDTH=300)
-endif()
 
 # Resources required for running the tests
 file(GLOB REQUIRED_TEST_FILES
