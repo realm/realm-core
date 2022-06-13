@@ -101,11 +101,10 @@ struct VersionList {
         int32_t older;
         int32_t newer;
     };
+    const int nil = -1;
 
     void expand_to(uint_fast32_t new_entries) noexcept
     {
-        // std::cout << "expanding to " << new_entries << std::endl;
-        // dump();
         for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 1;
             data[i].count_live = 0;
@@ -113,39 +112,19 @@ struct VersionList {
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].older = i + 1;
-            data[i].newer = -1;
+            data[i].newer = nil;
         }
         data[new_entries - 1].older = freelist;
         freelist = entries;
         entries = uint32_t(new_entries);
-        // dump();
     }
 
     VersionList() noexcept
     {
         entries = 0;
-        oldest = newest = -1; // empty
-        freelist = -1;        // empty
+        oldest = newest = nil; // empty
+        freelist = nil;        // empty
         expand_to(init_readers_size);
-    }
-
-    void dump()
-    {
-        /*
-        uint_fast32_t i = old_pos;
-        std::cout << "--- " << std::endl;
-        while (i != put_pos.load()) {
-            std::cout << "  used " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-            i = data[i].next;
-        }
-        std::cout << "  LAST " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-        i = data[i].next;
-        while (i != old_pos) {
-            std::cout << "  free " << i << " : " << data[i].count.load() << " | " << data[i].version << std::endl;
-            i = data[i].next;
-        }
-        std::cout << "--- Done" << std::endl;
-        */
     }
 
     static size_t compute_required_space(uint_fast32_t num_entries) noexcept
@@ -178,21 +157,21 @@ struct VersionList {
     ReadCount& allocate_entry()
     {
         // grab entry from freelist:
-        REALM_ASSERT(freelist != -1);
+        REALM_ASSERT(freelist != nil);
         auto& r = get(freelist);
         freelist = r.older;
 
-        if (newest == -1) {
+        if (newest == nil) {
             // list was empty
-            REALM_ASSERT(oldest == -1);
+            REALM_ASSERT(oldest == nil);
             newest = oldest = index_of(r);
-            r.older = r.newer = -1;
+            r.older = r.newer = nil;
         }
         else {
             // add to existing list
             auto& n = get(newest);
-            REALM_ASSERT(n.newer == -1);
-            r.newer = -1;
+            REALM_ASSERT(n.newer == nil);
+            r.newer = nil;
             r.older = newest;
             newest = index_of(r);
             n.newer = newest;
@@ -212,13 +191,13 @@ struct VersionList {
             oldest = r.newer;
         if (idx == newest)
             newest = r.older; // can this happen?
-        if (r.older != -1)
+        if (r.older != nil)
             get(r.older).newer = r.newer;
-        if (r.newer != -1)
+        if (r.newer != nil)
             get(r.newer).older = r.older;
 
         // add to freelist
-        r.newer = -1;
+        r.newer = nil;
         r.older = freelist;
         freelist = idx;
     }
@@ -234,7 +213,7 @@ struct VersionList {
     {
         int num_entries = entries;
         entries = 0;
-        newest = oldest = freelist = -1;
+        newest = oldest = freelist = nil;
         expand_to(num_entries);
         ReadCount& r = allocate_entry();
         r.count_live = r.count_frozen = 0;
@@ -243,7 +222,7 @@ struct VersionList {
 
     bool is_full() const noexcept
     {
-        return freelist == -1;
+        return freelist == nil;
     }
 
     void cleanup(uint64_t& oldest_v, uint64_t& oldest_live_v, TopRefMap& top_refs,
@@ -251,7 +230,7 @@ struct VersionList {
     {
         // build a map from version nr to top_ref
         auto it = oldest;
-        while (it != -1) {
+        while (it != nil) {
             auto& r = get(it);
             top_refs[r.version] = {to_ref(r.current_top), to_ref(r.filesize)};
             it = r.newer;
@@ -260,8 +239,8 @@ struct VersionList {
         // there is always at least one live entry
         it = oldest;
         bool looking_for_oldest_live = true;
-        REALM_ASSERT(oldest != -1);
-        while (it != -1) {
+        REALM_ASSERT(oldest != nil);
+        while (it != nil) {
             auto& r = get(it);
             if (looking_for_oldest_live && r.count_live != 0) {
                 looking_for_oldest_live = false;
@@ -1492,7 +1471,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         // in the VersionList. We need to have access to that later to update top_ref and file_size.
         // This is also needed to attach the group (get the proper top pointer, etc)
         TransactionRef tr = start_read();
-        size_t logical_file_size;
         // Compact by writing a new file holding only live data, then renaming the new file
         // so it becomes the database file, replacing the old one in the process.
         try {
@@ -1505,7 +1483,6 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
             bool disable_sync = get_disable_sync_to_disk();
             if (!disable_sync && dura != Durability::Unsafe)
                 file.sync(); // Throws
-            logical_file_size = file.get_size() - sizeof(SlabAlloc::StreamingFooter);
         }
         catch (...) {
             // If writing the compact version failed in any way, delete the partially written file to clean up disk
@@ -1543,8 +1520,12 @@ bool DB::compact(bool bump_version_number, util::Optional<const char*> output_en
         top_ref = m_alloc.attach_file(m_db_path, cfg);
         m_alloc.init_mapping_management(info->latest_version_number);
         info->number_of_versions = 1;
-        // std::cout << "Compacted to " << logical_file_size << std::endl;
-        // size_t file_size = m_alloc.get_file().get_size(); // get_baseline();
+        size_t logical_file_size = 24;
+        if (top_ref) {
+            Array top(m_alloc);
+            top.init_from_ref(top_ref);
+            logical_file_size = Group::get_logical_file_size(top);
+        }
         m_version_manager->init_versioning(top_ref, logical_file_size, info->latest_version_number);
     }
     return true;
@@ -2416,7 +2397,6 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
     transaction.update_num_objects();
 #endif // REALM_METRICS
 
-    // info->readers.dump();
     GroupWriter out(transaction, Durability(info->durability)); // Throws
     out.set_versions(new_version, oldest_version, top_refs, unreachable_versions);
     ref_type new_top_ref;

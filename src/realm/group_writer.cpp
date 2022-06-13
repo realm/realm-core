@@ -361,6 +361,7 @@ void GroupWriter::backdate()
             , version(version){};
     };
 
+
     std::set<int> unreachables;
     for (auto unreachable : m_unreachable_versions) {
         unreachables.insert(unreachable);
@@ -378,6 +379,8 @@ void GroupWriter::backdate()
         old_freelists.push_back(std::move(e));
     }
 
+
+    // little helper: get a youngest version older than given
     auto get_earlier = [&](uint64_t version) -> FreeList* {
         auto pred = [](const std::unique_ptr<FreeList>& e, uint64_t v) {
             return e->version < v;
@@ -393,6 +396,9 @@ void GroupWriter::backdate()
         return it->get();
     };
 
+
+    // find youngest time stamp in any block which (partially) overlaps a given one.
+    // if no such block exists, return the current version of the given block.
     auto find_cover_for = [&](FreeSpaceEntry& entry, FreeList* it) -> uint64_t {
         if (!it->resolved) {
             // setup arrays
@@ -464,6 +470,7 @@ void GroupWriter::backdate()
 #endif
         return entry.released_at_version;
     };
+
 
 #ifdef REALM_DEBUG
     auto reachables = map_reachable();
@@ -549,7 +556,7 @@ void GroupWriter::backdate()
 #endif
             entry.released_at_version = covering_blocks_released_at;
             if (entry.released_at_version) {
-                // retry backdating from the new state:
+                // retry backdating from the newly found older version:
                 --index;
             }
             continue;

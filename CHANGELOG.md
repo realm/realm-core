@@ -3,6 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Changed the signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). Previously, the method returned void. (PR [#5546](https://github.com/realm/realm-core/pull/5546))
+* Data in versions which are inaccessible are now reclaimed during commit. This prevents most cases of version pinning from causing huge file growth. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
 
 ### Fixed
 * Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)
@@ -10,7 +11,7 @@
 * Asymmetric sync now works with embedded objects. (Issue [#5565](https://github.com/realm/realm-core/issues/5565), since 12.1.0)
  
 ### Breaking changes
-* None.
+* The layout of the lock-file has changed, the lock file format version is bumped and all participants in a multiprocess scenario needs to be up to date so they expect the same format. This requires an update of Studio. (PR [#5440](https://github.com/realm/realm-core/pull/5440))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
