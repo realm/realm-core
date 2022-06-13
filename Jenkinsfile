@@ -130,8 +130,6 @@ jobWrapper {
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
             addressSanitizer        : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'address']),
-            // FIXME: disabled due to issues with CI
-	        // performance             : optionalBuildPerformance(releaseTesting), // always build performance on releases, otherwise make it optional
         ]
         if (releaseTesting) {
             extendedChecks = [
@@ -663,71 +661,6 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
     }
 }
 
-def optionalBuildPerformance(boolean force) {
-    if (force) {
-        return {
-            buildPerformance()
-        }
-    } else {
-        return {
-            def doPerformance = true
-            stage("Input") {
-                try {
-                    timeout(time: 10, unit: 'MINUTES') {
-                        script {
-                            input message: 'Build Performance?', ok: 'Yes'
-                        }
-                    }
-                } catch (err) { // manual abort or timeout
-                    println "Not building performance on this run: ${err}"
-                    doPerformance = false
-                }
-            }
-            if (doPerformance) {
-                stage("Build") {
-                    buildPerformance()
-                }
-            }
-        }
-    }
-}
-
-def buildPerformance() {
-    // Select docker-cph-X.  We want docker, metal (brix) and only one executor
-    // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
-    rlmNode('brix && exclusive') {
-      getArchive()
-
-      // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
-      // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
-      // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
-      buildDockerEnv('testing.Dockerfile').inside {
-        withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
-          rlmS3Get file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
-          sh 'unzip core-benchmarks.zip -d test/bench/'
-          sh 'rm core-benchmarks.zip'
-
-          sh """
-            cd test/bench
-            mkdir -p core-benchmarks results
-            ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
-          """
-          zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
-          withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
-            rlmS3Put file: 'core-benchmarks.zip', path: 'downloads/core/core-benchmarks.zip'
-          }
-          sh 'cd test/bench && ./parse_bench_hist.py --local-html results/ core-benchmarks/'
-          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance_Report'])
-          withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
-              sh "curl -H \"Authorization: token ${env.githubToken}\" " +
-                 "-d '{ \"body\": \"Check the performance result [here](${env.BUILD_URL}Performance_5fReport).\"}' " +
-                 "\"https://api.github.com/repos/realm/${repo}/issues/${env.CHANGE_ID}/comments\""
-          }
-        }
-      }
-    }
-}
-
 def doBuildMacOs(Map options = [:]) {
     def buildType = options.buildType;
 
@@ -758,7 +691,7 @@ def doBuildMacOs(Map options = [:]) {
             getArchive()
 
             dir('build-macosx') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -776,7 +709,7 @@ def doBuildMacOs(Map options = [:]) {
                     )
                 }
             }
-            withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer']) {
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer']) {
                 runAndCollectWarnings(
                     parser: 'clang',
                     script: 'xcrun swift build',
@@ -835,7 +768,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
             getArchive()
 
             dir('build-xcode-platforms') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-12.2.app/Contents/Developer/']) {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
                     sh "cmake ${cmakeDefinitions} -G Xcode .."
                     runAndCollectWarnings(
                         parser: 'clang',

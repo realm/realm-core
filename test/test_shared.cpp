@@ -1138,12 +1138,12 @@ TEST_IF(Shared_ManyReaders, TEST_DURATION > 0)
             WriteTransaction wt(root_sg);
             wt.get_group().verify();
             bool was_added = false;
-            TableRef test_1 = wt.get_or_add_table("test_1", &was_added);
+            TableRef test_1 = wt.get_or_add_table("test_1", Table::Type::TopLevel, &was_added);
             if (was_added) {
                 col_int = test_1->add_column(type_Int, "i");
             }
             test_1->create_object().set(col_int, 0);
-            TableRef test_2 = wt.get_or_add_table("test_2", &was_added);
+            TableRef test_2 = wt.get_or_add_table("test_2", Table::Type::TopLevel, &was_added);
             if (was_added) {
                 col_bin = test_2->add_column(type_Binary, "b");
             }
@@ -3944,11 +3944,11 @@ TEST(Shared_CompareGroups)
     {
         // Create schema in DB1
         auto wt = db1->start_write();
-        auto embedded = wt->add_embedded_table("class_Embedded");
+        auto embedded = wt->add_table("class_Embedded", Table::Type::Embedded);
         embedded->add_column(type_Float, "float");
         // Embedded in embedded
         embedded->add_column_dictionary(*embedded, "additional");
-        wt->add_embedded_table("class_AnotherEmbedded");
+        wt->add_table("class_AnotherEmbedded", Table::Type::Embedded);
 
         auto baas = wt->add_table_with_primary_key("class_Baa", type_Int, "_id");
         auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
@@ -3972,7 +3972,7 @@ TEST(Shared_CompareGroups)
         auto wt = db2->start_write();
         auto foos = wt->add_table_with_primary_key("class_Foo", type_String, "_id");
 
-        auto embedded = wt->add_embedded_table("class_Embedded");
+        auto embedded = wt->add_table("class_Embedded", Table::Type::Embedded);
         embedded->add_column(type_Float, "float");
         // Embedded in embedded
         embedded->add_column_dictionary(*embedded, "additional");
@@ -3992,7 +3992,7 @@ TEST(Shared_CompareGroups)
         foos->add_column_list(*baas, "link_list");
         foos->add_column_list(type_Mixed, "list_of_any", true);
 
-        wt->add_embedded_table("class_AnotherEmbedded");
+        wt->add_table("class_AnotherEmbedded", Table::Type::Embedded);
         wt->commit();
     }
     auto create_objects = [&](DBRef db) {
@@ -4063,11 +4063,11 @@ TEST(Shared_CopyReplication)
     // First create the local realm
     {
         // Create schema
-        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto embedded = tr->add_table("class_Embedded", Table::Type::Embedded);
         embedded->add_column(type_Float, "float");
         // Embedded in embedded
         embedded->add_column_dictionary(*embedded, "additional");
-        tr->add_embedded_table("class_AnotherEmbedded");
+        tr->add_table("class_AnotherEmbedded", Table::Type::Embedded);
 
         auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
         auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
@@ -4150,11 +4150,11 @@ TEST(Shared_WriteTo)
     // First create the local realm
     {
         // Create schema
-        auto embedded = tr->add_embedded_table("class_Embedded");
+        auto embedded = tr->add_table("class_Embedded", Table::Type::Embedded);
         embedded->add_column(type_Float, "float");
         // Embedded in embedded
         embedded->add_column_dictionary(*embedded, "additional");
-        tr->add_embedded_table("class_AnotherEmbedded");
+        tr->add_table("class_AnotherEmbedded", Table::Type::Embedded);
 
         auto baas = tr->add_table_with_primary_key("class_Baa", type_Int, "_id");
         auto foos = tr->add_table_with_primary_key("class_Foo", type_String, "_id");
@@ -4229,7 +4229,7 @@ TEST(Shared_WriteTo)
 
         // Create schema - where some columns are missing. This will cause the
         // ColKeys to be different
-        auto embedded = wt->add_embedded_table("class_Embedded");
+        auto embedded = wt->add_table("class_Embedded", Table::Type::Embedded);
         embedded->add_column(type_Float, "float");
         // Embedded in embedded
         embedded->add_column_dictionary(*embedded, "additional");

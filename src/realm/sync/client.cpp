@@ -634,12 +634,11 @@ void ClientImpl::remove_connection(ClientImpl::Connection& conn) noexcept
 }
 
 
-
 // ################ SessionImpl ################
 
 
-inline void SessionImpl::on_connection_state_changed(ConnectionState state,
-                                                     const util::Optional<SessionErrorInfo>& error_info)
+void SessionImpl::on_connection_state_changed(ConnectionState state,
+                                              const util::Optional<SessionErrorInfo>& error_info)
 {
     m_wrapper.on_connection_state_changed(state, error_info); // Throws
 }
@@ -800,9 +799,11 @@ void SessionImpl::process_pending_flx_bootstrap()
 
             history.integrate_server_changesets(
                 *pending_batch.progress, &downloadable_bytes, pending_batch.changesets.data(),
-                pending_batch.changesets.size(), new_version, batch_state, logger, [&](const TransactionRef& tr) {
+                pending_batch.changesets.size(), new_version, batch_state, logger,
+                [&](const TransactionRef& tr) {
                     bootstrap_store->pop_front_pending(tr, pending_batch.changesets.size());
-                });
+                },
+                get_transact_reporter());
             download_cursor = pending_batch.progress->download;
 
             logger.info(
@@ -818,8 +819,8 @@ void SessionImpl::process_pending_flx_bootstrap()
     }
 
     REALM_ASSERT_3(query_version, !=, -1);
-    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
     m_wrapper.on_sync_progress();
+    on_flx_sync_progress(query_version, DownloadBatchState::LastInBatch);
 }
 
 
@@ -1403,13 +1404,6 @@ void SessionWrapper::on_resumed()
 void SessionWrapper::on_connection_state_changed(ConnectionState state,
                                                  const util::Optional<SessionErrorInfo>& error_info)
 {
-    if (state == ConnectionState::connected && m_sess) {
-        ClientImpl::Connection& conn = m_sess->get_connection();
-        if (conn.is_flx_sync_connection()) {
-            get_flx_subscription_store();
-        }
-    }
-
     if (m_connection_state_change_listener) {
         if (!m_suspended)
             m_connection_state_change_listener(state, error_info); // Throws

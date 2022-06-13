@@ -113,6 +113,7 @@ public:
         IncompatibleHistories = RLM_ERR_INCOMPATIBLE_HISTORIES,
         FileFormatUpgradeRequired = RLM_ERR_FILE_FORMAT_UPGRADE_REQUIRED,
         SchemaVersionMismatch = RLM_ERR_SCHEMA_VERSION_MISMATCH,
+        NoSubscriptionForWrite = RLM_ERR_NO_SUBSCRIPTION_FOR_WRITE,
 
         SystemError = RLM_ERR_SYSTEM_ERROR,
 

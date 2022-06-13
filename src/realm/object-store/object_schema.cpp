@@ -44,6 +44,12 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
 {
 }
 
+ObjectSchema::ObjectSchema(std::string name, IsAsymmetric is_asymmetric,
+                           std::initializer_list<Property> persisted_properties)
+    : ObjectSchema(std::move(name), is_asymmetric, persisted_properties, {})
+{
+}
+
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                            std::initializer_list<Property> computed_properties, std::string name_alias)
     : ObjectSchema(std::move(name), IsEmbedded{false}, persisted_properties, computed_properties, name_alias)
@@ -57,6 +63,23 @@ ObjectSchema::ObjectSchema(std::string name, IsEmbedded is_embedded,
     , persisted_properties(persisted_properties)
     , computed_properties(computed_properties)
     , is_embedded(is_embedded)
+    , alias(name_alias)
+{
+    for (auto const& prop : persisted_properties) {
+        if (prop.is_primary) {
+            primary_key = prop.name;
+            break;
+        }
+    }
+}
+
+ObjectSchema::ObjectSchema(std::string name, IsAsymmetric is_asymmetric,
+                           std::initializer_list<Property> persisted_properties,
+                           std::initializer_list<Property> computed_properties, std::string name_alias)
+    : name(std::move(name))
+    , persisted_properties(persisted_properties)
+    , computed_properties(computed_properties)
+    , is_asymmetric(is_asymmetric)
     , alias(name_alias)
 {
     for (auto const& prop : persisted_properties) {
@@ -132,6 +155,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     }
     table_key = table->get_key();
     is_embedded = table->is_embedded();
+    is_asymmetric = table->is_asymmetric();
 
     size_t count = table->get_column_count();
     ColKey pk_col = table->get_primary_key_column();
@@ -291,6 +315,16 @@ static void validate_property(Schema const& schema, ObjectSchema const& parent_o
                                 object_name, prop.name, prop.object_type);
         return;
     }
+    if (parent_object_schema.is_asymmetric && !it->is_embedded) {
+        exceptions.emplace_back("Asymmetric table with property '%1.%2' of type '%3' cannot have an object type.",
+                                object_name, prop.name, string_for_property_type(prop.type));
+        return;
+    }
+    if (it->is_asymmetric) {
+        exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be a link to an asymmetric object.",
+                                object_name, prop.name, string_for_property_type(prop.type));
+        return;
+    }
     if (prop.type != PropertyType::LinkingObjects)
         return;
 
@@ -412,12 +446,17 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
                 primary_key, name));
         }
     }
+
+    if (!for_sync && is_asymmetric) {
+        exceptions.emplace_back(util::format("Asymmetric table '%1' not allowed in a local Realm", name));
+    }
 }
 
 namespace realm {
 bool operator==(ObjectSchema const& a, ObjectSchema const& b) noexcept
 {
-    return std::tie(a.name, a.is_embedded, a.primary_key, a.persisted_properties, a.computed_properties) ==
-           std::tie(b.name, b.is_embedded, b.primary_key, b.persisted_properties, b.computed_properties);
+    return std::tie(a.name, a.is_embedded, a.is_asymmetric, a.primary_key, a.persisted_properties,
+                    a.computed_properties) == std::tie(b.name, b.is_embedded, b.is_asymmetric, b.primary_key,
+                                                       b.persisted_properties, b.computed_properties);
 }
 } // namespace realm

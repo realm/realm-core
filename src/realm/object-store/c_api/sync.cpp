@@ -382,7 +382,9 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
         realm_t r1{before_realm};
-        return callback(userdata.get(), &r1);
+        if (!callback(userdata.get(), &r1)) {
+            throw CallbackFailed();
+        }
     };
     config->notify_before_client_reset = std::move(cb);
 }
@@ -396,7 +398,9 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                   SharedRealm before_realm, SharedRealm after_realm, bool did_recover) {
         realm_t r1{before_realm};
         realm_t r2{after_realm};
-        return callback(userdata.get(), &r1, &r2, did_recover);
+        if (!callback(userdata.get(), &r1, &r2, did_recover)) {
+            throw CallbackFailed();
+        }
     };
     config->notify_after_client_reset = std::move(cb);
 }
@@ -789,7 +793,7 @@ RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
-                                                             realm_sync_download_completion_func_t done,
+                                                             realm_sync_wait_for_completion_func_t done,
                                                              realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -808,7 +812,7 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t* session,
-                                                           realm_sync_upload_completion_func_t done,
+                                                           realm_sync_wait_for_completion_func_t done,
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -826,13 +830,14 @@ RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*
     (*session)->wait_for_upload_completion(std::move(cb));
 }
 
-RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session,
-                                                         const realm_sync_error_t* error)
+RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_session_t* session, int error_code,
+                                                         int error_category, const char* error_message, bool is_fatal)
 {
     REALM_ASSERT(session);
-    REALM_ASSERT(error);
-    auto err = sync_error_to_error_code(error->error_code);
-    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error->error_code.message, error->is_fatal});
+    realm_sync_error_code_t sync_error{static_cast<realm_sync_error_category_e>(error_category), error_code,
+                                       error_message};
+    auto err = sync_error_to_error_code(sync_error);
+    SyncSession::OnlyForTesting::handle_error(*session->get(), {err, error_message, is_fatal});
 }
 
 } // namespace realm::c_api

@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -2317,7 +2317,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
             REQUIRE_THROWS_MATCHES(
                 Realm::get_shared_realm(config), std::logic_error,
-                Catch::Message(
+                Catch::Matchers::Message(
                     util::format("Cannot start a sync session for user '%1' because this user has been removed.",
                                  anon_user->identity())));
         }
@@ -2341,7 +2341,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             // should not be able to open a sync'd Realm with an invalid user
             REQUIRE_THROWS_MATCHES(
                 Realm::get_shared_realm(config), std::logic_error,
-                Catch::Message(util::format(
+                Catch::Matchers::Message(util::format(
                     "Cannot start a sync session for user '%1' because this user has been removed.", user_ident)));
 
             std::shared_ptr<SyncUser> new_user_instance = log_in(app, creds);

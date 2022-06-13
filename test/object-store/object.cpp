@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
@@ -34,6 +34,10 @@
 
 #include <realm/group.hpp>
 #include <realm/util/any.hpp>
+
+#if REALM_ENABLE_AUTH_TESTS
+#include "sync/flx_sync_harness.hpp"
+#endif // REALM_ENABLE_AUTH_TESTS
 
 #include <cstdint>
 
@@ -2161,3 +2165,80 @@ TEST_CASE("Embedded Object") {
         REQUIRE(calls == 2);
     }
 }
+
+#if REALM_ENABLE_AUTH_TESTS
+
+TEST_CASE("Asymmetric Object") {
+    Schema schema{
+        {"asymmetric",
+         ObjectSchema::IsAsymmetric{true},
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"location", PropertyType::Int},
+             {"reading", PropertyType::Int},
+         }},
+        {"asymmetric_link",
+         ObjectSchema::IsAsymmetric{true},
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"location", PropertyType::Mixed | PropertyType::Nullable},
+         }},
+        {"table",
+         {
+             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"location", PropertyType::Int},
+             {"reading", PropertyType::Int},
+         }},
+    };
+
+    realm::app::FLXSyncTestHarness harness("asymmetric_sync", {schema});
+    SyncTestFile config(harness.app()->current_user(), schema, SyncConfig::FLXSyncEnabled{});
+
+    auto realm = Realm::get_shared_realm(config);
+    {
+        auto mut_subs = realm->get_latest_subscription_set().make_mutable_copy();
+        mut_subs.insert_or_assign(Query(realm->read_group().get_table("class_table")));
+        std::move(mut_subs).commit();
+    }
+    CppContext ctx(realm);
+
+    auto create = [&](util::Any&& value, std::string table_name, CreatePolicy policy = CreatePolicy::ForceCreate) {
+        realm->begin_transaction();
+        auto obj = Object::create(ctx, realm, *realm->schema().find(table_name), value, policy);
+        realm->commit_transaction();
+        return obj;
+    };
+
+    SECTION("Basic object creation") {
+        auto obj = create(
+            AnyDict{
+                {"_id", INT64_C(1)},
+                {"location", INT64_C(10)},
+                {"reading", INT64_C(20)},
+            },
+            "asymmetric");
+        // Object returned is not valid.
+        REQUIRE(!obj.obj().is_valid());
+        // Object gets deleted immediately.
+        REQUIRE(Results(realm, realm->read_group().get_table("class_table")).size() == 0);
+    }
+
+    SECTION("Outgoing link not allowed") {
+        auto obj = create(
+            AnyDict{
+                {"_id", INT64_C(1)},
+                {"location", INT64_C(10)},
+                {"reading", INT64_C(20)},
+            },
+            "table");
+        auto table = realm->read_group().get_table("class_table");
+        REQUIRE_THROWS(create(
+            AnyDict{
+                {"_id", INT64_C(1)},
+                {"location", Mixed(ObjLink{table->get_key(), obj.obj().get_key()})},
+            },
+            "asymmetric_link"));
+    }
+}
+
+#endif // REALM_ENABLE_AUTH_TESTS

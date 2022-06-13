@@ -119,23 +119,25 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
     TemporarySwapOut<decltype(m_last_object_key)> last_object_key_guard(m_last_object_key);
 
     auto add_table = util::overload{
-        [&](const Instruction::AddTable::PrimaryKeySpec& spec) {
-            if (spec.type == Instruction::Payload::Type::GlobalKey) {
-                log("sync::create_table(group, \"%1\");", table_name);
-                m_transaction.get_or_add_table(table_name);
+        [&](const Instruction::AddTable::TopLevelTable& spec) {
+            auto table_type = (spec.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
+            if (spec.pk_type == Instruction::Payload::Type::GlobalKey) {
+                log("sync::create_table(group, \"%1\", %2);", table_name, table_type);
+                m_transaction.get_or_add_table(table_name, table_type);
             }
             else {
-                if (!is_valid_key_type(spec.type)) {
-                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.type),
+                if (!is_valid_key_type(spec.pk_type)) {
+                    bad_transaction_log("Invalid primary key type '%1' while adding table '%2'", int8_t(spec.pk_type),
                                         table_name);
                 }
-                DataType pk_type = get_data_type(spec.type);
-                StringData pk_field = get_string(spec.field);
-                bool nullable = spec.nullable;
+                DataType pk_type = get_data_type(spec.pk_type);
+                StringData pk_field = get_string(spec.pk_field);
+                bool nullable = spec.pk_nullable;
 
-                log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4);", table_name, pk_type,
-                    pk_field, nullable);
-                if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable)) {
+                log("group.get_or_add_table_with_primary_key(group, \"%1\", %2, \"%3\", %4, %5);", table_name,
+                    pk_type, pk_field, nullable, table_type);
+                if (!m_transaction.get_or_add_table_with_primary_key(table_name, pk_type, pk_field, nullable,
+                                                                     table_type)) {
                     bad_transaction_log("AddTable: The existing table '%1' has different properties", table_name);
                 }
             }
@@ -148,7 +150,7 @@ void InstructionApplier::operator()(const Instruction::AddTable& instr)
             }
             else {
                 log("group.add_embedded_table(\"%1\");", table_name);
-                m_transaction.add_embedded_table(table_name);
+                m_transaction.add_table(table_name, Table::Type::Embedded);
             }
         },
     };

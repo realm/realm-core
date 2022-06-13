@@ -24,23 +24,18 @@
 
 namespace realm::_impl {
 
-void CopyReplication::add_class(TableKey, StringData name, bool is_embedded)
+void CopyReplication::add_class(TableKey, StringData name, Table::Type table_type)
 {
     if (auto existing_table = m_tr->get_table(name)) {
-        if (existing_table->is_embedded() != is_embedded)
+        if (existing_table->get_table_type() != table_type)
             throw LogicError(ErrorCodes::TypeMismatch, util::format("Incompatible class: %1", name));
         return;
     }
-    if (is_embedded) {
-        m_tr->add_embedded_table(name);
-    }
-    else {
-        m_tr->add_table(name);
-    }
+    m_tr->add_table(name, table_type);
 }
 
 void CopyReplication::add_class_with_primary_key(TableKey, StringData name, DataType type, StringData pk_name,
-                                                 bool nullable)
+                                                 bool nullable, Table::Type table_type)
 {
     if (auto existing_table = m_tr->get_table(name)) {
         auto pk_col = existing_table->get_primary_key_column();
@@ -48,7 +43,7 @@ void CopyReplication::add_class_with_primary_key(TableKey, StringData name, Data
             throw LogicError(ErrorCodes::TypeMismatch, util::format("Incompatible class: %1", name));
         return;
     }
-    m_tr->add_table_with_primary_key(name, type, pk_name, nullable);
+    m_tr->add_table_with_primary_key(name, type, pk_name, nullable, table_type);
 }
 
 void CopyReplication::insert_column(const Table* t, ColKey col_key, DataType type, StringData name, Table* dest)

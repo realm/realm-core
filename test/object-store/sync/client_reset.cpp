@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "collection_fixtures.hpp"
 #include "sync/sync_test_utils.hpp"
@@ -102,54 +102,37 @@ TableRef get_table(Realm& realm, StringData object_type)
 
 #if REALM_ENABLE_AUTH_TESTS
 
-namespace {
-struct PartitionPair {
-    std::string property_name;
-    std::string value;
-};
-
-Obj create_object(Realm& realm, StringData object_type, PartitionPair partition,
-                  util::Optional<int64_t> primary_key = util::none)
-{
-    auto table = get_table(realm, object_type);
-    REQUIRE(table);
-    static int64_t pk = 1; // TestClientReset creates an object with pk 0 so start with something else
-    FieldValues values = {{table->get_column_key(partition.property_name), partition.value}};
-    return table->create_object_with_primary_key(primary_key ? *primary_key : pk++, std::move(values));
-}
-
-} // anonymous namespace
-
 namespace cf = realm::collection_fixtures;
+using reset_utils::create_object;
 
 TEST_CASE("sync: client reset", "[client reset]") {
     if (!util::EventLoop::has_implementation())
         return;
 
-    const PartitionPair partition{"realm_id", "foo"};
+    const reset_utils::Partition partition{"realm_id", random_string(20)};
     Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
     Schema schema{
         {"object",
          {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
              partition_prop,
          }},
         {"link target",
          {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
              partition_prop,
          }},
         {"pk link target",
          {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
              partition_prop,
          }},
         {"link origin",
          {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
              {"link", PropertyType::Object | PropertyType::Nullable, "link target"},
              {"pk link", PropertyType::Object | PropertyType::Nullable, "pk link target"},
              {"list", PropertyType::Object | PropertyType::Array, "link target"},
@@ -314,12 +297,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->run();
         }
         SECTION("modify a deleted object") {
-            constexpr int64_t pk = -1;
+            ObjectId pk = ObjectId::gen();
             test_reset
                 ->setup([&](SharedRealm realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
-                    auto obj = create_object(*realm, "object", partition, {pk});
+                    auto obj = create_object(*realm, "object", {pk}, partition);
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, 100);
                 })
@@ -374,8 +357,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
-                    int64_t different_pk = table->begin()->get_primary_key().get_int() + 1;
-                    auto obj = create_object(*realm, "object", partition, {different_pk});
+                    ObjectId different_pk = ObjectId::gen();
+                    auto obj = create_object(*realm, "object", {different_pk}, partition);
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
                 })
@@ -435,12 +418,15 @@ TEST_CASE("sync: client reset", "[client reset]") {
             const std::string existing_table_name = "preexisting table name";
             const std::string locally_added_table_name = "locally added table";
             const std::string remotely_added_table_name = "remotely added table";
-            const Property pk_id = {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}};
+            const Property pk_id = {"_id", PropertyType::ObjectId | PropertyType::Nullable,
+                                    Property::IsPrimary{true}};
             const Property shared_added_property = {"added identical property",
                                                     PropertyType::UUID | PropertyType::Nullable};
             const Property locally_added_property = {"locally added property", PropertyType::ObjectId};
             const Property remotely_added_property = {"remotely added property",
                                                       PropertyType::Float | PropertyType::Nullable};
+            ObjectId pk1 = ObjectId::gen();
+            ObjectId pk2 = ObjectId::gen();
             auto verify_changes = [&](SharedRealm realm) {
                 REQUIRE_NOTHROW(advance_and_notify(*realm));
                 std::vector<std::string> tables_to_check = {existing_table_name, new_table_name,
@@ -454,8 +440,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE(table->get_column_key(remotely_added_property.name));
                     auto sorted_results = table->get_sorted_view(table->get_column_key(pk_id.name));
                     REQUIRE(sorted_results.size() == 2);
-                    REQUIRE(sorted_results.get_object(0).get_primary_key().get_int() == 1);
-                    REQUIRE(sorted_results.get_object(1).get_primary_key().get_int() == 2);
+                    REQUIRE(sorted_results.get_object(0).get_primary_key().get_object_id() == pk1);
+                    REQUIRE(sorted_results.get_object(1).get_primary_key().get_object_id() == pk2);
                 }
             };
             make_reset(local_config, remote_config)
@@ -498,10 +484,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         },
                         0, nullptr, nullptr, true);
 
-                    create_object(*local, new_table_name, partition, {1});
-                    create_object(*local, existing_table_name, partition, {1});
-                    create_object(*local, locally_added_table_name, partition, {1});
-                    create_object(*local, locally_added_table_name, partition, {2});
+                    create_object(*local, new_table_name, {pk1}, partition);
+                    create_object(*local, existing_table_name, {pk1}, partition);
+                    create_object(*local, locally_added_table_name, {pk1}, partition);
+                    create_object(*local, locally_added_table_name, {pk2}, partition);
                 })
                 ->make_remote_changes([&](SharedRealm remote) {
                     remote->update_schema(
@@ -531,10 +517,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         },
                         0, nullptr, nullptr, true);
 
-                    create_object(*remote, new_table_name, partition, {2});
-                    create_object(*remote, existing_table_name, partition, {2});
-                    create_object(*remote, remotely_added_table_name, partition, {1});
-                    create_object(*remote, remotely_added_table_name, partition, {2});
+                    create_object(*remote, new_table_name, {pk2}, partition);
+                    create_object(*remote, existing_table_name, {pk2}, partition);
+                    create_object(*remote, remotely_added_table_name, {pk1}, partition);
+                    create_object(*remote, remotely_added_table_name, {pk2}, partition);
                 })
                 ->on_post_reset([&](SharedRealm local) {
                     verify_changes(local);
@@ -549,7 +535,8 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("incompatible property changes are rejected") {
-            const Property pk_id = {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}};
+            const Property pk_id = {"_id", PropertyType::ObjectId | PropertyType::Nullable,
+                                    Property::IsPrimary{true}};
             const std::string table_name = "new table";
             const std::string prop_name = "new_property";
             ThreadSafeSyncError err;
@@ -631,7 +618,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 // keep the Realm to reset (config) the same, but change out the remote (config2)
                 // to a new path because otherwise it will be reset as well which we don't want
                 SyncTestFile config3 = get_valid_config();
+                ObjectId to_continue_reset = test_reset->get_pk_of_object_driving_reset();
                 test_reset = make_reset(local_config, config3);
+                test_reset->set_pk_of_object_driving_reset(to_continue_reset);
                 test_reset
                     ->setup([&](SharedRealm realm) {
                         // after a reset we already start with a value of 6
@@ -840,9 +829,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     auto table = get_table(*remote, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
-                    int64_t different_pk = table->begin()->get_primary_key().get_int() + 1;
+                    ObjectId different_pk = ObjectId::gen();
                     table->clear();
-                    auto obj = create_object(*remote, "object", partition, {different_pk});
+                    auto obj = create_object(*remote, "object", {different_pk}, partition);
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
                 })
@@ -876,7 +865,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE(table->size() == 1);
                     Mixed orig_pk = table->begin()->get_primary_key();
                     table->clear();
-                    auto obj = create_object(*remote, "object", partition, {orig_pk.get_int()});
+                    auto obj = create_object(*remote, "object", {orig_pk.get_object_id()}, partition);
                     REQUIRE(obj.get_primary_key() == orig_pk);
                     auto col = obj.get_table()->get_column_key("value");
                     obj.set(col, new_value);
@@ -910,7 +899,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
-                    auto obj = create_object(*local, "object", partition);
+                    auto obj = create_object(*local, "object", util::none, partition);
                     auto col = obj.get_table()->get_column_key("value");
                     REQUIRE(table->size() == 2);
                     obj.set(col, new_value);
@@ -973,13 +962,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         {
                             {"object2",
                              {
-                                 {"_id", PropertyType::Int | PropertyType::Nullable, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId | PropertyType::Nullable, Property::IsPrimary{true}},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                         },
                         0, nullptr, nullptr, true);
-                    create_object(*local, "object2", partition, {1});
-                    create_object(*local, "object2", partition, {2});
+                    create_object(*local, "object2", ObjectId::gen(), partition);
+                    create_object(*local, "object2", ObjectId::gen(), partition);
                 })
                 ->on_post_reset([&](SharedRealm realm) {
                     util::EventLoop::main().run_until([&] {
@@ -1005,7 +994,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         {
                             {"object",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"value2", PropertyType::Int},
                                  {"array", PropertyType::Int | PropertyType::Array},
                                  {"link", PropertyType::Object | PropertyType::Nullable, "object"},
@@ -1037,13 +1026,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         {
                             {"object",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"value2", PropertyType::Int},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                             {"object2",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"link", PropertyType::Object | PropertyType::Nullable, "object"},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
@@ -1055,13 +1044,13 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         {
                             {"object",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"value2", PropertyType::Int},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
                             {"object2",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"link", PropertyType::Object | PropertyType::Nullable, "object"},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
@@ -1088,7 +1077,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         {
                             {"object",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"value2", PropertyType::Float},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
@@ -1100,7 +1089,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                         {
                             {"object",
                              {
-                                 {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                  {"value2", PropertyType::Int},
                                  {"realm_id", PropertyType::String | PropertyType::Nullable},
                              }},
@@ -1161,10 +1150,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
         SECTION("list operations") {
             ObjKey k0, k1, k2;
             test_reset->setup([&](SharedRealm realm) {
-                k0 = create_object(*realm, "link target", partition).set("value", 1).get_key();
-                k1 = create_object(*realm, "link target", partition).set("value", 2).get_key();
-                k2 = create_object(*realm, "link target", partition).set("value", 3).get_key();
-                Obj o = create_object(*realm, "link origin", partition);
+                k0 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
+                k1 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2).get_key();
+                k2 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 3).get_key();
+                Obj o = create_object(*realm, "link origin", ObjectId::gen(), partition);
                 auto list = o.get_linklist(o.get_table()->get_column_key("list"));
                 list.add(k0);
                 list.add(k1);
@@ -1226,20 +1215,24 @@ TEST_CASE("sync: client reset", "[client reset]") {
         }
 
         SECTION("conflicting primary key creations") {
+            ObjectId id1 = ObjectId::gen();
+            ObjectId id2 = ObjectId::gen();
+            ObjectId id3 = ObjectId::gen();
+            ObjectId id4 = ObjectId::gen();
             test_reset
                 ->make_local_changes([&](SharedRealm local) {
                     auto table = get_table(*local, "object");
                     table->clear();
-                    create_object(*local, "object", partition, {1}).set("value", 4);
-                    create_object(*local, "object", partition, {2}).set("value", 5);
-                    create_object(*local, "object", partition, {3}).set("value", 6);
+                    create_object(*local, "object", {id1}, partition).set("value", 4);
+                    create_object(*local, "object", {id2}, partition).set("value", 5);
+                    create_object(*local, "object", {id3}, partition).set("value", 6);
                 })
                 ->make_remote_changes([&](SharedRealm remote) {
                     auto table = get_table(*remote, "object");
                     table->clear();
-                    create_object(*remote, "object", partition, {1}).set("value", 4);
-                    create_object(*remote, "object", partition, {2}).set("value", 7);
-                    create_object(*remote, "object", partition, {5}).set("value", 8);
+                    create_object(*remote, "object", {id1}, partition).set("value", 4);
+                    create_object(*remote, "object", {id2}, partition).set("value", 7);
+                    create_object(*remote, "object", {id4}, partition).set("value", 8);
                 })
                 ->on_post_local_changes([&](SharedRealm realm) {
                     setup_listeners(realm);
@@ -1251,11 +1244,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     REQUIRE_NOTHROW(advance_and_notify(*realm));
                     CHECK(results.size() == 3);
                     // here we rely on results being sorted by "value"
-                    CHECK(results.get<Obj>(0).get<Int>("_id") == 1);
+                    CHECK(results.get<Obj>(0).get<ObjectId>("_id") == id1);
                     CHECK(results.get<Obj>(0).get<Int>("value") == 4);
-                    CHECK(results.get<Obj>(1).get<Int>("_id") == 2);
+                    CHECK(results.get<Obj>(1).get<ObjectId>("_id") == id2);
                     CHECK(results.get<Obj>(1).get<Int>("value") == 7);
-                    CHECK(results.get<Obj>(2).get<Int>("_id") == 5);
+                    CHECK(results.get<Obj>(2).get<ObjectId>("_id") == id4);
                     CHECK(results.get<Obj>(2).get<Int>("value") == 8);
                     CHECK(object.is_valid());
                     REQUIRE_INDICES(results_changes.modifications, 1);
@@ -1282,11 +1275,12 @@ TEST_CASE("sync: client reset", "[client reset]") {
         SECTION("link to remotely deleted object") {
             test_reset
                 ->setup([&](SharedRealm realm) {
-                    auto k0 = create_object(*realm, "link target", partition).set("value", 1).get_key();
-                    create_object(*realm, "link target", partition).set("value", 2);
-                    create_object(*realm, "link target", partition).set("value", 3);
+                    auto k0 =
+                        create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
+                    create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2);
+                    create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 3);
 
-                    Obj o = create_object(*realm, "link origin", partition);
+                    Obj o = create_object(*realm, "link origin", ObjectId::gen(), partition);
                     o.set("link", k0);
                 })
                 ->make_local_changes([&](SharedRealm local) {
@@ -1320,10 +1314,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
             ObjKey k0, k1, k2;
             test_reset
                 ->setup([&](SharedRealm realm) {
-                    k0 = create_object(*realm, "link target", partition).set("value", 1).get_key();
-                    k1 = create_object(*realm, "link target", partition).set("value", 2).get_key();
-                    k2 = create_object(*realm, "link target", partition).set("value", 3).get_key();
-                    Obj o = create_object(*realm, "link origin", partition);
+                    k0 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 1).get_key();
+                    k1 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 2).get_key();
+                    k2 = create_object(*realm, "link target", ObjectId::gen(), partition).set("value", 3).get_key();
+                    Obj o = create_object(*realm, "link origin", ObjectId::gen(), partition);
                     o.get_linklist("list").add(k0);
                 })
                 ->make_local_changes([&](SharedRealm local) {
@@ -1435,7 +1429,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
             });
             REQUIRE(err.value()->is_client_reset_requested());
         }
-        const int64_t added_pk = 12345;
+        const ObjectId added_pk = ObjectId::gen();
         auto has_added_object = [&](SharedRealm realm) -> bool {
             REQUIRE_NOTHROW(realm->refresh());
             auto table = get_table(*realm, "object");
@@ -1459,7 +1453,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->make_local_changes([&](SharedRealm realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
-                    create_object(*realm, "object", partition, {added_pk});
+                    create_object(*realm, "object", {added_pk}, partition);
                 })
                 ->run();
             timed_sleeping_wait_for(
@@ -1485,7 +1479,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 ->make_local_changes([&](SharedRealm realm) {
                     auto table = get_table(*realm, "object");
                     REQUIRE(table);
-                    create_object(*realm, "object", partition, {added_pk});
+                    create_object(*realm, "object", {added_pk}, partition);
                 })
                 ->run();
             timed_sleeping_wait_for(
@@ -1536,7 +1530,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     auto table = get_table(*local, "object");
                     REQUIRE(table);
                     REQUIRE(table->size() == 1);
-                    auto obj = create_object(*local, "object", partition);
+                    auto obj = create_object(*local, "object", ObjectId::gen(), partition);
                     auto col = obj.get_table()->get_column_key("value");
                     REQUIRE(table->size() == 2);
                     obj.set(col, new_value);
@@ -1584,7 +1578,7 @@ TEMPLATE_TEST_CASE("client reset types", "[client reset][local]", cf::MixedVal, 
     config.schema = Schema{
         {"object",
          {
-             {"_id", PropertyType::Int, Property::IsPrimary{true}},
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
          }},
         {"test type",
@@ -2222,7 +2216,7 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
          }},
         {"object",
          {
-             {valid_pk_name, PropertyType::Int, Property::IsPrimary{true}},
+             {valid_pk_name, PropertyType::ObjectId, Property::IsPrimary{true}},
              {"value", PropertyType::Int},
              {"realm_id", PropertyType::String | PropertyType::Nullable},
          }},
@@ -2637,7 +2631,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
 
     ObjectSchema shared_class = {"object",
                                  {
-                                     {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                                      {"value", PropertyType::Int},
                                  }};
 

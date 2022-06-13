@@ -356,6 +356,14 @@ ColKey Table::add_column(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric() && !target.is_embedded()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
 
     m_has_any_embedded_objects.reset();
 
@@ -396,6 +404,14 @@ ColKey Table::add_column_list(Table& target, StringData name)
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw LogicError(LogicError::wrong_kind_of_table);
+    }
 
     m_has_any_embedded_objects.reset();
 
@@ -415,6 +431,14 @@ ColKey Table::add_column_set(Table& target, StringData name)
     REALM_ASSERT_RELEASE(origin_group == target_group);
     if (target.is_embedded())
         throw IllegalOperation("Set of embedded objects not supported");
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw IllegalOperation("Set of objects not supported in asymmetric table");
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw IllegalOperation("Set of objects in asymmetric table not supported");
+    }
 
     ColumnAttrMask attr;
     attr.set(col_attr_Set);
@@ -453,6 +477,14 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     Group* target_group = target.get_parent_group();
     REALM_ASSERT_RELEASE(origin_group && target_group);
     REALM_ASSERT_RELEASE(origin_group == target_group);
+    // Outgoing links from an asymmetric table are not allowed.
+    if (is_asymmetric()) {
+        throw IllegalOperation("Dictionary of objects not supported in asymmetric table");
+    }
+    // Incoming links from an asymmetric table are not allowed.
+    if (target.is_asymmetric()) {
+        throw IllegalOperation("Dictionary of objects in asymmetric table not supported");
+    }
 
     ColumnAttrMask attr;
     attr.set(col_attr_Dictionary);
@@ -616,11 +648,11 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
 
     if (m_top.size() <= top_position_for_flags) {
-        m_is_embedded = false;
+        m_table_type = Type::TopLevel;
     }
     else {
         uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-        m_is_embedded = flags & 0x1;
+        m_table_type = Type(flags & table_type_mask);
     }
     m_has_any_embedded_objects.reset();
 
@@ -1025,12 +1057,22 @@ Query Table::where(const DictionaryLinkValues& dictionary_of_links) const
     return Query(m_own_ref, dictionary_of_links);
 }
 
-void Table::set_embedded(bool embedded)
+void Table::set_table_type(Type table_type)
 {
-    if (embedded == m_is_embedded) {
+    if (table_type == m_table_type) {
         return;
     }
 
+    if (m_table_type == Type::TopLevelAsymmetric || table_type == Type::TopLevelAsymmetric) {
+        throw std::logic_error(util::format("Cannot change '%1' to/from asymmetric.", get_name()));
+    }
+
+    REALM_ASSERT_EX(table_type == Type::TopLevel || table_type == Type::Embedded, table_type);
+    set_embedded(table_type == Type::Embedded);
+}
+
+void Table::set_embedded(bool embedded)
+{
     if (Replication* repl = get_repl()) {
         if (repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
             throw IllegalOperation(util::format("Cannot change '%1' to embedded when using Sync.", get_name()));
@@ -1038,7 +1080,7 @@ void Table::set_embedded(bool embedded)
     }
 
     if (embedded == false) {
-        do_set_embedded(false);
+        do_set_table_type(Type::TopLevel);
         return;
     }
 
@@ -1073,23 +1115,21 @@ void Table::set_embedded(bool embedded)
         }
     }
 
-    do_set_embedded(embedded);
+    do_set_table_type(Type::Embedded);
 }
 
-void Table::do_set_embedded(bool embedded)
+void Table::do_set_table_type(Type table_type)
 {
     while (m_top.size() <= top_position_for_flags)
         m_top.add(0);
 
     uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-    if (embedded) {
-        flags |= 1;
-    }
-    else {
-        flags &= ~1;
-    }
+    // reset bits 0-1
+    flags &= ~table_type_mask;
+    // set table type
+    flags |= static_cast<uint8_t>(table_type);
     m_top.set(top_position_for_flags, RefOrTagged::make_tagged(flags));
-    m_is_embedded = embedded;
+    m_table_type = table_type;
 }
 
 
@@ -2586,10 +2626,10 @@ void Table::update_from_parent() noexcept
         m_opposite_column.update_from_parent();
         if (m_top.size() > top_position_for_flags) {
             uint64_t flags = m_top.get_as_ref_or_tagged(top_position_for_flags).get_as_int();
-            m_is_embedded = flags & 0x1;
+            m_table_type = Type(flags & table_type_mask);
         }
         else {
-            m_is_embedded = false;
+            m_table_type = Type::TopLevel;
         }
         if (m_tombstones)
             m_tombstones->update_from_parent();
@@ -2613,6 +2653,9 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
     }
     if (is_embedded()) {
         out << ",\"isEmbedded\":true";
+    }
+    if (is_asymmetric()) {
+        out << ",\"isAsymmetric\":true";
     }
     out << ",\"properties\":[";
     auto col_keys = get_column_keys();
@@ -2774,10 +2817,10 @@ void Table::refresh_accessor_tree()
     m_primary_key_col = rot_pk_key.is_tagged() ? ColKey(rot_pk_key.get_as_int()) : ColKey();
     if (m_top.size() > top_position_for_flags) {
         auto rot_flags = m_top.get_as_ref_or_tagged(top_position_for_flags);
-        m_is_embedded = rot_flags.get_as_int() & 0x1;
+        m_table_type = Type(rot_flags.get_as_int() & table_type_mask);
     }
     else {
-        m_is_embedded = false;
+        m_table_type = Type::TopLevel;
     }
     if (m_top.size() > top_position_for_tombstones && m_top.get_as_ref(top_position_for_tombstones)) {
         // Tombstones exists
@@ -2863,7 +2906,7 @@ MemStats Table::stats() const
 
 Obj Table::create_object(ObjKey key, const FieldValues& values)
 {
-    if (m_is_embedded)
+    if (is_embedded())
         throw IllegalOperation(util::format("Explicit creation of embedded object not allowed in: %1", get_name()));
     if (m_primary_key_col)
         throw IllegalOperation(util::format("Table has primary key: %1", get_name()));
@@ -2883,14 +2926,14 @@ Obj Table::create_object(ObjKey key, const FieldValues& values)
 
     REALM_ASSERT(key.value >= 0);
 
-    Obj obj = m_clusters.insert(key, values);
+    Obj obj = m_clusters.insert(key, values); // repl->set()
 
     return obj;
 }
 
 Obj Table::create_linked_object()
 {
-    REALM_ASSERT(m_is_embedded);
+    REALM_ASSERT(is_embedded());
 
     GlobalKey object_id = allocate_object_id_squeezed();
     ObjKey key = object_id.get_local_key(get_sync_file_id());
@@ -2904,7 +2947,7 @@ Obj Table::create_linked_object()
 
 Obj Table::create_object(GlobalKey object_id, const FieldValues& values)
 {
-    if (m_is_embedded)
+    if (is_embedded())
         throw IllegalOperation(util::format("Explicit creation of embedded object not allowed in: %1", get_name()));
     if (m_primary_key_col)
         throw IllegalOperation(util::format("Table has primary key: %1", get_name()));
@@ -2939,7 +2982,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
                                           bool* did_create)
 {
     auto primary_key_col = get_primary_key_column();
-    if (m_is_embedded || !primary_key_col)
+    if (is_embedded() || !primary_key_col)
         throw InvalidArgument(ErrorCodes::UnexpectedPrimaryKey,
                               util::format("Table has no primary key: %1", get_name()));
 
@@ -2997,7 +3040,8 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
 
     ObjKey key = get_next_valid_key();
 
-    if (auto repl = get_repl()) {
+    auto repl = get_repl();
+    if (repl) {
         repl->create_object_with_primary_key(this, key, primary_key);
     }
     if (did_create) {
@@ -3016,6 +3060,9 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
             CascadeState state(CascadeState::Mode::None);
             m_tombstones->erase(unres_key, state);
         }
+    }
+    if (is_asymmetric() && repl && repl->get_history_type() == Replication::HistoryType::hist_SyncClient) {
+        get_parent_group()->m_objects_to_delete.emplace_back(this->m_key, ret.get_key());
     }
     return ret;
 }
@@ -3365,7 +3412,7 @@ void Table::remove_object(ObjKey key)
 
 ObjKey Table::invalidate_object(ObjKey key)
 {
-    if (m_is_embedded)
+    if (is_embedded())
         throw IllegalOperation("Deletion of embedded object not allowed");
     REALM_ASSERT(!key.is_unresolved());
 

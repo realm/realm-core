@@ -2,14 +2,16 @@
 
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
-* None.
+* Changed the signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). Previously, the method returned void. (PR [#5546](https://github.com/realm/realm-core/pull/5546))
 
 ### Fixed
-* Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`.(Issue [#5522])(https://github.com/realm/realm-core/issues/5522).
+* Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)
+* Fix a data race when opening a flexible sync Realm (since v12.1.0).
+* Asymmetric sync now works with embedded objects. (Issue [#5565](https://github.com/realm/realm-core/issues/5565), since 12.1.0)
 * The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
-
  
 ### Breaking changes
+* `realm_sync_before_client_reset_func_t` and `realm_sync_after_client_reset_func_t` in the C API now return a boolean value to indicate whether the callback succeeded or not, which signals to the sync client that a fatal error occurred. (PR [#5564](https://github.com/realm/realm-core/pull/5564))
 * All exceptions thrown out of Core are now of type 'Exception'. All use of std::runtime_error and std::logical_error etc. has stopped and the specialized error classes that beforehand were based on these are now based on Exception.
 
 ### Compatibility
@@ -18,7 +20,34 @@
 -----------
 
 ### Internals
-* None.
+* Upgraded to Catch from v2.13.8 to v3.0.1. ([#5559](https://github.com/realm/realm-core/pull/5559))
+
+----------------------------------------------
+
+# 12.1.0 Release notes
+
+### Enhancements
+* The sync client will gracefully handle compensating write error messages from the server and pass detailed info to the SDK's sync error handler about which objects caused the compensating write to occur. ([#5528](https://github.com/realm/realm-core/pull/5528))
+* Support for asymmetric sync. Tables can be marked as Asymmetric when opening the realm. Upon creation, asymmetric objects are sync'd unidirectionally. ([#5505](https://github.com/realm/realm-core/pull/5505))
+* Creating an object for a class that has no subscriptions opened for it will now throw a `NoSubscriptionForWrite` exception ([#5488](https://github.com/realm/realm-core/pull/5488)).
+
+### Fixed
+* Added better comparator for `realm_user_t` and `realm_flx_sync_subscription_t` when using `realm_equals`. (Issue [#5522](https://github.com/realm/realm-core/issues/5522)).
+* Changed `realm_sync_session_handle_error_for_testing` in order to support all SDKs. (Issue [#5550](https://github.com/realm/realm-core/issues/5550)).
+* FLX sync subscription state changes will now correctly be reported after sync progress is reported ([#5553](https://github.com/realm/realm-core/pull/5553), since v12.0.0)
+
+### Breaking changes
+* Removed scheduler argument to the C API `realm_*_add_notification_callback` functions, because it wasn't actually used. (PR [#5541](https://github.com/realm/realm-core/pull/5541)).
+* Merged the `realm_sync_upload_completion_func_t` and the `realm_sync_download_completion_func_t` typedefs in the C API because they were identical. The new typedef is `realm_sync_wait_for_completion_func_t`. (PR [#5548](https://github.com/realm/realm-core/pull/5548))
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* The release package for Apple platforms is now built with Xcode 13 and the SPM package requires Xcode 13. ([5538](https://github.com/realm/realm-core/pull/5538))
+* The sync protocol is now version 6.
 
 ----------------------------------------------
 

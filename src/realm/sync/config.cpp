@@ -32,9 +32,11 @@ static_assert(std::is_same_v<sync::port_type, util::network::Endpoint::port_type
 using ProtocolError = realm::sync::ProtocolError;
 
 SyncError::SyncError(std::error_code error_code, std::string msg, bool is_fatal,
-                     util::Optional<std::string> serverLog)
+                     util::Optional<std::string> serverLog,
+                     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes)
     : SystemError(std::move(error_code), std::move(msg))
     , is_fatal(is_fatal)
+    , compensating_writes_info(std::move(compensating_writes))
 {
     if (serverLog) {
         size_t msg_length = message.size();
@@ -171,6 +173,8 @@ SimplifiedProtocolError get_simplified_error(sync::ProtocolError err)
         case ProtocolError::server_permissions_changed:
         case ProtocolError::write_not_allowed:
             return SimplifiedProtocolError::ClientResetRequested;
+        case ProtocolError::compensating_write:
+            return SimplifiedProtocolError::CompensatingWrite;
     }
     return SimplifiedProtocolError::UnexpectedInternalIssue; // always return a value to appease MSVC.
 }

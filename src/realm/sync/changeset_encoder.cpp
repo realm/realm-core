@@ -6,13 +6,26 @@ using namespace realm::sync;
 
 void ChangesetEncoder::operator()(const Instruction::AddTable& instr)
 {
-    auto spec = mpark::get_if<Instruction::AddTable::PrimaryKeySpec>(&instr.type);
+    auto spec = mpark::get_if<Instruction::AddTable::TopLevelTable>(&instr.type);
     const bool is_embedded = (spec == nullptr);
-    append(Instruction::Type::AddTable, instr.table, is_embedded);
+    Table::Type table_type;
     if (!is_embedded) {
-        append_value(spec->field);
-        append_value(spec->type);
-        append_value(spec->nullable);
+        if (spec->is_asymmetric) {
+            table_type = Table::Type::TopLevelAsymmetric;
+        }
+        else {
+            table_type = Table::Type::TopLevel;
+        }
+    }
+    else {
+        table_type = Table::Type::Embedded;
+    }
+    auto table_type_int = static_cast<uint8_t>(table_type);
+    append(Instruction::Type::AddTable, instr.table, table_type_int);
+    if (!is_embedded) {
+        append_value(spec->pk_field);
+        append_value(spec->pk_type);
+        append_value(spec->pk_nullable);
     }
 }
 

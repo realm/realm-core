@@ -16,7 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
@@ -259,15 +260,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             Schema{{"object",
                     {{"value", PropertyType::Int}},
                     {{"invalid backlink", PropertyType::LinkingObjects | PropertyType::Array, "object", "value"}}}};
-        REQUIRE_THROWS_WITH(Realm::get_shared_realm(config),
-                            Catch::Matchers::Contains("origin of linking objects property"));
+        REQUIRE_THROWS_CONTAINING(Realm::get_shared_realm(config), "origin of linking objects property");
     }
 
     SECTION("should apply the schema if one is supplied") {
         Realm::get_shared_realm(config);
 
         {
-            Group g(config.path);
+            Group g(config.path, config.encryption_key.data());
             auto table = ObjectStore::table_for_object_type(g, "object");
             REQUIRE(table);
             REQUIRE(table->get_column_count() == 1);
@@ -841,7 +841,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        auto db = DB::create(sync::make_client_replication(), config.path);
+        DBOptions options;
+        options.encryption_key = config.encryption_key.data();
+        auto db = DB::create(sync::make_client_replication(), config.path, options);
         auto write = db->start_write(); // block sync from writing until we cancel
 
         std::shared_ptr<AsyncOpenTask> task = Realm::get_synchronized_realm(config);
@@ -1109,11 +1111,13 @@ TEST_CASE("SharedRealm: async writes") {
         SECTION(close_function_names[i]) {
             bool persisted = false;
             SECTION("before write lock is acquired") {
+                DBOptions options;
+                options.encryption_key = config.encryption_key.data();
                 // Acquire the write lock with a different DB instance so that we'll
                 // be stuck in the Requesting stage
                 realm::test_util::BowlOfStonesSemaphore sema;
                 JoiningThread thread([&] {
-                    auto db = DB::create(make_in_realm_history(), config.path);
+                    auto db = DB::create(make_in_realm_history(), config.path, options);
                     auto write = db->start_write();
                     sema.add_stone();
 
@@ -1140,7 +1144,7 @@ TEST_CASE("SharedRealm: async writes") {
 
                 {
                     // Verify that we released the write lock
-                    auto db = DB::create(make_in_realm_history(), config.path);
+                    auto db = DB::create(make_in_realm_history(), config.path, options);
                     REQUIRE(db->start_write(/* nonblocking */ true));
                 }
 
@@ -1756,7 +1760,8 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i] {
                 // The top ref in the Realm file should only be updated once every 20 commits
-                CHECK(Group(config.path).get_table("class_object")->size() == (i / 20) * 20);
+                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
+                      (i / 20) * 20);
 
                 table->create_object();
                 realm->async_commit_transaction(
@@ -1776,7 +1781,8 @@ TEST_CASE("SharedRealm: async writes") {
         for (size_t i = 0; i < 41; ++i) {
             realm->async_begin_transaction([&, i] {
                 // The top ref in the Realm file should only be updated once every 6 commits
-                CHECK(Group(config.path).get_table("class_object")->size() == (i / 6) * 6);
+                CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
+                      (i / 6) * 6);
 
                 table->create_object();
                 realm->async_commit_transaction(
@@ -2295,24 +2301,22 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
         SECTION("removing a property") {
             table.remove_column(table.get_column_key("value"));
             wt.commit();
-            REQUIRE_THROWS_WITH(r->refresh(), Catch::Matchers::Contains("Property 'object.value' has been removed."));
+            REQUIRE_THROWS_CONTAINING(r->refresh(), "Property 'object.value' has been removed.");
         }
 
         SECTION("change property type") {
             table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Float, "value 2");
             wt.commit();
-            REQUIRE_THROWS_WITH(
-                r->refresh(),
-                Catch::Matchers::Contains("Property 'object.value 2' has been changed from 'int' to 'float'"));
+            REQUIRE_THROWS_CONTAINING(r->refresh(),
+                                      "Property 'object.value 2' has been changed from 'int' to 'float'");
         }
 
         SECTION("make property optional") {
             table.remove_column(table.get_column_key("value 2"));
             table.add_column(type_Int, "value 2", true);
             wt.commit();
-            REQUIRE_THROWS_WITH(r->refresh(),
-                                Catch::Matchers::Contains("Property 'object.value 2' has been made optional"));
+            REQUIRE_THROWS_CONTAINING(r->refresh(), "Property 'object.value 2' has been made optional");
         }
 
         SECTION("recreate column with no changes") {

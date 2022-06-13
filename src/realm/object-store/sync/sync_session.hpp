@@ -236,7 +236,7 @@ public:
         return m_server_url;
     }
 
-    sync::SubscriptionStore* get_flx_subscription_store();
+    const std::shared_ptr<sync::SubscriptionStore>& get_flx_subscription_store();
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.

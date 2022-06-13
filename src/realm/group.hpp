@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <chrono>
 
 #include <realm/alloc_slab.hpp>
 #include <realm/exceptions.hpp>
@@ -286,8 +287,11 @@ public:
     bool table_is_public(TableKey key) const;
     static StringData table_name_to_class_name(StringData table_name)
     {
-        return table_name.begins_with(g_class_name_prefix) ? table_name.substr(g_class_name_prefix_len) : table_name;
+        return table_name.begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len))
+                   ? table_name.substr(g_class_name_prefix_len)
+                   : table_name;
     }
+
     using TableNameBuffer = std::array<char, max_table_name_length>;
     static StringData class_name_to_table_name(StringData class_name, TableNameBuffer& buffer)
     {
@@ -307,12 +311,13 @@ public:
     TableRef get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
 
-    TableRef add_table(StringData name);
-    TableRef add_embedded_table(StringData name);
-    TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false);
-    TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
+    TableRef add_table(StringData name, Table::Type table_type = Table::Type::TopLevel);
+    TableRef add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name, bool nullable = false,
+                                        Table::Type table_type = Table::Type::TopLevel);
+    TableRef get_or_add_table(StringData name, Table::Type table_type = Table::Type::TopLevel,
+                              bool* was_added = nullptr);
     TableRef get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
-                                               bool nullable = false);
+                                               bool nullable = false, Table::Type table_type = Table::Type::TopLevel);
 
     void remove_table(TableKey key);
     void remove_table(StringData name);
@@ -535,6 +540,18 @@ private:
     static constexpr char g_class_name_prefix[] = "class_";
     static constexpr size_t g_class_name_prefix_len = 6;
 
+    struct ToDeleteRef {
+        ToDeleteRef(TableKey tk, ObjKey k)
+            : table_key(tk)
+            , obj_key(k)
+            , ttl(std::chrono::steady_clock::now())
+        {
+        }
+        TableKey table_key;
+        ObjKey obj_key;
+        std::chrono::steady_clock::time_point ttl;
+    };
+
     // nullptr, if we're sharing an allocator provided during initialization
     std::unique_ptr<SlabAlloc> m_local_alloc;
     // in-use allocator. If local, then equal to m_local_alloc.
@@ -599,6 +616,7 @@ private:
     util::UniqueFunction<void(const CascadeNotification&)> m_notify_handler;
     util::UniqueFunction<void()> m_schema_change_handler;
     std::shared_ptr<metrics::Metrics> m_metrics;
+    std::vector<ToDeleteRef> m_objects_to_delete;
     size_t m_total_rows;
 
     static constexpr size_t s_table_name_ndx = 0;
@@ -673,7 +691,7 @@ private:
     const Table* do_get_table(size_t ndx) const;
     Table* do_get_table(StringData name);
     const Table* do_get_table(StringData name) const;
-    Table* do_add_table(StringData name, bool is_embedded, bool do_repl = true);
+    Table* do_add_table(StringData name, Table::Type table_type, bool do_repl = true);
 
     void create_and_insert_table(TableKey key, StringData name);
     Table* create_table_accessor(size_t table_ndx);
@@ -918,7 +936,7 @@ inline StringData Group::get_table_name(TableKey key) const
 
 inline bool Group::table_is_public(TableKey key) const
 {
-    return get_table_name(key).begins_with(g_class_name_prefix);
+    return get_table_name(key).begins_with(StringData(g_class_name_prefix, g_class_name_prefix_len));
 }
 
 inline bool Group::has_table(StringData name) const noexcept
@@ -972,46 +990,41 @@ inline ConstTableRef Group::get_table(StringData name) const
     return ConstTableRef(table, table ? table->m_alloc.get_instance_version() : 0);
 }
 
-inline TableRef Group::add_table(StringData name)
+inline TableRef Group::add_table(StringData name, Table::Type table_type)
 {
     check_attached();
     check_table_name_uniqueness(name);
-    Table* table = do_add_table(name, false); // Throws
+    Table* table = do_add_table(name, table_type); // Throws
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
-inline TableRef Group::add_embedded_table(StringData name)
+inline TableRef Group::get_or_add_table(StringData name, Table::Type table_type, bool* was_added)
 {
-    check_attached();
-    check_table_name_uniqueness(name);
-    Table* table = do_add_table(name, true); // Throws
-    return TableRef(table, table->m_alloc.get_instance_version());
-}
-
-inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
-{
+    REALM_ASSERT(table_type != Table::Type::Embedded);
     check_attached();
     auto table = do_get_table(name);
     if (was_added)
         *was_added = !table;
     if (!table) {
-        table = do_add_table(name, false);
+        table = do_add_table(name, table_type);
     }
     return TableRef(table, table->m_alloc.get_instance_version());
 }
 
 inline TableRef Group::get_or_add_table_with_primary_key(StringData name, DataType pk_type, StringData pk_name,
-                                                         bool nullable)
+                                                         bool nullable, Table::Type table_type)
 {
+    REALM_ASSERT(table_type != Table::Type::Embedded);
     if (TableRef table = get_table(name)) {
         if (!table->get_primary_key_column() || table->get_column_name(table->get_primary_key_column()) != pk_name ||
-            table->is_nullable(table->get_primary_key_column()) != nullable) {
+            table->is_nullable(table->get_primary_key_column()) != nullable ||
+            table->get_table_type() != table_type) {
             return {};
         }
         return table;
     }
     else {
-        return add_table_with_primary_key(name, pk_type, pk_name, nullable);
+        return add_table_with_primary_key(name, pk_type, pk_name, nullable, table_type);
     }
 }
 

@@ -17,13 +17,15 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "baas_admin_api.hpp"
+#include "external/mpark/variant.hpp"
+#include "realm/object-store/sync/app_credentials.hpp"
 
 #if REALM_ENABLE_AUTH_TESTS
 
 #include <iostream>
 #include <mutex>
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include <curl/curl.h>
 
 #include "realm/object_id.hpp"
@@ -350,7 +352,7 @@ AdminAPIEndpoint AdminAPIEndpoint::operator[](StringData name) const
 
 app::Response AdminAPIEndpoint::do_request(app::Request request) const
 {
-    request.url = util::format("%1?bypass_service_change=SyncProtocolVersionIncrease", request.url);
+    request.url = util::format("%1?bypass_service_change=DestructiveSyncProtocolVersionIncrease", request.url);
     request.headers["Content-Type"] = "application/json;charset=utf-8";
     request.headers["Accept"] = "application/json";
     request.headers["Authorization"] = util::format("Bearer %1", m_access_token);
@@ -376,7 +378,8 @@ app::Response AdminAPIEndpoint::del() const
 nlohmann::json AdminAPIEndpoint::get_json() const
 {
     auto resp = get();
-    REALM_ASSERT(resp.http_status_code >= 200 && resp.http_status_code < 300);
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
+                    util::format("url: %1, reply: %2", m_url, resp.body));
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -392,7 +395,8 @@ app::Response AdminAPIEndpoint::post(std::string body) const
 nlohmann::json AdminAPIEndpoint::post_json(nlohmann::json body) const
 {
     auto resp = post(body.dump());
-    REALM_ASSERT(resp.http_status_code >= 200 && resp.http_status_code < 300);
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
+                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -408,7 +412,8 @@ app::Response AdminAPIEndpoint::put(std::string body) const
 nlohmann::json AdminAPIEndpoint::put_json(nlohmann::json body) const
 {
     auto resp = put(body.dump());
-    REALM_ASSERT(resp.http_status_code >= 200 && resp.http_status_code < 300);
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
+                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -424,7 +429,8 @@ app::Response AdminAPIEndpoint::patch(std::string body) const
 nlohmann::json AdminAPIEndpoint::patch_json(nlohmann::json body) const
 {
     auto resp = patch(body.dump());
-    REALM_ASSERT(resp.http_status_code >= 200 && resp.http_status_code < 300);
+    REALM_ASSERT_EX(resp.http_status_code >= 200 && resp.http_status_code < 300,
+                    util::format("url: %1 request: %2, reply: %3", m_url, body.dump(), resp.body));
     return nlohmann::json::parse(resp.body.empty() ? "{}" : resp.body);
 }
 
@@ -867,15 +873,46 @@ AppSession create_app(const AppCreateConfig& config)
         auto queryable_fields = nlohmann::json::array();
         const auto& queryable_fields_src = config.flx_sync_config->queryable_fields;
         std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
-        mongo_service_def["config"]["flexible_sync"] = nlohmann::json{
-            {"state", "enabled"},
-            {"database_name", config.mongo_dbname},
-            {"queryable_fields_names", queryable_fields},
-            {"permissions",
-             {{"rules", nlohmann::json::object()},
-              {"defaultRoles",
-               nlohmann::json::array(
-                   {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}})}}}};
+        auto asymmetric_tables = nlohmann::json::array();
+        for (const auto& obj_schema : config.schema) {
+            if (obj_schema.is_asymmetric) {
+                asymmetric_tables.emplace_back(obj_schema.name);
+            }
+        }
+        auto default_roles = nlohmann::json::array();
+        if (config.flx_sync_config->default_roles.empty()) {
+            default_roles = nlohmann::json::array(
+                {{{"name", "all"}, {"applyWhen", nlohmann::json::object()}, {"read", true}, {"write", true}}});
+        }
+        else {
+            std::transform(config.flx_sync_config->default_roles.begin(), config.flx_sync_config->default_roles.end(),
+                           std::back_inserter(default_roles), [](const AppCreateConfig::FLXSyncRole& role_def) {
+                               nlohmann::json ret{{"name", role_def.name}, {"applyWhen", role_def.apply_when}};
+                               if (auto read_bool_ptr = mpark::get_if<bool>(&role_def.read)) {
+                                   ret["read"] = *read_bool_ptr;
+                               }
+                               else {
+                                   ret["read"] = mpark::get<nlohmann::json>(role_def.read);
+                               }
+                               if (auto write_bool_ptr = mpark::get_if<bool>(&role_def.write)) {
+                                   ret["write"] = *write_bool_ptr;
+                               }
+                               else {
+                                   ret["write"] = mpark::get<nlohmann::json>(role_def.write);
+                               }
+                               return ret;
+                           });
+        }
+        mongo_service_def["config"]["flexible_sync"] = nlohmann::json{{"state", "enabled"},
+                                                                      {"database_name", config.mongo_dbname},
+                                                                      {"queryable_fields_names", queryable_fields},
+                                                                      {"asymmetric_tables", asymmetric_tables},
+                                                                      {"permissions",
+                                                                       {{"rules", nlohmann::json::object()},
+                                                                        {
+                                                                            "defaultRoles",
+                                                                            default_roles,
+                                                                        }}}};
     }
     else {
         sync_config = nlohmann::json{
@@ -900,21 +937,24 @@ AppSession create_app(const AppCreateConfig& config)
     auto rules = services[mongo_service_id]["rules"];
     auto schemas = app["schemas"];
 
-    auto pk_only = [&](const Property& prop) {
+    auto pk_and_queryable_only = [&](const Property& prop) {
+        if (config.flx_sync_config) {
+            const auto& queryable_fields = config.flx_sync_config->queryable_fields;
+
+            if (std::find(queryable_fields.begin(), queryable_fields.end(), prop.name) != queryable_fields.end()) {
+                return true;
+            }
+        }
         return prop.name == "_id" || prop.name == config.partition_key.name;
     };
 
     // Create the rules in two passes: first populate just the primary key and
-    // parition key, then add the rest of the properties. This ensures that the
+    // partition key, then add the rest of the properties. This ensures that the
     // targest of links exist before adding the links.
     std::vector<std::pair<std::string, const ObjectSchema*>> object_schema_to_create;
     BaasRuleBuilder rule_builder(config.schema, config.partition_key, mongo_service_name, config.mongo_dbname);
     for (const auto& obj_schema : config.schema) {
-        if (auto pk_prop = obj_schema.primary_key_property(); pk_prop == nullptr || pk_prop->name != "_id") {
-            continue;
-        }
-
-        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_only);
+        auto schema_to_create = rule_builder.object_schema_to_baas_schema(obj_schema, pk_and_queryable_only);
         auto schema_create_resp = schemas.post_json(schema_to_create);
         object_schema_to_create.push_back({schema_create_resp["_id"], &obj_schema});
 

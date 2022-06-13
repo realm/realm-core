@@ -295,6 +295,15 @@ public:
     }
 };
 
+class NoSubscriptionForWrite : public RuntimeError {
+public:
+    NoSubscriptionForWrite(const std::string& msg)
+        : RuntimeError(ErrorCodes::NoSubscriptionForWrite, msg)
+    {
+    }
+};
+
+
 class WrongTransactionState : public LogicError {
 public:
     WrongTransactionState(const std::string& msg)

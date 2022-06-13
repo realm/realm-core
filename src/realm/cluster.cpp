@@ -310,9 +310,14 @@ inline void Cluster::do_insert_mixed(size_t ndx, ColKey col_key, Mixed init_valu
         // In case we are inserting in a Dictionary cluster, the backlink will
         // be handled in Dictionary::insert function
         if (Table* origin_table = const_cast<Table*>(m_tree_top.get_owning_table())) {
+            if (origin_table->is_asymmetric()) {
+                throw LogicError(LogicError::wrong_kind_of_table);
+            }
             ObjLink link = init_value.get<ObjLink>();
             auto target_table = origin_table->get_parent_group()->get_table(link.get_table_key());
-
+            if (target_table->is_asymmetric()) {
+                throw LogicError(LogicError::wrong_kind_of_table);
+            }
             ColKey backlink_col_key = target_table->find_or_add_backlink_column(col_key, origin_table->get_key());
             target_table->get_object(link.get_obj_key()).add_backlink(backlink_col_key, origin_key);
         }

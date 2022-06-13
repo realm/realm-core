@@ -47,6 +47,7 @@ ErrorCategory ErrorCodes::error_categories(Error code)
         case BadChangeset:
         case SubscriptionFailed:
         case SchemaVersionMismatch:
+        case NoSubscriptionForWrite:
             return ErrorCategory().set(ErrorCategory::runtime_error);
         case FileOperationFailed:
         case PermissionDenied:
@@ -259,6 +260,7 @@ static const std::map<std::string_view, ErrorCodes::Error> error_codes_map = {
     {"MalformedJson", ErrorCodes::MalformedJson},
     {"MissingJsonKey", ErrorCodes::MissingJsonKey},
     {"BadBsonParse", ErrorCodes::BadBsonParse},
+    {"NoSubscriptionForWrite", ErrorCodes::NoSubscriptionForWrite},
 
     {"CustomError", ErrorCodes::CustomError},
     {"MissingAuthReq", ErrorCodes::MissingAuthReq},

@@ -554,7 +554,7 @@ struct alignas(8) DB::SharedInfo {
 DB::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht, int hsv)
     : size_of_mutex(sizeof(shared_writemutex))
     , size_of_condvar(sizeof(room_to_write))
-    , shared_writemutex() // Throws
+    , shared_writemutex()   // Throws
     , shared_controlmutex() // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
@@ -666,12 +666,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
     m_coordination_dir = get_core_file(path, CoreFileType::Management);
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     m_alloc.set_read_only(false);
-
-#if REALM_METRICS
-    if (options.enable_metrics) {
-        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
-    }
-#endif // REALM_METRICS
 
     Replication::HistoryType openers_hist_type = Replication::hist_None;
     int openers_hist_schema_version = 0;
@@ -1176,11 +1170,17 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }
+        start_read()->check_consistency();
     }
     catch (...) {
         close();
         throw;
     }
+#if REALM_METRICS
+    if (options.enable_metrics) {
+        m_metrics = std::make_shared<Metrics>(options.metrics_buffer_size);
+    }
+#endif // REALM_METRICS
 
     m_alloc.set_read_only(true);
 }
@@ -1307,10 +1307,10 @@ void Transaction::replicate(Transaction* dest, Replication& repl) const
                                    util::format("Primary key of class '%1' must be named '_id'. Current is '%2'",
                                                 Group::table_name_to_class_name(table_name), pk_name));
             repl.add_class_with_primary_key(tk, table_name, DataType(pk_col.get_type()), pk_name,
-                                            pk_col.is_nullable());
+                                            pk_col.is_nullable(), table->get_table_type());
         }
         else {
-            repl.add_class(tk, table_name, true);
+            repl.add_class(tk, table_name, Table::Type::Embedded);
         }
     }
     // Create columns
@@ -2303,12 +2303,18 @@ Replication::version_type DB::do_commit(Transaction& transaction, bool commit_to
     }
     version_type new_version = current_version + 1;
 
+    if (!transaction.m_objects_to_delete.empty()) {
+        for (auto it : transaction.m_objects_to_delete) {
+            transaction.get_table(it.table_key)->remove_object(it.obj_key);
+        }
+        transaction.m_objects_to_delete.clear();
+    }
     if (Replication* repl = get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
         // transaction with a call to Transaction::Rollback(), which in turn
         // must call Replication::abort_transact().
-        new_version = repl->prepare_commit(current_version); // Throws
+        new_version = repl->prepare_commit(current_version);        // Throws
         low_level_commit(new_version, transaction, commit_to_disk); // Throws
         repl->finalize_commit();
     }
