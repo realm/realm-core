@@ -746,6 +746,14 @@ void SyncSession::create_sync_session()
         };
     }
 
+    if (sync_config.on_error_message_received_hook) {
+        session_config.on_error_message_received_hook =
+            [hook = sync_config.on_error_message_received_hook,
+             anchor = weak_from_this()](const sync::ProtocolErrorInfo& error_info) {
+                return hook(anchor, error_info);
+            };
+    }
+
     {
         std::string sync_route = m_sync_manager->sync_route();
 

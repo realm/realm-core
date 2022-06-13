@@ -35,6 +35,7 @@ namespace realm::sync {
 namespace internal_schema_groups {
 constexpr static std::string_view c_flx_subscription_store("flx_subscription_store");
 constexpr static std::string_view c_pending_bootstraps("pending_bootstraps");
+constexpr static std::string_view c_pending_errors("pending_errors");
 }
 
 /*

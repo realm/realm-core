@@ -1,4 +1,5 @@
 #include "realm/sync/protocol.hpp"
+#include "realm/util/functional.hpp"
 #include <system_error>
 #include <sstream>
 
@@ -1360,6 +1361,7 @@ void Session::cancel_resumption_delay()
         return;
 
     m_suspended = false;
+    m_stopped_for_testing = false;
 
     logger.debug("Resumed"); // Throws
 
@@ -1375,7 +1377,8 @@ void Session::cancel_resumption_delay()
 void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& progress,
                                    std::uint_fast64_t downloadable_bytes,
                                    const ReceivedChangesets& received_changesets, VersionInfo& version_info,
-                                   DownloadBatchState download_batch_state)
+                                   DownloadBatchState download_batch_state,
+                                   UniqueFunction<void(const TransactionRef& tr)> run_in_tr_hook)
 {
     auto& history = repl.get_history();
     if (received_changesets.empty()) {
@@ -1389,7 +1392,8 @@ void Session::integrate_changesets(ClientReplication& repl, const SyncProgress& 
     const Transformer::RemoteChangeset* changesets = received_changesets.data();
     std::size_t num_changesets = received_changesets.size();
     history.integrate_server_changesets(progress, &downloadable_bytes, changesets, num_changesets, version_info,
-                                        download_batch_state, logger, {}, get_transact_reporter()); // Throws
+                                        download_batch_state, logger, std::move(run_in_tr_hook),
+                                        get_transact_reporter()); // Throws
     if (num_changesets == 1) {
         logger.debug("1 remote changeset integrated, producing client version %1",
                      version_info.sync_version.version); // Throws
@@ -2028,6 +2032,11 @@ void Session::receive_download_message(const SyncProgress& progress, std::uint_f
     if (m_state != Active)
         return;
 
+    if (REALM_UNLIKELY(m_stopped_for_testing)) {
+        logger.debug("Stopped for testing. Won't process download message");
+        return;
+    }
+
     bool legal_at_this_time = (m_ident_message_sent && !m_error_message_received && !m_unbound_message_received);
     if (REALM_UNLIKELY(!legal_at_this_time)) {
         logger.error("Illegal message at this time");
@@ -2187,9 +2196,22 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
         return ClientError::bad_error_code;
     }
 
-    if (!session_level_error_requires_suspend(error_code)) {
-        on_connection_state_changed(m_conn.get_state(), SessionErrorInfo{info, make_error_code(error_code)});
-        return {}; // Success
+    receive_error_message_hook(info);
+
+    if (info.pending_until_server_version) {
+        enqueue_pending_error_message(info);
+        return {};
+    }
+
+    on_server_error(SessionErrorInfo(info, make_error_code(error_code)));
+    return {};
+}
+
+void Session::on_server_error(const SessionErrorInfo& error_info)
+{
+    if (!session_level_error_requires_suspend(static_cast<ProtocolError>(error_info.raw_error_code))) {
+        on_connection_state_changed(m_conn.get_state(), error_info);
+        return;
     }
 
     REALM_ASSERT(!m_suspended);
@@ -2216,27 +2238,25 @@ std::error_code Session::receive_error_message(const ProtocolErrorInfo& info)
     // Notify the application of the suspension of the session if the session is
     // still in the Active state
     if (m_state == Active) {
-        m_conn.one_less_active_unsuspended_session();                      // Throws
-        on_suspended(SessionErrorInfo{info, make_error_code(error_code)}); // Throws
+        m_conn.one_less_active_unsuspended_session(); // Throws
+        on_suspended(error_info);                     // Throws
     }
 
-    if (info.try_again) {
-        begin_resumption_delay(info);
+    if (error_info.try_again) {
+        begin_resumption_delay(error_info);
     }
 
     // Ready to send the UNBIND message, if it has not been sent already
     if (!m_unbind_message_sent)
         ensure_enlisted_to_send(); // Throws
-
-    return {};
 }
 
 void Session::begin_resumption_delay(const ProtocolErrorInfo& error_info)
 {
     REALM_ASSERT(!m_try_again_activation_timer);
     m_try_again_activation_timer.emplace(m_conn.get_client().get_service());
-    if (error_info.resumption_delay_interval) {
-        m_try_again_delay_info = *error_info.resumption_delay_interval;
+    if (error_info.resumption_delay_info) {
+        m_try_again_delay_info = *error_info.resumption_delay_info;
     }
     if (!m_current_try_again_delay_interval ||
         (m_try_again_error_code && *m_try_again_error_code != ProtocolError(error_info.raw_error_code))) {

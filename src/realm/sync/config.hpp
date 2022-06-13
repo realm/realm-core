@@ -194,6 +194,9 @@ struct SyncConfig {
     // processing a finalized bootstrap. For testing only.
     std::function<bool(std::weak_ptr<SyncSession>, const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
         on_bootstrap_message_processed_hook;
+    // Will be called after an error message is received and parsed, but before the error handler has been
+    // called. If the function returns false, the sync session will close immediately. For testing only.
+    std::function<bool(std::weak_ptr<SyncSession>, const sync::ProtocolErrorInfo&)> on_error_message_received_hook;
 
     bool simulate_integration_error = false;
 

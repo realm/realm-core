@@ -138,7 +138,8 @@ void load_sync_metadata_schema(const TransactionRef& tr, std::vector<SyncMetadat
                     util::format("column %1 in sync internal table %2 is the wrong type", col.name, table.name));
             }
 
-            if (col.is_optional != table_ref->is_nullable(col_key)) {
+            if (col.is_optional != table_ref->is_nullable(col_key) && col.data_type != type_Mixed &&
+                col.data_type != type_Link) {
                 throw std::runtime_error(
                     util::format("column %1 in sync internal table %2 has different nullabilty than in its schema",
                                  col.name, table.name));

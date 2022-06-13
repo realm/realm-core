@@ -322,6 +322,7 @@ public:
         // but before processing a finalized bootstrap. For testing only.
         std::function<bool(const sync::SyncProgress&, int64_t, sync::DownloadBatchState)>
             on_bootstrap_message_processed_hook;
+        std::function<bool(const sync::ProtocolErrorInfo)> on_error_message_received_hook;
     };
 
     /// \brief Start a new session for the specified client-side Realm.

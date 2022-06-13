@@ -75,7 +75,9 @@ endif()
 
 add_executable(ObjectStoreTests ${SOURCES} ${HEADERS} ${RESOURCES})
 set_target_properties(ObjectStoreTests PROPERTIES OUTPUT_NAME realm-object-store-tests)
-set_target_resources(ObjectStoreTests "${RESOURCES}")
+if (CMAKE_GENERATOR MATCHES "Xcode")
+    set_target_resources(ObjectStoreTests "${RESOURCES}")
+endif()
 
 if(MSVC)
     # increase the number of sections supported in an obj file for the heavily templated tests

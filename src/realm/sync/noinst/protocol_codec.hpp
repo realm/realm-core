@@ -275,13 +275,18 @@ public:
                     info.should_client_reset = util::make_optional<bool>(json["shouldClientReset"]);
 
                     if (auto backoff_interval = json.find("backoffIntervalSec"); backoff_interval != json.end()) {
-                        info.resumption_delay_interval.emplace();
-                        info.resumption_delay_interval->resumption_delay_interval =
+                        info.resumption_delay_info.emplace();
+                        info.resumption_delay_info->resumption_delay_interval =
                             std::chrono::seconds{backoff_interval->get<int>()};
-                        info.resumption_delay_interval->max_resumption_delay_interval =
+                        info.resumption_delay_info->max_resumption_delay_interval =
                             std::chrono::seconds{json.at("backoffMaxDelaySec").get<int>()};
-                        info.resumption_delay_interval->resumption_delay_backoff_multiplier =
+                        info.resumption_delay_info->resumption_delay_backoff_multiplier =
                             json.at("backoffMultiplier").get<int>();
+                    }
+
+                    if (auto pending_until_server_version = json.find("compensatingWriteServerVersion");
+                        pending_until_server_version != json.end()) {
+                        info.pending_until_server_version = pending_until_server_version->get<int64_t>();
                     }
 
                     if (auto rejected_updates = json.find("rejectedUpdates"); rejected_updates != json.end()) {

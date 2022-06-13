@@ -16,6 +16,8 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/network_ssl.hpp>
 #include <realm/util/ez_websocket.hpp>
+#include "realm/db.hpp"
+#include "realm/util/functional.hpp"
 #include "realm/util/span.hpp"
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
@@ -722,7 +724,8 @@ public:
     /// event loop thread of the associated client object, the specified history
     /// accessor must **not** be the one made available by access_realm().
     void integrate_changesets(ClientReplication&, const SyncProgress&, std::uint_fast64_t downloadable_bytes,
-                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch);
+                              const ReceivedChangesets&, VersionInfo&, DownloadBatchState last_in_batch,
+                              util::UniqueFunction<void(const TransactionRef&)> run_in_tr_hook);
 
     /// To be used in connection with implementations of
     /// initiate_integrate_changesets().
@@ -740,6 +743,8 @@ public:
     void on_integration_failure(const IntegrationException& e, DownloadBatchState batch_state);
 
     void on_connection_state_changed(ConnectionState, const util::Optional<SessionErrorInfo>&);
+
+    void on_server_error(const SessionErrorInfo& error_info);
 
     /// The application must ensure that the new session object is either
     /// activated (Connection::activate_session()) or destroyed before the
@@ -874,6 +879,8 @@ private:
     // Processes any pending FLX bootstraps, if one exists. Otherwise this is a noop.
     void process_pending_flx_bootstrap();
 
+    void enqueue_pending_error_message(const ProtocolErrorInfo& error_info);
+
     void begin_resumption_delay(const ProtocolErrorInfo& error_info);
     void clear_resumption_delay_state();
 
@@ -890,6 +897,9 @@ private:
     State m_state = Unactivated;
 
     bool m_suspended = false;
+
+    // Can be set by testing hooks to stop the sync client from processing further DOWNLOAD messages.
+    bool m_stopped_for_testing = false;
 
     util::Optional<util::network::DeadlineTimer> m_try_again_activation_timer;
     ResumptionDelayInfo m_try_again_delay_info;
@@ -1074,6 +1084,7 @@ private:
     void check_for_upload_completion();
     void check_for_download_completion();
     void receive_download_message_hook(const SyncProgress&, int64_t, DownloadBatchState);
+    void receive_error_message_hook(const ProtocolErrorInfo&);
 
     friend class Connection;
 };

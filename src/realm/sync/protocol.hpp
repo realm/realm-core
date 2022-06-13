@@ -222,7 +222,8 @@ struct ProtocolErrorInfo {
     util::Optional<bool> should_client_reset;
     util::Optional<std::string> log_url;
     std::vector<CompensatingWriteErrorInfo> compensating_writes;
-    util::Optional<ResumptionDelayInfo> resumption_delay_interval;
+    util::Optional<ResumptionDelayInfo> resumption_delay_info;
+    util::Optional<version_type> pending_until_server_version;
 
     bool is_fatal() const
     {
