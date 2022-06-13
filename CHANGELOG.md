@@ -10,7 +10,7 @@
 * Asymmetric sync now works with embedded objects. (Issue [#5565](https://github.com/realm/realm-core/issues/5565), since 12.1.0)
  
 ### Breaking changes
-* None.
+* `realm_sync_before_client_reset_func_t` and `realm_sync_after_client_reset_func_t` in the C API now return a boolean value to indicate whether the callback succeeded or not, which signals to the sync client that a fatal error occurred. (PR [#5564](https://github.com/realm/realm-core/pull/5564))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
