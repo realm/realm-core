@@ -370,7 +370,7 @@ public:
     /// than or equal to get_current_protocol_version().
     int get_negotiated_protocol_version() noexcept;
 
-    // Overriding methods in util::websocket::SocketObserverSocketObserver
+    // Overriding methods in util::websocket::SocketObserver
     void websocket_handshake_completion_handler(const std::string& protocol) override;
     void websocket_connect_error_handler(std::error_code) override;
     void websocket_ssl_handshake_error_handler(std::error_code) override;
