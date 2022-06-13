@@ -449,13 +449,6 @@ bool run_tests(util::Logger* logger)
 
     // Set up reporter
     std::ofstream xml_file;
-    bool xml;
-#if REALM_MOBILE
-    xml = true;
-#else
-    const char* xml_str = getenv("UNITTEST_XML");
-    xml = (xml_str && strlen(xml_str) != 0);
-#endif
     std::vector<std::unique_ptr<Reporter>> reporters;
     {
         const char* str = getenv("UNITTEST_PROGRESS");
@@ -463,10 +456,9 @@ bool run_tests(util::Logger* logger)
         std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
         reporters.push_back(std::move(reporter));
     }
-    if (xml) {
-        std::string path = get_test_path_prefix();
-        std::string xml_path = path + "unit-test-report.xml";
-        xml_file.open(xml_path.c_str());
+    if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
+        std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
+        xml_file.open(str);
         std::unique_ptr<Reporter> reporter_1 = create_junit_reporter(xml_file);
         std::unique_ptr<Reporter> reporter_2 = create_twofold_reporter(*reporters.back(), *reporter_1);
         reporters.push_back(std::move(reporter_1));

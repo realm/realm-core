@@ -44,9 +44,10 @@ int main(int argc, const char** argv)
         config.reporterSpecifications.push_back(Catch::ReporterSpec{"evergreen", {str}, {}, {}});
     }
     else if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
+        std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
         config.showDurations = Catch::ShowDurations::Always; // this is to help debug hangs in Jenkins
         config.reporterSpecifications.push_back(Catch::ReporterSpec{"console", {}, {}, {}});
-        config.reporterSpecifications.push_back(Catch::ReporterSpec{"junit", {"unit-test-report.xml"}, {}, {}});
+        config.reporterSpecifications.push_back(Catch::ReporterSpec{"junit", {str}, {}, {}});
     }
 
     if (const char* env = getenv("UNITTEST_ENCRYPT_ALL")) {

@@ -278,6 +278,7 @@ def doCheckInDocker(Map options = [:]) {
             def buildEnv = buildDockerEnv('testing.Dockerfile')
 
             def environment = environment()
+            environment << 'UNITTEST_XML=unit-test-report.xml'
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
@@ -368,7 +369,8 @@ def doCheckSanity(Map options = [:]) {
 
             def environment = environment() + [
               'CC=clang',
-              'CXX=clang++'
+              'CXX=clang++',
+              'UNITTEST_XML=unit-test-report.xml'
             ]
             buildDockerEnv('testing.Dockerfile').inside(privileged) {
                 withEnv(environment) {
@@ -499,6 +501,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
             def buildEnv = buildDockerEnv('android.Dockerfile')
 
             def environment = environment()
+            environment << 'UNITTEST_XML=/data/local/tmp/unit-test-report.xml'
             def cmakeArgs = ''
             if (test == TestAction.None) {
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
@@ -637,12 +640,11 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
             }
             if (runTests && !isUWP) {
                 def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1' ]
-                withEnv(environment) {
+                withEnv(environment + ['UNITTEST_XML=..\\core-results.xml']) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
                           realm-tests.exe
-                          copy unit-test-report.xml ..\\core-results.xml
                           rmdir /Q /S %TMP%
                         '''
                     }
@@ -652,23 +654,21 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                   // the sync tests in parallel
                   environment << 'UNITTEST_THREADS=1'
                 }
-                withEnv(environment) {
+                withEnv(environment + ['UNITTEST_XML=..\\sync-results.xml']) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
                           realm-sync-tests.exe
-                          copy unit-test-report.xml ..\\sync-results.xml
                           rmdir /Q /S %TMP%
                         '''
                     }
                 }
 
-                withEnv(environment) {
+                withEnv(environment + ['UNITTEST_XML=..\\..\\object-store-results.xml']) {
                     dir("build-dir/test/object-store/${buildType}") {
                         bat '''
                           mkdir %TMP%
                           realm-object-store-tests.exe
-                          copy unit-test-report.xml ..\\..\\object-store-results.xml
                           rmdir /Q /S %TMP%
                         '''
                     }
@@ -752,17 +752,15 @@ def doBuildMacOs(Map options = [:]) {
                 try {
                     def environment = environment()
                     environment << 'CTEST_OUTPUT_ON_FAILURE=1'
+                    environment << "UNITTEST_XML=${WORKSPACE}/build-dir/test/unit-test-report.xml"
+
+                    sh 'mkdir -p build-dir/test'
                     dir('build-macosx') {
                         withEnv(environment) {
                             sh "${ctest_cmd} -C ${buildType}"
                         }
                     }
                 } finally {
-                    // recordTests expects the test results xml file in a build-dir/test/ folder
-                    sh """
-                        mkdir -p build-dir/test
-                        cp build-macosx/test/${buildType}/unit-test-report.xml build-dir/test/
-                    """
                     recordTests("macosx_${buildType}")
                 }
             }
@@ -805,12 +803,18 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
                         if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
                         sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
                         def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
+                        env << "SIMCTL_CHILD_UNITTEST_XML=${WORKSPACE}/build-dir/test/unit-test-report.xml"
+                        sh 'mkdir -p $WORKSPACE/build-dir/test'
                         withEnv(env) {
                             runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.CoreTests', '$WORKSPACE/')
                         }
+                        // Somehow Jenkins sees an empty file for a while after
+                        // the simulator exits, so wait for the file to be
+                        // non-empty
                         sh '''
-                            mkdir -p $WORKSPACE/build-dir/test
-                            cp $WORKSPACE/unit-test-report.xml $WORKSPACE/build-dir/test
+                        while [ ! -s $WORKSPACE/build-dir/test/unit-test-report.xml -a $((retries++)) -lt 100 ]; do
+                            sleep 5
+                        done
                         '''
                     }
                 }
@@ -871,7 +875,6 @@ def recordTests(tag, String reportName = "unit-test-report.xml") {
 def environment() {
     return [
         "UNITTEST_SHUFFLE=1",
-        "UNITTEST_XML=1",
         "UNITTEST_PROGRESS=1"
     ]
 }
