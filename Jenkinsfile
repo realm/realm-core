@@ -144,6 +144,7 @@ jobWrapper {
             buildWindows_ARM64_Debug: doBuildWindows('Debug', false, 'ARM64', false),
             buildUWP_ARM64_Debug    : doBuildWindows('Debug', true, 'ARM64', false),
             checkiOSSimulator_Debug : doBuildApplePlatform('iphonesimulator', 'Debug', true),
+            buildAppleTV_Debug      : doBuildApplePlatform('appletvos', 'Debug', false),
             buildAndroidArm64Debug  : doAndroidBuildInDocker('arm64-v8a', 'Debug'),
             buildAndroidTestsArmeabi: doAndroidBuildInDocker('armeabi-v7a', 'Debug', TestAction.Build),
             threadSanitizer         : doCheckSanity(buildOptions + [enableSync: true, sanitizeMode: 'thread']),
