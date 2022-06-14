@@ -262,7 +262,10 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig 
         history.set_write_validator_factory(
             [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
                 auto sub_mgr = weak_sub_mgr.lock();
-                REALM_ASSERT_RELEASE(sub_mgr);
+                if (!sub_mgr) {
+                    // A DB can outlive its sync session during client reset.
+                    return nullptr;
+                }
                 auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
                 return [tables = std::move(latest_sub_tables)](const Table& table) {
                     if (table.get_table_type() != Table::Type::TopLevel) {
