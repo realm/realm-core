@@ -3353,8 +3353,8 @@ typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm
                                                 const realm_sync_error_t);
 typedef bool (*realm_sync_ssl_verify_func_t)(realm_userdata_t userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
-typedef void (*realm_sync_before_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm);
-typedef void (*realm_sync_after_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm,
+typedef bool (*realm_sync_before_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm);
+typedef bool (*realm_sync_after_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm,
                                                      realm_t* after_realm, bool did_recover);
 
 typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;

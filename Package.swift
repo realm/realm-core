@@ -461,8 +461,38 @@ let package = Package(
             dependencies: ["Capi"],
             path: "src/swift"),
         .target(
+            name: "Catch2Generated",
+            path: "external/generated",
+            // this file was manually generated with catch v3.0.1
+            // and should be regenerated when catch is upgraded
+            resources: [.copy("catch2/catch_user_config.hpp")],
+            publicHeadersPath: "."),
+        .target(
+            name: "Catch2",
+            dependencies: ["Catch2Generated"],
+            path: "external/catch/src",
+            exclude: [
+                "CMakeLists.txt",
+                "catch2/catch_user_config.hpp.in",
+                "catch2/internal/catch_main.cpp"
+                ],
+            publicHeadersPath: ".",
+            cxxSettings: ([
+                .headerSearchPath("catch2"),
+                .define("CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS")
+            ] + cxxSettings) as [CXXSetting]),
+        .target(
+            name: "CoreTestUtils",
+            dependencies: ["RealmCore"],
+            path: "test/util",
+            exclude: [
+                "CMakeLists.txt"
+            ],
+            publicHeadersPath: ".",
+            cxxSettings: (cxxSettings) as [CXXSetting]),
+        .target(
             name: "ObjectStoreTestUtils",
-            dependencies: ["RealmCore", "SyncServer"],
+            dependencies: ["RealmCore", "SyncServer", "Catch2", "CoreTestUtils"],
             path: "test/object-store/util",
             exclude: [
                 "baas_admin_api.hpp",
@@ -474,7 +504,6 @@ let package = Package(
             publicHeadersPath: ".",
             cxxSettings: ([
                 .headerSearchPath(".."),
-                .headerSearchPath("../../../external/catch/single_include"),
                 .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(
@@ -501,7 +530,6 @@ let package = Package(
             ],
             cxxSettings: ([
                 .headerSearchPath("."),
-                .headerSearchPath("../../external/catch/single_include"),
                 .define("_LIBCPP_DISABLE_AVAILABILITY")
             ] + cxxSettings) as [CXXSetting]),
         .executableTarget(
@@ -510,7 +538,6 @@ let package = Package(
             path: "test/object-store/c_api",
             cxxSettings: ([
                 .headerSearchPath("../"),
-                .headerSearchPath("../../../external/catch/single_include")
             ] + cxxSettings) as [CXXSetting]),
     ],
     cxxLanguageStandard: .cxx17

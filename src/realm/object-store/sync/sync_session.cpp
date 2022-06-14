@@ -256,6 +256,27 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig 
     , m_client(client)
     , m_sync_manager(sync_manager)
 {
+    if (m_config.flx_sync_requested) {
+        std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
+        auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
+        history.set_write_validator_factory(
+            [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
+                auto sub_mgr = weak_sub_mgr.lock();
+                REALM_ASSERT_RELEASE(sub_mgr);
+                auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
+                return [tables = std::move(latest_sub_tables)](const Table& table) {
+                    if (table.get_table_type() != Table::Type::TopLevel) {
+                        return;
+                    }
+                    auto object_class_name = Group::table_name_to_class_name(table.get_name());
+                    if (tables.find(object_class_name) == tables.end()) {
+                        throw NoSubscriptionForWrite(util::format(
+                            "Cannot write to class %1 when no flexible sync subscription has been created.",
+                            object_class_name));
+                    }
+                };
+            });
+    }
 }
 
 std::shared_ptr<SyncManager> SyncSession::sync_manager() const

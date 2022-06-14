@@ -18,7 +18,7 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "flx_sync_harness.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
@@ -276,7 +276,6 @@ TEST_CASE("flx: creating an object on a class with no subscription throws", "[sy
     });
 }
 
-#if REALM_ENABLE_COMPENSATING_WRITES_TESTS
 TEST_CASE("flx: uploading an object that is out-of-view results in compensating write", "[sync][flx][app]") {
     AppCreateConfig::FLXSyncRole role;
     role.name = "compensating_write_perms";
@@ -324,7 +323,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         CHECK(write_info.primary_key.is_type(type_ObjectId));
         CHECK(write_info.primary_key.get_object_id() == invalid_obj);
         CHECK(write_info.object_name == "TopLevel");
-        CHECK_THAT(write_info.reason, Catch::Matchers::Contains(error_msg_fragment));
+        CHECK_THAT(write_info.reason, Catch::Matchers::ContainsSubstring(error_msg_fragment));
     };
 
     SECTION("compensating write because of permission violation") {
@@ -476,7 +475,6 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
         });
     }
 }
-#endif
 
 TEST_CASE("flx: query on non-queryable field results in query error message", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
@@ -1166,10 +1164,8 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
     }
 }
 
-#if REALM_ENABLE_MASTER_BAAS_TESTS
 TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
-    server_schema.dev_mode_enabled = true;
     server_schema.queryable_fields = {"queryable_str_field"};
     server_schema.schema = {
         {"Asymmetric",
@@ -1199,6 +1195,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         });
 
         harness.do_with_new_realm([&](SharedRealm realm) {
+            wait_for_download(*realm);
+
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
             auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
@@ -1323,7 +1321,69 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 }
 
-#endif // REALM_ENABLE_MASTER_BAAS_TESTS
+TEST_CASE("flx: asymmetric sync with embedded objects") {
+    FLXSyncTestHarness::ServerSchema server_schema;
+    server_schema.schema = {
+        {"Asymmetric",
+         ObjectSchema::IsAsymmetric{true},
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Asymmetric_embedded_obj"},
+         }},
+        {"Asymmetric_embedded_obj",
+         ObjectSchema::IsEmbedded{true},
+         {
+             {"value", PropertyType::String | PropertyType::Nullable},
+         }},
+    };
+
+    FLXSyncTestHarness harness("asymmetric_sync", server_schema);
+
+    SECTION("basic object construction") {
+        harness.load_initial_data([&](SharedRealm realm) {
+            CppContext c(realm);
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                             {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+        });
+
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
+
+    SECTION("replace object") {
+        harness.do_with_new_realm([&](SharedRealm realm) {
+            CppContext c(realm);
+            auto foo_obj_id = ObjectId::gen();
+            realm->begin_transaction();
+            Object::create(
+                c, realm, "Asymmetric",
+                util::Any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+            realm->commit_transaction();
+            // Update embedded field to `null`.
+            realm->begin_transaction();
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", util::Any()}}));
+            realm->commit_transaction();
+            // Update embedded field again to a new value.
+            realm->begin_transaction();
+            Object::create(
+                c, realm, "Asymmetric",
+                util::Any(AnyDict{{"_id", foo_obj_id}, {"embedded_obj", AnyDict{{"value", std::string{"bar"}}}}}));
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+            wait_for_download(*realm);
+
+            auto table = realm->read_group().get_table("class_Asymmetric");
+            REQUIRE(table->size() == 0);
+        });
+    }
+}
 
 } // namespace realm::app
 
