@@ -392,6 +392,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
+        c_user_info.reserve(error.user_info.size());
         for (auto& info : error.user_info) {
             c_user_info.push_back({info.first.c_str(), info.second.c_str()});
         }
