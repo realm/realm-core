@@ -168,11 +168,6 @@ jobWrapper {
 
     if (isPublishingRun) {
 
-        if(isCoreCronJob) {
-            echo "Cron job build... disable publishing for now"
-            return
-        }
-
         stage('BuildPackages') {
             def buildOptions = [
                 enableSync: "ON",
