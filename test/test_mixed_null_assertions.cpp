@@ -328,3 +328,111 @@ TEST(Mixed_Set_unresolved_links)
         CHECK_EQUAL(unresolved, 2);
     }
 }
+
+TEST(Mixed_nullify_removes_backlinks_crash)
+{
+    Group g;
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "_id");
+    ColKey mixed_col = source_table->add_column(type_Mixed, "mixed");
+    auto source_obj = source_table->create_object_with_primary_key({0});
+    auto dest_obj = dest_table->create_object_with_primary_key({1});
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.set(mixed_col, Mixed{ObjLink{dest_table->get_key(), dest_obj.get_key()}});
+    CHECK(dest_obj.get_backlink_count() == 1);
+    source_obj.set_null(mixed_col); // needs to remove backlinks!
+    CHECK(dest_obj.get_backlink_count() == 0);
+    dest_obj.remove(); // triggers an assertion failure if the backlink was not removed
+    source_obj.remove();
+}
+
+TEST(Mixed_nullify_removes_backlinks_exception)
+{
+    Group g;
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "_id");
+    ColKey mixed_col = source_table->add_column(type_Mixed, "mixed");
+    auto source_obj = source_table->create_object_with_primary_key({0});
+    auto dest_obj = dest_table->create_object_with_primary_key({1});
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.set(mixed_col, Mixed{ObjLink{dest_table->get_key(), dest_obj.get_key()}});
+    CHECK(dest_obj.get_backlink_count() == 1);
+    source_obj.set_null(mixed_col); // needs to remove backlinks!
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.remove();
+    dest_obj.remove(); // if the backlink was not removed, this creates an exception "key not found"
+}
+
+TEST(Mixed_nullify_and_invalidate_crash)
+{
+    Group g;
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "_id");
+    ColKey mixed_col = source_table->add_column(type_Mixed, "mixed");
+    auto source_obj = source_table->create_object_with_primary_key({0});
+    auto dest_obj = dest_table->create_object_with_primary_key({1});
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.set(mixed_col, Mixed{ObjLink{dest_table->get_key(), dest_obj.get_key()}});
+    CHECK(dest_obj.get_backlink_count() == 1);
+    source_obj.set_null(mixed_col); // needs to remove backlinks!
+    CHECK(dest_obj.get_backlink_count() == 0);
+    dest_obj.invalidate(); // triggers an assertion failure if the backlink was not removed
+    auto resurrected = dest_table->create_object_with_primary_key({1});
+    CHECK(source_obj.is_null(mixed_col));
+    source_obj.remove();
+    resurrected.remove();
+}
+
+TEST(Mixed_nullify_and_invalidate_exception)
+{
+    Group g;
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "_id");
+    ColKey mixed_col = source_table->add_column(type_Mixed, "mixed");
+    auto source_obj = source_table->create_object_with_primary_key({0});
+    auto dest_obj = dest_table->create_object_with_primary_key({1});
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.set(mixed_col, Mixed{ObjLink{dest_table->get_key(), dest_obj.get_key()}});
+    CHECK(dest_obj.get_backlink_count() == 1);
+    source_obj.set_null(mixed_col); // needs to remove backlinks!
+    CHECK(dest_obj.get_backlink_count() == 0);
+    dest_obj.invalidate(); // triggers an exception "key not found" if the backlink was not removed
+    auto resurrected = dest_table->create_object_with_primary_key({1});
+    CHECK(source_obj.is_null(mixed_col));
+    CHECK(resurrected.get_backlink_count() == 0);
+    resurrected.remove();
+}
+
+TEST(Mixed_set_non_link_exception)
+{
+    Group g;
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "_id");
+    ColKey mixed_col = source_table->add_column(type_Mixed, "mixed");
+    auto source_obj = source_table->create_object_with_primary_key({0});
+    auto dest_obj = dest_table->create_object_with_primary_key({1});
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.set(mixed_col, Mixed{ObjLink{dest_table->get_key(), dest_obj.get_key()}});
+    CHECK(dest_obj.get_backlink_count() == 1);
+    source_obj.set(mixed_col, Mixed{0}); // needs to remove backlinks!
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.remove();
+    dest_obj.remove(); // triggers an exception "key not found" if the backlink was not removed
+}
+
+TEST(Mixed_set_non_link_assertion)
+{
+    Group g;
+    auto source_table = g.add_table_with_primary_key("source", type_Int, "_id");
+    auto dest_table = g.add_table_with_primary_key("dest", type_Int, "_id");
+    ColKey mixed_col = source_table->add_column(type_Mixed, "mixed");
+    auto source_obj = source_table->create_object_with_primary_key({0});
+    auto dest_obj = dest_table->create_object_with_primary_key({1});
+    CHECK(dest_obj.get_backlink_count() == 0);
+    source_obj.set(mixed_col, Mixed{ObjLink{dest_table->get_key(), dest_obj.get_key()}});
+    CHECK(dest_obj.get_backlink_count() == 1);
+    source_obj.set(mixed_col, Mixed{0}); // needs to remove backlinks!
+    CHECK(dest_obj.get_backlink_count() == 0);
+    dest_obj.remove(); // triggers an assertion failure if the backlink was not removed
+    source_obj.remove();
+}

@@ -7,6 +7,7 @@
 ### Fixed
 * Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)
 * Fix a data race when opening a flexible sync Realm (since v12.1.0).
+* Fixed a missing backlink removal when setting a Mixed from a TypedLink to null or any other non-link value. Users may have seen exception of "key not found" or assertion failures such as `mixed.hpp:165: [realm-core-12.1.0] Assertion failed: m_type` when removing the destination link object. ([#5574](https://github.com/realm/realm-core/pull/5573), since the introduction of Mixed in v11.0.0)
 * Asymmetric sync now works with embedded objects. (Issue [#5565](https://github.com/realm/realm-core/issues/5565), since 12.1.0)
  
 ### Breaking changes
