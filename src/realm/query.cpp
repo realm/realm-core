@@ -80,7 +80,7 @@ Query::Query(ConstTableRef table, std::unique_ptr<TableView> tv)
 void Query::create()
 {
     if (m_table && m_table->is_asymmetric()) {
-        throw LogicError{LogicError::wrong_kind_of_table};
+        throw IllegalOperation{"Query on ephemeral objects not allowed"};
     }
     m_groups.emplace_back();
 }
@@ -182,7 +182,7 @@ void Query::set_table(TableRef tr)
     }
 
     if (tr->is_asymmetric()) {
-        throw LogicError{LogicError::wrong_kind_of_table};
+        throw IllegalOperation{"Query on ephemeral objects not allowed"};
     }
 
     m_table = tr;

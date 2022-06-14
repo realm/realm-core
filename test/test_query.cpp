@@ -5604,7 +5604,7 @@ TEST(Query_AsymmetricObjects)
     auto col = table->add_column(type_String, "type");
     table->create_object().set(col, "hello");
     CHECK_LOGIC_ERROR(table->where().equal(col, "hello").Or().Not().group().end_group(),
-                      LogicError::wrong_kind_of_table);
+                      ErrorCodes::IllegalOperation);
 }
 
 #endif // TEST_QUERY

@@ -358,11 +358,11 @@ ColKey Table::add_column(Table& target, StringData name)
     REALM_ASSERT_RELEASE(origin_group == target_group);
     // Outgoing links from an asymmetric table are not allowed.
     if (is_asymmetric() && !target.is_embedded()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Object property not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("Ephemeral objects not supported");
     }
 
     m_has_any_embedded_objects.reset();
@@ -406,11 +406,11 @@ ColKey Table::add_column_list(Table& target, StringData name)
     REALM_ASSERT_RELEASE(origin_group == target_group);
     // Outgoing links from an asymmetric table are not allowed.
     if (is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("List of objects not supported in asymmetric table");
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw LogicError(LogicError::wrong_kind_of_table);
+        throw IllegalOperation("List of ephemeral objects not supported");
     }
 
     m_has_any_embedded_objects.reset();
@@ -437,7 +437,7 @@ ColKey Table::add_column_set(Table& target, StringData name)
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw IllegalOperation("Set of objects in asymmetric table not supported");
+        throw IllegalOperation("Set of ephemeral objects not supported");
     }
 
     ColumnAttrMask attr;
@@ -483,7 +483,7 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
     }
     // Incoming links from an asymmetric table are not allowed.
     if (target.is_asymmetric()) {
-        throw IllegalOperation("Dictionary of objects in asymmetric table not supported");
+        throw IllegalOperation("Dictionary of ephemeral objects not supported");
     }
 
     ColumnAttrMask attr;
@@ -3008,9 +3008,7 @@ Obj Table::create_object_with_primary_key(const Mixed& primary_key, FieldValues&
     // Check for existing object
     if (ObjKey key = m_index_accessors[primary_key_col.get_index().val]->find_first(primary_key)) {
         if (mode == UpdateMode::never) {
-            throw std::logic_error(
-                util::format("Attempting to create an object in '%1' with an existing primary key value '%2'.",
-                             get_name(), primary_key));
+            throw ObjectAlreadyExists(this->get_class_name(), primary_key);
         }
         auto obj = m_clusters.get(key);
         for (auto& val : field_values) {

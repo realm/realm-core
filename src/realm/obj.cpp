@@ -349,7 +349,7 @@ int64_t Obj::get<int64_t>(ColKey col_key) const
     if (col_key.get_attrs().test(col_attr_Nullable)) {
         auto val = _get<util::Optional<int64_t>>(col_key.get_index());
         if (!val) {
-            throw Exception(ErrorCodes::IllegalOperation, "Obj::get<int64_t> cannot return null");
+            throw IllegalOperation("Obj::get<int64_t> cannot return null");
         }
         return *val;
     }
@@ -368,7 +368,7 @@ bool Obj::get<bool>(ColKey col_key) const
     if (col_key.get_attrs().test(col_attr_Nullable)) {
         auto val = _get<util::Optional<bool>>(col_key.get_index());
         if (!val) {
-            throw Exception(ErrorCodes::IllegalOperation, "Obj::get<int64_t> cannot return null");
+            throw IllegalOperation("Obj::get<int64_t> cannot return null");
         }
         return *val;
     }
@@ -1199,7 +1199,7 @@ Obj& Obj::set<Mixed>(ColKey col_key, Mixed value, bool is_default)
 
     if (value.is_type(type_TypedLink)) {
         if (m_table->is_asymmetric()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation("Links not allowed in asymmetric tables");
         }
 
         ObjLink new_link = value.template get<ObjLink>();

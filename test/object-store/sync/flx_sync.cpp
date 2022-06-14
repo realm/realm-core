@@ -315,7 +315,7 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
 
     auto validate_sync_error = [&](const SyncError& sync_error, ObjectId invalid_obj,
                                    const std::string& error_msg_fragment) {
-        CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::compensating_write));
+        CHECK(sync_error.get_system_error() == sync::make_error_code(sync::ProtocolError::compensating_write));
         CHECK(sync_error.is_session_level_protocol_error());
         CHECK(!sync_error.is_client_reset_requested());
         CHECK(sync_error.compensating_writes_info.size() == 1);
@@ -1215,7 +1215,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
                 Object::create(c, realm, "Asymmetric",
                                util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"bar"}}})),
                 "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
-                "implemented'.");
+                "implemented'");
         });
 
         harness.do_with_new_realm([&](SharedRealm realm) {
@@ -1306,7 +1306,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError error) {
                 std::unique_lock<std::mutex> lock(wait_mutex);
                 wait_flag = true;
-                ec = error.error_code;
+                ec = error.get_system_error();
                 cv.notify_one();
             };
 

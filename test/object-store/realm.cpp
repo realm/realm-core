@@ -455,7 +455,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         std::thread([&] {
             REQUIRE_THROWS_MATCHES(realm->verify_thread(), LogicError,
-                                   Catch::Message("Realm accessed from incorrect thread."));
+                                   Catch::Matchers::Message("Realm accessed from incorrect thread."));
         }).join();
     }
 

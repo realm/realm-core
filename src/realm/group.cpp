@@ -1102,7 +1102,7 @@ void Group::validate(ObjLink link) const
             throw IllegalOperation("Cannot link to embedded object");
         }
         if (target_table->is_asymmetric()) {
-            throw LogicError(LogicError::wrong_kind_of_table);
+            throw IllegalOperation("Cannot link to ephemeral object");
         }
     }
 }
