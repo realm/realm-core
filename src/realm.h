@@ -3331,8 +3331,16 @@ typedef struct realm_sync_error {
     size_t user_info_length;
 } realm_sync_error_t;
 
-typedef void (*realm_sync_upload_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t*);
-typedef void (*realm_sync_download_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t*);
+/**
+ * Callback function invoked by the sync session once it has uploaded or download
+ * all available changesets. See @a realm_sync_session_wait_for_upload and
+ * @a realm_sync_session_wait_for_download.
+ *
+ * This callback is invoked on the sync client's worker thread.
+ *
+ * @param error Null, if the operation completed successfully.
+ */
+typedef void (*realm_sync_wait_for_completion_func_t)(realm_userdata_t userdata, realm_sync_error_code_t* error);
 typedef void (*realm_sync_connection_state_changed_func_t)(realm_userdata_t userdata,
                                                            realm_sync_connection_state_e old_state,
                                                            realm_sync_connection_state_e new_state);
@@ -3345,8 +3353,8 @@ typedef void (*realm_sync_error_handler_func_t)(realm_userdata_t userdata, realm
                                                 const realm_sync_error_t);
 typedef bool (*realm_sync_ssl_verify_func_t)(realm_userdata_t userdata, const char* server_address, short server_port,
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
-typedef void (*realm_sync_before_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm);
-typedef void (*realm_sync_after_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm,
+typedef bool (*realm_sync_before_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm);
+typedef bool (*realm_sync_after_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm,
                                                      realm_t* after_realm, bool did_recover);
 
 typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
@@ -3757,14 +3765,15 @@ RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_
  * Register a callback that will be invoked when all pending downloads have completed.
  */
 RLM_API void
-realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_sync_download_completion_func_t,
+realm_sync_session_wait_for_download_completion(realm_sync_session_t*, realm_sync_wait_for_completion_func_t,
                                                 realm_userdata_t userdata,
                                                 realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 
 /**
  * Register a callback that will be invoked when all pending uploads have completed.
  */
-RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*, realm_sync_upload_completion_func_t,
+RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t*,
+                                                           realm_sync_wait_for_completion_func_t,
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) RLM_API_NOEXCEPT;
 

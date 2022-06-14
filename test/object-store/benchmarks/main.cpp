@@ -18,8 +18,7 @@
 
 #define CATCH_CONFIG_ENABLE_BENCHMARKING
 
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <limits.h>
 

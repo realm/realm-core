@@ -392,6 +392,7 @@ RLM_API void realm_sync_config_set_error_handler(realm_sync_config_t* config, re
         c_error.c_recovery_file_path_key = error.c_recovery_file_path_key;
 
         std::vector<realm_sync_error_user_info_t> c_user_info;
+        c_user_info.reserve(error.user_info.size());
         for (auto& info : error.user_info) {
             c_user_info.push_back({info.first.c_str(), info.second.c_str()});
         }
@@ -503,7 +504,9 @@ RLM_API void realm_sync_config_set_before_client_reset_handler(realm_sync_config
 {
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](SharedRealm before_realm) {
         realm_t r1{before_realm};
-        return callback(userdata.get(), &r1);
+        if (!callback(userdata.get(), &r1)) {
+            throw CallbackFailed();
+        }
     };
     config->notify_before_client_reset = std::move(cb);
 }
@@ -517,7 +520,9 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
                   SharedRealm before_realm, SharedRealm after_realm, bool did_recover) {
         realm_t r1{before_realm};
         realm_t r2{after_realm};
-        return callback(userdata.get(), &r1, &r2, did_recover);
+        if (!callback(userdata.get(), &r1, &r2, did_recover)) {
+            throw CallbackFailed();
+        }
     };
     config->notify_after_client_reset = std::move(cb);
 }
@@ -910,7 +915,7 @@ RLM_API void realm_sync_session_unregister_progress_notifier(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_t* session,
-                                                             realm_sync_download_completion_func_t done,
+                                                             realm_sync_wait_for_completion_func_t done,
                                                              realm_userdata_t userdata,
                                                              realm_free_userdata_func_t userdata_free) noexcept
 {
@@ -929,7 +934,7 @@ RLM_API void realm_sync_session_wait_for_download_completion(realm_sync_session_
 }
 
 RLM_API void realm_sync_session_wait_for_upload_completion(realm_sync_session_t* session,
-                                                           realm_sync_upload_completion_func_t done,
+                                                           realm_sync_wait_for_completion_func_t done,
                                                            realm_userdata_t userdata,
                                                            realm_free_userdata_func_t userdata_free) noexcept
 {

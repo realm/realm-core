@@ -16,12 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#define CATCH_CONFIG_RUNNER
 #include "realm/util/features.h"
-#if REALM_PLATFORM_APPLE
-#define CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS
-#endif
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <limits.h>
 
@@ -33,6 +29,7 @@
 #pragma comment(lib, "Pathcch.lib")
 #else
 #include <libgen.h>
+#include <unistd.h>
 #endif
 
 int main(int argc, char** argv)

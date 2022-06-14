@@ -304,14 +304,12 @@ if(EXISTS "${DEPRECATED_CONFIG_FILE}")
     message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
 
-set(CATCH_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/single_include)
 set(JSON_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json)
 
 # Tell the build system where to find the sources (and generated sources)
 include_directories(src)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like config.h)
 
-# Include additional CMakeLists
 add_subdirectory(src)
 
 if (REALM_BUILD_DOGLESS)
@@ -326,6 +324,22 @@ install(FILES LICENSE CHANGELOG.md DESTINATION "doc/realm" COMPONENT devel)
 if(REALM_CORE_SUBMODULE_BUILD)
     return()
 endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Increase the Catch2 virtual console width because our test names can be very long and they break test reports
+    set(CATCH_CONFIG_CONSOLE_WIDTH 300)
+elseif(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(CATCH_CONFIG_NO_POSIX_SIGNALS ON CACHE BOOL "Disable Catch support for POSIX signals on Apple platforms other than macOS")
+endif()
+
+add_subdirectory(external/catch EXCLUDE_FROM_ALL)
+
+# This disables a c++17 feature that Apple doesn't support yet and Catch2 uses
+# The following define could be removed if we drop support for MacOS 10.12
+target_compile_definitions(Catch2 PRIVATE
+    CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS=1
+    _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
+)
 
 # Enable CTest and include unit tests
 enable_testing()
