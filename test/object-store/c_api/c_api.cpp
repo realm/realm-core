@@ -3962,6 +3962,163 @@ struct Userdata {
 };
 
 #if REALM_ENABLE_SYNC
+
+TEST_CASE("C API - client reset", "[c_api][client-reset]") {
+    reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "c_api_client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+
+    auto app = test_app_session.app();
+    auto get_valid_config = [&]() -> SyncTestFile {
+        create_user_and_log_in(app);
+        return SyncTestFile(app->current_user(), partition.value, schema);
+    };
+    SyncTestFile local_config = get_valid_config();
+    SyncTestFile remote_config = get_valid_config();
+
+    struct ClientSyncObject {
+        static ClientSyncObject& instance()
+        {
+            static ClientSyncObject client;
+            return client;
+        }
+        bool stop()
+        {
+            return m_stop.load();
+        }
+        void signal()
+        {
+            m_stop = true;
+        }
+        std::atomic_bool m_stop{false};
+    };
+
+    auto make_reset = [&](Realm::Config config_local,
+                          Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
+        return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
+    };
+
+    realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
+
+    SECTION("Manual reset") {
+        realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
+
+        struct ResetRealmFiles {
+            void set_app(std::shared_ptr<realm::app::App> app)
+            {
+                m_app = app;
+            }
+            void do_reset(const char* path)
+            {
+                realm_app_t realm_app{m_app};
+                realm_sync_immediately_run_file_actions(&realm_app, path);
+            }
+            static ResetRealmFiles& instance()
+            {
+                static ResetRealmFiles instance;
+                return instance;
+            }
+            std::shared_ptr<realm::app::App> m_app;
+        };
+
+        ResetRealmFiles::instance().set_app(app);
+        realm_sync_config_set_error_handler(
+            local_sync_config,
+            [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                REQUIRE(sync_error.c_original_file_path_key);
+                REQUIRE(sync_error.c_recovery_file_path_key);
+                REQUIRE(sync_error.is_client_reset_requested);
+                ResetRealmFiles::instance().do_reset(sync_error.c_original_file_path_key);
+                ClientSyncObject::instance().signal();
+            },
+            nullptr, nullptr);
+
+        make_reset(local_config, remote_config)
+            ->on_post_reset([&](SharedRealm) {
+                util::EventLoop::main().run_until([&] {
+                    return ClientSyncObject::instance().stop();
+                });
+            })
+            ->run();
+    }
+
+    SECTION("Local Discard") {
+        realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
+
+        struct AtomicCounter {
+            void increment()
+            {
+                std::lock_guard<std::mutex> lk{m_mutex};
+                m_counter += 1;
+            }
+            std::size_t fetch()
+            {
+                std::lock_guard<std::mutex> lk{m_mutex};
+                return m_counter;
+            }
+            std::mutex m_mutex;
+            std::size_t m_counter{0};
+        };
+
+        struct BeforeRst : AtomicCounter {
+            static BeforeRst& instance()
+            {
+                static BeforeRst instance;
+                return instance;
+            }
+        };
+
+        struct AfterRst : AtomicCounter {
+            static BeforeRst& instance()
+            {
+                static BeforeRst instance;
+                return instance;
+            }
+        };
+
+        realm_sync_config_set_before_client_reset_handler(
+            local_sync_config,
+            [](realm_userdata_t, realm_t*) -> bool {
+                BeforeRst::instance().increment();
+                return true;
+            },
+            nullptr, nullptr);
+
+        realm_sync_config_set_after_client_reset_handler(
+            local_sync_config,
+            [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                AfterRst::instance().increment();
+                ClientSyncObject::instance().signal();
+                return true;
+            },
+            nullptr, nullptr);
+
+        make_reset(local_config, remote_config)
+            ->on_post_reset([&](SharedRealm) {
+                util::EventLoop::main().run_until([&] {
+                    return ClientSyncObject::instance().stop();
+                });
+            })
+            ->run();
+
+        REQUIRE(BeforeRst::instance().fetch() == 1);
+        REQUIRE(AfterRst::instance().fetch() == 1);
+    }
+}
+
 static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
                                  const realm_async_error_t* async_error)
 {
