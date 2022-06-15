@@ -5,7 +5,7 @@
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/functional.hpp>
-#include <realm/util/util_websocket.hpp>
+#include <realm/util/client_websocket.hpp>
 
 namespace realm::sync {
 class ClientImpl;

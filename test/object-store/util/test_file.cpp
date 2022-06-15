@@ -28,7 +28,7 @@
 #include <realm/object-store/sync/sync_session.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
 #include <realm/object-store/schema.hpp>
-#include <realm/util/util_websocket.hpp>
+#include <realm/util/client_websocket.hpp>
 #endif
 
 #include <realm/db.hpp>

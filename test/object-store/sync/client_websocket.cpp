@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
@@ -30,7 +30,7 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/event_loop_dispatcher.hpp>
 
-#include <realm/util/util_websocket.hpp>
+#include <realm/util/client_websocket.hpp>
 
 using namespace realm;
 using namespace realm::sync;

@@ -1,4 +1,4 @@
-#include <realm/util/util_websocket.hpp>
+#include <realm/util/client_websocket.hpp>
 
 #include <realm/util/websocket.hpp>
 #include <realm/util/network.hpp>

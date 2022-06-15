@@ -1,5 +1,5 @@
-#ifndef REALM_UTIL_PL_WEBSOCKET_HPP
-#define REALM_UTIL_PL_WEBSOCKET_HPP
+#ifndef REALM_CLIENT_WEBSOCKET_HPP
+#define REALM_CLIENT_WEBSOCKET_HPP
 
 #include <random>
 #include <system_error>
@@ -114,4 +114,4 @@ private:
 
 } // namespace realm::util::websocket
 
-#endif // REALM_UTIL_PL_WEBSOCKET_HPP
+#endif // REALM_CLIENT_WEBSOCKET_HPP

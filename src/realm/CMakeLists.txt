@@ -223,7 +223,7 @@ set(REALM_INSTALL_HEADERS
     util/compression.hpp
     util/encrypted_file_mapping.hpp
     util/errno.hpp
-    util/util_websocket.hpp
+    util/client_websocket.hpp
     util/features.h
     util/flat_map.hpp
     util/fifo_helper.hpp
