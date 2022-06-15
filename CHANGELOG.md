@@ -5,6 +5,7 @@
 * Changed the signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). Previously, the method returned void. (PR [#5546](https://github.com/realm/realm-core/pull/5546))
 
 ### Fixed
+* Fixed an exception "key not found" during client reset recovery if a list had local moves or deletes and the base object was also deleted. ([#5593](https://github.com/realm/realm-core/issues/5593) since the introduction of recovery in v11.16.0)
 * Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)
 * Fix a data race when opening a flexible sync Realm (since v12.1.0).
 * Fixed a missing backlink removal when setting a Mixed from a TypedLink to null or any other non-link value. Users may have seen exception of "key not found" or assertion failures such as `mixed.hpp:165: [realm-core-12.1.0] Assertion failed: m_type` when removing the destination link object. ([#5574](https://github.com/realm/realm-core/pull/5573), since the introduction of Mixed in v11.0.0)

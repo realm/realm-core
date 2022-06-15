@@ -333,8 +333,14 @@ bool ListPath::operator!=(const ListPath& other) const noexcept
 std::string ListPath::path_to_string(Transaction& remote, const InterningBuffer& buffer)
 {
     TableRef remote_table = remote.get_table(m_table_key);
-    Obj base_obj = remote_table->get_object(m_obj_key);
-    std::string path = util::format("%1.pk=%2", remote_table->get_name(), base_obj.get_primary_key());
+
+    std::string path = util::format("%1", remote_table->get_name());
+    if (Obj base_obj = remote_table->try_get_object(m_obj_key)) {
+        path += util::format(".pk=%1", base_obj.get_primary_key());
+    }
+    else {
+        path += util::format(".%1(removed)", m_obj_key);
+    }
     for (auto& e : m_path) {
         switch (e.type) {
             case Element::Type::ColumnKey:
@@ -437,7 +443,7 @@ void RecoverLocalChangesetsHandler::copy_lists_with_unrecoverable_changes()
         if (!did_translate) {
             // object no longer exists in the local state, ignore and continue
             m_logger.warn("Discarding a list recovery made to an object which could not be resolved. "
-                          "remote_path='%3'",
+                          "remote_path='%1'",
                           path_str);
         }
     }
@@ -509,7 +515,7 @@ bool RecoverLocalChangesetsHandler::resolve(ListPath& path, util::UniqueFunction
     if (!local_table)
         return false;
 
-    auto remote_obj = remote_table->get_object(path.obj_key());
+    auto remote_obj = remote_table->try_get_object(path.obj_key());
     if (!remote_obj)
         return false;
 
