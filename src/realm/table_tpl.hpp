@@ -27,6 +27,10 @@ namespace realm {
 template <typename T>
 void Table::aggregate(QueryStateBase& st, ColKey column_key) const
 {
+    if (column_key.is_collection())
+        throw IllegalOperation(
+            util::format("Aggregation over collection %1 not supported", get_column_name(column_key)));
+
     using LeafType = typename ColumnTypeTraits<T>::cluster_leaf_type;
     LeafType leaf(get_alloc());
 

@@ -4512,6 +4512,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
              {"float", PropertyType::Float | PropertyType::Nullable},
              {"double", PropertyType::Double | PropertyType::Nullable},
              {"date", PropertyType::Date | PropertyType::Nullable},
+             {"int_list", PropertyType::Int | PropertyType::Array},
          }},
         {"linking_object",
          {
@@ -4522,6 +4523,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
 
     auto table = r->read_group().get_table("class_object");
     ColKey col_int = table->get_column_key("int");
+    ColKey col_int_list = table->get_column_key("int_list");
     ColKey col_float = table->get_column_key("float");
     ColKey col_double = table->get_column_key("double");
     ColKey col_date = table->get_column_key("date");
@@ -4544,6 +4546,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.max(col_float)->get_float() == 2.f);
             REQUIRE(results.max(col_double)->get_double() == 2.0);
             REQUIRE(results.max(col_date)->get_timestamp() == Timestamp(2, 0));
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.max(col_int_list), ErrorCodes::IllegalOperation);
         }
 
         SECTION("min") {
@@ -4551,12 +4554,14 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.min(col_float)->get_float() == 0.f);
             REQUIRE(results.min(col_double)->get_double() == 0.0);
             REQUIRE(results.min(col_date)->get_timestamp() == Timestamp(0, 0));
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.min(col_int_list), ErrorCodes::IllegalOperation);
         }
 
         SECTION("average") {
             REQUIRE(results.average(col_int) == 1.0);
             REQUIRE(results.average(col_float) == 1.0);
             REQUIRE(results.average(col_double) == 1.0);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_int_list), ErrorCodes::IllegalOperation);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.average(col_date), ErrorCodes::IllegalOperation);
         }
 
@@ -4564,6 +4569,7 @@ TEMPLATE_TEST_CASE("results: aggregate", "[query][aggregate]", ResultsFromTable,
             REQUIRE(results.sum(col_int)->get_int() == 2);
             REQUIRE(results.sum(col_float)->get_double() == 2.0);
             REQUIRE(results.sum(col_double)->get_double() == 2.0);
+            REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_int_list), ErrorCodes::IllegalOperation);
             REQUIRE_THROW_LOGIC_ERROR_WITH_CODE(results.sum(col_date), ErrorCodes::IllegalOperation);
         }
     }
