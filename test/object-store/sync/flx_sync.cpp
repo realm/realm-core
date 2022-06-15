@@ -423,7 +423,6 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 local_realm->refresh();
                 auto latest_subs = local_realm->get_latest_subscription_set();
                 latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
-                REQUIRE(latest_subs.state() == sync::SubscriptionSet::State::Complete);
                 auto table = local_realm->read_group().get_table("class_TopLevel");
                 REQUIRE(table->size() == 1);
                 auto mut_sub = latest_subs.make_mutable_copy();

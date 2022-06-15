@@ -988,11 +988,9 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
-
     auto wt_remote = db_remote->start_write();
     auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
     REALM_ASSERT(history_remote);
-    history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
 
     SyncProgress remote_progress;
     {
@@ -1002,10 +1000,45 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     }
     fresh_server_version = remote_progress.latest_server_version;
     BinaryData recovered_changeset;
-    std::vector<SubscriptionSet> pending_subscriptions;
 
-    if (recover_local_changes) {
-        if (!sub_store) {
+    // FLX with recovery has to be done in multiple commits, which is significantly different than other modes
+    if (recover_local_changes && sub_store) {
+        // In FLX recovery, save a copy of the pending subscriptions for later. This
+        // needs to be done before they are wiped out by remake_active_subscription()
+        std::vector<SubscriptionSet> pending_subscriptions = sub_store->get_pending_subscriptions();
+        // transform the local Realm such that all public tables become identical to the remote Realm
+        transfer_group(*wt_remote, *wt_local, logger);
+        // now that the state of the fresh and local Realms are identical,
+        // reset the local sync history.
+        // Note that we do not set the new file ident yet! This is done in the last commit.
+        history_local->set_client_reset_adjustments(current_version_local, orig_file_ident, fresh_server_version,
+                                                    recovered_changeset);
+        // The local Realm is committed. There are no changes to the remote Realm.
+        wt_remote->rollback_and_continue_as_read();
+        wt_local->commit_and_continue_as_read();
+        // Make a copy of the active subscription set and mark it as
+        // complete. This will cause all other subscription sets to become superceded.
+        remake_active_subscription();
+        // Apply local changes interleaved with pending subscriptions in separate commits
+        // as needed. This has the consequence that there may be extra notifications along
+        // the way to the final state, but since separate commits are necessary, this is
+        // unavoidable.
+        wt_local = db_local->start_write();
+        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
+        handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
+        // The new file ident is set as part of the final commit. This is to ensure that if
+        // there are any exceptions during recovery, or the process is killed for some
+        // reason, the client reset cycle detection will catch this and we will not attempt
+        // to recover again. If we had set the ident in the first commit, a Realm which was
+        // partially recovered, but interrupted may continue sync the next time it is
+        // opened with only partially recovered state while having lost the history of any
+        // offline modifications.
+        history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
+        wt_local->commit_and_continue_as_read();
+    }
+    else {
+        if (recover_local_changes) {
+            REALM_ASSERT(!sub_store);
             // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
             // and then transfer the modified state all at once to the local Realm. This creates a
             // nice side effect for notifications because only the minimal state change is made.
@@ -1017,59 +1050,24 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
             const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
             recovered_changeset = {buffer.data(), buffer.size()};
         }
-        else {
-            // In FLX recovery, save a copy of the pending subscriptions for later. This
-            // needs to be done before they are wiped out by remake_active_subscription()
-            pending_subscriptions = sub_store->get_pending_subscriptions();
-        }
-    }
 
-    // transform the local Realm such that all public tables become identical to the remote Realm
-    transfer_group(*wt_remote, *wt_local, logger);
+        // transform the local Realm such that all public tables become identical to the remote Realm
+        transfer_group(*wt_remote, *wt_local, logger);
 
-    // now that the state of the fresh and local Realms are identical,
-    // reset the local sync history and steal the fresh Realm's ident
-    history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
-                                                recovered_changeset);
+        // now that the state of the fresh and local Realms are identical,
+        // reset the local sync history and steal the fresh Realm's ident
+        history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
+                                                    recovered_changeset);
 
-    // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
-    wt_remote->rollback_and_continue_as_read();
-    wt_local->commit_and_continue_as_read();
+        // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
+        wt_remote->rollback_and_continue_as_read();
+        wt_local->commit_and_continue_as_read();
 
-    // If in FLX mode, make a copy of the active subscription set and mark it as
-    // complete. This will cause all other subscription sets to become superceded. If
-    // this is DiscardLocal mode, only the active subscription set is preserved, so we
-    // are done. If this is recovery mode, any pending subscriptions will be reapplied
-    // on top below.
-    remake_active_subscription();
-
-    if (recover_local_changes && sub_store) {
-        // In FLX recovery, transform the local state into the remote state first, then remake the
-        // active subscription as complete, and apply local changes interleaved with pending subscriptions
-        // in separate commits as needed. This has the consequence that there may be extra notifications
-        // along the way to the final state, but since separate commits are necessary, this is unavoidable.
-        try {
-            wt_local = db_local->start_write();
-            RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
-            handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
-            wt_local->commit_and_continue_as_read();
-        }
-        catch (const std::exception& e) {
-            // If there is a fatal error while recovering the changesets in FLX mode,
-            // restore the old file ident in an abundance of caution so that manual client
-            // reset is triggered on the next open of the Realm. If we did not do this, the
-            // Realm may continue sync with only partially recovered state while having lost
-            // the history of any offline modifications.
-            logger.error("Could not recover local FLX changesets, restoring original ident", e.what());
-            if (wt_local->get_transact_stage() == DB::TransactStage::transact_Writing) {
-                wt_local->rollback_and_continue_as_read(); // avoid committing inconsistent state by rolling back
-            }
-            wt_local->promote_to_write();
-            history_local->set_client_file_ident_in_wt(current_version_local, orig_file_ident);
-            wt_local->commit();
-            logger.error("Restored original ident successfully");
-            throw;
-        }
+        // If in FLX mode, make a copy of the active subscription set and mark it as
+        // complete. This will cause all other subscription sets to become superceded.
+        // In DiscardLocal mode, only the active subscription set is preserved, so we
+        // are done.
+        remake_active_subscription();
     }
 
     if (did_recover_out) {
