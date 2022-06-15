@@ -9,6 +9,7 @@
 * Fix a data race when opening a flexible sync Realm (since v12.1.0).
 * Asymmetric sync now works with embedded objects. (Issue [#5565](https://github.com/realm/realm-core/issues/5565), since 12.1.0)
 * The C API type `realm_sync_error_code_t` did not include a textural representation of the underlying category. ([#5399](https://github.com/realm/realm-core/issues/5399)),
+* Calling Results::sum/min/max on a RealmList field returns its memory address. ([#5137](https://github.com/realm/realm-core/issues/5137))
  
 ### Breaking changes
 * `realm_sync_before_client_reset_func_t` and `realm_sync_after_client_reset_func_t` in the C API now return a boolean value to indicate whether the callback succeeded or not, which signals to the sync client that a fatal error occurred. (PR [#5564](https://github.com/realm/realm-core/pull/5564))
