@@ -340,6 +340,11 @@ target_compile_definitions(Catch2 PRIVATE
     CATCH_CONFIG_NO_CPP17_UNCAUGHT_EXCEPTIONS=1
     _SILENCE_CXX17_UNCAUGHT_EXCEPTION_DEPRECATION_WARNING=1
 )
+if (NOT MSVC)
+    target_compile_options(Catch2 PRIVATE
+        -Wno-deprecated-declarations
+    )
+endif()
 
 # Enable CTest and include unit tests
 enable_testing()
