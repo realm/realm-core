@@ -1142,7 +1142,7 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
             auto started = steady_clock::now();
             int ret = 0;
 
-            do {
+            for (;;) {
                 if (m_pollfd_slots.size() > 1) {
                     // Poll all network sockets
                     ret = WSAPoll(LPWSAPOLLFD(&m_pollfd_slots[1]), ULONG(m_pollfd_slots.size() - 1),
@@ -1155,10 +1155,13 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
                     ret++;
                 }
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                if (ret != 0 ||
+                    (duration_cast<milliseconds>(steady_clock::now() - started).count() >= max_wait_millis)) {
+                    break;
+                }
 
-            } while (ret == 0 &&
-                     (duration_cast<milliseconds>(steady_clock::now() - started).count() < max_wait_millis));
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
 
 #else // !defined _WIN32
             int ret = ::poll(fds, nfds, max_wait_millis);
