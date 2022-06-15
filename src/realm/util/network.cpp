@@ -1155,6 +1155,8 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
                     ret++;
                 }
 
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
             } while (ret == 0 &&
                      (duration_cast<milliseconds>(steady_clock::now() - started).count() < max_wait_millis));
 
