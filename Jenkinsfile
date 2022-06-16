@@ -240,7 +240,7 @@ jobWrapper {
 
                             if(requireNightlyBuild)
                             {
-                                def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+                                def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE	)
                                 def beta_version = "${gitDescribeVersion}_beta_${local_date}"  
                                 publishBuildArtifactsToS3(false, beta_version, path, files)
                             }
