@@ -3964,6 +3964,10 @@ struct Userdata {
 #if REALM_ENABLE_SYNC
 
 // std::atomic_bool
+std::atomic_bool baas_client_stop{false};
+std::atomic<std::size_t> error_handler_counter{0};
+std::atomic<std::size_t> before_client_reset_counter{0};
+std::atomic<std::size_t> after_client_reset_counter{0};
 
 TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     reset_utils::Partition partition{"realm_id", random_string(20)};
@@ -3998,33 +4002,12 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
 
-    struct ClientSyncObject {
-        static ClientSyncObject& instance()
-        {
-            static ClientSyncObject client;
-            return client;
-        }
-        bool stop()
-        {
-            return m_stop.load();
-        }
-        void signal()
-        {
-            m_stop = true;
-        }
-        void reset()
-        {
-            m_stop = false;
-        }
-        std::atomic_bool m_stop{false};
-    };
-
     struct ResetRealmFiles {
         void set_app(std::shared_ptr<realm::app::App> app)
         {
             m_app = app;
         }
-        void do_reset(const char* path)
+        void reset_realm(const char* path)
         {
             realm_app_t realm_app{m_app};
             realm_sync_immediately_run_file_actions(&realm_app, path);
@@ -4038,66 +4021,24 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     };
     ResetRealmFiles::instance().set_app(app);
 
-    struct AtomicCounter {
-        void increment()
-        {
-            std::lock_guard<std::mutex> lk{m_mutex};
-            m_counter += 1;
-        }
-        std::size_t fetch()
-        {
-            std::lock_guard<std::mutex> lk{m_mutex};
-            return m_counter;
-        }
-        void reset()
-        {
-            m_counter = 0;
-        }
-        std::mutex m_mutex;
-        std::size_t m_counter{0};
-    };
-
-    struct BeforeRstCnt : AtomicCounter {
-        static BeforeRstCnt& instance()
-        {
-            static BeforeRstCnt instance;
-            return instance;
-        }
-    };
-
-    struct AfterRstCnt : AtomicCounter {
-        static AfterRstCnt& instance()
-        {
-            static AfterRstCnt instance;
-            return instance;
-        }
-    };
-
-    struct ErrorHandlerCnt : AtomicCounter {
-        static ErrorHandlerCnt& instance()
-        {
-            static ErrorHandlerCnt instance;
-            return instance;
-        }
-    };
-
     SECTION("Manual reset") {
         realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
+
         realm_sync_config_set_error_handler(
             local_sync_config,
             [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
                 REQUIRE(sync_error.c_original_file_path_key);
                 REQUIRE(sync_error.c_recovery_file_path_key);
                 REQUIRE(sync_error.is_client_reset_requested);
-                ResetRealmFiles::instance().do_reset(sync_error.c_original_file_path_key);
-                ClientSyncObject::instance().signal();
+                ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                baas_client_stop.store(true);
             },
             nullptr, nullptr);
 
         make_reset(local_config, remote_config)
             ->on_post_reset([&](SharedRealm) {
                 util::EventLoop::main().run_until([&] {
-                    return ClientSyncObject::instance().stop();
+                    return baas_client_stop.load();
                 });
             })
             ->run();
@@ -4110,7 +4051,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             realm_sync_config_set_before_client_reset_handler(
                 local_sync_config,
                 [](realm_userdata_t, realm_t*) -> bool {
-                    BeforeRstCnt::instance().increment();
+                    before_client_reset_counter.fetch_add(1);
                     return true;
                 },
                 nullptr, nullptr);
@@ -4118,8 +4059,8 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             realm_sync_config_set_after_client_reset_handler(
                 local_sync_config,
                 [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
-                    AfterRstCnt::instance().increment();
-                    ClientSyncObject::instance().signal();
+                    after_client_reset_counter.fetch_add(1);
+                    baas_client_stop.store(true);
                     return true;
                 },
                 nullptr, nullptr);
@@ -4127,36 +4068,36 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             make_reset(local_config, remote_config)
                 ->on_post_reset([&](SharedRealm) {
                     util::EventLoop::main().run_until([&] {
-                        return ClientSyncObject::instance().stop();
+                        return baas_client_stop.load();
                     });
                 })
                 ->run();
 
-            REQUIRE(BeforeRstCnt::instance().fetch() == 1);
-            REQUIRE(AfterRstCnt::instance().fetch() == 1);
+            REQUIRE(before_client_reset_counter.load() == 1);
+            REQUIRE(after_client_reset_counter.load() == 1);
         }
 
         SECTION("Before client reset fails") {
-            ClientSyncObject::instance().reset();
-            BeforeRstCnt::instance().reset();
-            AfterRstCnt::instance().reset();
+            baas_client_stop.store(false);
+            before_client_reset_counter.store(0);
+            after_client_reset_counter.store(0);
 
             realm_sync_config_set_error_handler(
                 local_sync_config,
-                [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                [](realm_userdata_t, realm_sync_session_t* realm_session, const realm_sync_error_t sync_error) {
                     REQUIRE(sync_error.c_original_file_path_key);
                     REQUIRE(sync_error.c_recovery_file_path_key);
                     REQUIRE(sync_error.is_client_reset_requested);
-                    ResetRealmFiles::instance().do_reset(sync_error.c_original_file_path_key);
-                    ErrorHandlerCnt::instance().increment();
-                    ClientSyncObject::instance().signal();
+                    ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                    error_handler_counter.fetch_add(1);
+                    baas_client_stop.store(true);
                 },
                 nullptr, nullptr);
 
             realm_sync_config_set_before_client_reset_handler(
                 local_sync_config,
                 [](realm_userdata_t, realm_t*) -> bool {
-                    BeforeRstCnt::instance().increment();
+                    before_client_reset_counter.fetch_add(1);
                     return false;
                 },
                 nullptr, nullptr);
@@ -4164,7 +4105,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             realm_sync_config_set_after_client_reset_handler(
                 local_sync_config,
                 [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
-                    AfterRstCnt::instance().increment();
+                    after_client_reset_counter.fetch_add(1);
                     return true;
                 },
                 nullptr, nullptr);
@@ -4172,14 +4113,14 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
             make_reset(local_config, remote_config)
                 ->on_post_reset([&](SharedRealm) {
                     util::EventLoop::main().run_until([&] {
-                        return ClientSyncObject::instance().stop();
+                        return baas_client_stop.load();
                     });
                 })
                 ->run();
 
-            REQUIRE(ErrorHandlerCnt::instance().fetch() == 1);
-            REQUIRE(BeforeRstCnt::instance().fetch() == 1);
-            REQUIRE(AfterRstCnt::instance().fetch() == 0);
+            REQUIRE(error_handler_counter.load() == 1);
+            REQUIRE(before_client_reset_counter.load() == 1);
+            REQUIRE(after_client_reset_counter.load() == 0);
         }
     }
 }
