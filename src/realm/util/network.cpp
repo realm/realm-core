@@ -1160,7 +1160,9 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
                     break;
                 }
 
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                // If we don't have any sockets to poll for (m_pollfd_slots is less than 2) and no one signals
+                // the wakeup pipe, we'd be stuck busy waiting for either condition to become true.
+                std::this_thread::sleep_for(std::chrono::milliseconds(socket_poll_timeout));
             }
 
 #else // !defined _WIN32
