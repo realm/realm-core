@@ -18,6 +18,7 @@
 
 #include <realm/object-store/sync/sync_session.hpp>
 
+#include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
@@ -629,19 +630,18 @@ static sync::Session::Config::ClientReset make_client_reset_config(SyncConfig& s
     config.notify_after_client_reset = [notify = session_config.notify_after_client_reset](
                                            std::string local_path, VersionID previous_version, bool did_recover) {
         REALM_ASSERT(!local_path.empty());
-        SharedRealm frozen_before, active_after;
+        SharedRealm frozen_before;
+        ThreadSafeReference active_after;
         if (auto local_coordinator = RealmCoordinator::get_existing_coordinator(local_path)) {
             auto local_config = local_coordinator->get_config();
-            active_after = local_coordinator->get_realm(local_config, util::none);
+            active_after = local_coordinator->get_unbound_realm();
             local_config.scheduler = nullptr;
             frozen_before = local_coordinator->get_realm(local_config, previous_version);
-            REALM_ASSERT(active_after);
-            REALM_ASSERT(!active_after->is_frozen());
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
         }
         if (notify) {
-            notify(frozen_before, active_after, did_recover);
+            notify(frozen_before, std::move(active_after), did_recover);
         }
     };
     config.notify_before_client_reset = [notify = session_config.notify_before_client_reset](std::string local_path) {
