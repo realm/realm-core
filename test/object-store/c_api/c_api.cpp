@@ -18,6 +18,7 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
 #include <external/json/json.hpp>
+#include "sync/sync_test_utils.hpp"
 #endif
 
 using namespace realm;
@@ -3996,7 +3997,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
     auto make_reset = [&](Realm::Config config_local,
                           Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
-        return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
+        return realm::reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
