@@ -3963,7 +3963,6 @@ struct Userdata {
 
 #if REALM_ENABLE_SYNC
 
-// std::atomic_bool
 std::atomic_bool baas_client_stop{false};
 std::atomic<std::size_t> error_handler_counter{0};
 std::atomic<std::size_t> before_client_reset_counter{0};
