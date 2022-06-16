@@ -18,7 +18,11 @@
 #if REALM_ENABLE_SYNC
 #include <realm/object-store/sync/sync_user.hpp>
 #include <external/json/json.hpp>
+#endif
+
+#if REALM_ENABLE_AUTH_TESTS
 #include "sync/sync_test_utils.hpp"
+#include "util/baas_admin_api.hpp"
 #endif
 
 using namespace realm;
