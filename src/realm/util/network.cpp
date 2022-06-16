@@ -348,30 +348,128 @@ private:
 
 #else // defined _WIN32
 
+/* dumb_socketpair: http://cantrip.org/socketpair.c
+
+ * Copyright 2007 by Nathan C. Myers <ncm@cantrip.org>; some rights reserved.
+ * This code is Free Software.  It may be copied freely, in original or 
+ * modified form, subject only to the restrictions that (1) the author is
+ * relieved from all responsibilities for any use for any purpose, and (2)
+ * this copyright notice must be retained, unchanged, in its entirety.  If
+ * for any reason the author might be held responsible for any consequences
+ * of copying or use, license is withheld.  
+ */ 
+ /*
+ * If make_overlapped is nonzero, both sockets created will be usable for
+ * "overlapped" operations via WSASend etc.  If make_overlapped is zero,
+ * socks[0] (only) will be usable with regular ReadFile etc., and thus 
+ * suitable for use as stdin or stdout of a child process.  Note that the
+ * sockets must be closed with closesocket() regardless.
+ */
+int socketpair(SOCKET socks[2], int make_overlapped)
+{
+    union {
+       struct sockaddr_in inaddr;
+       struct sockaddr addr;
+    } a;
+    SOCKET listener;
+    int e;
+    socklen_t addrlen = sizeof(a.inaddr);
+    DWORD flags = (make_overlapped ? WSA_FLAG_OVERLAPPED : 0);
+    int reuse = 1;
+
+    if (socks == 0) {
+      WSASetLastError(WSAEINVAL);
+      return SOCKET_ERROR;
+    }
+
+    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listener == INVALID_SOCKET) 
+        return SOCKET_ERROR;
+
+    memset(&a, 0, sizeof(a));
+    a.inaddr.sin_family = AF_INET;
+    a.inaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    a.inaddr.sin_port = 0; 
+
+    socks[0] = socks[1] = INVALID_SOCKET;
+    do {
+        if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, 
+               (char*) &reuse, (socklen_t) sizeof(reuse)) == -1)
+            break;
+        if  (bind(listener, &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR)
+            break;
+        if  (getsockname(listener, &a.addr, &addrlen) == SOCKET_ERROR)
+            break;
+        if (listen(listener, 1) == SOCKET_ERROR)
+            break;
+        socks[0] = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, flags);
+        if (socks[0] == INVALID_SOCKET)
+            break;
+        if (connect(socks[0], &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR)
+            break;
+        socks[1] = accept(listener, NULL, NULL);
+        if (socks[1] == INVALID_SOCKET)
+            break;
+
+        closesocket(listener);
+        return 0;
+
+    } while (0);
+
+    e = WSAGetLastError();
+    closesocket(listener);
+    closesocket(socks[0]);
+    closesocket(socks[1]);
+    WSASetLastError(e);
+    return SOCKET_ERROR;
+}
+
 class WakeupPipe {
 public:
+    WakeupPipe() {
+      SOCKET socks[2];
+      
+      int res = socketpair(socks, true);
+      if (REALM_UNLIKELY(res == SOCKET_ERROR)) {
+        std::error_code ec = make_basic_system_error_code(errno);
+        throw std::system_error(ec);
+      }
+
+      m_write_fd.reset(socks[0]);
+      m_read_fd.reset(socks[1]);
+    }
+
     SOCKET wait_fd() const noexcept
     {
-        return INVALID_SOCKET;
+        return m_read_fd;
     }
 
     void signal() noexcept
     {
-        m_signal_count++;
-    }
-
-    bool is_signaled() const noexcept
-    {
-        return m_signal_count > 0;
+        LockGuard lock{m_mutex};
+        if (!m_signaled) {
+            char c = 0;
+            ssize_t ret = ::send(m_write_fd, &c, 1, 0);
+            REALM_ASSERT_RELEASE(ret != SOCKET_ERROR);
+            m_signaled = true;
+        }
     }
 
     void acknowledge_signal() noexcept
     {
-        m_signal_count--;
+        LockGuard lock{m_mutex};
+        if (m_signaled) {
+            char c;
+            ssize_t ret = ::recv(m_read_fd, &c, 1, 0);
+            REALM_ASSERT_RELEASE(ret != SOCKET_ERROR);
+            m_signaled = false;
+        }
     }
 
 private:
-    std::atomic<uint32_t> m_signal_count = 0;
+    CloseGuard m_read_fd, m_write_fd;
+    Mutex m_mutex;
+    bool m_signaled = false; // Protected by `m_mutex`.
 };
 
 #endif // defined _WIN32
@@ -1122,19 +1220,6 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
 #endif
 
 #ifdef _WIN32
-            max_wait_millis = 1000;
-
-            // Windows does not have a single API call to wait for pipes and
-            // sockets with a timeout. So we repeatedly poll them individually
-            // in a loop until max_wait_millis has elapsed or an event happend.
-            //
-            // FIXME: Maybe switch to Windows IOCP instead.
-
-            // Following variable is the poll time for the sockets in
-            // miliseconds. Adjust it to find a balance between CPU usage and
-            // response time:
-            constexpr INT socket_poll_timeout = 10;
-
             for (size_t t = 0; t < m_pollfd_slots.size(); t++)
                 m_pollfd_slots[t].revents = 0;
 
@@ -1142,21 +1227,14 @@ bool Service::IoReactor::wait_and_advance(clock::time_point timeout, clock::time
             auto started = steady_clock::now();
             int ret = 0;
 
-            do {
-                if (m_pollfd_slots.size() > 1) {
+            
                     // Poll all network sockets
-                    ret = WSAPoll(LPWSAPOLLFD(&m_pollfd_slots[1]), ULONG(m_pollfd_slots.size() - 1),
-                                  socket_poll_timeout);
+                    ret = WSAPoll(LPWSAPOLLFD(fds), ULONG(m_pollfd_slots.size()),
+                                  max_wait_millis);
+                    /*if (ret == SOCKET_ERROR) {
+                        int lastErr = WSAGetLastError();
+                    }*/
                     REALM_ASSERT(ret != SOCKET_ERROR);
-                }
-
-                if (m_wakeup_pipe.is_signaled()) {
-                    m_pollfd_slots[0].revents = POLLIN;
-                    ret++;
-                }
-
-            } while (ret == 0 &&
-                     (duration_cast<milliseconds>(steady_clock::now() - started).count() < max_wait_millis));
 
 #else // !defined _WIN32
             int ret = ::poll(fds, nfds, max_wait_millis);
