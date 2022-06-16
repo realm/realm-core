@@ -3964,6 +3964,98 @@ struct Userdata {
 
 #if REALM_ENABLE_SYNC
 
+static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
+                                 const realm_async_error_t* async_error)
+{
+    auto userdata_p = static_cast<Userdata*>(p);
+
+    userdata_p->realm_ref = realm;
+    userdata_p->has_error = async_error != nullptr;
+    if (userdata_p->has_error)
+        realm_get_async_error(async_error, &userdata_p->error);
+    userdata_p->called = true;
+}
+
+TEST_CASE("C API - async_open", "[c_api][sync]") {
+    TestSyncManager init_sync_manager;
+    SyncTestFile test_config(init_sync_manager.app(), "default");
+    test_config.cache = false;
+    ObjectSchema object_schema = {"object",
+                                  {
+                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                      {"value", PropertyType::Int},
+                                  }};
+    test_config.schema = Schema{object_schema};
+
+    SECTION("can open synced Realms that don't already exist") {
+        realm_config_t* config = realm_config_new();
+        config->schema = Schema{object_schema};
+        realm_user user(init_sync_manager.app()->current_user());
+        realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
+        realm_config_set_path(config, test_config.path.c_str());
+        realm_config_set_sync_config(config, sync_config);
+        realm_config_set_schema_version(config, 1);
+        Userdata userdata;
+        realm_async_open_task_t* task = realm_open_synchronized(config);
+        REQUIRE(task);
+        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
+        util::EventLoop::main().run_until([&] {
+            return userdata.called.load();
+        });
+        REQUIRE(userdata.called);
+        REQUIRE(userdata.realm_ref);
+        realm_release(task);
+
+        realm_t* realm = realm_from_thread_safe_reference(userdata.realm_ref, nullptr);
+        realm_release(userdata.realm_ref);
+
+        bool found;
+        realm_class_info_t class_info;
+        realm_find_class(realm, "object", &found, &class_info);
+        REQUIRE(found);
+        realm_release(realm);
+        realm_release(config);
+        realm_release(sync_config);
+    }
+
+    SECTION("cancels download and reports an error on auth error") {
+        // Create a token which can be parsed as a JWT but is not valid
+        std::string unencoded_body = nlohmann::json({{"exp", 123}, {"iat", 456}}).dump();
+        std::string encoded_body;
+        encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
+        util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
+        auto invalid_token = "." + encoded_body + ".";
+
+
+        realm_config_t* config = realm_config_new();
+        config->schema = Schema{object_schema};
+        realm_user user(init_sync_manager.app()->current_user());
+        realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
+        sync_config->user->update_refresh_token(std::string(invalid_token));
+        sync_config->user->update_access_token(std::move(invalid_token));
+
+        realm_config_set_path(config, test_config.path.c_str());
+        realm_config_set_sync_config(config, sync_config);
+        realm_config_set_schema_version(config, 1);
+        Userdata userdata;
+        realm_async_open_task_t* task = realm_open_synchronized(config);
+        REQUIRE(task);
+        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
+        init_sync_manager.network_callback(app::Response{403});
+        util::EventLoop::main().run_until([&] {
+            return userdata.called.load();
+        });
+        REQUIRE(userdata.called);
+        REQUIRE(!userdata.realm_ref);
+        realm_release(task);
+        realm_release(config);
+        realm_release(sync_config);
+    }
+}
+#endif
+
+#ifdef REALM_ENABLE_AUTH_TESTS
+
 std::atomic_bool baas_client_stop{false};
 std::atomic<std::size_t> error_handler_counter{0};
 std::atomic<std::size_t> before_client_reset_counter{0};
@@ -3997,7 +4089,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
     auto make_reset = [&](Realm::Config config_local,
                           Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
-        return realm::reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
+        return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
@@ -4125,97 +4217,6 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
     }
 }
 
-static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
-                                 const realm_async_error_t* async_error)
-{
-    auto userdata_p = static_cast<Userdata*>(p);
-
-    userdata_p->realm_ref = realm;
-    userdata_p->has_error = async_error != nullptr;
-    if (userdata_p->has_error)
-        realm_get_async_error(async_error, &userdata_p->error);
-    userdata_p->called = true;
-}
-
-TEST_CASE("C API - async_open", "[c_api][sync]") {
-    TestSyncManager init_sync_manager;
-    SyncTestFile test_config(init_sync_manager.app(), "default");
-    test_config.cache = false;
-    ObjectSchema object_schema = {"object",
-                                  {
-                                      {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                                      {"value", PropertyType::Int},
-                                  }};
-    test_config.schema = Schema{object_schema};
-
-    SECTION("can open synced Realms that don't already exist") {
-        realm_config_t* config = realm_config_new();
-        config->schema = Schema{object_schema};
-        realm_user user(init_sync_manager.app()->current_user());
-        realm_sync_config_t* sync_config = realm_sync_config_new(&user, "default");
-        realm_config_set_path(config, test_config.path.c_str());
-        realm_config_set_sync_config(config, sync_config);
-        realm_config_set_schema_version(config, 1);
-        Userdata userdata;
-        realm_async_open_task_t* task = realm_open_synchronized(config);
-        REQUIRE(task);
-        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
-        util::EventLoop::main().run_until([&] {
-            return userdata.called.load();
-        });
-        REQUIRE(userdata.called);
-        REQUIRE(userdata.realm_ref);
-        realm_release(task);
-
-        realm_t* realm = realm_from_thread_safe_reference(userdata.realm_ref, nullptr);
-        realm_release(userdata.realm_ref);
-
-        bool found;
-        realm_class_info_t class_info;
-        realm_find_class(realm, "object", &found, &class_info);
-        REQUIRE(found);
-        realm_release(realm);
-        realm_release(config);
-        realm_release(sync_config);
-    }
-
-    SECTION("cancels download and reports an error on auth error") {
-        // Create a token which can be parsed as a JWT but is not valid
-        std::string unencoded_body = nlohmann::json({{"exp", 123}, {"iat", 456}}).dump();
-        std::string encoded_body;
-        encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
-        util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
-        auto invalid_token = "." + encoded_body + ".";
-
-
-        realm_config_t* config = realm_config_new();
-        config->schema = Schema{object_schema};
-        realm_user user(init_sync_manager.app()->current_user());
-        realm_sync_config_t* sync_config = realm_sync_config_new(&user, "realm");
-        sync_config->user->update_refresh_token(std::string(invalid_token));
-        sync_config->user->update_access_token(std::move(invalid_token));
-
-        realm_config_set_path(config, test_config.path.c_str());
-        realm_config_set_sync_config(config, sync_config);
-        realm_config_set_schema_version(config, 1);
-        Userdata userdata;
-        realm_async_open_task_t* task = realm_open_synchronized(config);
-        REQUIRE(task);
-        realm_async_open_task_start(task, task_completion_func, &userdata, nullptr);
-        init_sync_manager.network_callback(app::Response{403});
-        util::EventLoop::main().run_until([&] {
-            return userdata.called.load();
-        });
-        REQUIRE(userdata.called);
-        REQUIRE(!userdata.realm_ref);
-        realm_release(task);
-        realm_release(config);
-        realm_release(sync_config);
-    }
-}
-#endif
-
-#ifdef REALM_ENABLE_AUTH_TESTS
 
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
