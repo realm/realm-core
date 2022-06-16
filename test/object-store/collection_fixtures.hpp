@@ -19,7 +19,7 @@
 #ifndef REALM_TEST_COLLECTION_FIXTURES_HPP
 #define REALM_TEST_COLLECTION_FIXTURES_HPP
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include <realm/object-store/list.hpp>
 #include <realm/object-store/property.hpp>
@@ -205,11 +205,11 @@ struct Float : Base<PropertyType::Float, float> {
     }
     static auto sum()
     {
-        return Approx(6.6f);
+        return Catch::Approx(6.6f);
     }
     static auto average()
     {
-        return Approx(2.2f);
+        return Catch::Approx(2.2f);
     }
 };
 
@@ -228,11 +228,11 @@ struct Double : Base<PropertyType::Double, double> {
     }
     static auto sum()
     {
-        return Approx(6.6);
+        return Catch::Approx(6.6);
     }
     static auto average()
     {
-        return Approx(2.2);
+        return Catch::Approx(2.2);
     }
 };
 

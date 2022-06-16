@@ -1,7 +1,8 @@
-#include "catch2/catch.hpp"
+#include <catch2/catch_all.hpp>
 
 #include "collection_fixtures.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 #include "util/index_helpers.hpp"
 
 #include <realm/object-store/binding_context.hpp>
@@ -481,8 +482,7 @@ TEMPLATE_PRODUCT_TEST_CASE("set of links to all types", "[set]", (CreateNewSet, 
         }
         SECTION("sort") {
             if (!Test::can_sort()) {
-                REQUIRE_THROWS_WITH(set_as_results().sort({{"value", true}}),
-                                    Catch::Matchers::Contains("is of unsupported type"));
+                REQUIRE_THROWS_CONTAINING(set_as_results().sort({{"value", true}}), "is of unsupported type");
                 return;
             }
             SECTION("ascending") {

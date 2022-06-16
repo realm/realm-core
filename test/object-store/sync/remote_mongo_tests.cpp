@@ -26,7 +26,7 @@
 #include <realm/object-store/sync/mongo_collection.hpp>
 
 #include <sstream>
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 namespace realm::app {
 using bson::Bson;

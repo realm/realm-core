@@ -108,14 +108,6 @@ functions:
               set_cmake_var realm_vars REALM_TEST_SYNC_LOGGING BOOL On
           fi
 
-          if [ -n "${realm_enable_compensating_writes_tests|}" ]; then
-              set_cmake_var realm_vars REALM_ENABLE_COMPENSATING_WRITES_TESTS BOOL On
-          fi
-
-          if [ -n "${realm_enable_master_baas_tests|}" ]; then
-              set_cmake_var realm_vars REALM_ENABLE_MASTER_BAAS_TESTS BOOL On
-          fi
-
           GENERATOR="${cmake_generator}"
           if [ -z "${cmake_generator|}" ]; then
               GENERATOR="Ninja Multi-Config"
@@ -209,8 +201,38 @@ functions:
       content_type: text/text
       display_name: baas server logs
       optional: true
+  - command: s3.put
+    params:
+      aws_key: '${artifacts_aws_access_key}'
+      aws_secret: '${artifacts_aws_secret_key}'
+      local_file: 'realm-core/install_baas_output.log'
+      remote_file: '${project}/${branch_name}/${task_id}/${execution}/install_baas_output.log'
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/text
+      display_name: install baas output
+      optional: true
 
   "run hang analyzer":
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |-
+        set -o errexit
+        set -o verbose
+
+        if [[ -z "{run_tests_against_baas|}" ]]; then
+          exit 0
+        fi
+
+        BAAS_PID=$(pgrep baas_server)
+        if [[ -z "$BAAS_PID" ]]; then
+          echo "No baas pid found"
+          exit 0
+        fi
+
+        kill -3 $BAAS_PID
+
   - command: shell.exec
     params:
       shell: bash
@@ -518,7 +540,7 @@ tasks:
                 INSTALL_BAAS_BRANCH="-b ${baas_branch}"
             fi
 
-            ./evergreen/install_baas.sh -w ./baas-work-dir $INSTALL_BAAS_BRANCH
+            ./evergreen/install_baas.sh -w ./baas-work-dir $INSTALL_BAAS_BRANCH 2>&1 | tee install_baas_output.log
         fi
 
   - command: shell.exec
@@ -670,42 +692,6 @@ buildvariants:
     cxx_compiler: "./clang_binaries/bin/clang++"
   tasks:
   - name: lint
-  - name: compile_test
-    distros:
-    - ubuntu2004-large
-
-- name: ubuntu2004-compensating-writes
-  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Compensating Writes)"
-  run_on: ubuntu2004-small
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    run_tests_against_baas: On
-    realm_enable_compensating_writes_tests: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    baas_branch: master
-  tasks:
-  - name: compile_test
-    distros:
-    - ubuntu2004-large
-
-- name: ubuntu2004-asymmetric-sync
-  display_name: "Ubuntu 20.04 x86_64 (Clang 11 Asymmetric Sync)"
-  run_on: ubuntu2004-small
-  expansions:
-    clang_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/clang%2Bllvm-11.0.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz"
-    cmake_url: "https://s3.amazonaws.com/static.realm.io/evergreen-assets/cmake-3.20.3-linux-x86_64.tar.gz"
-    cmake_bindir: "./cmake_binaries/bin"
-    fetch_missing_dependencies: On
-    run_tests_against_baas: On
-    realm_enable_master_baas_tests: On
-    c_compiler: "./clang_binaries/bin/clang"
-    cxx_compiler: "./clang_binaries/bin/clang++"
-    baas_branch: master
-  tasks:
   - name: compile_test
     distros:
     - ubuntu2004-large

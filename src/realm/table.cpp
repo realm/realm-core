@@ -360,7 +360,7 @@ ColKey Table::add_column(Table& target, StringData name)
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
     // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
+    if (is_asymmetric() && !target.is_embedded()) {
         throw LogicError(LogicError::wrong_kind_of_table);
     }
     // Incoming links from an asymmetric table are not allowed.

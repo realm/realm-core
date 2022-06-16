@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "sync/flx_sync_harness.hpp"
 #include "util/event_loop.hpp"
