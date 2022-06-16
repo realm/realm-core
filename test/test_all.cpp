@@ -453,25 +453,19 @@ bool run_tests(util::Logger* logger)
     {
         const char* str = getenv("UNITTEST_PROGRESS");
         bool report_progress = str && strlen(str) != 0;
-        std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
-        reporters.push_back(std::move(reporter));
+        reporters.push_back(std::make_unique<CustomReporter>(report_progress));
     }
     if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
         xml_file.open(str);
-        std::unique_ptr<Reporter> reporter_1 = create_junit_reporter(xml_file);
-        std::unique_ptr<Reporter> reporter_2 = create_twofold_reporter(*reporters.back(), *reporter_1);
-        reporters.push_back(std::move(reporter_1));
-        reporters.push_back(std::move(reporter_2));
+        reporters.push_back(create_junit_reporter(xml_file));
     }
     else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
-        auto evergreen_reporter = create_evergreen_reporter(str);
-        auto combined_reporter = create_twofold_reporter(*reporters.back(), *evergreen_reporter);
-        reporters.push_back(std::move(evergreen_reporter));
-        reporters.push_back(std::move(combined_reporter));
+        reporters.push_back(create_evergreen_reporter(str));
     }
-    config.reporter = reporters.back().get();
+    auto reporter = create_combined_reporter(reporters);
+    config.reporter = reporter.get();
 
     // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
