@@ -4083,7 +4083,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
             realm_sync_config_set_error_handler(
                 local_sync_config,
-                [](realm_userdata_t, realm_sync_session_t* realm_session, const realm_sync_error_t sync_error) {
+                [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
                     REQUIRE(sync_error.c_original_file_path_key);
                     REQUIRE(sync_error.c_recovery_file_path_key);
                     REQUIRE(sync_error.is_client_reset_requested);
