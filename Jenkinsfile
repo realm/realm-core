@@ -68,6 +68,7 @@ jobWrapper {
         }
         else if(isCoreCronJob && requireNightlyBuild) {
             isPublishingRun = true
+            longRunningTests = true
         }
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
@@ -135,9 +136,9 @@ jobWrapper {
             checkLinuxDebug         : doCheckInDocker(buildOptions),
             checkLinuxDebugEncrypt  : doCheckInDocker(buildOptions + [useEncryption : true]),
             checkLinuxRelease_4     : doCheckInDocker(buildOptions + [maxBpNodeSize: 4, buildType : 'Release']),
-            //checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
+            checkLinuxDebug_Sync    : doCheckInDocker(buildOptions + [enableSync: true, dumpChangesetTransform: true]),
             checkLinuxDebugNoEncryp : doCheckInDocker(buildOptions + [enableEncryption: false]),
-            //checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
+            checkMacOsRelease_Sync  : doBuildMacOs(buildOptions + [buildType: 'Release', enableSync: true]),
             checkWindows_x86_Release: doBuildWindows('Release', false, 'Win32', true),
             checkWindows_x64_Debug  : doBuildWindows('Debug', false, 'x64', true),
             buildUWP_x86_Release    : doBuildWindows('Release', true, 'Win32', false),
@@ -240,7 +241,7 @@ jobWrapper {
 
                             if(requireNightlyBuild)
                             {
-                                def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE	)
+                                def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
                                 def beta_version = "${gitDescribeVersion}_beta_${local_date}"  
                                 publishBuildArtifactsToS3(false, beta_version, path, files)
                             }
