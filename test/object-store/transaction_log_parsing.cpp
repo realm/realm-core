@@ -32,7 +32,6 @@
 #include <realm/object-store/schema.hpp>
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 
 #include <iostream>
 

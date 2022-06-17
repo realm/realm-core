@@ -28,7 +28,6 @@
 #include <realm.hpp>
 #include <realm/column_integer.hpp>
 #include <realm/array_bool.hpp>
-#include <realm/history.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/index_string.hpp>
 #include <realm/query_expression.hpp>

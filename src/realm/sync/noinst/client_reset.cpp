@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/table_view.hpp>
 #include <realm/set.hpp>

@@ -1,7 +1,7 @@
 #ifndef REALM_SYNC_CLIENT_BASE_HPP
 #define REALM_SYNC_CLIENT_BASE_HPP
 
-#include <realm/db.hpp>
+#include <realm/transaction.hpp>
 #include <realm/sync/config.hpp>
 #include <realm/sync/protocol.hpp>
 #include <realm/util/functional.hpp>

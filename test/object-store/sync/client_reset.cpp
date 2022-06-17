@@ -2532,8 +2532,12 @@ TEMPLATE_TEST_CASE("client reset collections of links", "[client reset][local][l
                          {dest_pk_1, dest_pk_2, dest_pk_3, dest_pk_5}, 1);
     }
     if (test_mode == ClientResyncMode::Recover) {
-        SECTION("local removes source object, remote modifies list") {
+        SECTION("local adds a list item and removes source object, remote modifies list") {
             reset_collection_removing_source_object({Add{dest_pk_4}, RemoveObject{"source", source_pk}},
+                                                    {Add{dest_pk_5}});
+        }
+        SECTION("local erases list item then removes source object, remote modifies list") {
+            reset_collection_removing_source_object({Remove{dest_pk_1}, RemoveObject{"source", source_pk}},
                                                     {Add{dest_pk_5}});
         }
         SECTION("remote removes source object, recover local modifications") {

@@ -1,18 +1,16 @@
+#include "compare_groups.hpp"
+
 #include <algorithm>
 #include <vector>
 #include <set>
 #include <sstream>
 #include <iostream>
 
-#include <realm/group.hpp>
 #include <realm/table.hpp>
 #include <realm/sync/object_id.hpp>
 #include <realm/list.hpp>
 #include <realm/dictionary.hpp>
 #include <realm/set.hpp>
-
-#include "compare_groups.hpp"
-
 
 using namespace realm;
 

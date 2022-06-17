@@ -19,7 +19,8 @@
 #ifndef REALM_HPP
 #define REALM_HPP
 
-#include <realm/db.hpp>
+#include <realm/history.hpp>
+#include <realm/transaction.hpp>
 #include <realm/obj.hpp>
 #include <realm/list.hpp>
 #include <realm/set.hpp>

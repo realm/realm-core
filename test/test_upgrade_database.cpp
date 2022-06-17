@@ -30,7 +30,6 @@
 #endif
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 #include <realm/query_expression.hpp>
 #include <realm/util/file.hpp>
 #include <realm/util/to_string.hpp>
