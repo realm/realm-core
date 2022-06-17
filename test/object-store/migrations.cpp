@@ -35,6 +35,10 @@
 #include <Windows.h>
 #endif
 
+#if REALM_ENABLE_AUTH_TESTS
+#include "sync/flx_sync_harness.hpp"
+#endif // REALM_ENABLE_AUTH_TESTS
+
 using namespace realm;
 using TableType = ObjectSchema::TableType;
 using util::any_cast;
@@ -2773,3 +2777,111 @@ TEST_CASE("migration: Manual") {
         REQUIRE_THROWS_AS(realm->update_schema(new_schema, 1, nullptr), SchemaMismatchException);
     }
 }
+
+#if REALM_ENABLE_AUTH_TESTS
+
+TEST_CASE("migrations with asymmetric tables") {
+    realm::app::FLXSyncTestHarness harness("asymmetric_sync_migrations");
+    SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config.automatic_change_notifications = false;
+
+    SECTION("migration: Automatic") {
+        config.schema_mode = SchemaMode::Automatic;
+
+        SECTION("add asymmetric object schema") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {};
+            Schema schema2 = add_table(schema1, {"object",
+                                                 TableType::TopLevelAsymmetric,
+                                                 {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                                  {"value", PropertyType::Int}}});
+            Schema schema3 =
+                add_table(schema2, {"object2",
+                                    TableType::TopLevelAsymmetric,
+                                    {{"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                                     {"link", PropertyType::Object | PropertyType::Array, "embedded2"}}});
+            schema3 = add_table(schema3, {"embedded2", TableType::Embedded, {{"value", PropertyType::Int}}});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema3, 1);
+        }
+
+        SECTION("cannot change table from top-level to top-level asymmetric without version bump") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "object", TableType::TopLevelAsymmetric), 1),
+                "Class 'object' has been changed from TopLevel to TopLevelAsymmetric.");
+        }
+
+        SECTION("cannot change table from top-level asymmetric to top-level without version bump") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema = {
+                {"object",
+                 TableType::TopLevelAsymmetric,
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema, 1);
+            REQUIRE_THROWS_CONTAINING(realm->update_schema(set_table_type(schema, "object", TableType::TopLevel), 1),
+                                      "Class 'object' has been changed from TopLevelAsymmetric to TopLevel.");
+        }
+
+        SECTION("cannot change empty table from top-level to top-level asymmetric") {
+            Schema schema = {
+                {"table",
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "table");
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevel);
+
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "table", TableType::TopLevelAsymmetric), 2, nullptr),
+                "Cannot change 'class_table' to/from asymmetric.");
+
+            REQUIRE(realm->schema_version() == 1);
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevel);
+        }
+
+        SECTION("cannot change empty table from top-level asymmetric to top-level") {
+            Schema schema = {
+                {"table",
+                 TableType::TopLevelAsymmetric,
+                 {
+                     {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                     {"value", PropertyType::Int},
+                 }},
+            };
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(schema, 1);
+            auto child_table = ObjectStore::table_for_object_type(realm->read_group(), "table");
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevelAsymmetric);
+
+            REQUIRE_THROWS_CONTAINING(
+                realm->update_schema(set_table_type(schema, "table", TableType::TopLevel), 2, nullptr),
+                "Cannot change 'class_table' to/from asymmetric.");
+
+            REQUIRE(realm->schema_version() == 1);
+            REQUIRE(child_table->get_table_type() == Table::Type::TopLevelAsymmetric);
+        }
+    }
+}
+
+#endif // REALM_ENABLE_AUTH_TESTS
