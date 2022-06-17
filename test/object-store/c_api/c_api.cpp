@@ -20,6 +20,11 @@
 #include <external/json/json.hpp>
 #endif
 
+#if REALM_ENABLE_AUTH_TESTS
+#include "sync/sync_test_utils.hpp"
+#include "util/baas_admin_api.hpp"
+#endif
+
 using namespace realm;
 
 extern "C" int realm_c_api_tests(const char* file);
@@ -3962,6 +3967,7 @@ struct Userdata {
 };
 
 #if REALM_ENABLE_SYNC
+
 static void task_completion_func(void* p, realm_thread_safe_reference_t* realm,
                                  const realm_async_error_t* async_error)
 {
@@ -4053,6 +4059,168 @@ TEST_CASE("C API - async_open", "[c_api][sync]") {
 #endif
 
 #ifdef REALM_ENABLE_AUTH_TESTS
+
+std::atomic_bool baas_client_stop{false};
+std::atomic<std::size_t> error_handler_counter{0};
+std::atomic<std::size_t> before_client_reset_counter{0};
+std::atomic<std::size_t> after_client_reset_counter{0};
+
+TEST_CASE("C API - client reset", "[c_api][client-reset]") {
+    reset_utils::Partition partition{"realm_id", random_string(20)};
+    Property partition_prop = {partition.property_name, PropertyType::String | PropertyType::Nullable};
+    Schema schema{
+        {"object",
+         {
+             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+             {"value", PropertyType::Int},
+             partition_prop,
+         }},
+    };
+
+    std::string base_url = get_base_url();
+    REQUIRE(!base_url.empty());
+    auto server_app_config = minimal_app_config(base_url, "c_api_client_reset_tests", schema);
+    server_app_config.partition_key = partition_prop;
+    TestAppSession test_app_session(create_app(server_app_config));
+
+    auto app = test_app_session.app();
+    auto get_valid_config = [&]() -> SyncTestFile {
+        create_user_and_log_in(app);
+        return SyncTestFile(app->current_user(), partition.value, schema);
+    };
+    SyncTestFile local_config = get_valid_config();
+    SyncTestFile remote_config = get_valid_config();
+
+    auto make_reset = [&](Realm::Config config_local,
+                          Realm::Config config_remote) -> std::unique_ptr<reset_utils::TestClientReset> {
+        return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
+    };
+
+    realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
+
+    struct ResetRealmFiles {
+        void set_app(std::shared_ptr<realm::app::App> app)
+        {
+            m_app = app;
+        }
+        void reset_realm(const char* path)
+        {
+            realm_app_t realm_app{m_app};
+            realm_sync_immediately_run_file_actions(&realm_app, path);
+        }
+        static ResetRealmFiles& instance()
+        {
+            static ResetRealmFiles instance;
+            return instance;
+        }
+        std::shared_ptr<realm::app::App> m_app;
+    };
+    ResetRealmFiles::instance().set_app(app);
+
+    SECTION("Manual reset") {
+        realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
+
+        realm_sync_config_set_error_handler(
+            local_sync_config,
+            [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                REQUIRE(sync_error.c_original_file_path_key);
+                REQUIRE(sync_error.c_recovery_file_path_key);
+                REQUIRE(sync_error.is_client_reset_requested);
+                ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                baas_client_stop.store(true);
+            },
+            nullptr, nullptr);
+
+        make_reset(local_config, remote_config)
+            ->on_post_reset([&](SharedRealm) {
+                util::EventLoop::main().run_until([&] {
+                    return baas_client_stop.load();
+                });
+            })
+            ->run();
+    }
+
+    SECTION("Local Discard") {
+        realm_sync_config_set_resync_mode(local_sync_config, RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
+
+        SECTION("Before client reset success") {
+            realm_sync_config_set_before_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*) -> bool {
+                    before_client_reset_counter.fetch_add(1);
+                    return true;
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_after_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                    after_client_reset_counter.fetch_add(1);
+                    baas_client_stop.store(true);
+                    return true;
+                },
+                nullptr, nullptr);
+
+            make_reset(local_config, remote_config)
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return baas_client_stop.load();
+                    });
+                })
+                ->run();
+
+            REQUIRE(before_client_reset_counter.load() == 1);
+            REQUIRE(after_client_reset_counter.load() == 1);
+        }
+
+        SECTION("Before client reset fails") {
+            baas_client_stop.store(false);
+            before_client_reset_counter.store(0);
+            after_client_reset_counter.store(0);
+
+            realm_sync_config_set_error_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_sync_session_t*, const realm_sync_error_t sync_error) {
+                    REQUIRE(sync_error.c_original_file_path_key);
+                    REQUIRE(sync_error.c_recovery_file_path_key);
+                    REQUIRE(sync_error.is_client_reset_requested);
+                    ResetRealmFiles::instance().reset_realm(sync_error.c_original_file_path_key);
+                    error_handler_counter.fetch_add(1);
+                    baas_client_stop.store(true);
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_before_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*) -> bool {
+                    before_client_reset_counter.fetch_add(1);
+                    return false;
+                },
+                nullptr, nullptr);
+
+            realm_sync_config_set_after_client_reset_handler(
+                local_sync_config,
+                [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                    after_client_reset_counter.fetch_add(1);
+                    return true;
+                },
+                nullptr, nullptr);
+
+            make_reset(local_config, remote_config)
+                ->on_post_reset([&](SharedRealm) {
+                    util::EventLoop::main().run_until([&] {
+                        return baas_client_stop.load();
+                    });
+                })
+                ->run();
+
+            REQUIRE(error_handler_counter.load() == 1);
+            REQUIRE(before_client_reset_counter.load() == 1);
+            REQUIRE(after_client_reset_counter.load() == 0);
+        }
+    }
+}
+
 
 static void realm_app_void_completion(void*, const realm_app_error_t*) {}
 
