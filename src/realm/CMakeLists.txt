@@ -58,6 +58,7 @@ set(REALM_SOURCES
     obj_list.cpp
     object_id.cpp
     table_view.cpp
+    transaction.cpp
     sort_descriptor.cpp
     status.cpp
     unicode.cpp
@@ -190,6 +191,7 @@ set(REALM_INSTALL_HEADERS
     table_cluster_tree.hpp
     table_ref.hpp
     table_view.hpp
+    transaction.hpp
     timestamp.hpp
     unicode.hpp
     utilities.hpp

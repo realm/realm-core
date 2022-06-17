@@ -19,7 +19,6 @@
 #include "testsettings.hpp"
 
 #include <realm.hpp>
-#include <realm/history.hpp>
 #include <realm/array_mixed.hpp>
 
 #include "test.hpp"

@@ -15,7 +15,6 @@
 #include <realm.hpp>
 #include <realm/chunked_binary.hpp>
 #include <realm/data_type.hpp>
-#include <realm/history.hpp>
 #include <realm/impl/simulated_failure.hpp>
 #include <realm/list.hpp>
 #include <realm/sync/changeset.hpp>

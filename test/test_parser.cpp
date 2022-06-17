@@ -56,8 +56,6 @@
 // check-testcase` (or one of its friends) from the command line.
 
 #include <realm.hpp>
-#include <realm/history.hpp>
-#include <realm/query_expression.hpp>
 #include <realm/replication.hpp>
 #include <realm/util/any.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>

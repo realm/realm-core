@@ -53,7 +53,6 @@
 
 #include <realm.hpp>
 #include <realm/replication.hpp>
-#include <realm/history.hpp>
 
 using namespace realm;
 using namespace realm::metrics;
