@@ -1848,6 +1848,48 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 }
 
+TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
+    FLXSyncTestHarness::ServerSchema server_schema;
+    server_schema.dev_mode_enabled = true;
+    server_schema.schema = Schema{};
+
+    auto schema = Schema{{"Asymmetric",
+                          ObjectSchema::TableType::TopLevelAsymmetric,
+                          {
+                              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                              {"location", PropertyType::String | PropertyType::Nullable},
+                          }},
+                         {"TopLevel",
+                          {
+                              {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                              {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
+                          }}};
+
+    FLXSyncTestHarness harness("asymmetric_sync", server_schema);
+
+    auto foo_obj_id = ObjectId::gen();
+    auto bar_obj_id = ObjectId::gen();
+
+    harness.do_with_new_realm(
+        [&](SharedRealm realm) {
+            auto table = realm->read_group().get_table("class_TopLevel");
+            auto new_query = realm->get_latest_subscription_set().make_mutable_copy();
+            new_query.insert_or_assign(Query(table));
+            std::move(new_query).commit();
+
+            CppContext c(realm);
+            realm->begin_transaction();
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
+            Object::create(c, realm, "Asymmetric",
+                           util::Any(AnyDict{{"_id", bar_obj_id}, {"location", std::string{"bar"}}}));
+            realm->commit_transaction();
+
+            wait_for_upload(*realm);
+        },
+        schema);
+}
+
 } // namespace realm::app
 
 #endif // REALM_ENABLE_AUTH_TESTS
