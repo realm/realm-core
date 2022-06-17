@@ -1165,7 +1165,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }
-        start_read()->check_consistency();
     }
     catch (...) {
         close();

@@ -1671,7 +1671,7 @@ TEST_IF(Upgrade_Database_10_11, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
 #endif // TEST_READ_UPGRADE_MODE
 }
 
-TEST_TYPES(Upgrade_Database_11, std::true_type, std::false_type)
+TEST(Upgrade_Database_11)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_11.realm";
     std::vector<int64_t> ids = {0, 2, 3, 15, 42, 100, 7000};
@@ -1684,9 +1684,7 @@ TEST_TYPES(Upgrade_Database_11, std::true_type, std::false_type)
     // Make a copy of the database so that we keep the original file intact and unmodified
     File::copy(path, temp_copy);
     auto hist = make_in_realm_history();
-    DBOptions options;
-    options.is_immutable = TEST_TYPE::value;
-    auto sg = DB::create(*hist, temp_copy, options);
+    auto sg = DB::create(*hist, temp_copy);
     auto rt = sg->start_read();
 
     auto foo = rt->get_table("foo");

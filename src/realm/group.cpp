@@ -332,7 +332,7 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None) {
-        if (current_file_format_version == 22) {
+        if (current_file_format_version == 23) {
             // We are able to open these file formats in RO mode
             return current_file_format_version;
         }
@@ -404,9 +404,6 @@ int Group::read_only_version_check(SlabAlloc& alloc, ref_type top_ref, const std
         case 0:
             file_format_ok = (top_ref == 0);
             break;
-        case 11:
-        case 20:
-        case 21:
         case g_current_file_format_version:
             file_format_ok = true;
             break;
