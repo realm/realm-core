@@ -208,7 +208,7 @@ protected:
     int64_t m_version = 0;
     State m_state = State::Uncommitted;
     std::string m_error_str;
-    DB::version_type m_snapshot_version = std::numeric_limits<DB::version_type>::max();
+    DB::version_type m_snapshot_version = -1;
     std::vector<Subscription> m_subs;
 };
 
