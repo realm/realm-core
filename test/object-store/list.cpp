@@ -1215,9 +1215,9 @@ TEST_CASE("embedded List") {
         {"origin",
          {{"pk", PropertyType::Int, Property::IsPrimary{true}},
           {"array", PropertyType::Array | PropertyType::Object, "target"}}},
-        {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+        {"target", ObjectSchema::TableType::Embedded, {{"value", PropertyType::Int}}},
         {"other_origin", {{"array", PropertyType::Array | PropertyType::Object, "other_target"}}},
-        {"other_target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}},
+        {"other_target", ObjectSchema::TableType::Embedded, {{"value", PropertyType::Int}}},
     });
 
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
@@ -1647,7 +1647,7 @@ TEST_CASE("list of embedded objects") {
              {"array", PropertyType::Object | PropertyType::Array, "embedded"},
          }},
         {"embedded",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"value", PropertyType::Int},
          }},

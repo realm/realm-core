@@ -2661,7 +2661,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
               "EmbeddedObject"},
          }},
         {"EmbeddedObject",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
              {"name", PropertyType::String | PropertyType::Nullable},
@@ -2670,7 +2670,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
              {"int_value", PropertyType::Int},
          }},
         {"EmbeddedObject2",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"notes", PropertyType::String | PropertyType::Dictionary | PropertyType::Nullable},
              {"set_of_ids", PropertyType::Set | PropertyType::ObjectId | PropertyType::Nullable},

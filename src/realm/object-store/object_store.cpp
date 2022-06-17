@@ -162,16 +162,20 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
         return table;
 
     if (auto* pk_property = object_schema.primary_key_property()) {
-        auto table_type = (object_schema.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
+        auto table_type = object_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric
+                              ? Table::Type::TopLevelAsymmetric
+                              : Table::Type::TopLevel;
         table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
                                                  is_nullable(pk_property->type), table_type);
     }
     else {
-        if (object_schema.is_embedded) {
+        if (object_schema.table_type == ObjectSchema::TableType::Embedded) {
             table = group.add_table(name, Table::Type::Embedded);
         }
         else {
-            auto table_type = (object_schema.is_asymmetric ? Table::Type::TopLevelAsymmetric : Table::Type::TopLevel);
+            auto table_type = object_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric
+                                  ? Table::Type::TopLevelAsymmetric
+                                  : Table::Type::TopLevel;
             table = group.get_or_add_table(name, table_type);
         }
     }
@@ -276,10 +280,8 @@ struct SchemaDifferenceExplainer {
 
     void operator()(schema_change::ChangeTableType op)
     {
-        if (op.object->is_embedded)
-            errors.emplace_back("Class '%1' has been changed from top-level to embedded.", op.object->name);
-        else
-            errors.emplace_back("Class '%1' has been changed from embedded to top-level.", op.object->name);
+        errors.emplace_back("Class '%1' has been changed from %2 to %3.", op.object->name, *op.old_table_type,
+                            *op.new_table_type);
     }
 
     void operator()(schema_change::AddInitialProperties)
@@ -603,15 +605,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // downside.
         void operator()(ChangeTableType op)
         {
-            if (op.object->is_embedded) {
-                table(op.object).set_table_type(Table::Type::Embedded);
-            }
-            else if (op.object->is_asymmetric) {
-                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
-            }
-            else {
-                table(op.object).set_table_type(Table::Type::TopLevel);
-            }
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
         }
         void operator()(AddProperty op)
         {
@@ -827,15 +821,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
 
         void operator()(ChangeTableType op)
         {
-            if (op.object->is_embedded) {
-                table(op.object).set_table_type(Table::Type::Embedded);
-            }
-            else if (op.object->is_asymmetric) {
-                table(op.object).set_table_type(Table::Type::TopLevelAsymmetric);
-            }
-            else {
-                table(op.object).set_table_type(Table::Type::TopLevel);
-            }
+            table(op.object).set_table_type(static_cast<Table::Type>(*op.new_table_type));
         }
         void operator()(RemoveTable) {}
         void operator()(ChangePropertyType) {}

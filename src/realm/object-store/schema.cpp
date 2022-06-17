@@ -118,7 +118,7 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
             if (prop.type == PropertyType::Object) {
                 auto it = schema.find(prop.object_type);
                 REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
-                if (!it->is_embedded) {
+                if (it->table_type != ObjectSchema::TableType::Embedded) {
                     // the server does support links to top level objects (serialized as a PK)
                     // so if we encounter this type of link, no need to check further along this path
                     continue;
@@ -143,7 +143,7 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
     // so we only need to run this check from embedded objects. This is an optimization to exclude entire
     // object graphs which do not contain embedded objects.
     for (auto const& object : schema) {
-        if (object.is_embedded) {
+        if (object.table_type == ObjectSchema::TableType::Embedded) {
             std::string loop = do_check(schema, object);
             if (!loop.empty()) {
                 exceptions.push_back(
@@ -157,7 +157,7 @@ std::unordered_set<std::string> get_embedded_object_orphans(const Schema& schema
 {
     std::queue<const ObjectSchema*> to_check;
     for (auto& object : schema) {
-        if (!object.is_embedded) {
+        if (object.table_type != ObjectSchema::TableType::Embedded) {
             to_check.push(&object);
         }
     }
@@ -171,7 +171,7 @@ std::unordered_set<std::string> get_embedded_object_orphans(const Schema& schema
             if (prop.type == PropertyType::Object) {
                 auto it = schema.find(prop.object_type);
                 REALM_ASSERT(it != schema.end());
-                if (it->is_embedded && reachable.insert(&*it).second) {
+                if (it->table_type == ObjectSchema::TableType::Embedded && reachable.insert(&*it).second) {
                     to_check.push(&*it);
                 }
             }
@@ -181,7 +181,7 @@ std::unordered_set<std::string> get_embedded_object_orphans(const Schema& schema
     // Any object types which weren't found above are orphans
     std::unordered_set<std::string> orphans;
     for (auto& object : schema) {
-        if (object.is_embedded && !reachable.count(&object)) {
+        if (object.table_type == ObjectSchema::TableType::Embedded && !reachable.count(&object)) {
             orphans.insert(object.name);
         }
     }
@@ -341,8 +341,8 @@ std::vector<SchemaChange> Schema::compare(Schema const& target_schema, SchemaMod
 
     // Detect embedded table changes last, in case column property changes affect link counts
     zip_matching(target_schema, *this, [&](const ObjectSchema* target, const ObjectSchema* existing) {
-        if (existing && target && existing->is_embedded != target->is_embedded) {
-            changes.emplace_back(schema_change::ChangeTableType{target});
+        if (existing && target && existing->table_type != target->table_type) {
+            changes.emplace_back(schema_change::ChangeTableType{target, &existing->table_type, &target->table_type});
         }
     });
 
@@ -389,7 +389,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt) noexcept
         REALM_SC_COMPARE(AddInitialProperties, v.object)
         REALM_SC_COMPARE(AddTable, v.object)
         REALM_SC_COMPARE(RemoveTable, v.object)
-        REALM_SC_COMPARE(ChangeTableType, v.object)
+        REALM_SC_COMPARE(ChangeTableType, v.object, v.old_table_type, v.new_table_type)
         REALM_SC_COMPARE(ChangePrimaryKey, v.object, v.property)
         REALM_SC_COMPARE(ChangePropertyType, v.object, v.old_property, v.new_property)
         REALM_SC_COMPARE(MakePropertyNullable, v.object, v.property)

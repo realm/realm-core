@@ -423,8 +423,11 @@ static inline realm_class_info_t to_capi(const ObjectSchema& o)
     info.num_properties = o.persisted_properties.size();
     info.num_computed_properties = o.computed_properties.size();
     info.key = o.table_key.value;
-    if (o.is_embedded) {
+    if (o.table_type == ObjectSchema::TableType::Embedded) {
         info.flags = RLM_CLASS_EMBEDDED;
+    }
+    else if (o.table_type == ObjectSchema::TableType::TopLevelAsymmetric) {
+        info.flags = RLM_CLASS_ASYMMETRIC;
     }
     else {
         info.flags = RLM_CLASS_NORMAL;

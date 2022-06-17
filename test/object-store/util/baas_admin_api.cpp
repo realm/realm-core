@@ -128,7 +128,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, con
         auto target_obj = m_schema.find(prop.object_type);
         REALM_ASSERT(target_obj != m_schema.end());
 
-        if (target_obj->is_embedded) {
+        if (target_obj->table_type == ObjectSchema::TableType::Embedded) {
             m_current_path.push_back(prop.name);
             if (is_collection(prop.type)) {
                 m_current_path.push_back("[]");
@@ -902,7 +902,7 @@ AppSession create_app(const AppCreateConfig& config)
         std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
         auto asymmetric_tables = nlohmann::json::array();
         for (const auto& obj_schema : config.schema) {
-            if (obj_schema.is_asymmetric) {
+            if (obj_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric) {
                 asymmetric_tables.emplace_back(obj_schema.name);
             }
         }
@@ -1062,7 +1062,7 @@ TEST_CASE("app: baas admin api", "[sync][app]") {
                        {{"_id", PropertyType::String, true},
                         {"location", PropertyType::Object | PropertyType::Nullable, "location"}}},
                       {"location",
-                       ObjectSchema::IsEmbedded{true},
+                       ObjectSchema::TableType::Embedded,
                        {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
 
         auto test_app_config = minimal_app_config(base_url, "test", schema);
@@ -1074,7 +1074,9 @@ TEST_CASE("app: baas admin api", "[sync][app]") {
             {"a",
              {{"_id", PropertyType::String, true},
               {"b_link", PropertyType::Object | PropertyType::Array | PropertyType::Nullable, "b"}}},
-            {"b", ObjectSchema::IsEmbedded{true}, {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
+            {"b",
+             ObjectSchema::TableType::Embedded,
+             {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
             {"c", {{"_id", PropertyType::String, true}, {"d_str", PropertyType::String}}},
         };
         auto test_app_config = minimal_app_config(base_url, "test", schema);

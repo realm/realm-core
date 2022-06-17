@@ -83,7 +83,7 @@ const Schema g_simple_embedded_obj_schema{
       {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
       {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"}}},
     {"TopLevel_embedded_obj",
-     ObjectSchema::IsEmbedded{true},
+     ObjectSchema::TableType::Embedded,
      {
          {"str_field", PropertyType::String | PropertyType::Nullable},
      }},
@@ -1644,14 +1644,14 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         server_schema.queryable_fields = {"queryable_str_field"};
         server_schema.schema = {
             {"Asymmetric",
-             ObjectSchema::IsAsymmetric{true},
+             ObjectSchema::TableType::TopLevelAsymmetric,
              {
                  {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                  {"location", PropertyType::String | PropertyType::Nullable},
                  {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Embedded"},
              }},
             {"Embedded",
-             ObjectSchema::IsEmbedded{true},
+             ObjectSchema::TableType::Embedded,
              {
                  {"value", PropertyType::String | PropertyType::Nullable},
              }},
@@ -1769,7 +1769,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 
     SECTION("open with schema mismatch on IsAsymmetric") {
         auto schema = server_schema.schema;
-        schema.find("Asymmetric")->is_asymmetric = ObjectSchema::IsAsymmetric{false};
+        schema.find("Asymmetric")->table_type = ObjectSchema::TableType::TopLevel;
 
         harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
             SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});

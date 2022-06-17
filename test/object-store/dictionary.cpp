@@ -854,7 +854,7 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
     config.automatic_change_notifications = false;
     config.schema = Schema{
         {"origin", {{"links", PropertyType::Dictionary | PropertyType::Object | PropertyType::Nullable, "target"}}},
-        {"target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
+        {"target", ObjectSchema::TableType::Embedded, {{"value", PropertyType::Int}}}};
 
     auto r = Realm::get_shared_realm(config);
 

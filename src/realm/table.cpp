@@ -2677,12 +2677,7 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         out << ",";
         out << "\"primaryKey\":\"" << this->get_column_name(m_primary_key_col) << "\"";
     }
-    if (is_embedded()) {
-        out << ",\"isEmbedded\":true";
-    }
-    if (is_asymmetric()) {
-        out << ",\"isAsymmetric\":true";
-    }
+    out << ",\"tableType\":\"" << this->get_table_type() << "\"";
     out << ",\"properties\":[";
     auto col_keys = get_column_keys();
     int sz = int(col_keys.size());

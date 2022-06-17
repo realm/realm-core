@@ -332,6 +332,8 @@ typedef struct realm_class_info {
 typedef enum realm_class_flags {
     RLM_CLASS_NORMAL = 0,
     RLM_CLASS_EMBEDDED = 1,
+    RLM_CLASS_ASYMMETRIC = 2,
+    RLM_CLASS_MASK = 3,
 } realm_class_flags_e;
 
 typedef enum realm_property_flags {

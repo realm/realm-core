@@ -307,7 +307,7 @@ TEST_CASE("audit object serialization") {
           {"embedded object dictionary", PropertyType::Object | PropertyType::Nullable | PropertyType::Dictionary,
            "embedded target"}}},
         {"target", {{"_id", PropertyType::Int, Property::IsPrimary{true}}, {"value", PropertyType::Int}}},
-        {"embedded target", ObjectSchema::IsEmbedded{true}, {{"value", PropertyType::Int}}}};
+        {"embedded target", ObjectSchema::TableType::Embedded, {{"value", PropertyType::Int}}}};
     config.audit_config = std::make_shared<AuditConfig>();
     auto serializer = std::make_shared<CustomSerializer>();
     config.audit_config->serializer = serializer;

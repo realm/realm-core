@@ -1697,17 +1697,17 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
               "TopLevel_embedded_dict"},
          }},
         {"TopLevel_array_of_objs",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
          }},
         {"TopLevel_embedded_obj",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
          }},
         {"TopLevel_embedded_dict",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"array", PropertyType::Int | PropertyType::Array},
          }},

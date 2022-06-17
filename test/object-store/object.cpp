@@ -1939,12 +1939,12 @@ TEST_CASE("Embedded Object") {
              {"array", PropertyType::Object | PropertyType::Array, "array target"},
          }},
         {"link target",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"value", PropertyType::Int},
          }},
         {"array target",
-         ObjectSchema::IsEmbedded{true},
+         ObjectSchema::TableType::Embedded,
          {
              {"value", PropertyType::Int},
          }},
@@ -2171,14 +2171,14 @@ TEST_CASE("Embedded Object") {
 TEST_CASE("Asymmetric Object") {
     Schema schema{
         {"asymmetric",
-         ObjectSchema::IsAsymmetric{true},
+         ObjectSchema::TableType::TopLevelAsymmetric,
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"location", PropertyType::Int},
              {"reading", PropertyType::Int},
          }},
         {"asymmetric_link",
-         ObjectSchema::IsAsymmetric{true},
+         ObjectSchema::TableType::TopLevelAsymmetric,
          {
              {"_id", PropertyType::Int, Property::IsPrimary{true}},
              {"location", PropertyType::Mixed | PropertyType::Nullable},
