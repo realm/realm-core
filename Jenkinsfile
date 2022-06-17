@@ -279,6 +279,7 @@ def doCheckInDocker(Map options = [:]) {
 
             def environment = environment()
             environment << 'UNITTEST_XML=unit-test-report.xml'
+            environment << "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
             if (options.useEncryption) {
                 environment << 'UNITTEST_ENCRYPT_ALL=1'
             }
@@ -297,7 +298,7 @@ def doCheckInDocker(Map options = [:]) {
                                 sh "${ctest_cmd}"
                             }
                         } finally {
-                            recordTests("Linux-${options.buildType}")
+                            junit testResults: 'build-dir/test/unit-test-report.xml'
                         }
                     }
                 }
@@ -370,7 +371,8 @@ def doCheckSanity(Map options = [:]) {
             def environment = environment() + [
               'CC=clang',
               'CXX=clang++',
-              'UNITTEST_XML=unit-test-report.xml'
+              'UNITTEST_XML=unit-test-report.xml',
+              "UNITTEST_SUITE_NAME=Linux-${options.buildType}"
             ]
             buildDockerEnv('testing.Dockerfile').inside(privileged) {
                 withEnv(environment) {
@@ -387,7 +389,7 @@ def doCheckSanity(Map options = [:]) {
                         }
 
                     } finally {
-                        recordTests("Linux-${options.buildType}")
+                        junit testResults: 'build-dir/test/unit-test-report.xml'
                     }
                 }
             }
@@ -463,6 +465,7 @@ def doCheckValgrind() {
 
             def environment = environment()
             environment << 'UNITTEST_NO_ERROR_EXITCODE=1'
+            environment << 'UNITTEST_SUITE_NAME=Linux-Valgrind'
 
             buildDockerEnv('testing.Dockerfile').inside {
                 withEnv(environment) {
@@ -483,7 +486,7 @@ def doCheckValgrind() {
                             valgrind --tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --suppressions=$WORKSPACE/test/valgrind.suppress --error-exitcode=1 ./realm-tests
                         '''
                     } finally {
-                        recordTests('Linux-Valgrind')
+                        junit testResults: 'build-dir/test/unit-test-report.xml'
                     }
                 }
             }
@@ -502,6 +505,7 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
 
             def environment = environment()
             environment << 'UNITTEST_XML=/data/local/tmp/unit-test-report.xml'
+            environment << 'UNITTEST_SUITE_NAME=android'
             def cmakeArgs = ''
             if (test == TestAction.None) {
                 cmakeArgs = '-DREALM_NO_TESTS=ON'
@@ -551,12 +555,8 @@ def doAndroidBuildInDocker(String abi, String buildType, TestAction test = TestA
                                 ! grep __ADB_FAIL__ adb.log
                             """
                         } finally {
-                            sh '''
-                                mkdir -p build-dir/test
-                                cd build-dir/test
-                                adb pull /data/local/tmp/unit-test-report.xml
-                            '''
-                            recordTests('android')
+                            sh 'adb pull /data/local/tmp/unit-test-report.xml'
+                            junit testResults: 'unit-test-report.xml'
                         }
                     }
                 }
@@ -639,8 +639,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                 }
             }
             if (runTests && !isUWP) {
+                def prefix = "Windows-${platform}-${buildType}";
                 def environment = environment() + [ "TMP=${env.WORKSPACE}\\temp", 'UNITTEST_NO_ERROR_EXITCODE=1' ]
-                withEnv(environment + ['UNITTEST_XML=..\\core-results.xml']) {
+                withEnv(environment + ["UNITTEST_XML=${WORKSPACE}\\core-results.xml", "UNITTEST_SUITE_NAME=${prefix}-core"]) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
@@ -654,7 +655,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                   // the sync tests in parallel
                   environment << 'UNITTEST_THREADS=1'
                 }
-                withEnv(environment + ['UNITTEST_XML=..\\sync-results.xml']) {
+                withEnv(environment + ["UNITTEST_XML=${WORKSPACE}\\sync-results.xml", "UNITTEST_SUITE_NAME=${prefix}-sync"]) {
                     dir("build-dir/test/${buildType}") {
                         bat '''
                           mkdir %TMP%
@@ -664,7 +665,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                     }
                 }
 
-                withEnv(environment + ['UNITTEST_XML=..\\..\\object-store-results.xml']) {
+                withEnv(environment + ["UNITTEST_XML=${WORKSPACE}\\object-store-results.xml", "UNITTEST_SUITE_NAME=${prefix}-object-store"]) {
                     dir("build-dir/test/object-store/${buildType}") {
                         bat '''
                           mkdir %TMP%
@@ -673,10 +674,9 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         '''
                     }
                 }
-                def prefix = "Windows-${platform}-${buildType}";
-                recordTests("${prefix}-core", "core-results.xml")
-                recordTests("${prefix}-sync", "sync-results.xml")
-                recordTests("${prefix}-object-store", "object-store-results.xml")
+                junit testResults: 'core-results.xml'
+                junit testResults: 'sync-results.xml'
+                junit testResults: 'object-store-results.xml'
             }
         }
     }
@@ -752,16 +752,16 @@ def doBuildMacOs(Map options = [:]) {
                 try {
                     def environment = environment()
                     environment << 'CTEST_OUTPUT_ON_FAILURE=1'
-                    environment << "UNITTEST_XML=${WORKSPACE}/build-dir/test/unit-test-report.xml"
+                    environment << "UNITTEST_XML=${WORKSPACE}/unit-test-report.xml"
+                    environment << "UNITTEST_SUITE_NAME=macOS_${buildType}"
 
-                    sh 'mkdir -p build-dir/test'
                     dir('build-macosx') {
                         withEnv(environment) {
                             sh "${ctest_cmd} -C ${buildType}"
                         }
                     }
                 } finally {
-                    recordTests("macosx_${buildType}")
+                    junit testResults: 'unit-test-report.xml'
                 }
             }
         }
@@ -803,8 +803,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
                         if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
                         sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
                         def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
-                        env << "SIMCTL_CHILD_UNITTEST_XML=${WORKSPACE}/build-dir/test/unit-test-report.xml"
-                        sh 'mkdir -p $WORKSPACE/build-dir/test'
+                        env << "SIMCTL_CHILD_UNITTEST_XML=${WORKSPACE}/unit-test-report.xml"
                         withEnv(env) {
                             runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.CoreTests', '$WORKSPACE/')
                         }
@@ -812,14 +811,14 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
                         // the simulator exits, so wait for the file to be
                         // non-empty
                         sh '''
-                        while [ ! -s $WORKSPACE/build-dir/test/unit-test-report.xml -a $((retries++)) -lt 100 ]; do
+                        while [ ! -s $WORKSPACE/unit-test-report.xml -a $((retries++)) -lt 100 ]; do
                             sleep 5
                         done
                         '''
+                        junit testResults: "${WORKSPACE}/unit-test-report.xml"
                     }
                 }
             }
-            if (test) recordTests("${platform}_${buildType}")
 
             String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
             archiveArtifacts tarball
@@ -860,16 +859,6 @@ def doBuildCoverage() {
       }
     }
   }
-}
-
-/**
- *  Wraps the test recorder by adding a tag which will make the test distinguishible
- */
-def recordTests(tag, String reportName = "unit-test-report.xml") {
-    def tests = readFile("build-dir/test/${reportName}")
-    def modifiedTests = tests.replaceAll('realm-core-tests', tag)
-    writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
-    junit testResults: 'build-dir/test/modified-test-report.xml'
 }
 
 def environment() {

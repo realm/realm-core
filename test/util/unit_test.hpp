@@ -416,7 +416,7 @@ std::unique_ptr<Reporter> create_xml_reporter(std::ostream&);
 
 /// Generates output that is compatible with the XML output of JUnit. See
 /// http://llg.cubic.org/docs/junit/
-std::unique_ptr<Reporter> create_junit_reporter(std::ostream&);
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream&, std::string_view test_suite_name);
 
 /// Generates output that is compatible with the evergreen test results api.
 std::unique_ptr<Reporter> create_evergreen_reporter(const std::string&);

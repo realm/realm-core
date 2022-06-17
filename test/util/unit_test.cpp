@@ -227,11 +227,11 @@ protected:
 };
 
 
-class JUnitReporter : public XmlReporter
-{
+class JUnitReporter : public XmlReporter {
 public:
-    JUnitReporter(std::ostream& out)
-    : XmlReporter(out)
+    JUnitReporter(std::ostream& out, std::string_view test_suite_name)
+        : XmlReporter(out)
+        , m_test_suite_name(test_suite_name)
     {
     }
 
@@ -241,7 +241,7 @@ public:
 
         m_out << "<testsuites>\n"
               << "  <testsuite "
-              << "name=\"realm-core-tests\" "
+              << "name=\"" << m_test_suite_name << "\" "
               << "tests=\"" << results_summary.num_executed_tests << "\" "
               << "disabled=\"" << results_summary.num_excluded_tests << "\" "
               << "failures=\"" << results_summary.num_failed_tests << "\" "
@@ -281,6 +281,9 @@ public:
         }
         m_out << "  </testsuite>\n</testsuites>\n";
     }
+
+private:
+    std::string m_test_suite_name;
 };
 
 
@@ -1082,9 +1085,9 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     }
 }
 
-std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out)
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out, std::string_view test_suite_name)
 {
-    return std::make_unique<JUnitReporter>(out);
+    return std::make_unique<JUnitReporter>(out, test_suite_name);
 }
 
 std::unique_ptr<Reporter> create_xml_reporter(std::ostream& out)

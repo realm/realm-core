@@ -458,7 +458,10 @@ bool run_tests(util::Logger* logger)
     if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
         xml_file.open(str);
-        reporters.push_back(create_junit_reporter(xml_file));
+        const char* test_suite_name = getenv("UNITTEST_SUITE_NAME");
+        if (!test_suite_name || !strlen(test_suite_name))
+            test_suite_name = "realm-core-tests";
+        reporters.push_back(create_junit_reporter(xml_file, test_suite_name));
     }
     else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
