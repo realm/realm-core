@@ -328,8 +328,8 @@ TestAppSession::~TestAppSession()
 
 // MARK: - TestSyncManager
 
-TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_config, const Config& config,
-                                 const SyncServer::Config& sync_server_config)
+TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config,
+                                 const util::Optional<realm::SyncClientConfig> sync_client_config)
     : m_sync_server(sync_server_config)
     , m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
@@ -338,32 +338,18 @@ TestSyncManager::TestSyncManager(const realm::SyncClientConfig& sync_client_conf
     app::App::Config app_config = config.app_config;
     set_app_config_defaults(app_config, transport);
 
-    m_app = app::App::get_uncached_app(app_config, sync_client_config);
-    if (config.override_sync_route) {
-        m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
+    if (sync_client_config) {
+        m_app = app::App::get_uncached_app(app_config, *sync_client_config);
+    } else {
+        SyncClientConfig sc_config;
+        m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
+        util::try_make_dir(m_base_file_path);
+        sc_config.base_file_path = m_base_file_path;
+        sc_config.metadata_mode = config.metadata_mode;
+        sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+        sc_config.socket_factory = util::websocket::SocketFactory::defaultSocketFactory;
+        m_app = app::App::get_uncached_app(app_config, sc_config);
     }
-    // initialize sync client
-    m_app->sync_manager()->get_sync_client();
-}
-
-TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
-    : m_sync_server(sync_server_config)
-    , m_should_teardown_test_directory(config.should_teardown_test_directory)
-{
-    if (config.transport)
-        transport = config.transport;
-    app::App::Config app_config = config.app_config;
-    set_app_config_defaults(app_config, transport);
-
-    SyncClientConfig sc_config;
-    m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
-    util::try_make_dir(m_base_file_path);
-    sc_config.base_file_path = m_base_file_path;
-    sc_config.metadata_mode = config.metadata_mode;
-    sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
-    sc_config.socket_factory = util::websocket::SocketFactory::defaultSocketFactory;
-
-    m_app = app::App::get_uncached_app(app_config, sc_config);
     if (config.override_sync_route) {
         m_app->sync_manager()->set_sync_route(m_sync_server.base_url() + "/realm-sync");
     }

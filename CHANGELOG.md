@@ -3,7 +3,7 @@
 ### Enhancements
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Changed the signature of `Realm::async_cancel_transaction` to return a boolean indicating whether the removal of the scheduled callback was successful (true) or not (false). Previously, the method returned void. (PR [#5546](https://github.com/realm/realm-core/pull/5546))
-* Added platform networking interface ([#5346](https://github.com/realm/realm-core/pull/5346))
+* Added support for SDK-specific websocket implementations in the sync client ([#5346](https://github.com/realm/realm-core/pull/5346))
 
 ### Fixed
 * Fixed a segfault in sync compiled by MSVC 2022. ([#5557](https://github.com/realm/realm-core/pull/5557), since 12.1.0)

@@ -294,7 +294,7 @@ struct ClientConfig {
     bool disable_sync_to_disk = false;
 
     /// Default implementation of the WebSocket factory. Can be overriden in SDK
-    std::function<std::unique_ptr<realm::util::websocket::SocketFactory>(realm::util::websocket::SocketConfig&&)>
+    std::function<std::unique_ptr<realm::util::websocket::SocketFactory>(realm::util::websocket::SocketFactoryConfig&&)>
         socket_factory = realm::util::websocket::SocketFactory::defaultSocketFactory;
 };
 

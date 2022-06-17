@@ -38,7 +38,7 @@ using namespace realm::util::websocket;
 
 class TestSocketFactory : public SocketFactory {
 public:
-    TestSocketFactory(SocketConfig config, std::function<void()> factoryCallback)
+    TestSocketFactory(SocketFactoryConfig config, std::function<void()> factoryCallback)
         : SocketFactory(config)
         , didCallHandler(factoryCallback)
     {
@@ -61,7 +61,7 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
         didCallConnect = true;
     };
 
-    TestSyncManager::Config testConfig = TestSyncManager::Config();
+    TestSyncManager::Config testConfig;
 
     // Configuring custom socket factory in SyncClientConfig
     SyncClientConfig sc_config;
@@ -72,11 +72,11 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     sc_config.metadata_mode = testConfig.metadata_mode;
     sc_config.log_level =
         testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
-    sc_config.socket_factory = [&factoryCallHandler](SocketConfig&& config) {
+    sc_config.socket_factory = [&factoryCallHandler](SocketFactoryConfig&& config) {
         return std::unique_ptr<SocketFactory>(new TestSocketFactory(std::move(config), factoryCallHandler));
     };
 
-    TestSyncManager init_sync_manager(sc_config, testConfig);
+    TestSyncManager init_sync_manager(testConfig, {}, util::some<SyncClientConfig>(sc_config));
 
     SyncTestFile config(init_sync_manager.app(), "default");
     config.cache = false;

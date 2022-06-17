@@ -120,7 +120,7 @@ ClientImpl::ClientImpl(ClientConfig config)
     , m_service{}                                         // Throws
     , m_socket_factory([&] {
         REALM_ASSERT(config.socket_factory);
-        return config.socket_factory(websocket::SocketConfig{
+        return config.socket_factory(websocket::SocketFactoryConfig{
             logger,
             m_random,
             m_service,

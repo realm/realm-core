@@ -1,3 +1,20 @@
+/*************************************************************************
+ *
+ * Copyright 2022 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 #ifndef REALM_CLIENT_WEBSOCKET_HPP
 #define REALM_CLIENT_WEBSOCKET_HPP
 
@@ -16,7 +33,7 @@ namespace realm::util::websocket {
 using port_type = sync::port_type;
 
 // TODO figure out what belongs on config and what belongs on endpoint.
-struct SocketConfig {
+struct SocketFactoryConfig {
     util::Logger& logger;
     std::mt19937_64& random;
     util::network::Service& service;
@@ -94,7 +111,7 @@ public:
 
 class SocketFactory {
 public:
-    SocketFactory(SocketConfig config)
+    SocketFactory(SocketFactoryConfig config)
         : m_config(config)
     {
     }
@@ -103,13 +120,13 @@ public:
 
     virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint);
 
-    static std::unique_ptr<SocketFactory> defaultSocketFactory(SocketConfig&& config)
+    static std::unique_ptr<SocketFactory> defaultSocketFactory(SocketFactoryConfig&& config)
     {
-        return std::unique_ptr<SocketFactory>(new SocketFactory(std::move(config)));
+        return std::make_unique<SocketFactory>(std::move<SocketFactoryConfig>(std::move(config)));
     }
 
 private:
-    SocketConfig m_config;
+    SocketFactoryConfig m_config;
 };
 
 } // namespace realm::util::websocket
