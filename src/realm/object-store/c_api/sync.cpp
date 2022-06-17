@@ -519,8 +519,8 @@ RLM_API void realm_sync_config_set_after_client_reset_handler(realm_sync_config_
     auto cb = [callback, userdata = SharedUserdata(userdata, FreeUserdata(userdata_free))](
                   SharedRealm before_realm, ThreadSafeReference after_realm, bool did_recover) {
         realm_t r1{before_realm};
-        auto tsr = new realm_t::thread_safe_reference(std::move(after_realm));
-        if (!callback(userdata.get(), &r1, tsr, did_recover)) {
+        auto tsr = realm_t::thread_safe_reference(std::move(after_realm));
+        if (!callback(userdata.get(), &r1, &tsr, did_recover)) {
             throw CallbackFailed();
         }
     };
