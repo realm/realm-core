@@ -1866,6 +1866,28 @@ void Table::finalize_migration(ColKey pk_col_key)
     do_set_primary_key_column(pk_col_key);
 }
 
+void Table::migrate_sets_and_dictionaries()
+{
+    std::vector<ColKey> to_migrate;
+    for (auto col : get_column_keys()) {
+        if (col.is_dictionary() || (col.is_set() && col.get_type() == col_type_Mixed)) {
+            to_migrate.push_back(col);
+        }
+    }
+    if (to_migrate.size()) {
+        for (auto obj : *this) {
+            for (auto col : to_migrate) {
+                if (col.is_set()) {
+                    auto set = obj.get_set<Mixed>(col);
+                    set.migrate();
+                }
+                else if (col.is_dictionary()) {
+                }
+            }
+        }
+    }
+}
+
 StringData Table::get_name() const noexcept
 {
     const Array& real_top = m_top;

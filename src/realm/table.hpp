@@ -706,6 +706,7 @@ private:
     bool migrate_objects(); // Returns true if there are no links to migrate
     void migrate_links();
     void finalize_migration(ColKey pk_col_key);
+    void migrate_sets_and_dictionaries();
 
     /// Disable copying assignment.
     ///
