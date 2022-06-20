@@ -162,18 +162,18 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
         return table;
 
     if (auto* pk_property = object_schema.primary_key_property()) {
-        auto table_type = object_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric
+        auto table_type = object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric
                               ? Table::Type::TopLevelAsymmetric
                               : Table::Type::TopLevel;
         table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
                                                  is_nullable(pk_property->type), table_type);
     }
     else {
-        if (object_schema.table_type == ObjectSchema::TableType::Embedded) {
+        if (object_schema.table_type == ObjectSchema::ObjectType::Embedded) {
             table = group.add_table(name, Table::Type::Embedded);
         }
         else {
-            auto table_type = object_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric
+            auto table_type = object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric
                                   ? Table::Type::TopLevelAsymmetric
                                   : Table::Type::TopLevel;
             table = group.get_or_add_table(name, table_type);

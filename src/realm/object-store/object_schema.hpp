@@ -37,14 +37,14 @@ class ObjectSchema {
 public:
     /// The type of tables supported by a realm.
     /// Note: Enumeration value assignments must be kept in sync with <realm/table.hpp>.
-    enum class TableType : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
+    enum class ObjectType : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
 
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
-    ObjectSchema(std::string name, TableType table_type, std::initializer_list<Property> persisted_properties);
+    ObjectSchema(std::string name, ObjectType table_type, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
-    ObjectSchema(std::string name, TableType table_type, std::initializer_list<Property> persisted_properties,
+    ObjectSchema(std::string name, ObjectType table_type, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ~ObjectSchema();
 
@@ -62,7 +62,7 @@ public:
     std::vector<Property> computed_properties;
     std::string primary_key;
     TableKey table_key;
-    TableType table_type = TableType::TopLevel;
+    ObjectType table_type = ObjectType::TopLevel;
     std::string alias;
 
     Property* property_for_public_name(StringData public_name) noexcept;
@@ -91,22 +91,17 @@ private:
     void set_primary_key_property() noexcept;
 };
 
-inline std::ostream& operator<<(std::ostream& o, ObjectSchema::TableType table_type)
+inline std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type)
 {
     switch (table_type) {
-        case ObjectSchema::TableType::TopLevel:
-            o << "TopLevel";
-            break;
-        case ObjectSchema::TableType::Embedded:
-            o << "Embedded";
-            break;
-        case ObjectSchema::TableType::TopLevelAsymmetric:
-            o << "TopLevelAsymmetric";
-            break;
-        default:
-            o << "Unknown table type";
+        case ObjectSchema::ObjectType::TopLevel:
+            return o << "TopLevel";
+        case ObjectSchema::ObjectType::Embedded:
+            return o << "Embedded";
+        case ObjectSchema::ObjectType::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
     }
-    return o;
+    return o << "Invalid table type: " << uint8_t(table_type);
 }
 
 } // namespace realm

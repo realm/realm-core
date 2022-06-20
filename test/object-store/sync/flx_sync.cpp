@@ -83,7 +83,7 @@ const Schema g_simple_embedded_obj_schema{
       {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
       {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "TopLevel_embedded_obj"}}},
     {"TopLevel_embedded_obj",
-     ObjectSchema::TableType::Embedded,
+     ObjectSchema::ObjectType::Embedded,
      {
          {"str_field", PropertyType::String | PropertyType::Nullable},
      }},
@@ -1644,14 +1644,14 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
         server_schema.queryable_fields = {"queryable_str_field"};
         server_schema.schema = {
             {"Asymmetric",
-             ObjectSchema::TableType::TopLevelAsymmetric,
+             ObjectSchema::ObjectType::TopLevelAsymmetric,
              {
                  {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                  {"location", PropertyType::String | PropertyType::Nullable},
                  {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Embedded"},
              }},
             {"Embedded",
-             ObjectSchema::TableType::Embedded,
+             ObjectSchema::ObjectType::Embedded,
              {
                  {"value", PropertyType::String | PropertyType::Nullable},
              }},
@@ -1769,7 +1769,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 
     SECTION("open with schema mismatch on IsAsymmetric") {
         auto schema = server_schema.schema;
-        schema.find("Asymmetric")->table_type = ObjectSchema::TableType::TopLevel;
+        schema.find("Asymmetric")->table_type = ObjectSchema::ObjectType::TopLevel;
 
         harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
             SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
@@ -1854,7 +1854,7 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
     server_schema.schema = Schema{};
 
     auto schema = Schema{{"Asymmetric",
-                          ObjectSchema::TableType::TopLevelAsymmetric,
+                          ObjectSchema::ObjectType::TopLevelAsymmetric,
                           {
                               {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
                               {"location", PropertyType::String | PropertyType::Nullable},

@@ -868,18 +868,13 @@ inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
 {
     switch (table_type) {
         case Table::Type::TopLevel:
-            o << "TopLevel";
-            break;
+            return o << "TopLevel";
         case Table::Type::Embedded:
-            o << "Embedded";
-            break;
+            return o << "Embedded";
         case Table::Type::TopLevelAsymmetric:
-            o << "TopLevelAsymmetric";
-            break;
-        default:
-            o << "Unknown table type";
+            return o << "TopLevelAsymmetric";
     }
-    return o;
+    return o << "Invalid table type: " << uint8_t(table_type);
 }
 
 class ColKeyIterator {

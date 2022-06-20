@@ -583,7 +583,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     SECTION("freeze with orphaned embedded tables") {
         auto schema = Schema{
             {"object1", {{"value", PropertyType::Int}}},
-            {"object2", ObjectSchema::TableType::Embedded, {{"value", PropertyType::Int}}},
+            {"object2", ObjectSchema::ObjectType::Embedded, {{"value", PropertyType::Int}}},
         };
         config.schema = schema;
         config.schema_mode = SchemaMode::AdditiveDiscovered;
@@ -2922,7 +2922,7 @@ TEST_CASE("SharedRealm: declaring an object as embedded results in creating an e
 
     // Prepopulate the Realm with the schema.
     config.schema = Schema{{"object1",
-                            ObjectSchema::TableType::Embedded,
+                            ObjectSchema::ObjectType::Embedded,
                             {
                                 {"value", PropertyType::Int},
                             }},

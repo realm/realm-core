@@ -271,7 +271,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     auto table = realm->read_group().get_table(object_schema.table_key);
 
     // Asymmetric objects cannot be updated through Object::create.
-    if (object_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric) {
+    if (object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
         REALM_ASSERT(!policy.update);
         REALM_ASSERT(!current_obj);
         REALM_ASSERT(object_schema.primary_key_property());
@@ -323,7 +323,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     if (!obj) {
         if (current_obj)
             obj = table->get_object(current_obj);
-        else if (object_schema.table_type == ObjectSchema::TableType::Embedded)
+        else if (object_schema.table_type == ObjectSchema::ObjectType::Embedded)
             obj = ctx.create_embedded_object();
         else
             obj = table->create_object();
@@ -334,7 +334,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
     // KVO in Cocoa requires that the obj ivar on the wrapper object be set
     // *before* we start setting the properties, so it passes in a pointer to
     // that.
-    if (out_row && object_schema.table_type != ObjectSchema::TableType::TopLevelAsymmetric)
+    if (out_row && object_schema.table_type != ObjectSchema::ObjectType::TopLevelAsymmetric)
         *out_row = obj;
     for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
         auto& prop = object_schema.persisted_properties[i];
@@ -361,7 +361,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm, Obj
         if (v)
             object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
-    if (object_schema.table_type == ObjectSchema::TableType::TopLevelAsymmetric) {
+    if (object_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
         return Object{};
     }
     return object;

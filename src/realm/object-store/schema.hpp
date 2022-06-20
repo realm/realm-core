@@ -184,8 +184,8 @@ struct RemoveTable {
 
 struct ChangeTableType {
     const ObjectSchema* object;
-    const ObjectSchema::TableType* old_table_type;
-    const ObjectSchema::TableType* new_table_type;
+    const ObjectSchema::ObjectType* old_table_type;
+    const ObjectSchema::ObjectType* new_table_type;
 };
 
 struct AddInitialProperties {
