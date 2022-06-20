@@ -1,3 +1,16 @@
+# NEXT MAJOR RELEASE
+### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+
+### Fixed
+* Set<Mixed> consider string and binary data equivilent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([#4860](https://github.com/realm/realm-core/issues/4860), since v11.0.0)
+
+### Breaking changes
+* File format version bumped. File needs to be upgraded if it contains any Set<Mixed>.
+
+### Compatibility
+* Fileformat: Generates files with format v23. Reads and automatically upgrade from fileformat v5.
+
 # NEXT RELEASE
 
 ### Enhancements

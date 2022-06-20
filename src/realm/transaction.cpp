@@ -588,29 +588,31 @@ void Transaction::upgrade_file_format(int target_file_format_version)
         remove_table(progress_info->get_key());
     }
 
-    // Ensure we have search index on all primary key columns. This is idempotent so no
-    // need to check on current_file_format_version
+    // Ensure we have search index on all primary key columns.
     auto table_keys = get_table_keys();
-    for (auto k : table_keys) {
-        auto t = get_table(k);
-        if (auto col = t->get_primary_key_column()) {
-            t->do_add_search_index(col);
+    if (current_file_format_version < 22) {
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            if (auto col = t->get_primary_key_column()) {
+                t->do_add_search_index(col);
+            }
         }
     }
 
-    if (current_file_format_version <= 22 && target_file_format_version >= 23) {
-        // Upgrade Set and Dictionary columns and check that asymmetric table are empty
+    if (current_file_format_version == 22) {
+        // Check that asymmetric table are empty
         for (auto k : table_keys) {
             auto t = get_table(k);
             if (t->is_asymmetric() && t->size() > 0) {
                 t->clear();
             }
-            for (auto col : t->get_column_keys()) {
-                if (col.is_set()) {
-                }
-                if (col.is_dictionary()) {
-                }
-            }
+        }
+    }
+    if (current_file_format_version >= 21 && current_file_format_version < 23) {
+        // Upgrade Set and Dictionary columns
+        for (auto k : table_keys) {
+            auto t = get_table(k);
+            t->migrate_sets_and_dictionaries();
         }
     }
     // NOTE: Additional future upgrade steps go here.
