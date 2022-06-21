@@ -6,6 +6,8 @@
 # ./evergreen/install_baas.sh -w {path to working directory} [-b git revision of baas]
 #
 
+# shellcheck disable=SC1091
+
 set -o errexit
 set -o pipefail
 
@@ -48,6 +50,7 @@ case $(uname -s) in
         # /etc/os-release covers debian/ubuntu/suse
         if [[ -e /etc/os-release ]]; then
             # Amazon Linux 2 comes back as 'amzn'
+            # shellcheck disable=SC1091
             DISTRO_NAME="$(. /etc/os-release ; echo "$ID")"
             DISTRO_VERSION="$(. /etc/os-release ; echo "$VERSION_ID")"
             DISTRO_VERSION_MAJOR="$(cut -d. -f1 <<< "$DISTRO_VERSION" )"
@@ -125,6 +128,7 @@ usage()
 
 WORK_PATH=""
 BAAS_VERSION=""
+
 while getopts "w:b:" opt; do
     case "${opt}" in
         w) WORK_PATH="$($REALPATH "${OPTARG}")";;
@@ -139,7 +143,7 @@ if [[ -z "$WORK_PATH" ]]; then
     exit 1
 fi
 
-[[ -d $WORK_PATH ]] || mkdir -p "$WORK_PATH"
+[[ -d "$WORK_PATH" ]] || mkdir -p "$WORK_PATH"
 cd "$WORK_PATH"
 
 if [[ -f "$WORK_PATH/baas_ready" ]]; then
@@ -270,11 +274,11 @@ mkdir mongodb-dbpath
 function cleanup() {
     BAAS_PID=""
     MONGOD_PID=""
-    if [[ -f $WORK_PATH/baas_server.pid ]]; then
+    if [[ -f "$WORK_PATH/baas_server.pid" ]]; then
         BAAS_PID="$(< "$WORK_PATH/baas_server.pid")"
     fi
 
-    if [[ -f $WORK_PATH/mongod.pid ]]; then
+    if [[ -f "$WORK_PATH/mongod.pid" ]]; then
         MONGOD_PID="$(< "$WORK_PATH/mongod.pid")"
     fi
 
@@ -329,13 +333,17 @@ go run -exec="env LD_LIBRARY_PATH=$LD_LIBRARY_PATH DYLD_LIBRARY_PATH=$DYLD_LIBRA
     -password "password"
 
 [[ -d tmp ]] || mkdir tmp
-echo "Starting stitch app server"
-[[ -f $WORK_PATH/baas_server.pid ]] && rm "$WORK_PATH/baas_server.pid"
+echo "Building stitch app server"
+[[ -f "$WORK_PATH/baas_server.pid" ]] && rm "$WORK_PATH/baas_server.pid"
 go build -o "$WORK_PATH/baas_server" cmd/server/main.go
+
+echo "Starting stitch app server"
+
 "$WORK_PATH/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json > "$WORK_PATH/baas_server.log" 2>&1 &
+    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH/config_overrides.json" > "$WORK_PATH/baas_server.log" 2>&1 &
+
 echo $! > "$WORK_PATH/baas_server.pid"
-"$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid"
+"$BASE_PATH/wait_for_baas.sh" "$WORK_PATH/baas_server.pid" 120 "$WORK_PATH/baas_server.log"
 
 touch "$WORK_PATH/baas_ready"
 

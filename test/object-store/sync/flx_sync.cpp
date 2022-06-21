@@ -1307,6 +1307,7 @@ TEST_CASE("flx: writes work without waiting for sync", "[sync][flx][app]") {
     });
 }
 
+#ifndef _WIN32
 TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query");
     SyncTestFile config(harness.app()->current_user(), harness.schema(), SyncConfig::FLXSyncEnabled{});
@@ -1326,6 +1327,7 @@ TEST_CASE("flx: subscriptions persist after closing/reopening", "[sync][flx][app
         latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
     }
 }
+#endif
 
 TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") {
     const std::string base_url = get_base_url();

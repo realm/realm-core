@@ -6,6 +6,7 @@ set -o pipefail
 CURL=${CURL:=curl}
 STITCH_PID_FILE=$1
 RETRY_COUNT=${2:-120}
+BAAS_SERVER_LOG=$3
 
 WAIT_COUNTER=0
 until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
@@ -17,6 +18,10 @@ until $CURL --output /dev/null --head --fail http://localhost:9090 --silent ; do
     if [[ $WAIT_COUNTER = $RETRY_COUNT ]]; then
         echo "Timed out waiting for stitch to start"
         exit 1
+    fi
+
+    if [[ -n "$BAAS_SERVER_LOG" && -f "$BAAS_SERVER_LOG" ]]; then
+        tail $BAAS_SERVER_LOG
     fi
 
     sleep 5

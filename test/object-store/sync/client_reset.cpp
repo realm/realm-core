@@ -164,6 +164,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
     local_config.path = local_config.path + ".local";
     remote_config.path = remote_config.path + ".remote";
 
+#ifndef _WIN32
     SECTION("a client reset in manual mode can be handled") {
         std::string orig_path, recovery_path;
         local_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -208,6 +209,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
         wait_for_download(*post_reset_realm); // this should now succeed without any sync errors
         REQUIRE(util::File::exists(orig_path));
     }
+#endif
 
     local_config.sync_config->error_handler = [&](std::shared_ptr<SyncSession>, SyncError err) {
         CAPTURE(err.message);
