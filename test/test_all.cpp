@@ -448,7 +448,9 @@ bool run_tests(util::Logger* logger)
     }
 
     // Set up reporter
-    std::ofstream xml_file;
+    util::File junit_file;
+    util::File::Streambuf junit_streambuf(&junit_file);
+    std::ostream junit_out(&junit_streambuf);
     std::vector<std::unique_ptr<Reporter>> reporters;
     {
         const char* str = getenv("UNITTEST_PROGRESS");
@@ -457,11 +459,11 @@ bool run_tests(util::Logger* logger)
     }
     if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
         std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
-        xml_file.open(str);
+        junit_file.open(str, util::File::mode_Write);
         const char* test_suite_name = getenv("UNITTEST_SUITE_NAME");
         if (!test_suite_name || !strlen(test_suite_name))
             test_suite_name = "realm-core-tests";
-        reporters.push_back(create_junit_reporter(xml_file, test_suite_name));
+        reporters.push_back(create_junit_reporter(junit_out, test_suite_name));
     }
     else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
@@ -527,6 +529,15 @@ bool run_tests(util::Logger* logger)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
     std::cout << "\n";
+
+    // The iOS Simulator has a separate set of kernel file caches from the parent
+    // OS, and if the simulator is deleted immediately after running the tests
+    // (as is done on CI), the writes never actually make it to disk without
+    // an explicit F_FULLFSYNC.
+    if (junit_file.is_attached()) {
+        junit_out.flush();
+        junit_file.sync();
+    }
 
     return success;
 }

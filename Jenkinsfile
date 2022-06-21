@@ -803,21 +803,17 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
                         if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
                         sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
                         def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
-                        env << "SIMCTL_CHILD_UNITTEST_XML=${WORKSPACE}/unit-test-report.xml"
+                        def resultFile = "${WORKSPACE}/unit-test-report.xml"
+                        env << "SIMCTL_CHILD_UNITTEST_XML=${resultFile}"
                         withEnv(env) {
-                            runSimulator("test/${buildType}-${platform}/realm-tests.app", 'io.realm.CoreTests', '$WORKSPACE/')
+                            sh "$WORKSPACE/tools/run-in-simulator.sh 'test/${buildType}-${platform}/realm-tests.app' 'io.realm.CoreTests' '${resultFile}'"
                         }
-                        // Somehow Jenkins sees an empty file for a while after
-                        // the simulator exits, so wait for the file to be
-                        // non-empty
-                        sh '''
-                        while [ ! -s $WORKSPACE/unit-test-report.xml -a $((retries++)) -lt 100 ]; do
-                            sleep 5
-                        done
-                        '''
-                        junit testResults: "${WORKSPACE}/unit-test-report.xml"
                     }
                 }
+            }
+
+            if (test) {
+                junit testResults: 'unit-test-report.xml'
             }
 
             String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
