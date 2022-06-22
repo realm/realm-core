@@ -115,10 +115,6 @@ install(FILES ${UTIL_INSTALL_HEADERS}
         DESTINATION include/realm/util
         COMPONENT devel)
 
-install(FILES ${UTIL_METERED_INSTALL_HEADERS}
-        DESTINATION include/realm/util/metered
-        COMPONENT devel)
-
 install(FILES ../../external/mpark/variant.hpp
         DESTINATION include/external/mpark
         COMPONENT devel)

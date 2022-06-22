@@ -8,8 +8,6 @@
 
 #include <realm/util/assert.hpp>
 #include <realm/util/backtrace.hpp>
-#include <realm/util/allocator.hpp>
-#include <realm/util/allocation_metrics.hpp>
 #include <vector>
 
 namespace realm {
@@ -36,7 +34,7 @@ struct ScratchMemory {
     static const size_t block_size = 16 << 20; // 16 MB
     static const size_t alignment = 16;
 
-    ScratchMemory(AllocatorBase& allocator = DefaultAllocator::get_default()) noexcept;
+    ScratchMemory() noexcept = default;
     ~ScratchMemory();
 
     struct Position {
@@ -77,49 +75,12 @@ private:
     /// Note that blocks are never freed.
     void* allocate(const ScratchArena&, size_t size);
 
-    AllocatorBase& m_allocator;
     Position m_position;
     Position m_high_mark;
-    using Block = std::unique_ptr<char[], STLDeleter<char[]>>;
-    std::vector<Block> m_blocks;
+    std::vector<std::unique_ptr<char[]>> m_blocks;
 
     const ScratchArena* m_current_arena = nullptr;
 };
-
-/// Create a scoped arena based on scratch memory.
-///
-/// Any previously associated arena for the instance of ScratchMemory will be
-/// immutable for the duration of the lifetime of the new instance of
-/// ScratchArena.
-///
-/// Allocating memory through a ScratchArena is very cheap (pointer bump),
-/// and freeing memory is a no-op. Therefore you must make sure to manage the
-/// lifetime of a ScratchArena, such that it is periodically reset.
-struct ScratchArena : AllocatorBase {
-    explicit ScratchArena(ScratchMemory&) noexcept;
-    ~ScratchArena();
-
-    void* allocate(size_t size, size_t align) noexcept override final;
-    void free(void*, size_t size) noexcept override final;
-
-    /// Return the number of bytes that have been "freed" by calls to free().
-    /// Use this to gather statistics about usage patterns.
-    size_t get_dead_memory() const noexcept;
-
-private:
-    ScratchMemory& m_memory;
-    const ScratchArena* m_previous = nullptr;
-    ScratchMemory::Position m_checkpoint;
-    size_t m_dead_memory = 0;
-
-    void* allocate_large(size_t size);
-    using LargeBlock = std::unique_ptr<char[], STLDeleter<char[], MeteredAllocator>>;
-    std::vector<LargeBlock> m_large_allocations;
-};
-
-/// STL-compatible allocator
-template <class T>
-using ScratchAllocator = STLAllocator<T, ScratchArena>;
 
 // Implementation:
 
@@ -135,11 +96,6 @@ inline bool operator<=(const ScratchMemory::Position& a, const ScratchMemory::Po
     if (a.block_index == b.block_index)
         return a.offset <= b.offset;
     return a.block_index < b.block_index;
-}
-
-inline ScratchMemory::ScratchMemory(AllocatorBase& allocator) noexcept
-    : m_allocator(allocator)
-{
 }
 
 inline ScratchMemory::~ScratchMemory()
@@ -203,7 +159,7 @@ inline void* ScratchMemory::allocate(const ScratchArena& current_arena, size_t s
         // Skip to next block
         pos.block_index = m_blocks.size();
         pos.offset = 0;
-        m_blocks.emplace_back(util::make_unique<char[]>(m_allocator, block_size)); // Throws
+        m_blocks.emplace_back(std::make_unique<char[]>(block_size)); // Throws
         m_position.block_index = pos.block_index;
         m_position.offset = size;
     }
@@ -211,46 +167,6 @@ inline void* ScratchMemory::allocate(const ScratchArena& current_arena, size_t s
     char* block = m_blocks[pos.block_index].get();
     return static_cast<void*>(block + pos.offset);
 }
-
-inline ScratchArena::ScratchArena(ScratchMemory& memory) noexcept
-    : m_memory(memory)
-{
-    m_previous = m_memory.enter_arena(*this);
-    m_checkpoint = memory.get_current_position();
-}
-
-inline ScratchArena::~ScratchArena()
-{
-    m_memory.reset(*this, m_previous, m_checkpoint);
-}
-
-inline void* ScratchArena::allocate(size_t size, size_t align) noexcept
-{
-    static_cast<void>(align); // FIXME
-    if (size > ScratchMemory::block_size)
-        return allocate_large(size);
-    return m_memory.allocate(*this, size);
-}
-
-inline void* ScratchArena::allocate_large(size_t size)
-{
-    m_large_allocations.emplace_back(util::make_unique<char[]>(MeteredAllocator::get_default(), size));
-    return m_large_allocations.back().get();
-}
-
-inline void ScratchArena::free(void*, size_t size) noexcept
-{
-    m_dead_memory += size;
-    // No-op
-}
-
-inline size_t ScratchArena::get_dead_memory() const noexcept
-{
-    return m_dead_memory;
-}
-
-template <class T>
-using ScratchDeleter = STLDeleter<T, ScratchArena>;
 
 } // namespace util
 } // namespace realm
