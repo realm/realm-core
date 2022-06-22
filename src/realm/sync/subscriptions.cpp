@@ -717,7 +717,7 @@ std::vector<SubscriptionSet> SubscriptionStore::get_pending_subscriptions() cons
     auto active_sub = get_active();
     auto cur_query_version = active_sub.version();
     DB::version_type db_version = 0;
-    if (active_sub.state() != SubscriptionSet::State::Pending) {
+    if (active_sub.state() == SubscriptionSet::State::Complete) {
         db_version = active_sub.snapshot_version();
     }
     REALM_ASSERT_EX(db_version != DB::version_type(-1), active_sub.state());
