@@ -1165,36 +1165,41 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
 }
 
 TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
-    FLXSyncTestHarness::ServerSchema server_schema;
-    server_schema.queryable_fields = {"queryable_str_field"};
-    server_schema.schema = {
-        {"Asymmetric",
-         ObjectSchema::IsAsymmetric{true},
-         {
-             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-             {"location", PropertyType::String | PropertyType::Nullable},
-         }},
-        {"TopLevel",
-         {
-             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-             {"queryable_str_field", PropertyType::String | PropertyType::Nullable},
-         }},
-    };
-
-    FLXSyncTestHarness harness("asymmetric_sync", server_schema);
+    static auto server_schema = [] {
+        FLXSyncTestHarness::ServerSchema server_schema;
+        server_schema.queryable_fields = {"queryable_str_field"};
+        server_schema.schema = {
+            {"Asymmetric",
+             ObjectSchema::IsAsymmetric{true},
+             {
+                 {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
+                 {"location", PropertyType::String | PropertyType::Nullable},
+                 {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Embedded"},
+             }},
+            {"Embedded",
+             ObjectSchema::IsEmbedded{true},
+             {
+                 {"value", PropertyType::String | PropertyType::Nullable},
+             }},
+        };
+        return server_schema;
+    }();
+    static auto harness = std::make_unique<FLXSyncTestHarness>("asymmetric_sync", server_schema);
 
     SECTION("basic object construction") {
         auto foo_obj_id = ObjectId::gen();
         auto bar_obj_id = ObjectId::gen();
-        harness.load_initial_data([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            realm->begin_transaction();
             CppContext c(realm);
             Object::create(c, realm, "Asymmetric",
                            util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
             Object::create(c, realm, "Asymmetric",
                            util::Any(AnyDict{{"_id", bar_obj_id}, {"location", std::string{"bar"}}}));
+            realm->commit_transaction();
         });
 
-        harness.do_with_new_realm([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             wait_for_download(*realm);
 
             auto table = realm->read_group().get_table("class_Asymmetric");
@@ -1207,7 +1212,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
 
     SECTION("do not allow objects with same key within the same transaction") {
         auto foo_obj_id = ObjectId::gen();
-        harness.load_initial_data([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            realm->begin_transaction();
             CppContext c(realm);
             Object::create(c, realm, "Asymmetric",
                            util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
@@ -1216,9 +1222,10 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
                                util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"bar"}}})),
                 "Attempting to create an object of type 'Asymmetric' with an existing primary key value 'not "
                 "implemented'.");
+            realm->commit_transaction();
         });
 
-        harness.do_with_new_realm([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             wait_for_download(*realm);
 
             auto table = realm->read_group().get_table("class_Asymmetric");
@@ -1227,7 +1234,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 
     SECTION("replace object") {
-        harness.do_with_new_realm([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             auto foo_obj_id = ObjectId::gen();
             realm->begin_transaction();
@@ -1249,7 +1256,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 
     SECTION("create multiple objects - separate commits") {
-        harness.do_with_new_realm([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             for (int i = 0; i < 100; ++i) {
                 realm->begin_transaction();
@@ -1268,7 +1275,7 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 
     SECTION("create multiple objects - same commit") {
-        harness.do_with_new_realm([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             realm->begin_transaction();
             for (int i = 0; i < 100; ++i) {
@@ -1287,17 +1294,10 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 
     SECTION("open with schema mismatch on IsAsymmetric") {
-        auto foo_obj_id = ObjectId::gen();
-        harness.load_initial_data([&](SharedRealm realm) {
-            CppContext c(realm);
-            Object::create(c, realm, "Asymmetric",
-                           util::Any(AnyDict{{"_id", foo_obj_id}, {"location", std::string{"foo"}}}));
-        });
-
         auto schema = server_schema.schema;
         schema.find("Asymmetric")->is_asymmetric = ObjectSchema::IsAsymmetric{false};
 
-        harness.do_with_new_user([&](std::shared_ptr<SyncUser> user) {
+        harness->do_with_new_user([&](std::shared_ptr<SyncUser> user) {
             SyncTestFile config(user, schema, SyncConfig::FLXSyncEnabled{});
             std::condition_variable cv;
             std::mutex wait_mutex;
@@ -1319,35 +1319,18 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
             CHECK(ec.value() == int(realm::sync::ClientError::bad_changeset));
         });
     }
-}
 
-TEST_CASE("flx: asymmetric sync with embedded objects") {
-    FLXSyncTestHarness::ServerSchema server_schema;
-    server_schema.schema = {
-        {"Asymmetric",
-         ObjectSchema::IsAsymmetric{true},
-         {
-             {"_id", PropertyType::ObjectId, Property::IsPrimary{true}},
-             {"embedded_obj", PropertyType::Object | PropertyType::Nullable, "Asymmetric_embedded_obj"},
-         }},
-        {"Asymmetric_embedded_obj",
-         ObjectSchema::IsEmbedded{true},
-         {
-             {"value", PropertyType::String | PropertyType::Nullable},
-         }},
-    };
-
-    FLXSyncTestHarness harness("asymmetric_sync", server_schema);
-
-    SECTION("basic object construction") {
-        harness.load_initial_data([&](SharedRealm realm) {
+    SECTION("basic embedded object construction") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
+            realm->begin_transaction();
             CppContext c(realm);
             Object::create(c, realm, "Asymmetric",
                            util::Any(AnyDict{{"_id", ObjectId::gen()},
                                              {"embedded_obj", AnyDict{{"value", std::string{"foo"}}}}}));
+            realm->commit_transaction();
         });
 
-        harness.do_with_new_realm([&](SharedRealm realm) {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             wait_for_download(*realm);
 
             auto table = realm->read_group().get_table("class_Asymmetric");
@@ -1355,8 +1338,8 @@ TEST_CASE("flx: asymmetric sync with embedded objects") {
         });
     }
 
-    SECTION("replace object") {
-        harness.do_with_new_realm([&](SharedRealm realm) {
+    SECTION("replace embedded object") {
+        harness->do_with_new_realm([&](SharedRealm realm) {
             CppContext c(realm);
             auto foo_obj_id = ObjectId::gen();
             realm->begin_transaction();
@@ -1382,6 +1365,12 @@ TEST_CASE("flx: asymmetric sync with embedded objects") {
             auto table = realm->read_group().get_table("class_Asymmetric");
             REQUIRE(table->size() == 0);
         });
+    }
+
+    // Add any new test sections above this point
+
+    SECTION("teardown") {
+        harness.reset();
     }
 }
 
