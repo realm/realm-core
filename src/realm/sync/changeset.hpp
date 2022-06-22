@@ -539,7 +539,13 @@ inline StringData Changeset::string_data() const noexcept
 
 inline StringBufferRange Changeset::append_string(StringData string)
 {
-    m_string_buffer->reserve(1024); // we expect more strings
+    // small string optimization; we expect more strings, but constantly requesting many small allocation increases
+    // to the string buffer can become a performance bottleneck in highly fragmented or low memory devices
+    constexpr size_t small_string_buffer_size = 1024;
+    if (m_string_buffer->capacity() - m_string_buffer->size() < string.size() &&
+        string.size() < small_string_buffer_size) {
+        m_string_buffer->reserve(m_string_buffer->capacity() + small_string_buffer_size);
+    }
     size_t offset = m_string_buffer->size();
     m_string_buffer->append(string.data(), string.size());
     return StringBufferRange{uint32_t(offset), uint32_t(string.size())};
