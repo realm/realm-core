@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef SECTIONED_RESULTS_HPP
-#define SECTIONED_RESULTS_HPP
+#ifndef REALM_SECTIONED_RESULTS_HPP
+#define REALM_SECTIONED_RESULTS_HPP
 
 #include <realm/util/functional.hpp>
 
@@ -68,7 +68,6 @@ public:
 
     realm::ThreadSafeReference thread_safe_reference();
     bool is_valid() const;
-    size_t hash() const;
 
 private:
     friend class SectionedResults;
@@ -124,20 +123,32 @@ private:
     uint_fast64_t get_content_version();
 
     friend struct SectionedResultsNotificationHandler;
-    void calculate_sections_if_required(bool force_update = false);
+    void calculate_sections_if_required();
     void calculate_sections();
-
+    bool has_performed_initial_evalutation = false;
     NotificationToken add_notification_callback_for_section(size_t section_index,
                                                             SectionedResultsNotificatonCallback callback,
                                                             KeyPathArray key_path_array = {});
 
     friend class realm::ResultsSection;
     Results m_results;
+    std::map<Mixed, size_t> m_prev_sections;
+    std::map<size_t, Mixed> m_prev_section_index_to_key;
+    std::map<Mixed, size_t> m_section_key_to_index_lookup;
+
     std::vector<Section> m_sections;
     // Key: Original index in Results, Value: <section_index, section_size>
     std::vector<std::pair<size_t, size_t>> m_row_to_index_path;
     SectionKeyFunc m_callback;
     uint_fast64_t m_previous_content_version;
+    // Binary representable types require a buffer to hold deep
+    // copies of the values for the lifetime of the sectioned results.
+    // This is due to the fact that such values can reference the memory address of the value in the realm.
+    // We can not rely on that because it would not produce stable keys.
+    // So we perform a deep copy to produce stable key values that will not change if the realm is modified.
+    // The buffer will purge keys that are no longer used in the case that the `calculate_sections` method runs.
+    std::deque<std::unique_ptr<util::Optional<std::string>>> m_str_data_buffers;
+    size_t m_prev_str_data_buffer_size = 0;
 };
 
 struct SectionedResultsChangeSet {
@@ -159,11 +170,10 @@ struct Section {
     Mixed key;
     // A unique id which helps us calculate what section has changed in the notification callback.
     // We need this because Mixed doesn't copy all value types.
-    size_t hash;
     std::vector<size_t> indices;
 };
 
 } // namespace realm
 
 
-#endif /* SECTIONED_RESULTS_HPP */
+#endif /* REALM_SECTIONED_RESULTS_HPP */

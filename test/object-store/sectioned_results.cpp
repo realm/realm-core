@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_all.hpp>
 
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
@@ -566,7 +566,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         auto v = obj.get_column_value<StringData>("name_col");
         return v.prefix(1);
     });
-    REQUIRE(algo_run_count == 5);
+    REQUIRE(algo_run_count == 0);
 
     SECTION("sorts results correctly") {
         REQUIRE(sectioned_results.size() == 3);
@@ -750,11 +750,13 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
             });
 
         coordinator->on_change();
-        REQUIRE(algo_run_count == 5);
+        REQUIRE(algo_run_count == 0);
         algo_run_count = 0;
 
         // Insertions
         r->begin_transaction();
+        REQUIRE(algo_run_count == 5); // Initial evaluation will be kicked off.
+        algo_run_count = 0;
         auto o1 = table->create_object().set(name_col, "safari");
         auto o2 = table->create_object().set(name_col, "mail");
         auto o3 = table->create_object().set(name_col, "czar");
@@ -1002,6 +1004,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
         r->begin_transaction();
         table->clear();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 5);
+        algo_run_count = 0;
+
+        r->begin_transaction();
         auto o1 = table->create_object().set(name_col, "apple");
         auto o2 = table->create_object().set(name_col, "banana");
         auto o3 = table->create_object().set(name_col, "beans");
@@ -1050,6 +1058,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         algo_run_count = 0;
 
         r->begin_transaction();
+        REQUIRE(algo_run_count == 4); // Initial evaluation will be kicked off.
+        algo_run_count = 0;
         table->clear();
         o1 = table->create_object().set(name_col, "apple");
         o2 = table->create_object().set(name_col, "banana");
@@ -1156,6 +1166,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
 
         // Insertions
         r->begin_transaction();
+        REQUIRE(algo_run_count == 4); // Initial evaluation will be kicked off.
+        algo_run_count = 0;
         lst.delete_all();
         lst.add(StringData("apple"));
         lst.add(StringData("banana"));
@@ -1209,11 +1221,12 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         });
 
         coordinator->on_change();
-        REQUIRE(algo_run_count == 5);
-        algo_run_count = 0;
-
         // Insertions
         r->begin_transaction();
+        REQUIRE(algo_run_count == 5);
+        algo_run_count = 0;
+        section1_notification_calls = 0;
+        section2_notification_calls = 0;
         auto o1 = table->create_object().set(name_col, "any");
         r->commit_transaction();
         advance_and_notify(*r);
