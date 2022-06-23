@@ -299,6 +299,7 @@ TestAppSession::TestAppSession(AppSession session,
     sc_config.base_file_path = m_base_file_path;
     sc_config.log_level = TEST_ENABLE_SYNC_LOGGING ? util::Logger::Level::all : util::Logger::Level::off;
     sc_config.metadata_mode = realm::SyncManager::MetadataMode::NoEncryption;
+    sc_config.socket_factory = realm::util::websocket::SocketFactory::defaultSocketFactory;
 
     m_app = app::App::get_uncached_app(app_config, sc_config);
 
