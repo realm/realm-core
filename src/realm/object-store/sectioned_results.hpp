@@ -132,15 +132,21 @@ private:
 
     friend class realm::ResultsSection;
     Results m_results;
+    SectionKeyFunc m_callback;
+    std::vector<Section> m_sections;
+    // Stores the Key, Section Index of the previous section
+    // so we can efficiently calculate the collection change set.
     std::map<Mixed, size_t> m_prev_sections;
+    // Returns the index of the previous section from its key.
     std::map<size_t, Mixed> m_prev_section_index_to_key;
+    // Returns the index of a section from its key.
     std::map<Mixed, size_t> m_section_key_to_index_lookup;
 
-    std::vector<Section> m_sections;
-    // Key: Original index in Results, Value: <section_index, section_size>
+    // Key: Original index in Results, Value: <section_index, index_in_section>
+    // Pass the index of the object from the underlying `Results`,
+    // this will give a pair with the section index of the object, and the position of the object in that section.
+    // This is used for parsing the indices in CollectionChangeSet to section indices.
     std::vector<std::pair<size_t, size_t>> m_row_to_index_path;
-    SectionKeyFunc m_callback;
-    uint_fast64_t m_previous_content_version;
     // Binary representable types require a buffer to hold deep
     // copies of the values for the lifetime of the sectioned results.
     // This is due to the fact that such values can reference the memory address of the value in the realm.
@@ -164,12 +170,10 @@ struct SectionedResultsChangeSet {
     IndexSet sections_to_delete;
 };
 
-/// For internal use only. Used to track the indicies for a given section.
+/// For internal use only. Used to track the indices for a given section.
 struct Section {
     size_t index;
     Mixed key;
-    // A unique id which helps us calculate what section has changed in the notification callback.
-    // We need this because Mixed doesn't copy all value types.
     std::vector<size_t> indices;
 };
 
