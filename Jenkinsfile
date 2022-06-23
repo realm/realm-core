@@ -801,19 +801,32 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
 
                     if (test) {
                         if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
-                        sh "xcodebuild -scheme CoreTests -configuration ${buildType} -destination \"${buildDestination}\""
+                        sh "xcodebuild -scheme CoreTests -configuration ${buildType} -sdk iphonesimulator -arch x86_64"
+                        // sh "xcodebuild -scheme SyncTests -configuration ${buildType} -sdk iphonesimulator -arch x86_64 IPHONEOS_DEPLOYMENT_TARGET=13"
+                        sh "xcodebuild -scheme ObjectStoreTests -configuration ${buildType} -sdk iphonesimulator -arch x86_64 IPHONEOS_DEPLOYMENT_TARGET=13"
+
                         def env = environment().collect { v -> "SIMCTL_CHILD_${v}" }
-                        def resultFile = "${WORKSPACE}/unit-test-report.xml"
-                        env << "SIMCTL_CHILD_UNITTEST_XML=${resultFile}"
-                        withEnv(env) {
+                        def resultFile = "${WORKSPACE}/core-test-report.xml"
+                        withEnv(env + ["SIMCTL_CHILD_UNITTEST_XML=${resultFile}", "SIMCTL_CHILD_UNITTEST_SUITE_NAME=iOS-${buildType}-Core"]) {
                             sh "$WORKSPACE/tools/run-in-simulator.sh 'test/${buildType}-${platform}/realm-tests.app' 'io.realm.CoreTests' '${resultFile}'"
+                        }
+                        // Sync tests currently don't work on iOS because they require an unimplemented server feature
+                        // resultFile = "${WORKSPACE}/sync-test-report.xml"
+                        // withEnv(env + ["SIMCTL_CHILD_UNITTEST_XML=${resultFile}", "SIMCTL_CHILD_UNITTEST_SUITE_NAME=iOS-${buildType}-Sync"]) {
+                        //     sh "$WORKSPACE/tools/run-in-simulator.sh 'test/${buildType}-${platform}/realm-sync-tests.app' 'io.realm.SyncTests' '${resultFile}'"
+                        // }
+                        resultFile = "${WORKSPACE}/object-store-test-report.xml"
+                        withEnv(env + ["SIMCTL_CHILD_UNITTEST_XML=${resultFile}", "SIMCTL_CHILD_UNITTEST_SUITE_NAME=iOS-${buildType}-Object-Store"]) {
+                            sh "$WORKSPACE/tools/run-in-simulator.sh 'test/object-store/${buildType}-${platform}/realm-object-store-tests.app' 'io.realm.ObjectStoreTests' '${resultFile}'"
                         }
                     }
                 }
             }
 
             if (test) {
-                junit testResults: 'unit-test-report.xml'
+                junit testResults: 'core-test-report.xml'
+                // junit testResults: 'sync-test-report.xml'
+                junit testResults: 'object-store-test-report.xml'
             }
 
             String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
