@@ -207,34 +207,35 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     static std::vector<BinaryData> values()
     {
         return {BinaryData("a", 1), BinaryData("aa", 2), BinaryData("b", 1), BinaryData("bb", 2),
-                BinaryData("c", 1), BinaryData("cc", 2), BinaryData("d", 1), BinaryData("dd", 2),
-                BinaryData("e", 1), BinaryData("ee", 2)};
+                BinaryData("c", 1), BinaryData("cc", 2), BinaryData("a", 1), BinaryData("b", 1),
+                BinaryData("c", 1)};
     }
 
     static std::vector<BinaryData> expected_sorted()
     {
-        return {BinaryData("a", 1),  BinaryData("b", 1),  BinaryData("c", 1),  BinaryData("d", 1),
-                BinaryData("e", 1),  BinaryData("aa", 2), BinaryData("bb", 2), BinaryData("cc", 2),
-                BinaryData("dd", 2), BinaryData("ee", 2)};
+        return {BinaryData("a", 1),  BinaryData("a", 1), BinaryData("aa", 2),
+                BinaryData("b", 1), BinaryData("b", 1), BinaryData("bb", 2),
+                BinaryData("c", 1), BinaryData("c", 1), BinaryData("cc", 2)};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {1, 2};
+        return {BinaryData("a", 1), BinaryData("aa", 2),
+                BinaryData("b", 1), BinaryData("bb", 2),
+                BinaryData("c", 1), BinaryData("cc", 2)};
     }
 
     static Mixed comparison_value(Mixed value)
     {
-        // Seperate by size of data
         if (value.is_null()) {
             return "nulls";
         }
-        return (int)value.get_binary().size();
+        return value.get_binary();
     }
 
     static size_t expected_size()
     {
-        return 2;
+        return 6;
     }
 };
 
