@@ -25,8 +25,15 @@ namespace realm {
 class Mixed;
 class Results;
 class SectionedResults;
-struct Section;
 struct SectionedResultsChangeSet;
+
+/// For internal use only. Used to track the indices for a given section.
+struct Section {
+    Section() = default;
+    size_t index = 0;
+    Mixed key;
+    std::vector<size_t> indices;
+};
 
 using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
 
@@ -39,7 +46,11 @@ using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedR
  */
 class ResultsSection {
 public:
-    ResultsSection() = default;
+    ResultsSection()
+        : m_parent(nullptr)
+        , m_key(Mixed())
+    {
+    }
 
     /// Retrieve an element from the section for a given index.
     Mixed operator[](size_t idx) const;
@@ -66,19 +77,18 @@ public:
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 
-    realm::ThreadSafeReference thread_safe_reference();
     bool is_valid() const;
 
 private:
     friend class SectionedResults;
-    ResultsSection(SectionedResults* parent, size_t index)
+    ResultsSection(SectionedResults* parent, Mixed key)
         : m_parent(parent)
-        , m_index(index)
+        , m_key(key)
     {
     }
 
     SectionedResults* m_parent;
-    size_t m_index;
+    Mixed m_key;
 };
 
 class SectionedResults {
@@ -107,7 +117,6 @@ public:
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 
-    realm::ThreadSafeReference thread_safe_reference();
     /// Return a new instance SectionedResults that uses a snapshot of the underlying `Results`.
     /// The section key callback parameter will never be invoked.
     SectionedResults snapshot();
@@ -126,35 +135,37 @@ private:
     void calculate_sections_if_required();
     void calculate_sections();
     bool has_performed_initial_evalutation = false;
-    NotificationToken add_notification_callback_for_section(size_t section_index,
+    NotificationToken add_notification_callback_for_section(Mixed section_key,
                                                             SectionedResultsNotificatonCallback callback,
                                                             KeyPathArray key_path_array = {});
 
     friend class realm::ResultsSection;
     Results m_results;
     SectionKeyFunc m_callback;
-    std::vector<Section> m_sections;
+    std::unordered_map<Mixed, Section> m_sections;
+
     // Stores the Key, Section Index of the previous section
     // so we can efficiently calculate the collection change set.
-    std::map<Mixed, size_t> m_prev_sections;
-    // Returns the index of the previous section from its key.
-    std::map<size_t, Mixed> m_prev_section_index_to_key;
-    // Returns the index of a section from its key.
-    std::map<Mixed, size_t> m_section_key_to_index_lookup;
+    std::unordered_map<Mixed, size_t> m_previous_key_to_index_lookup;
+    // Returns the key of the previous section from its index.
+    std::unordered_map<size_t, Mixed> m_prev_section_index_to_key;
+    // Returns the key of the current section from its index.
+    std::vector<Mixed> m_ordered_section_keys;
 
-    // Key: Original index in Results, Value: <section_index, index_in_section>
-    // Pass the index of the object from the underlying `Results`,
+    // By passing the index of the object from the underlying `Results`,
     // this will give a pair with the section index of the object, and the position of the object in that section.
     // This is used for parsing the indices in CollectionChangeSet to section indices.
     std::vector<std::pair<size_t, size_t>> m_row_to_index_path;
-    // Binary representable types require a buffer to hold deep
-    // copies of the values for the lifetime of the sectioned results.
+    // BinaryData & StringData types require a buffer to hold deep
+    // copies of the key values for the lifetime of the sectioned results.
     // This is due to the fact that such values can reference the memory address of the value in the realm.
     // We can not rely on that because it would not produce stable keys.
     // So we perform a deep copy to produce stable key values that will not change if the realm is modified.
     // The buffer will purge keys that are no longer used in the case that the `calculate_sections` method runs.
-    std::deque<std::unique_ptr<util::Optional<std::string>>> m_str_data_buffers;
-    size_t m_prev_str_data_buffer_size = 0;
+    // We need to hold the string value in a shared_ptr so that if multiple notification handlers are attached
+    // to this `SectionedResults` the copy of the key will not be discarded during `calculate_sections` as each
+    // notification handler will hold a reference to the shared_ptr.
+    std::unordered_map<Mixed, std::shared_ptr<std::string>> m_previous_str_buffers, m_current_str_buffers;
 };
 
 struct SectionedResultsChangeSet {
@@ -168,13 +179,6 @@ struct SectionedResultsChangeSet {
     IndexSet sections_to_insert;
     /// Indexes of sections which are deleted from the _old_ collection.
     IndexSet sections_to_delete;
-};
-
-/// For internal use only. Used to track the indices for a given section.
-struct Section {
-    size_t index;
-    Mixed key;
-    std::vector<size_t> indices;
 };
 
 } // namespace realm

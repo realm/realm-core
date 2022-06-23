@@ -206,23 +206,20 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     using Boxed = std::string;
     static std::vector<BinaryData> values()
     {
-        return {BinaryData("a", 1), BinaryData("aa", 2), BinaryData("b", 1), BinaryData("bb", 2),
-                BinaryData("c", 1), BinaryData("cc", 2), BinaryData("a", 1), BinaryData("b", 1),
-                BinaryData("c", 1)};
+        return {BinaryData("a", 1),  BinaryData("aa", 2), BinaryData("b", 1), BinaryData("bb", 2), BinaryData("c", 1),
+                BinaryData("cc", 2), BinaryData("a", 1),  BinaryData("b", 1), BinaryData("c", 1)};
     }
 
     static std::vector<BinaryData> expected_sorted()
     {
-        return {BinaryData("a", 1),  BinaryData("a", 1), BinaryData("aa", 2),
-                BinaryData("b", 1), BinaryData("b", 1), BinaryData("bb", 2),
-                BinaryData("c", 1), BinaryData("c", 1), BinaryData("cc", 2)};
+        return {BinaryData("a", 1),  BinaryData("a", 1), BinaryData("aa", 2), BinaryData("b", 1), BinaryData("b", 1),
+                BinaryData("bb", 2), BinaryData("c", 1), BinaryData("c", 1),  BinaryData("cc", 2)};
     }
 
     static std::vector<Mixed> expected_keys()
     {
-        return {BinaryData("a", 1), BinaryData("aa", 2),
-                BinaryData("b", 1), BinaryData("bb", 2),
-                BinaryData("c", 1), BinaryData("cc", 2)};
+        return {BinaryData("a", 1),  BinaryData("aa", 2), BinaryData("b", 1),
+                BinaryData("bb", 2), BinaryData("c", 1),  BinaryData("cc", 2)};
     }
 
     static Mixed comparison_value(Mixed value)
@@ -1307,6 +1304,69 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section1_changes.insertions.empty());
         REQUIRE(section1_changes.modifications.empty());
         REQUIRE(algo_run_count == 5);
+    }
+
+    SECTION("notifications on section where section is deleted") {
+        auto section1 = sectioned_results[0]; // Refers to key 'a'
+        int section1_notification_calls = 0;
+        SectionedResultsChangeSet section1_changes;
+        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            section1_changes = c;
+            ++section1_notification_calls;
+        });
+
+        auto section2 = sectioned_results[1]; // Refers to key 'b'
+        int section2_notification_calls = 0;
+        SectionedResultsChangeSet section2_changes;
+        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            section2_changes = c;
+            ++section2_notification_calls;
+        });
+
+        coordinator->on_change();
+        // Delete all objects from section1
+        r->begin_transaction();
+        REQUIRE(algo_run_count == 5);
+        algo_run_count = 0;
+        section1_notification_calls = 0;
+        section2_notification_calls = 0;
+        std::vector<ObjKey> objs_to_delete;
+        for (size_t i = 0; i < section1.size(); i++) {
+            objs_to_delete.push_back(section1[i].get_link().get_obj_key());
+        }
+        for (auto& o : objs_to_delete) {
+            table->remove_object(o);
+        }
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(section1_notification_calls == 1);
+        REQUIRE(section2_notification_calls == 0);
+        REQUIRE(section1_changes.deletions.empty());
+        REQUIRE(section1_changes.insertions.empty());
+        REQUIRE(section1_changes.modifications.empty());
+        REQUIRE_INDICES(section1_changes.sections_to_delete, 0);
+        REQUIRE(algo_run_count == 2);
+
+        r->begin_transaction();
+        REQUIRE(algo_run_count == 2);
+        algo_run_count = 0;
+        section1_notification_calls = 0;
+        section2_notification_calls = 0;
+        auto o1 = table->create_object().set(name_col, "book");
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(algo_run_count == 3);
+
+        REQUIRE(section1_notification_calls == 0);
+        REQUIRE(section2_notification_calls == 1);
+        REQUIRE(section2_changes.deletions.empty());
+        // Section2 will now be at index 0 as all values begining with 'a' have been deleted.
+        REQUIRE_INDICES(section2_changes.insertions[0], 1);
+        REQUIRE(section2_changes.modifications.empty());
+        REQUIRE(algo_run_count == 3);
     }
 
     SECTION("snapshot") {
