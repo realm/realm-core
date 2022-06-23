@@ -210,6 +210,8 @@ Mixed ResultsSection::operator[](size_t idx) const
 
 Mixed ResultsSection::key()
 {
+    m_parent->calculate_sections_if_required();
+    REALM_ASSERT(m_parent->m_sections.size() > m_index);
     return m_parent->m_sections[m_index].key;
 }
 
@@ -291,14 +293,15 @@ void SectionedResults::calculate_sections()
         m_prev_section_index_to_key[s.index] = s.key;
     }
 
+    bool uses_buffer = false;
+    size_t next_buffer_size = 0;
     size_t size = m_results.size();
+    std::map<Mixed, size_t> key_to_section_index;
+
     m_sections.clear();
     m_section_key_to_index_lookup.clear();
     m_row_to_index_path.clear();
-    std::map<Mixed, size_t> key_to_section_index;
     m_row_to_index_path.resize(size);
-    bool uses_buffer = false;
-    size_t next_buffer_size = 0;
 
     for (size_t i = 0; i < size; ++i) {
         Mixed key = m_callback(m_results.get_any(i), m_results.get_realm());
