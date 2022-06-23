@@ -73,7 +73,7 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     sc_config.log_level =
         testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
     sc_config.socket_factory = [&factoryCallHandler](SocketFactoryConfig&& config) {
-        return std::unique_ptr<SocketFactory>(new TestSocketFactory(std::move(config), factoryCallHandler));
+        return std::make_unique<TestSocketFactory>(std::move(config), factoryCallHandler);
     };
 
     TestSyncManager init_sync_manager(testConfig, {}, util::some<SyncClientConfig>(sc_config));

@@ -122,7 +122,7 @@ public:
 
     static std::unique_ptr<SocketFactory> defaultSocketFactory(SocketFactoryConfig&& config)
     {
-        return std::make_unique<SocketFactory>(std::move<SocketFactoryConfig>(std::move(config)));
+        return std::make_unique<SocketFactory>(std::move(config));
     }
 
 private:
