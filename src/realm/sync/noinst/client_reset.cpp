@@ -1038,7 +1038,6 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     }
     else {
         if (recover_local_changes) {
-            REALM_ASSERT(!sub_store);
             // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
             // and then transfer the modified state all at once to the local Realm. This creates a
             // nice side effect for notifications because only the minimal state change is made.
