@@ -76,17 +76,17 @@ struct TestContext : CppContext {
 TEST_CASE("Benchmark index change calculations", "[benchmark]") {
     _impl::CollectionChangeBuilder c;
 
-    auto all_modified = [](size_t) {
+    auto all_modified = [](ObjKey) {
         return true;
     };
-    auto none_modified = [](size_t) {
+    auto none_modified = [](ObjKey) {
         return false;
     };
 
     SECTION("reports inserts/deletes for simple reorderings") {
-        auto calc = [&](std::vector<int64_t> old_rows, std::vector<int64_t> new_rows,
-                        util::UniqueFunction<bool(size_t)> modifications) {
-            return _impl::CollectionChangeBuilder::calculate(old_rows, new_rows, std::move(modifications), false);
+        auto calc = [&](const ObjKeys& old_keys, const ObjKeys& new_keys,
+                        util::UniqueFunction<bool(ObjKey)> modifications) {
+            return _impl::CollectionChangeBuilder::calculate(old_keys, new_keys, std::move(modifications), false);
         };
         std::vector<int64_t> indices = {};
         constexpr size_t indices_size = 10000;
@@ -94,17 +94,18 @@ TEST_CASE("Benchmark index change calculations", "[benchmark]") {
         for (size_t i = 0; i < indices_size; ++i) {
             indices.push_back(i);
         }
+        ObjKeys objkeys(indices);
 
         BENCHMARK("no changes")
         {
-            c = calc(indices, indices, none_modified);
+            c = calc(objkeys, objkeys, none_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
 
         BENCHMARK("all modified")
         {
-            c = calc(indices, indices, all_modified);
+            c = calc(objkeys, objkeys, all_modified);
         };
         REQUIRE(c.insertions.empty());
         REQUIRE(c.deletions.empty());
