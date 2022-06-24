@@ -272,7 +272,10 @@ void ChangesetEncoder::append_bytes(const void* bytes, size_t size)
 {
     // FIXME: It would be better to move ownership of `m_buffer` to the caller,
     // potentially reducing the number of allocations to zero (amortized).
-    m_buffer.reserve(1024); // lower the amount of reallocations
+    constexpr size_t min_buffer_capacity = 1024;
+    if (m_buffer.capacity() < min_buffer_capacity) {
+        m_buffer.reserve(min_buffer_capacity); // lower the amount of reallocations
+    }
     m_buffer.append(static_cast<const char*>(bytes), size);
 }
 
