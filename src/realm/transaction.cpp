@@ -219,6 +219,9 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
     // from going shortly to zero
     db->grab_read_lock(new_read_lock, version_id); // Throws
 
+    m_history = nullptr;
+    set_transact_stage(DB::transact_Reading);
+
     if (commit_to_disk || m_oldest_version_not_persisted) {
         // Here we are either committing to disk or we are already
         // holding on to an older version. In either case there is
@@ -263,9 +266,6 @@ VersionID Transaction::commit_and_continue_as_read(bool commit_to_disk)
 
     // Remap file if it has grown, and update refs in underlying node structure
     remap_and_update_refs(m_read_lock.m_top_ref, m_read_lock.m_file_size, false); // Throws
-
-    m_history = nullptr;
-    set_transact_stage(DB::transact_Reading);
 
     return VersionID{version, new_read_lock.m_reader_idx};
 }

@@ -18,6 +18,7 @@
 
 ### Internals
 * Delete everything related to the metered allocations feature used for server monitoring.
+* Fixes potential issue where an exception could be hidden by subsequent assertion.
 
 ----------------------------------------------
 
