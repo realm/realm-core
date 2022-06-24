@@ -341,13 +341,15 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 
     if (sync_client_config) {
         m_app = app::App::get_uncached_app(app_config, *sync_client_config);
-    } else {
+    }
+    else {
         SyncClientConfig sc_config;
         m_base_file_path = config.base_path.empty() ? util::make_temp_dir() + random_string(10) : config.base_path;
         util::try_make_dir(m_base_file_path);
         sc_config.base_file_path = m_base_file_path;
         sc_config.metadata_mode = config.metadata_mode;
-        sc_config.log_level = config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
+        sc_config.log_level =
+            config.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
         sc_config.socket_factory = util::websocket::SocketFactory::defaultSocketFactory;
         m_app = app::App::get_uncached_app(app_config, sc_config);
     }
