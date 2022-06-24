@@ -315,7 +315,6 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
         });
 }
 
-
 void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
 {
     // first check that recovery will not be prevented
@@ -367,22 +366,51 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
         config.stop_policy = SyncSessionStopPolicy::Immediately;
         config.client_resync_mode = ClientResyncMode::Manual;
         sync_session = create(m_client, db, config, m_sync_manager);
+        auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
+        // the fresh Realm may apply writes to this db after it has outlived its sync session
+        // the writes are used to generate a changeset for recovery, but are never committed
+        history.set_write_validator_factory({});
     }
 
     sync_session->assert_mutex_unlocked();
-    sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
-        // Keep the sync session alive while it's downloading, but then close
-        // it immediately
-        sync_session->close();
-        if (auto strong_self = weak_self.lock()) {
-            if (ec) {
-                strong_self->handle_fresh_realm_downloaded(nullptr, ec.message(), allowed_mode);
+    if (m_flx_subscription_store) {
+        sync::SubscriptionSet active = m_flx_subscription_store->get_active();
+        auto fresh_sub_store = sync_session->get_flx_subscription_store();
+        REALM_ASSERT(fresh_sub_store);
+        auto fresh_mut_sub = fresh_sub_store->get_latest().make_mutable_copy();
+        fresh_mut_sub.import(active);
+        std::move(fresh_mut_sub)
+            .commit()
+            .get_state_change_notification(sync::SubscriptionSet::State::Complete)
+            .get_async([=, weak_self = weak_from_this()](StatusWith<sync::SubscriptionSet::State> s) {
+                // Keep the sync session alive while it's downloading, but then close
+                // it immediately
+                sync_session->close();
+                if (auto strong_self = weak_self.lock()) {
+                    if (s.is_ok()) {
+                        strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
+                    }
+                    else {
+                        strong_self->handle_fresh_realm_downloaded(nullptr, s.get_status().reason(), allowed_mode);
+                    }
+                }
+            });
+    }
+    else { // pbs
+        sync_session->wait_for_download_completion([=, weak_self = weak_from_this()](std::error_code ec) {
+            // Keep the sync session alive while it's downloading, but then close
+            // it immediately
+            sync_session->close();
+            if (auto strong_self = weak_self.lock()) {
+                if (ec) {
+                    strong_self->handle_fresh_realm_downloaded(nullptr, ec.message(), allowed_mode);
+                }
+                else {
+                    strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
+                }
             }
-            else {
-                strong_self->handle_fresh_realm_downloaded(db, none, allowed_mode);
-            }
-        }
-    });
+        });
+    }
     sync_session->revive_if_needed();
 }
 
@@ -396,8 +424,19 @@ void SyncSession::handle_fresh_realm_downloaded(DBRef db, util::Optional<std::st
     // The download can fail for many reasons. For example:
     // - unable to write the fresh copy to the file system
     // - during download of the fresh copy, the fresh copy itself is reset
+    // - in FLX mode there was a problem fulfilling the previously active subscription
     if (error_message) {
         lock.unlock();
+        if (m_flx_subscription_store) {
+            // In DiscardLocal mode, only the active subscription set is preserved
+            // this means that we have to remove all other subscriptions including later
+            // versioned ones.
+            auto mut_sub = m_flx_subscription_store->get_active().make_mutable_copy();
+            m_flx_subscription_store->supercede_all_except(mut_sub);
+            mut_sub.update_state(sync::SubscriptionSet::State::Error,
+                                 util::make_optional<std::string_view>(*error_message));
+            std::move(mut_sub).commit();
+        }
         const bool is_fatal = true;
         SyncError synthetic(make_error_code(sync::Client::Error::auto_client_reset_failure),
                             util::format("A fatal error occured during client reset: '%1'", error_message), is_fatal);
@@ -727,11 +766,11 @@ void SyncSession::create_sync_session()
     std::weak_ptr<SyncSession> weak_self = weak_from_this();
 
     // Configure the sync transaction callback.
-    auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
+    auto wrapped_callback = [weak_self](VersionID old_version, VersionID new_version) {
         if (auto self = weak_self.lock()) {
-            util::CheckedLockGuard l(m_state_mutex);
-            if (m_sync_transact_callback) {
-                m_sync_transact_callback(old_version, new_version);
+            util::CheckedLockGuard l(self->m_state_mutex);
+            if (self->m_sync_transact_callback) {
+                self->m_sync_transact_callback(old_version, new_version);
             }
         }
     };

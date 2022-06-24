@@ -239,6 +239,8 @@ public:
     // will have
     std::pair<iterator, bool> insert_or_assign(const Query& query);
 
+    void import(const SubscriptionSet&);
+
     // Erases a subscription pointed to by an iterator. Returns the "next" iterator in the set - to provide
     // STL compatibility. The SubscriptionSet must be in the Uncommitted state to call this - otherwise
     // this will throw.
@@ -318,6 +320,10 @@ public:
     // To be used internally by the sync client. This returns a read-only view of a subscription set by its
     // version ID. If there is no SubscriptionSet with that version ID, this throws KeyNotFound.
     SubscriptionSet get_by_version(int64_t version_id) const;
+
+    // Fulfill all previous subscriptions by superceding them. This does not
+    // affect the mutable subscription identified by the parameter.
+    void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
 
     using TableSet = std::set<std::string, std::less<>>;
     TableSet get_tables_for_latest(const Transaction& tr) const;

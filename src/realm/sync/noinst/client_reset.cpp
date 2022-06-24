@@ -27,6 +27,7 @@
 #include <realm/sync/noinst/client_history_impl.hpp>
 #include <realm/sync/noinst/client_reset.hpp>
 #include <realm/sync/noinst/client_reset_recovery.hpp>
+#include <realm/sync/subscriptions.hpp>
 
 #include <realm/util/compression.hpp>
 #include <realm/util/flat_map.hpp>
@@ -484,6 +485,11 @@ void InterRealmObjectConverter::populate_columns_from_table(ConstTableRef table_
 
 namespace realm::_impl::client_reset {
 
+static inline bool should_skip_table(const Transaction& group, TableKey key)
+{
+    return !group.table_is_public(key);
+}
+
 void transfer_group(const Transaction& group_src, Transaction& group_dst, util::Logger& logger)
 {
     logger.debug("transfer_group, src size = %1, dst size = %2", group_src.size(), group_dst.size());
@@ -491,7 +497,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // Find all tables in dst that should be removed.
     std::set<std::string> tables_to_remove;
     for (auto table_key : group_dst.get_table_keys()) {
-        if (!group_dst.table_is_public(table_key))
+        if (should_skip_table(group_dst, table_key))
             continue;
         StringData table_name = group_dst.get_table_name(table_key);
         logger.debug("key = %1, table_name = %2", table_key.value, table_name);
@@ -566,7 +572,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Create new tables in dst if needed.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -594,12 +600,12 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     {
         size_t num_tables_src = 0;
         for (auto table_key : group_src.get_table_keys()) {
-            if (group_src.table_is_public(table_key))
+            if (!should_skip_table(group_src, table_key))
                 ++num_tables_src;
         }
         size_t num_tables_dst = 0;
         for (auto table_key : group_dst.get_table_keys()) {
-            if (group_dst.table_is_public(table_key))
+            if (!should_skip_table(group_dst, table_key))
                 ++num_tables_dst;
         }
         REALM_ASSERT(num_tables_src == num_tables_dst);
@@ -609,7 +615,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Remove columns in dst if they are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -638,7 +644,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Add columns in dst if present in src and absent in dst.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         StringData table_name = table_src->get_name();
@@ -717,7 +723,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
 
     // Remove objects in dst that are absent in src.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         auto table_src = group_src.get_table(table_key);
         // There are no primary keys in embedded tables but this is ok, because
@@ -750,7 +756,7 @@ void transfer_group(const Transaction& group_src, Transaction& group_dst, util::
     // There may be missing object from src and the values of existing objects may
     // still differ. Diff all the values and create missing objects on the fly.
     for (auto table_key : group_src.get_table_keys()) {
-        if (!group_src.table_is_public(table_key))
+        if (should_skip_table(group_src, table_key))
             continue;
         ConstTableRef table_src = group_src.get_table(table_key);
         // Embedded objects don't have a primary key, so they are handled
@@ -931,7 +937,8 @@ static ClientResyncMode reset_precheck_guard(TransactionRef wt, ClientResyncMode
 
 LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync::SaltedFileIdent client_file_ident,
                                           util::Logger& logger, ClientResyncMode mode, bool recovery_is_allowed,
-                                          bool* did_recover_out)
+                                          bool* did_recover_out, sync::SubscriptionStore* sub_store,
+                                          util::UniqueFunction<void(int64_t)> on_flx_version_complete)
 {
     REALM_ASSERT(db_local);
     REALM_ASSERT(db_remote);
@@ -941,6 +948,21 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
                 "remote = %4, mode = %5, recovery_is_allowed = %6",
                 db_local->get_path(), client_file_ident.ident, client_file_ident.salt, db_remote->get_path(), mode,
                 recovery_is_allowed);
+
+    auto remake_active_subscription = [&]() {
+        if (!sub_store) {
+            return;
+        }
+        auto mut_subs = sub_store->get_active().make_mutable_copy();
+        int64_t before_version = mut_subs.version();
+        mut_subs.update_state(sync::SubscriptionSet::State::Complete);
+        auto sub = std::move(mut_subs).commit();
+        if (on_flx_version_complete) {
+            on_flx_version_complete(sub.version());
+        }
+        logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
+                    sub.version());
+    };
 
     auto wt_local = db_local->start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
@@ -990,7 +1012,12 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
                                                 recovered_changeset);
 
     // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
+    wt_remote->rollback_and_continue_as_read();
     wt_local->commit_and_continue_as_read();
+
+    // In DiscardLocal mode, only the active subscription set is preserved.
+    remake_active_subscription();
+
     if (did_recover_out) {
         *did_recover_out = recover_local_changes;
     }

@@ -21,6 +21,8 @@
 #include <catch2/catch_all.hpp>
 
 #include "flx_sync_harness.hpp"
+#include "sync/sync_test_utils.hpp"
+#include "util/test_file.hpp"
 #include "realm/object-store/impl/object_accessor_impl.hpp"
 #include "realm/object-store/impl/realm_coordinator.hpp"
 #include "realm/object-store/schema.hpp"
@@ -223,6 +225,202 @@ TEST_CASE("flx: connect to FLX-enabled app", "[sync][flx][app]") {
     });
 }
 
+static auto make_error_handler()
+{
+    auto [error_promise, error_future] = util::make_promise_future<SyncError>();
+    auto shared_promise = std::make_shared<decltype(error_promise)>(std::move(error_promise));
+    auto fn = [error_promise = std::move(shared_promise)](std::shared_ptr<SyncSession>, SyncError err) {
+        error_promise->emplace_value(std::move(err));
+    };
+    return std::make_pair(std::move(error_future), std::move(fn));
+}
+
+static auto make_client_reset_handler()
+{
+    auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
+    auto shared_promise = std::make_shared<decltype(reset_promise)>(std::move(reset_promise));
+    auto fn = [reset_promise = std::move(shared_promise)](SharedRealm, SharedRealm, bool did_recover) {
+        reset_promise->emplace_value(did_recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal);
+    };
+    return std::make_pair(std::move(reset_future), std::move(fn));
+}
+
+TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
+    FLXSyncTestHarness harness("flx_client_reset");
+
+    auto add_object = [](SharedRealm realm, std::string str_field, int64_t int_field) {
+        CppContext c(realm);
+        realm->begin_transaction();
+        Object::create(c, realm, "TopLevel",
+                       util::Any(AnyDict{{"_id", ObjectId::gen()},
+                                         {"queryable_str_field", str_field},
+                                         {"queryable_int_field", int_field},
+                                         {"non_queryable_field", std::string{"non queryable 1"}}}));
+        realm->commit_transaction();
+    };
+
+    auto add_subscription_for_new_object = [&](SharedRealm realm, std::string str_field,
+                                               int64_t int_field) -> sync::SubscriptionSet {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("queryable_str_field");
+        auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
+        sub_set.insert_or_assign(Query(table).equal(queryable_str_field, StringData(str_field)));
+        auto resulting_set = std::move(sub_set).commit();
+        add_object(realm, str_field, int_field);
+        return resulting_set;
+    };
+
+    auto add_invalid_subscription = [&](SharedRealm realm) -> sync::SubscriptionSet {
+        auto table = realm->read_group().get_table("class_TopLevel");
+        auto queryable_str_field = table->get_column_key("non_queryable_field");
+        auto sub_set = realm->get_latest_subscription_set().make_mutable_copy();
+        sub_set.insert_or_assign(Query(table).equal(queryable_str_field, "foo"));
+        auto resulting_set = std::move(sub_set).commit();
+        return resulting_set;
+    };
+
+    auto count_queries_with_str = [](sync::SubscriptionSet subs, std::string_view str) {
+        size_t count = 0;
+        for (auto sub : subs) {
+            if (sub.query_string().find(str) != std::string::npos) {
+                ++count;
+            }
+        }
+        return count;
+    };
+    create_user_and_log_in(harness.app());
+    auto user1 = harness.app()->current_user();
+    create_user_and_log_in(harness.app());
+    auto user2 = harness.app()->current_user();
+    SyncTestFile config_local(user1, harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config_local.path += ".local";
+    SyncTestFile config_remote(user2, harness.schema(), SyncConfig::FLXSyncEnabled{});
+    config_remote.path += ".remote";
+    const std::string str_field_value = "foo";
+    const int64_t local_added_int = 100;
+    const int64_t remote_added_int = 200;
+
+    SECTION("DiscardLocal: offline writes and subscriptions are lost") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::DiscardLocal);
+                local_realm->refresh();
+                auto table = local_realm->read_group().get_table("class_TopLevel");
+                auto queryable_str_field = table->get_column_key("queryable_str_field");
+                auto queryable_int_field = table->get_column_key("queryable_int_field");
+                auto tv = table->where().equal(queryable_str_field, StringData(str_field_value)).find_all();
+                // the object we created while offline was discarded, and the remote object was not downloaded
+                REQUIRE(tv.size() == 0);
+                auto active_subs = local_realm->get_active_subscription_set();
+                size_t count_of_foo = count_queries_with_str(active_subs, util::format("\"%1\"", str_field_value));
+                // make sure that the subscription for "foo" did not survive the reset
+                REQUIRE(count_of_foo == 0);
+                REQUIRE(active_subs.state() == sync::SubscriptionSet::State::Complete);
+                // the latest subscription set is the same one as the active one
+                auto latest_subs = local_realm->get_latest_subscription_set();
+                REQUIRE(latest_subs.version() == active_subs.version());
+
+                // adding data and subscriptions to a reset Realm works as normal
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+                latest_subs = local_realm->get_latest_subscription_set();
+                REQUIRE(latest_subs.version() > active_subs.version());
+                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                local_realm->refresh();
+                count_of_foo = count_queries_with_str(latest_subs, util::format("\"%1\"", str_field_value));
+                REQUIRE(count_of_foo == 1);
+                tv = table->where().equal(queryable_str_field, StringData(str_field_value)).find_all();
+                REQUIRE(tv.size() == 2);
+                tv.sort(queryable_int_field);
+                REQUIRE(tv.get_object(0).get<int64_t>(queryable_int_field) == local_added_int);
+                REQUIRE(tv.get_object(1).get<int64_t>(queryable_int_field) == remote_added_int);
+            })
+            ->run();
+    }
+
+    SECTION("DiscardLocal: an invalid subscription made while offline becomes superceeded") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [reset_future, reset_handler] = make_client_reset_handler();
+        config_local.sync_config->notify_after_client_reset = reset_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        std::unique_ptr<sync::SubscriptionSet> invalid_sub;
+        test_reset
+            ->make_local_changes([&](SharedRealm local_realm) {
+                invalid_sub = std::make_unique<sync::SubscriptionSet>(add_invalid_subscription(local_realm));
+                add_subscription_for_new_object(local_realm, str_field_value, local_added_int);
+            })
+            ->make_remote_changes([&](SharedRealm remote_realm) {
+                add_subscription_for_new_object(remote_realm, str_field_value, remote_added_int);
+            })
+            ->on_post_reset([&, client_reset_future = std::move(reset_future)](SharedRealm local_realm) {
+                local_realm->refresh();
+                sync::SubscriptionSet::State actual =
+                    invalid_sub->get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                REQUIRE(actual == sync::SubscriptionSet::State::Superseded);
+                ClientResyncMode mode = client_reset_future.get();
+                REQUIRE(mode == ClientResyncMode::DiscardLocal);
+            })
+            ->run();
+    }
+
+    SECTION("DiscardLocal: an error is produced if a previously successful query becomes invalid due to "
+            "server changes across a reset") {
+        config_local.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
+        auto&& [error_future, err_handler] = make_error_handler();
+        config_local.sync_config->error_handler = err_handler;
+        auto test_reset = reset_utils::make_baas_flx_client_reset(config_local, config_remote, harness.session());
+        test_reset
+            ->setup([&](SharedRealm realm) {
+                if (realm->sync_session()->path() == config_local.path) {
+                    auto added_sub = add_subscription_for_new_object(realm, str_field_value, 0);
+                    added_sub.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                }
+            })
+            ->make_local_changes([&](SharedRealm local_realm) {
+                add_object(local_realm, str_field_value, local_added_int);
+                // Make "queryable_str_field" not a valid query field.
+                // Pre-reset, the Realm had a successful query on it, but now when the client comes back online
+                // and tries to reset, the fresh Realm download will fail with a query error.
+                const AppSession& app_session = harness.session().app_session();
+                auto baas_sync_service = app_session.admin_api.get_sync_service(app_session.server_app_id);
+                auto baas_sync_config =
+                    app_session.admin_api.get_config(app_session.server_app_id, baas_sync_service);
+                REQUIRE(baas_sync_config.queryable_field_names->is_array());
+                auto it = baas_sync_config.queryable_field_names->begin();
+                for (; it != baas_sync_config.queryable_field_names->end(); ++it) {
+                    if (*it == "queryable_str_field") {
+                        break;
+                    }
+                }
+                REQUIRE(it != baas_sync_config.queryable_field_names->end());
+                baas_sync_config.queryable_field_names->erase(it);
+                app_session.admin_api.enable_sync(app_session.server_app_id, baas_sync_service.id, baas_sync_config);
+            })
+            ->on_post_reset([&, err_future = std::move(error_future)](SharedRealm) {
+                auto sync_error = std::move(err_future).get();
+                // There is a race here depending on if the server produces a query error or responds to
+                // the ident message first. We consider either error to be a sufficient outcome.
+                if (sync_error.error_code == sync::make_error_code(sync::ClientError::auto_client_reset_failure)) {
+                    CHECK(sync_error.is_client_reset_requested());
+                }
+                else {
+                    CHECK(sync_error.error_code == sync::make_error_code(sync::ProtocolError::bad_query));
+                }
+            })
+            ->run();
+    }
+}
+
 TEST_CASE("flx: creating an object on a class with no subscription throws", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bad_query", {g_simple_embedded_obj_schema, {"queryable_str_field"}});
     harness.do_with_new_user([&](auto user) {
@@ -285,13 +483,12 @@ TEST_CASE("flx: uploading an object that is out-of-view results in compensating 
     FLXSyncTestHarness::ServerSchema server_schema{g_simple_embedded_obj_schema, {"queryable_str_field"}, {role}};
     FLXSyncTestHarness harness("flx_bad_query", server_schema);
 
-    // TODO(RCORE-912) When DiscardLocal is supported with FLX sync we should remove this check in favor of the
-    // tests for DiscardLocal.
-    SECTION("disallow discardlocal") {
+    SECTION("disallow recovery mode") {
         harness.do_with_new_user([&](auto user) {
             SyncTestFile config(user, harness.schema(), SyncConfig::FLXSyncEnabled{});
-            config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
-
+            config.sync_config->client_resync_mode = ClientResyncMode::Recover;
+            CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
+            config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             CHECK_THROWS_AS(Realm::get_shared_realm(config), std::logic_error);
         });
     }

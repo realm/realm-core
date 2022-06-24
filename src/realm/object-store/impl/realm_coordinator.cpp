@@ -154,8 +154,10 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         // TODO(RCORE-912) we definitely do want to support this, but until its implemented we should prevent users
         // from using something that is currently broken.
         if (config.sync_config->flx_sync_requested &&
-            config.sync_config->client_resync_mode != ClientResyncMode::Manual) {
-            throw std::logic_error("Only manual client resets are supported with flexible sync");
+            (config.sync_config->client_resync_mode != ClientResyncMode::Manual &&
+             config.sync_config->client_resync_mode != ClientResyncMode::DiscardLocal)) {
+            throw std::logic_error(
+                "Only manual or 'discard local' client resets are supported with flexible sync at this time");
         }
     }
 #endif
