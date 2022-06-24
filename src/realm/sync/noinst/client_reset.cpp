@@ -950,17 +950,18 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
                 recovery_is_allowed);
 
     auto remake_active_subscription = [&]() {
-        if (sub_store) {
-            auto mut_subs = sub_store->get_active().make_mutable_copy();
-            int64_t before_version = mut_subs.version();
-            mut_subs.update_state(sync::SubscriptionSet::State::Complete);
-            auto sub = std::move(mut_subs).commit();
-            if (on_flx_version_complete) {
-                on_flx_version_complete(sub.version());
-            }
-            logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
-                        sub.version());
+        if (!sub_store) {
+            return;
         }
+        auto mut_subs = sub_store->get_active().make_mutable_copy();
+        int64_t before_version = mut_subs.version();
+        mut_subs.update_state(sync::SubscriptionSet::State::Complete);
+        auto sub = std::move(mut_subs).commit();
+        if (on_flx_version_complete) {
+            on_flx_version_complete(sub.version());
+        }
+        logger.info("Recreated the active subscription set in the complete state (%1 -> %2)", before_version,
+                    sub.version());
     };
 
     auto wt_local = db_local->start_write();

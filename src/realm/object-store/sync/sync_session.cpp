@@ -262,10 +262,7 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, SyncConfig 
         history.set_write_validator_factory(
             [weak_sub_mgr](Transaction& tr) -> util::UniqueFunction<sync::SyncReplication::WriteValidator> {
                 auto sub_mgr = weak_sub_mgr.lock();
-                if (!sub_mgr) {
-                    // A DB can outlive its sync session during client reset.
-                    return nullptr;
-                }
+                REALM_ASSERT_RELEASE(sub_mgr);
                 auto latest_sub_tables = sub_mgr->get_tables_for_latest(tr);
                 return [tables = std::move(latest_sub_tables)](const Table& table) {
                     if (table.get_table_type() != Table::Type::TopLevel) {
@@ -369,6 +366,10 @@ void SyncSession::download_fresh_realm(util::Optional<SyncError::ClientResetMode
         config.stop_policy = SyncSessionStopPolicy::Immediately;
         config.client_resync_mode = ClientResyncMode::Manual;
         sync_session = create(m_client, db, config, m_sync_manager);
+        auto& history = static_cast<sync::ClientReplication&>(*db->get_replication());
+        // the fresh Realm may apply writes to this db after it has outlived its sync session
+        // the writes are used to generate a changeset for recovery, but are never committed
+        history.set_write_validator_factory({});
     }
 
     sync_session->assert_mutex_unlocked();
