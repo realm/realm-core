@@ -964,14 +964,20 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
                     sub.version());
     };
 
+    auto frozen_pre_local_state = db_local->start_frozen();
     auto wt_local = db_local->start_write();
     auto history_local = dynamic_cast<ClientHistory*>(wt_local->get_replication()->_get_history_write());
     REALM_ASSERT(history_local);
     VersionID old_version_local = wt_local->get_version_of_current_transaction();
     sync::version_type current_version_local = old_version_local.version;
     wt_local->get_history()->ensure_updated(current_version_local);
-    BinaryData recovered_changeset;
-    std::vector<ChunkedBinaryData> local_changes;
+    SaltedFileIdent orig_file_ident;
+    {
+        sync::version_type old_version_unused;
+        SyncProgress old_progress_unused;
+        history_local->get_status(old_version_unused, orig_file_ident, old_progress_unused);
+    }
+    std::vector<ClientHistory::LocalChange> local_changes;
 
     mode = reset_precheck_guard(wt_local, mode, recovery_is_allowed, logger);
     bool recover_local_changes = (mode == ClientResyncMode::Recover || mode == ClientResyncMode::RecoverOrDiscard);
@@ -982,41 +988,86 @@ LocalVersionIDs perform_client_reset_diff(DBRef db_local, DBRef db_remote, sync:
     }
 
     sync::SaltedVersion fresh_server_version = {0, 0};
-
     auto wt_remote = db_remote->start_write();
     auto history_remote = dynamic_cast<ClientHistory*>(wt_remote->get_replication()->_get_history_write());
     REALM_ASSERT(history_remote);
-    sync::version_type current_version_remote = wt_remote->get_version();
-    history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
-    history_remote->set_client_file_ident_in_wt(current_version_remote, client_file_ident);
 
-    sync::version_type remote_version;
-    SaltedFileIdent remote_ident;
     SyncProgress remote_progress;
-    history_remote->get_status(remote_version, remote_ident, remote_progress);
-    fresh_server_version = remote_progress.latest_server_version;
-
-    if (recover_local_changes) {
-        RecoverLocalChangesetsHandler handler{*wt_remote, *wt_local, logger};
-        handler.process_changesets(local_changes); // throws on error
-        ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
-        REALM_ASSERT_RELEASE(client_repl);
-        ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
-        const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
-        recovered_changeset = {buffer.data(), buffer.size()};
+    {
+        sync::version_type remote_version_unused;
+        SaltedFileIdent remote_ident_unused;
+        history_remote->get_status(remote_version_unused, remote_ident_unused, remote_progress);
     }
+    fresh_server_version = remote_progress.latest_server_version;
+    BinaryData recovered_changeset;
 
-    transfer_group(*wt_remote, *wt_local, logger);
+    // FLX with recovery has to be done in multiple commits, which is significantly different than other modes
+    if (recover_local_changes && sub_store) {
+        // In FLX recovery, save a copy of the pending subscriptions for later. This
+        // needs to be done before they are wiped out by remake_active_subscription()
+        std::vector<SubscriptionSet> pending_subscriptions = sub_store->get_pending_subscriptions();
+        // transform the local Realm such that all public tables become identical to the remote Realm
+        transfer_group(*wt_remote, *wt_local, logger);
+        // now that the state of the fresh and local Realms are identical,
+        // reset the local sync history.
+        // Note that we do not set the new file ident yet! This is done in the last commit.
+        history_local->set_client_reset_adjustments(current_version_local, orig_file_ident, fresh_server_version,
+                                                    recovered_changeset);
+        // The local Realm is committed. There are no changes to the remote Realm.
+        wt_remote->rollback_and_continue_as_read();
+        wt_local->commit_and_continue_as_read();
+        // Make a copy of the active subscription set and mark it as
+        // complete. This will cause all other subscription sets to become superceded.
+        remake_active_subscription();
+        // Apply local changes interleaved with pending subscriptions in separate commits
+        // as needed. This has the consequence that there may be extra notifications along
+        // the way to the final state, but since separate commits are necessary, this is
+        // unavoidable.
+        wt_local = db_local->start_write();
+        RecoverLocalChangesetsHandler handler{*wt_local, *frozen_pre_local_state, logger};
+        handler.process_changesets(local_changes, std::move(pending_subscriptions)); // throws on error
+        // The new file ident is set as part of the final commit. This is to ensure that if
+        // there are any exceptions during recovery, or the process is killed for some
+        // reason, the client reset cycle detection will catch this and we will not attempt
+        // to recover again. If we had set the ident in the first commit, a Realm which was
+        // partially recovered, but interrupted may continue sync the next time it is
+        // opened with only partially recovered state while having lost the history of any
+        // offline modifications.
+        history_local->set_client_file_ident_in_wt(current_version_local, client_file_ident);
+        wt_local->commit_and_continue_as_read();
+    }
+    else {
+        if (recover_local_changes) {
+            // In PBS recovery, the strategy is to apply all local changes to the remote realm first,
+            // and then transfer the modified state all at once to the local Realm. This creates a
+            // nice side effect for notifications because only the minimal state change is made.
+            RecoverLocalChangesetsHandler handler{*wt_remote, *frozen_pre_local_state, logger};
+            handler.process_changesets(local_changes, {}); // throws on error
+            ClientReplication* client_repl = dynamic_cast<ClientReplication*>(wt_remote->get_replication());
+            REALM_ASSERT_RELEASE(client_repl);
+            ChangesetEncoder& encoder = client_repl->get_instruction_encoder();
+            const sync::ChangesetEncoder::Buffer& buffer = encoder.buffer();
+            recovered_changeset = {buffer.data(), buffer.size()};
+        }
 
-    history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
-                                                recovered_changeset);
+        // transform the local Realm such that all public tables become identical to the remote Realm
+        transfer_group(*wt_remote, *wt_local, logger);
 
-    // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
-    wt_remote->rollback_and_continue_as_read();
-    wt_local->commit_and_continue_as_read();
+        // now that the state of the fresh and local Realms are identical,
+        // reset the local sync history and steal the fresh Realm's ident
+        history_local->set_client_reset_adjustments(current_version_local, client_file_ident, fresh_server_version,
+                                                    recovered_changeset);
 
-    // In DiscardLocal mode, only the active subscription set is preserved.
-    remake_active_subscription();
+        // Finally, the local Realm is committed. The changes to the remote Realm are discarded.
+        wt_remote->rollback_and_continue_as_read();
+        wt_local->commit_and_continue_as_read();
+
+        // If in FLX mode, make a copy of the active subscription set and mark it as
+        // complete. This will cause all other subscription sets to become superceded.
+        // In DiscardLocal mode, only the active subscription set is preserved, so we
+        // are done.
+        remake_active_subscription();
+    }
 
     if (did_recover_out) {
         *did_recover_out = recover_local_changes;
