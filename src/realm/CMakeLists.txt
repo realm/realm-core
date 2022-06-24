@@ -69,7 +69,6 @@ set(REALM_SOURCES
 ) # REALM_SOURCES
 
 set(UTIL_SOURCES
-    util/allocator.cpp
     util/backtrace.cpp
     util/base64.cpp
     util/basic_system_errors.cpp
@@ -92,7 +91,6 @@ set(UTIL_SOURCES
     util/timestamp_logger.cpp
     util/thread.cpp
     util/to_string.cpp
-    util/allocation_metrics.cpp
     util/copy_dir_recursive.cpp
     util/demangle.cpp
     util/duplicating_logger.cpp
@@ -209,8 +207,6 @@ set(REALM_INSTALL_HEADERS
     impl/transact_log.hpp
 
     util/aes_cryptor.hpp
-    util/allocation_metrics.hpp
-    util/allocator.hpp
     util/any.hpp
     util/assert.hpp
     util/backtrace.hpp
@@ -260,14 +256,6 @@ set(REALM_INSTALL_HEADERS
     util/type_traits.hpp
     util/uri.hpp
     util/utf8.hpp
-
-    util/metered/unordered_map.hpp
-    util/metered/vector.hpp
-    util/metered/map.hpp
-    util/metered/set.hpp
-    util/metered/string.hpp
-    util/metered/deque.hpp
-    util/metered/unordered_set.hpp
 
     metrics/metrics.hpp
     metrics/metric_timer.hpp

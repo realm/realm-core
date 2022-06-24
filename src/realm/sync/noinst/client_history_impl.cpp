@@ -444,9 +444,8 @@ void ClientHistory::integrate_server_changesets(const SyncProgress& progress,
 
         if (m_replication.apply_server_changes()) {
             Transformer& transformer = get_transformer(); // Throws
-            Transformer::Reporter* reporter = nullptr;
             transformer.transform_remote_changesets(*this, transact->get_sync_file_id(), local_version,
-                                                    changesets.data(), changesets.size(), reporter,
+                                                    changesets.data(), changesets.size(),
                                                     &logger); // Throws
 
             for (std::size_t i = 0; i < num_changesets; ++i) {

@@ -24,7 +24,6 @@ set(TEST_UTIL_HEADERS
     demangle.hpp
     dump_changesets.hpp
     misc.hpp
-    mock_metrics.hpp
     number_names.hpp
     quote.hpp
     random.hpp
@@ -47,7 +46,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND TEST_UTIL_SOURCES
         compare_groups.cpp
         dump_changesets.cpp
-        mock_metrics.cpp
     )
 endif()
 

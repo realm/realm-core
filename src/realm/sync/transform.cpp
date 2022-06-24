@@ -26,9 +26,6 @@
 #include <realm/sync/changeset_encoder.hpp>
 #include <realm/sync/noinst/changeset_index.hpp>
 #include <realm/sync/noinst/protocol_codec.hpp>
-#include <realm/util/allocation_metrics.hpp>
-#include <realm/util/metered/vector.hpp>
-#include <realm/util/metered/map.hpp>
 #include <realm/util/logger.hpp>
 
 namespace realm {
@@ -57,9 +54,6 @@ namespace {
 
 #define REALM_MERGE_ASSERT(condition)                                                                                \
     (REALM_LIKELY(condition) ? static_cast<void>(0) : throw sync::TransformError{"Assertion failed: " #condition})
-
-
-const util::AllocationMetricName g_transform_metric_scope{"transform"};
 
 } // unnamed namespace
 
@@ -617,29 +611,12 @@ struct TransformerImpl::Transformer {
     MinorSide m_minor_side;
     MinorSide::Position m_minor_end;
     bool m_trace;
-    Reporter* const m_reporter;
-    long m_num_merges = 0;
 
-    Transformer(bool trace, Reporter* reporter)
+    Transformer(bool trace)
         : m_major_side{*this}
         , m_minor_side{*this}
         , m_trace{trace}
-        , m_reporter{reporter}
     {
-    }
-
-    void report_merge(bool force)
-    {
-        ++m_num_merges;
-        long report_every = 1000000;
-        if (REALM_LIKELY(!force && m_num_merges < report_every)) {
-            return;
-        }
-        if (REALM_UNLIKELY(!m_reporter)) {
-            return;
-        }
-        m_reporter->on_changesets_merged(m_num_merges); // Throws
-        m_num_merges = 0;
     }
 
     void transform()
@@ -660,8 +637,6 @@ struct TransformerImpl::Transformer {
                 m_major_side.next_instruction();
             m_major_side.skip_tombstones();
         }
-
-        report_merge(true); // Throws
     }
 
     _impl::ChangesetIndex::Ranges* get_conflict_ranges_for_instruction(const Instruction& instr)
@@ -2320,8 +2295,6 @@ void merge_nested_2(Outer& outer, Inner& inner, OuterSide& outer_side, InnerSide
 
 void TransformerImpl::Transformer::merge_instructions(MajorSide& their_side, MinorSide& our_side)
 {
-    report_merge(false); // Throws
-
     // FIXME: Find a way to avoid heap-copies of the path.
     Instruction their_before = their_side.get();
     Instruction our_before = our_side.get();
@@ -2403,7 +2376,7 @@ TransformerImpl::TransformerImpl()
 
 void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changeset* their_changesets,
                                        size_t their_size, Changeset** our_changesets, size_t our_size,
-                                       Reporter* reporter, util::Logger* logger)
+                                       util::Logger* logger)
 {
     REALM_ASSERT(their_size != 0);
     REALM_ASSERT(our_size != 0);
@@ -2418,7 +2391,7 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
         l = std::unique_lock<std::mutex>{trace_mutex};
     }
 #endif
-    Transformer transformer{trace, reporter};
+    Transformer transformer{trace};
 
     _impl::ChangesetIndex their_index;
     size_t their_num_instructions = 0;
@@ -2550,14 +2523,11 @@ void TransformerImpl::merge_changesets(file_ident_type local_file_ident, Changes
 
 void TransformerImpl::transform_remote_changesets(TransformHistory& history, file_ident_type local_file_ident,
                                                   version_type current_local_version, Changeset* parsed_changesets,
-                                                  std::size_t num_changesets, Reporter* reporter,
-                                                  util::Logger* logger)
+                                                  std::size_t num_changesets, util::Logger* logger)
 {
     REALM_ASSERT(local_file_ident != 0);
 
-    AllocationMetricNameScope scope{g_transform_metric_scope};
-
-    metered::vector<Changeset*> our_changesets;
+    std::vector<Changeset*> our_changesets;
 
     try {
         // p points to the beginning of a range of changesets that share the same
@@ -2588,7 +2558,7 @@ void TransformerImpl::transform_remote_changesets(TransformHistory& history, fil
 
             if (!our_changesets.empty()) {
                 merge_changesets(local_file_ident, &*p, same_base_range_end - p, our_changesets.data(),
-                                 our_changesets.size(), reporter, logger); // Throws
+                                 our_changesets.size(), logger); // Throws
             }
 
             p = same_base_range_end;

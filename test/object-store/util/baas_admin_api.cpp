@@ -116,6 +116,7 @@ nlohmann::json BaasRuleBuilder::object_schema_to_jsonschema(const ObjectSchema& 
     return {
         {"properties", properties},
         {"required", required},
+        {"title", obj_schema.name},
     };
 }
 
@@ -179,7 +180,6 @@ nlohmann::json BaasRuleBuilder::object_schema_to_baas_schema(const ObjectSchema&
     m_relationships.clear();
 
     auto schema_json = object_schema_to_jsonschema(obj_schema, include_prop, true);
-    schema_json.emplace("title", obj_schema.name);
     auto& prop_sub_obj = schema_json["properties"];
     if (!prop_sub_obj.contains(m_partition_key.name)) {
         prop_sub_obj.emplace(m_partition_key.name, property_to_jsonschema(m_partition_key, include_prop));

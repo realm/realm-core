@@ -4,15 +4,13 @@
 
 #include <realm/sync/instructions.hpp>
 #include <realm/util/optional.hpp>
-#include <realm/util/allocation_metrics.hpp>
-#include <realm/util/metered/vector.hpp>
 
 #include <type_traits>
 
 namespace realm {
 namespace sync {
 
-using InternStrings = util::metered::vector<StringBufferRange>;
+using InternStrings = std::vector<StringBufferRange>;
 
 struct BadChangesetError : ExceptionWithBacktrace<std::runtime_error> {
     using ExceptionWithBacktrace<std::runtime_error>::ExceptionWithBacktrace;
@@ -196,7 +194,7 @@ struct Changeset {
     bool operator!=(const Changeset& that) const noexcept;
 
 private:
-    util::metered::vector<Instruction> m_instructions;
+    std::vector<Instruction> m_instructions;
     std::shared_ptr<std::string> m_string_buffer;
     std::shared_ptr<InternStrings> m_strings;
     bool m_is_dirty = false;
@@ -215,7 +213,7 @@ std::ostream& operator<<(std::ostream&, const Changeset& changeset);
 /// empty, and the position is zero, the iterator is pointing to a tombstone.
 template <bool is_const>
 struct Changeset::IteratorImpl {
-    using list_type = util::metered::vector<Instruction>;
+    using list_type = std::vector<Instruction>;
     using inner_iterator_type = std::conditional_t<is_const, list_type::const_iterator, list_type::iterator>;
 
     // reference_type is a pointer because we have no way to create a reference
