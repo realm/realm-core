@@ -422,8 +422,13 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                 REQUIRE(mode == ClientResyncMode::Recover);
                 local_realm->refresh();
                 auto latest_subs = local_realm->get_latest_subscription_set();
-                latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                auto state = latest_subs.get_state_change_notification(sync::SubscriptionSet::State::Complete).get();
+                REQUIRE(state == sync::SubscriptionSet::State::Complete);
+                local_realm->refresh();
                 auto table = local_realm->read_group().get_table("class_TopLevel");
+                if (table->size() != 1) {
+                    table->to_json(std::cout, 1, {});
+                }
                 REQUIRE(table->size() == 1);
                 auto mut_sub = latest_subs.make_mutable_copy();
                 mut_sub.clear();
