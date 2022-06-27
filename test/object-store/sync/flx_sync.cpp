@@ -240,7 +240,7 @@ static auto make_client_reset_handler()
 {
     auto [reset_promise, reset_future] = util::make_promise_future<ClientResyncMode>();
     auto shared_promise = std::make_shared<decltype(reset_promise)>(std::move(reset_promise));
-    auto fn = [reset_promise = std::move(shared_promise)](SharedRealm, SharedRealm, bool did_recover) {
+    auto fn = [reset_promise = std::move(shared_promise)](SharedRealm, ThreadSafeReference, bool did_recover) {
         reset_promise->emplace_value(did_recover ? ClientResyncMode::Recover : ClientResyncMode::DiscardLocal);
     };
     return std::make_pair(std::move(reset_future), std::move(fn));
@@ -341,7 +341,8 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
     config_local.sync_config->notify_before_client_reset = [&before_reset_count](SharedRealm) {
         ++before_reset_count;
     };
-    config_local.sync_config->notify_after_client_reset = [&after_reset_count](SharedRealm, SharedRealm, bool) {
+    config_local.sync_config->notify_after_client_reset = [&after_reset_count](SharedRealm, ThreadSafeReference,
+                                                                               bool) {
         ++after_reset_count;
     };
 
