@@ -769,37 +769,16 @@ def doBuildMacOs(Map options = [:]) {
 }
 
 def doBuildApplePlatform(String platform, String buildType, boolean test = false) {
-    def cmakeOptions = [
-        CMAKE_TOOLCHAIN_FILE: '$WORKSPACE/tools/cmake/xcode.toolchain.cmake',
-        CPACK_PACKAGE_DIRECTORY: '$WORKSPACE',
-        REALM_VERSION: gitDescribeVersion,
-        REALM_BUILD_LIB_ONLY: 'ON'
-    ]
-    def cmakeDefinitions = cmakeOptions.collect { k,v -> "-D$k=\"$v\"" }.join(' ')
-
-    String buildDestination = "generic/platform=${platform}"
-    if (platform == 'maccatalyst') {
-        buildDestination = 'generic/platform=macOS,variant=Mac Catalyst'
-    }
-
     return {
         rlmNode('osx') {
             getArchive()
 
-            dir('build-xcode-platforms') {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/']) {
-                    sh "cmake ${cmakeDefinitions} -G Xcode .."
-                    runAndCollectWarnings(
-                        parser: 'clang',
-                        script: """
-                            xcodebuild -scheme ALL_BUILD -configuration ${buildType} -destination "${buildDestination}"
-                        """,
-                        name: "xcode-${platform}-${buildType}",
-                        filters: warningFilters,
-                    )
-                    sh "PLATFORM_NAME=${platform} EFFECTIVE_PLATFORM_NAME=-${platform} cpack -C ${buildType}"
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/',
+                     'XCODE_14_DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
+                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}'"
 
-                    if (test) {
+                if (test) {
+                    dir('build-xcode-platforms') {
                         if (platform != 'iphonesimulator') error 'Testing is only available for iOS Simulator'
                         sh "xcodebuild -scheme CoreTests -configuration ${buildType} -sdk iphonesimulator -arch x86_64"
                         // sh "xcodebuild -scheme SyncTests -configuration ${buildType} -sdk iphonesimulator -arch x86_64 IPHONEOS_DEPLOYMENT_TARGET=13"
