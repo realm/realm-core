@@ -30,6 +30,8 @@
 #include <realm/sync/noinst/client_reset_operation.hpp>
 #include <realm/sync/noinst/client_history_impl.hpp>
 
+#include <realm/object-store/thread_safe_reference.hpp>
+#include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
@@ -227,8 +229,10 @@ TEST_CASE("sync: client reset", "[client reset]") {
         REQUIRE(before->config().path == local_config.path);
         REQUIRE(util::File::exists(local_config.path));
     };
-    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after, bool) {
+    local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, ThreadSafeReference after_ref,
+                                                              bool) {
         std::lock_guard<std::mutex> lock(mtx);
+        SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
         ++after_callback_invocations;
         REQUIRE(before);
         REQUIRE(before->is_frozen());
@@ -690,7 +694,7 @@ TEST_CASE("sync: client reset", "[client reset]") {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++before_callback_invoctions_2;
                 };
-                config_copy->notify_after_client_reset = [&](SharedRealm, SharedRealm, bool) {
+                config_copy->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference, bool) {
                     std::lock_guard<std::mutex> lock(mtx);
                     ++after_callback_invocations_2;
                 };
@@ -1374,8 +1378,9 @@ TEST_CASE("sync: client reset", "[client reset]") {
                 std::lock_guard<std::mutex> lock(mtx);
                 ++before_callback_invoctions;
             };
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, SharedRealm realm,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm, ThreadSafeReference realm_ref,
                                                                       bool did_recover) {
+                SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref), util::Scheduler::make_default());
                 auto flag = has_reset_cycle_flag(realm);
                 REQUIRE(bool(flag));
                 REQUIRE(flag->type == ClientResyncMode::Recover);
@@ -1441,8 +1446,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
             "In RecoverOrDiscard mode: a previous failed recovery is detected and triggers a DiscardLocal reset") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::RecoverOrDiscard;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+                                                                      ThreadSafeReference after_ref,
                                                                       bool did_recover) {
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+
                 REQUIRE(!did_recover);
                 REQUIRE(has_added_object(before));
                 REQUIRE(!has_added_object(after)); // discarded insert due to fallback to DiscardLocal mode
@@ -1467,8 +1475,11 @@ TEST_CASE("sync: client reset", "[client reset]") {
         SECTION("In DiscardLocal mode: a previous failed recovery does not cause an error") {
             local_config.sync_config->client_resync_mode = ClientResyncMode::DiscardLocal;
             make_fake_previous_reset(ClientResyncMode::Recover);
-            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before, SharedRealm after,
+            local_config.sync_config->notify_after_client_reset = [&](SharedRealm before,
+                                                                      ThreadSafeReference after_ref,
                                                                       bool did_recover) {
+                SharedRealm after = Realm::get_shared_realm(std::move(after_ref), util::Scheduler::make_default());
+
                 REQUIRE(!did_recover);
                 REQUIRE(has_added_object(before));
                 REQUIRE(!has_added_object(after)); // not recovered

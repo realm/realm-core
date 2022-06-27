@@ -4154,7 +4154,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
             realm_sync_config_set_after_client_reset_handler(
                 local_sync_config,
-                [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
                     after_client_reset_counter.fetch_add(1);
                     baas_client_stop.store(true);
                     return true;
@@ -4200,7 +4200,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
             realm_sync_config_set_after_client_reset_handler(
                 local_sync_config,
-                [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
                     after_client_reset_counter.fetch_add(1);
                     return true;
                 },
