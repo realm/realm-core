@@ -394,6 +394,7 @@ public:
     void schema_info();
     void memory_leaks();
     void free_list_info() const;
+    void print_memory_layout() const;
 
 private:
     uint64_t m_top_ref;
@@ -403,7 +404,7 @@ private:
     realm::SlabAlloc m_alloc;
 };
 
-std::string human_readable(uint64_t val)
+static std::string human_readable(uint64_t val)
 {
     std::ostringstream out;
     out.precision(3);
@@ -422,7 +423,7 @@ std::string human_readable(uint64_t val)
     return out.str();
 }
 
-uint64_t get_size(const std::vector<Entry>& list)
+static uint64_t get_size(const std::vector<Entry>& list)
 {
     uint64_t sz = 0;
     std::for_each(list.begin(), list.end(), [&](const Entry& e) { sz += e.length; });
@@ -489,7 +490,7 @@ void Table::print_columns(const Group& group) const
             if (col_key.is_set())
                 type_str += "{}";
             if (col_key.is_dictionary()) {
-                auto key_type = realm::DataType(m_column_types.get_val(i) >> 16);
+                auto key_type = realm::DataType(int(m_column_types.get_val(i) >> 16));
                 type_str = std::string("{") + get_data_type_name(key_type) + ", " + type_str + "}";
             }
         }
@@ -531,7 +532,7 @@ void Node::init(realm::Allocator& alloc, uint64_t ref)
 
 std::vector<unsigned> path;
 
-std::string print_path()
+static std::string print_path()
 {
     std::string ret = "[" + std::to_string(path[0]);
     for (auto it = path.begin() + 1; it != path.end(); ++it) {
@@ -541,7 +542,7 @@ std::string print_path()
     return ret + "]";
 }
 
-std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
+static std::vector<Entry> get_nodes(realm::Allocator& alloc, uint64_t ref)
 {
     std::vector<Entry> nodes;
     if (ref != 0) {
@@ -767,6 +768,37 @@ void RealmFile::free_list_info() const
     std::cout << "Pinned free space size: " << pinned_free_list_size << std::endl;
 }
 
+void RealmFile::print_memory_layout() const
+{
+    constexpr char uninitialized = 'u';
+    constexpr char free_space = '-';
+    constexpr char allocated = 'a';
+    std::vector<char> layout(static_cast<size_t>(m_group->get_file_size()), uninitialized);
+    auto free_list = m_group->get_free_list();
+    for (auto it : free_list) {
+        for (size_t i = 0; i < it.length; ++i) {
+            REALM_ASSERT(layout[it.start + i] == uninitialized);
+            layout[it.start + i] = free_space;
+        }
+    }
+    auto nodes = m_group->get_allocated_nodes();
+    for (auto it : nodes) {
+        for (size_t i = it.start; i < it.start + it.length; ++i) {
+            REALM_ASSERT(layout[i] == uninitialized);
+            layout[i] = allocated;
+        }
+    }
+    std::cout << "memory layout: " << std::endl;
+    constexpr size_t line_with = 256;
+    for (size_t i = 0; i < layout.size(); i += line_with) {
+        std::string_view sv(layout.data() + i, line_with);
+        std::cout << sv << std::endl;
+        if (i % 4096 == 1) {
+            std::cout << std::endl;
+        }
+    }
+}
+
 int main(int argc, const char* argv[])
 {
     if (argc > 1) {
@@ -775,6 +807,7 @@ int main(int argc, const char* argv[])
             bool memory_leaks = false;
             bool schema_info = false;
             bool node_scan = false;
+            bool print_layout = false;
             uint64_t alternate_top = 0;
             const char* key_ptr = nullptr;
             char key[64];
@@ -803,6 +836,9 @@ int main(int argc, const char* argv[])
                             case 'm':
                                 memory_leaks = true;
                                 break;
+                            case 'p':
+                                print_layout = true;
+                                break;
                             case 's':
                                 schema_info = true;
                                 break;
@@ -827,6 +863,9 @@ int main(int argc, const char* argv[])
                     if (node_scan) {
                         rf.node_scan();
                     }
+                    if (print_layout) {
+                        rf.print_memory_layout();
+                    }
                     std::cout << std::endl;
                 }
             }
@@ -839,6 +878,7 @@ int main(int argc, const char* argv[])
         std::cout << "Usage: realm-trawler [-afmsw] [--key crypt_key] [--top top_ref] <realmfile>" << std::endl;
         std::cout << "   f : free list analysis" << std::endl;
         std::cout << "   m : memory leak check" << std::endl;
+        std::cout << "   p : print memory layout" << std::endl;
         std::cout << "   s : schema dump" << std::endl;
         std::cout << "   w : node walk" << std::endl;
     }
