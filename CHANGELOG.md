@@ -10,7 +10,7 @@
 * Improved performance of sync clients during integration of changesets with many small strings (totalling > 1024 bytes per changeset) on iOS 14, and devices which have restrictive or fragmented memory. ([#5614](https://github.com/realm/realm-core/issues/5614))
  
 ### Breaking changes
-* None.
+* In Realm JS, the client reset callback can result in the fatal error `Realm accessed on incorrect thread`. Using a thread safe reference instead of Realm instance fixes the issue. (Issue [realm/realm-js#4410](https://github.com/realm/realm-js/issues/4410))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -37,7 +37,6 @@
 
 ### Breaking changes
 * `realm_sync_before_client_reset_func_t` and `realm_sync_after_client_reset_func_t` in the C API now return a boolean value to indicate whether the callback succeeded or not, which signals to the sync client that a fatal error occurred. (PR [#5564](https://github.com/realm/realm-core/pull/5564))
-* In Realm JS, the client reset callback can result in the fatal error `Realm accessed on incorrect thread`. Using a thread safe reference instead of Realm instance fixes the issue. (Issue [realm/realm-js#4410](https://github.com/realm/realm-js/issues/4410))
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
