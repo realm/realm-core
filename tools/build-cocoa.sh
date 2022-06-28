@@ -7,7 +7,7 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 VERSION=$(git describe)
 
 function usage {
-    echo "Usage: ${SCRIPT} [-b] [-m] [-x] [-c <realm-cocoa-folder>] [-f <cmake-flags>]"
+    echo "Usage: ${SCRIPT} [-b] [-m] [-x] [-c <realm-cocoa-folder>] [-v <version>] [-f <cmake-flags>]"
     echo ""
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
@@ -15,12 +15,13 @@ function usage {
     echo "   -x : build as an xcframework"
     echo "   -d : include debug libraries"
     echo "   -c : copy core to the specified folder instead of packaging it"
+    echo "   -v : specify version string to use"
     echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 
 # Parse the options
-while getopts ":bmxdc:f:" opt; do
+while getopts ":bmxdc:v:f:" opt; do
     case "${opt}" in
         b) BUILD=1;;
         m) MACOS_ONLY=1;;
@@ -29,6 +30,7 @@ while getopts ":bmxdc:f:" opt; do
         c) COPY=1
            DESTINATION=${OPTARG};;
         f) CMAKE_FLAGS=${OPTARG};;
+        v) VERSION=${OPTARG};;
         *) usage;;
     esac
 done

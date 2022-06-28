@@ -69,6 +69,8 @@ jobWrapper {
         else if(isCoreCronJob && requireNightlyBuild) {
             isPublishingRun = true
             longRunningTests = true
+            def localDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+            gitDescribeVersion = "${dependencies.VERSION}-nightly-${localDate}"
         }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
@@ -219,7 +221,7 @@ jobWrapper {
                 for (cocoaStash in cocoaStashes) {
                     unstash name: cocoaStash
                 }
-                sh 'tools/build-cocoa.sh -x'
+                sh "tools/build-cocoa.sh -x -v \"${gitDescribeVersion}\""
                 archiveArtifacts('realm-*.tar.xz')
                 stash includes: 'realm-*.tar.xz', name: "cocoa"
                 publishingStashes << "cocoa"
@@ -233,33 +235,19 @@ jobWrapper {
                         for (publishingStash in publishingStashes) {
                             unstash name: publishingStash
                             def path = publishingStash.replaceAll('___', '/')
-                            def files = findFiles(glob: '**')
 
-                            if(requireNightlyBuild) {
-                                def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
-                                def beta_version = "${gitDescribeVersion}_nightly_${local_date}"  
-                                publishBuildArtifactsToS3(false, beta_version, path, files)
-                            }
-                            else {
-                                publishBuildArtifactsToS3(true,gitDescribeVersion,path,files)
-                            }
-                            deleteDir()
+                            for (file in findFiles(glob: '**')) {
+                                rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
+                                if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
+                                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+                                }
+                            } 
                         }
                     }
                 }
             }
         }
     }
-}
-
-def publishBuildArtifactsToS3(release, version, path, files)
-{
-    for (file in files) {
-        rlmS3Put file: file.path, path: "downloads/core/${version}/${path}/${file.name}"
-        if(release) {
-            rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-        }
-    } 
 }
 
 def doCheckInDocker(Map options = [:]) {
@@ -415,7 +403,7 @@ def doBuildLinux(String buildType) {
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -444,7 +432,7 @@ def doBuildLinuxClang(String buildType) {
             buildDockerEnv('testing.Dockerfile').inside {
                 withEnv(environment) {
                     dir('build-dir') {
-                        sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
+                        sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION=\"${gitDescribeVersion}\" -G Ninja .."
                         runAndCollectWarnings(
                             script: 'ninja',
                             parser: "clang",
@@ -598,6 +586,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       // set a custom buildtrees path because the default one is too long and msbuild tasks fail
       VCPKG_INSTALL_OPTIONS: '--x-buildtrees-root=%WORKSPACE%/vcpkg-buildtrees',
       VCPKG_TARGET_TRIPLET: triplet,
+      REALM_VERSION: gitDescribeVersion,
     ]
 
      if (isUWP) {

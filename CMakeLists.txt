@@ -14,7 +14,6 @@ endif()
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(CheckSymbolExists)
-include(GetGitRevisionDescription)
 include(Utilities)
 include(SpecialtyBuilds)
 include(GetVersion)
@@ -23,8 +22,11 @@ include(CheckCXXSourceRuns)
 
 include(CodeCoverage)
 
-# Get accurate git-describe version
-git_describe(REALM_VERSION)
+if(NOT DEFINED REALM_VERSION)
+    # Get accurate git-describe version
+    include(GetGitRevisionDescription)
+    git_describe(REALM_VERSION)
+endif()
 set(PROJECT_VERSION ${DEP_VERSION})
 
 # Project-wide build flags
