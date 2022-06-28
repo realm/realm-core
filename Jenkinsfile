@@ -70,7 +70,7 @@ jobWrapper {
             isPublishingRun = true
             longRunningTests = true
         }
-        
+
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
@@ -78,7 +78,7 @@ jobWrapper {
         echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
-        if(!requireNightlyBuild) {
+        if(isCoreCronJob && !requireNightlyBuild) {
             currentBuild.result = 'ABORTED'
             error 'Nightly build is not needed because there are no new commits to build'
         }
@@ -900,7 +900,7 @@ def isCronJob() {
     def upstreams = currentBuild.getUpstreamBuilds()
     for(upstream in upstreams) {
         def upstreamProjectName = upstream.getFullProjectName()
-        def isRealmCronBuild = "${upstreamProjectName} in `realm-core-cron`"
+        def isRealmCronBuild = upstreamProjectName == 'realm-core-cron'
         if(isRealmCronBuild)
             return true;
     }
