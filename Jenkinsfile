@@ -28,7 +28,6 @@ jobWrapper {
 
             dependencies = readProperties file: 'dependencies.list'
             echo "Version in dependencies.list: ${dependencies.VERSION}"
-
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
             gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
@@ -48,13 +47,18 @@ jobWrapper {
             targetSHA1 = 'NONE'
             if (isPullRequest) {
                 targetSHA1 = sh(returnStdout: true, script: "git fetch origin && git merge-base origin/${targetBranch} HEAD").trim()
+            } 
+
+            isCoreCronJob = isCronJob()
+            requireNightlyBuild = false
+            if(isCoreCronJob) {
+                requireNightlyBuild = isNightlyBuildNeeded()
             }
-        }
+        }   
 
         currentBranch = env.BRANCH_NAME
         println "Building branch: ${currentBranch}"
-        println "Target branch: ${targetBranch}"
-
+        println "Target branch: ${targetBranch}"        
         releaseTesting = targetBranch.contains('release')
         isMaster = currentBranch.contains('master')
         longRunningTests = isMaster || currentBranch.contains('next-major')
@@ -62,12 +66,25 @@ jobWrapper {
         if (gitTag) {
             isPublishingRun = currentBranch.contains('release')
         }
+        else if(isCoreCronJob && requireNightlyBuild) {
+            isPublishingRun = true
+            longRunningTests = true
+            def localDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
+            gitDescribeVersion = "v${dependencies.VERSION}-nightly-${localDate}"
+        }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
+        echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
+        echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
+        if(isCoreCronJob && !requireNightlyBuild) {
+            currentBuild.result = 'ABORTED'
+            error 'Nightly build is not needed because there are no new commits to build'
+        }
+        
         if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
@@ -148,6 +165,7 @@ jobWrapper {
     }
 
     if (isPublishingRun) {
+
         stage('BuildPackages') {
             def buildOptions = [
                 enableSync: "ON",
@@ -203,7 +221,7 @@ jobWrapper {
                 for (cocoaStash in cocoaStashes) {
                     unstash name: cocoaStash
                 }
-                sh 'tools/build-cocoa.sh -x'
+                sh "tools/build-cocoa.sh -x -v \"${gitDescribeVersion}\""
                 archiveArtifacts('realm-*.tar.xz')
                 stash includes: 'realm-*.tar.xz', name: "cocoa"
                 publishingStashes << "cocoa"
@@ -217,12 +235,13 @@ jobWrapper {
                         for (publishingStash in publishingStashes) {
                             unstash name: publishingStash
                             def path = publishingStash.replaceAll('___', '/')
-                            def files = findFiles(glob: '**')
-                            for (file in files) {
-                                rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
-                                rlmS3Put file: file.path, path: "downloads/core/${file.name}"
-                            }
-                            deleteDir()
+
+                            for (file in findFiles(glob: '**')) {
+                                s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
+                                if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
+                                    s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                                }
+                            } 
                         }
                     }
                 }
@@ -384,7 +403,7 @@ def doBuildLinux(String buildType) {
                    rm -rf build-dir
                    mkdir build-dir
                    cd build-dir
-                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja ..
+                   cmake -DCMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION="${gitDescribeVersion}" -G Ninja ..
                    ninja
                    cpack -G TGZ
                 """
@@ -413,7 +432,7 @@ def doBuildLinuxClang(String buildType) {
             buildDockerEnv('testing.Dockerfile').inside {
                 withEnv(environment) {
                     dir('build-dir') {
-                        sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -G Ninja .."
+                        sh "cmake -D CMAKE_BUILD_TYPE=${buildType} -DREALM_NO_TESTS=1 -DREALM_VERSION=\"${gitDescribeVersion}\" -G Ninja .."
                         runAndCollectWarnings(
                             script: 'ninja',
                             parser: "clang",
@@ -567,6 +586,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
       // set a custom buildtrees path because the default one is too long and msbuild tasks fail
       VCPKG_INSTALL_OPTIONS: '--x-buildtrees-root=%WORKSPACE%/vcpkg-buildtrees',
       VCPKG_TARGET_TRIPLET: triplet,
+      REALM_VERSION: gitDescribeVersion,
     ]
 
      if (isUWP) {
@@ -800,7 +820,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
             String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
             archiveArtifacts tarball
 
-            def stashName = "${platform}__${buildType}"
+            def stashName = "${platform}___${buildType}"
             stash includes: tarball, name: stashName
             cocoaStashes << stashName
             publishingStashes << stashName
@@ -863,6 +883,26 @@ def readGitTag() {
         return null
     }
     return sh(returnStdout: true, script: command).trim()
+}
+
+def isCronJob() {
+    def upstreams = currentBuild.getUpstreamBuilds()
+    for(upstream in upstreams) {
+        def upstreamProjectName = upstream.getFullProjectName()
+        def isRealmCronBuild = upstreamProjectName == 'realm-core-cron'
+        if(isRealmCronBuild)
+            return true;
+    }
+    return false;
+}
+
+def isNightlyBuildNeeded() {
+    def command = 'git log -1 --format=%cI'
+    def lastCommitTime = sh(returnStdout: true, script:command).trim()
+    def current_dt = java.time.LocalDateTime.now()
+    def last_commit_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
+    echo "Last Commit Time: ${last_commit_dt}"
+    return current_dt.getDayOfYear() - last_commit_dt.getDayOfYear() <= 1;
 }
 
 def setBuildName(newBuildName) {

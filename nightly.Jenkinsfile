@@ -1,0 +1,1 @@
+def run = build '/realm/realm-core/master'
