@@ -27,6 +27,7 @@
 #pragma comment(lib, "Shlwapi.lib")
 #else
 #include <libgen.h>
+#include <unistd.h>
 #endif
 
 int main(int argc, char** argv)

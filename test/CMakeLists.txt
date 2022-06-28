@@ -1,12 +1,11 @@
 add_subdirectory(util)
+add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
 # AFL not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
 endif()
-
-add_custom_target(benchmarks)
 
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
@@ -200,20 +199,16 @@ if(REALM_ENABLE_SYNC)
 
     set(SYNC_TESTS
         test_all.cpp
-        test_allocation_metrics.cpp
         test_array_sync.cpp
         test_changeset_encoding.cpp
         test_client_reset.cpp
         test_compact_changesets.cpp
         test_crypto.cpp
         test_embedded_objects.cpp
-        test_encrypt_fingerprint.cpp
-        test_encrypt_transform.cpp
         test_instruction_replication.cpp
         test_lang_bind_helper_sync.cpp
         test_noinst_server_dir.cpp
         test_noinst_vacuum.cpp
-        test_scratch_allocator.cpp
         test_server_history.cpp
         test_stable_ids.cpp
         test_sync.cpp
@@ -284,12 +279,6 @@ if(REALM_ENABLE_SYNC)
     add_executable(BenchTransform EXCLUDE_FROM_ALL ${BENCH_TRANSFORM_SOURCES})
     set_target_properties(BenchTransform PROPERTIES OUTPUT_NAME "bench-transform")
     target_link_libraries(BenchTransform TestUtil Sync)
-
-    if(REALM_BUILD_DOGLESS)
-        add_executable(SyncTestClient ${TEST_CLIENT_SOURCES} ${TEST_CLIENT_HEADERS})
-        set_target_properties(SyncTestClient PROPERTIES OUTPUT_NAME "test-client")
-        target_link_libraries(SyncTestClient Sync Dogless)
-    endif()
 
     file(GLOB test_resources *.json *.pem)
 

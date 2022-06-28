@@ -151,12 +151,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         if (config.sync_config->flx_sync_requested && !config.sync_config->partition_value.empty()) {
             throw std::logic_error("Cannot specify a partition value when flexible sync is enabled");
         }
-        // TODO(RCORE-912) we definitely do want to support this, but until its implemented we should prevent users
-        // from using something that is currently broken.
-        if (config.sync_config->flx_sync_requested &&
-            config.sync_config->client_resync_mode != ClientResyncMode::Manual) {
-            throw std::logic_error("Only manual client resets are supported with flexible sync");
-        }
     }
 #endif
 

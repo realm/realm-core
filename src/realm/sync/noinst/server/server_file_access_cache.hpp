@@ -13,8 +13,6 @@
 #include <realm/util/optional.hpp>
 #include <realm/sync/noinst/server/server_history.hpp>
 
-#include <realm/sync/noinst/server/metrics.hpp>
-
 namespace realm {
 namespace _impl {
 
@@ -32,7 +30,7 @@ public:
     /// cache object before the first invocation of Slot::access() on an
     /// associated file file slot.
     ServerFileAccessCache(long max_open_files, util::Logger&, ServerHistory::Context&,
-                          util::Optional<std::array<char, 64>> encryption_key, sync::Metrics* metrics);
+                          util::Optional<std::array<char, 64>> encryption_key);
 
     ~ServerFileAccessCache() noexcept;
 
@@ -53,12 +51,10 @@ private:
     const util::Optional<std::array<char, 64>> m_encryption_key;
     util::Logger& m_logger;
     ServerHistory::Context& m_history_context;
-    sync::Metrics* m_metrics;
 
     void access(Slot&);
     void remove(Slot&) noexcept;
     void insert(Slot&) noexcept;
-    void poll_core_metrics();
 };
 
 
@@ -135,13 +131,11 @@ private:
 
 inline ServerFileAccessCache::ServerFileAccessCache(long max_open_files, util::Logger& logger,
                                                     ServerHistory::Context& history_context,
-                                                    util::Optional<std::array<char, 64>> encryption_key,
-                                                    sync::Metrics* metrics)
+                                                    util::Optional<std::array<char, 64>> encryption_key)
     : m_max_open_files{max_open_files}
     , m_encryption_key{encryption_key}
     , m_logger{logger}
     , m_history_context{history_context}
-    , m_metrics{metrics}
 {
     REALM_ASSERT(m_max_open_files >= 1);
 }
@@ -237,13 +231,6 @@ inline DBOptions ServerFileAccessCache::Slot::make_shared_group_options() const 
         options.encryption_key = m_cache.m_encryption_key->data();
     if (m_disable_sync_to_disk)
         options.durability = DBOptions::Durability::Unsafe;
-
-    // Core's metrics can be a bit memory intensive, only turn them on
-    // if the sync metrics are going somewhere and they are not explicitly
-    // excluded from the user defined blacklist.
-    if (m_cache.m_metrics && !m_cache.m_metrics->will_exclude(sync::MetricsOptions::Core_All))
-        options.enable_metrics = true;
-
     return options;
 }
 

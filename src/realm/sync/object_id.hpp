@@ -23,6 +23,7 @@
 #include <string>
 #include <iosfwd> // operator<<
 #include <map>
+#include <set>
 
 #include <external/mpark/variant.hpp>
 #include <realm/global_key.hpp>
@@ -31,9 +32,6 @@
 #include <realm/keys.hpp>
 #include <realm/db.hpp>
 #include <realm/mixed.hpp>
-#include <realm/util/metered/map.hpp>
-#include <realm/util/metered/set.hpp>
-#include <realm/util/metered/string.hpp>
 
 namespace realm {
 
@@ -67,7 +65,7 @@ public:
     bool empty() const noexcept;
 
     // A map from table name to a set of object ids.
-    util::metered::map<std::string, util::metered::set<PrimaryKey>> m_objects;
+    std::map<std::string, std::set<PrimaryKey>> m_objects;
 };
 
 // FieldSet is a set of fields in tables. A field is defined by a
@@ -82,7 +80,7 @@ public:
 
     // A map from table name to a map from column name to a set of
     // object ids.
-    util::metered::map<std::string, util::metered::map<std::string, util::metered::set<PrimaryKey>>> m_fields;
+    std::map<std::string, std::map<std::string, std::set<PrimaryKey>>> m_fields;
 };
 
 struct GlobalID {

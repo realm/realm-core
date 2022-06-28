@@ -488,7 +488,7 @@ EncryptedFileMapping::~EncryptedFileMapping()
 char* EncryptedFileMapping::page_addr(size_t local_page_ndx) const noexcept
 {
     REALM_ASSERT_EX(local_page_ndx < m_page_state.size(), local_page_ndx, m_page_state.size());
-    return (reinterpret_cast<char*>(local_page_ndx << m_page_shift) + reinterpret_cast<uintptr_t>(m_addr));
+    return static_cast<char*>(m_addr) + (local_page_ndx << m_page_shift);
 }
 
 void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept

@@ -294,15 +294,6 @@ size_t get_num_decrypted_pages()
     return num_decrypted_pages.load();
 }
 
-decrypted_memory_stats_t get_decrypted_memory_stats()
-{
-    decrypted_memory_stats_t retval;
-    retval.memory_size = num_decrypted_pages.load() * page_size();
-    retval.reclaimer_target = reclaimer_target.load() * page_size();
-    retval.reclaimer_workload = reclaimer_workload.load() * page_size();
-    return retval;
-}
-
 void encryption_note_reader_start(SharedFileInfo& info, const void* reader_id)
 {
     UniqueLock lock(mapping_mutex);

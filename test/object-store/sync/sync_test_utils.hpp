@@ -138,6 +138,10 @@ protected:
 std::unique_ptr<TestClientReset> make_baas_client_reset(const Realm::Config& local_config,
                                                         const Realm::Config& remote_config,
                                                         TestAppSession& test_app_session);
+
+std::unique_ptr<TestClientReset> make_baas_flx_client_reset(const Realm::Config& local_config,
+                                                            const Realm::Config& remote_config,
+                                                            const TestAppSession& test_app_session);
 #endif // REALM_ENABLE_AUTH_TESTS
 
 #endif // REALM_ENABLE_SYNC
