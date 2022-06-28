@@ -70,25 +70,24 @@ jobWrapper {
             isPublishingRun = true
             longRunningTests = true
         }
+        
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
         echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
         echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
-            if(!requireNightlyBuild)
-            {
-                currentBuild.result = 'ABORTED'
-                error 'Nightly build is not needed because there are no new commits to build'
-            }
-        }
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
+        if(!requireNightlyBuild) {
+            currentBuild.result = 'ABORTED'
+            error 'Nightly build is not needed because there are no new commits to build'
+        }
+        
         if (isMaster) {
             // If we're on master, instruct the docker image builds to push to the
             // cache registry
             env.DOCKER_PUSH = "1"
         }
-
     }
 
     if (isPullRequest) {
@@ -236,14 +235,12 @@ jobWrapper {
                             def path = publishingStash.replaceAll('___', '/')
                             def files = findFiles(glob: '**')
 
-                            if(requireNightlyBuild)
-                            {
+                            if(requireNightlyBuild) {
                                 def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
                                 def beta_version = "${gitDescribeVersion}_nightly_${local_date}"  
                                 publishBuildArtifactsToS3(false, beta_version, path, files)
                             }
-                            else
-                            {
+                            else {
                                 publishBuildArtifactsToS3(true,gitDescribeVersion,path,files)
                             }
                             deleteDir()
@@ -259,8 +256,9 @@ def publishBuildArtifactsToS3(release, version, path, files)
 {
     for (file in files) {
         rlmS3Put file: file.path, path: "downloads/core/${version}/${path}/${file.name}"
-        if(release)
+        if(release) {
             rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+        }
     } 
 }
 
@@ -900,8 +898,7 @@ def readGitTag() {
 
 def isCronJob() {
     def upstreams = currentBuild.getUpstreamBuilds()
-    for(upstream in upstreams)
-    {
+    for(upstream in upstreams) {
         def upstreamProjectName = upstream.getFullProjectName()
         def isRealmCronBuild = "${upstreamProjectName} in `realm-core-cron`"
         if(isRealmCronBuild)
