@@ -14,6 +14,7 @@
 #include <realm/sync/subscriptions.hpp>
 #include <realm/util/bind_ptr.hpp>
 #include <realm/util/circular_buffer.hpp>
+#include <realm/util/client_websocket.hpp>
 #include <realm/util/platform_info.hpp>
 #include <realm/util/thread.hpp>
 #include <realm/util/uri.hpp>
@@ -424,7 +425,7 @@ void ClientImpl::cancel_reconnect_delay()
             }
         }
     };
-    get_service().post(std::move(handler)); // Throws
+    m_socket_factory->post(std::move(handler)); // Throws
 }
 
 
@@ -459,7 +460,7 @@ bool ClientImpl::wait_for_session_terminations_or_client_stopped()
         m_sessions_terminated = true;
         m_wait_or_client_stopped_cond.notify_all();
     };
-    get_service().post(std::move(handler)); // Throws
+    m_socket_factory->post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -923,7 +924,7 @@ void SessionWrapper::on_new_flx_subscription_set(int64_t new_version)
         return;
     }
 
-    m_client.get_service().post([new_version, this] {
+    m_client.m_socket_factory->post([new_version, this] {
         REALM_ASSERT(m_actualized);
         if (REALM_UNLIKELY(!m_sess)) {
             return; // Already finalized
@@ -1044,7 +1045,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         sess.recognize_sync_version(new_version); // Throws
         self->report_progress();                  // Throws
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.m_socket_factory->post(std::move(handler)); //Throws
 }
 
 
@@ -1063,7 +1064,7 @@ void SessionWrapper::cancel_reconnect_delay()
         ClientImpl::Connection& conn = sess.get_connection();
         conn.cancel_reconnect_delay(); // Throws
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.m_socket_factory->post(std::move(handler)); // Throws
 }
 
 void SessionWrapper::async_wait_for(bool upload_completion, bool download_completion,
@@ -1101,7 +1102,7 @@ void SessionWrapper::async_wait_for(bool upload_completion, bool download_comple
         if (download_completion)
             sess.request_download_completion_notification(); // Throws
     };
-    m_client.get_service().post(std::move(handler_2)); // Throws
+    m_client.m_socket_factory->post(std::move(handler_2)); // Throws
 }
 
 
@@ -1131,7 +1132,7 @@ bool SessionWrapper::wait_for_upload_complete_or_client_stopped()
             sess.request_upload_completion_notification(); // Throws
         }
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.m_socket_factory->post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1170,7 +1171,7 @@ bool SessionWrapper::wait_for_download_complete_or_client_stopped()
             sess.request_download_completion_notification(); // Throws
         }
     };
-    m_client.get_service().post(std::move(handler)); // Throws
+    m_client.m_socket_factory->post(std::move(handler)); // Throws
 
     bool completion_condition_was_satisfied;
     {
@@ -1188,7 +1189,7 @@ void SessionWrapper::refresh(std::string signed_access_token)
     // Thread safety required
     REALM_ASSERT(m_initiated);
 
-    m_client.get_service().post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
+    m_client.m_socket_factory->post([self = util::bind_ptr(this), token = std::move(signed_access_token)] {
         REALM_ASSERT(self->m_actualized);
         if (REALM_UNLIKELY(!self->m_sess))
             return; // Already finalized

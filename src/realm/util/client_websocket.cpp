@@ -18,7 +18,6 @@
 #include <realm/util/client_websocket.hpp>
 
 #include <realm/util/websocket.hpp>
-#include <realm/util/network.hpp>
 #include <realm/util/network_ssl.hpp>
 
 namespace realm::util::websocket {

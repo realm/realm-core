@@ -24,6 +24,7 @@
 
 #include <realm/sync/config.hpp>
 #include <realm/util/http.hpp>
+#include <realm/util/network.hpp>
 
 namespace realm::util::network {
 class Service;
@@ -125,9 +126,42 @@ public:
         return std::make_unique<SocketFactory>(std::move(config));
     }
 
+    /// \brief Submit a handler to be executed by the event loop thread.
+    ///
+    /// Register the sepcified completion handler for immediate asynchronous
+    /// execution. The specified handler will be executed by an expression on
+    /// the form `handler()`. If the the handler object is movable, it will
+    /// never be copied. Otherwise, it will be copied as necessary.
+    ///
+    /// This function is thread-safe, that is, it may be called by any
+    /// thread. It may also be called from other completion handlers.
+    ///
+    /// The handler will never be called as part of the execution of post(). It
+    /// will always be called by a thread that is executing run(). If no thread
+    /// is currently executing run(), the handler will not be executed until a
+    /// thread starts executing run(). If post() is called while another thread
+    /// is executing run(), the handler may be called before post() returns. If
+    /// post() is called from another completion handler, the submitted handler
+    /// is guaranteed to not be called during the execution of post().
+    ///
+    /// Completion handlers added through post() will be executed in the order
+    /// that they are added. More precisely, if post() is called twice to add
+    /// two handlers, A and B, and the execution of post(A) ends before the
+    /// beginning of the execution of post(B), then A is guaranteed to execute
+    /// before B.
+    template <class H>
+    void post(H handler);
+
 private:
     SocketFactoryConfig m_config;
 };
+
+
+template <class H>
+inline void SocketFactory::post(H handler)
+{
+    m_config.service.post(std::move(handler)); // Throws
+}
 
 } // namespace realm::util::websocket
 
