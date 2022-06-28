@@ -70,7 +70,7 @@ jobWrapper {
             isPublishingRun = true
             longRunningTests = true
             def localDate = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
-            gitDescribeVersion = "${dependencies.VERSION}-nightly-${localDate}"
+            gitDescribeVersion = "v${dependencies.VERSION}-nightly-${localDate}"
         }
 
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
@@ -237,9 +237,9 @@ jobWrapper {
                             def path = publishingStash.replaceAll('___', '/')
 
                             for (file in findFiles(glob: '**')) {
-                                rlmS3Put file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}"
+                                s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
                                 if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
-                                    rlmS3Put file: file.path, path: "downloads/core/${file.name}"
+                                    s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
                                 }
                             } 
                         }
@@ -820,7 +820,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
             String tarball = "realm-${buildType}-${gitDescribeVersion}-${platform}-devel.tar.gz";
             archiveArtifacts tarball
 
-            def stashName = "${platform}__${buildType}"
+            def stashName = "${platform}___${buildType}"
             stash includes: tarball, name: stashName
             cocoaStashes << stashName
             publishingStashes << stashName
