@@ -73,15 +73,12 @@ jobWrapper {
         echo "Pull request: ${isPullRequest ? 'yes' : 'no'}"
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
-        if(isCoreCronJob)
-        {
-            echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
-            echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
+        echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
+        echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
             if(!requireNightlyBuild)
             {
-                echo "Build is not needed because there are no new commits to build"
-                currentBuild.result = 'SUCCESS (No realm-core nightly build needed)'
-                sh 'exit 1'
+                currentBuild.result = 'ABORTED'
+                error 'Nightly build is not needed because there are no new commits to build'
             }
         }
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
@@ -242,7 +239,7 @@ jobWrapper {
                             if(requireNightlyBuild)
                             {
                                 def local_date = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE)
-                                def beta_version = "${gitDescribeVersion}_beta_${local_date}"  
+                                def beta_version = "${gitDescribeVersion}_nightly_${local_date}"  
                                 publishBuildArtifactsToS3(false, beta_version, path, files)
                             }
                             else
@@ -906,7 +903,8 @@ def isCronJob() {
     for(upstream in upstreams)
     {
         def upstreamProjectName = upstream.getFullProjectName()
-        if(upstreamProjectName.contains("realm-core-cron"))
+        def isRealmCronBuild = "${upstreamProjectName} in `realm-core-cron`"
+        if(isRealmCronBuild)
             return true;
     }
     return false;
@@ -918,7 +916,6 @@ def isNightlyBuildNeeded() {
     def current_dt = java.time.LocalDateTime.now()
     def last_commit_dt = java.time.LocalDateTime.parse(lastCommitTime, java.time.format.DateTimeFormatter.ISO_DATE_TIME)
     echo "Last Commit Time: ${last_commit_dt}"
-    echo "Current time: ${current_dt}" 
     return current_dt.getDayOfYear() - last_commit_dt.getDayOfYear() <= 1;
 }
 
