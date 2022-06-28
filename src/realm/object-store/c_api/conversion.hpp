@@ -423,11 +423,21 @@ static inline realm_class_info_t to_capi(const ObjectSchema& o)
     info.num_properties = o.persisted_properties.size();
     info.num_computed_properties = o.computed_properties.size();
     info.key = o.table_key.value;
-    if (o.is_embedded) {
-        info.flags = RLM_CLASS_EMBEDDED;
-    }
-    else {
-        info.flags = RLM_CLASS_NORMAL;
+    switch (o.table_type) {
+        case ObjectSchema::ObjectType::Embedded: {
+            info.flags = RLM_CLASS_EMBEDDED;
+            break;
+        }
+        case ObjectSchema::ObjectType::TopLevelAsymmetric: {
+            info.flags = RLM_CLASS_ASYMMETRIC;
+            break;
+        }
+        case ObjectSchema::ObjectType::TopLevel: {
+            info.flags = RLM_CLASS_NORMAL;
+            break;
+        }
+        default:
+            REALM_TERMINATE(util::format("Invalid table type: %1", uint8_t(o.table_type)).c_str());
     }
     return info;
 }

@@ -359,7 +359,7 @@ ColKey Table::add_column(Table& target, StringData name)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
-    // Outgoing links from an asymmetric table are not allowed.
+    // Only links to embedded objects are allowed.
     if (is_asymmetric() && !target.is_embedded()) {
         throw LogicError(LogicError::wrong_kind_of_table);
     }
@@ -409,8 +409,8 @@ ColKey Table::add_column_list(Table& target, StringData name)
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
+    // Only links to embedded objects are allowed.
+    if (is_asymmetric() && !target.is_embedded()) {
         throw LogicError(LogicError::wrong_kind_of_table);
     }
     // Incoming links from an asymmetric table are not allowed.
@@ -487,8 +487,8 @@ ColKey Table::add_column_dictionary(Table& target, StringData name, DataType key
         throw LogicError(LogicError::wrong_kind_of_table);
     if (origin_group != target_group)
         throw LogicError(LogicError::group_mismatch);
-    // Outgoing links from an asymmetric table are not allowed.
-    if (is_asymmetric()) {
+    // Only links to embedded objects are allowed.
+    if (is_asymmetric() && !target.is_embedded()) {
         throw LogicError(LogicError::wrong_kind_of_table);
     }
     // Incoming links from an asymmetric table are not allowed.
@@ -2677,12 +2677,7 @@ void Table::schema_to_json(std::ostream& out, const std::map<std::string, std::s
         out << ",";
         out << "\"primaryKey\":\"" << this->get_column_name(m_primary_key_col) << "\"";
     }
-    if (is_embedded()) {
-        out << ",\"isEmbedded\":true";
-    }
-    if (is_asymmetric()) {
-        out << ",\"isAsymmetric\":true";
-    }
+    out << ",\"tableType\":\"" << this->get_table_type() << "\"";
     out << ",\"properties\":[";
     auto col_keys = get_column_keys();
     int sz = int(col_keys.size());
