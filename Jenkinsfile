@@ -77,7 +77,7 @@ jobWrapper {
         echo "Release Run: ${releaseTesting ? 'yes' : 'no'}"
         echo "Publishing Run: ${isPublishingRun ? 'yes' : 'no'}"
         echo "Is Realm cron job: ${isCoreCronJob ? 'yes' : 'no'}"
-        echo "Requires nighly build: ${requireNightlyBuild ? 'yes' : 'no'}"
+        echo "Is nightly build: ${requireNightlyBuild ? 'yes' : 'no'}"
         echo "Long running test: ${longRunningTests ? 'yes' : 'no'}"
 
         if(isCoreCronJob && !requireNightlyBuild) {
