@@ -2444,6 +2444,7 @@ template ObjKey Table::find_first(ColKey col_key, ObjectId) const;
 template ObjKey Table::find_first(ColKey col_key, ObjKey) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<bool>) const;
 template ObjKey Table::find_first(ColKey col_key, util::Optional<int64_t>) const;
+template ObjKey Table::find_first(ColKey col_key, StringData) const;
 template ObjKey Table::find_first(ColKey col_key, BinaryData) const;
 template ObjKey Table::find_first(ColKey col_key, Mixed) const;
 template ObjKey Table::find_first(ColKey col_key, UUID) const;
@@ -2493,7 +2494,7 @@ ObjKey Table::find_first_decimal(ColKey col_key, Decimal128 value) const
 
 ObjKey Table::find_first_string(ColKey col_key, StringData value) const
 {
-    return find_first(col_key, value);
+    return find_first<StringData>(col_key, value);
 }
 
 ObjKey Table::find_first_binary(ColKey col_key, BinaryData value) const
