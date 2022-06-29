@@ -19,6 +19,9 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
+//#include <realm/object-store/sync/mongo_client.hpp>
+//#include <realm/object-store/sync/mongo_database.hpp>
+#include <realm/object-store/sync/mongo_collection.hpp>
 #endif
 
 #include <stdexcept>
@@ -722,6 +725,10 @@ struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::Async
         return false;
     }
 };
+
+struct realm_mongodb_collection : realm::c_api::WrapC, std::shared_ptr<realm::app::MongoCollection> {
+};
+
 #endif // REALM_ENABLE_SYNC
 
 #endif // REALM_OBJECT_STORE_C_API_TYPES_HPP

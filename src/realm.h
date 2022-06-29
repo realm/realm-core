@@ -3798,4 +3798,18 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  */
 RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_API_NOEXCEPT;
 
+
+typedef struct realm_mongodb_collection realm_mongodb_collection_t;
+
+/**
+ *  Get mongo db collection from realm mongo db client
+ *  @param user ptr to the sync realm user of which we want to retrieve the remote collection for
+ *  @param service name of the service where the collection will be found
+ *  @param database name of the database where the collection will be found
+ *  @param collection name of the collection to fetch
+ *  @return a ptr to a valid mongodb collection if such collection exists, nullptr otherwise
+ */
+RLM_API realm_mongodb_collection_t* realm_mongo_collection_get(realm_user_t* user, const char* service, const char* database, const char* collection);
+
+
 #endif // REALM_H
