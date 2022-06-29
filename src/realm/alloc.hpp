@@ -53,7 +53,6 @@ int64_t to_int64(size_t value) noexcept;
 class MemRef {
 public:
     MemRef() noexcept;
-    ~MemRef() noexcept;
 
     MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept;
     MemRef(ref_type ref, Allocator& alloc) noexcept;
@@ -449,8 +448,6 @@ inline MemRef::MemRef() noexcept
     , m_ref(0)
 {
 }
-
-inline MemRef::~MemRef() noexcept {}
 
 inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
     : m_addr(addr)
