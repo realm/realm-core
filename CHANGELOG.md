@@ -6,8 +6,8 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* None.
- 
+* Fix exception when decoding interned strings in realm-apply-to-state tool. ([#5628](https://github.com/realm/realm-core/pull/5628))
+
 ### Breaking changes
 * None.
 
@@ -31,7 +31,6 @@
 * Fix a UBSan failure when mapping encrypted pages.
 * Improved performance of sync clients during integration of changesets with many small strings (totalling > 1024 bytes per changeset) on iOS 14, and devices which have restrictive or fragmented memory. ([#5614](https://github.com/realm/realm-core/issues/5614))
 * Fixed a bug that prevented the detection of tables being changed to or from asymmetric during migrations. ([#5603](https://github.com/realm/realm-core/pull/5603), since v12.1.0)
-* Fix exception when decoding interned strings in realm-apply-to-state tool. ([#5628](https://github.com/realm/realm-core/pull/5628))
  
 ### Breaking changes
 * In Realm JS, the client reset callback can result in the fatal error `Realm accessed on incorrect thread`. Using a thread safe reference instead of Realm instance fixes the issue. (Issue [realm/realm-js#4410](https://github.com/realm/realm-js/issues/4410))
