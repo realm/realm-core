@@ -847,14 +847,14 @@ TEST(Json_Schema)
     const std::string json = ss.str();
     std::string expected =
         "[\n"
-        "{\"name\":\"person\",\"properties\":["
+        "{\"name\":\"person\",\"tableType\":\"TopLevel\",\"properties\":["
         "{\"name\":\"name\",\"type\":\"string\"},"
         "{\"name\":\"isMarried\",\"type\":\"bool\"},"
         "{\"name\":\"age\",\"type\":\"int\",\"isOptional\":true},"
         "{\"name\":\"dates\",\"type\":\"timestamp\",\"isArray\":true},"
         "{\"name\":\"pet\",\"type\":\"object\",\"objectType\":\"dog\",\"isArray\":true}"
         "]},\n"
-        "{\"name\":\"dog\",\"isEmbedded\":true,\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
+        "{\"name\":\"dog\",\"tableType\":\"Embedded\",\"properties\":[{\"name\":\"name\",\"type\":\"string\"}]}\n"
         "]\n";
     CHECK_EQUAL(expected, json);
 }

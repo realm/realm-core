@@ -19,8 +19,6 @@
 #ifndef REALM_OBJECT_SCHEMA_HPP
 #define REALM_OBJECT_SCHEMA_HPP
 
-#include <realm/object-store/util/tagged_bool.hpp>
-
 #include <realm/keys.hpp>
 #include <realm/string_data.hpp>
 
@@ -37,18 +35,16 @@ struct Property;
 
 class ObjectSchema {
 public:
-    using IsEmbedded = util::TaggedBool<class IsEmbeddedTag>;
-    using IsAsymmetric = util::TaggedBool<class IsAsymmetricTag>;
+    /// The type of tables supported by a realm.
+    /// Note: Enumeration value assignments must be kept in sync with <realm/table.hpp>.
+    enum class ObjectType : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
 
     ObjectSchema();
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties);
-    ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties);
-    ObjectSchema(std::string name, IsAsymmetric is_asymmetric, std::initializer_list<Property> persisted_properties);
+    ObjectSchema(std::string name, ObjectType table_type, std::initializer_list<Property> persisted_properties);
     ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
-    ObjectSchema(std::string name, IsEmbedded is_embedded, std::initializer_list<Property> persisted_properties,
-                 std::initializer_list<Property> computed_properties, std::string name_alias = "");
-    ObjectSchema(std::string name, IsAsymmetric is_asymmetric, std::initializer_list<Property> persisted_properties,
+    ObjectSchema(std::string name, ObjectType table_type, std::initializer_list<Property> persisted_properties,
                  std::initializer_list<Property> computed_properties, std::string name_alias = "");
     ~ObjectSchema();
 
@@ -66,9 +62,7 @@ public:
     std::vector<Property> computed_properties;
     std::string primary_key;
     TableKey table_key;
-    // Cannot be both true at the same time.
-    IsEmbedded is_embedded = false;
-    IsAsymmetric is_asymmetric = false;
+    ObjectType table_type = ObjectType::TopLevel;
     std::string alias;
 
     Property* property_for_public_name(StringData public_name) noexcept;
@@ -96,6 +90,20 @@ public:
 private:
     void set_primary_key_property() noexcept;
 };
+
+inline std::ostream& operator<<(std::ostream& o, ObjectSchema::ObjectType table_type)
+{
+    switch (table_type) {
+        case ObjectSchema::ObjectType::TopLevel:
+            return o << "TopLevel";
+        case ObjectSchema::ObjectType::Embedded:
+            return o << "Embedded";
+        case ObjectSchema::ObjectType::TopLevelAsymmetric:
+            return o << "TopLevelAsymmetric";
+    }
+    return o << "Invalid table type: " << uint8_t(table_type);
+}
+
 } // namespace realm
 
 #endif /* defined(REALM_OBJECT_SCHEMA_HPP) */

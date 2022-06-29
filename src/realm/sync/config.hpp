@@ -36,6 +36,7 @@ namespace realm {
 class SyncUser;
 class SyncSession;
 class Realm;
+class ThreadSafeReference;
 
 namespace bson {
 class Bson;
@@ -182,7 +183,7 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Manual;
     std::function<void(std::shared_ptr<Realm> before_frozen)> notify_before_client_reset;
-    std::function<void(std::shared_ptr<Realm> before_frozen, std::shared_ptr<Realm> after, bool did_recover)>
+    std::function<void(std::shared_ptr<Realm> before_frozen, ThreadSafeReference after, bool did_recover)>
         notify_after_client_reset;
 
     // Will be called after a download message is received and validated by the client but befefore it's been

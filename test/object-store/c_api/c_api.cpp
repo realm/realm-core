@@ -4154,7 +4154,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
             realm_sync_config_set_after_client_reset_handler(
                 local_sync_config,
-                [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
                     after_client_reset_counter.fetch_add(1);
                     baas_client_stop.store(true);
                     return true;
@@ -4200,7 +4200,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
 
             realm_sync_config_set_after_client_reset_handler(
                 local_sync_config,
-                [](realm_userdata_t, realm_t*, realm_t*, bool) -> bool {
+                [](realm_userdata_t, realm_t*, realm_thread_safe_reference_t*, bool) -> bool {
                     after_client_reset_counter.fetch_add(1);
                     return true;
                 },
@@ -4663,9 +4663,10 @@ TEST_CASE("app: flx-sync basic tests", "[c_api][flx][sync]") {
                 {
                     using namespace std::chrono_literals;
                     std::unique_lock<std::mutex> lock{m_mutex};
-                    m_cv.wait_for(lock, 300ms, [this]() {
+                    bool completed_within_time_limit = m_cv.wait_for(lock, 5s, [this]() {
                         return m_state == RLM_SYNC_SUBSCRIPTION_COMPLETE && m_userdata != nullptr;
                     });
+                    CHECK(completed_within_time_limit);
                     return m_state;
                 }
             };

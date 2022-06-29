@@ -332,6 +332,8 @@ typedef struct realm_class_info {
 typedef enum realm_class_flags {
     RLM_CLASS_NORMAL = 0,
     RLM_CLASS_EMBEDDED = 1,
+    RLM_CLASS_ASYMMETRIC = 2,
+    RLM_CLASS_MASK = 3,
 } realm_class_flags_e;
 
 typedef enum realm_property_flags {
@@ -3355,7 +3357,7 @@ typedef bool (*realm_sync_ssl_verify_func_t)(realm_userdata_t userdata, const ch
                                              const char* pem_data, size_t pem_size, int preverify_ok, int depth);
 typedef bool (*realm_sync_before_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm);
 typedef bool (*realm_sync_after_client_reset_func_t)(realm_userdata_t userdata, realm_t* before_realm,
-                                                     realm_t* after_realm, bool did_recover);
+                                                     realm_thread_safe_reference_t* after_realm, bool did_recover);
 
 typedef struct realm_flx_sync_subscription realm_flx_sync_subscription_t;
 typedef struct realm_flx_sync_subscription_set realm_flx_sync_subscription_set_t;

@@ -1,12 +1,11 @@
 add_subdirectory(util)
+add_custom_target(benchmarks)
 add_subdirectory(object-store)
 
 # AFL not yet supported by Windows
 if(NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_subdirectory(fuzzy)
 endif()
-
-add_custom_target(benchmarks)
 
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)

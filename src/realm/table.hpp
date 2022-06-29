@@ -88,6 +88,8 @@ class Table {
 public:
     /// The type of tables supported by a realm.
     /// Note: Any change to this enum is a file-format breaking change.
+    /// Note: Enumeration value assignments must be kept in sync with
+    /// <realm/object-store/object_schema.hpp>.
     enum class Type : uint8_t { TopLevel = 0, Embedded = 0x1, TopLevelAsymmetric = 0x2 };
     constexpr static uint8_t table_type_mask = 0x3;
 
@@ -866,16 +868,13 @@ inline std::ostream& operator<<(std::ostream& o, Table::Type table_type)
 {
     switch (table_type) {
         case Table::Type::TopLevel:
-            o << "TopLevel";
-            break;
+            return o << "TopLevel";
         case Table::Type::Embedded:
-            o << "Embedded";
-            break;
+            return o << "Embedded";
         case Table::Type::TopLevelAsymmetric:
-            o << "TopLevelAsymmetric";
-            break;
+            return o << "TopLevelAsymmetric";
     }
-    return o;
+    return o << "Invalid table type: " << uint8_t(table_type);
 }
 
 class ColKeyIterator {

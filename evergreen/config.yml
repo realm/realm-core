@@ -506,7 +506,7 @@ tasks:
 
 - name: object-store-tests
   tags: [ "test_suite", "for_pull_requests" ]
-  exec_timeout_secs: 1800
+  exec_timeout_secs: 2100
   commands:
   - func: "compile"
   # If we need to start a local copy of baas, do it in the background here in a separate script.

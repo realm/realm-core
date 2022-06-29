@@ -90,10 +90,10 @@ void ClientHistory::set_client_reset_adjustments(version_type current_version, S
     m_client_reset_changeset = uploadable_changeset; // Picked up by prepare_changeset()
 }
 
-std::vector<ChunkedBinaryData> ClientHistory::get_local_changes(version_type current_version) const
+std::vector<ClientHistory::LocalChange> ClientHistory::get_local_changes(version_type current_version) const
 {
     ensure_updated(current_version); // Throws
-    std::vector<ChunkedBinaryData> changesets;
+    std::vector<ClientHistory::LocalChange> changesets;
     if (!m_arrays || m_arrays->changesets.is_empty())
         return changesets;
 
@@ -115,7 +115,7 @@ std::vector<ChunkedBinaryData> ClientHistory::get_local_changes(version_type cur
         std::int_fast64_t origin_file_ident = m_arrays->origin_file_idents.get(ndx);
         bool not_from_server = (origin_file_ident == 0);
         if (not_from_server) {
-            changesets.push_back(m_arrays->changesets.get(ndx));
+            changesets.push_back({version, m_arrays->changesets.get(ndx)});
         }
     }
     return changesets;

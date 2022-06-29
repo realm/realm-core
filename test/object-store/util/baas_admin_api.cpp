@@ -128,7 +128,7 @@ nlohmann::json BaasRuleBuilder::property_to_jsonschema(const Property& prop, con
         auto target_obj = m_schema.find(prop.object_type);
         REALM_ASSERT(target_obj != m_schema.end());
 
-        if (target_obj->is_embedded) {
+        if (target_obj->table_type == ObjectSchema::ObjectType::Embedded) {
             m_current_path.push_back(prop.name);
             if (is_collection(prop.type)) {
                 m_current_path.push_back("[]");
@@ -549,8 +549,20 @@ AdminAPISession::Service AdminAPISession::get_sync_service(const std::string& ap
 
 static nlohmann::json convert_config(AdminAPISession::ServiceConfig config)
 {
+    if (config.mode == AdminAPISession::ServiceConfig::SyncMode::Flexible) {
+        auto payload = nlohmann::json{{"database_name", config.database_name},
+                                      {"state", config.state},
+                                      {"is_recovery_mode_disabled", config.recovery_is_disabled}};
+        if (config.queryable_field_names) {
+            payload["queryable_fields_names"] = *config.queryable_field_names;
+        }
+        if (config.permissions) {
+            payload["permissions"] = *config.permissions;
+        }
+        return payload;
+    }
     return nlohmann::json{{"database_name", config.database_name},
-                          {"partition", config.partition},
+                          {"partition", *config.partition},
                           {"state", config.state},
                           {"is_recovery_mode_disabled", config.recovery_is_disabled}};
 }
@@ -567,7 +579,7 @@ AdminAPISession::ServiceConfig AdminAPISession::disable_sync(const std::string& 
     auto endpoint = service_config_endpoint(app_id, service_id);
     if (sync_config.state != "") {
         sync_config.state = "";
-        endpoint.patch_json({{"sync", convert_config(sync_config)}});
+        endpoint.patch_json({{sync_config.sync_service_name(), convert_config(sync_config)}});
     }
     return sync_config;
 }
@@ -578,7 +590,7 @@ AdminAPISession::ServiceConfig AdminAPISession::pause_sync(const std::string& ap
     auto endpoint = service_config_endpoint(app_id, service_id);
     if (sync_config.state != "disabled") {
         sync_config.state = "disabled";
-        endpoint.patch_json({{"sync", convert_config(sync_config)}});
+        endpoint.patch_json({{sync_config.sync_service_name(), convert_config(sync_config)}});
     }
     return sync_config;
 }
@@ -588,7 +600,7 @@ AdminAPISession::ServiceConfig AdminAPISession::enable_sync(const std::string& a
 {
     auto endpoint = service_config_endpoint(app_id, service_id);
     sync_config.state = "enabled";
-    endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    endpoint.patch_json({{sync_config.sync_service_name(), convert_config(sync_config)}});
     return sync_config;
 }
 
@@ -598,7 +610,7 @@ AdminAPISession::ServiceConfig AdminAPISession::set_disable_recovery_to(const st
 {
     auto endpoint = service_config_endpoint(app_id, service_id);
     sync_config.recovery_is_disabled = disable;
-    endpoint.patch_json({{"sync", convert_config(sync_config)}});
+    endpoint.patch_json({{sync_config.sync_service_name(), convert_config(sync_config)}});
     return sync_config;
 }
 
@@ -609,11 +621,26 @@ AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& ap
     auto response = endpoint.get_json();
     AdminAPISession::ServiceConfig config;
     try {
-        auto sync = response["sync"];
-        config.state = sync["state"];
-        config.database_name = sync["database_name"];
-        config.partition = sync["partition"];
-        config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
+        if (response.contains("flexible_sync")) {
+            auto sync = response["flexible_sync"];
+            config.mode = AdminAPISession::ServiceConfig::SyncMode::Flexible;
+            config.state = sync["state"];
+            config.database_name = sync["database_name"];
+            config.permissions = sync["permissions"];
+            config.queryable_field_names = sync["queryable_fields_names"];
+            config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
+        }
+        else if (response.contains("sync")) {
+            auto sync = response["sync"];
+            config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
+            config.state = sync["state"];
+            config.database_name = sync["database_name"];
+            config.partition = sync["partition"];
+            config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
+        }
+        else {
+            config.mode = AdminAPISession::ServiceConfig::SyncMode::Disabled;
+        }
     }
     catch (const std::exception&) {
         // ignored - the config for a disabled sync service will be empty
@@ -625,7 +652,7 @@ bool AdminAPISession::is_sync_enabled(const std::string& app_id) const
 {
     auto sync_service = get_sync_service(app_id);
     auto config = get_config(app_id, sync_service);
-    return config.state == "enabled";
+    return config.mode != AdminAPISession::ServiceConfig::SyncMode::Disabled;
 }
 
 AdminAPIEndpoint AdminAPISession::apps() const
@@ -875,7 +902,7 @@ AppSession create_app(const AppCreateConfig& config)
         std::copy(queryable_fields_src.begin(), queryable_fields_src.end(), std::back_inserter(queryable_fields));
         auto asymmetric_tables = nlohmann::json::array();
         for (const auto& obj_schema : config.schema) {
-            if (obj_schema.is_asymmetric) {
+            if (obj_schema.table_type == ObjectSchema::ObjectType::TopLevelAsymmetric) {
                 asymmetric_tables.emplace_back(obj_schema.name);
             }
         }
@@ -970,6 +997,7 @@ AppSession create_app(const AppCreateConfig& config)
     // For PBS, enable sync after schema is created.
     if (!config.flx_sync_config) {
         AdminAPISession::ServiceConfig service_config;
+        service_config.mode = AdminAPISession::ServiceConfig::SyncMode::Partitioned;
         service_config.database_name = sync_config["database_name"];
         service_config.partition = sync_config["partition"];
         session.enable_sync(app_id, mongo_service_id, service_config);
@@ -1034,7 +1062,7 @@ TEST_CASE("app: baas admin api", "[sync][app]") {
                        {{"_id", PropertyType::String, true},
                         {"location", PropertyType::Object | PropertyType::Nullable, "location"}}},
                       {"location",
-                       ObjectSchema::IsEmbedded{true},
+                       ObjectSchema::ObjectType::Embedded,
                        {{"coordinates", PropertyType::Double | PropertyType::Array}}}};
 
         auto test_app_config = minimal_app_config(base_url, "test", schema);
@@ -1046,7 +1074,9 @@ TEST_CASE("app: baas admin api", "[sync][app]") {
             {"a",
              {{"_id", PropertyType::String, true},
               {"b_link", PropertyType::Object | PropertyType::Array | PropertyType::Nullable, "b"}}},
-            {"b", ObjectSchema::IsEmbedded{true}, {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
+            {"b",
+             ObjectSchema::ObjectType::Embedded,
+             {{"c_link", PropertyType::Object | PropertyType::Nullable, "c"}}},
             {"c", {{"_id", PropertyType::String, true}, {"d_str", PropertyType::String}}},
         };
         auto test_app_config = minimal_app_config(base_url, "test", schema);
