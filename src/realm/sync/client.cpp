@@ -1045,7 +1045,7 @@ void SessionWrapper::nonsync_transact_notify(version_type new_version)
         sess.recognize_sync_version(new_version); // Throws
         self->report_progress();                  // Throws
     };
-    m_client.m_socket_factory->post(std::move(handler)); //Throws
+    m_client.m_socket_factory->post(std::move(handler)); // Throws
 }
 
 
