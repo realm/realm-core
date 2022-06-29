@@ -236,6 +236,14 @@ Mixed ResultsSection::key()
     return m_key;
 }
 
+size_t ResultsSection::index()
+{
+    m_parent->calculate_sections_if_required();
+    REALM_ASSERT(is_valid());
+    auto& section = m_parent->m_sections[m_key];
+    return section.index;
+}
+
 size_t ResultsSection::size()
 {
     m_parent->calculate_sections_if_required();

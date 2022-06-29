@@ -38,11 +38,13 @@ struct Section {
 using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedResultsChangeSet, std::exception_ptr)>;
 
 /**
- * An instance of ResultsSection gives access to elements in the underlying collection that belong to a given section.
+ * An instance of ResultsSection gives access to elements in the underlying collection that belong to a given section
+ * key.
  *
  * A ResultsSection is only valid as long as it's `SectionedResults` parent stays alive.
  *
- * You can register a notification callback for changes to elements in a specific `ResultsSection`.
+ * You can register a notification callback for changes which will only deliver if the change indices match the
+ * section key bound in this `ResultsSection`.
  */
 class ResultsSection {
 public:
@@ -58,13 +60,19 @@ public:
     /// The key identifying this section.
     Mixed key();
 
+    /// The index of this section in the parent `SectionedResults`.
+    size_t index();
+
     /// The total count of elements in this section.
     size_t size();
 
     /**
      * Create an async query from this ResultsSection
      * The query will be run on a background thread and delivered to the callback,
-     * and then rerun after each commit (if needed) and redelivered if it changed
+     * and then rerun after each commit (if needed) and redelivered if it changed.
+     *
+     * NOTE: Notifications will only be delivered if the change indices match the current or
+     * previous location of the section key bound to this `ResultsSection`.
      *
      * @param callback The function to execute when a insertions, modification or deletion in this `ResultsSection`
      * was detected.
@@ -91,12 +99,27 @@ private:
     Mixed m_key;
 };
 
+/**
+ * An instance of `SectionedResults` allows access to elements from underlying `Results` collection
+ * where elements are arranged into sections defined by a key either from a user defined sectioning algorithm
+ * or a predefined built-in sectioning algorithm. Elements are then accessed through a `ResultsSection` which can be
+ * retreived through the subscript operator on `SectionedResults`.
+ */
 class SectionedResults {
 public:
     SectionedResults() = default;
-
     using SectionKeyFunc = util::UniqueFunction<Mixed(Mixed value, SharedRealm realm)>;
 
+    /**
+     * Returns a `ResultsSection` which will be bound to a section key present at the given index in
+     * `SectionedResults`.
+     *
+     * NOTE: A `ResultsSection` is lazily retreived, meaning that the index it was retreived from
+     * is not guaranteed to be the index of this `ResultsSection` at the time of access.
+     * For example if this `ResultsSection` is at index 1 and the  `ResultsSection`
+     * below this one is deleted, this `ResultsSection` will now be at index 0
+     * but will continue to be a container for elements only refering to the section key it was originally bound to.
+     */
     ResultsSection operator[](size_t idx);
     /// The total amount of Sections.
     size_t size();
@@ -143,7 +166,6 @@ private:
     Results m_results;
     SectionKeyFunc m_callback;
     std::unordered_map<Mixed, Section> m_sections;
-
     // Stores the Key, Section Index of the previous section
     // so we can efficiently calculate the collection change set.
     std::unordered_map<Mixed, size_t> m_previous_key_to_index_lookup;
@@ -151,7 +173,6 @@ private:
     std::unordered_map<size_t, Mixed> m_prev_section_index_to_key;
     // Returns the key of the current section from its index.
     std::vector<Mixed> m_ordered_section_keys;
-
     // By passing the index of the object from the underlying `Results`,
     // this will give a pair with the section index of the object, and the position of the object in that section.
     // This is used for parsing the indices in CollectionChangeSet to section indices.
