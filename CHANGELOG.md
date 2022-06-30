@@ -42,6 +42,7 @@
 
 ### Internals
 * Delete everything related to the metered allocations feature used for server monitoring.
+* Fixes potential issue where an exception could be hidden by subsequent assertion ([#5615](https://github.com/realm/realm-core/pull/5615)).
 * Support Nightly builds in Jenkins. ([#5626](https://github.com/realm/realm-core/issues/5626))
 
 ----------------------------------------------
