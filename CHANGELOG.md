@@ -8,7 +8,6 @@
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
 * Fix a UBSan failure when mapping encrypted pages.
 * Improved performance of sync clients during integration of changesets with many small strings (totalling > 1024 bytes per changeset) on iOS 14, and devices which have restrictive or fragmented memory. ([#5614](https://github.com/realm/realm-core/issues/5614))
-* Fixed an issue where having realm-cocoa as SPM sub-target dependency leads to missing symbols error during iOS archiving. ([#7645](https://github.com/realm/realm-swift/issues/7645))
  
 ### Breaking changes
 * In Realm JS, the client reset callback can result in the fatal error `Realm accessed on incorrect thread`. Using a thread safe reference instead of Realm instance fixes the issue. (Issue [realm/realm-js#4410](https://github.com/realm/realm-js/issues/4410))
