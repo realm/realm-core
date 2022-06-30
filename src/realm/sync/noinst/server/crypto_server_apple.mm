@@ -29,35 +29,33 @@ PKey &PKey::operator=(PKey &&) = default;
 PKey::~PKey() = default;
 
 static CFPtr<SecKeyRef> load_public_from_data(CFDataRef pem_data) {
-  CFArrayRef itemsCF = nullptr;
-  auto scope_exit = util::make_scope_exit([&]() noexcept {
-    if (itemsCF)
-      CFRelease(itemsCF);
-  });
+#if REALM_MOBILE
+    static_cast<void>(pem_data);
+    REALM_UNREACHABLE();
+#else
+    CFArrayRef itemsCF = nullptr;
+    auto scope_exit = util::make_scope_exit([&]() noexcept {
+        if (itemsCF)
+            CFRelease(itemsCF);
+    });
 
-  SecExternalFormat format = kSecFormatPEMSequence;
-  SecExternalItemType itemType = kSecItemTypePublicKey;
-  OSStatus status = SecItemImport(pem_data, CFSTR(".pem"), &format, &itemType,
-                                  0, nullptr, nullptr, &itemsCF);
-  if (status != errSecSuccess) {
-    NSError *error = [NSError errorWithDomain:NSOSStatusErrorDomain
-                                         code:status
-                                     userInfo:nil];
-    throw CryptoError(std::string("Could not import PEM data: ") +
-                      error.localizedDescription.UTF8String);
-  }
-  if (CFArrayGetCount(itemsCF) != 1) {
-    throw CryptoError(
-        std::string("Loading PEM file produced unexpected number of keys."));
-  }
-  SecKeyRef key = static_cast<SecKeyRef>(
-      const_cast<void *>(CFArrayGetValueAtIndex(itemsCF, 0)));
-  if (CFGetTypeID(key) != SecKeyGetTypeID()) {
-    throw CryptoError(
-        std::string("Loading PEM file produced a key of unexpected type."));
-  }
+    SecExternalFormat format = kSecFormatPEMSequence;
+    SecExternalItemType itemType = kSecItemTypePublicKey;
+    OSStatus status = SecItemImport(pem_data, CFSTR(".pem"), &format, &itemType, 0, nullptr, nullptr, &itemsCF);
+    if (status != errSecSuccess) {
+        NSError* error = [NSError errorWithDomain:NSOSStatusErrorDomain code:status userInfo:nil];
+        throw CryptoError(std::string("Could not import PEM data: ") + error.localizedDescription.UTF8String);
+    }
+    if (CFArrayGetCount(itemsCF) != 1) {
+        throw CryptoError(std::string("Loading PEM file produced unexpected number of keys."));
+    }
+    SecKeyRef key = static_cast<SecKeyRef>(const_cast<void*>(CFArrayGetValueAtIndex(itemsCF, 0)));
+    if (CFGetTypeID(key) != SecKeyGetTypeID()) {
+        throw CryptoError(std::string("Loading PEM file produced a key of unexpected type."));
+    }
 
-  return util::retainCF(key);
+    return util::retainCF(key);
+#endif
 }
 
 PKey PKey::load_public(const std::string &pemfile) {

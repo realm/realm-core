@@ -448,38 +448,29 @@ bool run_tests(util::Logger* logger)
     }
 
     // Set up reporter
-    std::ofstream xml_file;
-    bool xml;
-#if REALM_MOBILE
-    xml = true;
-#else
-    const char* xml_str = getenv("UNITTEST_XML");
-    xml = (xml_str && strlen(xml_str) != 0);
-#endif
+    util::File junit_file;
+    util::File::Streambuf junit_streambuf(&junit_file);
+    std::ostream junit_out(&junit_streambuf);
     std::vector<std::unique_ptr<Reporter>> reporters;
     {
         const char* str = getenv("UNITTEST_PROGRESS");
         bool report_progress = str && strlen(str) != 0;
-        std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
-        reporters.push_back(std::move(reporter));
+        reporters.push_back(std::make_unique<CustomReporter>(report_progress));
     }
-    if (xml) {
-        std::string path = get_test_path_prefix();
-        std::string xml_path = path + "unit-test-report.xml";
-        xml_file.open(xml_path.c_str());
-        std::unique_ptr<Reporter> reporter_1 = create_junit_reporter(xml_file);
-        std::unique_ptr<Reporter> reporter_2 = create_twofold_reporter(*reporters.back(), *reporter_1);
-        reporters.push_back(std::move(reporter_1));
-        reporters.push_back(std::move(reporter_2));
+    if (const char* str = getenv("UNITTEST_XML"); str && strlen(str) != 0) {
+        std::cout << "Configuring jUnit reporter to store test results in " << str << std::endl;
+        junit_file.open(str, util::File::mode_Write);
+        const char* test_suite_name = getenv("UNITTEST_SUITE_NAME");
+        if (!test_suite_name || !strlen(test_suite_name))
+            test_suite_name = "realm-core-tests";
+        reporters.push_back(create_junit_reporter(junit_out, test_suite_name));
     }
     else if (const char* str = getenv("UNITTEST_EVERGREEN_TEST_RESULTS"); str && strlen(str) != 0) {
         std::cout << "Configuring evergreen reporter to store test results in " << str << std::endl;
-        auto evergreen_reporter = create_evergreen_reporter(str);
-        auto combined_reporter = create_twofold_reporter(*reporters.back(), *evergreen_reporter);
-        reporters.push_back(std::move(evergreen_reporter));
-        reporters.push_back(std::move(combined_reporter));
+        reporters.push_back(create_evergreen_reporter(str));
     }
-    config.reporter = reporters.back().get();
+    auto reporter = create_combined_reporter(reporters);
+    config.reporter = reporter.get();
 
     // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
@@ -538,6 +529,15 @@ bool run_tests(util::Logger* logger)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
     std::cout << "\n";
+
+    // The iOS Simulator has a separate set of kernel file caches from the parent
+    // OS, and if the simulator is deleted immediately after running the tests
+    // (as is done on CI), the writes never actually make it to disk without
+    // an explicit F_FULLFSYNC.
+    if (junit_file.is_attached()) {
+        junit_out.flush();
+        junit_file.sync();
+    }
 
     return success;
 }

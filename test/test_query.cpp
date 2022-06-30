@@ -1443,10 +1443,7 @@ TEST(Query_StrIndexCrash)
             if (v == 8) {
                 eights++;
             }
-            char dst[100];
-            memset(dst, 0, sizeof(dst));
-            sprintf(dst, "%d", v);
-            table->create_object().set(col, dst);
+            table->create_object().set(col, util::to_string(v));
         }
 
         table->add_search_index(col);
