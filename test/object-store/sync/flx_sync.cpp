@@ -1303,6 +1303,9 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     CHECK(!wait_for_upload(*realm));
 
     CHECK(!realm->sync_session()->get_flx_subscription_store());
+
+    CHECK_THROWS_AS(realm->get_active_subscription_set(), std::runtime_error);
+    CHECK_THROWS_AS(realm->get_latest_subscription_set(), std::runtime_error);
 }
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
