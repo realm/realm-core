@@ -143,10 +143,6 @@ public:
     {
     }
 
-    ~XmlReporter() noexcept override
-    {
-    }
-
     void begin(const TestContext& context) override
     {
         auto key = key_type(context.test_index, context.recurrence_index);
@@ -231,24 +227,21 @@ protected:
 };
 
 
-class JUnitReporter : public XmlReporter
-{
+class JUnitReporter : public XmlReporter {
 public:
-    JUnitReporter(std::ostream& out)
-    : XmlReporter(out)
+    JUnitReporter(std::ostream& out, std::string_view test_suite_name)
+        : XmlReporter(out)
+        , m_test_suite_name(test_suite_name)
     {
     }
 
-    ~JUnitReporter() noexcept override
-    {
-    }
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 
         m_out << "<testsuites>\n"
               << "  <testsuite "
-              << "name=\"realm-core-tests\" "
+              << "name=\"" << m_test_suite_name << "\" "
               << "tests=\"" << results_summary.num_executed_tests << "\" "
               << "disabled=\"" << results_summary.num_excluded_tests << "\" "
               << "failures=\"" << results_summary.num_failed_tests << "\" "
@@ -288,15 +281,18 @@ public:
         }
         m_out << "  </testsuite>\n</testsuites>\n";
     }
+
+private:
+    std::string m_test_suite_name;
 };
 
 
 class ManifoldReporter : public Reporter {
 public:
-    ManifoldReporter(std::initializer_list<Reporter*> subreporters)
+    ManifoldReporter(const std::vector<std::unique_ptr<Reporter>>& subreporters)
     {
-        for (Reporter* r : subreporters)
-            m_subreporters.push_back(r);
+        for (auto& r : subreporters)
+            m_subreporters.push_back(r.get());
     }
 
     void begin(const TestContext& context) override
@@ -378,10 +374,6 @@ public:
         // Include everything if no includes are specified.
         if (m_include.empty())
             m_include.push_back(wildcard_pattern("*"));
-    }
-
-    ~WildcardFilter() noexcept
-    {
     }
 
     bool include(const TestDetails& details) override
@@ -982,10 +974,6 @@ public:
             m_patterns.push_back(wildcard_pattern(*i));
     }
 
-    ~state() noexcept
-    {
-    }
-
     int get_major(const TestDetails& details)
     {
         major_map::const_iterator i = m_major_map.find(&details);
@@ -1097,9 +1085,9 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     }
 }
 
-std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out)
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out, std::string_view test_suite_name)
 {
-    return std::make_unique<JUnitReporter>(out);
+    return std::make_unique<JUnitReporter>(out, test_suite_name);
 }
 
 std::unique_ptr<Reporter> create_xml_reporter(std::ostream& out)
@@ -1112,12 +1100,10 @@ std::unique_ptr<Reporter> create_evergreen_reporter(const std::string& path)
     return std::make_unique<EvergreenReporter>(path);
 }
 
-std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2)
+std::unique_ptr<Reporter> create_combined_reporter(const std::vector<std::unique_ptr<Reporter>>& subreporters)
 {
-    using list = std::initializer_list<Reporter*>;
-    return std::make_unique<ManifoldReporter>(list{&subreporter_1, &subreporter_2});
+    return std::make_unique<ManifoldReporter>(subreporters);
 }
-
 
 std::unique_ptr<Filter> create_wildcard_filter(const std::string& filter)
 {
