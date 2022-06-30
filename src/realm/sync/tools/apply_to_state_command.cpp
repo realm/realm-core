@@ -109,19 +109,18 @@ DownloadMessage DownloadMessage::parse(HeaderLineParser& msg, Logger& logger, bo
                  ret.progress.upload.last_integrated_server_version, ret.progress.upload.client_version,
                  ret.latest_server_version.version);
 
-    std::unique_ptr<char[]> uncompressed_body_buffer;
     HeaderLineParser body;
     if (is_body_compressed) {
-        uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
+        ret.uncompressed_body_buffer.set_size(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
-        std::error_code ec =
-            util::compression::decompress(compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
+        std::error_code ec = util::compression::decompress(
+            compressed_body, {ret.uncompressed_body_buffer.data(), uncompressed_body_size});
 
         if (ec) {
             throw ProtocolCodecException("error decompressing download message");
         }
 
-        body = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
+        body = HeaderLineParser(std::string_view(ret.uncompressed_body_buffer.data(), uncompressed_body_size));
     }
     else {
         body = HeaderLineParser(msg.read_sized_data<std::string_view>(uncompressed_body_size));
@@ -162,21 +161,20 @@ UploadMessage UploadMessage::parse(HeaderLineParser& msg, Logger& logger)
     ret.upload_progress.last_integrated_server_version = msg.read_next<sync::version_type>();
     ret.locked_server_version = msg.read_next<sync::version_type>('\n');
 
-    std::unique_ptr<char[]> uncompressed_body_buffer;
     HeaderLineParser body;
     // if is_body_compressed == true, we must decompress the received body.
     if (is_body_compressed) {
-        uncompressed_body_buffer = std::make_unique<char[]>(uncompressed_body_size);
+        ret.uncompressed_body_buffer.set_size(uncompressed_body_size);
         auto compressed_body = msg.read_sized_data<BinaryData>(compressed_body_size);
 
-        std::error_code ec =
-            util::compression::decompress(compressed_body, {uncompressed_body_buffer.get(), uncompressed_body_size});
+        std::error_code ec = util::compression::decompress(
+            compressed_body, {ret.uncompressed_body_buffer.data(), uncompressed_body_size});
 
         if (ec) {
             throw ProtocolCodecException("error decompressing upload message");
         }
 
-        body = HeaderLineParser(std::string_view(uncompressed_body_buffer.get(), uncompressed_body_size));
+        body = HeaderLineParser(std::string_view(ret.uncompressed_body_buffer.data(), uncompressed_body_size));
     }
     else {
         body = HeaderLineParser(msg.read_sized_data<std::string_view>(uncompressed_body_size));
