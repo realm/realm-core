@@ -1519,15 +1519,15 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
 
         coordinator->on_change();
         r->begin_transaction();
-        auto o = table->create_object();
-        for (size_t i = 0; i < values.size(); ++i) {
-            lst.add(T(values[i]));
-        }
+        lst.remove_all();
         r->commit_transaction();
         advance_and_notify(*r);
-        REQUIRE(!changes.insertions.empty());
+
+        REQUIRE(changes.insertions.empty());
         REQUIRE(changes.deletions.empty());
         REQUIRE(changes.modifications.empty());
+        REQUIRE(changes.sections_to_insert.empty());
+        REQUIRE(changes.sections_to_delete.count() == exp_keys.size());
     }
 
     SECTION("notifications on section") {
@@ -1540,33 +1540,53 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         auto section2 = sectioned_results[1];
 
         SectionedResultsChangeSet changes1, changes2;
-        auto token1 =
-            section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                changes1 = c;
-            });
-        auto token2 =
-            section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
-                REQUIRE_FALSE(err);
-                changes2 = c;
-            });
+        auto token1 = section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            changes1 = c;
+        });
+        auto token2 = section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            changes2 = c;
+        });
 
         coordinator->on_change();
         r->begin_transaction();
-        auto o = table->create_object();
+        lst.remove_all();
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(changes1.insertions.empty());
+        REQUIRE(changes1.deletions.empty());
+        REQUIRE(changes1.modifications.empty());
+        REQUIRE(changes1.sections_to_insert.empty());
+        REQUIRE(changes1.sections_to_delete.count() == 1);
+
+        REQUIRE(changes2.insertions.empty());
+        REQUIRE(changes2.deletions.empty());
+        REQUIRE(changes2.modifications.empty());
+        REQUIRE(changes2.sections_to_insert.empty());
+        REQUIRE(changes2.sections_to_delete.count() == 1);
+
+        coordinator->on_change();
+        r->begin_transaction();
         for (size_t i = 0; i < values.size(); ++i) {
             lst.add(T(values[i]));
         }
         r->commit_transaction();
         advance_and_notify(*r);
+
         REQUIRE(changes1.insertions.size() == 1);
         REQUIRE(!changes1.insertions[0].empty());
         REQUIRE(changes1.deletions.empty());
         REQUIRE(changes1.modifications.empty());
+        REQUIRE_INDICES(changes1.sections_to_insert, 0);
+        REQUIRE(changes1.sections_to_delete.empty());
 
         REQUIRE(changes2.insertions.size() == 1);
         REQUIRE(!changes2.insertions[1].empty());
         REQUIRE(changes2.deletions.empty());
         REQUIRE(changes2.modifications.empty());
+        REQUIRE_INDICES(changes2.sections_to_insert, 1);
+        REQUIRE(changes2.sections_to_delete.empty());
     }
 }
