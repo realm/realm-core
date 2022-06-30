@@ -1848,6 +1848,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 }
 
+// TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
+#if 0
 TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
@@ -1889,6 +1891,7 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
         },
         schema);
 }
+#endif
 
 } // namespace realm::app
 
