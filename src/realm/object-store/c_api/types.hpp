@@ -726,7 +726,11 @@ struct realm_async_open_task : realm::c_api::WrapC, std::shared_ptr<realm::Async
     }
 };
 
-struct realm_mongodb_collection : realm::c_api::WrapC, std::shared_ptr<realm::app::MongoCollection> {
+struct realm_mongodb_collection : realm::c_api::WrapC, realm::app::MongoCollection {
+    realm_mongodb_collection(realm::app::MongoCollection collection)
+        : realm::app::MongoCollection(std::move(collection))
+    {
+    }
 };
 
 #endif // REALM_ENABLE_SYNC
