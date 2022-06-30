@@ -48,13 +48,11 @@ static SectionedResults::SectionKeyFunc builtin_comparison(Results& results, Res
 struct SectionedResultsNotificationHandler {
 public:
     SectionedResultsNotificationHandler(SectionedResults& sectioned_results, SectionedResultsNotificatonCallback cb,
-                                        util::Optional<Mixed> section_filter = util::none,
-                                        util::Optional<std::shared_ptr<std::string>> section_key_buffer = util::none)
+                                        util::Optional<Mixed> section_filter = util::none)
         : m_cb(std::move(cb))
         , m_sectioned_results(sectioned_results)
         , m_prev_row_to_index_path(m_sectioned_results.m_row_to_index_path)
         , m_section_filter(section_filter)
-        , m_section_key_buffer(section_key_buffer)
     {
     }
 
@@ -216,9 +214,41 @@ private:
     // When set change notifications will be filtered to only deliver
     // change indices refering to the supplied section key.
     util::Optional<Mixed> m_section_filter;
-    // Should be set when the key is StringData or BinaryData.
-    util::Optional<std::shared_ptr<std::string>> m_section_key_buffer;
 };
+
+template <typename StringType>
+void create_buffered_key(Mixed& key, util::Optional<std::string>& buffer,
+                         StringType value)
+{
+    if (value.size() == 0) {
+        key = StringType("", 0);
+    }
+    else {
+        buffer = std::string(value.data(), value.size());
+        key = Mixed(buffer);
+    }
+}
+
+ResultsSection::ResultsSection(SectionedResults* parent, Mixed key) : m_parent(parent)
+{
+    // Give the ResultsSection its own copy of the string data
+    // to counter the event that the m_previous_str_buffers, m_current_str_buffers
+    // no longer hold a reference to the data.
+    if (key.is_type(type_String, type_Binary)) {
+        key.is_type(type_String) ? create_buffered_key(m_key, m_key_buffer, key.get_string()) :
+        create_buffered_key(m_key, m_key_buffer, key.get_binary());
+    } else {
+        m_key = key;
+    }
+}
+
+bool ResultsSection::is_valid() const
+{
+    m_parent->calculate_sections_if_required();
+    auto it = m_parent->m_sections.find(m_key);
+    REALM_ASSERT(it != m_parent->m_sections.end());
+    return m_parent->is_valid();
+}
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
@@ -231,24 +261,21 @@ Mixed ResultsSection::operator[](size_t idx) const
 
 Mixed ResultsSection::key()
 {
-    m_parent->calculate_sections_if_required();
     REALM_ASSERT(is_valid());
     return m_key;
 }
 
 size_t ResultsSection::index()
 {
-    m_parent->calculate_sections_if_required();
     REALM_ASSERT(is_valid());
-    auto& section = m_parent->m_sections[m_key];
-    return section.index;
+    return m_parent->m_sections[m_key].index;
 }
 
 size_t ResultsSection::size()
 {
     m_parent->calculate_sections_if_required();
     REALM_ASSERT(is_valid());
-    auto& section = m_parent->m_sections[m_key];
+    auto& section = m_parent->m_sections[m_key]; // TODO: Two lookups are being performed
     return section.indices.size();
 }
 
@@ -256,13 +283,6 @@ NotificationToken ResultsSection::add_notification_callback(SectionedResultsNoti
                                                             KeyPathArray key_path_array) &
 {
     return m_parent->add_notification_callback_for_section(m_key, std::move(callback), key_path_array);
-}
-
-bool ResultsSection::is_valid() const
-{
-    auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(it != m_parent->m_sections.end());
-    return m_parent->is_valid();
 }
 
 SectionedResults::SectionedResults(Results results, SectionKeyFunc section_key_func)
@@ -296,16 +316,14 @@ void SectionedResults::calculate_sections_if_required()
 }
 
 template <typename StringType>
-void create_buffered_key(Mixed& key, std::unordered_map<Mixed, std::shared_ptr<std::string>>& buffer,
+void create_buffered_key(Mixed& key, std::list<std::string>& buffer,
                          StringType value)
 {
     if (value.size() == 0) {
         key = StringType("", 0);
     }
     else {
-        auto ptr = std::make_shared<std::string>(value.data(), value.size());
-        key = StringType(ptr->data(), ptr->size());
-        buffer[key] = ptr;
+        key = buffer.emplace_back(value.data(), value.size());
     }
 }
 
@@ -318,10 +336,10 @@ void SectionedResults::calculate_sections()
     m_previous_str_buffers.swap(m_current_str_buffers);
     m_previous_key_to_index_lookup.clear();
     m_prev_section_index_to_key.clear();
-    m_ordered_section_keys.clear();
+    m_current_section_index_to_key_lookup.clear();
     for (auto& [key, section] : m_sections) {
         m_previous_key_to_index_lookup[key] = section.index;
-        m_prev_section_index_to_key[section.index] = key;
+        m_prev_section_index_to_key[section.index] = section.key;
     }
 
     size_t size = m_results.size();
@@ -352,7 +370,7 @@ void SectionedResults::calculate_sections()
             section.indices.push_back(i);
             m_sections[key] = section;
             m_row_to_index_path[i] = {idx, section.indices.size() - 1};
-            m_ordered_section_keys.push_back(key);
+            m_current_section_index_to_key_lookup[idx] = key;
         }
         else {
             auto& section = it->second;
@@ -364,16 +382,19 @@ void SectionedResults::calculate_sections()
 
 size_t SectionedResults::size()
 {
+    REALM_ASSERT(is_valid());
     calculate_sections_if_required();
     return m_sections.size();
 }
 
 ResultsSection SectionedResults::operator[](size_t idx)
 {
-    REALM_ASSERT(is_valid());
-    size_t s = size();
-    REALM_ASSERT(idx < s && s == m_ordered_section_keys.size());
-    return ResultsSection(this, m_ordered_section_keys[idx]);
+    auto s = size();
+    REALM_ASSERT(idx < s);
+    auto it = m_current_section_index_to_key_lookup.find(idx);
+    REALM_ASSERT(it != m_current_section_index_to_key_lookup.end());
+    auto& section = m_sections[it->second];
+    return ResultsSection(this, section.key);
 }
 
 NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificatonCallback callback,
@@ -386,10 +407,8 @@ NotificationToken SectionedResults::add_notification_callback(SectionedResultsNo
 NotificationToken SectionedResults::add_notification_callback_for_section(
     Mixed section_key, SectionedResultsNotificatonCallback callback, KeyPathArray key_path_array)
 {
-    auto it = m_current_str_buffers.find(section_key);
-    REALM_ASSERT(it != m_current_str_buffers.end());
     return m_results.add_notification_callback(
-        SectionedResultsNotificationHandler(*this, std::move(callback), section_key, it->second),
+        SectionedResultsNotificationHandler(*this, std::move(callback), section_key),
         std::move(key_path_array));
 }
 
@@ -401,8 +420,8 @@ SectionedResults SectionedResults::snapshot()
     SectionedResults sr;
     sr.m_results = m_results.snapshot();
     sr.m_sections = m_sections;
-    sr.m_ordered_section_keys = m_ordered_section_keys;
     sr.has_performed_initial_evalutation = true;
+    sr.m_current_section_index_to_key_lookup = m_current_section_index_to_key_lookup;
     return sr;
 }
 

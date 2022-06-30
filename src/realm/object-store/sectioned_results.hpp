@@ -21,6 +21,8 @@
 
 #include <realm/util/functional.hpp>
 
+#include <list>
+
 namespace realm {
 class Mixed;
 class Results;
@@ -51,6 +53,7 @@ public:
     ResultsSection()
         : m_parent(nullptr)
         , m_key(Mixed())
+        , m_key_buffer(util::none)
     {
     }
 
@@ -89,14 +92,11 @@ public:
 
 private:
     friend class SectionedResults;
-    ResultsSection(SectionedResults* parent, Mixed key)
-        : m_parent(parent)
-        , m_key(key)
-    {
-    }
+    ResultsSection(SectionedResults* parent, Mixed key);
 
     SectionedResults* m_parent;
     Mixed m_key;
+    util::Optional<std::string> m_key_buffer;
 };
 
 /**
@@ -166,13 +166,12 @@ private:
     Results m_results;
     SectionKeyFunc m_callback;
     std::unordered_map<Mixed, Section> m_sections;
+    std::unordered_map<size_t, Mixed> m_current_section_index_to_key_lookup;
     // Stores the Key, Section Index of the previous section
     // so we can efficiently calculate the collection change set.
     std::unordered_map<Mixed, size_t> m_previous_key_to_index_lookup;
     // Returns the key of the previous section from its index.
     std::unordered_map<size_t, Mixed> m_prev_section_index_to_key;
-    // Returns the key of the current section from its index.
-    std::vector<Mixed> m_ordered_section_keys;
     // By passing the index of the object from the underlying `Results`,
     // this will give a pair with the section index of the object, and the position of the object in that section.
     // This is used for parsing the indices in CollectionChangeSet to section indices.
@@ -183,10 +182,7 @@ private:
     // We can not rely on that because it would not produce stable keys.
     // So we perform a deep copy to produce stable key values that will not change if the realm is modified.
     // The buffer will purge keys that are no longer used in the case that the `calculate_sections` method runs.
-    // We need to hold the string value in a shared_ptr so that if multiple notification handlers are attached
-    // to this `SectionedResults` the copy of the key will not be discarded during `calculate_sections` as each
-    // notification handler will hold a reference to the shared_ptr.
-    std::unordered_map<Mixed, std::shared_ptr<std::string>> m_previous_str_buffers, m_current_str_buffers;
+    std::list<std::string> m_previous_str_buffers, m_current_str_buffers;
 };
 
 struct SectionedResultsChangeSet {

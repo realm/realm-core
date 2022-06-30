@@ -1356,7 +1356,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         algo_run_count = 0;
         section1_notification_calls = 0;
         section2_notification_calls = 0;
-        auto o1 = table->create_object().set(name_col, "book");
+        table->create_object().set(name_col, "book");
         r->commit_transaction();
         advance_and_notify(*r);
         REQUIRE(algo_run_count == 3);
@@ -1501,5 +1501,72 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
             }
         }
         REQUIRE(algo_run_count == (int)exp_values_sorted.size());
+    }
+
+    SECTION("notifications") {
+        auto sorted = results.sort({{"self", true}});
+        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
+            return TestType::comparison_value(value);
+        });
+
+        SectionedResultsChangeSet changes;
+        auto token =
+            sectioned_results.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes = c;
+            });
+
+        coordinator->on_change();
+        r->begin_transaction();
+        auto o = table->create_object();
+        for (size_t i = 0; i < values.size(); ++i) {
+            lst.add(T(values[i]));
+        }
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(!changes.insertions.empty());
+        REQUIRE(changes.deletions.empty());
+        REQUIRE(changes.modifications.empty());
+    }
+
+    SECTION("notifications on section") {
+        auto sorted = results.sort({{"self", true}});
+        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
+            return TestType::comparison_value(value);
+        });
+        auto section1 = sectioned_results[0];
+        auto section2 = sectioned_results[1];
+
+        SectionedResultsChangeSet changes1, changes2;
+        auto token1 =
+            section1.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes1 = c;
+            });
+        auto token2 =
+            section2.add_notification_callback([&](SectionedResultsChangeSet c, std::exception_ptr err) {
+                REQUIRE_FALSE(err);
+                changes2 = c;
+            });
+
+        coordinator->on_change();
+        r->begin_transaction();
+        auto o = table->create_object();
+        for (size_t i = 0; i < values.size(); ++i) {
+            lst.add(T(values[i]));
+        }
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(changes1.insertions.size() == 1);
+        REQUIRE(!changes1.insertions[0].empty());
+        REQUIRE(changes1.deletions.empty());
+        REQUIRE(changes1.modifications.empty());
+
+        REQUIRE(changes2.insertions.size() == 1);
+        REQUIRE(!changes2.insertions[1].empty());
+        REQUIRE(changes2.deletions.empty());
+        REQUIRE(changes2.modifications.empty());
     }
 }
