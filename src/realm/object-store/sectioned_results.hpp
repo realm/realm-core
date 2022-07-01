@@ -120,9 +120,9 @@ public:
      * below this one is deleted, this `ResultsSection` will now be at index 0
      * but will continue to be a container for elements only refering to the section key it was originally bound to.
      */
-    ResultsSection operator[](size_t idx);
+    ResultsSection operator[](size_t idx) REQUIRES(!m_mutex);
     /// The total amount of Sections.
-    size_t size();
+    size_t size() REQUIRES(!m_mutex);
 
     /**
      * Create an async query from this SectionedResults
@@ -142,26 +142,39 @@ public:
 
     /// Return a new instance of SectionedResults that uses a snapshot of the underlying `Results`.
     /// The section key callback parameter will never be invoked.
-    SectionedResults snapshot();
+    SectionedResults snapshot() REQUIRES(!m_mutex);
 
     /// Return a new instance of SectionedResults that uses a frozen version of the underlying `Results`.
     /// The section key callback parameter will never be invoked.
     /// This SectionedResults can be used across threads.
-    SectionedResults freeze(std::shared_ptr<Realm> const& frozen_realm);
+    SectionedResults freeze(std::shared_ptr<Realm> const& frozen_realm) REQUIRES(!m_mutex);
 
     bool is_valid() const;
-    bool is_frozen() const;
+    bool is_frozen() const REQUIRES(!m_mutex);
 
 private:
     friend class Results;
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.
     SectionedResults(Results results, SectionKeyFunc section_key_func);
     SectionedResults(Results results, Results::SectionedResultsOperator op, util::Optional<StringData> prop_name);
-    uint_fast64_t get_content_version();
+
+    /// Used for creating a snapshot of SectionedResults.
+    SectionedResults(Results&& results, std::unordered_map<Mixed, Section>&& sections,
+                     std::unordered_map<size_t, Mixed>&& current_section_index_to_key_lookup,
+                     std::list<std::string>&& current_str_buffers)
+        : has_performed_initial_evalutation(true)
+        , m_results(std::move(results))
+        , m_sections(std::move(sections))
+        , m_current_section_index_to_key_lookup(std::move(current_section_index_to_key_lookup))
+        , m_current_str_buffers(std::move(current_str_buffers))
+    {
+    }
 
     friend struct SectionedResultsNotificationHandler;
-    void calculate_sections_if_required();
-    void calculate_sections();
+    util::CheckedOptionalMutex m_mutex;
+    SectionedResults copy(Results&&) REQUIRES(!m_mutex);
+    void calculate_sections_if_required() REQUIRES(m_mutex);
+    void calculate_sections() REQUIRES(m_mutex);
     bool has_performed_initial_evalutation = false;
     NotificationToken add_notification_callback_for_section(Mixed section_key,
                                                             SectionedResultsNotificatonCallback callback,
@@ -170,8 +183,9 @@ private:
     friend class realm::ResultsSection;
     Results m_results;
     SectionKeyFunc m_callback;
-    std::unordered_map<Mixed, Section> m_sections;
-    std::unordered_map<size_t, Mixed> m_current_section_index_to_key_lookup;
+    std::unordered_map<Mixed, Section> m_sections GUARDED_BY(m_mutex);
+    // Returns the key of the current section from its index.
+    std::unordered_map<size_t, Mixed> m_current_section_index_to_key_lookup GUARDED_BY(m_mutex);
     // Stores the Key, Section Index of the previous section
     // so we can efficiently calculate the collection change set.
     std::unordered_map<Mixed, size_t> m_previous_key_to_index_lookup;
@@ -187,7 +201,7 @@ private:
     // We can not rely on that because it would not produce stable keys.
     // So we perform a deep copy to produce stable key values that will not change if the realm is modified.
     // The buffer will purge keys that are no longer used in the case that the `calculate_sections` method runs.
-    std::list<std::string> m_previous_str_buffers, m_current_str_buffers;
+    std::list<std::string> m_previous_str_buffers, m_current_str_buffers GUARDED_BY(m_mutex);
 };
 
 struct SectionedResultsChangeSet {

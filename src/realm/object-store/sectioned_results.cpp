@@ -69,6 +69,8 @@ public:
             return ret;
         };
 
+        util::CheckedUniqueLock lock(m_sectioned_results.m_mutex);
+
         m_sectioned_results.calculate_sections_if_required();
 
         auto converted_insertions = convert_indices(c.insertions, m_sectioned_results.m_row_to_index_path);
@@ -187,7 +189,7 @@ public:
         m_cb({}, ptr);
     }
 
-    std::pair<IndexSet, IndexSet> calculate_sections_to_insert_and_delete()
+    std::pair<IndexSet, IndexSet> calculate_sections_to_insert_and_delete() REQUIRES(m_sectioned_results.m_mutex)
     {
         IndexSet sections_to_insert, sections_to_remove;
 
@@ -245,6 +247,7 @@ ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
 
 bool ResultsSection::is_valid() const
 {
+    util::CheckedUniqueLock lock(m_parent->m_mutex);
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     return it != m_parent->m_sections.end() && m_parent->is_valid();
@@ -252,6 +255,7 @@ bool ResultsSection::is_valid() const
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
+    util::CheckedUniqueLock lock(m_parent->m_mutex);
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     REALM_ASSERT(it != m_parent->m_sections.end());
@@ -267,6 +271,7 @@ Mixed ResultsSection::key()
 
 size_t ResultsSection::index()
 {
+    util::CheckedUniqueLock lock(m_parent->m_mutex);
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     REALM_ASSERT(m_parent->is_valid() && it != m_parent->m_sections.end());
@@ -275,6 +280,7 @@ size_t ResultsSection::index()
 
 size_t ResultsSection::size()
 {
+    util::CheckedUniqueLock lock(m_parent->m_mutex);
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     REALM_ASSERT(m_parent->is_valid() && it != m_parent->m_sections.end());
@@ -304,9 +310,8 @@ void SectionedResults::calculate_sections_if_required()
 {
     if (m_results.m_update_policy == Results::UpdatePolicy::Never)
         return;
-    else if (!m_results.has_changed() && has_performed_initial_evalutation)
+    else if ((!m_results.has_changed() || m_results.is_frozen()) && has_performed_initial_evalutation)
         return;
-
     {
         util::CheckedUniqueLock lock(m_results.m_mutex);
         m_results.ensure_up_to_date();
@@ -382,6 +387,7 @@ void SectionedResults::calculate_sections()
 
 size_t SectionedResults::size()
 {
+    util::CheckedUniqueLock lock(m_mutex);
     REALM_ASSERT(is_valid());
     calculate_sections_if_required();
     return m_sections.size();
@@ -391,6 +397,7 @@ ResultsSection SectionedResults::operator[](size_t idx)
 {
     auto s = size();
     REALM_ASSERT(idx < s);
+    util::CheckedUniqueLock lock(m_mutex);
     auto it = m_current_section_index_to_key_lookup.find(idx);
     REALM_ASSERT(it != m_current_section_index_to_key_lookup.end());
     auto& section = m_sections[it->second];
@@ -411,32 +418,44 @@ NotificationToken SectionedResults::add_notification_callback_for_section(
         SectionedResultsNotificationHandler(*this, std::move(callback), section_key), std::move(key_path_array));
 }
 
+SectionedResults SectionedResults::copy(Results&& results)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    calculate_sections_if_required();
+    // m_callback will never be run when using frozen results so we do
+    // not need to set it.
+    std::list<std::string> str_buffers;
+    std::unordered_map<Mixed, Section> sections;
+    std::unordered_map<size_t, Mixed> current_section_index_to_key_lookup;
+
+    for (auto& [key, section] : m_sections) {
+        Mixed new_key;
+        if (key.is_type(type_String, type_Binary)) {
+            key.is_type(type_String) ? create_buffered_key(new_key, str_buffers, key.get_string())
+                                     : create_buffered_key(new_key, str_buffers, key.get_binary());
+        }
+        else {
+            new_key = key;
+        }
+        Section new_section;
+        new_section.index = section.index;
+        new_section.key = new_key;
+        new_section.indices = section.indices;
+        sections[Mixed(new_key)] = new_section;
+        current_section_index_to_key_lookup[section.index] = new_key;
+    }
+    return SectionedResults(std::move(results), std::move(sections), std::move(current_section_index_to_key_lookup),
+                            std::move(str_buffers));
+}
+
 SectionedResults SectionedResults::snapshot()
 {
-    calculate_sections_if_required();
-    // m_callback will never be run when using a snapshot so we do
-    // not need to set it.
-    SectionedResults sr;
-    sr.m_results = m_results.snapshot();
-    sr.m_sections = m_sections;
-    sr.has_performed_initial_evalutation = true;
-    sr.m_current_section_index_to_key_lookup = m_current_section_index_to_key_lookup;
-    sr.m_current_str_buffers = m_current_str_buffers;
-    return sr;
+    return copy(m_results.snapshot());
 }
 
 SectionedResults SectionedResults::freeze(std::shared_ptr<Realm> const& frozen_realm)
 {
-    calculate_sections_if_required();
-    // m_callback will never be run when using frozen results so we do
-    // not need to set it.
-    SectionedResults sr;
-    sr.m_results = m_results.freeze(frozen_realm);
-    sr.m_sections = m_sections;
-    sr.has_performed_initial_evalutation = true;
-    sr.m_current_section_index_to_key_lookup = m_current_section_index_to_key_lookup;
-    sr.m_current_str_buffers = m_current_str_buffers;
-    return sr;
+    return copy(m_results.freeze(frozen_realm));
 }
 
 bool SectionedResults::is_valid() const

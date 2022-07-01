@@ -1506,7 +1506,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         t1.join();
         while (!signal) {
         }
-        signal = true;
 
         // Remove all objects and ensure that string buffers work.
         // Clear the current buffer.
@@ -1711,5 +1710,54 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         REQUIRE(changes2.modifications.empty());
         REQUIRE_INDICES(changes2.sections_to_insert, 1);
         REQUIRE(changes2.sections_to_delete.empty());
+    }
+
+    SECTION("frozen primitive") {
+        auto sorted = results.sort({{"self", true}});
+        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
+            return TestType::comparison_value(value);
+        });
+        auto frozen_realm = r->freeze();
+        auto frozen_sr = sectioned_results.freeze(frozen_realm);
+        auto size = frozen_sr.size();
+        REQUIRE(size == TestType::expected_size());
+        auto results_idx = 0;
+        for (size_t section_idx = 0; section_idx < size; section_idx++) {
+            auto section = frozen_sr[section_idx];
+            REQUIRE(exp_keys[section_idx] == section.key());
+            REQUIRE(section_idx == section.index());
+            for (size_t element_idx = 0; element_idx < section.size(); element_idx++) {
+                auto element = frozen_sr[section_idx][element_idx];
+                Mixed value = T(exp_values_sorted[results_idx]);
+                REQUIRE(element == value);
+                results_idx++;
+            }
+        }
+        REQUIRE(algo_run_count == (int)exp_values_sorted.size());
+    }
+
+    SECTION("frozen results primitive") {
+        auto frozen_realm = r->freeze();
+        auto sorted = results.sort({{"self", true}}).freeze(frozen_realm);
+        auto sectioned_results = sorted.sectioned_results([&algo_run_count](Mixed value, SharedRealm) -> Mixed {
+            algo_run_count++;
+            return TestType::comparison_value(value);
+        });
+        auto size = sectioned_results.size();
+        REQUIRE(size == TestType::expected_size());
+        auto results_idx = 0;
+        for (size_t section_idx = 0; section_idx < size; section_idx++) {
+            auto section = sectioned_results[section_idx];
+            REQUIRE(exp_keys[section_idx] == section.key());
+            REQUIRE(section_idx == section.index());
+            for (size_t element_idx = 0; element_idx < section.size(); element_idx++) {
+                auto element = sectioned_results[section_idx][element_idx];
+                Mixed value = T(exp_values_sorted[results_idx]);
+                REQUIRE(element == value);
+                results_idx++;
+            }
+        }
+        REQUIRE(algo_run_count == (int)exp_values_sorted.size());
     }
 }
