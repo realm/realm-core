@@ -195,8 +195,7 @@ std::shared_ptr<SyncSession> Realm::sync_session() const
 sync::SubscriptionSet Realm::get_latest_subscription_set()
 {
     // If there is a subscription store, then return the latest set
-    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
-    if (flx_sub_store) {
+    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
         return flx_sub_store->get_latest();
     }
     // Otherwise, throw runtime_error
@@ -206,8 +205,7 @@ sync::SubscriptionSet Realm::get_latest_subscription_set()
 sync::SubscriptionSet Realm::get_active_subscription_set()
 {
     // If there is a subscription store, then return the active set
-    auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store();
-    if (flx_sub_store) {
+    if (auto flx_sub_store = m_coordinator->sync_session()->get_flx_subscription_store()) {
         return flx_sub_store->get_active();
     }
     // Otherwise, throw runtime_error
