@@ -2575,7 +2575,6 @@ DisableReplication::DisableReplication(Transaction& t)
     , m_version(t.get_version())
 {
     m_owner->set_replication(nullptr);
-    t.get_version();
     t.m_history = nullptr;
 }
 

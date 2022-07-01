@@ -1168,31 +1168,22 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
             AuditEventWriter writer{*m_source_db, *scope.metadata, scope.activity_name, *table, *m_serializer};
 
             m_logger->trace("Audit: Total event count: %1", scope.events.size());
-            for (size_t i = 0; i < scope.events.size();) {
-                {
-                    // We write directly to the replication log and don't want
-                    // the automatic replication to happen
-                    DisableReplication dr(tr);
 
-                    // There's awkward nested looping here because we need
-                    // replication enabled when we commit intermediate transactions
-                    for (; i < scope.events.size(); ++i) {
-                        m_serializer->set_event_index(i);
-                        if (mpark::visit(writer, scope.events[i])) {
-                            // This event didn't fit in the current transaction
-                            // so commit and try it again after that.
-                            break;
-                        }
-                    }
-                    table->clear();
-                }
+            // We write directly to the replication log and don't want
+            // the automatic replication to happen
+            Table::DisableReplication dr(*table);
 
-                // i.e. if we hit the break
-                if (i + 1 < scope.events.size()) {
+            for (size_t i = 0; i < scope.events.size(); ++i) {
+                m_serializer->set_event_index(i);
+                if (mpark::visit(writer, scope.events[i])) {
+                    // This event didn't fit in the current transaction
+                    // so commit and try it again after that.
                     m_logger->detail("Audit: Incrementally comitting transaction after %1 events", i);
                     tr.commit_and_continue_writing();
+                    --i;
                 }
             }
+            table->clear();
         });
 
         if (scope.completion)
