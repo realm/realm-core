@@ -523,13 +523,11 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
     config.automatic_change_notifications = false;
 
     auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object",
-         {{"name_col", PropertyType::String},
-          {"int_col", PropertyType::Int},
-          {"array_string_col", PropertyType::String | PropertyType::Array},
-          {"array_int_col", PropertyType::Int | PropertyType::Array}}},
-    });
+    r->update_schema({{"object",
+                       {{"name_col", PropertyType::String},
+                        {"int_col", PropertyType::Int},
+                        {"array_string_col", PropertyType::String | PropertyType::Array},
+                        {"array_int_col", PropertyType::Int | PropertyType::Array}}}});
 
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
@@ -621,6 +619,32 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         }
         REQUIRE(algo_run_count == 10);
         REQUIRE(count == 10);
+    }
+
+    SECTION("correctly asserts key") {
+        // Should throw on Object being a section key.
+        auto sr = sorted.sectioned_results([](Mixed value, SharedRealm) {
+            return value.get_link();
+        });
+        REQUIRE_THROWS(sr.size()); // Trigger calculation
+        // Even after sectioning has failed, the sectioned results
+        // object should left in a sensible state.
+        REQUIRE(sr.is_valid());
+
+        r->begin_transaction();
+        table->clear();
+        auto col_typed_link = table->add_column(type_TypedLink, "typed_link_col");
+        auto linked = table->create_object();
+        auto o1 = table->create_object(ObjKey{}, {{col_typed_link, linked.get_link()}});
+        r->commit_transaction();
+
+        // Should throw on `type_TypedLink` being a section key.
+        sr = sorted.sectioned_results([&](Mixed value, SharedRealm realm) {
+            auto obj = Object(realm, value.get_link());
+            return Mixed(obj.obj().get<ObjLink>(col_typed_link));
+        });
+        REQUIRE_THROWS(sr.size()); // Trigger calculation
+        REQUIRE(sr.is_valid());
     }
 
     SECTION("FirstLetter builtin with link") {
@@ -1369,6 +1393,28 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(section2_changes.modifications.empty());
         REQUIRE(section2.index() == 0);
         REQUIRE(algo_run_count == 3);
+
+        // Insert values back into section1
+        REQUIRE_FALSE(section1.is_valid());
+        r->begin_transaction();
+        REQUIRE(algo_run_count == 3);
+        algo_run_count = 0;
+        section1_notification_calls = 0;
+        section2_notification_calls = 0;
+        table->create_object().set(name_col, "apple");
+        r->commit_transaction();
+        advance_and_notify(*r);
+
+        REQUIRE(algo_run_count == 4);
+        REQUIRE(section1_notification_calls == 1);
+        REQUIRE(section2_notification_calls == 0);
+        REQUIRE(section1_changes.deletions.empty());
+        REQUIRE(section1_changes.insertions.size() == 1);
+        REQUIRE_INDICES(section1_changes.insertions[0], 0);
+        REQUIRE(section1_changes.modifications.empty());
+        REQUIRE_INDICES(section1_changes.sections_to_insert, 0);
+        REQUIRE(section1_changes.sections_to_delete.empty());
+        REQUIRE(section1.is_valid());
     }
 
     SECTION("snapshot") {
@@ -1397,7 +1443,6 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->create_object().set(name_col, "any");
         table->create_object().set(name_col, "zebra");
         r->commit_transaction();
-        advance_and_notify(*r);
 
         // results should stay the same.
         count = 0;
@@ -1405,6 +1450,84 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
             auto section = sr_snapshot[i];
             for (size_t y = 0; y < section.size(); y++) {
                 auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                REQUIRE(expected[count] == val);
+                count++;
+            }
+        }
+        REQUIRE(algo_run_count == 5);
+        REQUIRE(count == 5);
+    }
+
+    SECTION("frozen") {
+        auto frozen_realm = r->freeze();
+        REQUIRE(!sectioned_results.is_frozen());
+        auto sr_frozen = sectioned_results.freeze(frozen_realm);
+        REQUIRE(sr_frozen.is_frozen());
+        REQUIRE(sr_frozen.size() == 3);
+        REQUIRE(sr_frozen[0].size() == 3);
+        REQUIRE(sr_frozen[1].size() == 1);
+        REQUIRE(sr_frozen[2].size() == 1);
+        REQUIRE(algo_run_count == 5);
+        std::vector<std::string> expected{"apple", "apples", "apricot", "banana", "orange"};
+
+        int count = 0;
+        for (size_t i = 0; i < sr_frozen.size(); i++) {
+            auto section = sr_frozen[i];
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                REQUIRE(expected[count] == val);
+                count++;
+            }
+        }
+        REQUIRE(algo_run_count == 5);
+        REQUIRE(count == 5);
+
+        r->begin_transaction();
+        table->create_object().set(name_col, "any");
+        table->create_object().set(name_col, "zebra");
+        r->commit_transaction();
+
+        std::atomic<bool> signal(false);
+        std::thread t1 = std::thread([&]() {
+            // results should stay the same & work across threads.
+            count = 0;
+            for (size_t i = 0; i < sr_frozen.size(); i++) {
+                auto section = sr_frozen[i];
+                for (size_t y = 0; y < section.size(); y++) {
+                    auto val = Object(r, section[y].get_link()).get_column_value<StringData>("name_col");
+                    REQUIRE(expected[count] == val);
+                    count++;
+                }
+            }
+            REQUIRE(algo_run_count == 5);
+            REQUIRE(count == 5);
+            signal = true;
+        });
+        t1.join();
+        while (!signal) {
+        }
+        signal = true;
+
+        // Remove all objects and ensure that string buffers work.
+        // Clear the current buffer.
+        r->begin_transaction();
+        table->clear();
+        r->commit_transaction();
+        sectioned_results.size();
+        // Clear the previous buffer.
+        r->begin_transaction();
+        table->clear();
+        r->commit_transaction();
+        sectioned_results.size();
+
+        auto exp_keys = std::vector<std::string>{"a", "b", "o"};
+        count = 0;
+        for (size_t i = 0; i < sr_frozen.size(); i++) {
+            auto section = sr_frozen[i];
+            REQUIRE(section.is_valid());
+            REQUIRE(section.key().get_string() == exp_keys[i]);
+            for (size_t y = 0; y < section.size(); y++) {
+                auto val = Object(frozen_realm, section[y].get_link()).get_column_value<StringData>("name_col");
                 REQUIRE(expected[count] == val);
                 count++;
             }

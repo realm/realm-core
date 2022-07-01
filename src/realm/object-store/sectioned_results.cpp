@@ -124,19 +124,19 @@ public:
         if (m_section_filter) {
             std::map<size_t, IndexSet> filtered_insertions, filtered_modifications, filtered_deletions;
 
-            auto current_index_of_section = m_sectioned_results.m_sections.find(*m_section_filter);
+            auto current_section = m_sectioned_results.m_sections.find(*m_section_filter);
 
             auto previous_index_of_section_key =
                 m_sectioned_results.m_previous_key_to_index_lookup.find(*m_section_filter);
-            auto current_key_exists = current_index_of_section != m_sectioned_results.m_sections.end();
+            auto current_key_exists = current_section != m_sectioned_results.m_sections.end();
             auto previous_key_exists =
                 previous_index_of_section_key != m_sectioned_results.m_previous_key_to_index_lookup.end();
 
             bool has_insertions =
-                current_key_exists && converted_insertions.count(current_index_of_section->second.index) != 0;
+                current_key_exists && converted_insertions.count(current_section->second.index) != 0;
             if (has_insertions) {
-                filtered_insertions[current_index_of_section->second.index] =
-                    converted_insertions[current_index_of_section->second.index];
+                filtered_insertions[current_section->second.index] =
+                    converted_insertions[current_section->second.index];
             }
             bool has_modifications =
                 previous_key_exists && converted_modifications.count(previous_index_of_section_key->second) != 0;
@@ -155,8 +155,8 @@ public:
             IndexSet filtered_sections_to_insert, filtered_sections_to_delete;
 
             if (current_key_exists) {
-                if (section_changes.first.contains(current_index_of_section->second.index))
-                    filtered_sections_to_insert.add(current_index_of_section->second.index);
+                if (section_changes.first.contains(current_section->second.index))
+                    filtered_sections_to_insert.add(current_section->second.index);
             }
 
             if (previous_key_exists) {
@@ -247,8 +247,7 @@ bool ResultsSection::is_valid() const
 {
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(it != m_parent->m_sections.end());
-    return m_parent->is_valid();
+    return it != m_parent->m_sections.end() && m_parent->is_valid();
 }
 
 Mixed ResultsSection::operator[](size_t idx) const
@@ -344,17 +343,16 @@ void SectionedResults::calculate_sections()
         m_prev_section_index_to_key[section.index] = section.key;
     }
 
-    size_t size = m_results.size();
-
     m_sections.clear();
     m_row_to_index_path.clear();
+    size_t size = m_results.size();
     m_row_to_index_path.resize(size);
 
     for (size_t i = 0; i < size; ++i) {
         Mixed key = m_callback(m_results.get_any(i), m_results.get_realm());
         // Disallow links as section keys. It would be uncommon to use them to begin with
         // and if the object acting as the key was deleted bad things would happen.
-        if (key.is_type(type_Link, type_LinkList, type_TypedLink)) {
+        if (key.is_type(type_Link, type_TypedLink)) {
             throw std::logic_error("Links are not supported as section keys.");
         }
 
@@ -423,6 +421,21 @@ SectionedResults SectionedResults::snapshot()
     sr.m_sections = m_sections;
     sr.has_performed_initial_evalutation = true;
     sr.m_current_section_index_to_key_lookup = m_current_section_index_to_key_lookup;
+    sr.m_current_str_buffers = m_current_str_buffers;
+    return sr;
+}
+
+SectionedResults SectionedResults::freeze(std::shared_ptr<Realm> const& frozen_realm)
+{
+    calculate_sections_if_required();
+    // m_callback will never be run when using frozen results so we do
+    // not need to set it.
+    SectionedResults sr;
+    sr.m_results = m_results.freeze(frozen_realm);
+    sr.m_sections = m_sections;
+    sr.has_performed_initial_evalutation = true;
+    sr.m_current_section_index_to_key_lookup = m_current_section_index_to_key_lookup;
+    sr.m_current_str_buffers = m_current_str_buffers;
     return sr;
 }
 

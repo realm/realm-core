@@ -140,9 +140,14 @@ public:
     NotificationToken add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                 KeyPathArray key_path_array = {}) &;
 
-    /// Return a new instance SectionedResults that uses a snapshot of the underlying `Results`.
+    /// Return a new instance of SectionedResults that uses a snapshot of the underlying `Results`.
     /// The section key callback parameter will never be invoked.
     SectionedResults snapshot();
+
+    /// Return a new instance of SectionedResults that uses a frozen version of the underlying `Results`.
+    /// The section key callback parameter will never be invoked.
+    /// This SectionedResults can be used across threads.
+    SectionedResults freeze(std::shared_ptr<Realm> const& frozen_realm);
 
     bool is_valid() const;
     bool is_frozen() const;
