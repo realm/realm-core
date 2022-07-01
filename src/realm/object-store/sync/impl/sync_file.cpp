@@ -104,7 +104,7 @@ std::string make_percent_encoded_string(const std::string& raw_string)
         else {
             buffer.resize(buffer.size() + 3);
             // Format string must resolve to exactly 3 characters.
-            sprintf(&buffer.back() - 2, "%%%2X", character);
+            snprintf(&buffer.back() - 2, 4, "%%%2X", character);
         }
     }
     return buffer;

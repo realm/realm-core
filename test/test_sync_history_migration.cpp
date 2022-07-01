@@ -216,9 +216,7 @@ TEST(Sync_HistoryMigration)
         return compare_groups(rt_1, rt_2, test_context.logger);
     };
 
-    std::string resources_dir = "resources";
-    std::string history_migration_dir = util::File::resolve("history_migration", resources_dir);
-
+    std::string resources_dir = get_test_resource_path();
     std::ostringstream formatter;
     formatter.fill('0');
 
@@ -234,7 +232,7 @@ TEST(Sync_HistoryMigration)
     auto fetch_file = [&](const char* prefix, int history_schema_version, const std::string& path) {
         bool with_new = false;
         std::string fetch_name = get_name(prefix, history_schema_version, with_new);
-        std::string fetch_path = util::File::resolve(fetch_name, history_migration_dir);
+        std::string fetch_path = util::File::resolve(fetch_name, resources_dir);
         log("Fetching %1", fetch_path);
         util::File::copy(fetch_path, path);
     };
@@ -242,8 +240,8 @@ TEST(Sync_HistoryMigration)
     auto stash_file = [&](const std::string& path, const char* prefix, int history_schema_version) {
         bool with_new = true;
         std::string stash_name = get_name(prefix, history_schema_version, with_new);
-        std::string stash_path = util::File::resolve(stash_name, history_migration_dir);
-        util::try_make_dir(history_migration_dir);
+        std::string stash_path = util::File::resolve(stash_name, resources_dir);
+        util::try_make_dir(resources_dir);
         log("Stashing %1", stash_path);
         util::File::copy(path, stash_path);
     };

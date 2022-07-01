@@ -945,12 +945,12 @@ void SlabAlloc::attach_empty()
 void SlabAlloc::throw_header_exception(std::string msg, const Header& header, const std::string& path)
 {
     char buf[256];
-    sprintf(buf,
-            ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
-            "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
-            header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
-            header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
-            header.m_flags);
+    snprintf(buf, sizeof(buf),
+             ". top_ref[0]: %" PRIX64 ", top_ref[1]: %" PRIX64 ", "
+             "mnemonic: %X %X %X %X, fmt[0]: %d, fmt[1]: %d, flags: %X",
+             header.m_top_ref[0], header.m_top_ref[1], header.m_mnemonic[0], header.m_mnemonic[1],
+             header.m_mnemonic[2], header.m_mnemonic[3], header.m_file_format[0], header.m_file_format[1],
+             header.m_flags);
     msg += buf;
     throw InvalidDatabase(msg, path);
 }

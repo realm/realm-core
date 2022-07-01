@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync_test_utils.hpp"
+#include "util/test_path.hpp"
 #include "util/test_utils.hpp"
 
 #include <realm/object-store/object_schema.hpp>
@@ -532,7 +533,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync]") {
     }
 
     SECTION("open schema version 4") {
-        File::copy("sync-metadata-v4.realm", metadata_path);
+        File::copy(test_util::get_test_resource_path() + "sync-metadata-v4.realm", metadata_path);
         SyncMetadataManager manager(metadata_path, false);
         auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->identity() == identity);
@@ -541,7 +542,7 @@ TEST_CASE("sync metadata: can open old metadata realms", "[sync]") {
     }
 
     SECTION("open schema version 5") {
-        File::copy("sync-metadata-v5.realm", metadata_path);
+        File::copy(test_util::get_test_resource_path() + "sync-metadata-v5.realm", metadata_path);
         SyncMetadataManager manager(metadata_path, false);
         auto user_metadata = manager.get_or_make_user_metadata(identity, provider_type);
         REQUIRE(user_metadata->identity() == identity);

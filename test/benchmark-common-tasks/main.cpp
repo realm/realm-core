@@ -1713,25 +1713,21 @@ struct BenchmarkNonInitiatorOpen : Benchmark {
 
     DBRef do_open()
     {
-        const std::string realm_path = *path;
-        return create_new_shared_group(realm_path, m_durability, m_encryption_key);
+        return create_new_shared_group(*path, m_durability, m_encryption_key);
     }
 
     void before_all(DBRef)
     {
         // Generate the benchmark result texts:
-        std::stringstream ident_ss;
-        ident_ss << "BenchmarkCommonTasks_" << this->name()
-        << "_" << to_ident_cstr(m_durability);
-        std::string ident = ident_ss.str();
+        std::string ident = util::format("BenchmarkCommonTasks_%1_%2", this->name(), to_ident_cstr(m_durability));
 
-        realm::test_util::unit_test::TestDetails test_details;
+        unit_test::TestDetails test_details;
         test_details.suite_name = "BenchmarkCommonTasks";
         test_details.test_name = ident.c_str();
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
 
-        path = std::make_unique<realm::test_util::DBTestPathGuard>(ident);
+        path = std::make_unique<DBTestPathGuard>(get_test_path(ident, ".realm"));
 
         // open once - session initiation
         initiator = do_open();
@@ -2027,7 +2023,8 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
         test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
-        realm::test_util::DBTestPathGuard realm_path("benchmark_common_tasks" + ident);
+        realm::test_util::DBTestPathGuard realm_path(
+            test_util::get_test_path("benchmark_common_tasks" + ident, ".realm"));
         DBRef group;
         group = create_new_shared_group(realm_path, level, key);
         benchmark.before_all(group);
@@ -2152,9 +2149,9 @@ int benchmark_common_tasks_main()
     return 0;
 }
 
-#if !REALM_IOS
-int main(int, const char**)
+int main(int argc, const char** argv)
 {
+    if (!initialize_test_path(argc, argv))
+        return 1;
     return benchmark_common_tasks_main();
 }
-#endif
