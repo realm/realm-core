@@ -30,6 +30,7 @@
 #include <realm/util/file.hpp>
 
 #include "test.hpp"
+#include "util/test_only.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -369,8 +370,9 @@ NONCONCURRENT_TEST_IF(Alloc_MapFailureRecovery, _impl::SimulatedFailure::is_enab
         alloc.get_file().resize(page_size * 2);
         alloc.update_reader_view(page_size * 2);
         CHECK_EQUAL(alloc.get_baseline(), page_size * 2);
-        CHECK_EQUAL(initial_version + 1, alloc.get_mapping_version());
-        CHECK_NOT_EQUAL(initial_translated, alloc.translate(1000));
+        // These two no longer applies:
+        // CHECK_EQUAL(initial_version + 1, alloc.get_mapping_version());
+        // CHECK_NOT_EQUAL(initial_translated, alloc.translate(1000));
 
         // Delete the old mapping. Will double-delete it if we incorrectly added
         // the mapping in the call that failed.

@@ -1691,9 +1691,10 @@ void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags,
 #else
     m_addr = f.map(a, size, map_flags, offset);
 #endif
-    m_size = size;
+    m_size = m_reservation_size = size;
     m_fd = f.m_fd;
     m_offset = offset;
+    m_a = a;
 }
 
 
@@ -1701,10 +1702,11 @@ void File::MapBase::unmap() noexcept
 {
     if (!m_addr)
         return;
-    REALM_ASSERT(m_size);
-    File::unmap(m_addr, m_size);
+    REALM_ASSERT(m_reservation_size);
+    File::unmap(m_addr, m_reservation_size);
     m_addr = nullptr;
     m_size = 0;
+    m_reservation_size = 0;
 #if REALM_ENABLE_ENCRYPTION
     m_encrypted_mapping = nullptr;
 #endif
@@ -1714,7 +1716,61 @@ void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flag
 {
     REALM_ASSERT(m_addr);
     m_addr = f.remap(m_addr, m_size, a, size, map_flags);
-    m_size = size;
+    m_size = m_reservation_size = size;
+}
+
+bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, size_t offset)
+{
+#if REALM_ENABLE_ENCRYPTION
+    if (file.m_encryption_key)
+        return false;
+#endif
+#ifdef _WIN32
+    // unsupported for now
+    return false;
+#else
+    void* addr = ::mmap(0, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (addr == MAP_FAILED)
+        return false;
+    m_addr = addr;
+    REALM_ASSERT(m_size == 0);
+    m_a = a;
+    m_reservation_size = size;
+    m_fd = file.get_descriptor();
+    m_offset = offset;
+    return true;
+#endif
+}
+
+bool File::MapBase::try_extend_to(size_t size) noexcept
+{
+    if (size > m_reservation_size) {
+        return false;
+    }
+    // return false;
+#ifndef _WIN32
+#if REALM_ENABLE_ENCRYPTION
+    // unsupported for encryption ATM
+    // needs an encryption key....
+    if (m_encrypted_mapping)
+        return false;
+#endif
+    char* extension_start_addr = (char*)m_addr + m_size;
+    size_t extension_size = size - m_size;
+    size_t extension_start_offset = m_offset + m_size;
+    try {
+        void* got_addr =
+            util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_a, extension_start_offset, nullptr);
+        if (got_addr == extension_start_addr) {
+            m_size = size;
+            return true;
+        }
+    }
+    catch (...) {
+        return false;
+    }
+#endif
+    return false;
 }
 
 void File::MapBase::sync()

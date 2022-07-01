@@ -712,6 +712,7 @@ void* mmap_anon(size_t size)
 void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMode access, size_t offset,
                  const char* enc_key)
 {
+    _impl::SimulatedFailure::trigger_mmap(size);
     static_cast<void>(enc_key); // FIXME: Consider removing this parameter
 #ifdef _WIN32
     REALM_ASSERT(false);
