@@ -133,7 +133,8 @@ typedef enum realm_schema_validation_mode {
  * - null
  *   When the data member is NULL.
  * - empty
- *   When the data member is non-NULL, and the size member is 0. The actual contents of the data member in this case don't matter.
+ *   When the data member is non-NULL, and the size member is 0. The actual contents of the data member in this case
+ * don't matter.
  * - non-empty
  *   When the data member is non-NULL, and the size member is greater than 0.
  *
@@ -3971,8 +3972,8 @@ RLM_API void realm_mongo_collection_update_many(realm_mongodb_collection_t* coll
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
  */
-RLM_API void realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection,
-                                                        realm_string_t filter, realm_string_t doc,
+RLM_API void realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection, realm_string_t filter,
+                                                        realm_string_t doc,
                                                         realm_mongodb_find_and_modify_options_t* options,
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
@@ -4002,8 +4003,7 @@ RLM_API void realm_mongo_collection_find_one_and_replace(realm_mongodb_collectio
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
  */
-RLM_API void realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection,
-                                                        realm_string_t filter,
+RLM_API void realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection, realm_string_t filter,
                                                         realm_mongodb_find_and_modify_options_t* options,
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
