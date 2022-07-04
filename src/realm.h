@@ -2733,7 +2733,7 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 
 /**
  * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
- * 
+ *
  * @return A non-null pointer if no error occurred.
  */
 RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
