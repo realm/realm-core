@@ -19,8 +19,6 @@
 #ifndef REALM_SYNC_TEST_UTILS_HPP
 #define REALM_SYNC_TEST_UTILS_HPP
 
-#include <catch2/catch_all.hpp>
-
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>

@@ -467,7 +467,7 @@ tasks:
     # hours to complete
     timeout_secs: 14400
     vars:
-      test_filter: StorageTests
+      test_filter: CoreTests
       report_test_progress: On
 
 - name: core-tests
@@ -477,7 +477,7 @@ tasks:
   - func: "compile"
   - func: "run tests"
     vars:
-      test_filter: StorageTests
+      test_filter: CoreTests
 
 - name: benchmark-common-tasks
   exec_timeout_secs: 1800

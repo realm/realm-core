@@ -1939,13 +1939,12 @@ void DB::grab_read_lock(ReadLockInfo& read_lock, VersionID version_id)
     }
 
     for (;;) {
-        SharedInfo* r_info = m_reader_map.get_addr();
         read_lock.m_reader_idx = version_id.index;
         if (grow_reader_mapping(read_lock.m_reader_idx)) { // Throws
             // remapping takes time, so retry with a fresh entry
             continue;
         }
-        r_info = m_reader_map.get_addr();
+        SharedInfo* r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(read_lock.m_reader_idx);
 
         // if the entry is stale and has been cleared by the cleanup process,

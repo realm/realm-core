@@ -1,9 +1,10 @@
 set(HEADERS
+    ../util/crypt_key.hpp
+    ../util/test_path.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
     util/test_utils.hpp
-    ../util/crypt_key.hpp
     collection_fixtures.hpp
 )
 
@@ -29,11 +30,15 @@ set(SOURCES
     c_api/c_api.cpp
     c_api/c_api.c
 
+    ../util/crypt_key.cpp
+    ../util/test_path.cpp
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
-    ../util/crypt_key.cpp
 )
+
+file(GLOB RESOURCES RELATIVE ${CMAKE_CURRENT_BINARY_DIR}
+     "*.realm")
 
 if(REALM_ENABLE_AUTH_TESTS)
     list(APPEND SOURCES util/baas_admin_api.cpp)
@@ -67,10 +72,9 @@ if(REALM_ENABLE_SYNC)
     endif()
 endif()
 
-add_executable(ObjectStoreTests ${SOURCES} ${HEADERS})
-set_target_properties(ObjectStoreTests PROPERTIES
-    OUTPUT_NAME realm-object-store-tests
-)
+add_executable(ObjectStoreTests ${SOURCES} ${HEADERS} ${RESOURCES})
+set_target_properties(ObjectStoreTests PROPERTIES OUTPUT_NAME realm-object-store-tests)
+set_target_resources(ObjectStoreTests "${RESOURCES}")
 
 if(MSVC)
     # increase the number of sections supported in an obj file for the heavily templated tests
@@ -78,16 +82,9 @@ if(MSVC)
 endif()
 
 target_link_libraries(ObjectStoreTests Catch2::Catch2 ObjectStore RealmFFIStatic)
-
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
-        target_link_libraries(ObjectStoreTests stdc++fs)
-    endif()
-endif()
-
+enable_stdfilesystem(ObjectStoreTests)
 create_coverage_target(generate-coverage ObjectStoreTests)
-
-add_test(NAME ObjectStoreTests COMMAND realm-object-store-tests)
+add_bundled_test(ObjectStoreTests)
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(ObjectStoreTests SyncServer)
@@ -113,15 +110,11 @@ if(REALM_TEST_SYNC_LOGGING)
     )
 endif()
 
-target_include_directories(ObjectStoreTests PRIVATE ${CATCH_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
-# Resources required for running the tests
-file(GLOB REQUIRED_TEST_FILES
-     "*.realm")
-
-
-add_custom_command(TARGET ObjectStoreTests POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${REQUIRED_TEST_FILES} $<TARGET_FILE_DIR:ObjectStoreTests>)
+target_include_directories(ObjectStoreTests PRIVATE
+    ${CATCH_INCLUDE_DIR}
+    ${JSON_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 # on Apple platforms we use the built-in CFRunLoop
 # everywhere else it's libuv, except UWP where it doesn't build
@@ -155,10 +148,6 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
     target_compile_definitions(ObjectStore PUBLIC REALM_HAVE_UV=1)
     get_property(libuv_include_dir TARGET ${libuv_target} PROPERTY INCLUDE_DIRECTORIES)
     target_include_directories(ObjectStore PRIVATE ${libuv_include_dir})
-endif()
-
-if(APPLE)
-    target_compile_definitions(ObjectStoreTests PRIVATE _LIBCPP_DISABLE_AVAILABILITY)
 endif()
 
 add_subdirectory(notifications-fuzzer)
