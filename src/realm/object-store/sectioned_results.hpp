@@ -155,7 +155,7 @@ private:
     SectionedResults(Results results, Results::SectionedResultsOperator op, util::Optional<StringData> prop_name);
 
     /// Used for creating a snapshot of SectionedResults.
-    SectionedResults(Results&& results, std::unordered_map<Mixed, Section>&& sections,
+    SectionedResults(Results&& results, std::map<Mixed, Section>&& sections,
                      std::unordered_map<size_t, Mixed>&& current_section_index_to_key_lookup,
                      std::list<std::string>&& current_str_buffers)
         : has_performed_initial_evalutation(true)
@@ -179,7 +179,7 @@ private:
     friend class realm::ResultsSection;
     Results m_results;
     SectionKeyFunc m_callback;
-    std::unordered_map<Mixed, Section> m_sections GUARDED_BY(m_mutex);
+    std::map<Mixed, Section> m_sections GUARDED_BY(m_mutex);
     // Returns the key of the current section from its index.
     std::unordered_map<size_t, Mixed> m_current_section_index_to_key_lookup GUARDED_BY(m_mutex);
     // Stores the Key, Section Index of the previous section

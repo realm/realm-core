@@ -453,7 +453,7 @@ SectionedResults SectionedResults::copy(Results&& results)
     // m_callback will never be run when using frozen results so we do
     // not need to set it.
     std::list<std::string> str_buffers;
-    std::unordered_map<Mixed, Section> sections;
+    std::map<Mixed, Section> sections;
     std::unordered_map<size_t, Mixed> current_section_index_to_key_lookup;
 
     for (auto& [key, section] : m_sections) {
