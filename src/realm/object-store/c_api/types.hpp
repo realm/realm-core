@@ -19,8 +19,6 @@
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/impl/sync_client.hpp>
 #include <realm/object-store/sync/sync_user.hpp>
-//#include <realm/object-store/sync/mongo_client.hpp>
-//#include <realm/object-store/sync/mongo_database.hpp>
 #include <realm/object-store/sync/mongo_collection.hpp>
 #endif
 

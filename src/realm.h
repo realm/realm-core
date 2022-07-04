@@ -52,7 +52,7 @@
 // which is a pointer to an opaque struct treated specially by the Dart code generator.
 // WARNING: only define this to a pointer type, anything else breaks the ABI.
 #ifndef realm_userdata_t
-#define realm_userdata_t  void*
+#define realm_userdata_t void*
 #endif
 
 typedef struct shared_realm realm_t;
