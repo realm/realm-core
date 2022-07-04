@@ -876,20 +876,19 @@ to_mongodb_collection_find_and_modify_options(realm_mongodb_find_and_modify_opti
     return mongodb_options;
 }
 
+using UserDataPtr = std::unique_ptr<void, realm_free_userdata_func_t>;
 static void handle_mongodb_collection_result(util::Optional<bson::Bson> bson, util::Optional<AppError> app_error,
-                                             realm_userdata_t data, realm_free_userdata_func_t delete_data,
-                                             realm_mongodb_callback_t callback)
+                                             UserDataPtr data, realm_mongodb_callback_t callback)
 {
     if (app_error) {
         auto error = to_capi(*app_error);
-        callback(data, nullptr, &error);
+        callback(data.get(), nullptr, &error);
     }
     else if (bson) {
         const auto& bson_data = bson->to_string();
-        auto str = new realm_string_t{bson_data.c_str(), bson_data.size()};
-        callback(data, str, nullptr);
+        realm_string_t str{bson_data.c_str(), bson_data.size()};
+        callback(data.get(), &str, nullptr);
     }
-    delete_data(data);
 }
 
 RLM_API realm_mongodb_collection_t* realm_mongo_collection_get(realm_user_t* user, const char* service,
@@ -901,157 +900,156 @@ RLM_API realm_mongodb_collection_t* realm_mongo_collection_get(realm_user_t* use
     });
 }
 
-RLM_API void realm_mongo_collection_find(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_find(realm_mongodb_collection_t* collection, realm_string_t filter,
                                          realm_mongodb_find_and_modify_options_t* options, realm_userdata_t data,
                                          realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback)
 {
-    collection->find_bson(convert_to_bson<bson::BsonDocument>(filter), to_mongodb_collection_find_options(options),
+    collection->find_bson(convert_to_bson<bson::BsonDocument>(&filter), to_mongodb_collection_find_options(options),
                           [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                              handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                              handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                           });
 }
 
-RLM_API void realm_mongo_collection_find_one(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_find_one(realm_mongodb_collection_t* collection, realm_string_t filter,
                                              realm_mongodb_find_and_modify_options_t* options, realm_userdata_t data,
                                              realm_free_userdata_func_t delete_data,
                                              realm_mongodb_callback_t callback)
 {
-    collection->find_one_bson(convert_to_bson<bson::BsonDocument>(filter),
+    collection->find_one_bson(convert_to_bson<bson::BsonDocument>(&filter),
                               to_mongodb_collection_find_options(options),
                               [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                  handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                  handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                               });
 }
 
-RLM_API void realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection, realm_string_t filter,
                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                               realm_mongodb_callback_t callback)
 {
-    collection->aggregate_bson(convert_to_bson<bson::BsonArray>(filter),
+    collection->aggregate_bson(convert_to_bson<bson::BsonArray>(&filter),
                                [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                   handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                   handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                });
 }
 
-RLM_API void realm_mongo_collection_count(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_count(realm_mongodb_collection_t* collection, realm_string_t filter,
                                           realm_mongodb_find_and_modify_options_t* options, realm_userdata_t data,
                                           realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback)
 {
-    collection->count_bson(convert_to_bson<bson::BsonDocument>(filter), options->limit,
+    collection->count_bson(convert_to_bson<bson::BsonDocument>(&filter), options->limit,
                            [&](util::Optional<bson::Bson> bson, util::Optional<app::AppError> app_error) {
-                               handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                               handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                            });
 }
 
-RLM_API void realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection, realm_string_t filter,
                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback)
 {
-    collection->insert_one_bson(convert_to_bson<bson::BsonDocument>(filter),
+    collection->insert_one_bson(convert_to_bson<bson::BsonDocument>(&filter),
                                 [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                    handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                    handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                 });
 }
 
-RLM_API void realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection, realm_string_t filter,
                                                 realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback)
 {
-    collection->insert_many_bson(convert_to_bson<bson::BsonArray>(filter),
+    collection->insert_many_bson(convert_to_bson<bson::BsonArray>(&filter),
                                  [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                     handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                     handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                  });
 }
 
-RLM_API void realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection, realm_string_t filter,
                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback)
 {
-    collection->delete_one_bson(convert_to_bson<bson::BsonDocument>(filter),
+    collection->delete_one_bson(convert_to_bson<bson::BsonDocument>(&filter),
                                 [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                    handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                    handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                 });
 }
 
-RLM_API void realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection, realm_string_t* filter,
+RLM_API void realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection, realm_string_t filter,
                                                 realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback)
 {
-    collection->delete_many_bson(convert_to_bson<bson::BsonDocument>(filter),
+    collection->delete_many_bson(convert_to_bson<bson::BsonDocument>(&filter),
                                  [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                     handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                     handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                  });
 }
 
-RLM_API void realm_mongo_collection_update_one(realm_mongodb_collection_t* collection, realm_string_t* filter,
-                                               realm_string_t* doc, realm_mongodb_find_and_modify_options_t* options,
+RLM_API void realm_mongo_collection_update_one(realm_mongodb_collection_t* collection, realm_string_t filter,
+                                               realm_string_t doc, realm_mongodb_find_and_modify_options_t* options,
                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback)
 {
-    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter);
-    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(doc);
+    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(&filter);
+    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(&doc);
     collection->update_one_bson(bson_filter, bson_doc, options->upsert,
                                 [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                    handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                    handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                 });
 }
 
-RLM_API void realm_mongo_collection_update_many(realm_mongodb_collection_t* collection, realm_string_t* filter,
-                                                realm_string_t* doc, realm_mongodb_find_and_modify_options_t* options,
+RLM_API void realm_mongo_collection_update_many(realm_mongodb_collection_t* collection, realm_string_t filter,
+                                                realm_string_t doc, realm_mongodb_find_and_modify_options_t* options,
                                                 realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback)
 {
-    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter);
-    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(doc);
+    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(&filter);
+    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(&doc);
     collection->update_many_bson(bson_filter, bson_doc, options->upsert,
                                  [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                     handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+                                     handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
                                  });
 }
 
-RLM_API void realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection,
-                                                        realm_string_t* filter, realm_string_t* doc,
+RLM_API void realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection, realm_string_t filter,
+                                                        realm_string_t doc,
                                                         realm_mongodb_find_and_modify_options_t* options,
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback)
 {
-    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter);
-    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(doc);
+    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(&filter);
+    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(&doc);
     collection->find_one_and_update_bson(
         bson_filter, bson_doc, to_mongodb_collection_find_and_modify_options(options),
         [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-            handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+            handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
         });
 }
 
 RLM_API void realm_mongo_collection_find_one_and_replace(realm_mongodb_collection_t* collection,
-                                                         realm_string_t* filter, realm_string_t* doc,
+                                                         realm_string_t filter, realm_string_t doc,
                                                          realm_mongodb_find_and_modify_options_t* options,
                                                          realm_userdata_t data,
                                                          realm_free_userdata_func_t delete_data,
                                                          realm_mongodb_callback_t callback)
 {
-    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter);
-    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(doc);
+    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(&filter);
+    const auto& bson_doc = convert_to_bson<bson::BsonDocument>(&doc);
     collection->find_one_and_replace_bson(
         bson_filter, bson_doc, to_mongodb_collection_find_and_modify_options(options),
         [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-            handle_mongodb_collection_result(bson, app_error, data, delete_data, callback);
+            handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
         });
 }
 
-RLM_API void realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection,
-                                                        realm_string_t* filter,
+RLM_API void realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection, realm_string_t filter,
                                                         realm_mongodb_find_and_modify_options_t* options,
                                                         realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback)
 {
-    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter);
-    collection->find_one_and_delete_bson(bson_filter, to_mongodb_collection_find_and_modify_options(options),
-                                         [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
-                                             handle_mongodb_collection_result(bson, app_error, data, delete_data,
-                                                                              callback);
-                                         });
+    const auto& bson_filter = convert_to_bson<bson::BsonDocument>(&filter);
+    collection->find_one_and_delete_bson(
+        bson_filter, to_mongodb_collection_find_and_modify_options(options),
+        [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+            handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+        });
 }
 
 } // namespace realm::c_api
