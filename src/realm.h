@@ -2745,6 +2745,15 @@ RLM_API void realm_app_config_set_sdk_version(realm_app_config_t*, const char*) 
 RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credentials_t*) RLM_API_NOEXCEPT;
 
 /**
+ * Create realm_app_t* instance given a valid realm configuration and sync client configuration.
+ *
+ * @return A non-null pointer if no error occurred.
+ */
+RLM_API realm_app_t* realm_app_create(const realm_app_config_t*, const realm_sync_client_config_t*);
+
+/**
+ * @note this API will be removed and it is now deprecated in favour of realm_app_create
+ *
  * Get an existing @a realm_app_t* instance with the same app id, or create it with the
  * configuration if it doesn't exist.
  *
@@ -2753,6 +2762,8 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 RLM_API realm_app_t* realm_app_get(const realm_app_config_t*, const realm_sync_client_config_t*);
 
 /**
+ * @note this API will be removed and it is now deprecated in favour of realm_app_create
+ *
  * Get an existing @a realm_app_t* instance from the cache.
  *
  * @return Cached app instance, or null if no cached app exists for this @a app_id.
