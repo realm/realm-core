@@ -230,6 +230,34 @@ void create_buffered_key(Mixed& key, util::Optional<std::string>& buffer, String
     }
 }
 
+ResultsSection::ResultsSection()
+    : m_parent(nullptr)
+    , m_key(Mixed())
+    , m_key_buffer(util::none)
+{
+}
+
+ResultsSection& ResultsSection::operator=(ResultsSection&& other)
+{
+    std::swap(m_parent, other.m_parent);
+    if (other.m_key_buffer) {
+        std::swap(m_key_buffer, other.m_key_buffer);
+        if (other.m_key.is_type(type_String)) {
+            m_key = StringData(m_key_buffer->data(), m_key_buffer->size());
+        }
+        else if (other.m_key.is_type(type_String)) {
+            m_key = BinaryData(m_key_buffer->data(), m_key_buffer->size());
+        }
+        else {
+            REALM_UNREACHABLE();
+        }
+    }
+    else {
+        std::swap(m_key, other.m_key);
+    }
+    return *this;
+}
+
 ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
     : m_parent(parent)
 {

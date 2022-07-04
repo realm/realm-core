@@ -50,12 +50,8 @@ using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedR
  */
 class ResultsSection {
 public:
-    ResultsSection()
-        : m_parent(nullptr)
-        , m_key(Mixed())
-        , m_key_buffer(util::none)
-    {
-    }
+    ResultsSection();
+    ResultsSection& operator=(ResultsSection&& other);
 
     /// Retrieve an element from the section for a given index.
     Mixed operator[](size_t idx) const;

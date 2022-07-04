@@ -1588,9 +1588,12 @@ TEMPLATE_TEST_CASE("sectioned results primitive types", "[sectioned_results]", c
         auto results_idx = 0;
         for (size_t section_idx = 0; section_idx < size; section_idx++) {
             auto section = sectioned_results[section_idx];
-            REQUIRE(exp_keys[section_idx] == section.key());
-            REQUIRE(section_idx == section.index());
-            for (size_t element_idx = 0; element_idx < section.size(); element_idx++) {
+            ResultsSection section_copy;
+            // Ensure copy assignment works.
+            section_copy = std::move(section);
+            REQUIRE(exp_keys[section_idx] == section_copy.key());
+            REQUIRE(section_idx == section_copy.index());
+            for (size_t element_idx = 0; element_idx < section_copy.size(); element_idx++) {
                 auto element = sectioned_results[section_idx][element_idx];
                 Mixed value = T(exp_values_sorted[results_idx]);
                 REQUIRE(element == value);
