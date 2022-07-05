@@ -630,6 +630,24 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(algo_run_count == 5);
     }
 
+    SECTION("reset section callback") {
+        algo_run_count = 0;
+        sectioned_results.reset_section_callback([&](Mixed value, SharedRealm realm) {
+            algo_run_count++;
+            auto obj = Object(realm, value.get_link());
+            auto v = obj.get_column_value<StringData>("name_col");
+            return v.prefix(2);
+        });
+        REQUIRE(algo_run_count == 0);
+        REQUIRE(sectioned_results.size() == 3);
+        REQUIRE(algo_run_count == 5);
+        REQUIRE(sectioned_results["ap"].size() == 3);
+        REQUIRE(sectioned_results["ba"].size() == 1);
+        REQUIRE(sectioned_results["or"].size() == 1);
+        REQUIRE_THROWS(sectioned_results["a"]);
+        REQUIRE(algo_run_count == 5);
+    }
+
     SECTION("correctly asserts key") {
         // Should throw on Object being a section key.
         auto sr = sorted.sectioned_results([](Mixed value, SharedRealm) {

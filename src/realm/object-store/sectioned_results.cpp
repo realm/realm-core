@@ -508,4 +508,11 @@ bool SectionedResults::is_frozen() const
     return m_results.is_frozen();
 }
 
+void SectionedResults::reset_section_callback(SectionKeyFunc section_callback)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    m_callback = std::move(section_callback);
+    has_performed_initial_evalutation = false;
+}
+
 } // namespace realm

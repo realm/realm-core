@@ -152,6 +152,8 @@ public:
 
     bool is_valid() const;
     bool is_frozen() const REQUIRES(!m_mutex);
+    /// Replaces the function which will perform the sectioning on the underlying results.
+    void reset_section_callback(SectionKeyFunc section_callback) REQUIRES(!m_mutex);
 
 private:
     friend class Results;
@@ -159,7 +161,7 @@ private:
     SectionedResults(Results results, SectionKeyFunc section_key_func);
     SectionedResults(Results results, Results::SectionedResultsOperator op, util::Optional<StringData> prop_name);
 
-    /// Used for creating a snapshot of SectionedResults.
+    /// Used for creating a frozen or snapshot of SectionedResults.
     SectionedResults(Results&& results, std::map<Mixed, Section>&& sections,
                      std::unordered_map<size_t, Mixed>&& current_section_index_to_key_lookup,
                      std::list<std::string>&& current_str_buffers)
