@@ -124,12 +124,14 @@ ClientImpl::ClientImpl(ClientConfig config)
 {
     if (config.socket_factory) {
         m_socket_factory = config.socket_factory;
-    } else {
+    }
+    else {
         m_socket_factory = std::make_shared<websocket::DefaultSocketFactory>(
             websocket::SocketFactoryConfig{
                 get_user_agent_string(),
             },
-            websocket::DefaultSocketFactoryConfig{logger,
+            websocket::DefaultSocketFactoryConfig{
+                logger,
                 m_random,
                 m_service,
             });
