@@ -621,6 +621,15 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         REQUIRE(count == 10);
     }
 
+    SECTION("key subscript") {
+        REQUIRE(sectioned_results.size() == 3);
+        REQUIRE(sectioned_results["a"].size() == 3);
+        REQUIRE(sectioned_results["b"].size() == 1);
+        REQUIRE(sectioned_results["o"].size() == 1);
+        REQUIRE_THROWS(sectioned_results["x"]);
+        REQUIRE(algo_run_count == 5);
+    }
+
     SECTION("correctly asserts key") {
         // Should throw on Object being a section key.
         auto sr = sorted.sectioned_results([](Mixed value, SharedRealm) {

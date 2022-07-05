@@ -117,6 +117,11 @@ public:
      * but will continue to be a container for elements only refering to the section key it was originally bound to.
      */
     ResultsSection operator[](size_t idx) REQUIRES(!m_mutex);
+    /**
+     * Returns a `ResultsSection` for a given key. This method will throw
+     * if the key does not already exist.
+     */
+    ResultsSection operator[](Mixed key) REQUIRES(!m_mutex);
     /// The total amount of Sections.
     size_t size() REQUIRES(!m_mutex);
 

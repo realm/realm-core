@@ -432,6 +432,18 @@ ResultsSection SectionedResults::operator[](size_t idx)
     return ResultsSection(this, section.key);
 }
 
+ResultsSection SectionedResults::operator[](Mixed key)
+{
+    util::CheckedUniqueLock lock(m_mutex);
+    REALM_ASSERT(is_valid());
+    calculate_sections_if_required();
+    auto it = m_sections.find(key);
+    if (it == m_sections.end()) {
+        throw std::logic_error("Key does not exist for any sections.");
+    }
+    return ResultsSection(this, it->second.key);
+}
+
 NotificationToken SectionedResults::add_notification_callback(SectionedResultsNotificatonCallback callback,
                                                               KeyPathArray key_path_array) &
 {
