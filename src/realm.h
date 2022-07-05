@@ -3802,6 +3802,17 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
                                                          int category, const char* error_message, bool is_fatal);
 
 /**
+ * Wrapper for SyncSession::shutdown_and_wait + delete realm files.
+ * The realm files can/cannot be deleted. SyncSession::shutdown_and_wait will block until
+ * the sync session does not get closed.
+ * @param session ptr to a valid sync session
+ * @param realm_path a null terminated string containing the path where the realm files are
+ * @param did_delete a boolean flag indicating whether the files were deleted or not
+ * @return False in case of errors, otherwise returns True.
+ */
+RLM_API bool realm_sync_shutdown_and_delete_realm(const realm_sync_session_t* session, const char* realm_path, bool* did_delete);
+
+/**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
  * and retrieve a it later via realm_get_last_error.
  * Most importantly the SDK is responsible to handle the memory pointed by usercode_error.
