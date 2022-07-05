@@ -25,8 +25,9 @@ namespace realm::util::websocket {
 namespace {
 class SocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
-    SocketImpl(SocketFactoryConfig& config, SocketObserver& observer, Endpoint&& endpoint)
+    SocketImpl(SocketFactoryConfig& config, DefaultSocketFactoryConfig defaultSocketConfig, SocketObserver& observer, Endpoint&& endpoint)
         : m_config(config)
+        , m_defaultSocketConfig(defaultSocketConfig)
         , m_observer(observer)
         , m_endpoint(std::move(endpoint))
         , m_websocket(*this)
@@ -49,11 +50,11 @@ private:
 
     util::Logger& websocket_get_logger() noexcept override
     {
-        return m_config.logger;
+        return m_defaultSocketConfig.logger;
     }
     std::mt19937_64& websocket_get_random() noexcept override
     {
-        return m_config.random;
+        return m_defaultSocketConfig.random;
     }
 
     void websocket_handshake_completion_handler(const util::HTTPHeaders& headers) override
@@ -110,10 +111,11 @@ private:
 
     util::Logger& logger() const
     {
-        return m_config.logger;
+        return m_defaultSocketConfig.logger;
     }
 
     SocketFactoryConfig& m_config;
+    DefaultSocketFactoryConfig m_defaultSocketConfig;
     SocketObserver& m_observer;
 
     const Endpoint m_endpoint;
@@ -177,7 +179,7 @@ void SocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_config.service);                            // Throws
+    m_resolver.emplace(m_defaultSocketConfig.service);                            // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 
@@ -198,7 +200,7 @@ void SocketImpl::initiate_tcp_connect(util::network::Endpoint::List endpoints, s
 
     util::network::Endpoint ep = *(endpoints.begin() + i);
     std::size_t n = endpoints.size();
-    m_socket.emplace(m_config.service); // Throws
+    m_socket.emplace(m_defaultSocketConfig.service); // Throws
     m_socket->async_connect(ep, [this, endpoints = std::move(endpoints), i](std::error_code ec) mutable {
         // If the operation is aborted, the connection object may have been
         // destroyed.
@@ -354,9 +356,9 @@ void SocketImpl::initiate_websocket_handshake()
 
 WebSocket::~WebSocket() = default;
 
-std::unique_ptr<WebSocket> SocketFactory::connect(SocketObserver* observer, Endpoint&& endpoint)
+std::unique_ptr<WebSocket> DefaultSocketFactory::connect(SocketObserver* observer, Endpoint&& endpoint)
 {
-    return std::make_unique<SocketImpl>(m_config, *observer, std::move(endpoint));
+    return std::make_unique<SocketImpl>(m_config, m_defaultSocketConfig, *observer, std::move(endpoint));
 }
 
 } // namespace realm::util::websocket

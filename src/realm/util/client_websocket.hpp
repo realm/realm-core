@@ -33,12 +33,15 @@ class Service;
 namespace realm::util::websocket {
 using port_type = sync::port_type;
 
-// TODO figure out what belongs on config and what belongs on endpoint.
 struct SocketFactoryConfig {
+    std::string user_agent;
+};
+
+// Legacy socket configuration
+struct DefaultSocketFactoryConfig {
     util::Logger& logger;
     std::mt19937_64& random;
     util::network::Service& service;
-    std::string user_agent;
 };
 
 struct Endpoint {
@@ -112,19 +115,14 @@ public:
 
 class SocketFactory {
 public:
-    SocketFactory(SocketFactoryConfig config)
-        : m_config(config)
+    SocketFactory(DefaultSocketFactoryConfig config)
+    : defaultSocketConfig(config)
     {
     }
 
     virtual ~SocketFactory() {}
 
-    virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint);
-
-    static std::unique_ptr<SocketFactory> defaultSocketFactory(SocketFactoryConfig&& config)
-    {
-        return std::make_unique<SocketFactory>(std::move(config));
-    }
+    virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) = 0;
 
     /// \brief Submit a handler to be executed by the event loop thread.
     ///
@@ -151,16 +149,30 @@ public:
     /// before B.
     template <class H>
     void post(H handler);
-
 private:
-    SocketFactoryConfig m_config;
+    DefaultSocketFactoryConfig defaultSocketConfig;
 };
 
+// Legacy Core websocket implementation
+class DefaultSocketFactory : public SocketFactory {
+public:
+    DefaultSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig defaultSocketConfig)
+    : SocketFactory(defaultSocketConfig)
+    , m_config(config)
+    , m_defaultSocketConfig(defaultSocketConfig)
+    {
+    }
+
+    virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override;
+private:
+    SocketFactoryConfig m_config;
+    DefaultSocketFactoryConfig m_defaultSocketConfig;
+};
 
 template <class H>
 inline void SocketFactory::post(H handler)
 {
-    m_config.service.post(std::move(handler)); // Throws
+    defaultSocketConfig.service.post(std::move(handler)); // Throws
 }
 
 } // namespace realm::util::websocket

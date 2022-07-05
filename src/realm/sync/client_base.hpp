@@ -293,10 +293,8 @@ struct ClientConfig {
     /// Testing/debugging feature. Should never be enabled in production.
     bool disable_sync_to_disk = false;
 
-    /// Default implementation of the WebSocket factory. Can be overriden in SDK
-    std::function<std::unique_ptr<realm::util::websocket::SocketFactory>(
-        realm::util::websocket::SocketFactoryConfig&&)>
-        socket_factory = realm::util::websocket::SocketFactory::defaultSocketFactory;
+    // Custom implementation of the WebSocket factory.
+    std::shared_ptr<realm::util::websocket::SocketFactory> socket_factory;
 };
 
 /// \brief Information about an error causing a session to be temporarily

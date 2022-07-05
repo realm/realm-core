@@ -36,10 +36,10 @@ using namespace realm;
 using namespace realm::sync;
 using namespace realm::util::websocket;
 
-class TestSocketFactory : public SocketFactory {
+class TestSocketFactory : public DefaultSocketFactory {
 public:
-    TestSocketFactory(SocketFactoryConfig config, std::function<void()> factoryCallback)
-        : SocketFactory(config)
+    TestSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig cfg2, std::function<void()> factoryCallback)
+    : DefaultSocketFactory(config, cfg2)
         , didCallHandler(factoryCallback)
     {
     }
@@ -47,7 +47,7 @@ public:
     std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override
     {
         didCallHandler();
-        return SocketFactory::connect(observer, std::move(endpoint));
+        return DefaultSocketFactory::connect(observer, std::move(endpoint));
     }
     std::function<void()> didCallHandler;
 };
@@ -62,6 +62,9 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     };
 
     TestSyncManager::Config testConfig;
+    TestLogger logger;
+    std::mt19937_64 random;
+    util::network::Service service;
 
     // Configuring custom socket factory in SyncClientConfig
     SyncClientConfig sc_config;
@@ -72,9 +75,11 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     sc_config.metadata_mode = testConfig.metadata_mode;
     sc_config.log_level =
         testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
-    sc_config.socket_factory = [&factoryCallHandler](SocketFactoryConfig&& config) {
-        return std::make_unique<TestSocketFactory>(std::move(config), factoryCallHandler);
-    };
+    sc_config.socket_factory = std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"}, DefaultSocketFactoryConfig{
+        logger,
+        random,
+        service,
+    }, factoryCallHandler);
 
     TestSyncManager init_sync_manager(testConfig, {}, util::some<SyncClientConfig>(sc_config));
 
