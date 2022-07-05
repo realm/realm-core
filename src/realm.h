@@ -3810,7 +3810,8 @@ RLM_API void realm_sync_session_handle_error_for_testing(const realm_sync_sessio
  * @param did_delete a boolean flag indicating whether the files were deleted or not
  * @return False in case of errors, otherwise returns True.
  */
-RLM_API bool realm_sync_shutdown_and_delete_realm(const realm_sync_session_t* session, const char* realm_path, bool* did_delete);
+RLM_API bool realm_sync_shutdown_and_delete_realm(const realm_sync_session_t* session, const char* realm_path,
+                                                  bool* did_delete);
 
 /**
  * In case of exception thrown in user code callbacks, this api will allow the sdk to store the user code exception
