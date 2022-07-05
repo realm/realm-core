@@ -6,7 +6,7 @@ SCRIPT="$(basename "${BASH_SOURCE[0]}")"
 VERSION="$(git describe)"
 
 function usage {
-    echo "Usage: ${SCRIPT} -p <platform> [-c <configuration>] [-f <cmake-flags>]"
+    echo "Usage: ${SCRIPT} -p <platform> [-c <configuration>] [-v <version>] [-f <cmake-flags>]"
     echo ""
     echo "Supported platforms:"
     echo "  iphoneos iphonesimulator"
@@ -17,15 +17,17 @@ function usage {
     echo "Arguments:"
     echo "   -p : Platform to build"
     echo "   -c : Configuration to build [Debug|Release|RelWithDebugSymbols]"
+    echo "   -v : Version string to use"
     echo "   -f : additional configuration flags to pass to cmake"
     exit 1;
 }
 buildType="Debug"
 CMAKE_FLAGS=''
-while getopts ":p:c:f:" opt; do
+while getopts ":p:c:v:f:" opt; do
     case "${opt}" in
         p) platform="${OPTARG}";;
         c) buildType="${OPTARG}";;
+        v) VERSION="${OPTARG}";;
         f) CMAKE_FLAGS=${OPTARG};;
         *) usage;;
     esac
