@@ -116,7 +116,7 @@ public:
 class SocketFactory {
 public:
     SocketFactory(DefaultSocketFactoryConfig config)
-    : defaultSocketConfig(config)
+        : defaultSocketConfig(config)
     {
     }
 
@@ -149,6 +149,7 @@ public:
     /// before B.
     template <class H>
     void post(H handler);
+
 private:
     DefaultSocketFactoryConfig defaultSocketConfig;
 };
@@ -157,13 +158,14 @@ private:
 class DefaultSocketFactory : public SocketFactory {
 public:
     DefaultSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig defaultSocketConfig)
-    : SocketFactory(defaultSocketConfig)
-    , m_config(config)
-    , m_defaultSocketConfig(defaultSocketConfig)
+        : SocketFactory(defaultSocketConfig)
+        , m_config(config)
+        , m_defaultSocketConfig(defaultSocketConfig)
     {
     }
 
     virtual std::unique_ptr<WebSocket> connect(SocketObserver* observer, Endpoint&& endpoint) override;
+
 private:
     SocketFactoryConfig m_config;
     DefaultSocketFactoryConfig m_defaultSocketConfig;

@@ -25,7 +25,8 @@ namespace realm::util::websocket {
 namespace {
 class SocketImpl final : public WebSocket, public realm::util::websocket::Config {
 public:
-    SocketImpl(SocketFactoryConfig& config, DefaultSocketFactoryConfig defaultSocketConfig, SocketObserver& observer, Endpoint&& endpoint)
+    SocketImpl(SocketFactoryConfig& config, DefaultSocketFactoryConfig defaultSocketConfig, SocketObserver& observer,
+               Endpoint&& endpoint)
         : m_config(config)
         , m_defaultSocketConfig(defaultSocketConfig)
         , m_observer(observer)
@@ -179,7 +180,7 @@ void SocketImpl::initiate_resolve()
         if (ec != util::error::operation_aborted)
             handle_resolve(ec, std::move(endpoints)); // Throws
     };
-    m_resolver.emplace(m_defaultSocketConfig.service);                            // Throws
+    m_resolver.emplace(m_defaultSocketConfig.service);               // Throws
     m_resolver->async_resolve(std::move(query), std::move(handler)); // Throws
 }
 

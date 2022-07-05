@@ -38,8 +38,9 @@ using namespace realm::util::websocket;
 
 class TestSocketFactory : public DefaultSocketFactory {
 public:
-    TestSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig cfg2, std::function<void()> factoryCallback)
-    : DefaultSocketFactory(config, cfg2)
+    TestSocketFactory(SocketFactoryConfig config, DefaultSocketFactoryConfig cfg2,
+                      std::function<void()> factoryCallback)
+        : DefaultSocketFactory(config, cfg2)
         , didCallHandler(factoryCallback)
     {
     }
@@ -75,11 +76,13 @@ TEST_CASE("Can setup custom sockets factory", "[platformNetworking]") {
     sc_config.metadata_mode = testConfig.metadata_mode;
     sc_config.log_level =
         testConfig.verbose_sync_client_logging ? util::Logger::Level::all : util::Logger::Level::off;
-    sc_config.socket_factory = std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"}, DefaultSocketFactoryConfig{
-        logger,
-        random,
-        service,
-    }, factoryCallHandler);
+    sc_config.socket_factory = std::make_shared<TestSocketFactory>(SocketFactoryConfig{"test-user-agent"},
+                                                                   DefaultSocketFactoryConfig{
+                                                                       logger,
+                                                                       random,
+                                                                       service,
+                                                                   },
+                                                                   factoryCallHandler);
 
     TestSyncManager init_sync_manager(testConfig, {}, util::some<SyncClientConfig>(sc_config));
 

@@ -125,13 +125,14 @@ ClientImpl::ClientImpl(ClientConfig config)
     if (config.socket_factory) {
         m_socket_factory = config.socket_factory;
     } else {
-        m_socket_factory = std::make_shared<websocket::DefaultSocketFactory>(websocket::SocketFactoryConfig{
-                                                                                 get_user_agent_string(),
-                                                                             },
-                                                                             websocket::DefaultSocketFactoryConfig{logger,
-                                                                                 m_random,
-                                                                                 m_service,
-                                                                             });
+        m_socket_factory = std::make_shared<websocket::DefaultSocketFactory>(
+            websocket::SocketFactoryConfig{
+                get_user_agent_string(),
+            },
+            websocket::DefaultSocketFactoryConfig{logger,
+                m_random,
+                m_service,
+            });
     }
 
     // FIXME: Would be better if seeding was up to the application.
