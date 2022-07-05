@@ -3825,13 +3825,13 @@ RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_A
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
 typedef struct realm_mongodb_find_and_modify_options {
-    realm_string_t* projection_bson;
-    realm_string_t* sort_bson;
+    realm_string_t projection_bson;
+    realm_string_t sort_bson;
     bool upsert;
     bool return_new_document;
     int64_t limit;
 } realm_mongodb_find_and_modify_options_t;
-typedef void (*realm_mongodb_callback_t)(realm_userdata_t userdata, realm_string_t* bson,
+typedef void (*realm_mongodb_callback_t)(realm_userdata_t userdata, realm_string_t bson,
                                          realm_app_error_t* app_error);
 
 
