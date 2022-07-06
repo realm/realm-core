@@ -13,6 +13,7 @@
 * Fix compilation failures on watchOS platforms which do not support thread-local storage. ([#7694](https://github.com/realm/realm-swift/issues/7694), [#7695](https://github.com/realm/realm-swift/issues/7695) since v11.7.0)
 * Fix a data race when committing a transaction while multiple threads are waiting for the write lock on platforms using emulated interprocess condition variables (most platforms other than non-Android Linux).
 * Fix a data race when writing audit events which could occur if the sync client thread was busy with other work when the event Realm was opened.
+* Audit event scopes containing only write events and no read events would occasionally throw a `BadVersion` exception when a write transaction was committed (since v11.17.0).
 
 ### Breaking changes
 * None.
