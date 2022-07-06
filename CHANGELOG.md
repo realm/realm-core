@@ -7,9 +7,9 @@
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
-* Fix exception when decoding interned strings in realm-apply-to-state tool. ([#5628](https://github.com/realm/realm-core/pull/5628))
+* Fix exception when decoding interned strings in realm-apply-to-state tool. ([PR #5628](https://github.com/realm/realm-core/pull/5628))
 * Fix some warnings when building with Xcode 14 ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
-* Throw `runtime_error` if subscription set is requested and flexible sync is not enabled. ([#5637](https://github.com/realm/realm-core/pull/5637))
+* Throw `runtime_error` if subscription set is requested and flexible sync is not enabled. ([PR #5637](https://github.com/realm/realm-core/pull/5637))
 * Fix compilation failures on watchOS platforms which do not support thread-local storage. ([#7694](https://github.com/realm/realm-swift/issues/7694), [#7695](https://github.com/realm/realm-swift/issues/7695) since v11.7.0)
 
 ### Breaking changes
@@ -23,6 +23,7 @@
 ### Internals
 * Add support for running the object store tests and some of the benchmarks on iOS ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 * MemRef is now trivially copyable.
+* Fix bloaty CI test that is currently failing on master. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
 
 ----------------------------------------------
 
