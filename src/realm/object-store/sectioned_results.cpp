@@ -260,9 +260,9 @@ bool ResultsSection::is_valid() const
     // See if we need to recalculate the sections before
     // searching for the key.
     m_parent->calculate_sections_if_required();
-    if (m_parent->m_sections.find(m_key) == m_parent->m_sections.end()) {
+    if (m_parent->m_sections.find(m_key) == m_parent->m_sections.end())
         return false;
-    }
+
     return true;
 }
 
