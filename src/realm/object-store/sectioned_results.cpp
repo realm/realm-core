@@ -226,7 +226,7 @@ void create_buffered_key(Mixed& key, std::unique_ptr<char[]>& buffer, StringType
     }
     else {
         buffer = std::make_unique<char[]>(value.size());
-        strcpy(buffer.get(), value.data());
+        std::strncpy(buffer.get(), value.data(), value.size());
         key = StringType(buffer.get(), value.size());
     }
 }
