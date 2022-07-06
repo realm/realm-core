@@ -63,7 +63,7 @@ struct Int : Base<PropertyType::Int, int64_t> {
     {
         // Section odd and even numbers.
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
         return value.get_int() % 2;
     }
@@ -94,7 +94,7 @@ struct Bool : Base<PropertyType::Bool, bool> {
     {
         // Section true from false
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
         return value.get_bool();
     }
@@ -125,9 +125,9 @@ struct Float : Base<PropertyType::Float, float> {
     {
         // Section odd and even numbers.
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
-        return int(value.get_float()) % 2;
+        return (int(value.get_float()) % 2) ? 1.0 : 0.0;
     }
 
     static size_t expected_size()
@@ -156,9 +156,9 @@ struct Double : Base<PropertyType::Double, double> {
     {
         // Section odd and even numbers.
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
-        return int(value.get_double()) % 2;
+        return (int(value.get_double()) % 2) ? 1.0 : 0.0;
     }
 
     static size_t expected_size()
@@ -190,7 +190,7 @@ struct String : Base<PropertyType::String, StringData> {
     {
         // Return first char of string.
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
         auto str = value.get_string();
         return str.size() > 0 ? str.prefix(1) : str;
@@ -225,7 +225,7 @@ struct Binary : Base<PropertyType::Data, BinaryData> {
     static Mixed comparison_value(Mixed value)
     {
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
         return value.get_binary();
     }
@@ -251,16 +251,16 @@ struct Date : Base<PropertyType::Date, Timestamp> {
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Foo", "Bar"};
+        return {Timestamp(1, 1), Timestamp(2, 1)};
     }
 
     static Mixed comparison_value(Mixed value)
     {
         // Seperate by size of data
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
-        return value.get_timestamp().get_seconds() < 10 ? "Foo" : "Bar";
+        return value.get_timestamp().get_seconds() < 10 ? Timestamp(1, 1) : Timestamp(2, 1);
     }
 
     static size_t expected_size()
@@ -289,13 +289,13 @@ struct MixedVal : Base<PropertyType::Mixed, realm::Mixed> {
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Empty", "Numerics", "Alphanumeric"};
+        return {Mixed(), "Numerics", "Alphanumeric"};
     }
 
     static Mixed comparison_value(Mixed value)
     {
         if (value.is_null()) {
-            return "Empty";
+            return Mixed();
         }
         // Seperate numeric from non numeric
         return Mixed::is_numeric(value.get_type()) ? "Numerics" : "Alphanumeric";
@@ -333,16 +333,16 @@ struct OID : Base<PropertyType::ObjectId, ObjectId> {
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Foo", "Bar"};
+        return {ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa"), ObjectId("bbbbbbbbbbbbbbbbbbbbbbbb")};
     }
 
     static Mixed comparison_value(Mixed value)
     {
         // Seperate by sections containing the same ObjectId's
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
-        return value.get_object_id() == ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa") ? "Foo" : "Bar";
+        return value.get_object_id();
     }
 
     static size_t expected_size()
@@ -375,16 +375,16 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
 
     static std::vector<Mixed> expected_keys()
     {
-        return {"Foo", "Bar"};
+        return {realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999")};
     }
 
     static Mixed comparison_value(Mixed value)
     {
         // Seperate by sections containing the same UUID's
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
-        return value.get_uuid() == realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962") ? "Foo" : "Bar";
+        return value.get_uuid();
     }
 
     static size_t expected_size()
@@ -412,16 +412,16 @@ struct Decimal : Base<PropertyType::Decimal, Decimal128> {
 
     static std::vector<Mixed> expected_keys()
     {
-        return {true, false};
+        return {Decimal128("1"), Decimal128("0")};
     }
 
     static Mixed comparison_value(Mixed value)
     {
         // Seperate smaller values
         if (value.is_null()) {
-            return "nulls";
+            return Mixed();
         }
-        return value.get_decimal() < Decimal128("876.54e32");
+        return value.get_decimal() < Decimal128("876.54e32") ? Decimal128("1") : Decimal128("0");
     }
 
     static size_t expected_size()
@@ -464,7 +464,7 @@ struct BoxedOptional : BaseT {
     static std::vector<Mixed> expected_keys()
     {
         auto exp_keys = BaseT::expected_keys();
-        exp_keys.insert(exp_keys.begin(), "nulls");
+        exp_keys.insert(exp_keys.begin(), Mixed());
         return exp_keys;
     }
 };
@@ -510,7 +510,7 @@ struct UnboxedOptional : BaseT {
     static std::vector<Mixed> expected_keys()
     {
         auto exp_keys = BaseT::expected_keys();
-        exp_keys.insert(exp_keys.begin(), "nulls");
+        exp_keys.insert(exp_keys.begin(), Mixed());
         return exp_keys;
     }
 };
