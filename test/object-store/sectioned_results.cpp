@@ -375,7 +375,8 @@ struct UUID : Base<PropertyType::UUID, realm::UUID> {
 
     static std::vector<Mixed> expected_keys()
     {
-        return {realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"), realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999")};
+        return {realm::UUID("1a241101-e2bb-4255-8caf-4136c566a962"),
+                realm::UUID("1b241101-a2b3-4255-8caf-4136c566a999")};
     }
 
     static Mixed comparison_value(Mixed value)
