@@ -2999,7 +2999,6 @@ TEST_TYPES(Table_ListOps, Prop<Int>, Prop<Float>, Prop<Double>, Prop<Decimal>, P
     ColKey col = table.add_column_list(TEST_TYPE::data_type, "values", TEST_TYPE::is_nullable);
 
     Obj obj = table.create_object();
-    Obj obj1 = obj;
     Lst<type> list = obj.get_list<type>(col);
     list.add(gen.convert_for_test<underlying_type>(1));
     list.add(gen.convert_for_test<underlying_type>(2));
@@ -3496,7 +3495,7 @@ NONCONCURRENT_TEST(Table_object_sequential)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                const Obj o = table->get_object(ObjKey(i));
+                table->get_object(ObjKey(i));
             }
         }
 
@@ -3657,7 +3656,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                const Obj o = table->get_object(ObjKey(key_values[i]));
+                table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -3779,7 +3778,7 @@ NONCONCURRENT_TEST(Table_object_random)
 
         for (int j = 0; j < num_runs; ++j) {
             for (int i = 0; i < nb_rows; i++) {
-                const Obj o = table->get_object(ObjKey(key_values[i]));
+                table->get_object(ObjKey(key_values[i]));
             }
         }
 
@@ -5034,19 +5033,19 @@ void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type
     // insert elements 0 - 999
     for (int j = 0; j < 1000; ++j) {
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        table->create_object(ObjKey(j)).set_all(value.value);
         reference[j] = std::move(value);
     }
     // insert elements 10000 - 10999
     for (int j = 10000; j < 11000; ++j) {
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        table->create_object(ObjKey(j)).set_all(value.value);
         reference[j] = std::move(value);
     }
     // insert in between previous groups
     for (int j = 4000; j < 7000; ++j) {
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->create_object(ObjKey(j)).set_all(value.value);
+        table->create_object(ObjKey(j)).set_all(value.value);
         reference[j] = std::move(value);
     }
     check_table_values(test_context, table, col, reference);
@@ -5057,8 +5056,7 @@ void test_tables(TestContext& test_context, DBRef sg, const realm::DataType type
         if (it == reference.end()) // skip over holes in the key range
             continue;
         managed<T> value = generator<T>::get(optional);
-        Obj o = table->get_object(ObjKey(j));
-        o.set<T>(col, value.value);
+        table->get_object(ObjKey(j)).set<T>(col, value.value);
         it->second = value;
     }
     check_table_values(test_context, table, col, reference);
@@ -5120,8 +5118,7 @@ void test_dynamic_conversion(TestContext& test_context, DBRef sg, realm::DataTyp
     value_copier<TFrom, TTo> copier(false);
     for (int j = 0; j < 10; ++j) {
         managed<TFrom> value = generator<TFrom>::get(from_nullable);
-        Obj o =
-            table->create_object(ObjKey(j)).set_all(value.value); // <-- so set_all works even if it doesn't set all?
+        table->create_object(ObjKey(j)).set_all(value.value);
         TTo conv_value = copier(
             value.value, to_nullable); // one may argue that using the same converter for ref and dut is.. mmmh...
         reference[j] = managed<TTo>{conv_value};
@@ -5453,7 +5450,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyList)
     auto parent_ll = o.get_linklist(ck);
     Obj o2 = parent_ll.create_and_insert_linked_object(0);
     Obj o3 = parent_ll.create_and_insert_linked_object(1);
-    Obj o4 = parent_ll.create_and_insert_linked_object(0);
+    parent_ll.create_and_insert_linked_object(0);
     auto o2_ll = o2.get_linklist(col_recurse);
     auto o3_ll = o3.get_linklist(col_recurse);
     o2_ll.create_and_insert_linked_object(0);
@@ -5501,7 +5498,7 @@ TEST(Table_EmbeddedObjectCreateAndDestroyDictionary)
     CHECK_EQUAL(obj_path.path_from_top[0].index.get_string(), "one");
 
     Obj o3 = parent_dict.create_and_insert_linked_object("two");
-    Obj o4 = parent_dict.create_and_insert_linked_object("three");
+    parent_dict.create_and_insert_linked_object("three");
 
     CHECK_EQUAL(parent_dict.get_object("one").get_key(), o2.get_key());
 

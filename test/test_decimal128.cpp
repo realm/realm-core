@@ -301,7 +301,7 @@ TEST(Decimal_Distinct)
         auto table = wt->add_table("Foo");
         auto col_dec = table->add_column(type_Decimal, "price", true);
         for (int i = 1; i < 100; i++) {
-            auto obj = table->create_object().set(col_dec, Decimal128(i % 10));
+            table->create_object().set(col_dec, Decimal128(i % 10));
         }
 
         wt->commit();
