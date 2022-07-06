@@ -3824,16 +3824,22 @@ RLM_API void realm_register_user_code_callback_error(void* usercode_error) RLM_A
 
 
 typedef struct realm_mongodb_collection realm_mongodb_collection_t;
-typedef struct realm_mongodb_find_and_modify_options {
+
+typedef struct realm_mongodb_find_options {
+    realm_string_t projection_bson;
+    realm_string_t sort_bson;
+    int64_t limit;
+} realm_mongodb_find_options_t;
+
+typedef struct realm_mongodb_find_one_and_modify_options {
     realm_string_t projection_bson;
     realm_string_t sort_bson;
     bool upsert;
     bool return_new_document;
-    int64_t limit;
-} realm_mongodb_find_and_modify_options_t;
+}realm_mongodb_find_one_and_modify_options_t;
+
 typedef void (*realm_mongodb_callback_t)(realm_userdata_t userdata, realm_string_t bson,
                                          realm_app_error_t* app_error);
-
 
 /**
  *  Get mongo db collection from realm mongo db client
@@ -3848,159 +3854,201 @@ RLM_API realm_mongodb_collection_t* realm_mongo_collection_get(realm_user_t* use
 
 /**
  *  Implement find for mongodb collection
- *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param collection ptr to the collection to fetch from
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param options set of possible options to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_find(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                         realm_mongodb_find_and_modify_options_t* options, realm_userdata_t data,
-                                         realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback);
+RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection,
+                                         realm_string_t filter_ejson,
+                                         const realm_mongodb_find_options_t* options,
+                                         realm_userdata_t data,
+                                         realm_free_userdata_func_t delete_data,
+                                         realm_mongodb_callback_t callback);
 
 /**
  *  Implement find_one for mongodb collection
- *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param collection ptr to the collection to fetch from
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param options set of possible options to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_find_one(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                             realm_mongodb_find_and_modify_options_t* options, realm_userdata_t data,
+RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collection,
+                                             realm_string_t filter_ejson,
+                                             const realm_mongodb_find_options_t* options,
+                                             realm_userdata_t data,
                                              realm_free_userdata_func_t delete_data,
                                              realm_mongodb_callback_t callback);
 
 /**
  *  Implement aggregate for mongodb collection
- *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param collection ptr to the collection to fetch from
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                              realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection,
+                                              realm_string_t filter_ejson,
+                                              realm_userdata_t data,
+                                              realm_free_userdata_func_t delete_data,
                                               realm_mongodb_callback_t callback);
 
 /**
  *  Implement count for mongodb collection
- *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
- *  @param options set of possible options to apply to this operation
+ *  @param collection ptr to the collection to fetch from
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
+ *  @param limit number of collectio
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_count(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                          realm_mongodb_find_and_modify_options_t* options, realm_userdata_t data,
-                                          realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback);
+RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection,
+                                          realm_string_t filter_ejson,
+                                          int64_t limit,
+                                          realm_userdata_t data,
+                                          realm_free_userdata_func_t delete_data,
+                                          realm_mongodb_callback_t callback);
 
 /**
  *  Implement insert_one for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection,
+                                               realm_string_t filter_ejson,
+                                               realm_userdata_t data,
+                                               realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback);
 
 /**
  *  Implement insert_many for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection,
+                                                realm_string_t filter_ejson,
+                                                realm_userdata_t data,
+                                                realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback);
 
 /**
  *  Implement delete_one for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection,
+                                               realm_string_t filter_ejson,
+                                               realm_userdata_t data,
+                                               realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback);
 
 /**
  *  Implement delete_many for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
  */
-RLM_API void realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection,
+                                                realm_string_t filter_ejson,
+                                                realm_userdata_t data,
+                                                realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback);
 
 /**
  *  Implement update_one for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
- *  @param options set of possible options to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
+ *  @param update_ejson extended json string serialization representing the update to apply to this operation
+ *  @param upsert boolean flag to set for enable or disable upsert for the collection
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_update_one(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                               realm_string_t doc, realm_mongodb_find_and_modify_options_t* options,
-                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* collection,
+                                               realm_string_t filter_ejson,
+                                               realm_string_t update_ejson,
+                                               bool upsert,
+                                               realm_userdata_t data,
+                                               realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback);
 
 /**
  *  Implement update_many for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
- *  @param options set of possible options to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
+ *  @param update_ejson extended json string serialization representing the update to apply to this operation
+ *  @param upsert boolean flag to set for enable or disable upsert for the collection
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_update_many(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                                realm_string_t doc, realm_mongodb_find_and_modify_options_t* options,
-                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* collection,
+                                                realm_string_t filter_ejson,
+                                                realm_string_t update_ejson,
+                                                bool upsert,
+                                                realm_userdata_t data,
+                                                realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback);
 
 /**
  *  Implement find one and update for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
+ *  @param update_ejson extended json string serialization representing the update to apply to this operation
  *  @param options set of possible options to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                                        realm_string_t doc,
-                                                        realm_mongodb_find_and_modify_options_t* options,
-                                                        realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection,
+                                                        realm_string_t filter_ejson,
+                                                        realm_string_t update_ejson,
+                                                        const realm_mongodb_find_one_and_modify_options_t* options,
+                                                        realm_userdata_t data,
+                                                        realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
 /**
  *  Implement find_one and replace for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
+ *  @param replacement_ejson extended json string serialization representing the replacement object to apply to this operation
  *  @param options set of possible options to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_find_one_and_replace(realm_mongodb_collection_t* collection,
-                                                         realm_string_t filter, realm_string_t doc,
-                                                         realm_mongodb_find_and_modify_options_t* options,
+RLM_API bool realm_mongo_collection_find_one_and_replace(realm_mongodb_collection_t* collection,
+                                                         realm_string_t filter_ejson,
+                                                         realm_string_t replacement_ejson,
+                                                         const realm_mongodb_find_one_and_modify_options_t* options,
                                                          realm_userdata_t data,
                                                          realm_free_userdata_func_t delete_data,
                                                          realm_mongodb_callback_t callback);
@@ -4008,15 +4056,18 @@ RLM_API void realm_mongo_collection_find_one_and_replace(realm_mongodb_collectio
 /**
  *  Implement find_one and delete  for mongodb collection
  *  @param collection name of the collection to fetch from
- *  @param filter string representing the filter to apply to this operation
+ *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
  *  @param options set of possible options to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
+ *  @return True if completes successfully, False otherwise
  */
-RLM_API void realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection, realm_string_t filter,
-                                                        realm_mongodb_find_and_modify_options_t* options,
-                                                        realm_userdata_t data, realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection,
+                                                        realm_string_t filter_ejson,
+                                                        const realm_mongodb_find_one_and_modify_options_t* options,
+                                                        realm_userdata_t data,
+                                                        realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
 
