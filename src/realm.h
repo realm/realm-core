@@ -3836,7 +3836,7 @@ typedef struct realm_mongodb_find_one_and_modify_options {
     realm_string_t sort_bson;
     bool upsert;
     bool return_new_document;
-}realm_mongodb_find_one_and_modify_options_t;
+} realm_mongodb_find_one_and_modify_options_t;
 
 typedef void (*realm_mongodb_callback_t)(realm_userdata_t userdata, realm_string_t bson,
                                          realm_app_error_t* app_error);
@@ -3862,12 +3862,9 @@ RLM_API realm_mongodb_collection_t* realm_mongo_collection_get(realm_user_t* use
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection,
-                                         realm_string_t filter_ejson,
-                                         const realm_mongodb_find_options_t* options,
-                                         realm_userdata_t data,
-                                         realm_free_userdata_func_t delete_data,
-                                         realm_mongodb_callback_t callback);
+RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                         const realm_mongodb_find_options_t* options, realm_userdata_t data,
+                                         realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback);
 
 /**
  *  Implement find_one for mongodb collection
@@ -3879,10 +3876,8 @@ RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection,
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collection,
-                                             realm_string_t filter_ejson,
-                                             const realm_mongodb_find_options_t* options,
-                                             realm_userdata_t data,
+RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                             const realm_mongodb_find_options_t* options, realm_userdata_t data,
                                              realm_free_userdata_func_t delete_data,
                                              realm_mongodb_callback_t callback);
 
@@ -3895,10 +3890,8 @@ RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collect
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection,
-                                              realm_string_t filter_ejson,
-                                              realm_userdata_t data,
-                                              realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                              realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                               realm_mongodb_callback_t callback);
 
 /**
@@ -3911,12 +3904,9 @@ RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collec
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection,
-                                          realm_string_t filter_ejson,
-                                          int64_t limit,
-                                          realm_userdata_t data,
-                                          realm_free_userdata_func_t delete_data,
-                                          realm_mongodb_callback_t callback);
+RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                          int64_t limit, realm_userdata_t data,
+                                          realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback);
 
 /**
  *  Implement insert_one for mongodb collection
@@ -3927,10 +3917,8 @@ RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection,
-                                               realm_string_t filter_ejson,
-                                               realm_userdata_t data,
-                                               realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback);
 
 /**
@@ -3942,10 +3930,8 @@ RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* colle
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection,
-                                                realm_string_t filter_ejson,
-                                                realm_userdata_t data,
-                                                realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback);
 
 /**
@@ -3957,10 +3943,8 @@ RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* coll
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection,
-                                               realm_string_t filter_ejson,
-                                               realm_userdata_t data,
-                                               realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback);
 
 /**
@@ -3971,10 +3955,8 @@ RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* colle
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
  */
-RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection,
-                                                realm_string_t filter_ejson,
-                                                realm_userdata_t data,
-                                                realm_free_userdata_func_t delete_data,
+RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback);
 
 /**
@@ -3988,11 +3970,8 @@ RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* coll
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* collection,
-                                               realm_string_t filter_ejson,
-                                               realm_string_t update_ejson,
-                                               bool upsert,
-                                               realm_userdata_t data,
+RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                               realm_string_t update_ejson, bool upsert, realm_userdata_t data,
                                                realm_free_userdata_func_t delete_data,
                                                realm_mongodb_callback_t callback);
 
@@ -4007,11 +3986,8 @@ RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* colle
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* collection,
-                                                realm_string_t filter_ejson,
-                                                realm_string_t update_ejson,
-                                                bool upsert,
-                                                realm_userdata_t data,
+RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                                realm_string_t update_ejson, bool upsert, realm_userdata_t data,
                                                 realm_free_userdata_func_t delete_data,
                                                 realm_mongodb_callback_t callback);
 
@@ -4027,31 +4003,27 @@ RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* coll
  *  @return True if completes successfully, False otherwise
  */
 RLM_API bool realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection,
-                                                        realm_string_t filter_ejson,
-                                                        realm_string_t update_ejson,
+                                                        realm_string_t filter_ejson, realm_string_t update_ejson,
                                                         const realm_mongodb_find_one_and_modify_options_t* options,
-                                                        realm_userdata_t data,
-                                                        realm_free_userdata_func_t delete_data,
+                                                        realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
 /**
  *  Implement find_one and replace for mongodb collection
  *  @param collection name of the collection to fetch from
  *  @param filter_ejson extended json string serialization representing the filter to apply to this operation
- *  @param replacement_ejson extended json string serialization representing the replacement object to apply to this operation
+ *  @param replacement_ejson extended json string serialization representing the replacement object to apply to this
+ * operation
  *  @param options set of possible options to apply to this operation
  *  @param data user data to pass down to this function
  *  @param delete_data deleter for user data
  *  @param callback to invoke with the result
  *  @return True if completes successfully, False otherwise
  */
-RLM_API bool realm_mongo_collection_find_one_and_replace(realm_mongodb_collection_t* collection,
-                                                         realm_string_t filter_ejson,
-                                                         realm_string_t replacement_ejson,
-                                                         const realm_mongodb_find_one_and_modify_options_t* options,
-                                                         realm_userdata_t data,
-                                                         realm_free_userdata_func_t delete_data,
-                                                         realm_mongodb_callback_t callback);
+RLM_API bool realm_mongo_collection_find_one_and_replace(
+    realm_mongodb_collection_t* collection, realm_string_t filter_ejson, realm_string_t replacement_ejson,
+    const realm_mongodb_find_one_and_modify_options_t* options, realm_userdata_t data,
+    realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback);
 
 /**
  *  Implement find_one and delete  for mongodb collection
@@ -4066,8 +4038,7 @@ RLM_API bool realm_mongo_collection_find_one_and_replace(realm_mongodb_collectio
 RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection,
                                                         realm_string_t filter_ejson,
                                                         const realm_mongodb_find_one_and_modify_options_t* options,
-                                                        realm_userdata_t data,
-                                                        realm_free_userdata_func_t delete_data,
+                                                        realm_userdata_t data, realm_free_userdata_func_t delete_data,
                                                         realm_mongodb_callback_t callback);
 
 
