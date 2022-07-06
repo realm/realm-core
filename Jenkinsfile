@@ -775,7 +775,7 @@ def doBuildApplePlatform(String platform, String buildType, boolean test = false
 
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-13.1.app/Contents/Developer/',
                      'XCODE_14_DEVELOPER_DIR=/Applications/Xcode-14.app/Contents/Developer/']) {
-                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}'"
+                sh "tools/build-apple-device.sh -p '${platform}' -c '${buildType}' -v '${gitDescribeVersion}'"
 
                 if (test) {
                     dir('build-xcode-platforms') {
