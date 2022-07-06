@@ -51,7 +51,7 @@ using SectionedResultsNotificatonCallback = util::UniqueFunction<void(SectionedR
 class ResultsSection {
 public:
     ResultsSection();
-    ResultsSection& operator=(ResultsSection&& other);
+    //    ResultsSection& operator=(ResultsSection&& other);
 
     /// Retrieve an element from the section for a given index.
     Mixed operator[](size_t idx) const;
@@ -92,7 +92,7 @@ private:
 
     SectionedResults* m_parent;
     Mixed m_key;
-    util::Optional<std::string> m_key_buffer;
+    std::unique_ptr<char[]> m_key_buffer;
 };
 
 /**

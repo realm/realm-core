@@ -219,43 +219,22 @@ private:
 };
 
 template <typename StringType>
-void create_buffered_key(Mixed& key, util::Optional<std::string>& buffer, StringType value)
+void create_buffered_key(Mixed& key, std::unique_ptr<char[]>& buffer, StringType value)
 {
     if (value.size() == 0) {
         key = StringType("", 0);
     }
     else {
-        buffer = std::string(value.data(), value.size());
-        key = Mixed(buffer);
+        buffer = std::make_unique<char[]>(value.size());
+        strcpy(buffer.get(), value.data());
+        key = StringType(buffer.get(), value.size());
     }
 }
 
 ResultsSection::ResultsSection()
     : m_parent(nullptr)
     , m_key(Mixed())
-    , m_key_buffer(util::none)
 {
-}
-
-ResultsSection& ResultsSection::operator=(ResultsSection&& other)
-{
-    std::swap(m_parent, other.m_parent);
-    if (other.m_key_buffer) {
-        std::swap(m_key_buffer, other.m_key_buffer);
-        if (other.m_key.is_type(type_String)) {
-            m_key = StringData(m_key_buffer->data(), m_key_buffer->size());
-        }
-        else if (other.m_key.is_type(type_String)) {
-            m_key = BinaryData(m_key_buffer->data(), m_key_buffer->size());
-        }
-        else {
-            REALM_UNREACHABLE();
-        }
-    }
-    else {
-        std::swap(m_key, other.m_key);
-    }
-    return *this;
 }
 
 ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
@@ -276,42 +255,57 @@ ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
 bool ResultsSection::is_valid() const
 {
     util::CheckedUniqueLock lock(m_parent->m_mutex);
+    if (!m_parent->is_valid())
+        return false;
+    // See if we need to recalculate the sections before
+    // searching for the key.
     m_parent->calculate_sections_if_required();
-    auto it = m_parent->m_sections.find(m_key);
-    return it != m_parent->m_sections.end() && m_parent->is_valid();
+    if (m_parent->m_sections.find(m_key) == m_parent->m_sections.end()) {
+        return false;
+    }
+    return true;
 }
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
     util::CheckedUniqueLock lock(m_parent->m_mutex);
+    if (!m_parent->is_valid())
+        throw std::logic_error("The parent Results collection is not valid.");
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     REALM_ASSERT(it != m_parent->m_sections.end());
-    REALM_ASSERT(m_parent->is_valid() && idx < it->second.indices.size());
+    auto s = it->second.indices.size();
+    if (idx >= s)
+        std::out_of_range(util::format("Requested index %1 greater than max %2", idx, s - 1));
     return m_parent->m_results.get_any(it->second.indices[idx]);
 }
 
 Mixed ResultsSection::key()
 {
-    REALM_ASSERT(is_valid());
+    if (!is_valid())
+        throw std::logic_error("This ResultsSection is not in a valid state.");
     return m_key;
 }
 
 size_t ResultsSection::index()
 {
     util::CheckedUniqueLock lock(m_parent->m_mutex);
+    if (!m_parent->is_valid())
+        throw std::logic_error("The parent Results collection is not valid.");
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(m_parent->is_valid() && it != m_parent->m_sections.end());
+    REALM_ASSERT(it != m_parent->m_sections.end());
     return it->second.index;
 }
 
 size_t ResultsSection::size()
 {
     util::CheckedUniqueLock lock(m_parent->m_mutex);
+    if (!m_parent->is_valid())
+        throw std::logic_error("The parent Results collection is not valid.");
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(m_parent->is_valid() && it != m_parent->m_sections.end());
+    REALM_ASSERT(it != m_parent->m_sections.end());
     return it->second.indices.size();
 }
 
@@ -416,7 +410,8 @@ void SectionedResults::calculate_sections()
 size_t SectionedResults::size()
 {
     util::CheckedUniqueLock lock(m_mutex);
-    REALM_ASSERT(is_valid());
+    if (!is_valid())
+        throw std::logic_error("The parent Results collection is not valid.");
     calculate_sections_if_required();
     return m_sections.size();
 }
@@ -424,7 +419,8 @@ size_t SectionedResults::size()
 ResultsSection SectionedResults::operator[](size_t idx)
 {
     auto s = size();
-    REALM_ASSERT(idx < s);
+    if (idx >= s)
+        std::out_of_range(util::format("Requested index %1 greater than max %2", idx, s - 1));
     util::CheckedUniqueLock lock(m_mutex);
     auto it = m_current_section_index_to_key_lookup.find(idx);
     REALM_ASSERT(it != m_current_section_index_to_key_lookup.end());
@@ -435,7 +431,8 @@ ResultsSection SectionedResults::operator[](size_t idx)
 ResultsSection SectionedResults::operator[](Mixed key)
 {
     util::CheckedUniqueLock lock(m_mutex);
-    REALM_ASSERT(is_valid());
+    if (!is_valid())
+        throw std::logic_error("The parent Results collection is not valid.");
     calculate_sections_if_required();
     auto it = m_sections.find(key);
     if (it == m_sections.end()) {
