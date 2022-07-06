@@ -52,8 +52,7 @@ int64_t to_int64(size_t value) noexcept;
 
 class MemRef {
 public:
-    MemRef() noexcept;
-    ~MemRef() noexcept;
+    MemRef() noexcept = default;
 
     MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept;
     MemRef(ref_type ref, Allocator& alloc) noexcept;
@@ -64,14 +63,15 @@ public:
     void set_addr(char* addr);
 
 private:
-    char* m_addr;
-    ref_type m_ref;
+    char* m_addr = nullptr;
+    ref_type m_ref = 0;
 #if REALM_ENABLE_MEMDEBUG
     // Allocator that created m_ref. Used to verify that the ref is valid whenever you call
     // get_ref()/get_addr and that it e.g. has not been free'ed
     const Allocator* m_alloc = nullptr;
 #endif
 };
+static_assert(std::is_trivially_copyable_v<MemRef>);
 
 
 /// The common interface for Realm allocators.
@@ -131,7 +131,7 @@ public:
     /// therefore, is not part of an actual database.
     static Allocator& get_default() noexcept;
 
-    virtual ~Allocator() noexcept;
+    virtual ~Allocator() noexcept = default;
 
     // Disable copying. Copying an allocator can produce double frees.
     Allocator(const Allocator&) = delete;
@@ -443,15 +443,6 @@ inline int64_t to_int64(size_t value) noexcept
     return static_cast<int64_t>(value);
 }
 
-
-inline MemRef::MemRef() noexcept
-    : m_addr(nullptr)
-    , m_ref(0)
-{
-}
-
-inline MemRef::~MemRef() noexcept {}
-
 inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
     : m_addr(addr)
     , m_ref(ref)
@@ -562,8 +553,6 @@ inline Allocator::Allocator() noexcept
     m_instance_versioning_counter = 0;
     m_ref_translation_ptr = nullptr;
 }
-
-inline Allocator::~Allocator() noexcept {}
 
 // performance critical part of the translation process. Less critical code is in translate_less_critical.
 inline char* Allocator::translate_critical(RefTranslation* ref_translation_ptr, ref_type ref) const noexcept

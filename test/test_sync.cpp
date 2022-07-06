@@ -5892,7 +5892,7 @@ NONCONCURRENT_TEST_TYPES(Sync_PrimaryKeyTypes, Int, String, ObjectId, UUID, util
         auto obj_1 = table_1->create_object_with_primary_key(sequence_next<underlying_type>());
         auto obj_2 = table_2->create_object_with_primary_key(sequence_next<underlying_type>());
         if constexpr (is_optional) {
-            auto obj_3 = table_2->create_object_with_primary_key(default_or_null);
+            table_2->create_object_with_primary_key(default_or_null);
         }
 
         auto list = obj_1.template get_list<TEST_TYPE>("oids");
@@ -6491,7 +6491,7 @@ TEST(Sync_BundledRealmFile)
 
     write_transaction_notifying_session(db, session, [](WriteTransaction& tr) {
         auto foos = tr.get_group().add_table_with_primary_key("class_Foo", type_Int, "id");
-        auto foo = foos->create_object_with_primary_key(123);
+        foos->create_object_with_primary_key(123);
     });
 
     // We cannot write out file if changes are not synced to server
@@ -6570,7 +6570,7 @@ TEST(Sync_UpgradeToClientHistory)
         auto col_link = baas->add_column(*foos, "link");
 
         auto foo = foos->create_object_with_primary_key("123").set(col_str, "Goodbye");
-        auto baa = baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
+        baas->create_object_with_primary_key(888).set(col_link, foo.get_key());
 
         tr->commit();
     }
@@ -6589,7 +6589,7 @@ TEST(Sync_UpgradeToClientHistory)
 
     write_transaction_notifying_session(db_1, session_1, [](WriteTransaction& tr) {
         auto foos = tr.get_group().get_table("class_Foo");
-        auto foo = foos->create_object_with_primary_key("456");
+        foos->create_object_with_primary_key("456");
     });
     session_1.wait_for_upload_complete_or_client_stopped();
     session_2.wait_for_upload_complete_or_client_stopped();
