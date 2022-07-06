@@ -175,11 +175,10 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
     return false;
 }
 
-#if (REALM_ARCHITECTURE_X86_32 && REALM_IOS) || (REALM_ARCHITECTURE_X86_32 && REALM_WATCHOS) || (REALM_ARCHITECTURE_X86_64 && REALM_WATCHOS) || (REALM_ARCHITECTURE_ARM_64 && REALM_WATCHOS)
-bool (*s_mmap_predicate)(size_t);
-#else
-thread_local bool (*s_mmap_predicate)(size_t);
-#endif // THREAD_LOCAL NOT SUPPORTED ARCHITECTURES
+#if !defined(__clang__) || REALM_HAVE_CLANG_FEATURE(cxx_thread_local)
+thread_local
+#endif
+    bool (*s_mmap_predicate)(size_t);
 
 void SimulatedFailure::do_prime_mmap(bool (*predicate)(size_t))
 {
