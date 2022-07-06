@@ -463,7 +463,7 @@ SectionedResults SectionedResults::copy(Results&& results)
     // not need to set it.
     std::list<std::string> str_buffers;
     std::map<Mixed, Section> sections;
-    std::unordered_map<size_t, Mixed> current_section_index_to_key_lookup;
+    std::map<size_t, Mixed> current_section_index_to_key_lookup;
 
     for (auto& [key, section] : m_sections) {
         Mixed new_key;

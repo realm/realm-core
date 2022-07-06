@@ -162,7 +162,7 @@ private:
 
     /// Used for creating a frozen or snapshot of SectionedResults.
     SectionedResults(Results&& results, std::map<Mixed, Section>&& sections,
-                     std::unordered_map<size_t, Mixed>&& current_section_index_to_key_lookup,
+                     std::map<size_t, Mixed>&& current_section_index_to_key_lookup,
                      std::list<std::string>&& current_str_buffers)
         : has_performed_initial_evalutation(true)
         , m_results(std::move(results))
@@ -187,12 +187,12 @@ private:
     SectionKeyFunc m_callback;
     std::map<Mixed, Section> m_sections GUARDED_BY(m_mutex);
     // Returns the key of the current section from its index.
-    std::unordered_map<size_t, Mixed> m_current_section_index_to_key_lookup GUARDED_BY(m_mutex);
+    std::map<size_t, Mixed> m_current_section_index_to_key_lookup GUARDED_BY(m_mutex);
     // Stores the Key, Section Index of the previous section
     // so we can efficiently calculate the collection change set.
-    std::unordered_map<Mixed, size_t> m_previous_key_to_index_lookup;
+    std::map<Mixed, size_t> m_previous_key_to_index_lookup;
     // Returns the key of the previous section from its index.
-    std::unordered_map<size_t, Mixed> m_prev_section_index_to_key;
+    std::map<size_t, Mixed> m_prev_section_index_to_key;
     // By passing the index of the object from the underlying `Results`,
     // this will give a pair with the section index of the object, and the position of the object in that section.
     // This is used for parsing the indices in CollectionChangeSet to section indices.
