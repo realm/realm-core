@@ -2024,7 +2024,7 @@ void run_benchmark(BenchmarkResults& results, bool force_full = false)
 
         // Open a SharedGroup:
         realm::test_util::DBTestPathGuard realm_path(
-            test_util::get_test_path("benchmark_common_tasks" + ident, ".realm"));
+            test_util::get_test_path("benchmark_common_tasks_" + ident, ".realm"));
         DBRef group;
         group = create_new_shared_group(realm_path, level, key);
         benchmark.before_all(group);
@@ -2151,6 +2151,22 @@ int benchmark_common_tasks_main()
 
 int main(int argc, const char** argv)
 {
+    if (argc > 1) {
+        std::string arg_path = argv[1];
+        if (arg_path == "-h" || arg_path == "--help") {
+            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH]" << std::endl
+                      << "Run the common tasks benchmark test application." << std::endl
+                      << "Results are placed in the executable directory by default." << std::endl
+                      << std::endl
+                      << "Arguments:" << std::endl
+                      << "  -h, --help      display this help" << std::endl
+                      << "  PATH            alternate path to store the results files;" << std::endl
+                      << "                  this path should end with a slash." << std::endl
+                      << std::endl;
+            return 1;
+        }
+    }
+
     if (!initialize_test_path(argc, argv))
         return 1;
     return benchmark_common_tasks_main();

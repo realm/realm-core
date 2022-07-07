@@ -99,6 +99,7 @@ inline void erase(TableRef table, const OrderVec& order)
 
 } // anonymous namepsace
 
+extern "C" int benchmark_crud_main();
 
 int benchmark_crud_main()
 {
@@ -267,6 +268,22 @@ int benchmark_crud_main()
 
 int main(int argc, const char** argv)
 {
+    if (argc > 1) {
+        std::string arg_path = argv[1];
+        if (arg_path == "-h" || arg_path == "--help") {
+            std::cout << "Usage: " << argv[0] << " [-h|--help] [PATH]" << std::endl
+                      << "Run the CRUD operations benchmark test application." << std::endl
+                      << "Results are placed in the executable directory by default." << std::endl
+                      << std::endl
+                      << "Arguments:" << std::endl
+                      << "  -h, --help      display this help" << std::endl
+                      << "  PATH            alternate path to store the results files;" << std::endl
+                      << "                  this path should end with a slash." << std::endl
+                      << std::endl;
+            return 1;
+        }
+    }
+
     if (!initialize_test_path(argc, argv))
         return 1;
     return benchmark_crud_main();
