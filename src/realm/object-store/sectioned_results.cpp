@@ -254,30 +254,35 @@ ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
 
 bool ResultsSection::is_valid() const
 {
-    util::CheckedUniqueLock lock(m_parent->m_mutex);
+    return do_is_valid().first;
+}
+
+std::pair<bool, util::Optional<Section&>> ResultsSection::do_is_valid() const
+{
     if (!m_parent->is_valid())
-        return false;
+        return {false, util::none};
+    util::CheckedUniqueLock lock(m_parent->m_mutex);
     // See if we need to recalculate the sections before
     // searching for the key.
     m_parent->calculate_sections_if_required();
-    if (m_parent->m_sections.find(m_key) == m_parent->m_sections.end())
-        return false;
-
-    return true;
+    auto it = m_parent->m_sections.find(m_key);
+    if (it == m_parent->m_sections.end())
+        return {false, util::none};
+    else
+        return {true, it->second};
 }
+
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
-    util::CheckedUniqueLock lock(m_parent->m_mutex);
-    if (!m_parent->is_valid())
-        throw std::logic_error("The parent Results collection is not valid.");
-    m_parent->calculate_sections_if_required();
-    auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(it != m_parent->m_sections.end());
-    auto s = it->second.indices.size();
-    if (idx >= s)
-        std::out_of_range(util::format("Requested index %1 greater than max %2", idx, s - 1));
-    return m_parent->m_results.get_any(it->second.indices[idx]);
+    auto is_valid = do_is_valid();
+    if (!is_valid.first)
+        throw Results::InvalidatedException();
+    auto& section = *is_valid.second;
+    auto size = section.indices.size();
+    if (idx >= size)
+        std::out_of_range(util::format("Requested index %1 greater than max %2", idx, size - 1));
+    return m_parent->m_results.get_any(section.indices[idx]);
 }
 
 Mixed ResultsSection::key()
@@ -289,24 +294,20 @@ Mixed ResultsSection::key()
 
 size_t ResultsSection::index()
 {
-    util::CheckedUniqueLock lock(m_parent->m_mutex);
-    if (!m_parent->is_valid())
-        throw std::logic_error("The parent Results collection is not valid.");
-    m_parent->calculate_sections_if_required();
-    auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(it != m_parent->m_sections.end());
-    return it->second.index;
+    auto is_valid = do_is_valid();
+    if (!is_valid.first)
+        throw std::logic_error("This ResultsSection is not in a valid state.");
+    auto& section = *is_valid.second;
+    return section.index;
 }
 
 size_t ResultsSection::size()
 {
-    util::CheckedUniqueLock lock(m_parent->m_mutex);
-    if (!m_parent->is_valid())
-        throw std::logic_error("The parent Results collection is not valid.");
-    m_parent->calculate_sections_if_required();
-    auto it = m_parent->m_sections.find(m_key);
-    REALM_ASSERT(it != m_parent->m_sections.end());
-    return it->second.indices.size();
+    auto is_valid = do_is_valid();
+    if (!is_valid.first)
+        throw Results::InvalidatedException();
+    auto& section = *is_valid.second;
+    return section.indices.size();
 }
 
 NotificationToken ResultsSection::add_notification_callback(SectionedResultsNotificatonCallback callback,
@@ -332,7 +333,7 @@ void SectionedResults::calculate_sections_if_required()
 {
     if (m_results.m_update_policy == Results::UpdatePolicy::Never)
         return;
-    else if ((!m_results.has_changed() || m_results.is_frozen()) && has_performed_initial_evalutation)
+    else if ((m_results.is_frozen() || !m_results.has_changed()) && has_performed_initial_evalutation)
         return;
     {
         util::CheckedUniqueLock lock(m_results.m_mutex);
@@ -411,7 +412,7 @@ size_t SectionedResults::size()
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (!is_valid())
-        throw std::logic_error("The parent Results collection is not valid.");
+        throw Results::InvalidatedException();
     calculate_sections_if_required();
     return m_sections.size();
 }
@@ -432,7 +433,7 @@ ResultsSection SectionedResults::operator[](Mixed key)
 {
     util::CheckedUniqueLock lock(m_mutex);
     if (!is_valid())
-        throw std::logic_error("The parent Results collection is not valid.");
+        throw Results::InvalidatedException();
     calculate_sections_if_required();
     auto it = m_sections.find(key);
     if (it == m_sections.end()) {

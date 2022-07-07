@@ -405,8 +405,8 @@ private:
     auto dispatch(Fn&&) const REQUIRES(!m_mutex);
 
     enum class EvaluateMode { Count, Snapshot, Normal };
-    /// Return true if the Results has changed since the last call to
-    /// `has_changed()`. Note that this function is idempotent.
+    /// Returns true if the underlying table_view or collection has changed, and is waiting
+    /// for `ensure_up_to_date` to run.
     bool has_changed() REQUIRES(!m_mutex);
     void ensure_up_to_date(EvaluateMode mode = EvaluateMode::Normal) REQUIRES(m_mutex);
 
