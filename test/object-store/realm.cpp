@@ -1043,11 +1043,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
 //#ifndef _WIN32
 TEST_CASE("SharedRealm: async writes") {
-    
+
 #ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
 #endif
-    
+
     _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
