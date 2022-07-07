@@ -143,16 +143,16 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
-    : m_rw_buffer(new char[block_size]),
-      m_dst_buffer(new char[block_size])
+    : m_rw_buffer(new char[block_size])
+    , m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
     // A random iv is passed to CCCryptorReset. This iv is *not used* by Realm; we set it manually prior to
-    // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to 
+    // each call to BCryptEncrypt() and BCryptDecrypt(). We pass this random iv as an attempt to
     // suppress a false encryption security warning from the IBM Bluemix Security Analyzer (PR[#2911])
     unsigned char u_iv[kCCKeySizeAES256];
     arc4random_buf(u_iv, kCCKeySizeAES256);
-    void *iv = u_iv;
+    void* iv = u_iv;
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, iv, &m_decr);
 #elif defined(_WIN32)
@@ -522,8 +522,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (is(m->m_page_state[shadow_mapping_local_ndx], UpToDate)) {
-            memcpy(page_addr(local_page_ndx),
-                   m->page_addr(shadow_mapping_local_ndx),
+            memcpy(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
             return true;
         }
@@ -539,8 +538,8 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 
     if (!copy_up_to_date_page(local_page_ndx)) {
         size_t page_ndx_in_file = local_page_ndx + m_first_page;
-        m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
-                            addr, static_cast<size_t>(1ULL << m_page_shift));
+        m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr,
+                            static_cast<size_t>(1ULL << m_page_shift));
     }
     if (is_not(m_page_state[local_page_ndx], UpToDate | PartiallyUpToDate))
         m_num_decrypted++;
@@ -566,7 +565,8 @@ void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
         m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
-void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset, size_t end_offset) noexcept
+void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset,
+                                                size_t end_offset) noexcept
 {
     // Go through all other mappings of this file and copy changes into those mappings
     size_t page_ndx_in_file = local_page_ndx + m_first_page;
@@ -575,8 +575,7 @@ void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t be
         if (m != this && m->contains_page(page_ndx_in_file)) {
             size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
             if (is(m->m_page_state[shadow_local_page_ndx], UpToDate)) { // only keep up to data pages up to date
-                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset,
-                       page_addr(local_page_ndx) + begin_offset,
+                memcpy(m->page_addr(shadow_local_page_ndx) + begin_offset, page_addr(local_page_ndx) + begin_offset,
                        end_offset - begin_offset);
             }
             else {
@@ -599,8 +598,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
         return;
 
     const size_t page_ndx_in_file = local_page_ndx + m_first_page;
-    if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift),
-                             m_validate_buffer.get(),
+    if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), m_validate_buffer.get(),
                              static_cast<size_t>(1ULL << m_page_shift)))
         return;
 
@@ -608,8 +606,7 @@ void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
         EncryptedFileMapping* m = m_file.mappings[i];
         size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
         if (m != this && m->contains_page(page_ndx_in_file) && is(m->m_page_state[shadow_mapping_local_ndx], Dirty)) {
-            memcpy(m_validate_buffer.get(),
-                   m->page_addr(shadow_mapping_local_ndx),
+            memcpy(m_validate_buffer.get(), m->page_addr(shadow_mapping_local_ndx),
                    static_cast<size_t>(1ULL << m_page_shift));
             break;
         }
@@ -866,13 +863,25 @@ void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Header_to
     }
 }
 
+void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
+{
+    REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
+    size_t num_pages = new_size >> m_page_shift;
+    m_page_state.resize(num_pages, PageState(0));
+    m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
+    m_file.cryptor.set_file_size((off_t)(offset + new_size));
+}
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
     REALM_ASSERT(new_file_offset % (1ULL << m_page_shift) == 0);
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
-    REALM_ASSERT(new_size > 0);
+    // REALM_ASSERT(new_size > 0);
 
+    // FIXME: This seems dangerous - correct operation in a setting with multiple (partial)
+    // mappings of the same file would rely on ordering of individual mapping requests?
+    // However - we do resize on demand when accessing the iv table, so any problem
+    // may be fixed there. This approach isn't "cool".
     m_file.cryptor.set_file_size(off_t(new_size + new_file_offset));
 
     flush();

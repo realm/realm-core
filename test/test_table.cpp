@@ -98,9 +98,7 @@ namespace {
 // both non-nullable:
 template <typename T1, typename T2>
 struct value_copier {
-    value_copier(bool)
-    {
-    }
+    value_copier(bool) {}
     T2 operator()(T1 from_value, bool = false)
     {
         return from_value;
@@ -145,9 +143,7 @@ struct value_copier<Optional<T1>, T2> {
 // identical to non-specialized case, but specialization needed to avoid capture by 2 previous decls
 template <typename T1, typename T2>
 struct value_copier<Optional<T1>, Optional<T2>> {
-    value_copier(bool)
-    {
-    }
+    value_copier(bool) {}
     Optional<T2> operator()(Optional<T1> from_value, bool)
     {
         return from_value;
@@ -240,7 +236,7 @@ struct value_copier<Timestamp, Timestamp> {
         return from_value;
     }
 };
-}
+} // namespace
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
@@ -431,9 +427,9 @@ TEST(Table_DateTimeMinMax)
 
     auto col = table->add_column(type_Timestamp, "time", true);
 
-    // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
-    // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
-    // permutations in total.
+    // We test different code paths of the internal Core minmax method. First a null value as initial "best
+    // candidate", then non-null first. For each case we then try both a substitution of best candidate, then
+    // non-substitution. 4 permutations in total.
 
     std::vector<Obj> objs(3);
     objs[0] = table->create_object();
@@ -517,8 +513,8 @@ TEST(Table_MinMaxSingleNullRow)
 
         table->create_object();
 
-        CHECK(table->maximum_timestamp(date_col).is_null());               // max on table
-        table->where().find_all().maximum_timestamp(date_col, &key);       // max on tableview
+        CHECK(table->maximum_timestamp(date_col).is_null());         // max on table
+        table->where().find_all().maximum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
         table->where().maximum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
@@ -549,8 +545,8 @@ TEST(Table_MinMaxSingleNullRow)
 
         table->create_object();
 
-        CHECK(table->minimum_timestamp(date_col).is_null());               // max on table
-        table->where().find_all().minimum_timestamp(date_col, &key);       // max on tableview
+        CHECK(table->minimum_timestamp(date_col).is_null());         // max on table
+        table->where().find_all().minimum_timestamp(date_col, &key); // max on tableview
         CHECK(key == null_key);
         table->where().minimum_timestamp(date_col, &key); // max on query
         CHECK(key == null_key);
@@ -649,8 +645,7 @@ TEST(TableView_AggregateBugs)
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
-    for(int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++)
-    {
+    for (int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++) {
         Group g;
         TableRef table = g.add_table("test_table");
 
@@ -829,7 +824,6 @@ TEST(Table_AggregateFuzz)
 
             i = table->where().find_all().sum_int(int_col);
             CHECK_EQUAL(i, sum);
-
         }
 
         // Test methods on Query
@@ -2271,8 +2265,9 @@ TEST(Table_NullableChecks)
 
     Obj obj = t.create_object();
     StringData sd; // construct a null reference
-    Timestamp ts; // null
-    BinaryData bd;; // null
+    Timestamp ts;  // null
+    BinaryData bd;
+    ; // null
     obj.set(str_col, sd);
     obj.set(int_col, realm::null());
     obj.set(bool_col, realm::null());
@@ -3596,7 +3591,7 @@ NONCONCURRENT_TEST(Table_object_seq_rnd)
 {
 #ifdef PERFORMACE_TESTING
     size_t rows = 1'000'000;
-    int runs = 100;     // runs for building scenario
+    int runs = 100; // runs for building scenario
 #else
     size_t rows = 100'000;
     int runs = 100;
@@ -4531,7 +4526,7 @@ struct Tester {
 
 template <class T, bool nullable>
 ColKey Tester<T, nullable>::col;
-}
+} // namespace
 
 // The run() method will first add lots of objects, and then remove them. This will test
 // both node splits and empty leaf destruction and get good search index code coverage
@@ -4612,10 +4607,26 @@ std::string generate_value()
     return str;
 }
 
-template<> bool generate_value() { return test_util::random_int<int>() & 0x1; }
-template<> float generate_value() { return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000))); }
-template<> double generate_value() { return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)); }
-template<> Timestamp generate_value() { return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000)); }
+template <>
+bool generate_value()
+{
+    return test_util::random_int<int>() & 0x1;
+}
+template <>
+float generate_value()
+{
+    return float(1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000)));
+}
+template <>
+double generate_value()
+{
+    return 1.0 * test_util::random_int<int>() / (test_util::random_int<int>(1, 1000));
+}
+template <>
+Timestamp generate_value()
+{
+    return Timestamp(test_util::random_int<int>(0, 1000000), test_util::random_int<int>(0, 1000000000));
+}
 template <>
 Decimal128 generate_value()
 {
@@ -5285,7 +5296,8 @@ TEST(Table_ChangePKNullability)
     table->set_nullability(pk_col, false, true);
 }
 
-TEST(Table_MultipleObjs) {
+TEST(Table_MultipleObjs)
+{
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_in_realm_history());

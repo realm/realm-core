@@ -64,6 +64,10 @@ public:
     // Flushes any remaining dirty pages from the old mapping
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
+    // Extend the size of this mapping. Memory holding decrypted pages must
+    // have been allocated earlier
+    void extend_to(size_t offset, size_t new_size);
+
     size_t collect_decryption_count()
     {
         return m_num_decrypted;
@@ -146,7 +150,8 @@ inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr,
 {
     REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
 
-    size_t local_ndx = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
+    size_t local_ndx =
+        ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
     REALM_ASSERT_EX(local_ndx < m_page_state.size(), local_ndx, m_page_state.size());
     return local_ndx;
 }
@@ -159,8 +164,8 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 }
 
 
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_ENABLE_ENCRYPTION
 
@@ -175,7 +180,7 @@ struct DecryptionFailed : util::File::AccessError {
     {
     }
 };
-}
-}
+} // namespace util
+} // namespace realm
 
 #endif // REALM_UTIL_ENCRYPTED_FILE_MAPPING_HPP

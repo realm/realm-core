@@ -1703,13 +1703,16 @@ void File::MapBase::unmap() noexcept
     if (!m_addr)
         return;
     REALM_ASSERT(m_reservation_size);
-    File::unmap(m_addr, m_reservation_size);
+#if REALM_ENABLE_ENCRYPTION
+    if (m_encrypted_mapping) {
+        m_encrypted_mapping = nullptr;
+        util::remove_encrypted_mapping(m_addr, m_size);
+    }
+#endif
+    ::munmap(m_addr, m_reservation_size);
     m_addr = nullptr;
     m_size = 0;
     m_reservation_size = 0;
-#if REALM_ENABLE_ENCRYPTION
-    m_encrypted_mapping = nullptr;
-#endif
 }
 
 void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
@@ -1721,10 +1724,6 @@ void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flag
 
 bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, size_t offset)
 {
-#if REALM_ENABLE_ENCRYPTION
-    if (file.m_encryption_key)
-        return false;
-#endif
 #ifdef _WIN32
     // unsupported for now
     return false;
@@ -1738,8 +1737,13 @@ bool File::MapBase::try_reserve(const File& file, AccessMode a, size_t size, siz
     m_reservation_size = size;
     m_fd = file.get_descriptor();
     m_offset = offset;
-    return true;
+#if REALM_ENABLE_ENCRYPTION
+    if (file.m_encryption_key) {
+        m_encrypted_mapping = util::reserve_mapping(addr, m_fd, offset, a, file.m_encryption_key.get());
+    }
 #endif
+#endif
+    return true;
 }
 
 bool File::MapBase::try_extend_to(size_t size) noexcept
@@ -1749,15 +1753,21 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     }
     // return false;
 #ifndef _WIN32
-#if REALM_ENABLE_ENCRYPTION
-    // unsupported for encryption ATM
-    // needs an encryption key....
-    if (m_encrypted_mapping)
-        return false;
-#endif
     char* extension_start_addr = (char*)m_addr + m_size;
     size_t extension_size = size - m_size;
     size_t extension_start_offset = m_offset + m_size;
+#if REALM_ENABLE_ENCRYPTION
+    // unsupported for encryption ATM
+    // needs an encryption key....
+    if (m_encrypted_mapping) {
+        void* got_addr = ::mmap(extension_start_addr, extension_size, PROT_READ | PROT_WRITE,
+                                MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+        REALM_ASSERT(got_addr == extension_start_addr);
+        util::extend_encrypted_mapping(m_encrypted_mapping, m_addr, m_offset, m_size, size);
+        m_size = size;
+        return true;
+    }
+#endif
     try {
         void* got_addr =
             util::mmap_fixed(m_fd, extension_start_addr, extension_size, m_a, extension_start_offset, nullptr);
