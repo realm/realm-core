@@ -428,7 +428,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm4->schema().find("object") != realm4->schema().end());
     }
 
-// The ExternalCommitHelper implementation on Windows doesn't rely on files
+// The ExternalCommitHelper implementation on Windows doesn't rely on FIFOs
 #ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
         REQUIRE(util::try_make_dir(config.path + ".note"));
@@ -1041,7 +1041,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 }
 #endif
 
-//#ifndef _WIN32
 TEST_CASE("SharedRealm: async writes") {
 
 #ifdef _WIN32
@@ -1416,6 +1415,7 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(realm->is_closed());
     }
     SECTION("exception thrown from async commit completion callback with error handler") {
+#ifndef _WIN32
         Realm::AsyncHandle h;
         realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
             REQUIRE(error);
@@ -1431,6 +1431,7 @@ TEST_CASE("SharedRealm: async writes") {
         });
         wait_for_done();
         verify_persisted_count(1);
+#endif
     }
     SECTION("exception thrown from async commit completion callback without error handler") {
         realm->begin_transaction();
@@ -1866,7 +1867,6 @@ TEST_CASE("SharedRealm: async writes") {
         return !realm || !realm->has_pending_async_work();
     });
 }
-//#endif
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms
 #if REALM_PLATFORM_APPLE
@@ -2052,8 +2052,13 @@ private:
     };
     std::vector<Task> m_tasks;
 };
-#ifndef _WIN32
+
 TEST_CASE("SharedRealm: async_writes_2") {
+
+#ifdef _WIN32
+    _impl::RealmCoordinator::clear_all_caches();
+#endif
+
     _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
@@ -2118,7 +2123,6 @@ TEST_CASE("SharedRealm: async_writes_2") {
     });
     REQUIRE(done);
 }
-#endif
 
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())
@@ -3060,7 +3064,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     }
 }
 
-#ifndef _WIN32
+//#ifndef _WIN32
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
     TestFile config;
@@ -3121,7 +3125,7 @@ TEST_CASE("SharedRealm: compact on launch") {
         }).join();
     }
 }
-#endif
+//#endif
 
 struct ModeAutomatic {
     static SchemaMode mode()
@@ -3232,9 +3236,10 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[
 }
 
 TEST_CASE("BindingContext is notified about delivery of change notifications") {
-#ifndef _WIN32
-    _impl::RealmCoordinator::assert_no_open_realms();
+#ifdef _WIN32
+    _impl::RealmCoordinator::clear_all_caches();
 #endif
+    _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
 
@@ -3431,9 +3436,10 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
 }
 
 TEST_CASE("Statistics on Realms") {
-#ifndef _WIN32
-    _impl::RealmCoordinator::assert_no_open_realms();
+#ifdef _WIN32
+    _impl::RealmCoordinator::clear_all_caches();
 #endif
+    _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     // config.cache = false;
     config.automatic_change_notifications = false;
