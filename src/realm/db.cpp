@@ -1081,19 +1081,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 // Realm file.
                 if (info->history_schema_version != openers_hist_schema_version)
                     throw LogicError(LogicError::mixed_history_schema_version);
-#ifdef _WIN32
-                uint64_t pid = GetCurrentProcessId();
-#else
-                uint64_t pid = getpid();
-#endif
-
-                if (m_key && info->session_initiator_pid != pid) {
-                    std::stringstream ss;
-                    ss << path << ": Encrypted interprocess sharing is currently unsupported."
-                       << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
-                       << ".";
-                    throw std::runtime_error(ss.str());
-                }
 
                 // We need per session agreement among all participants on the
                 // target Realm file format. From a technical perspective, the
@@ -2240,8 +2227,8 @@ void DB::low_level_commit(uint_fast64_t new_version, Transaction& transaction, b
         m_free_space = out.get_free_space_size();
         m_locked_space = out.get_locked_space_size();
         m_used_space = out.get_file_size() - m_free_space;
-        // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
-        //     << " Read lock at version " << oldest_version << std::endl;
+        std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref << " Read lock at version "
+                  << oldest_version << std::endl;
         switch (Durability(info->durability)) {
             case Durability::Full:
             case Durability::Unsafe:

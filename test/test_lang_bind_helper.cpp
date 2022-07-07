@@ -22,6 +22,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <csignal>
+#include <chrono>
 #include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -3012,12 +3013,17 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
     auto col = ta->get_column_keys()[0];
     auto b_col = tb->get_column_keys()[0];
     TableView tv = ta->where().greater(col, 100).find_all();
+    const auto wait_start = std::chrono::steady_clock::now();
+    std::chrono::seconds max_wait_seconds = std::chrono::seconds(15);
     while (tc->size() == 0) {
         auto count = tb->begin()->get<int64_t>(b_col);
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), count);
         std::this_thread::yield();
         g->advance_read();
+        if (std::chrono::steady_clock::now() - wait_start > max_wait_seconds) {
+            REALM_ASSERT(false);
+        }
     }
 }
 
@@ -3082,7 +3088,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE)
+//#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE)
 // Interprocess communication does not work with encryption enabled on Apple.
 // This is because fork() does not play well with Apple primitives such as
 // dispatch_queue_t in ReclaimerThreadStopper. This could possibly be fixed if
@@ -3107,10 +3113,11 @@ static void signal_handler(int signal)
 // crash upon exit(0) when attempting to destroy a locked mutex.
 // This is not run with ASAN because children intentionally call exit(0) which does not
 // invoke destructors.
-NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
+// NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running_with_asan && !running_with_tsan)
+ONLY(LangBindHelper_ImplicitTransactions_InterProcess)
 {
-    const int write_process_count = 7;
-    const int read_process_count = 3;
+    const int write_process_count = 2;
+    const int read_process_count = 2;
     auto waitpid_checked = [](int pid, int* status, int options, const std::string& info) {
         int ret;
         do {
@@ -3134,14 +3141,16 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     int readpids[read_process_count];
     int writepids[write_process_count];
     SHARED_GROUP_TEST_PATH(path);
+    auto key = crypt_key(true);
 
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
         std::signal(SIGSEGV, signal_handler);
+        std::signal(SIGTRAP, signal_handler);
         try {
             std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path);
+            DBRef sg = DB::create(*hist, path, DBOptions(key));
             // initialize table with 200 entries holding 0..200
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("A");
@@ -3171,8 +3180,9 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         REALM_ASSERT(writepids[i] >= 0);
         if (writepids[i] == 0) {
             std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path);
+            DBRef sg = DB::create(*hist, path, DBOptions(key));
             multiple_trackers_writer_thread(sg);
+            std::cout << "writer " << i << " finished" << std::endl;
             exit(0);
         }
     }
@@ -3183,8 +3193,9 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         REALM_ASSERT(readpids[i] >= 0);
         if (readpids[i] == 0) {
             std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path);
+            DBRef sg = DB::create(*hist, path, DBOptions(key));
             multiple_trackers_reader_thread(test_context, sg);
+            std::cout << "reader " << i << " finished" << std::endl;
             exit(0);
         }
     }
@@ -3202,7 +3213,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     // signal to all readers to complete
     {
         std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg = DB::create(*hist, path);
+        DBRef sg = DB::create(*hist, path, DBOptions(key));
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("C");
         tr->create_object();
@@ -3217,7 +3228,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
 }
 
 #endif // !REALM_ANDROID && !REALM_IOS
-#endif // not REALM_ENABLE_ENCRYPTION
+//#endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)

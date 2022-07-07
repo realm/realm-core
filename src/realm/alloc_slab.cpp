@@ -1208,6 +1208,17 @@ void SlabAlloc::update_reader_view(size_t file_size)
             e.ref_end += ref_displacement;
         }
     }
+    // FIXME: compute ranges that need refreshing rather than blindly refreshing everything
+    for (auto& mapping : m_mappings) {
+        if (auto encrypted_mapping = mapping.primary_mapping.get_encrypted_mapping()) {
+            encrypted_mapping->mark_for_refresh(0, 100000);
+        }
+    }
+    for (auto& mapping : m_old_mappings) {
+        if (auto encrypted_mapping = mapping.mapping.get_encrypted_mapping()) {
+            encrypted_mapping->mark_for_refresh(0, 100000);
+        }
+    }
 
     rebuild_freelists_from_slab();
 

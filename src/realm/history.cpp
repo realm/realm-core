@@ -23,6 +23,8 @@
 #include <realm/history.hpp>
 #include <realm/array_key.hpp>
 
+#include <iostream>
+
 using namespace realm;
 
 
@@ -137,13 +139,14 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
                                     BinaryIterator* buffer) const noexcept
 {
-    REALM_ASSERT(begin_version <= end_version);
-    REALM_ASSERT(begin_version >= m_base_version);
-    REALM_ASSERT(end_version <= m_base_version + m_size);
+    REALM_ASSERT_EX(begin_version <= end_version, begin_version, end_version);
+    REALM_ASSERT_EX(begin_version >= m_base_version, begin_version, m_base_version);
+    REALM_ASSERT_EX(end_version <= m_base_version + m_size, end_version, m_base_version, m_size);
     version_type n_version_type = end_version - begin_version;
     version_type offset_version_type = begin_version - m_base_version;
-    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(n_version_type) &&
-                 !util::int_cast_has_overflow<size_t>(offset_version_type));
+    REALM_ASSERT_EX(!util::int_cast_has_overflow<size_t>(n_version_type) &&
+                        !util::int_cast_has_overflow<size_t>(offset_version_type),
+                    begin_version, end_version, m_base_version);
     size_t n = size_t(n_version_type);
     size_t offset = size_t(offset_version_type);
     for (size_t i = 0; i < n; ++i)
@@ -164,6 +167,8 @@ void InRealmHistory::set_oldest_bound_version(version_type version)
         for (size_t i = 0; i < num_entries_to_erase; ++i)
             m_changesets->erase(0); // Throws
         m_base_version += num_entries_to_erase;
+        std::cout << "set_oldest_bound_version: " << version << " m_base_version is now: " << m_base_version
+                  << std::endl;
         m_size -= num_entries_to_erase;
     }
 }
@@ -191,6 +196,8 @@ void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type vers
         m_base_version = version;
         m_size = 0;
         m_changesets = nullptr;
+        std::cout << "update_from_ref_and_version0: " << ref << " version == m_base_version: " << version
+                  << std::endl;
     }
     else {
         if (!m_changesets) {
@@ -201,6 +208,8 @@ void InRealmHistory::update_from_ref_and_version(ref_type ref, version_type vers
         m_changesets->init_from_ref(ref);
         m_size = m_changesets->size();
         m_base_version = version - m_size;
+        std::cout << "update_from_ref_and_version: " << ref << " vesion: " << version
+                  << " m_base_version: " << m_base_version << std::endl;
     }
 }
 

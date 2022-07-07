@@ -21,6 +21,8 @@
 
 #include <realm/db.hpp>
 
+#include <iostream>
+
 namespace realm {
 class Transaction : public Group {
 public:
@@ -445,6 +447,8 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
 {
     DB::ReadLockInfo new_read_lock;
     db->grab_read_lock(new_read_lock, version_id); // Throws
+    //    std::cout << "advance_read new read lock on version " << new_read_lock.m_version
+    //              << " m_read_lock.version: " << m_read_lock.m_version << std::endl;
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         db->release_read_lock(new_read_lock);
@@ -459,6 +463,10 @@ inline bool Transaction::internal_advance_read(O* observer, VersionID version_id
     DB::version_type new_version = new_read_lock.m_version;
     size_t new_file_size = new_read_lock.m_file_size;
     ref_type new_top_ref = new_read_lock.m_top_ref;
+
+    std::cout << "advance_read new read lock on version " << new_read_lock.m_version
+              << " m_read_lock.version: " << m_read_lock.m_version << " new_file_size: " << new_file_size
+              << " new_top_ref: " << new_top_ref << std::endl;
 
     // Synchronize readers view of the file
     SlabAlloc& alloc = m_alloc;
