@@ -26,6 +26,7 @@
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
+#include "../util/test_path.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -99,7 +100,7 @@ inline void erase(TableRef table, const OrderVec& order)
 } // anonymous namepsace
 
 
-int main()
+int benchmark_crud_main()
 {
     const size_t target_size = 1100 * 100L;
     const int num_tables = 20;
@@ -148,7 +149,8 @@ int main()
     int_fast64_t dummy = 0;
 
     int max_lead_text_size = 26;
-    BenchmarkResults results(max_lead_text_size, "benchmark-crud");
+    std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
+    BenchmarkResults results(max_lead_text_size, "benchmark-crud", results_file_stem.c_str());
 
     Timer timer_total(Timer::type_UserTime);
     Timer timer(Timer::type_UserTime);
@@ -259,4 +261,14 @@ int main()
     results.submit_single("crud_total_time", "Total time", "runtime_secs", timer_total);
 
     std::cout << "dummy = " << dummy << " (to avoid over-optimization)\n";
+
+    return 0;
 }
+
+int main(int argc, const char** argv)
+{
+    if (!initialize_test_path(argc, argv))
+        return 1;
+    return benchmark_crud_main();
+}
+
