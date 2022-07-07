@@ -155,6 +155,13 @@ public:
     /// Replaces the function which will perform the sectioning on the underlying results.
     void reset_section_callback(SectionKeyFunc section_callback) REQUIRES(!m_mutex);
 
+    // The input index parameter was out of bounds
+    struct OutOfBoundsIndexException : public std::out_of_range {
+        OutOfBoundsIndexException(size_t r, size_t c);
+        const size_t requested;
+        const size_t valid_count;
+    };
+
 private:
     friend class Results;
     /// SectionedResults should not be created directly and should only be instantiated from `Results`.

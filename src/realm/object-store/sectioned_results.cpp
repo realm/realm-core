@@ -421,7 +421,7 @@ ResultsSection SectionedResults::operator[](size_t idx)
 {
     auto s = size();
     if (idx >= s)
-        std::out_of_range(util::format("Requested index %1 greater than max %2", idx, s - 1));
+        throw OutOfBoundsIndexException(idx, s);
     util::CheckedUniqueLock lock(m_mutex);
     auto it = m_current_section_index_to_key_lookup.find(idx);
     REALM_ASSERT(it != m_current_section_index_to_key_lookup.end());
@@ -511,6 +511,14 @@ void SectionedResults::reset_section_callback(SectionKeyFunc section_callback)
     util::CheckedUniqueLock lock(m_mutex);
     m_callback = std::move(section_callback);
     has_performed_initial_evalutation = false;
+}
+
+SectionedResults::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
+    : std::out_of_range(c == 0 ? util::format("Requested index %1 in empty SectionedResults", r)
+                               : util::format("Requested index %1 greater than max %2", r, c - 1))
+    , requested(r)
+    , valid_count(c)
+{
 }
 
 } // namespace realm
