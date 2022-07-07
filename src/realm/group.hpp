@@ -642,7 +642,8 @@ private:
     /// underlying node structure. If `top_ref` is zero and \a
     /// create_group_when_missing is true, create a new node structure that
     /// represents an empty group, and attach this group accessor to it.
-    void attach(ref_type top_ref, bool writable, bool create_group_when_missing);
+    void attach(ref_type top_ref, bool writable, bool create_group_when_missing, size_t file_size = -1,
+                uint_fast64_t version = -1);
 
     /// Detach this group accessor from the underlying node structure. If this
     /// group accessors is already in the detached state, this function does
@@ -651,14 +652,13 @@ private:
 
     /// \param writable Must be set to true when, and only when attaching for a
     /// write transaction.
-    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable);
+    void attach_shared(ref_type new_top_ref, size_t new_file_size, bool writable, uint_fast64_t version);
 
     void create_empty_group();
     void remove_table(size_t table_ndx, TableKey key);
 
     void reset_free_space_tracking();
 
-    void remap(size_t new_file_size);
     void remap_and_update_refs(ref_type new_top_ref, size_t new_file_size, bool writable);
 
     /// Recursively update refs stored in all cached array
@@ -817,7 +817,9 @@ private:
     template <class Accessor>
     void prepare_history_parent(Accessor& history_root, int history_type, int history_schema_version,
                                 uint64_t file_ident);
-    static void validate_top_array(const Array& arr, const SlabAlloc& alloc);
+    static void validate_top_array(const Array& arr, const SlabAlloc& alloc,
+                                   util::Optional<size_t> read_lock_file_size = util::none,
+                                   util::Optional<uint_fast64_t> read_lock_version = util::none);
 
     size_t find_table_index(StringData name) const noexcept;
     TableKey ndx2key(size_t ndx) const;

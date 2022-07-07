@@ -22,6 +22,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <csignal>
+#include <chrono>
 #include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -3066,12 +3067,19 @@ void multiple_trackers_reader_thread(TestContext& test_context, DBRef db)
     auto col = ta->get_column_keys()[0];
     auto b_col = tb->get_column_keys()[0];
     TableView tv = ta->where().greater(col, 100).find_all();
+    const auto wait_start = std::chrono::steady_clock::now();
+    std::chrono::seconds max_wait_seconds = std::chrono::seconds(15);
     while (tc->size() == 0) {
         auto count = tb->begin()->get<int64_t>(b_col);
         tv.sync_if_needed();
         CHECK_EQUAL(tv.size(), count);
         std::this_thread::yield();
         g->advance_read();
+        if (std::chrono::steady_clock::now() - wait_start > max_wait_seconds) {
+            // if there is a fatal problem with a writer process we don't want the
+            // readers to wait forever as a spawned background processs
+            REALM_ASSERT(false);
+        }
     }
 }
 
@@ -3136,7 +3144,6 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 
 #ifndef _WIN32
 
-#if !(REALM_ENABLE_ENCRYPTION && REALM_PLATFORM_APPLE)
 // Interprocess communication does not work with encryption enabled on Apple.
 // This is because fork() does not play well with Apple primitives such as
 // dispatch_queue_t in ReclaimerThreadStopper. This could possibly be fixed if
@@ -3188,14 +3195,17 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     int readpids[read_process_count];
     int writepids[write_process_count];
     SHARED_GROUP_TEST_PATH(path);
+    auto key = crypt_key(true);
 
     int pid = fork();
     REALM_ASSERT(pid >= 0);
     if (pid == 0) {
+        reset_reclaim_governor_globals_after_fork();
         std::signal(SIGSEGV, signal_handler);
+        std::signal(SIGTRAP, signal_handler);
         try {
             std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path);
+            DBRef sg = DB::create(*hist, path, DBOptions(key));
             // initialize table with 200 entries holding 0..200
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("A");
@@ -3224,8 +3234,9 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         writepids[i] = fork();
         REALM_ASSERT(writepids[i] >= 0);
         if (writepids[i] == 0) {
+            reset_reclaim_governor_globals_after_fork();
             std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path);
+            DBRef sg = DB::create(*hist, path, DBOptions(key));
             multiple_trackers_writer_thread(sg);
             exit(0);
         }
@@ -3236,8 +3247,9 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
         readpids[i] = fork();
         REALM_ASSERT(readpids[i] >= 0);
         if (readpids[i] == 0) {
+            reset_reclaim_governor_globals_after_fork();
             std::unique_ptr<Replication> hist(make_in_realm_history());
-            DBRef sg = DB::create(*hist, path);
+            DBRef sg = DB::create(*hist, path, DBOptions(key));
             multiple_trackers_reader_thread(test_context, sg);
             exit(0);
         }
@@ -3256,7 +3268,7 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
     // signal to all readers to complete
     {
         std::unique_ptr<Replication> hist(make_in_realm_history());
-        DBRef sg = DB::create(*hist, path);
+        DBRef sg = DB::create(*hist, path, DBOptions(key));
         WriteTransaction wt(sg);
         TableRef tr = wt.get_table("C");
         tr->create_object();
@@ -3271,7 +3283,6 @@ NONCONCURRENT_TEST_IF(LangBindHelper_ImplicitTransactions_InterProcess, !running
 }
 
 #endif // !REALM_ANDROID && !REALM_IOS
-#endif // not REALM_ENABLE_ENCRYPTION
 #endif // not defined _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)

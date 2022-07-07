@@ -72,6 +72,10 @@ inline void set_page_reclaim_governor_to_default()
     set_page_reclaim_governor(nullptr);
 }
 
+// There are several globals that rely on being process specific
+// The unit tests which use fork() need to set up their own
+void reset_reclaim_governor_globals_after_fork();
+
 // Retrieves the number of in memory decrypted pages, across all open files.
 size_t get_num_decrypted_pages();
 
@@ -169,6 +173,7 @@ void encryption_write_barrier(const File::Map<T>& map, size_t index, size_t num_
     T* addr = map.get_addr();
     encryption_write_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping());
 }
+void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end);
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;

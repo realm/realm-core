@@ -208,16 +208,18 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
     size_t idx = data_pos_casted / block_size;
-    if (idx < m_iv_buffer.size())
-        return m_iv_buffer[idx];
+    // FIXME: this has disabled all caching of the iv tables
+    //    if (idx < m_iv_buffer.size())
+    //        return m_iv_buffer[idx];
 
     size_t old_size = m_iv_buffer.size();
     size_t new_block_count = 1 + idx / blocks_per_metadata_block;
     REALM_ASSERT(new_block_count * blocks_per_metadata_block <= m_iv_buffer.capacity()); // not safe to allocate here
     m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
 
-    for (size_t i = old_size; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
-        size_t bytes = check_read(fd, iv_table_pos(off_t(i * block_size)), &m_iv_buffer[i], block_size);
+    for (size_t i = 0 /*old_size*/; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
+        off_t iv_pos = iv_table_pos(off_t(i * block_size));
+        size_t bytes = check_read(fd, iv_pos, &m_iv_buffer[i], block_size);
         if (bytes < block_size)
             break; // rest is zero-filled by resize()
     }
@@ -240,6 +242,8 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
 bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT(size % block_size == 0);
+    // FIXME: we need to throw DecryptionFailed if the key is incorrect, but not in a reader starvation scenario
+    size_t retries_left = 50;
     while (size > 0) {
         ssize_t bytes_read = check_read(fd, real_offset(pos), m_rw_buffer.get(), block_size);
 
@@ -273,8 +277,15 @@ bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
                 // required to fill any added space with zeroes, so assume that's
                 // what happened if the buffer is all zeroes
                 for (ssize_t i = 0; i < bytes_read; ++i) {
-                    if (m_rw_buffer[i] != 0)
-                        throw DecryptionFailed();
+                    if (m_rw_buffer[i] != 0) {
+                        if (--retries_left == 0) {
+                            throw DecryptionFailed();
+                        }
+                        else {
+                            millisleep(47); // a small prime
+                            continue;
+                        }
+                    }
                 }
                 return false;
             }
@@ -552,6 +563,7 @@ void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
             if (m->contains_page(page_ndx)) {
                 size_t local_page_ndx = page_ndx - m->m_first_page;
                 if (is(m->m_page_state[local_page_ndx], UpToDate)) {
+                    REALM_ASSERT_EX(is_not(m->m_page_state[local_page_ndx], Dirty), local_page_ndx);
                     clear(m->m_page_state[local_page_ndx], UpToDate);
                     set(m->m_page_state[local_page_ndx], RefetchRequired);
                 }

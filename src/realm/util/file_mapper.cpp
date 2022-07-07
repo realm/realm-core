@@ -250,9 +250,9 @@ struct ReclaimerThreadStopper {
 static dispatch_source_t reclaimer_timer;
 static dispatch_queue_t reclaimer_queue;
 
-static void ensure_reclaimer_thread_runs()
+static void ensure_reclaimer_thread_runs(bool force = false)
 {
-    if (!reclaimer_timer) {
+    if (!reclaimer_timer || force) {
         if (__builtin_available(iOS 10, macOS 12, tvOS 10, watchOS 3, *)) {
             reclaimer_queue = dispatch_queue_create_with_target("io.realm.page-reclaimer", DISPATCH_QUEUE_SERIAL,
                                                                 dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0));
@@ -292,6 +292,15 @@ void set_page_reclaim_governor(PageReclaimGovernor* new_governor)
     ensure_reclaimer_thread_runs();
 }
 
+void reset_reclaim_governor_globals_after_fork()
+{
+#if REALM_PLATFORM_APPLE
+    UniqueLock lock(mapping_mutex);
+    constexpr bool force = true;
+    ensure_reclaimer_thread_runs(force);
+#endif
+}
+
 size_t get_num_decrypted_pages()
 {
     return num_decrypted_pages.load();
@@ -324,6 +333,12 @@ void encryption_note_reader_end(SharedFileInfo& info, const void* reader_id) noe
             info.readers.pop_back();
             return;
         }
+}
+
+void encryption_mark_for_refresh(EncryptedFileMapping* mapping, size_t ref_start, size_t ref_end)
+{
+    UniqueLock lock(mapping_mutex);
+    mapping->mark_for_refresh(ref_start, ref_end);
 }
 
 namespace {

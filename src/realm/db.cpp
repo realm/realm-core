@@ -380,9 +380,8 @@ struct alignas(8) DB::SharedInfo {
     uint64_t latest_version_number; // Offset 16
 
     /// Pid of process initiating the session, but only if that process runs
-    /// with encryption enabled, zero otherwise. Other processes cannot join a
-    /// session wich uses encryption, because interprocess sharing is not
-    /// supported by our current encryption mechanisms.
+    /// with encryption enabled, zero otherwise. This was used to prevent
+    /// multiprocess encryption until support for that was added.
     uint64_t session_initiator_pid = 0; // Offset 24
 
     std::atomic<uint64_t> number_of_versions; // Offset 32
@@ -1116,19 +1115,6 @@ void DB::open(const std::string& path, bool no_create_file, const DBOptions opti
                 // Realm file.
                 if (info->history_schema_version != openers_hist_schema_version)
                     throw LogicError(LogicError::mixed_history_schema_version);
-#ifdef _WIN32
-                uint64_t pid = GetCurrentProcessId();
-#else
-                uint64_t pid = getpid();
-#endif
-
-                if (m_key && info->session_initiator_pid != pid) {
-                    std::stringstream ss;
-                    ss << path << ": Encrypted interprocess sharing is currently unsupported."
-                       << "DB has been opened by pid: " << info->session_initiator_pid << ". Current pid is " << pid
-                       << ".";
-                    throw std::runtime_error(ss.str());
-                }
 
                 // We need per session agreement among all participants on the
                 // target Realm file format. From a technical perspective, the

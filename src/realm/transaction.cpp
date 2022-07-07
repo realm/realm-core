@@ -111,7 +111,7 @@ Transaction::Transaction(DBRef _db, SlabAlloc* alloc, DB::ReadLockInfo& rli, DB:
     set_metrics(db->m_metrics);
     set_transact_stage(stage);
     m_alloc.note_reader_start(this);
-    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable);
+    attach_shared(m_read_lock.m_top_ref, m_read_lock.m_file_size, writable, m_read_lock.m_version);
 }
 
 Transaction::~Transaction()
