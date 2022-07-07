@@ -139,8 +139,7 @@ if(NOT APPLE AND NOT WINDOWS_STORE)
             GIT_REPOSITORY https://github.com/libuv/libuv.git
             GIT_TAG ${libUV_Git_TAG}
         )
-        FetchContent_Populate(libuv)
-        add_subdirectory(${libuv_SOURCE_DIR} ${libuv_BINARY_DIR} EXCLUDE_FROM_ALL)
+        FetchContent_MakeAvailable(libuv)
         set(libuv_target uv_a)
     endif()
     target_link_libraries(ObjectStoreTests ${libuv_target})

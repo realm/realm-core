@@ -44,3 +44,8 @@ set_target_properties(object-store-benchmarks PROPERTIES
       EXCLUDE_FROM_DEFAULT_BUILD 1)
 
 add_dependencies(benchmarks object-store-benchmarks)
+
+if(NOT APPLE AND NOT WINDOWS_STORE)
+    target_include_directories(object-store-benchmarks PRIVATE ${libuv_include_dir})
+    target_link_libraries(object-store-benchmarks ${libuv_target})
+endif()
