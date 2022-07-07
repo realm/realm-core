@@ -1378,6 +1378,7 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE_FALSE(called);
     }
     SECTION("exception thrown during transaction without error handler") {
+#ifndef _WIN32
         realm->set_async_error_handler(nullptr);
         realm->async_begin_transaction([&] {
             table->create_object();
@@ -1393,13 +1394,14 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 0);
 
         // Should be able to perform another write afterwards
-        realm->async_begin_transaction([&done, table, realm_copy = realm] {
+        realm->async_begin_transaction([&done, table, realm] {
             table->create_object();
-            realm_copy->commit_transaction();
+            realm->commit_transaction();
             done = true;
         });
         wait_for_done();
         REQUIRE(table->size() == 1);
+#endif
     }
     SECTION("exception thrown during transaction without error handler after closing Realm") {
         realm->set_async_error_handler(nullptr);
