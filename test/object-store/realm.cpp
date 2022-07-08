@@ -1523,6 +1523,7 @@ TEST_CASE("SharedRealm: async writes") {
 #endif
     }
     SECTION("synchronous cancel inside async transaction") {
+#ifndef _WIN32
         realm->async_begin_transaction([&, realm]() {
             REQUIRE(table->size() == 0);
             table->create_object().set(col, 45);
@@ -1532,6 +1533,7 @@ TEST_CASE("SharedRealm: async writes") {
             done = true;
         });
         wait_for_done();
+#endif
     }
     SECTION("synchronous commit of async transaction after async commit which allows grouping") {
         realm->async_begin_transaction([&, realm]() {
