@@ -1498,7 +1498,7 @@ TEST_CASE("SharedRealm: async writes") {
     }
 
     SECTION("cancel scheduled async transaction") {
-        auto handle = realm->async_begin_transaction([&]() {
+        auto handle = realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             realm->async_commit_transaction(
                 [&](auto) {
@@ -1506,7 +1506,7 @@ TEST_CASE("SharedRealm: async writes") {
                 },
                 true);
         });
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 90);
             realm->async_commit_transaction(
                 [&](auto) {
@@ -1532,7 +1532,7 @@ TEST_CASE("SharedRealm: async writes") {
         wait_for_done();
     }
     SECTION("synchronous commit of async transaction after async commit which allows grouping") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             realm->async_commit_transaction(
                 [&](auto) {
@@ -1540,7 +1540,7 @@ TEST_CASE("SharedRealm: async writes") {
                 },
                 true);
         });
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             realm->commit_transaction();
         });
@@ -1549,7 +1549,7 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 2);
     }
     SECTION("synchronous transaction after async transaction with no commit") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 80);
             done = true;
         });
@@ -1571,7 +1571,7 @@ TEST_CASE("SharedRealm: async writes") {
         verify_persisted_count(1);
     }
     SECTION("synchronous transaction with scheduled async transaction") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 80);
             realm->commit_transaction();
             done = true;
@@ -1598,12 +1598,12 @@ TEST_CASE("SharedRealm: async writes") {
         verify_persisted_count(2);
     }
     SECTION("synchronous transaction mixed with async transactions") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             done = true;
             realm->async_commit_transaction();
         });
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             realm->async_commit_transaction([&](std::exception_ptr) {
                 done = true;
@@ -1621,14 +1621,14 @@ TEST_CASE("SharedRealm: async writes") {
     }
     SECTION("asynchronous transaction mixed with sync transaction that is cancelled") {
         bool persisted = false;
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             done = true;
             realm->async_commit_transaction([&](std::exception_ptr) {
                 persisted = true;
             });
         });
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             auto handle = realm->async_commit_transaction([&](std::exception_ptr) {
                 FAIL();
@@ -1651,7 +1651,7 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(!table->find_first_int(col, 90));
     }
     SECTION("cancelled sync transaction with pending async transaction") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             realm->async_commit_transaction([&](std::exception_ptr) {
                 done = true;
@@ -1667,7 +1667,7 @@ TEST_CASE("SharedRealm: async writes") {
     }
     SECTION("cancelled sync transaction with pending async commit") {
         bool persisted = false;
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             done = true;
             realm->async_commit_transaction([&](std::exception_ptr) {
@@ -1686,11 +1686,11 @@ TEST_CASE("SharedRealm: async writes") {
         verify_persisted_count(1);
     }
     SECTION("sync commit of async transaction with subsequent pending async transaction") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object();
             realm->commit_transaction();
         });
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             table->create_object();
             realm->commit_transaction();
             done = true;
@@ -1767,7 +1767,7 @@ TEST_CASE("SharedRealm: async writes") {
     SECTION("async write grouping") {
         size_t completion_calls = 0;
         for (size_t i = 0; i < 41; ++i) {
-            realm->async_begin_transaction([&, i] {
+            realm->async_begin_transaction([&, i, realm] {
                 // The top ref in the Realm file should only be updated once every 20 commits
                 CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
                       (i / 20) * 20);
@@ -1788,7 +1788,7 @@ TEST_CASE("SharedRealm: async writes") {
     SECTION("async write grouping with manual barriers") {
         size_t completion_calls = 0;
         for (size_t i = 0; i < 41; ++i) {
-            realm->async_begin_transaction([&, i] {
+            realm->async_begin_transaction([&, i, realm] {
                 // The top ref in the Realm file should only be updated once every 6 commits
                 CHECK(Group(config.path, config.encryption_key.data()).get_table("class_object")->size() ==
                       (i / 6) * 6);
