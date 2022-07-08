@@ -1042,11 +1042,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 #endif
 
 TEST_CASE("SharedRealm: async writes") {
-
 #ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
 #endif
-
     _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
@@ -1487,7 +1485,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->begin_transaction();
         auto table = realm->read_group().get_table("class_object");
-        table->create_object();
+        auto obj = table->create_object();
         REQUIRE_THROWS_WITH(realm->async_commit_transaction([&](std::exception_ptr) {
             done = true;
         }),
@@ -1752,7 +1750,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->begin_transaction();
         auto table = realm->read_group().get_table("class_object");
-        table->create_object();
+        auto obj = table->create_object();
         bool persisted = false;
         realm->async_commit_transaction([&persisted](auto) {
             persisted = true;
@@ -2053,12 +2051,8 @@ private:
     std::vector<Task> m_tasks;
 };
 
-TEST_CASE("SharedRealm: async_writes_2") {
-
 #ifndef _WIN32
-    //    _impl::RealmCoordinator::clear_all_caches();
-
-
+TEST_CASE("SharedRealm: async_writes_2") {
     _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
@@ -2123,8 +2117,8 @@ TEST_CASE("SharedRealm: async_writes_2") {
         return done;
     });
     REQUIRE(done);
-#endif
 }
+#endif
 
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())
