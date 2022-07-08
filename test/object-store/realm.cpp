@@ -1042,9 +1042,6 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 #endif
 
 TEST_CASE("SharedRealm: async writes") {
-#ifdef _WIN32
-    _impl::RealmCoordinator::clear_all_caches();
-#endif
     _impl::RealmCoordinator::assert_no_open_realms();
     if (!util::EventLoop::has_implementation())
         return;
@@ -1867,6 +1864,10 @@ TEST_CASE("SharedRealm: async writes") {
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });
+    
+#ifdef _WIN32
+    _impl::RealmCoordinator::clear_all_caches();
+#endif
 }
 // Our libuv scheduler currently does not support background threads, so we can
 // only run this on apple platforms
@@ -3237,9 +3238,6 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[
 }
 
 TEST_CASE("BindingContext is notified about delivery of change notifications") {
-#ifdef _WIN32
-    _impl::RealmCoordinator::clear_all_caches();
-#endif
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -3434,12 +3432,12 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             r->refresh();
         }
     }
-}
-
-TEST_CASE("Statistics on Realms") {
 #ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
 #endif
+}
+
+TEST_CASE("Statistics on Realms") {
     _impl::RealmCoordinator::assert_no_open_realms();
     InMemoryTestFile config;
     // config.cache = false;
@@ -3454,6 +3452,9 @@ TEST_CASE("Statistics on Realms") {
         auto s = r->read_group().compute_aggregated_byte_size();
         REQUIRE(s > 0);
     }
+#ifdef _WIN32
+    _impl::RealmCoordinator::clear_all_caches();
+#endif
 }
 
 #if REALM_PLATFORM_APPLE && NOTIFIER_BACKGROUND_ERRORS
