@@ -1477,6 +1477,7 @@ TEST_CASE("SharedRealm: async writes") {
         }
     }
     SECTION("throw exception from did_change()") {
+#ifndef _WIN32
         struct Context : public BindingContext {
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
             {
@@ -1493,6 +1494,7 @@ TEST_CASE("SharedRealm: async writes") {
         }),
                             "expected error");
         wait_for_done();
+#endif
     }
 
     SECTION("cancel scheduled async transaction") {
