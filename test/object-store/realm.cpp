@@ -428,9 +428,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm4->schema().find("object") != realm4->schema().end());
     }
 
+    SECTION("should throw when creating the notification pipe fails") {
 // The ExternalCommitHelper implementation on Windows doesn't rely on FIFOs
 #ifndef _WIN32
-    SECTION("should throw when creating the notification pipe fails") {
         REQUIRE(util::try_make_dir(config.path + ".note"));
         auto sys_fallback_file =
             util::format("%1realm_%2.note", util::normalize_dir(DBOptions::get_sys_tmp_dir()),
@@ -439,8 +439,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
         util::remove_dir(sys_fallback_file);
-    }
 #endif
+    }
 
     SECTION("should get different instances on different threads") {
         config.cache = true;
@@ -1498,6 +1498,7 @@ TEST_CASE("SharedRealm: async writes") {
     }
 
     SECTION("cancel scheduled async transaction") {
+#ifndef _WIN32
         auto handle = realm->async_begin_transaction([&, realm]() {
             table->create_object().set(col, 45);
             realm->async_commit_transaction(
@@ -1519,9 +1520,10 @@ TEST_CASE("SharedRealm: async writes") {
         auto table = realm->read_group().get_table("class_object");
         REQUIRE(table->size() == 1);
         REQUIRE(table->begin()->get<Int>("value") == 90);
+#endif
     }
     SECTION("synchronous cancel inside async transaction") {
-        realm->async_begin_transaction([&]() {
+        realm->async_begin_transaction([&, realm]() {
             REQUIRE(table->size() == 0);
             table->create_object().set(col, 45);
             REQUIRE(table->size() == 1);
@@ -3545,8 +3547,9 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
             REQUIRE_THROWS(realm->verify_thread());
         }).join();
     }
-#ifndef _WIN32
+
     SECTION("delivers notifications to the thread it is resolved on") {
+#ifndef _WIN32
         if (!util::EventLoop::has_implementation())
             return;
         auto realm = Realm::get_shared_realm(std::move(ref));
@@ -3558,8 +3561,8 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         util::EventLoop::main().run_until([&] {
             return called;
         });
-    }
 #endif
+    }
 
     SECTION("resolves to existing cached Realm for the thread if caching is enabled") {
         auto r1 = Realm::get_shared_realm(config);
