@@ -380,7 +380,7 @@ tasks:
         BLOATY=$(pwd)/bin/bloaty
         cd ..
 
-        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/librealm-ffi.so"
+        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/${cmake_build_type|Debug}/librealm-ffi.so"
 
         mkdir bloaty-results
         for input_path in $FILES_TO_ANALYZE; do

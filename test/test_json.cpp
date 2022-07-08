@@ -510,7 +510,7 @@ TEST(Xjson_LinkList1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
@@ -568,7 +568,7 @@ TEST(Xjson_LinkSet1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 
@@ -624,7 +624,7 @@ TEST(Xjson_LinkDictionary1)
 
     // add some rows
     auto obj0 = table1->create_object_with_primary_key("t1o1").set(table1Coll, 100);
-    auto obj2 = table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
+    table1->create_object_with_primary_key("t1o3").set(table1Coll, 300);
     auto obj1 = table1->create_object_with_primary_key("t1o2").set(table1Coll, 200);
 
 

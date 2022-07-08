@@ -2085,14 +2085,12 @@ void DB::do_end_write() noexcept
     SharedInfo* info = m_file_map.get_addr();
     info->next_served.fetch_add(1, std::memory_order_relaxed);
 
-    {
-        std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
-        REALM_ASSERT(m_write_transaction_open);
-        m_alloc.set_read_only(true);
-        m_write_transaction_open = false;
-        m_writemutex.unlock();
-    }
+    std::lock_guard<std::recursive_mutex> local_lock(m_mutex);
+    REALM_ASSERT(m_write_transaction_open);
+    m_alloc.set_read_only(true);
+    m_write_transaction_open = false;
     m_pick_next_writer.notify_all();
+    m_writemutex.unlock();
 }
 
 
@@ -2577,7 +2575,6 @@ DisableReplication::DisableReplication(Transaction& t)
     , m_version(t.get_version())
 {
     m_owner->set_replication(nullptr);
-    t.get_version();
     t.m_history = nullptr;
 }
 

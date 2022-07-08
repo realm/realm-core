@@ -539,7 +539,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         auto table = realm->read_group().get_table("class_object");
         realm->begin_transaction();
-        Obj obj = table->create_object();
+        table->create_object();
         realm->commit_transaction();
 
         REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());
@@ -1479,7 +1479,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->begin_transaction();
         auto table = realm->read_group().get_table("class_object");
-        auto obj = table->create_object();
+        table->create_object();
         REQUIRE_THROWS_WITH(realm->async_commit_transaction([&](std::exception_ptr) {
             done = true;
         }),
@@ -1729,7 +1729,7 @@ TEST_CASE("SharedRealm: async writes") {
                 auto r = realm.lock();
                 r->begin_transaction();
                 auto table = r->read_group().get_table("class_object");
-                auto obj = table->create_object();
+                table->create_object();
                 if (++change_count == 1) {
                     r->commit_transaction();
                 }
@@ -1745,7 +1745,7 @@ TEST_CASE("SharedRealm: async writes") {
 
         realm->begin_transaction();
         auto table = realm->read_group().get_table("class_object");
-        auto obj = table->create_object();
+        table->create_object();
         bool persisted = false;
         realm->async_commit_transaction([&persisted](auto) {
             persisted = true;

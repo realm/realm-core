@@ -640,6 +640,24 @@ public:
     ColKey get_opposite_column(ColKey col_key) const;
     ColKey find_opposite_column(ColKey col_key) const;
 
+    class DisableReplication {
+    public:
+        DisableReplication(Table& table) noexcept
+            : m_table(table)
+            , m_repl(table.m_repl)
+        {
+            m_table.m_repl = &g_dummy_replication;
+        }
+        ~DisableReplication()
+        {
+            m_table.m_repl = m_repl;
+        }
+
+    private:
+        Table& m_table;
+        Replication* const* m_repl;
+    };
+
 private:
     enum LifeCycleCookie {
         cookie_created = 0x1234,

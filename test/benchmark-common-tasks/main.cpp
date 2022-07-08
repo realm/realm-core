@@ -817,7 +817,7 @@ struct BenchmarkQueryIntListSize : Benchmark {
         TableRef t = tr.add_table(name());
         int_list_col_ndx = t->add_column_list(type_Int, "ints");
         for (size_t i = 0; i < num_rows; ++i) {
-            auto obj = t->create_object().set_list_values<Int>(int_list_col_ndx, {0, 1, 2});
+            t->create_object().set_list_values<Int>(int_list_col_ndx, {0, 1, 2});
         }
         tr.commit();
     }

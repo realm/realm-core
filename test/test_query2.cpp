@@ -5034,7 +5034,7 @@ TEST_IF(Query_IntOrQueryPerformance, TEST_DURATION > 0)
             ++num_nulls_added;
         }
         else {
-            auto o = table->create_object().set_all(i, i);
+            table->create_object().set_all(i, i);
         }
     }
 
@@ -5765,10 +5765,10 @@ TEST(Query_DictionaryTypedLinks)
     auto fido = dog->create_object().set(col_dog_name, "Fido");
     auto pluto = dog->create_object().set(col_dog_name, "Pluto");
     pluto.set(col_dog_parent, fido.get_key());
-    auto vaks = dog->create_object().set(col_dog_name, "Vaks");
+    dog->create_object().set(col_dog_name, "Vaks");
     auto marie = cat->create_object().set(col_cat_name, "Marie");
-    auto berlioz = cat->create_object().set(col_cat_name, "Berlioz");
-    auto toulouse = cat->create_object().set(col_cat_name, "Toulouse");
+    cat->create_object().set(col_cat_name, "Berlioz");
+    cat->create_object().set(col_cat_name, "Toulouse");
 
     auto john = person->create_object().get_dictionary(col_data);
     auto paul = person->create_object().get_dictionary(col_data);
