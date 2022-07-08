@@ -81,7 +81,6 @@ inline BenchmarkResults::BenchmarkResults(int max_lead_text_width, std::string s
     , m_results_file_stem(results_file_stem)
     , m_suite_name(std::move(suite_name))
 {
-    std::cout << "Output file stem: " << m_results_file_stem << std::endl;
     try_load_baseline_results();
 }
 

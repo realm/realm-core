@@ -2069,7 +2069,9 @@ extern "C" int benchmark_common_tasks_main();
 
 int benchmark_common_tasks_main()
 {
-    std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
+    std::string results_file_stem = realm::test_util::get_test_path_prefix();
+    std::cout << "Results path: " << results_file_stem << std::endl;
+    results_file_stem += "results";
     BenchmarkResults results(40, "benchmark-common-tasks", results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)

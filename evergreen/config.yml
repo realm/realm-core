@@ -154,10 +154,6 @@ functions:
           cd benchmark_results
 
           $BENCHMARK "$(pwd)/"
-          ls
-          if [[ -e "results.latest.json"]]; then
-            echo "Results.latest.json exists."
-          fi
     - command: perf.send
       params:
         file: './realm-core/benchmark_results/results.latest.json'

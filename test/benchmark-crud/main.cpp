@@ -150,7 +150,9 @@ int benchmark_crud_main()
     int_fast64_t dummy = 0;
 
     int max_lead_text_size = 26;
-    std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
+    std::string results_file_stem = realm::test_util::get_test_path_prefix();
+    std::cout << "Results path: " << results_file_stem << std::endl;
+    results_file_stem += "results";
     BenchmarkResults results(max_lead_text_size, "benchmark-crud", results_file_stem.c_str());
 
     Timer timer_total(Timer::type_UserTime);
