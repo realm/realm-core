@@ -1473,7 +1473,9 @@ TEST_CASE("SharedRealm: async writes") {
             wait_for_done();
             sf::set_thread_local(true);
         }
+#endif
     }
+#ifndef _WIN32
     SECTION("throw exception from did_change()") {
         struct Context : public BindingContext {
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
@@ -1860,6 +1862,7 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 6);
     }
 #endif
+
 
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
