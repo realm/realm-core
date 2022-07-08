@@ -290,4 +290,3 @@ int main(int argc, const char** argv)
         return 1;
     return benchmark_crud_main();
 }
-
