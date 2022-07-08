@@ -1864,7 +1864,7 @@ TEST_CASE("SharedRealm: async writes") {
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });
-    
+
 #ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
 #endif
