@@ -101,7 +101,7 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
 
-    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, *m_config.sync_config);
+    m_sync_session = m_config.sync_config->user->sync_manager()->get_session(m_db, m_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [weak_self](VersionID, VersionID) {

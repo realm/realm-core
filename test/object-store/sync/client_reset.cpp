@@ -33,6 +33,7 @@
 #include <realm/object-store/thread_safe_reference.hpp>
 #include <realm/object-store/util/scheduler.hpp>
 #include <realm/object-store/impl/object_accessor_impl.hpp>
+#include <realm/object-store/impl/realm_coordinator.hpp>
 #include <realm/object-store/property.hpp>
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/app_credentials.hpp>
@@ -677,6 +678,31 @@ TEST_CASE("sync: client reset", "[client reset]") {
             make_reset(local_config, remote_config)->run();
             REQUIRE(before_callback_invoctions == 0);
             REQUIRE(after_callback_invocations == 0);
+        }
+
+        SECTION("callbacks are seeded with Realm instances even if the coordinator dies") {
+            auto client_reset_harness = make_reset(local_config, remote_config);
+            client_reset_harness->disable_wait_for_reset_completion();
+            std::shared_ptr<SyncSession> session;
+            client_reset_harness
+                ->on_post_local_changes([&](SharedRealm local) {
+                    // retain a reference so the sync session completes, even though the Realm is cleaned up
+                    session = local->sync_session();
+                })
+                ->run();
+            auto local_coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(local_config.path);
+            REQUIRE(!local_coordinator);
+            REQUIRE(before_callback_invoctions == 0);
+            REQUIRE(after_callback_invocations == 0);
+            timed_sleeping_wait_for(
+                [&]() -> bool {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    return after_callback_invocations > 0;
+                },
+                std::chrono::seconds(60));
+            // this test also relies on the test config above to verify the Realm instances in the callbacks
+            REQUIRE(before_callback_invoctions == 1);
+            REQUIRE(after_callback_invocations == 1);
         }
 
         SECTION("notifiers work if the session instance changes") {
