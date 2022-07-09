@@ -156,6 +156,10 @@ public:
     {
         elements.emplace_back(elem);
     }
+    std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+
+private:
+    std::vector<std::unique_ptr<Subexpr>> m_evaluated_storage;
 };
 
 class PropertyNode : public ParserNode {
@@ -176,6 +180,7 @@ class ValueNode : public ExpressionNode {
 public:
     ConstantNode* constant = nullptr;
     PropertyNode* prop = nullptr;
+    ListNode* list = nullptr;
 
     ValueNode(ConstantNode* node)
         : constant(node)
@@ -185,20 +190,21 @@ public:
         : prop(node)
     {
     }
+    ValueNode(ListNode* node)
+        : list(node)
+    {
+    }
     bool is_constant() final
     {
-        return constant != nullptr;
-    }
-    ConstantNode* get_constant()
-    {
-        REALM_ASSERT(is_constant());
-        return constant;
+        return constant != nullptr || list != nullptr;
     }
 
     std::unique_ptr<Subexpr> visit(ParserDriver* drv, DataType type) override
     {
         if (prop)
             return prop->visit(drv);
+        if (list)
+            return list->visit(drv, type);
         return constant->visit(drv, type);
     }
 };

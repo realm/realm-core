@@ -403,7 +403,7 @@ static Query verify_query(test_util::unit_test::TestContext& test_context, Table
     size_t q_count = q.count();
     CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description(mapping.get_backlink_class_prefix());
-    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->query(description, args, mapping);
 
     size_t q2_count = q2.count();
@@ -3722,7 +3722,7 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
 }
 
-TEST(Parser_OperatorIN)
+ONLY(Parser_OperatorIN)
 {
     Group g;
 
@@ -3799,6 +3799,9 @@ TEST(Parser_OperatorIN)
             list.add(items_keys[3]);
         }
     }
+
+    verify_query(test_context, t, "customer_id IN {0, 1, 2}", 3);
+    verify_query(test_context, t, "fav_item.name IN {'milk', 'oranges', 'cereal'}", 2);
 
     verify_query(test_context, t, "5.5 IN items.price", 2);
     verify_query(test_context, t, "!(5.5 IN items.price)", 1);              // group not
@@ -4512,7 +4515,7 @@ TEST(Parser_TypeOfValue)
     verify_query(test_context, origin, "links.mixed.@type == 'numeric' || links.mixed.@type == 'string'",
                  origin->size());
     // TODO: enable this when IN is supported for list constants
-    // verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'string'}", origin->size());
+    verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'string'}", origin->size());
 
     verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
     verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);

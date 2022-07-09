@@ -1208,6 +1208,27 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
+std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
+{
+    // FIXME: Should this be type QueryValue instead of Mixed?
+    std::unique_ptr<Value<Mixed>> ret = std::make_unique<Value<Mixed>>();
+    m_evaluated_storage.reserve(elements.size());
+    constexpr bool is_list = true;
+    ret->init(is_list, elements.size());
+    size_t ndx = 0;
+    for (auto constant : elements) {
+        m_evaluated_storage.push_back(constant->visit(drv, hint));
+        if (auto value = dynamic_cast<const ValueBase*>(m_evaluated_storage.back().get())) {
+            REALM_ASSERT_EX(value->size() == 1, value->size());
+            ret->set(ndx++, value->get(0));
+        }
+        else {
+            throw InvalidQueryError("Invalid constant inside constant list");
+        }
+    }
+    return ret;
+}
+
 LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
@@ -1229,7 +1250,7 @@ LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
             try {
                 link_chain.link(path_elem);
             }
-            // I case of exception, we have to throw InvalidQueryError
+            // In case of exception, we have to throw InvalidQueryError
             catch (const std::runtime_error& e) {
                 auto str = e.what();
                 StringData table_name = drv->get_printable_name(link_chain.get_current_table()->get_name());

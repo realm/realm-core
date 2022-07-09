@@ -1132,31 +1132,49 @@ public:
     {
     }
 
+    std::string value_to_string(size_t ndx) const
+    {
+        auto val = get(ndx);
+        if (val.is_null())
+            return "NULL";
+        else {
+            if constexpr (std::is_same_v<T, TypeOfValue>) {
+                return util::serializer::print_value(val.get_type_of_value());
+            }
+            else {
+                return util::serializer::print_value(val.template get<T>());
+            }
+        }
+    }
+
     std::string description(util::serializer::SerialisationState&) const override
     {
-        if (ValueBase::m_from_link_list) {
-            return util::serializer::print_value(util::to_string(ValueBase::size()) +
-                                                 (ValueBase::size() == 1 ? " value" : " values"));
+        const size_t sz = size();
+        if (sz == 1) {
+            return value_to_string(0);
         }
-        if (size() > 0) {
-            auto val = get(0);
-            if (val.is_null())
-                return "NULL";
-            else {
-                if constexpr (std::is_same_v<T, TypeOfValue>) {
-                    return util::serializer::print_value(val.get_type_of_value());
+        else if (sz > 1) {
+            std::string desc = "{";
+            for (size_t i = 0; i < sz; ++i) {
+                if (i != 0) {
+                    desc += ", ";
                 }
-                else {
-                    return util::serializer::print_value(val.template get<T>());
-                }
+                desc += value_to_string(i);
             }
+            desc += "}";
+            return desc;
         }
         return "";
     }
 
+    bool has_multiple_values() const override
+    {
+        return size() > 1;
+    }
+
     bool has_constant_evaluation() const override
     {
-        return true;
+        return size() == 1;
     }
 
     Mixed get_mixed() override

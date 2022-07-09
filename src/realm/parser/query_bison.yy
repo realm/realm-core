@@ -182,7 +182,7 @@ expr
 value
     : constant                  { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
     | prop                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
-
+    | list                      { $$ = drv.m_parse_nodes.create<ValueNode>($1);}
 
 prop
     : path id post_op           { $$ = drv.m_parse_nodes.create<PropNode>($1, $2, $3); }
