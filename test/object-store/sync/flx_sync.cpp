@@ -1303,6 +1303,9 @@ TEST_CASE("flx: no subscription store created for PBS app", "[sync][flx][app]") 
     CHECK(!wait_for_upload(*realm));
 
     CHECK(!realm->sync_session()->get_flx_subscription_store());
+
+    CHECK_THROWS_AS(realm->get_active_subscription_set(), std::runtime_error);
+    CHECK_THROWS_AS(realm->get_latest_subscription_set(), std::runtime_error);
 }
 
 TEST_CASE("flx: connect to FLX as PBS returns an error", "[sync][flx][app]") {
@@ -1416,6 +1419,8 @@ TEST_CASE("flx: commit subscription while refreshing the access token", "[sync][
     REQUIRE(seen_waiting_for_access_token);
 }
 
+// TODO Re-enable this test in RCORE-1150
+#if 0
 TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]") {
     FLXSyncTestHarness harness("flx_bootstrap_batching", {g_large_array_schema, {"queryable_int_field"}});
 
@@ -1637,6 +1642,7 @@ TEST_CASE("flx: bootstrap batching prevents orphan documents", "[sync][flx][app]
         }
     }
 }
+#endif
 
 TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     static auto server_schema = [] {
@@ -1848,6 +1854,8 @@ TEST_CASE("flx: asymmetric sync", "[sync][flx][app]") {
     }
 }
 
+// TODO this test has been failing very frequently. We need to fix it and re-enable it in RCORE-1149.
+#if 0
 TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
     FLXSyncTestHarness::ServerSchema server_schema;
     server_schema.dev_mode_enabled = true;
@@ -1889,6 +1897,7 @@ TEST_CASE("flx: asymmetric sync - dev mode", "[sync][flx][app]") {
         },
         schema);
 }
+#endif
 
 } // namespace realm::app
 

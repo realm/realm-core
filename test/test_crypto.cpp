@@ -42,7 +42,7 @@ static const char test_signature[] = "\x21\xbc\x92\x5e\x1e\x63\x04\xe3\x51\x75\x
 
 TEST(Crypto_LoadPublicKey)
 {
-    auto key = PKey::load_public(test_crypto_pubkey);
+    auto key = PKey::load_public(test_util::get_test_resource_path() + test_crypto_pubkey);
     CHECK(key.can_verify());
     CHECK(!key.can_sign());
 }
@@ -56,7 +56,7 @@ TEST(Crypto_LoadPublicKeyFromBuffer)
 
 TEST(Crypto_Verify_WithKeyFromFile)
 {
-    auto key = PKey::load_public(test_crypto_pubkey);
+    auto key = PKey::load_public(test_util::get_test_resource_path() + test_crypto_pubkey);
     CHECK(key.can_verify());
 
     BinaryData msg{test_message, sizeof test_message - 1};

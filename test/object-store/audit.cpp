@@ -749,7 +749,7 @@ TEST_CASE("audit object serialization") {
     SECTION("link access tracking") {
         realm->begin_transaction();
         table->create_object_with_primary_key(1);
-        auto target_obj = target_table->create_object_with_primary_key(0);
+        target_table->create_object_with_primary_key(0);
         auto obj = table->create_object_with_primary_key(2);
         obj.set("object", target_table->create_object_with_primary_key(1).set_all(1).get_key());
         obj.create_and_set_linked_object(table->get_column_key("embedded object")).set_all(200);
@@ -1028,7 +1028,7 @@ TEST_CASE("audit object serialization") {
 
     SECTION("reads mixed with deletions") {
         realm->begin_transaction();
-        auto obj1 = table->create_object_with_primary_key(1);
+        table->create_object_with_primary_key(1);
         auto obj2 = table->create_object_with_primary_key(2);
         auto obj3 = table->create_object_with_primary_key(3);
         realm->commit_transaction();

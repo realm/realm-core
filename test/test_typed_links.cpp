@@ -219,7 +219,7 @@ TEST(TypedLinks_Clear)
     auto col_list_mixed = person->add_column_list(type_Mixed, "mixed_list");
 
     auto pluto = dog->create_object();
-    auto garfield = cat->create_object();
+    cat->create_object();
     auto paul = person->create_object();
 
     paul.set(col_typed, ObjLink{dog->get_key(), pluto.get_key()});

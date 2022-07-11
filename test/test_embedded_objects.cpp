@@ -414,7 +414,7 @@ TEST(EmbeddedObjects_DiscardThroughImplicitErase)
             sub->add_column(type_Int, "i");
 
             auto top_obj = top->create_object_with_primary_key(123);
-            auto sub_obj = top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
+            top_obj.create_and_set_linked_object(top->get_column_key("sub")).set("i", 5);
         });
 
         it.sync_all();
@@ -613,7 +613,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject)
             auto embedded = tr.add_table("class_embedded", Table::Type::Embedded);
             embedded->add_column(type_Int, "int");
             table->add_column(*embedded, "embedded");
-            auto obj = table->create_object_with_primary_key(123);
+            table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
 
@@ -681,7 +681,7 @@ TEST(EmbeddedObjects_CreateEraseCreateSequencePreservesObject_Nested)
             embedded->add_column(type_Int, "int");
             embedded->add_column(*embedded, "embedded");
             table->add_column(*embedded, "embedded");
-            auto obj = table->create_object_with_primary_key(123);
+            table->create_object_with_primary_key(123);
             // Note: embedded object is NULL at this stage.
         });
 

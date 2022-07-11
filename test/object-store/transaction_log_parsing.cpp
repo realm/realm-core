@@ -1007,7 +1007,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         auto obj0 = origin->create_object_with_primary_key(5).set("link", target_keys[5]);
         auto obj1 = origin->create_object_with_primary_key(6).set("link", target_keys[6]);
-        auto obj2 = origin->create_object_with_primary_key(7);
+        origin->create_object_with_primary_key(7);
 
         auto lv = obj0.get_linklist(origin_cols[2]);
         for (auto key : target_keys)

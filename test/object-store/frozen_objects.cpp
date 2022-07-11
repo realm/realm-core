@@ -265,7 +265,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         ordering.append_sort(SortDescriptor({{value_col}}, {false}));
         TableView tv = q.find_all();
         Results query_results(realm, tv, ordering);
-        auto obj = query_results.get(0);
+        query_results.get(0);
         Results frozen_res = query_results.freeze(frozen_realm);
         JoiningThread thread([&] {
             auto obj = frozen_res.get(0);

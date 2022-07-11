@@ -495,14 +495,9 @@ void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
 {
     if (local_page_ndx >= m_page_state.size())
         return;
+    REALM_ASSERT(is_not(m_page_state[local_page_ndx], UpToDate));
+    REALM_ASSERT(is_not(m_page_state[local_page_ndx], Dirty));
 
-    if (is(m_page_state[local_page_ndx], Dirty)) {
-        flush();
-    }
-    if (is(m_page_state[local_page_ndx], UpToDate)) {
-        clear(m_page_state[local_page_ndx], UpToDate);
-        set(m_page_state[local_page_ndx], PartiallyUpToDate);
-    }
     size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
     if (m_chunk_dont_scan[chunk_ndx])
         m_chunk_dont_scan[chunk_ndx] = 0;
@@ -541,33 +536,34 @@ void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
         m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr,
                             static_cast<size_t>(1ULL << m_page_shift));
     }
-    if (is_not(m_page_state[local_page_ndx], UpToDate | PartiallyUpToDate))
+    if (is_not(m_page_state[local_page_ndx], UpToDate | RefetchRequired))
         m_num_decrypted++;
-    clear(m_page_state[local_page_ndx], PartiallyUpToDate);
+    clear(m_page_state[local_page_ndx], RefetchRequired);
     set(m_page_state[local_page_ndx], UpToDate);
 }
 
-void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
+void EncryptedFileMapping::mark_for_refresh(size_t ref_start, size_t ref_end)
 {
-    // Go through all other mappings of this file and mark
-    // the page outdated in those mappings:
-    size_t page_ndx_in_file = local_page_ndx + m_first_page;
-    for (size_t i = 0; i < m_file.mappings.size(); ++i) {
-        EncryptedFileMapping* m = m_file.mappings[i];
-        if (m != this && m->contains_page(page_ndx_in_file)) {
-            size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
-            m->mark_outdated(shadow_local_page_ndx);
+    size_t first_page_ndx = ref_start >> m_page_shift;
+    size_t last_page_ndx = (ref_end - 1) >> m_page_shift;
+    for (size_t page_ndx = first_page_ndx; page_ndx <= last_page_ndx; ++page_ndx) {
+        for (size_t i = 0; i < m_file.mappings.size(); ++i) {
+            EncryptedFileMapping* m = m_file.mappings[i];
+            if (m->contains_page(page_ndx)) {
+                size_t local_page_ndx = page_ndx - m->m_first_page;
+                if (is(m->m_page_state[local_page_ndx], UpToDate)) {
+                    clear(m->m_page_state[local_page_ndx], UpToDate);
+                    set(m->m_page_state[local_page_ndx], RefetchRequired);
+                }
+            }
         }
     }
-    set(m_page_state[local_page_ndx], Dirty);
-    size_t chunk_ndx = local_page_ndx >> page_to_chunk_shift;
-    if (m_chunk_dont_scan[chunk_ndx])
-        m_chunk_dont_scan[chunk_ndx] = 0;
 }
 
 void EncryptedFileMapping::write_and_update_all(size_t local_page_ndx, size_t begin_offset,
                                                 size_t end_offset) noexcept
 {
+    REALM_ASSERT(is(m_page_state[local_page_ndx], UpToDate));
     // Go through all other mappings of this file and copy changes into those mappings
     size_t page_ndx_in_file = local_page_ndx + m_first_page;
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
@@ -641,9 +637,9 @@ void EncryptedFileMapping::reclaim_page(size_t page_ndx)
     memset(page_addr(page_ndx), 0, static_cast<size_t>(1) << m_page_shift);
 #else
     // On Posix compatible, we can request a new page in the middle of an already
-    // requested range, so we request a new one. This releases the backing store for the
+    // requested range, so that's what we do. This releases the backing store for the
     // old page and gives us a shared zero-page that we can later demand-allocate, thus
-    // reducing the overall amount of dirty pages.
+    // reducing the overall amount of used physical pages.
     void* addr = page_addr(page_ndx);
     void* addr2 = ::mmap(addr, 1 << m_page_shift, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
     if (addr != addr2) {
@@ -679,9 +675,9 @@ void EncryptedFileMapping::reclaim_untouched(size_t& progress_index, size_t& wor
 
     auto visit_and_potentially_reclaim = [&](size_t page_ndx) {
         PageState ps = m_page_state[page_ndx];
-        if (is(m_page_state[page_ndx], UpToDate | PartiallyUpToDate)) {
+        if (is(m_page_state[page_ndx], UpToDate | RefetchRequired)) {
             if (is_not(ps, Touched) && is_not(ps, Dirty)) {
-                clear(m_page_state[page_ndx], UpToDate | PartiallyUpToDate);
+                clear(m_page_state[page_ndx], UpToDate | RefetchRequired);
                 reclaim_page(page_ndx);
                 m_num_decrypted--;
                 done_some_work();

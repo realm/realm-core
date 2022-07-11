@@ -16,27 +16,37 @@
  *
  **************************************************************************/
 
-#include <algorithm>
-#include <sstream>
-#include <string>
+#include "test_path.hpp"
 
 #include <realm/util/file.hpp>
 
-#include "test_path.hpp"
+#include <algorithm>
+#include <string>
 
 #if REALM_PLATFORM_APPLE
+#include <realm/util/cf_ptr.hpp>
+
+#include <CoreFoundation/CoreFoundation.h>
 #include <sys/mount.h>
 #include <sys/param.h>
+#elif defined(_WIN32)
+#include <Windows.h>
+// PathCchRemoveFileSpec()
+#include <pathcch.h>
+#pragma comment(lib, "Pathcch.lib")
+#else
+#include <unistd.h>
+#include <libgen.h>
 #endif
 
 using namespace realm::util;
 
 namespace {
 
-bool keep_files = false;
+bool g_keep_files = false;
 
-std::string path_prefix;
-std::string resource_path;
+std::string g_path_prefix;
+std::string g_resource_path;
 
 #ifdef _WIN32
 std::string sanitize_for_file_name(std::string str)
@@ -56,35 +66,88 @@ std::string sanitize_for_file_name(const std::string& str)
 }
 #endif
 
-std::locale locale_classic = std::locale::classic();
+#if REALM_PLATFORM_APPLE
+std::string url_to_path(CFURLRef url)
+{
+    auto absolute = adoptCF(CFURLCopyAbsoluteURL(url));
+    auto path = adoptCF(CFURLCopyPath(absolute.get()));
+    auto length = CFStringGetLength(path.get());
+    std::string ret;
+    ret.resize(CFStringGetMaximumSizeForEncoding(length, kCFStringEncodingUTF8));
+    CFIndex bytes_written;
+    CFStringGetBytes(path.get(), {0, length}, kCFStringEncodingUTF8, 0, false, reinterpret_cast<uint8_t*>(ret.data()),
+                     ret.size(), &bytes_written);
+    REALM_ASSERT(bytes_written);
+    ret.resize(bytes_written);
+    return ret;
+}
+#endif
 
 } // anonymous namespace
 
-namespace realm {
-namespace test_util {
-
+namespace realm::test_util {
 
 void keep_test_files()
 {
-    keep_files = true;
+    g_keep_files = true;
 }
 
 std::string get_test_path(const std::string& test_name, const std::string& suffix)
 {
-    std::ostringstream out;
-    out.imbue(locale_classic);
-    out << path_prefix << sanitize_for_file_name(test_name) << suffix;
-    return out.str();
-}
-
-void set_test_path_prefix(const std::string& prefix)
-{
-    path_prefix = prefix;
+    return g_path_prefix + sanitize_for_file_name(test_name) + suffix;
 }
 
 std::string get_test_path_prefix()
 {
-    return path_prefix;
+    return g_path_prefix;
+}
+
+bool initialize_test_path(int argc, const char* argv[])
+{
+#if REALM_PLATFORM_APPLE
+    // On Apple platforms we copy everything into a read-only bundle containing
+    // the test executable and resource files, and have to create test files in
+    // a temporary directory.
+#if REALM_APPLE_DEVICE || TARGET_OS_SIMULATOR
+    auto home = adoptCF(CFCopyHomeDirectoryURL());
+    g_path_prefix = url_to_path(home.get()) + "Documents/";
+#else
+    g_path_prefix = util::make_temp_dir() + "/";
+#endif
+
+    auto resources_url = adoptCF(CFBundleCopyResourcesDirectoryURL(CFBundleGetMainBundle()));
+    g_resource_path = url_to_path(resources_url.get());
+
+    // On other platforms we can write to the executable's directory, so we use
+    // that as the base path.
+#elif defined(_MSC_VER)
+    wchar_t path[MAX_PATH];
+    if (GetModuleFileName(NULL, path, MAX_PATH) == 0) {
+        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        return false;
+    }
+    PathCchRemoveFileSpec(path, MAX_PATH);
+    SetCurrentDirectory(path);
+    g_resource_path = "resources\\";
+#else
+    char executable[PATH_MAX];
+    if (realpath(argv[0], executable) == nullptr) {
+        fprintf(stderr, "Failed to retrieve path to exectuable.\n");
+        return false;
+    }
+    const char* directory = dirname(executable);
+    if (chdir(directory) < 0) {
+        fprintf(stderr, "Failed to change directory.\n");
+        return false;
+    }
+    g_resource_path = "resources/";
+#endif
+
+    if (argc > 1) {
+        g_path_prefix = argv[1];
+    }
+
+    return true;
 }
 
 bool test_dir_is_exfat()
@@ -106,12 +169,7 @@ bool test_dir_is_exfat()
 
 std::string get_test_resource_path()
 {
-    return resource_path;
-}
-
-void set_test_resource_path(const std::string& path)
-{
-    resource_path = path;
+    return g_resource_path;
 }
 
 TestPathGuard::TestPathGuard(const std::string& path)
@@ -122,7 +180,7 @@ TestPathGuard::TestPathGuard(const std::string& path)
 
 TestPathGuard::~TestPathGuard() noexcept
 {
-    if (keep_files)
+    if (g_keep_files)
         return;
     try {
         if (!m_path.empty())
@@ -157,7 +215,7 @@ TestDirGuard::TestDirGuard(const std::string& path)
 
 TestDirGuard::~TestDirGuard() noexcept
 {
-    if (keep_files)
+    if (g_keep_files)
         return;
     try {
         clean_dir(m_path);
@@ -205,7 +263,7 @@ DBTestPathGuard::DBTestPathGuard(const std::string& path)
 
 DBTestPathGuard::~DBTestPathGuard() noexcept
 {
-    if (!keep_files && !m_path.empty())
+    if (!g_keep_files && !m_path.empty())
         cleanup();
 }
 
@@ -232,5 +290,4 @@ std::string TestDirNameGenerator::next()
     return m_path + "/" + std::to_string(m_counter++);
 }
 
-} // namespace test_util
-} // namespace realm
+} // namespace realm::test_util
