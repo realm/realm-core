@@ -1136,7 +1136,7 @@ void SlabAlloc::update_reader_view(size_t file_size)
         // section to the end of the new file size.
         const auto new_slab_base = align_size_to_section_boundary(file_size);
         const size_t num_mappings = get_section_index(new_slab_base);
-        new_mappings.reserve(num_mappings);
+        new_mappings.reserve(num_mappings - old_num_mappings);
         for (size_t k = old_num_mappings; k < num_mappings; ++k) {
             const size_t section_start_offset = get_section_base(k);
             const size_t section_size = std::min<size_t>(1 << section_shift, file_size - section_start_offset);
@@ -1201,7 +1201,6 @@ void SlabAlloc::update_reader_view(size_t file_size)
     // Being used in a multithreaded scenario, the old mappings must be retained open,
     // until the realm version for which they were established has been closed/detached.
     //
-    // FIXME: This is clearly a wrong assumption:
     // This assumes that only write transactions call do_alloc() or do_free() or needs to
     // translate refs in the slab area, and that all these uses are serialized, whether
     // that is achieved by being single threaded, interlocked or run from a sequential

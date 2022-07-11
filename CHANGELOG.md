@@ -4,6 +4,7 @@
 * <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
 * Add support for building with Xcode 14 using the CMake project ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 * Add support in the C API for constructing a new `realm_app_t` object via `realm_app_create`. ([PR #5570](https://github.com/realm/realm-core/issues/5570))
+* Reduce use of memory mappings and virtual address space ([PR #5645](https://github.com/realm/realm-core/pull/5645)). Also fixes some errors (see below)
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
@@ -13,6 +14,7 @@
 * Fix compilation failures on watchOS platforms which do not support thread-local storage. ([#7694](https://github.com/realm/realm-swift/issues/7694), [#7695](https://github.com/realm/realm-swift/issues/7695) since v11.7.0)
 * Fix a data race when committing a transaction while multiple threads are waiting for the write lock on platforms using emulated interprocess condition variables (most platforms other than non-Android Linux).
 * Fix a data race when writing audit events which could occur if the sync client thread was busy with other work when the event Realm was opened.
+* Fix some cases of running out of virtual address space (seen/reported as mmap failures) ([PR #5645](https://github.com/realm/realm-core/pull/5645))
 
 ### Breaking changes
 * None.

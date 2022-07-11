@@ -874,10 +874,10 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     // REALM_ASSERT(new_size > 0);
 
-    // FIXME: This seems dangerous - correct operation in a setting with multiple (partial)
-    // mappings of the same file would rely on ordering of individual mapping requests?
-    // However - we do resize on demand when accessing the iv table, so any problem
-    // may be fixed there. This approach isn't "cool".
+    // This seems dangerous - correct operation in a setting with multiple (partial)
+    // mappings of the same file would rely on ordering of individual mapping requests.
+    // Currently we only ever extend the file - but when we implement continuous defrag,
+    // this design should be revisited.
     m_file.cryptor.set_file_size(off_t(new_size + new_file_offset));
 
     flush();
