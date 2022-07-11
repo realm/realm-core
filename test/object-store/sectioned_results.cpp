@@ -1275,6 +1275,8 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         r->begin_transaction();
         REQUIRE(algo_run_count == 5);
         algo_run_count = 0;
+        REQUIRE(section1_notification_calls == 1); // Initial callback.
+        REQUIRE(section2_notification_calls == 1); // Initial callback.
         section1_notification_calls = 0;
         section2_notification_calls = 0;
         auto o1 = table->create_object().set(name_col, "any");

@@ -169,10 +169,11 @@ public:
             bool should_notify = has_insertions || has_modifications || has_deletions ||
                                  !filtered_sections_to_insert.empty() || !filtered_sections_to_delete.empty();
 
-            if (should_notify) {
+            if (should_notify || m_section_filter_should_deliver_initial_notification) {
                 m_cb(SectionedResultsChangeSet{filtered_insertions, filtered_modifications, filtered_deletions,
                                                filtered_sections_to_insert, filtered_sections_to_delete},
                      {});
+                m_section_filter_should_deliver_initial_notification = false;
             }
         }
         else {
@@ -216,6 +217,7 @@ private:
     // When set change notifications will be filtered to only deliver
     // change indices refering to the supplied section key.
     util::Optional<Mixed> m_section_filter;
+    bool m_section_filter_should_deliver_initial_notification = true;
 };
 
 template <typename StringType>
