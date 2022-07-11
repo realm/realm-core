@@ -47,8 +47,8 @@ set_target_properties(object-store-benchmarks PROPERTIES
 add_dependencies(benchmarks object-store-benchmarks)
 
 # on Apple platforms we use the built-in CFRunLoop
-# everywhere else it's libuv, except UWP or Android where it doesn't build
-if(NOT APPLE AND NOT ANDROID AND NOT WINDOWS_STORE)
+# everywhere else it's libuv, except UWP where it doesn't build
+if(NOT APPLE AND NOT WINDOWS_STORE)
     target_include_directories(object-store-benchmarks PRIVATE ${libuv_include_dir})
     target_link_libraries(object-store-benchmarks ${libuv_target})
 endif()
