@@ -539,7 +539,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         auto table = realm->read_group().get_table("class_object");
         realm->begin_transaction();
-        table->create_object();
+        Obj obj = table->create_object();
         realm->commit_transaction();
 
         REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());
@@ -1388,7 +1388,7 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 0);
 
         // Should be able to perform another write afterwards
-        realm->async_begin_transaction([&done, table, realm] {
+        realm->async_begin_transaction([&, realm] {
             table->create_object();
             realm->commit_transaction();
             done = true;
