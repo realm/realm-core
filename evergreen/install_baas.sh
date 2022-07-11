@@ -97,7 +97,7 @@ esac
 # Allow path to $CURL to be overloaded by an environment variable
 CURL="${CURL:=$LAUNCHER curl}"
 
-BASE_PATH="$(cd $(dirname "$0"); pwd)"
+BASE_PATH="$(cd "$(dirname "$0")"; pwd)"
 
 REALPATH="$BASE_PATH/abspath.sh"
 
@@ -180,12 +180,12 @@ if [[ ! -d $WORK_PATH/baas/etc/dylib/lib ]]; then
     if [[ -n "$STITCH_SUPPORT_LIB_PATH" ]]; then
         echo "Copying stitch support library from $STITCH_SUPPORT_LIB_PATH"
         mkdir baas/etc/dylib
-        cp -rav $STITCH_SUPPORT_LIB_PATH/* $WORK_PATH/baas/etc/dylib
+        cp -rav "$STITCH_SUPPORT_LIB_PATH"/* "$WORK_PATH/baas/etc/dylib"
     else
         echo "Downloading stitch support library"
         mkdir baas/etc/dylib
         cd baas/etc/dylib
-        $CURL -LsS $STITCH_SUPPORT_LIB_URL | tar -xz --strip-components=1
+        $CURL -LsS "$STITCH_SUPPORT_LIB_URL" | tar -xz --strip-components=1
         cd -
     fi
 fi
@@ -195,27 +195,27 @@ export DYLD_LIBRARY_PATH="$WORK_PATH/baas/etc/dylib/lib"
 if [[ ! -x $WORK_PATH/baas_dep_binaries/libmongo.so ]]; then
     if [[ -n "$STITCH_ASSISTED_AGG_LIB_PATH" ]]; then
         echo "Copying stitch support library from $STITCH_ASSISTED_AGG_LIB_PATH"
-        cp -rav $STITCH_ASSISTED_AGG_LIB_PATH $WORK_PATH/baas_dep_binaries/libmongo.so
-        chmod 755 $WORK_PATH/baas_dep_binaries/libmongo.so
+        cp -rav "$STITCH_ASSISTED_AGG_LIB_PATH" "$WORK_PATH/baas_dep_binaries/libmongo.so"
+        chmod 755 "$WORK_PATH/baas_dep_binaries/libmongo.so"
     elif [[ -n "$STITCH_ASSISTED_AGG_LIB_URL" ]]; then
         echo "Downloading assisted agg library"
         cd "$WORK_PATH/baas_dep_binaries"
-        $CURL -LsS $STITCH_ASSISTED_AGG_LIB_URL > libmongo.so
+        $CURL -LsS "$STITCH_ASSISTED_AGG_LIB_URL" > libmongo.so
         chmod 755 libmongo.so
         cd -
     fi
 fi
 
-if [[ ! -x $WORK_PATH/baas_dep_binaries/assisted_agg && -n "$STITCH_ASSISTED_AGG_URL" ]]; then
+if [[ ! -x "$WORK_PATH/baas_dep_binaries/assisted_agg" && -n "$STITCH_ASSISTED_AGG_URL" ]]; then
     echo "Downloading assisted agg binary"
     cd "$WORK_PATH/baas_dep_binaries"
-    $CURL -LsS $STITCH_ASSISTED_AGG_URL > assisted_agg
+    $CURL -LsS "$STITCH_ASSISTED_AGG_URL" > assisted_agg
     chmod 755 assisted_agg
     cd -
 fi
 
-YARN=$WORK_PATH/yarn/bin/yarn
-if [[ ! -x $YARN ]]; then
+YARN="$WORK_PATH/yarn/bin/yarn"
+if [[ ! -x "$YARN" ]]; then
     echo "Getting yarn"
     mkdir yarn && cd yarn
     $CURL -LsS https://s3.amazonaws.com/stitch-artifacts/yarn/latest.tar.gz | tar -xz --strip-components=1
@@ -312,7 +312,7 @@ echo "Starting stitch app server"
 [[ -f $WORK_PATH/baas_server.pid ]] && rm "$WORK_PATH/baas_server.pid"
 go build -o "$WORK_PATH/baas_server" cmd/server/main.go
 "$WORK_PATH/baas_server" \
-    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json 2>&1 > "$WORK_PATH/baas_server.log" &
+    --configFile=etc/configs/test_config.json --configFile="$BASE_PATH"/config_overrides.json > "$WORK_PATH/baas_server.log" 2>&1 &
 echo $! > "$WORK_PATH/baas_server.pid"
 "$BASE_PATH"/wait_for_baas.sh "$WORK_PATH/baas_server.pid"
 
