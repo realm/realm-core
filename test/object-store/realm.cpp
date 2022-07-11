@@ -1371,8 +1371,8 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(table->size() == 1);
         REQUIRE_FALSE(called);
     }
-    SECTION("exception thrown during transaction without error handler") {
 #ifndef _WIN32
+    SECTION("exception thrown during transaction without error handler") {
         realm->set_async_error_handler(nullptr);
         realm->async_begin_transaction([&] {
             table->create_object();
@@ -1395,7 +1395,6 @@ TEST_CASE("SharedRealm: async writes") {
         });
         wait_for_done();
         REQUIRE(table->size() == 1);
-#endif
     }
     SECTION("exception thrown during transaction without error handler after closing Realm") {
         realm->set_async_error_handler(nullptr);
@@ -1410,7 +1409,6 @@ TEST_CASE("SharedRealm: async writes") {
         REQUIRE(realm->is_closed());
     }
     SECTION("exception thrown from async commit completion callback with error handler") {
-#ifndef _WIN32
         Realm::AsyncHandle h;
         realm->set_async_error_handler([&](Realm::AsyncHandle handle, std::exception_ptr error) {
             REQUIRE(error);
@@ -1426,7 +1424,6 @@ TEST_CASE("SharedRealm: async writes") {
         });
         wait_for_done();
         verify_persisted_count(1);
-#endif
     }
     SECTION("exception thrown from async commit completion callback without error handler") {
         realm->begin_transaction();
@@ -1454,7 +1451,6 @@ TEST_CASE("SharedRealm: async writes") {
                               _impl::SimulatedFailure);
             REQUIRE_FALSE(realm->is_in_transaction());
         }
-#ifndef _WIN32
         SECTION("error in the async part of async commit") {
             realm->begin_transaction();
             table->create_object();
@@ -1470,9 +1466,7 @@ TEST_CASE("SharedRealm: async writes") {
             wait_for_done();
             sf::set_thread_local(true);
         }
-#endif
     }
-#ifndef _WIN32
     SECTION("throw exception from did_change()") {
         struct Context : public BindingContext {
             void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
@@ -1858,12 +1852,12 @@ TEST_CASE("SharedRealm: async writes") {
         wait_for_done();
         REQUIRE(table->size() == 6);
     }
-#endif
-
 
     util::EventLoop::main().run_until([&] {
         return !realm || !realm->has_pending_async_work();
     });
+#endif
+
 
 #ifdef _WIN32
     _impl::RealmCoordinator::clear_all_caches();
