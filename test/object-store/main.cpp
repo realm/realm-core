@@ -33,7 +33,7 @@
 
 int main(int argc, const char** argv)
 {
-    realm::test_util::initialize_test_path(argc, argv);
+    realm::test_util::initialize_test_path(1, argv);
 
     Catch::ConfigData config;
 
