@@ -3057,13 +3057,12 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     }
 }
 
-//#ifndef _WIN32
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
     TestFile config;
     config.automatic_change_notifications = false;
     int num_opens = 0;
-    config.should_compact_on_launch_function = [&](size_t total_bytes, size_t used_bytes) {
+    config.should_compact_on_launch_function = [&](uint64_t total_bytes, uint64_t used_bytes) {
         REQUIRE(total_bytes > used_bytes);
         num_opens++;
         return num_opens != 2;
@@ -3120,7 +3119,6 @@ TEST_CASE("SharedRealm: compact on launch") {
         }).join();
     }
 }
-//#endif
 
 struct ModeAutomatic {
     static SchemaMode mode()
