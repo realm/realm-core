@@ -1169,7 +1169,7 @@ public:
 
     bool has_multiple_values() const override
     {
-        return size() > 1;
+        return m_from_link_list;
     }
 
     bool has_constant_evaluation() const override

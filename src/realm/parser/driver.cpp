@@ -156,82 +156,103 @@ class MixedArguments : public query_parser::Arguments {
 public:
     MixedArguments(const std::vector<Mixed>& args)
         : Arguments(args.size())
+        , m_args([](const std::vector<Mixed>& list) -> std::vector<std::vector<Mixed>> {
+            std::vector<std::vector<Mixed>> ret;
+            for (const Mixed& m : list) {
+                ret.push_back({m});
+            }
+            return ret;
+        }(args))
+    {
+    }
+    MixedArguments(const std::vector<std::vector<Mixed>>& args)
+        : Arguments(args.size())
         , m_args(args)
     {
     }
     bool bool_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<bool>();
+        return m_args.at(n)[0].get<bool>();
     }
     long long long_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<int64_t>();
+        return m_args.at(n)[0].get<int64_t>();
     }
     float float_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<float>();
+        return m_args.at(n)[0].get<float>();
     }
     double double_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<double>();
+        return m_args.at(n)[0].get<double>();
     }
     StringData string_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<StringData>();
+        return m_args.at(n)[0].get<StringData>();
     }
     BinaryData binary_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<BinaryData>();
+        return m_args.at(n)[0].get<BinaryData>();
     }
     Timestamp timestamp_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<Timestamp>();
+        return m_args.at(n)[0].get<Timestamp>();
     }
     ObjectId objectid_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<ObjectId>();
+        return m_args.at(n)[0].get<ObjectId>();
     }
     UUID uuid_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<UUID>();
+        return m_args.at(n)[0].get<UUID>();
     }
     Decimal128 decimal128_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<Decimal128>();
+        return m_args.at(n)[0].get<Decimal128>();
     }
     ObjKey object_index_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<ObjKey>();
+        return m_args.at(n)[0].get<ObjKey>();
     }
     ObjLink objlink_for_argument(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get<ObjLink>();
+        return m_args.at(n)[0].get<ObjLink>();
+    }
+    std::vector<Mixed> list_for_argument(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n);
     }
     bool is_argument_null(size_t n) final
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).is_null();
+        return m_args.at(n).size() == 0 || m_args.at(n)[0].is_null();
+    }
+    bool is_argument_list(size_t n) final
+    {
+        Arguments::verify_ndx(n);
+        return m_args.at(n).size() > 1;
     }
     DataType type_for_argument(size_t n)
     {
         Arguments::verify_ndx(n);
-        return m_args.at(n).get_type();
+        return m_args.at(n)[0].get_type();
     }
 
 private:
-    const std::vector<Mixed>& m_args;
+    const std::vector<std::vector<Mixed>> m_args;
 };
 
 Timestamp get_timestamp_if_valid(int64_t seconds, int32_t nanoseconds)
@@ -417,7 +438,8 @@ Query EqualityNode::visit(ParserDriver* drv)
     if (op == CompareNode::IN) {
         Subexpr* r = right.get();
         if (!r->has_multiple_values()) {
-            throw InvalidQueryArgError("The keypath following 'IN' must contain a list");
+            throw InvalidQueryArgError("The keypath following 'IN' must contain a list: '" +
+                                       r->description(drv->m_serializer_state) + "'");
         }
     }
 
@@ -1111,6 +1133,17 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
                 ret = std::make_unique<Value<null>>(realm::null());
             }
+            else if (drv->m_args.is_argument_list(arg_no)) {
+                std::vector<Mixed> mixed_list = drv->m_args.list_for_argument(arg_no);
+                std::unique_ptr<Value<Mixed>> values = std::make_unique<Value<Mixed>>();
+                constexpr bool is_list = true;
+                values->init(is_list, mixed_list.size());
+                size_t ndx = 0;
+                for (auto& val : mixed_list) {
+                    values->set(ndx++, val);
+                }
+                ret = std::move(values);
+            }
             else {
                 auto type = drv->m_args.type_for_argument(arg_no);
                 explain_value_message =
@@ -1485,13 +1518,20 @@ std::string check_escapes(const char* str)
 
 } // namespace query_parser
 
-Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const
+Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments) const
 {
     MixedArguments args(arguments);
     return query(query_string, args, {});
 }
 
 Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                   const query_parser::KeyPathMapping& mapping) const
+{
+    MixedArguments args(arguments);
+    return query(query_string, args, mapping);
+}
+
+Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
                    const query_parser::KeyPathMapping& mapping) const
 {
     MixedArguments args(arguments);

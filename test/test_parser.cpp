@@ -218,6 +218,25 @@ static std::vector<std::string> valid_queries = {
     "a == b and c==d sort(a ASC, b DESC) DISTINCT(p) sort(c ASC, d DESC) DISTINCT(q.r)",
     "a == b  and c==d sort(a   ASC, b DESC)   DISTINCT( p )  sort( c   ASC  ,  d  DESC  ) DISTINCT(q.r ,   p)   ",
 
+    // constant list comparisons
+    "a BETWEEN {1, 2}",
+    "a IN {1, 2, 3}",
+    "a IN {'one', 2, -3.0, null}",
+    "a == {1, 2}",
+    "a > {1, 2}",
+    "a >= {1, 2}",
+    "a < {1, 2}",
+    "a <= {1, 2}",
+    "a != {1, 2}",
+    "a ==[c] {'a'}",
+    "a beginswith {'a', 'b'}",
+    "a endswith {'a', 'b'}",
+    "a contains {'a', 'b'}",
+    "a like {'a*', 'b*'}",
+    "NOT a IN {1, 2}",
+    "ALL a IN {1, 2}",
+    "NONE a IN {1, 2}",
+
     // limit
     "a=b LIMIT(1)",
     "a=b LIMIT ( 1 )",
@@ -231,20 +250,6 @@ static std::vector<std::string> valid_queries = {
     "a=b && c=d LIMIT(5) LIMIT(2)",
     "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) LIMIT(2)",
 
-    /*
-    // include
-    "a=b INCLUDE(c)",
-    "a=b include(c,d)",
-    "a=b INCLUDE(c.d)",
-    "a=b INCLUDE(c.d.e, f.g, h)",
-    "a=b INCLUDE ( c )",
-    "a=b INCLUDE(d, e, f    , g )",
-    "a=b INCLUDE(c) && d=f",
-    "a=b INCLUDE(c) INCLUDE(d)",
-    "a=b && c=d || e=f INCLUDE(g)",
-    "a=b LIMIT(5) SORT(age ASC) DISTINCT(name) INCLUDE(links1, links2)",
-    "a=b INCLUDE(links1, links2) LIMIT(5) SORT(age ASC) DISTINCT(name)",
-     */
     // subquery expression
     "SUBQUERY(items, $x, $x.name == 'Tom').@size > 0",
     "SUBQUERY(items, $x, $x.name == 'Tom').@count > 0",
@@ -313,6 +318,15 @@ static std::vector<std::string> invalid_queries = {
 
     "truepredicate &&",
     "truepredicate & truepredicate",
+
+    // constant list comparisons
+    "a IN {1, 2, 3",
+    "a IN 1, 2, 3}",
+    "a IN (1, 2, 3)",
+    "a IN [1, 2, 3]",
+    "a IN 1, 2, 3",
+    "a IN {b, c}",
+    "a IN {}",
 
     // sort/distinct
     "SORT(p ASCENDING)",                      // no query conditions
@@ -425,7 +439,7 @@ static void verify_query_sub(test_util::unit_test::TestContext& test_context, Ta
     size_t q_count = q.count();
     CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
-    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->query(description, args, {});
 
     size_t q2_count = q2.count();
@@ -1472,11 +1486,11 @@ TEST(Parser_substitution)
     CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query_sub(test_context, t, "age > $2", args, /*num_args*/ 2, 0), message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
-    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $0", std::vector<Mixed>{}), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $0", std::vector<Mixed>{}, {}), message);
     CHECK_EQUAL(message, "Request for argument at index 0 but no arguments are provided");
-    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $1", std::vector<Mixed>{{1}}), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $1", std::vector<Mixed>{{1}}, {}), message);
     CHECK_EQUAL(message, "Request for argument at index 1 but only 1 argument is provided");
-    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $2", std::vector<Mixed>{{1}, {2}}), message);
+    CHECK_THROW_ANY_GET_MESSAGE(t->query("age > $2", std::vector<Mixed>{{1}, {2}}, {}), message);
     CHECK_EQUAL(message, "Request for argument at index 2 but only 2 arguments are provided");
 
     // Mixed types
@@ -2594,9 +2608,9 @@ TEST(Parser_SortAndDistinctSerialisation)
 
 static TableView get_sorted_view(TableRef t, std::string query_string, query_parser::KeyPathMapping mapping = {})
 {
-    Query q = t->query(query_string, {}, mapping);
+    Query q = t->query(query_string, std::vector<Mixed>{}, mapping);
     std::string query_description = q.get_description(mapping.get_backlink_class_prefix());
-    Query q2 = t->query(query_description, {}, mapping);
+    Query q2 = t->query(query_description, std::vector<Mixed>{}, mapping);
     return q2.find_all();
 }
 
@@ -3800,9 +3814,56 @@ ONLY(Parser_OperatorIN)
         }
     }
 
+    // RHS is a constant list
     verify_query(test_context, t, "customer_id IN {0, 1, 2}", 3);
-    verify_query(test_context, t, "fav_item.name IN {'milk', 'oranges', 'cereal'}", 2);
+    verify_query(test_context, t, "NOT customer_id IN {0}", 2);
+    verify_query(test_context, t, "customer_id != {0}", 2);
+    verify_query(test_context, t, "customer_id != {0, 1}", 3);
+    verify_query(test_context, t, "NOT customer_id IN {0, 1}", 1);
+    verify_query(test_context, t, "customer_id != {0, 1, 2}", 3);
+    verify_query(test_context, t, "customer_id > {0, 1}", 2);
+    verify_query(test_context, t, "customer_id > {4, 5, 6}", 0);
+    verify_query(test_context, t, "customer_id < {0, 1}", 1);
+    verify_query(test_context, t, "customer_id < {0}", 0);
+    verify_query(test_context, t, "customer_id >= {0, 1}", 3);
+    verify_query(test_context, t, "customer_id >= {2, 3, 4}", 1);
+    verify_query(test_context, t, "customer_id <= {0, 1}", 2);
+    verify_query(test_context, t, "customer_id <= {-1}", 0);
 
+    verify_query(test_context, t, "fav_item.name IN {'milk', 'oranges', 'cereal'}", 2);
+    verify_query(test_context, t, "fav_item.price IN {6.5, 9.5}", 1);
+    verify_query(test_context, t, "fav_item.name IN {0, null, -1, 'not found', 3.14, oid(000000000000000000000000)}",
+                 0);
+    verify_query(test_context, t, "fav_item.name != {'milk', 'oranges'}", 3);
+    verify_query(test_context, t, "NOT fav_item.name IN {'milk', 'oranges'}", 1);
+    verify_query(test_context, t, "fav_item.name contains[c] {'ILK', 'Range'}", 2);
+    verify_query(test_context, t, "fav_item.name beginswith[c] {'MIL', 'CERe'}", 1);
+    verify_query(test_context, t, "fav_item.name endswith {'lk', 'EAL', 'GeS'}", 1);
+    verify_query(test_context, t, "fav_item.name endswith[c] {'lk', 'EAL', 'GeS'}", 2);
+    verify_query(test_context, t, "fav_item.name like {'*lk', '*zz*'}", 2);
+
+    std::vector<Mixed> int_list = {0, 1, 2};
+    std::vector<Mixed> strings_list = {"milk", "oranges", "cereal"};
+    std::vector<Mixed> mixed_list = {"no match",
+                                     -1,
+                                     3.14,
+                                     UUID(),
+                                     ObjectId::gen(),
+                                     Timestamp{0, 0},
+                                     Mixed{},
+                                     false,
+                                     2.6f,
+                                     Decimal128(8.888),
+                                     ObjKey{},
+                                     ObjLink{t->get_key(), people_keys[0]}};
+    util::Any args[] = {realm::null(), int_list, strings_list, mixed_list};
+    size_t num_args = 4;
+    verify_query_sub(test_context, t, "customer_id IN $1", args, num_args, 3);
+    verify_query_sub(test_context, t, "customer_id IN $3", args, num_args, 0);
+    verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
+    verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
+
+    // RHS is a list property
     verify_query(test_context, t, "5.5 IN items.price", 2);
     verify_query(test_context, t, "!(5.5 IN items.price)", 1);              // group not
     verify_query(test_context, t, "'milk' IN items.name", 2);               // string compare
@@ -3817,6 +3878,8 @@ ONLY(Parser_OperatorIN)
     CHECK_THROW(verify_query(test_context, t, "SOME 5.5 IN items.price", 2), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "ALL 5.5 IN items.price", 1), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "NONE 5.5 IN items.price", 1), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "ALL customer_id IN {0, 1, 2}", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "NONE customer_id IN {0, 1, 2}", 3), query_parser::SyntaxError);
 
     CHECK_THROW_EX(verify_query(test_context, t, "items.price IN 5.5", 1), query_parser::InvalidQueryArgError,
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));

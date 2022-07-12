@@ -560,8 +560,10 @@ public:
     }
     Query where(const DictionaryLinkValues& dictionary_of_links) const;
 
-    Query query(const std::string& query_string, const std::vector<Mixed>& arguments = {}) const;
+    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments = {}) const;
     Query query(const std::string& query_string, const std::vector<Mixed>& arguments,
+                const query_parser::KeyPathMapping& mapping) const;
+    Query query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments,
                 const query_parser::KeyPathMapping& mapping) const;
     Query query(const std::string& query_string, query_parser::Arguments& arguments,
                 const query_parser::KeyPathMapping&) const;
