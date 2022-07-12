@@ -427,10 +427,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm4->schema().size() == 1);
         REQUIRE(realm4->schema().find("object") != realm4->schema().end());
     }
-
+#ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
 // The ExternalCommitHelper implementation on Windows doesn't rely on FIFOs
-#ifndef _WIN32
         REQUIRE(util::try_make_dir(config.path + ".note"));
         auto sys_fallback_file =
             util::format("%1realm_%2.note", util::normalize_dir(DBOptions::get_sys_tmp_dir()),
@@ -439,8 +438,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
         util::remove_dir(sys_fallback_file);
-#endif
     }
+#endif
 
     SECTION("should get different instances on different threads") {
         config.cache = true;
