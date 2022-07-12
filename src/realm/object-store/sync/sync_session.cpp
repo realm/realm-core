@@ -235,8 +235,9 @@ SyncSession::handle_refresh(const std::shared_ptr<SyncSession>& session)
     };
 }
 
-SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, RealmConfig config, SyncManager* sync_manager)
-    : m_config(std::move(config))
+SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
+                         SyncManager* sync_manager)
+    : m_config(config)
     , m_db(std::move(db))
     , m_flx_subscription_store([this](bool use_flx_sync) -> std::shared_ptr<sync::SubscriptionStore> {
         if (!use_flx_sync) {
@@ -258,6 +259,10 @@ SyncSession::SyncSession(SyncClient& client, std::shared_ptr<DB> db, RealmConfig
     , m_sync_manager(sync_manager)
 {
     REALM_ASSERT(m_config.sync_config);
+    // we don't want the following configs enabled during a client reset
+    m_config.scheduler = nullptr;
+    m_config.audit_config = nullptr;
+
     if (m_config.sync_config->flx_sync_requested) {
         std::weak_ptr<sync::SubscriptionStore> weak_sub_mgr(m_flx_subscription_store);
         auto& history = static_cast<sync::ClientReplication&>(*m_db->get_replication());
@@ -668,13 +673,13 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig& 
                                                                    bool recovery_is_allowed)
 {
     RealmConfig copy_config = session_config;
-    copy_config.sync_config = std::make_shared<SyncConfig>(*session_config.sync_config);
+    copy_config.sync_config = std::make_shared<SyncConfig>(*session_config.sync_config); // deep copy
     sync::Session::Config::ClientReset config;
     REALM_ASSERT(session_config.sync_config->client_resync_mode != ClientResyncMode::Manual);
     config.mode = session_config.sync_config->client_resync_mode;
-    config.notify_after_client_reset = [config = copy_config](std::string local_path, VersionID previous_version,
-                                                              bool did_recover) {
-        if (config.sync_config->notify_after_client_reset) {
+    if (copy_config.sync_config->notify_after_client_reset) {
+        config.notify_after_client_reset = [config = copy_config](std::string local_path, VersionID previous_version,
+                                                                  bool did_recover) {
             REALM_ASSERT(local_path == config.path);
             auto local_coordinator = RealmCoordinator::get_coordinator(config);
             REALM_ASSERT(local_coordinator);
@@ -685,10 +690,10 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig& 
             REALM_ASSERT(frozen_before);
             REALM_ASSERT(frozen_before->is_frozen());
             config.sync_config->notify_after_client_reset(frozen_before, std::move(active_after), did_recover);
-        }
-    };
-    config.notify_before_client_reset = [config = copy_config](std::string local_path) {
-        if (config.sync_config->notify_before_client_reset) {
+        };
+    }
+    if (copy_config.sync_config->notify_before_client_reset) {
+        config.notify_before_client_reset = [config = copy_config](std::string local_path) {
             REALM_ASSERT(local_path == config.path);
             auto local_coordinator = RealmCoordinator::get_coordinator(config);
             REALM_ASSERT(local_coordinator);
@@ -698,13 +703,13 @@ static sync::Session::Config::ClientReset make_client_reset_config(RealmConfig& 
             REALM_ASSERT(frozen_local);
             REALM_ASSERT(frozen_local->is_frozen());
             config.sync_config->notify_before_client_reset(frozen_local);
-        }
-    };
+        };
+    }
+
     config.fresh_copy = std::move(fresh_copy);
     config.recovery_is_allowed = recovery_is_allowed;
     return config;
 }
-
 
 void SyncSession::create_sync_session()
 {

@@ -314,18 +314,18 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<DB> db, RealmConfig config,
-                                               SyncManager* sync_manager)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::shared_ptr<DB> db,
+                                               const RealmConfig& config, SyncManager* sync_manager)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, RealmConfig config,
+            MakeSharedEnabler(_impl::SyncClient& client, std::shared_ptr<DB> db, const RealmConfig& config,
                               SyncManager* sync_manager)
-                : SyncSession(client, std::move(db), std::move(config), sync_manager)
+                : SyncSession(client, std::move(db), config, sync_manager)
             {
             }
         };
         REALM_ASSERT(config.sync_config);
-        return std::make_shared<MakeSharedEnabler>(client, std::move(db), std::move(config), std::move(sync_manager));
+        return std::make_shared<MakeSharedEnabler>(client, std::move(db), config, std::move(sync_manager));
     }
     // }
 
@@ -334,7 +334,7 @@ private:
     static util::UniqueFunction<void(util::Optional<app::AppError>)>
     handle_refresh(const std::shared_ptr<SyncSession>&);
 
-    SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, RealmConfig, SyncManager* sync_manager);
+    SyncSession(_impl::SyncClient&, std::shared_ptr<DB>, const RealmConfig&, SyncManager* sync_manager);
 
     void download_fresh_realm(util::Optional<SyncError::ClientResetModeAllowed> allowed_mode)
         REQUIRES(!m_config_mutex, !m_state_mutex, !m_connection_state_mutex);
