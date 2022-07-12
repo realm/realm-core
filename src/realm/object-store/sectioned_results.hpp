@@ -92,7 +92,7 @@ private:
     SectionedResults* m_parent;
     Mixed m_key;
     std::unique_ptr<char[]> m_key_buffer;
-    std::pair<bool, util::Optional<Section&>> do_is_valid() const;
+    util::Optional<Section&> get_if_valid() const;
 };
 
 /**

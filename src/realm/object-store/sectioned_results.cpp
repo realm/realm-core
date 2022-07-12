@@ -256,31 +256,31 @@ ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
 
 bool ResultsSection::is_valid() const
 {
-    return do_is_valid().first;
+    return get_if_valid().operator bool();
 }
 
-std::pair<bool, util::Optional<Section&>> ResultsSection::do_is_valid() const
+util::Optional<Section&> ResultsSection::get_if_valid() const
 {
     if (!m_parent->is_valid())
-        return {false, util::none};
+        return util::none;
     util::CheckedUniqueLock lock(m_parent->m_mutex);
     // See if we need to recalculate the sections before
     // searching for the key.
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     if (it == m_parent->m_sections.end())
-        return {false, util::none};
+        return util::none;
     else
-        return {true, it->second};
+        return it->second;
 }
 
 
 Mixed ResultsSection::operator[](size_t idx) const
 {
-    auto is_valid = do_is_valid();
-    if (!is_valid.first)
+    auto is_valid = get_if_valid();
+    if (!is_valid)
         throw Results::InvalidatedException();
-    auto& section = *is_valid.second;
+    auto& section = *is_valid;
     auto size = section.indices.size();
     if (idx >= size)
         std::out_of_range(util::format("Requested index %1 greater than max %2", idx, size - 1));
@@ -296,19 +296,19 @@ Mixed ResultsSection::key()
 
 size_t ResultsSection::index()
 {
-    auto is_valid = do_is_valid();
-    if (!is_valid.first)
+    auto is_valid = get_if_valid();
+    if (!is_valid)
         throw std::logic_error("This ResultsSection is not in a valid state.");
-    auto& section = *is_valid.second;
+    auto& section = *is_valid;
     return section.index;
 }
 
 size_t ResultsSection::size()
 {
-    auto is_valid = do_is_valid();
-    if (!is_valid.first)
+    auto is_valid = get_if_valid();
+    if (!is_valid)
         throw Results::InvalidatedException();
-    auto& section = *is_valid.second;
+    auto& section = *is_valid;
     return section.indices.size();
 }
 
