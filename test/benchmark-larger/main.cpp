@@ -48,6 +48,7 @@ int main()
 {
     std::random_device rd;
     std::mt19937 g(rd());
+    volatile int64_t sum = 0; // prevent optimization
 
     auto run_steps = [&](int num_steps, int step_size, step_type st, const char* step_layout,
                          std::vector<int> rw_probes = {}) {
@@ -160,6 +161,9 @@ int main()
                     std::cout << j + step_size << " _ " << probe_size << " " << print_diff.count() / probe_size
                               << std::endl;
                     start = end;
+                    for (size_t i = 0; i < probe_size; ++i) {
+                        sum += objects[i].get<Int>(col2);
+                    }
                     end = std::chrono::steady_clock::now();
                     diff = end - start;
                     print_diff = std::chrono::duration_cast<std::chrono::nanoseconds>(diff);
