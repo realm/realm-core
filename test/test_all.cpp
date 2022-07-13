@@ -243,22 +243,6 @@ void display_build_config()
     const char* encryption = "Disabled at compile-time";
 #endif
 
-#ifdef REALM_COMPILER_SSE
-    const char* compiler_sse = "Yes";
-#else
-    const char* compiler_sse = "No";
-#endif
-
-#ifdef REALM_COMPILER_AVX
-    const char* compiler_avx = "Yes";
-#else
-    const char* compiler_avx = "No";
-#endif
-
-    const char* cpu_sse = realm::sseavx<42>() ? "4.2" : (realm::sseavx<30>() ? "3.0" : "None");
-
-    const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
-
     std::cout << std::endl
               << "Realm version: " << Version::get_version() << " with Debug " << with_debug << "\n"
               << "Platform: " << util::get_platform_info() << "\n"
@@ -270,11 +254,6 @@ void display_build_config()
               // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
               // We decide to print size_t here
               << "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
-              << "\n"
-              << "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
-              << "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
-              << "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
-              << "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
               << "\n"
               << "UNITTEST_RANDOM_SEED:                       " << unit_test_random_seed << "\n"
               << "Test path prefix:                           " << test_util::get_test_path_prefix() << "\n"

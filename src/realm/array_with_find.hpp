@@ -369,11 +369,10 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
     REALM_ASSERT_3(m_array.m_width, !=, 0);
 
 #if defined(REALM_COMPILER_SSE)
-    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note taht SSE doesn't support
+    // Only use SSE if payload is at least one SSE chunk (128 bits) in size. Also note that SSE doesn't support
     // Less-than comparison for 64-bit values.
-    if ((!(std::is_same<cond, Less>::value && m_array.m_width == 64)) && end - start2 >= sizeof(__m128i) &&
-        m_array.m_width >= 8 &&
-        (sseavx<42>() || (sseavx<30>() && std::is_same<cond, Equal>::value && m_array.m_width < 64))) {
+    if ((!(std::is_same_v<cond, Less> && m_array.m_width == 64)) && end - start2 >= sizeof(__m128i) &&
+        m_array.m_width >= 8) {
 
         // find_sse() must start2 at 16-byte boundary, so search area before that using compare_equality()
         __m128i* const a =
@@ -388,19 +387,10 @@ bool ArrayWithFind::find_optimized(int64_t value, size_t start, size_t end, size
 
         // Search aligned area with SSE
         if (b > a) {
-            if (sseavx<42>()) {
-                if (!find_sse<cond, bitwidth, Callback>(
-                        value, a, b - a, state,
-                        baseindex + ((reinterpret_cast<char*>(a) - m_array.m_data) * 8 / no0(bitwidth)), callback))
-                    return false;
-            }
-            else if (sseavx<30>()) {
-
-                if (!find_sse<Equal, bitwidth, Callback>(
-                        value, a, b - a, state,
-                        baseindex + ((reinterpret_cast<char*>(a) - m_array.m_data) * 8 / no0(bitwidth)), callback))
-                    return false;
-            }
+            if (!find_sse<cond, bitwidth, Callback>(
+                    value, a, b - a, state,
+                    baseindex + ((reinterpret_cast<char*>(a) - m_array.m_data) * 8 / no0(bitwidth)), callback))
+                return false;
         }
 
         // Search remainder with compare_equality()
@@ -909,7 +899,7 @@ bool ArrayWithFind::compare_leafs_4(const Array* foreign, size_t start, size_t e
 
 
 #if defined(REALM_COMPILER_SSE)
-    if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
+    if (width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         // and the two arrays are aligned the same way
         if ((reinterpret_cast<size_t>(m_array.m_data) & 0xf) == (reinterpret_cast<size_t>(foreign_m_data) & 0xf)) {

@@ -17,7 +17,8 @@
 -----------
 
 ### Internals
-* None.
+* Remove `set_string_compare_method()` and everything related to it, which has never actually been used and was a bad solution to the problem it tried to solve.
+* Remove runtime CPUID checking as the most recent CPU features we rely on are now 15 years old.
 
 ----------------------------------------------
 
