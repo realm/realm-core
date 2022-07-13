@@ -48,6 +48,7 @@ int main()
 {
     std::random_device rd;
     std::mt19937 g(rd());
+    volatile int64_t sum = 0; // prevent optimization
 
     auto run_steps = [&](int num_steps, int step_size, step_type st, const char* step_layout,
                          std::vector<int> rw_probes = {}) {
@@ -139,7 +140,6 @@ int main()
                     auto trans = db->start_write();
                     start = std::chrono::steady_clock::now();
                     auto t = trans->get_table("table");
-                    volatile int64_t sum = 0; // prevent optimization
                     auto start_idx = keys.size();
                     if (start_idx > probe_size)
                         start_idx -= probe_size;
