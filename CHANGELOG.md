@@ -27,7 +27,8 @@
 ### Internals
 * Add support for running the object store tests and some of the benchmarks on iOS ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
 * MemRef is now trivially copyable.
-* Fix bloaty CI test that is currently failing on master. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
+* Fix bloaty CI test that is currently failing on Ubuntu. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
+* Fix benchmark tests that are failing on Ubuntu and MacOS. ([PR #5656](https://github.com/realm/realm-core/pull/5656))
 
 ----------------------------------------------
 
