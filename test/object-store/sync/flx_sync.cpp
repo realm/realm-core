@@ -268,17 +268,19 @@ TEST_CASE("flx: client reset", "[sync][flx][app][client reset]") {
                          ObjectId oid = ObjectId::gen()) {
         CppContext c(realm);
         realm->begin_transaction();
+
         int64_t r1 = random_int();
         int64_t r2 = random_int();
         int64_t r3 = random_int();
+        int64_t sum = uint64_t(r1) + r2 + r3;
 
         Object::create(c, realm, "TopLevel",
-                       util::Any(AnyDict{{"_id", oid},
-                                         {"queryable_str_field", str_field},
-                                         {"queryable_int_field", int_field},
-                                         {"non_queryable_field", std::string{"non queryable 1"}},
-                                         {"list_of_ints_field", std::vector<util::Any>{r1, r2, r3}},
-                                         {"sum_of_list_field", r1 + r2 + r3}}));
+                       std::any(AnyDict{{"_id", oid},
+                                        {"queryable_str_field", str_field},
+                                        {"queryable_int_field", int_field},
+                                        {"non_queryable_field", std::string{"non queryable 1"}},
+                                        {"list_of_ints_field", std::vector<std::any>{r1, r2, r3}},
+                                        {"sum_of_list_field", sum}}));
         realm->commit_transaction();
     };
 

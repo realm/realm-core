@@ -4340,6 +4340,7 @@ TEST_CASE("C API - client reset", "[c_api][client-reset]") {
         return reset_utils::make_baas_client_reset(config_local, config_remote, test_app_session);
     };
 
+    local_config.sync_config = std::make_shared<realm_sync_config_t>(*local_config.sync_config);
     realm_sync_config_t* local_sync_config = static_cast<realm_sync_config_t*>(local_config.sync_config.get());
 
     struct ResetRealmFiles {

@@ -3704,7 +3704,10 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                 actual.test(test_mode == ClientResyncMode::Recover ? expected_recovered : initial);
             });
             int64_t initial_value = initial.dict_values[existing_key]->int_value;
-            int64_t addition = random_int();
+            std::mt19937_64 engine(std::random_device{}());
+            std::uniform_int_distribution<int64_t> rng(-10'000'000'000, 10'000'000'000);
+
+            int64_t addition = rng(engine);
             SECTION("local add_int to an existing dictionary item") {
                 INFO("adding " << initial_value << " with " << addition);
                 expected_recovered = initial;
@@ -3716,7 +3719,7 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
                     ->run();
             }
             SECTION("local and remote both create the same dictionary item and add to it") {
-                int64_t remote_addition = random_int();
+                int64_t remote_addition = rng(engine);
                 INFO("adding " << initial_value << " with local " << addition << " and remote " << remote_addition);
                 expected_recovered = initial;
                 expected_recovered.dict_values[existing_key]->int_value += (addition + remote_addition);

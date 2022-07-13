@@ -112,6 +112,23 @@ TEST(Decimal_Basics)
     CHECK_EQUAL(decimal, decimal3);
 }
 
+TEST(Decimal_Int64_Conversions)
+{
+    auto check_roundtrip = [=](int64_t v) {
+        int64_t v2 = 0;
+        CHECK(Decimal128(v).to_int(v2));
+        CHECK_EQUAL(v, v2);
+    };
+
+    check_roundtrip(std::numeric_limits<int64_t>::lowest());
+    check_roundtrip(std::numeric_limits<int64_t>::lowest() + 1);
+    check_roundtrip(-1);
+    check_roundtrip(0);
+    check_roundtrip(1);
+    check_roundtrip(std::numeric_limits<int64_t>::max() - 1);
+    check_roundtrip(std::numeric_limits<int64_t>::max());
+}
+
 TEST(Decimal_Arithmetics)
 {
     Decimal128 d(10);

@@ -768,14 +768,13 @@ template <>
 size_t LinksToNode<Equal>::find_first_local(size_t start, size_t end)
 {
     if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
-
         // LinkLists never contain null
         if (!m_target_keys[0] && m_target_keys.size() == 1 && start != end)
             return not_found;
 
         BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
         for (size_t i = start; i < end; i++) {
-            if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
+            if (ref_type ref = LinkMap::get_ref(m_leaf_ptr, m_column_type, i)) {
                 links.init_from_ref(ref);
                 for (auto& key : m_target_keys) {
                     if (key) {
@@ -808,7 +807,7 @@ size_t LinksToNode<NotEqual>::find_first_local(size_t start, size_t end)
     if (m_column_type == col_type_LinkList || m_condition_column_key.is_set()) {
         BPlusTree<ObjKey> links(m_table.unchecked_ptr()->get_alloc());
         for (size_t i = start; i < end; i++) {
-            if (ref_type ref = static_cast<const ArrayList*>(m_leaf_ptr)->get(i)) {
+            if (ref_type ref = LinkMap::get_ref(m_leaf_ptr, m_column_type, i)) {
                 links.init_from_ref(ref);
                 auto sz = links.size();
                 for (size_t j = 0; j < sz; j++) {
