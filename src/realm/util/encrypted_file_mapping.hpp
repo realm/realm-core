@@ -108,6 +108,7 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
+        Clean = 0,
         Touched = 1,         // a ref->ptr translation has taken place
         UpToDate = 2,        // the page is fully up to date
         RefetchRequired = 4, // the page is valid for old translations, but requires re-decryption for new

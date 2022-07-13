@@ -2266,8 +2266,7 @@ TEST(Table_NullableChecks)
     Obj obj = t.create_object();
     StringData sd; // construct a null reference
     Timestamp ts;  // null
-    BinaryData bd;
-    ; // null
+    BinaryData bd; // null
     obj.set(str_col, sd);
     obj.set(int_col, realm::null());
     obj.set(bool_col, realm::null());

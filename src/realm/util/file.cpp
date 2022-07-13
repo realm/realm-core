@@ -1757,8 +1757,6 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     size_t extension_size = size - m_size;
     size_t extension_start_offset = m_offset + m_size;
 #if REALM_ENABLE_ENCRYPTION
-    // unsupported for encryption ATM
-    // needs an encryption key....
     if (m_encrypted_mapping) {
         void* got_addr = ::mmap(extension_start_addr, extension_size, PROT_READ | PROT_WRITE,
                                 MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);

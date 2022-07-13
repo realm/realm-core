@@ -1155,7 +1155,6 @@ void SlabAlloc::update_reader_view(size_t file_size)
                         throw std::bad_alloc();
                 }
                 else {
-                    // REALM_ASSERT(false);
                     new_mappings.back().primary_mapping.map(m_file, File::access_ReadOnly, section_size, 0,
                                                             section_start_offset);
                 }

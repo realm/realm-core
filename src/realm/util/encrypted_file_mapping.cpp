@@ -863,7 +863,7 @@ void EncryptedFileMapping::extend_to(size_t offset, size_t new_size)
 {
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     size_t num_pages = new_size >> m_page_shift;
-    m_page_state.resize(num_pages, PageState(0));
+    m_page_state.resize(num_pages, PageState::Clean);
     m_chunk_dont_scan.resize((num_pages + page_to_chunk_factor - 1) >> page_to_chunk_shift, false);
     m_file.cryptor.set_file_size((off_t)(offset + new_size));
 }
@@ -872,7 +872,6 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
 {
     REALM_ASSERT(new_file_offset % (1ULL << m_page_shift) == 0);
     REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
-    // REALM_ASSERT(new_size > 0);
 
     // This seems dangerous - correct operation in a setting with multiple (partial)
     // mappings of the same file would rely on ordering of individual mapping requests.
