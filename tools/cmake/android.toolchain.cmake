@@ -10,6 +10,7 @@ endif()
 # For some reason, APPLE is set when building for Android on MacOS
 # This leads to the incorrect ar program being seleccted: "/usr/bin/ar" vs "llvm-ar"
 # Unset APPLE now so the correct ar program is selected
+# Remove once https://gitlab.kitware.com/cmake/cmake/-/issues/23333 is resolved
 if(APPLE)
     unset(APPLE)
 endif()
