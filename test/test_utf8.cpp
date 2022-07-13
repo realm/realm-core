@@ -118,12 +118,10 @@ TEST(UTF_Fuzzy_utf8_to_utf16)
 }
 
 
-NONCONCURRENT_TEST(UTF8_Compare_Core_ASCII)
+TEST(UTF8_Compare_Core_ASCII)
 {
     // Useful line for creating new unit test cases:
     // bool ret = std::locale("us_EN")(string("a"), std::string("b"));
-
-    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     // simplest test
     CHECK_EQUAL(true, utf8_compare("a", "b"));
@@ -172,10 +170,8 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_ASCII)
 }
 
 
-NONCONCURRENT_TEST(UTF8_Compare_Core_utf8)
+TEST(UTF8_Compare_Core_utf8)
 {
-    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
-
     // single utf16 code points (tests mostly Windows)
     CHECK_EQUAL(false, utf8_compare(uae, uae));
     CHECK_EQUAL(false, utf8_compare(uAE, uAE));
@@ -202,7 +198,7 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8)
 }
 
 
-NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
+TEST(UTF8_Compare_Core_utf8_invalid)
 {
     // Test that invalid utf8 won't make decisions on data beyond Realm payload. Do that by placing an utf8 header
     // that
@@ -217,7 +213,6 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
     static_cast<void>(spurious1);
     static_cast<void>(spurious2);
 
-    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
     StringData i1 = StringData(invalid1);
     StringData i2 = StringData(invalid2);
 
@@ -228,7 +223,7 @@ NONCONCURRENT_TEST(UTF8_Compare_Core_utf8_invalid)
 }
 
 
-NONCONCURRENT_TEST(Compare_Core_utf8_invalid_crash)
+TEST(Compare_Core_utf8_invalid_crash)
 {
     // See if we can crash Realm with random data
     constexpr size_t str_len = 20;
@@ -236,8 +231,6 @@ NONCONCURRENT_TEST(Compare_Core_utf8_invalid_crash)
     char str2[str_len];
     using namespace realm::test_util;
     Random r;
-
-    set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
     for (size_t t = 0; t < 10000; t++) {
         for (size_t i = 0; i < str_len; i++) {
