@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -56,9 +56,14 @@ if [ -z "${OS}" ] || [ -z "${BUILD_TYPE}" ]; then
 fi
 
 # Check for android-related obligatory fields
-if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
-    echo "ERROR: option -a is needed for android builds";
-    usage
+if [[ "${OS}" == "android" ]]; then
+    if [[ -z "${ARCH}" ]]; then
+        echo "ERROR: option -a is needed for android builds";
+        usage
+    elif [[ -z "${ANDROID_NDK}" ]]; then
+        echo "ERROR: set ANDROID_NDK to the top level path for the Android NDK";
+        usage
+    fi
 fi
 
 if [ "${OS}" == "android" ]; then
