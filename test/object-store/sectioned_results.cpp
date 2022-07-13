@@ -663,7 +663,7 @@ TEST_CASE("sectioned results", "[sectioned_results]") {
         table->clear();
         auto col_typed_link = table->add_column(type_TypedLink, "typed_link_col");
         auto linked = table->create_object();
-        auto o1 = table->create_object(ObjKey{}, {{col_typed_link, linked.get_link()}});
+        table->create_object(ObjKey{}, {{col_typed_link, linked.get_link()}});
         r->commit_transaction();
 
         // Should throw on `type_TypedLink` being a section key.
