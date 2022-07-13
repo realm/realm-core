@@ -749,7 +749,8 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
                 auto frozen_results = frozen_links.get_values();
                 size_t frozen_links_counter = 0;
                 // Implementation of the hashing function for dictionaries vary between 32 and 64 bit.
-                // Order is not preserved and assumptions around at which position ad object is cannot be found.
+                // Order is not preserved and assumptions around at which position an object is inside the Set is
+                // wrong and cannot be used for testing.
                 // TODO : fix the implementation for Dicitionaries in order to match order between 32 and 64 bit archs
                 for (size_t i = 0; i < frozen_results.size(); ++i) {
                     if (frozen_results.get(i)) {

@@ -920,6 +920,7 @@ public:
                       util::UniqueFunction<void(std::exception_ptr)>&& completion) override REQUIRES(!m_mutex);
 
     void record_query(VersionID, TableView const&) override REQUIRES(!m_mutex);
+    void prepare_for_write(VersionID) override REQUIRES(!m_mutex);
     void record_write(VersionID, VersionID) override REQUIRES(!m_mutex);
     void record_read(VersionID, const Obj& row, const Obj& parent, ColKey col) override REQUIRES(!m_mutex);
 
@@ -1052,12 +1053,18 @@ void AuditContext::record_read(VersionID version, const Obj& obj, const Obj& par
                                                           parent_table_key, parent_obj_key, col});
 }
 
-void AuditContext::record_write(realm::VersionID old_version, realm::VersionID new_version)
+void AuditContext::prepare_for_write(VersionID old_version)
+{
+    util::CheckedLockGuard lock(m_mutex);
+    if (m_current_scope)
+        pin_version(old_version);
+}
+
+void AuditContext::record_write(VersionID old_version, VersionID new_version)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (!m_current_scope)
         return;
-    pin_version(old_version);
     m_current_scope->events.push_back(audit_event::Write{now(), old_version, new_version});
 }
 
