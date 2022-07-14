@@ -1760,6 +1760,8 @@ bool File::MapBase::try_extend_to(size_t size) noexcept
     if (m_encrypted_mapping) {
         void* got_addr = ::mmap(extension_start_addr, extension_size, PROT_READ | PROT_WRITE,
                                 MAP_ANON | MAP_PRIVATE | MAP_FIXED, -1, 0);
+        if (got_addr == MAP_FAILED)
+            return false;
         REALM_ASSERT(got_addr == extension_start_addr);
         util::extend_encrypted_mapping(m_encrypted_mapping, m_addr, m_offset, m_size, size);
         m_size = size;
