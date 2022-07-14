@@ -1,7 +1,8 @@
 
 import groovy.json.JsonOutput
 
-def run = build '/realm/realm-core/master'
+//def run = build '/realm/realm-core/master'
+def run = build '/realm/realm-core/PR-5661'
 
 node('build-notification') 
 {
