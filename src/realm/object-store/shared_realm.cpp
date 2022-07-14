@@ -972,6 +972,9 @@ void Realm::commit_transaction()
     }
 
     DB::VersionID prev_version = transaction().get_version_of_current_transaction();
+    if (auto audit = audit_context()) {
+        audit->prepare_for_write(prev_version);
+    }
 
     m_coordinator->commit_write(*this, /* commit_to_disk */ true);
     cache_new_schema();

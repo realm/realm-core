@@ -23,6 +23,7 @@ set(SOURCES
     realm.cpp
     results.cpp
     schema.cpp
+    sectioned_results.cpp
     set.cpp
     thread_safe_reference.cpp
     transaction_log_parsing.cpp

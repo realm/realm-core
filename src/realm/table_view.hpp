@@ -339,6 +339,10 @@ public:
         return ret;
     }
 
+    bool has_changed() const
+    {
+        return m_last_seen_versions != get_dependency_versions();
+    }
 
     // Sort m_key_values according to one column
     void sort(ColKey column, bool ascending = true);
