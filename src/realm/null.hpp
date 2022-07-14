@@ -62,11 +62,6 @@ struct null {
     {
         throw(LogicError::type_mismatch);
     }
-    template <class T>
-    operator util::Optional<T>()
-    {
-        return util::none;
-    }
 
     /// Returns whether `v` bitwise equals the null bit-pattern
     template <class T>

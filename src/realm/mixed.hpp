@@ -125,6 +125,7 @@ public:
 
     Mixed(int64_t) noexcept;
     Mixed(bool) noexcept;
+    explicit Mixed(std::vector<bool>::reference b) noexcept : Mixed(bool(b)) {}
     Mixed(float) noexcept;
     Mixed(double) noexcept;
     Mixed(util::Optional<int64_t>) noexcept;

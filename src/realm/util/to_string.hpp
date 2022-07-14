@@ -24,6 +24,8 @@
 #include <string>
 #include <string_view>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 class StringData;
 namespace util {
@@ -111,7 +113,7 @@ public:
     Printable(T const& value)
         : m_type(Type::Callback)
         , m_callback({static_cast<const void*>(&value), [](std::ostream& os, const void* ptr) {
-                          os << *static_cast<const T*>(ptr);
+                          stream_possible_optional(os, *static_cast<const T*>(ptr));
                       }})
     {
     }
