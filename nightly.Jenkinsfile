@@ -1,7 +1,7 @@
 
 import groovy.json.JsonOutput
 //def run = build '/realm/realm-core/master'
-def run = build '/realm/realm-core/PR-5661'
+def run = build '/realm/realm-core/PR-5661', propagate: false
 node() 
 {
     withCredentials([[$class: 'StringBinding', credentialsId: 'slack-realm-core-ci-alerts-url', variable: 'SLACK_URL']]) {
