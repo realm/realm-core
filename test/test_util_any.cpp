@@ -30,7 +30,7 @@ using namespace realm;
 
 TEST(Util_AnyCast_Basics)
 {
-    util::Any any(15);
+    std::any any(15);
     CHECK_EQUAL(util::any_cast<int>(any), 15);
     CHECK_EQUAL(util::any_cast<int&>(any), 15);
     CHECK_EQUAL(util::any_cast<int&&>(std::move(any)), 15);
@@ -38,7 +38,7 @@ TEST(Util_AnyCast_Basics)
     CHECK_THROW(util::any_cast<bool&>(any), std::bad_cast);
     CHECK_THROW(util::any_cast<bool&&>(std::move(any)), std::bad_cast);
 
-    const util::Any const_any(15);
+    const std::any const_any(15);
     CHECK_EQUAL(util::any_cast<const int>(any), 15);
     CHECK_EQUAL(util::any_cast<const int&>(any), 15);
     CHECK_EQUAL(util::any_cast<const int&&>(std::move(any)), 15);
@@ -50,7 +50,7 @@ TEST(Util_AnyCast_Basics)
 // thing and not some dangling local
 TEST(Util_AnyCast_MutateViaReference)
 {
-    util::Any any(std::string("a"));
+    std::any any(std::string("a"));
     util::any_cast<std::string&>(any) = "b";
     CHECK_EQUAL(util::any_cast<const std::string&>(any), "b");
 

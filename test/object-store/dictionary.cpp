@@ -298,7 +298,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         for (auto key : keys) {
             size_t ndx = keys_as_results.index_of(StringData(key));
             REQUIRE(ndx < keys.size());
-            size_t ndx_ctx = keys_as_results.index_of(ctx, util::Any(key));
+            size_t ndx_ctx = keys_as_results.index_of(ctx, std::any(key));
             REQUIRE(ndx_ctx == ndx);
             found.push_back(ndx);
         }
@@ -324,8 +324,8 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
     }
 
     SECTION("links") {
-        links.insert(ctx, "foo", util::Any(another));
-        links.insert(ctx, "m", util::Any());
+        links.insert(ctx, "foo", std::any(another));
+        links.insert(ctx, "m", std::any());
     }
 
     SECTION("iteration") {
@@ -881,14 +881,14 @@ TEST_CASE("embedded dictionary", "[dictionary]") {
         r->begin_transaction();
 
         SECTION("rejects boxed Obj and Object") {
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(target->get_object(5))),
+            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", std::any(target->get_object(5))),
                               List::InvalidEmbeddedOperationException);
-            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", util::Any(Object(r, target->get_object(5)))),
+            REQUIRE_THROWS_AS(dict.insert(ctx, "foo", std::any(Object(r, target->get_object(5)))),
                               List::InvalidEmbeddedOperationException);
         }
 
         SECTION("creates new object for dictionary") {
-            dict.insert(ctx, "foo", util::Any(AnyDict{{"value", INT64_C(20)}}));
+            dict.insert(ctx, "foo", std::any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(dict.size() == 11);
             REQUIRE(target->size() == initial_target_size + 1);
             REQUIRE(dict.get_object("foo").get<Int>(col_value) == 20);

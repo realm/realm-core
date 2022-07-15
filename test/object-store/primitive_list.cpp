@@ -782,8 +782,8 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
             r->begin_transaction();
 
             CppContext ctx(r);
-            auto obj = Object::create(ctx, r, *r->schema().find("object"), util::Any(AnyDict{}));
-            auto list = util::any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
+            auto obj = Object::create(ctx, r, *r->schema().find("object"), std::any(AnyDict{}));
+            auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
             list.add(static_cast<T>(values[0]));
 
             r->commit_transaction();
@@ -802,7 +802,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", cf::MixedVal, cf::Int, cf::
 
             CppContext ctx(r);
             Object obj(r, "object", 0);
-            auto list = util::any_cast<List>(obj.get_property_value<util::Any>(ctx, "value"));
+            auto list = util::any_cast<List>(obj.get_property_value<std::any>(ctx, "value"));
             REQUIRE(list.get<T>(0) == values[0]);
         }
     }
