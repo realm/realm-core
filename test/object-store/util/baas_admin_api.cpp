@@ -627,7 +627,8 @@ AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& ap
         config.database_name = sync["database_name"];
         config.permissions = sync["permissions"];
         config.queryable_field_names = sync["queryable_fields_names"];
-        config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
+        auto recovery_disabled = sync["is_recovery_mode_disabled"];
+        config.recovery_is_disabled = recovery_disabled.is_boolean() ? recovery_disabled.get<bool>() : false;
     }
     else if (response.contains("sync")) {
         auto sync = response["sync"];
@@ -635,7 +636,8 @@ AdminAPISession::ServiceConfig AdminAPISession::get_config(const std::string& ap
         config.state = sync["state"];
         config.database_name = sync["database_name"];
         config.partition = sync["partition"];
-        config.recovery_is_disabled = sync["is_recovery_mode_disabled"];
+        auto recovery_disabled = sync["is_recovery_mode_disabled"];
+        config.recovery_is_disabled = recovery_disabled.is_boolean() ? recovery_disabled.get<bool>() : false;
     }
     else {
         throw std::runtime_error(util::format("Unsupported config format from server: %1", response));
