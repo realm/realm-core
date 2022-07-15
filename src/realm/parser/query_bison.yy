@@ -223,11 +223,12 @@ direction
     : ASCENDING                 { $$ = true; }
     | DESCENDING                { $$ = false; }
 
-list : '{' list_content '}'     { $$ = $2; }
-
+list : '{' list_content '}'             { $$ = $2; }
+     | comp_type '{' list_content '}'   { $3->set_comp_type(ExpressionComparisonType($1)); $$ = $3; }
 
 list_content
     : constant                  { $$ = drv.m_parse_nodes.create<ListNode>($1); }
+    | %empty                    { $$ = drv.m_parse_nodes.create<ListNode>(); }
     | list_content ',' constant { $1->add_element($3); $$ = $1; } 
 
 constant

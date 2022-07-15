@@ -239,7 +239,7 @@ public:
     using ValueType = QueryValue;
 
     static const size_t chunk_size = 8;
-    bool m_from_link_list = false;
+    bool m_from_list = false;
 
     ValueBase() = default;
     ValueBase(const ValueType& init_val)
@@ -257,7 +257,7 @@ public:
 
     ValueBase& operator=(const ValueBase& other)
     {
-        m_from_link_list = other.m_from_link_list;
+        m_from_list = other.m_from_list;
         set(other.begin(), other.end());
         return *this;
     }
@@ -269,7 +269,7 @@ public:
 
     void init(bool from_link_list, size_t nb_values)
     {
-        m_from_link_list = from_link_list;
+        m_from_list = from_link_list;
         resize(nb_values);
     }
 
@@ -351,7 +351,7 @@ public:
         TOperator o;
         // Operate on values one-by-one
         size_t sz = right.size();
-        init(right.m_from_link_list, sz);
+        init(right.m_from_list, sz);
         for (size_t i = 0; i < sz; i++) {
             set(i, o(const_value, right[i]));
         }
@@ -362,7 +362,7 @@ public:
         TOperator o;
         // Operate on values one-by-one
         size_t sz = left.size();
-        init(left.m_from_link_list, sz);
+        init(left.m_from_list, sz);
         for (size_t i = 0; i < sz; i++) {
             set(i, o(left[i], const_value));
         }
@@ -372,7 +372,7 @@ public:
     {
         TOperator o;
 
-        if (!left.m_from_link_list && !right.m_from_link_list) {
+        if (!left.m_from_list && !right.m_from_list) {
             // Operate on values one-by-one (one value is one row; no links)
             size_t min = std::min(left.size(), right.size());
             init(false, min);
@@ -381,11 +381,12 @@ public:
                 set(i, o(left[i], right[i]));
             }
         }
-        else if (left.m_from_link_list && right.m_from_link_list) {
+        else if (left.m_from_list && right.m_from_list) {
             // FIXME: Many-to-many links not supported yet. Need to specify behaviour
-            REALM_ASSERT_DEBUG(false);
+            // Eg: `{1, 2, 3} * {4, 5} > age`
+            throw std::runtime_error("Operations involving two lists are not supported");
         }
-        else if (!left.m_from_link_list && right.m_from_link_list) {
+        else if (!left.m_from_list && right.m_from_list) {
             // Right values come from link. Left must come from single row.
             REALM_ASSERT_DEBUG(left.size() > 0);
             init(true, right.size());
@@ -395,7 +396,7 @@ public:
                 set(i, o(left_value, right[i]));
             }
         }
-        else if (left.m_from_link_list && !right.m_from_link_list) {
+        else if (left.m_from_list && !right.m_from_list) {
             // Same as above, but with left values coming from links
             REALM_ASSERT_DEBUG(right.size() > 0);
             init(true, left.size());
@@ -414,7 +415,7 @@ public:
     {
         TCond c;
         const size_t sz = right.size();
-        if (!right.m_from_link_list) {
+        if (!right.m_from_list) {
             REALM_ASSERT_DEBUG(comparison ==
                                ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
             for (size_t m = 0; m < sz; m++) {
@@ -452,12 +453,11 @@ public:
                                             ExpressionComparisonType right_cmp_type)
     {
         TCond c;
+        using Compare = ExpressionComparisonType;
 
-        if (!left.m_from_link_list && !right.m_from_link_list) {
-            REALM_ASSERT_DEBUG(left_cmp_type ==
-                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
-            REALM_ASSERT_DEBUG(right_cmp_type ==
-                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+        if (!left.m_from_list && !right.m_from_list) {
+            REALM_ASSERT_DEBUG(left_cmp_type == Compare::Any);  // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(right_cmp_type == Compare::Any); // ALL/NONE not supported for non list types
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left.size(), right.size());
             for (size_t m = 0; m < min; m++) {
@@ -465,15 +465,129 @@ public:
                     return m;
             }
         }
-        else if (left.m_from_link_list && right.m_from_link_list) {
-            // FIXME: Many-to-many links not supported yet. Need to specify behaviour
-            // knowing the comparison types means we can potentially support things such as:
-            // ALL list.int > list.[FIRST].int
-            // ANY list.int > ALL list2.int
-            // NONE list.int > ANY list2.int
-            REALM_ASSERT_DEBUG(false);
+        else if (left.m_from_list && right.m_from_list) {
+            // TODO: support FIRST, LAST as new ExpressionComparisonTypes
+            // eg: ALL list.int > list.[FIRST].int
+
+            if (REALM_UNLIKELY(left_cmp_type == Compare::None && right_cmp_type == Compare::None)) {
+                throw util::runtime_error("NONE vs NONE comparisons are not supported");
+            }
+
+            // remove duplicates to reduce comparison time
+            std::vector<QueryValue> left_vals, right_vals;
+            left_vals.reserve(left.size());
+            right_vals.reserve(right.size());
+            left_vals.insert(left_vals.begin(), left.begin(), left.end());
+            right_vals.insert(right_vals.begin(), right.begin(), right.end());
+            std::sort(left_vals.begin(), left_vals.end());
+            std::sort(right_vals.begin(), right_vals.end());
+            left_vals.erase(std::unique(left_vals.begin(), left_vals.end()), left_vals.end());
+            right_vals.erase(std::unique(right_vals.begin(), right_vals.end()), right_vals.end());
+
+            if (left_cmp_type == Compare::Any && right_cmp_type == Compare::Any) {
+                // return true if the intersection of {left Intersect right} is not empty
+                for (auto& left_val : left_vals) {
+                    for (auto& right_val : right_vals) {
+                        if (c(left_val, right_val)) {
+                            return 0;
+                        }
+                    }
+                }
+                return not_found;
+            }
+            else if (left_cmp_type == Compare::All && right_cmp_type == Compare::All) {
+                // matches if all values of the left match with all values of the right
+                for (auto& left_val : left_vals) {
+                    for (auto& right_val : right_vals) {
+                        if (!c(left_val, right_val)) {
+                            return not_found;
+                        }
+                    }
+                }
+                return 0;
+            }
+            else if (left_cmp_type == Compare::Any && right_cmp_type == Compare::All) {
+                // return a match if the ALL list is a subset of the ANY list
+                // (if every value of the ALL list finds a match in the ANY list)
+                for (auto& right_val : right_vals) {
+                    bool found_match = false;
+                    for (auto& left_val : left_vals) {
+                        if (c(left_val, right_val)) {
+                            found_match = true;
+                            break;
+                        }
+                    }
+                    if (!found_match) {
+                        return not_found; // no match for one of the ALL elements
+                    }
+                }
+                return 0; // all matches found
+            }
+            else if (left_cmp_type == Compare::All && right_cmp_type == Compare::Any) {
+                // same as above but left and right are swapped
+                for (auto& left_val : left_vals) {
+                    bool found_match = false;
+                    for (auto& right_val : right_vals) {
+                        if (c(left_val, right_val)) {
+                            found_match = true;
+                            break;
+                        }
+                    }
+                    if (!found_match) {
+                        return not_found; // no match for one of the ALL elements
+                    }
+                }
+                return 0; // all matches found
+            }
+            else if (left_cmp_type == Compare::Any && right_cmp_type == Compare::None) {
+                // return a match if any of the values on the left do not match with any right values
+                for (auto& left_val : left_vals) {
+                    bool match = false;
+                    for (auto& right_val : right_vals) {
+                        if (c(left_val, right_val)) {
+                            match = true;
+                            break; // this one matched, check the next left value
+                        }
+                    }
+                    if (!match) {
+                        return 0; // a left value did not match anything on the right
+                    }
+                }
+                return not_found; // every left value matched
+            }
+            else if (left_cmp_type == Compare::None && right_cmp_type == Compare::Any) {
+                // same as above but left and right are swapped
+                for (auto& right_val : right_vals) {
+                    bool match = false;
+                    for (auto& left_val : left_vals) {
+                        if (c(left_val, right_val)) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (!match) {
+                        return 0;
+                    }
+                }
+                return not_found;
+            }
+            else if ((left_cmp_type == Compare::All && right_cmp_type == Compare::None) ||
+                     (left_cmp_type == Compare::None && right_cmp_type == Compare::All)) {
+                // return a match if all of the values on the left do not match with any right values
+                for (auto& left_val : left_vals) {
+                    for (auto& right_val : right_vals) {
+                        if (c(left_val, right_val)) {
+                            return not_found; // one matched
+                        }
+                    }
+                }
+                return 0; // no matches over all values
+            }
+            else {
+                REALM_UNREACHABLE();
+            }
         }
-        else if (!left.m_from_link_list && right.m_from_link_list) {
+        else if (!left.m_from_list && right.m_from_list) {
             // Right values come from link list. Left must come from single row. Semantics: Match if at least 1
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left.size() > 0);
@@ -482,24 +596,24 @@ public:
             for (size_t r = 0; r < num_right_values; r++) {
                 bool match = c(left_val, right[r]);
                 if (match) {
-                    if (right_cmp_type == ExpressionComparisonType::Any) {
+                    if (right_cmp_type == Compare::Any) {
                         return 0;
                     }
-                    if (right_cmp_type == ExpressionComparisonType::None) {
+                    if (right_cmp_type == Compare::None) {
                         return not_found; // one matched
                     }
                 }
                 else {
-                    if (right_cmp_type == ExpressionComparisonType::All) {
+                    if (right_cmp_type == Compare::All) {
                         return not_found;
                     }
                 }
             }
-            if (right_cmp_type == ExpressionComparisonType::None || right_cmp_type == ExpressionComparisonType::All) {
+            if (right_cmp_type == Compare::None || right_cmp_type == Compare::All) {
                 return 0; // either none or all
             }
         }
-        else if (left.m_from_link_list && !right.m_from_link_list) {
+        else if (left.m_from_list && !right.m_from_list) {
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right.size() > 0);
             const size_t num_left_values = left.size();
@@ -1147,14 +1261,11 @@ public:
         }
     }
 
-    std::string description(util::serializer::SerialisationState&) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         const size_t sz = size();
-        if (sz == 1) {
-            return value_to_string(0);
-        }
-        else if (sz > 1) {
-            std::string desc = "{";
+        if (m_from_list) {
+            std::string desc = state.describe_expression_type(m_comparison_type) + "{";
             for (size_t i = 0; i < sz; ++i) {
                 if (i != 0) {
                     desc += ", ";
@@ -1164,17 +1275,31 @@ public:
             desc += "}";
             return desc;
         }
+        else if (sz == 1) {
+            return value_to_string(0);
+        }
         return "";
     }
 
     bool has_multiple_values() const override
     {
-        return m_from_link_list;
+        return m_from_list;
     }
 
     bool has_constant_evaluation() const override
     {
-        return size() == 1;
+        return !m_from_list;
+    }
+
+    ExpressionComparisonType get_comparison_type() const final
+    {
+        REALM_ASSERT_DEBUG(m_comparison_type == ExpressionComparisonType::Any || m_from_list);
+        return m_comparison_type;
+    }
+
+    void set_comparison_type(ExpressionComparisonType type)
+    {
+        m_comparison_type = type;
     }
 
     Mixed get_mixed() override
@@ -1191,6 +1316,9 @@ public:
     {
         return make_subexpr<Value<T>>(*this);
     }
+
+protected:
+    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
 };
 
 class ConstantMixedValue : public Value<Mixed> {
@@ -1711,7 +1839,7 @@ public:
 
             if (m_link_map.only_unary_links()) {
                 REALM_ASSERT(destination.size() == 1);
-                REALM_ASSERT(!destination.m_from_link_list);
+                REALM_ASSERT(!destination.m_from_list);
                 destination.set_null(0);
                 auto link_translation_key = this->m_link_map.get_unary_link_or_not_found(index);
                 if (link_translation_key) {
@@ -1754,7 +1882,7 @@ public:
             // Not a link column
             REALM_ASSERT(m_leaf_ptr != nullptr);
             REALM_ASSERT(destination.size() == 1);
-            REALM_ASSERT(!destination.m_from_link_list);
+            REALM_ASSERT(!destination.m_from_list);
             if (m_leaf_ptr->is_null(index)) {
                 destination.set_null(0);
             }
@@ -2238,7 +2366,7 @@ public:
         m_expr->evaluate(index, v);
 
         size_t sz = v.size();
-        destination.init(v.m_from_link_list, sz);
+        destination.init(v.m_from_list, sz);
 
         for (size_t i = 0; i < sz; i++) {
             auto elem = v[i].template get<T>();
@@ -2317,7 +2445,7 @@ public:
         m_expr->evaluate(index, v);
 
         size_t sz = v.size();
-        destination.init(v.m_from_link_list, sz);
+        destination.init(v.m_from_list, sz);
 
         for (size_t i = 0; i < sz; i++) {
             auto elem = v[i].template get<T>();
@@ -2988,7 +3116,7 @@ private:
         Allocator& alloc = ColumnsCollection<T>::get_alloc();
         Value<int64_t> list_refs;
         this->get_lists(index, list_refs, 1);
-        destination.init(list_refs.m_from_link_list, list_refs.size());
+        destination.init(list_refs.m_from_list, list_refs.size());
         for (size_t i = 0; i < list_refs.size(); i++) {
             ref_type list_ref = to_ref(list_refs[i].get_int());
             if (list_ref) {
@@ -3186,9 +3314,9 @@ public:
             Value<int64_t> list_refs;
             m_columns_collection.get_lists(index, list_refs, 1);
             size_t sz = list_refs.size();
-            REALM_ASSERT_DEBUG(sz > 0 || list_refs.m_from_link_list);
+            REALM_ASSERT_DEBUG(sz > 0 || list_refs.m_from_list);
             // The result is an aggregate value for each table
-            destination.init_for_links(!list_refs.m_from_link_list, sz);
+            destination.init_for_links(!list_refs.m_from_list, sz);
             for (size_t i = 0; i < list_refs.size(); i++) {
                 auto list_ref = to_ref(list_refs[i].get_int());
                 Operation op;
@@ -3846,6 +3974,17 @@ public:
         return s;
     }
 
+    virtual ExpressionComparisonType get_comparison_type() const override
+    {
+        if (!m_left_is_const) {
+            return m_left->get_comparison_type();
+        }
+        if (!m_right_is_const) {
+            return m_right->get_comparison_type();
+        }
+        return ExpressionComparisonType::Any;
+    }
+
     std::unique_ptr<Subexpr> clone() const override
     {
         return make_subexpr<Operator>(*this);
@@ -3998,7 +4137,7 @@ public:
                 if (match != not_found && match + start < end)
                     return start + match;
 
-                size_t rows = right.m_from_link_list ? 1 : right.size();
+                size_t rows = right.m_from_list ? 1 : right.size();
                 start += rows;
             }
         }
@@ -4012,8 +4151,7 @@ public:
                 if (match != not_found && match + start < end)
                     return start + match;
 
-                size_t rows =
-                    (left.m_from_link_list || right.m_from_link_list) ? 1 : minimum(right.size(), left.size());
+                size_t rows = (left.m_from_list || right.m_from_list) ? 1 : minimum(right.size(), left.size());
                 start += rows;
             }
         }

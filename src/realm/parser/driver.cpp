@@ -325,10 +325,11 @@ std::unique_ptr<Subexpr> OperationNode::visit(ParserDriver* drv, DataType type)
     std::unique_ptr<Subexpr> left;
     std::unique_ptr<Subexpr> right;
 
-    auto left_is_constant = m_left->is_constant();
-    auto right_is_constant = m_right->is_constant();
+    const bool left_is_constant = m_left->is_constant();
+    const bool right_is_constant = m_right->is_constant();
+    const bool produces_multiple_values = m_left->is_list() || m_right->is_list();
 
-    if (left_is_constant && right_is_constant) {
+    if (left_is_constant && right_is_constant && !produces_multiple_values) {
         right = m_right->visit(drv, type);
         left = m_left->visit(drv, type);
         auto v_left = left->get_mixed();
@@ -438,7 +439,7 @@ Query EqualityNode::visit(ParserDriver* drv)
     if (op == CompareNode::IN) {
         Subexpr* r = right.get();
         if (!r->has_multiple_values()) {
-            throw InvalidQueryArgError("The keypath following 'IN' must contain a list: '" +
+            throw InvalidQueryArgError("The keypath following 'IN' must contain a list. Found '" +
                                        r->description(drv->m_serializer_state) + "'");
         }
     }
@@ -1243,11 +1244,35 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
 
 std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
 {
-    // FIXME: Should this be type QueryValue instead of Mixed?
+    if (hint == type_TypeOfValue) {
+        try {
+            std::unique_ptr<Value<TypeOfValue>> ret = std::make_unique<Value<TypeOfValue>>();
+            constexpr bool is_list = true;
+            ret->init(is_list, elements.size());
+            ret->set_comparison_type(m_comp_type);
+            size_t ndx = 0;
+            for (auto constant : elements) {
+                std::unique_ptr<Subexpr> evaluated = constant->visit(drv, hint);
+                if (auto converted = dynamic_cast<Value<TypeOfValue>*>(evaluated.get())) {
+                    ret->set(ndx++, converted->get(0));
+                }
+                else {
+                    throw InvalidQueryError(util::format("Invalid constant inside constant list: %1",
+                                                         evaluated->description(drv->m_serializer_state)));
+                }
+            }
+            return ret;
+        }
+        catch (const std::runtime_error& e) {
+            throw InvalidQueryArgError(e.what());
+        }
+    }
+
     std::unique_ptr<Value<Mixed>> ret = std::make_unique<Value<Mixed>>();
     m_evaluated_storage.reserve(elements.size());
     constexpr bool is_list = true;
     ret->init(is_list, elements.size());
+    ret->set_comparison_type(m_comp_type);
     size_t ndx = 0;
     for (auto constant : elements) {
         m_evaluated_storage.push_back(constant->visit(drv, hint));
@@ -1358,10 +1383,6 @@ static void verify_conditions(Subexpr* left, Subexpr* right, util::serializer::S
         throw InvalidQueryError(
             util::format("Ordered comparison between two primitive lists is not implemented yet ('%1' and '%2')",
                          left->description(state), right->description(state)));
-    }
-    if (left->has_multiple_values() && right->has_multiple_values()) {
-        throw InvalidQueryError(util::format("Comparison between two lists is not supported ('%1' and '%2')",
-                                             left->description(state), right->description(state)));
     }
     if (dynamic_cast<Value<TypeOfValue>*>(left) && dynamic_cast<Value<TypeOfValue>*>(right)) {
         throw InvalidQueryError(util::format("Comparison between two constants is not supported ('%1' and '%2')",
@@ -1519,6 +1540,12 @@ std::string check_escapes(const char* str)
 } // namespace query_parser
 
 Query Table::query(const std::string& query_string, const std::vector<std::vector<Mixed>>& arguments) const
+{
+    MixedArguments args(arguments);
+    return query(query_string, args, {});
+}
+
+Query Table::query(const std::string& query_string, const std::vector<Mixed>& arguments) const
 {
     MixedArguments args(arguments);
     return query(query_string, args, {});

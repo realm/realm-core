@@ -6,6 +6,7 @@
 * Expose MongoDB client interface in the C API. ([PR #5638](https://github.com/realm/realm-core/pull/5638)).
 * Add support in the C API for constructing a new `realm_app_t` object via `realm_app_create`. ([PR #5570](https://github.com/realm/realm-core/issues/5570))
 * Reduce use of memory mappings and virtual address space ([PR #5645](https://github.com/realm/realm-core/pull/5645)). Also fixes some errors (see below)
+* Introducing query parser support for constant list expressions such as `fruit IN {'apple', 'orange'}`. This also includes general query support for list vs list matching such as `NONE fruits IN {'apple', 'orange'}`. ([Issue #4266](https://github.com/realm/realm-core/issues/4266))
 
 ### Fixed
 * <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)

@@ -150,7 +150,7 @@ TEST(Query_Parser)
     books.create_object().set_all("Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
-    Query q = books.query("pages >= $0 && author == $1", {{200, "David Griffiths"}});
+    Query q = books.query("pages >= $0 && author == $1", std::vector<Mixed>{200, "David Griffiths"});
     auto match = q.find();
     CHECK_EQUAL(obj2.get_key(), match);
     // You don't need to create a query object first:

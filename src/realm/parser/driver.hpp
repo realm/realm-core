@@ -147,19 +147,24 @@ class ListNode : public ParserNode {
 public:
     std::vector<ConstantNode*> elements;
 
+    ListNode() = default;
     ListNode(ConstantNode* elem)
     {
         elements.emplace_back(elem);
     }
-
     void add_element(ConstantNode* elem)
     {
         elements.emplace_back(elem);
+    }
+    void set_comp_type(ExpressionComparisonType comp_type)
+    {
+        m_comp_type = comp_type;
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
 
 private:
     std::vector<std::unique_ptr<Subexpr>> m_evaluated_storage;
+    ExpressionComparisonType m_comp_type = ExpressionComparisonType::Any;
 };
 
 class PropertyNode : public ParserNode {
@@ -170,6 +175,10 @@ public:
 class ExpressionNode : public ParserNode {
 public:
     virtual bool is_constant()
+    {
+        return false;
+    }
+    virtual bool is_list()
     {
         return false;
     }
@@ -198,6 +207,10 @@ public:
     {
         return constant != nullptr || list != nullptr;
     }
+    bool is_list() final
+    {
+        return list != nullptr;
+    }
 
     std::unique_ptr<Subexpr> visit(ParserDriver* drv, DataType type) override
     {
@@ -223,6 +236,10 @@ public:
     bool is_constant() final
     {
         return m_left->is_constant() && m_right->is_constant();
+    }
+    bool is_list() final
+    {
+        return m_left->is_list() || m_right->is_list();
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType) override;
 };

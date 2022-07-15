@@ -222,6 +222,7 @@ static std::vector<std::string> valid_queries = {
     "a BETWEEN {1, 2}",
     "a IN {1, 2, 3}",
     "a IN {'one', 2, -3.0, null}",
+    "a IN {}",
     "a == {1, 2}",
     "a > {1, 2}",
     "a >= {1, 2}",
@@ -285,11 +286,9 @@ static std::vector<std::string> invalid_queries = {
     "0x = 1",
     "- = a",
     "a..b = a",
-    "{} = $0",
 
     // operators
     "0===>0",
-    "a between {}",
     "a between {1 2}",
     "0 contains1",
     "a contains_something",
@@ -326,7 +325,6 @@ static std::vector<std::string> invalid_queries = {
     "a IN [1, 2, 3]",
     "a IN 1, 2, 3",
     "a IN {b, c}",
-    "a IN {}",
 
     // sort/distinct
     "SORT(p ASCENDING)",                      // no query conditions
@@ -417,7 +415,7 @@ static Query verify_query(test_util::unit_test::TestContext& test_context, Table
     size_t q_count = q.count();
     CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description(mapping.get_backlink_class_prefix());
-    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->query(description, args, mapping);
 
     size_t q2_count = q2.count();
@@ -439,7 +437,7 @@ static void verify_query_sub(test_util::unit_test::TestContext& test_context, Ta
     size_t q_count = q.count();
     CHECK_EQUAL(q_count, num_results);
     std::string description = q.get_description();
-    std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
+    // std::cerr << "original: " << query_string << "\tdescribed: " << description << "\n";
     Query q2 = t->query(description, args, {});
 
     size_t q2_count = q2.count();
@@ -3736,7 +3734,7 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     CHECK_THROW_ANY(verify_query(test_context, t, "NONE 'milk' == fav_item.name", 1));
 }
 
-ONLY(Parser_OperatorIN)
+TEST(Parser_OperatorIN)
 {
     Group g;
 
@@ -3856,12 +3854,14 @@ ONLY(Parser_OperatorIN)
                                      Decimal128(8.888),
                                      ObjKey{},
                                      ObjLink{t->get_key(), people_keys[0]}};
-    util::Any args[] = {realm::null(), int_list, strings_list, mixed_list};
-    size_t num_args = 4;
+    std::vector<Mixed> empty_list = {};
+    util::Any args[] = {realm::null(), int_list, strings_list, mixed_list, empty_list};
+    size_t num_args = 5;
     verify_query_sub(test_context, t, "customer_id IN $1", args, num_args, 3);
-    verify_query_sub(test_context, t, "customer_id IN $3", args, num_args, 0);
     verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
     verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
+    verify_query_sub(test_context, t, "fav_item.name IN $4", args, num_args, 0);
+    verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
 
     // RHS is a list property
     verify_query(test_context, t, "5.5 IN items.price", 2);
@@ -3873,23 +3873,85 @@ ONLY(Parser_OperatorIN)
     verify_query(test_context, items, "20 IN @links.class_Person.items.account_balance", 1); // backlinks
     verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
 
+    // list property compared to a constant list
+    verify_query(test_context, t, "{5.5, 4.0} IN items.price", 2);
+    verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 1);
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN items.price", 2);
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN ALL items.price", 1);
+    verify_query(test_context, t, "ANY {5.5, 4.0} IN ALL items.price", 1);
+    verify_query(test_context, t, "ANY {5.5, 4.0} IN NONE items.price", 2);
+    verify_query(test_context, t, "ALL {5.5, 4.0} IN NONE items.price", 1);
+    verify_query(test_context, t, "ALL {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "ALL {5.5, 5.5} IN ALL items.price", 1);
+    verify_query(test_context, t, "ALL {6.0, 6.1, 1.1} <= ALL items.price", 1);
+    verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ANY items.price", 0);
+    verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 0);
+
+    verify_query(test_context, t, "items.name contains[c] {'A', 'B'}", 2);
+    verify_query(test_context, t, "ALL items.name contains[c] {'A', 'B'}", 1);
+    verify_query(test_context, t, "ALL items.name contains[c] NONE {'A', 'B'}", 1); // customer_id: 1
+    verify_query(test_context, t, "NONE items.name contains[c] {'A', 'B'}", 3);
+    verify_query(test_context, t, "NONE items.name contains[c] ALL {'A', 'B'}", 1);
+    verify_query(test_context, t, "ANY items.name contains[c] NONE {'A', 'B'}", 2); // customer_id: 0, 1
+    verify_query(test_context, t, "ANY items.name contains[c] ALL {'A', 'B'}", 0);
+
+    // empty constant list
+    verify_query(test_context, t, "{} IN items.price", 0);
+    verify_query(test_context, t, "{ } IN ALL items.price", 0);
+    verify_query(test_context, t, "{   } IN NONE items.price", 0);
+    verify_query(test_context, t, "ALL {} IN ALL items.price", 3);
+    verify_query(test_context, t, "ALL { } IN NONE items.price", 3);
+    verify_query(test_context, t, "ALL { } IN ANY items.price", 3);
+    verify_query(test_context, t, "NONE {   } IN ALL items.price", 3);
+    verify_query(test_context, t, "NONE {} IN ANY items.price", 3);
+
+    // one item in constant list
+    verify_query(test_context, t, "{6.5} IN items.price", 2);
+    verify_query(test_context, t, "{6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "{6.5} IN NONE items.price", 1);
+    verify_query(test_context, t, "ALL {6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "ALL {6.5} IN NONE items.price", 1);
+    verify_query(test_context, t, "ALL {6.5} IN ANY items.price", 2);
+    verify_query(test_context, t, "NONE {6.5} IN ALL items.price", 1);
+    verify_query(test_context, t, "NONE {6.5} IN ANY items.price", 3);
+
+    // operators on a list
+    verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
+    verify_query(test_context, t, "NONE {1, 2, 3} * 20 <= ANY items.price", 3);
+    verify_query(test_context, t, "ANY {1, 2, 3, 4, 5, 6} + 2 == ANY items.price", 1);
+
+    // list property vs list property
+    verify_query(test_context, t, "items.price IN items.price", 3);
+    verify_query(test_context, t, "ALL items.price IN ALL items.price", 1);
+    verify_query(test_context, t, "ALL items.price IN ANY items.price", 3);
+    verify_query(test_context, t, "NONE items.price IN ANY items.price", 0);
+    verify_query(test_context, t, "items.price * 2 > items.price", 3);
+    verify_query(test_context, t, "ALL items.price * 2 > ALL items.price", 2);
+    verify_query(test_context, t, "ALL items.price * 2 > ANY items.price", 3);
+    verify_query(test_context, t, "NONE items.price * 2 > ANY items.price", 0);
+
+    // unsupported combinations
+    CHECK_THROW(verify_query(test_context, t, "NONE {5.5, 4.0} IN NONE items.price", 0), std::runtime_error);
+    CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1),
+                std::runtime_error);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@size >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@max >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@min >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.@avg >= ANY items.price", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "{8, 10}.length >= ANY items.price", 3), query_parser::SyntaxError);
+
     // aggregate modifiers must operate on a list
     CHECK_THROW(verify_query(test_context, t, "ANY 5.5 IN items.price", 2), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "SOME 5.5 IN items.price", 2), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "ALL 5.5 IN items.price", 1), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "NONE 5.5 IN items.price", 1), query_parser::SyntaxError);
-    CHECK_THROW(verify_query(test_context, t, "ALL customer_id IN {0, 1, 2}", 3), query_parser::SyntaxError);
-    CHECK_THROW(verify_query(test_context, t, "NONE customer_id IN {0, 1, 2}", 3), query_parser::SyntaxError);
+    CHECK_THROW(verify_query(test_context, t, "ALL customer_id IN {0, 1, 2}", 3), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query(test_context, t, "NONE customer_id IN {0, 1, 2}", 3), query_parser::InvalidQueryError);
 
     CHECK_THROW_EX(verify_query(test_context, t, "items.price IN 5.5", 1), query_parser::InvalidQueryArgError,
-                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));
+                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));
     CHECK_THROW_EX(verify_query(test_context, t, "5.5 in fav_item.price", 1), query_parser::InvalidQueryArgError,
-                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list"));
-    verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
-    // list property vs list property is not supported by core yet
-    CHECK_THROW_EX(
-        verify_query(test_context, t, "items.price IN items.price", 0), query_parser::InvalidQueryError,
-        CHECK_EQUAL(e.what(), "Comparison between two lists is not supported ('items.price' and 'items.price')"));
+                   CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
 }
 
 TEST(Parser_Object)
@@ -4577,7 +4639,6 @@ TEST(Parser_TypeOfValue)
                  origin->size());
     verify_query(test_context, origin, "links.mixed.@type == 'numeric' || links.mixed.@type == 'string'",
                  origin->size());
-    // TODO: enable this when IN is supported for list constants
     verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'string'}", origin->size());
 
     verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
@@ -4607,6 +4668,10 @@ TEST(Parser_TypeOfValue)
     std::string message;
     CHECK_THROW_EX(
         verify_query(test_context, table, "mixed.@type == 'asdf'", 1), query_parser::InvalidQueryArgError,
+        CHECK(std::string(e.what()).find("Unable to parse the type attribute string 'asdf'") != std::string::npos));
+    CHECK_THROW_EX(
+        verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'asdf'}", 0),
+        query_parser::InvalidQueryArgError,
         CHECK(std::string(e.what()).find("Unable to parse the type attribute string 'asdf'") != std::string::npos));
     CHECK_THROW_EX(
         verify_query(test_context, table, "mixed.@type == ''", 1), query_parser::InvalidQueryArgError,
