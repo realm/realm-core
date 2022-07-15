@@ -23,6 +23,7 @@
   * `std::optional` cannot be directly streamed (`<<`) to an `ostream`. A helper `realm::util::stream_possible_optional` is provided that can be used instead. For convenience, it will work with both optional and non-optional types.
   * [CTAD](https://en.cppreference.com/w/cpp/language/class_template_argument_deduction) doesn't work through aliases until C++20, so any code like `util::Optional(EXPRESSION)` without the `<Type>` template arguments will need to switch to using `std::optional(Expression)` directly.
   * Aliases and helpers not used by core were removed. If needed by SDKs they can be added back, but it would probably be better to just use the `std::` names instead.
+  * The method `std::optional<T>::value()` requires a higher deployment target on iOS than we currently target because it throws exceptions when used incorrectly. You should use `*opt` and `opt->method()` instead to access the value anyway.
   * C++ overload resolution rules are always fun. Since `std::optional` is implicitly convertable from more types, it is possible that this will generate new ambiguous overload errors in overload sets that include optionals. If you have any vexing compiler errors due to this change, please ask for help on #realm-core.
 
 ### Compatibility

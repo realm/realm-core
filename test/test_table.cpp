@@ -132,7 +132,7 @@ struct value_copier<Optional<T1>, T2> {
     T2 operator()(Optional<T1> from_value, bool)
     {
         if (bool(from_value))
-            return from_value.value();
+            return *from_value;
         else {
             if (m_throw_on_null)
                 throw realm::LogicError(realm::LogicError::column_not_nullable);
