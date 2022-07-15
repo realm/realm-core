@@ -72,6 +72,10 @@ public:
     // Flushes any remaining dirty pages from the old mapping
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
+    // Extend the size of this mapping. Memory holding decrypted pages must
+    // have been allocated earlier
+    void extend_to(size_t offset, size_t new_size);
+
     size_t collect_decryption_count()
     {
         return m_num_decrypted;
@@ -104,6 +108,7 @@ private:
     size_t m_num_decrypted; // 1 for every page decrypted
 
     enum PageState {
+        Clean = 0,
         Touched = 1,         // a ref->ptr translation has taken place
         UpToDate = 2,        // the page is fully up to date
         RefetchRequired = 4, // the page is valid for old translations, but requires re-decryption for new
