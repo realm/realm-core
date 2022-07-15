@@ -170,7 +170,6 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
 
 private:
-    std::vector<std::unique_ptr<Subexpr>> m_evaluated_storage;
     ExpressionComparisonType m_comp_type = ExpressionComparisonType::Any;
 };
 
