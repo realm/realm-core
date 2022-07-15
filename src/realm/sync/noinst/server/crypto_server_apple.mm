@@ -2,6 +2,7 @@
 
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/backtrace.hpp>
 
 #define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 
