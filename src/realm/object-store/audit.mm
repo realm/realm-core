@@ -840,7 +840,10 @@ void AuditRealmPool::scan_for_realms_to_upload()
 
         m_open_paths.insert(path);
         auto partition = file_name.substr(0, file_name.size() - 6);
-        wait_for_upload(m_user->sync_manager()->get_session(db, SyncConfig{m_user, prefixed_partition(partition)}));
+        RealmConfig config;
+        config.path = db->get_path();
+        config.sync_config = std::make_shared<SyncConfig>(m_user, prefixed_partition(partition));
+        wait_for_upload(m_user->sync_manager()->get_session(db, config));
         return;
     }
 
