@@ -1130,6 +1130,11 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
             break;
         case Type::ARG: {
             size_t arg_no = size_t(strtol(text.substr(1).c_str(), nullptr, 10));
+            if (m_comp_type && !drv->m_args.is_argument_list(arg_no)) {
+                throw InvalidQueryError(util::format(
+                    "ANY/ALL/NONE are only allowed on arguments which contain a list but '%1' is not a list.",
+                    explain_value_message));
+            }
             if (drv->m_args.is_argument_null(arg_no)) {
                 explain_value_message = util::format("argument '%1' which is NULL", explain_value_message);
                 ret = std::make_unique<Value<null>>(realm::null());
@@ -1142,6 +1147,9 @@ std::unique_ptr<Subexpr> ConstantNode::visit(ParserDriver* drv, DataType hint)
                 size_t ndx = 0;
                 for (auto& val : mixed_list) {
                     values->set(ndx++, val);
+                }
+                if (m_comp_type) {
+                    values->set_comparison_type(*m_comp_type);
                 }
                 ret = std::move(values);
             }

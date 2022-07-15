@@ -248,6 +248,8 @@ constant
     | FALSE                     { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::FALSE, ""); }
     | NULL_VAL                  { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::NULL_VAL, ""); }
     | ARG                       { $$ = drv.m_parse_nodes.create<ConstantNode>(ConstantNode::ARG, $1); }
+    | comp_type ARG             { $$ = drv.m_parse_nodes.create<ConstantNode>(ExpressionComparisonType($1), $2); }
+
 
 boolexpr
     : "truepredicate"           { $$ = drv.m_parse_nodes.create<TrueOrFalseNode>(true); }

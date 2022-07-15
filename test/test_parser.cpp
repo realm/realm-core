@@ -3861,6 +3861,9 @@ TEST(Parser_OperatorIN)
     verify_query_sub(test_context, t, "fav_item.name IN $2", args, num_args, 2);
     verify_query_sub(test_context, t, "fav_item.name IN $3", args, num_args, 0);
     verify_query_sub(test_context, t, "fav_item.name IN $4", args, num_args, 0);
+    verify_query_sub(test_context, t, "customer_id IN ANY $1", args, num_args, 3);
+    verify_query_sub(test_context, t, "customer_id IN ALL $1", args, num_args, 0);
+    verify_query_sub(test_context, t, "customer_id IN NONE $1", args, num_args, 0);
     verify_query(test_context, t, "'dairy' in items.allergens.name", 3);
 
     // RHS is a list property
@@ -3947,6 +3950,12 @@ TEST(Parser_OperatorIN)
     CHECK_THROW(verify_query(test_context, t, "NONE 5.5 IN items.price", 1), query_parser::SyntaxError);
     CHECK_THROW(verify_query(test_context, t, "ALL customer_id IN {0, 1, 2}", 3), query_parser::InvalidQueryError);
     CHECK_THROW(verify_query(test_context, t, "NONE customer_id IN {0, 1, 2}", 3), query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, t, "customer_id IN NONE $0", args, num_args, 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, t, "customer_id IN ANY $0", args, num_args, 0),
+                query_parser::InvalidQueryError);
+    CHECK_THROW(verify_query_sub(test_context, t, "customer_id IN ALL $0", args, num_args, 0),
+                query_parser::InvalidQueryError);
 
     CHECK_THROW_EX(verify_query(test_context, t, "items.price IN 5.5", 1), query_parser::InvalidQueryArgError,
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found '5.5'"));

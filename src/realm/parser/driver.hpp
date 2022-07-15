@@ -140,7 +140,14 @@ public:
         , text(str)
     {
     }
+    ConstantNode(ExpressionComparisonType comp_type, const std::string& str)
+        : type(Type::ARG)
+        , text(str)
+        , m_comp_type(comp_type)
+    {
+    }
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
+    util::Optional<ExpressionComparisonType> m_comp_type;
 };
 
 class ListNode : public ParserNode {
