@@ -31,7 +31,10 @@ using Optional = std::optional<T>;
 using None = std::nullopt_t;
 
 template <class T, class... Args>
-Optional<T> some(Args&&... args) { return std::make_optional<T>(std::forward<Args>(args)...); }
+Optional<T> some(Args&&... args)
+{
+    return std::make_optional<T>(std::forward<Args>(args)...);
+}
 
 using std::make_optional;
 
@@ -52,7 +55,8 @@ struct RemoveOptional<Optional<T>> {
  * This function supports both optional and non-optional Ts, so that callers don't need to do their own dispatch.
  */
 template <class T>
-std::ostream& stream_possible_optional(std::ostream& os, const T& rhs) {
+std::ostream& stream_possible_optional(std::ostream& os, const T& rhs)
+{
     return os << rhs;
 }
 template <class T>
