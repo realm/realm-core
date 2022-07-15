@@ -1201,7 +1201,7 @@ TEST_CASE("list") {
         CppContext ctx(r, &list.get_object_schema());
 
         Object obj;
-        REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
+        REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
         REQUIRE(obj.obj().get_key() == target_keys[1]);
     }
@@ -1633,7 +1633,7 @@ TEST_CASE("embedded List") {
         CppContext ctx(r, &list.get_object_schema());
 
         Object obj;
-        REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
+        REQUIRE_NOTHROW(obj = util::any_cast<Object&&>(list.get(ctx, 1)));
         REQUIRE(obj.is_valid());
         REQUIRE(obj.obj().get<int64_t>(col_value) == 1);
     }

@@ -17,7 +17,7 @@
 -----------
 
 ### Internals
-* None.
+* `util::Any` is now just a typedef for `std::any`. `util::any_cast()` remains for deployment support on older Apple platforms. Outside of niche ADL implications, this should not have any visible effects. ([PR #5665](https://github.com/realm/realm-core/pull/5665))
 
 ----------------------------------------------
 

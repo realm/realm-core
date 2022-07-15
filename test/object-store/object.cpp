@@ -89,7 +89,7 @@ struct TestContext : CppContext {
     template <class T>
     T get(Object& obj, const std::string& name)
     {
-        return any_cast<T>(obj.get_property_value<util::Any>(*this, name));
+        return util::any_cast<T>(obj.get_property_value<util::Any>(*this, name));
     }
 };
 
@@ -1119,15 +1119,15 @@ TEST_CASE("object") {
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object id").has_value());
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "uuid").has_value());
 
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).size() == 0);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "int array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "float array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "double array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "string array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "data array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "date array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "object id array")).size() == 0);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "uuid array")).size() == 0);
     }
 
     SECTION("create throws for missing values if there is no default") {
@@ -1679,70 +1679,71 @@ TEST_CASE("object") {
 
         auto property = *r->schema().find("all types")->property_for_name("int");
         obj.set_property_value(d, property, util::Any(INT64_C(6)));
-        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, property)) == 6);
+        REQUIRE(util::any_cast<int64_t>(obj.get_property_value<util::Any>(d, property)) == 6);
 
         obj.set_property_value(d, "bool", util::Any(true));
-        REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
+        REQUIRE(util::any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
 
         obj.set_property_value(d, "int", util::Any(INT64_C(5)));
-        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
+        REQUIRE(util::any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
 
         obj.set_property_value(d, "float", util::Any(1.23f));
-        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 1.23f);
+        REQUIRE(util::any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 1.23f);
 
         obj.set_property_value(d, "double", util::Any(1.23));
-        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 1.23);
+        REQUIRE(util::any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 1.23);
 
         obj.set_property_value(d, "string", util::Any("abc"s));
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "abc");
+        REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "abc");
 
         obj.set_property_value(d, "data", util::Any("abc"s));
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "data")) == "abc");
+        REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(d, "data")) == "abc");
 
         obj.set_property_value(d, "date", util::Any(Timestamp(1, 2)));
-        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(1, 2));
+        REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(1, 2));
 
         obj.set_property_value(d, "object id", util::Any(ObjectId("111111111111111111111111")));
-        REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "object id")) ==
+        REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<util::Any>(d, "object id")) ==
                 ObjectId("111111111111111111111111"));
 
         obj.set_property_value(d, "decimal", util::Any(Decimal128("42.4242e42")));
-        REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) == Decimal128("42.4242e42"));
+        REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<util::Any>(d, "decimal")) ==
+                Decimal128("42.4242e42"));
 
         obj.set_property_value(d, "uuid", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
-        REQUIRE(any_cast<UUID>(obj.get_property_value<util::Any>(d, "uuid")) ==
+        REQUIRE(util::any_cast<UUID>(obj.get_property_value<util::Any>(d, "uuid")) ==
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "mixed", util::Any(25));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 25);
         obj.set_property_value(d, "mixed", util::Any("Hello"s));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == "Hello");
         obj.set_property_value(d, "mixed", util::Any(1.23));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 1.23);
         obj.set_property_value(d, "mixed", util::Any(123.45f));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == 123.45f);
         obj.set_property_value(d, "mixed", util::Any(Timestamp(30, 40)));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Timestamp(30, 40));
         obj.set_property_value(d, "mixed", util::Any(ObjectId("111111111111111111111111")));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 ObjectId("111111111111111111111111"));
         obj.set_property_value(d, "mixed", util::Any(Decimal128("42.4242e42")));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) == Decimal128("42.4242e42"));
         obj.set_property_value(d, "mixed", util::Any(UUID("3b241101-aaaa-bbbb-cccc-4136c566a962")));
-        REQUIRE(any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
+        REQUIRE(util::any_cast<Mixed>(obj.get_property_value<util::Any>(d, "mixed")) ==
                 UUID("3b241101-aaaa-bbbb-cccc-4136c566a962"));
 
         obj.set_property_value(d, "dictionary", util::Any(AnyDict({{"k1", "v1"s}, {"k2", "v2"s}})));
-        auto dict = any_cast<object_store::Dictionary&&>(obj.get_property_value<util::Any>(d, "dictionary"));
+        auto dict = util::any_cast<object_store::Dictionary&&>(obj.get_property_value<util::Any>(d, "dictionary"));
         REQUIRE(dict.get_any("k1") == "v1");
         REQUIRE(dict.get_any("k2") == "v2");
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));
-        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
+        REQUIRE(util::any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
                 linkobj.obj().get_key());
 
-        auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(d, "origin"));
+        auto linking = util::any_cast<Results>(linkobj.get_property_value<util::Any>(d, "origin"));
         REQUIRE(linking.size() == 1);
 
         REQUIRE_THROWS(obj.set_property_value(d, "_id", util::Any(INT64_C(5))));
@@ -1796,16 +1797,16 @@ TEST_CASE("object") {
             {"object array", AnyVec{AnyDict{{"_id", INT64_C(20)}, {"value", INT64_C(20)}}}},
         });
 
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
 
         r->begin_transaction();
         obj.set_property_value(d, "bool array", obj.get_property_value<util::Any>(d, "bool array"));
         obj.set_property_value(d, "object array", obj.get_property_value<util::Any>(d, "object array"));
         r->commit_transaction();
 
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
-        REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "bool array")).size() == 2);
+        REQUIRE(util::any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
     }
 
     SECTION("Mixed emit notification on type change") {
@@ -1853,7 +1854,7 @@ TEST_CASE("object") {
 
         REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
         obj.set_property_value(d, "object", util::Any(linkobj));
-        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
+        REQUIRE(util::any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).obj().get_key() ==
                 linkobj.obj().get_key());
 
         REQUIRE(!obj.obj().is_unresolved(link_col));
@@ -1972,10 +1973,10 @@ TEST_CASE("Embedded Object") {
         });
 
         REQUIRE(obj.obj().get<int64_t>("_id") == 1);
-        auto linked_obj = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj();
+        auto linked_obj = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj();
         REQUIRE(linked_obj.is_valid());
         REQUIRE(linked_obj.get<int64_t>("value") == 10);
-        auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+        auto list = util::any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
         REQUIRE(list.size() == 2);
         REQUIRE(list.get(0).get<int64_t>("value") == 20);
         REQUIRE(list.get(1).get<int64_t>("value") == 30);
@@ -1998,9 +1999,9 @@ TEST_CASE("Embedded Object") {
 
         SECTION("replaces object when given a dictionary and CreatePolicy::UpdateAll") {
             realm->begin_transaction();
-            auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            auto old_linked = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}));
-            auto new_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            auto new_linked = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             REQUIRE_FALSE(old_linked.is_valid());
             REQUIRE(new_linked.obj().get<int64_t>("value") == 40);
             realm->cancel_transaction();
@@ -2008,10 +2009,10 @@ TEST_CASE("Embedded Object") {
 
         SECTION("mutates existing object when given a dictionary and CreatePolicy::UpdateModified") {
             realm->begin_transaction();
-            auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            auto old_linked = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any(AnyDict{{"value", INT64_C(40)}}),
                                    CreatePolicy::UpdateModified);
-            auto new_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            auto new_linked = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             REQUIRE(old_linked.is_valid());
             REQUIRE(old_linked.obj() == new_linked.obj());
             REQUIRE(new_linked.obj().get<int64_t>("value") == 40);
@@ -2020,7 +2021,7 @@ TEST_CASE("Embedded Object") {
 
         SECTION("can set embedded link to null") {
             realm->begin_transaction();
-            auto old_linked = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+            auto old_linked = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
             obj.set_property_value(ctx, "object", util::Any());
             auto new_linked = obj.get_property_value<util::Any>(ctx, "object");
             REQUIRE_FALSE(old_linked.is_valid());
@@ -2147,7 +2148,7 @@ TEST_CASE("Embedded Object") {
         });
 
         CppContext ctx(realm);
-        auto child = any_cast<Object>(parent.get_property_value<util::Any>(ctx, "object"));
+        auto child = util::any_cast<Object>(parent.get_property_value<util::Any>(ctx, "object"));
 
         int calls = 0;
         auto token = child.add_notification_callback([&](CollectionChangeSet const& c, std::exception_ptr) {

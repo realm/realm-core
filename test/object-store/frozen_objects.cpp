@@ -423,8 +423,8 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     SECTION("read across threads") {
         JoiningThread thread([&] {
             REQUIRE(frozen_obj.is_valid());
-            REQUIRE(any_cast<Int>(frozen_obj.get_property_value<util::Any>(ctx, "value")) == 100);
-            auto object_list = any_cast<List&&>(frozen_obj.get_property_value<util::Any>(ctx, "object_array"));
+            REQUIRE(util::any_cast<Int>(frozen_obj.get_property_value<util::Any>(ctx, "value")) == 100);
+            auto object_list = util::any_cast<List&&>(frozen_obj.get_property_value<util::Any>(ctx, "object_array"));
             REQUIRE(object_list.is_frozen());
             REQUIRE(object_list.is_valid());
             REQUIRE(object_list.get(0).get<Int>(linked_object_value_col) == 10);

@@ -222,7 +222,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         for (size_t i = 0; i < values.size(); ++i) {
             REQUIRE(dict.get<T>(keys[i]) == values[i]);
             auto val = dict.get(ctx, keys[i]);
-            REQUIRE(any_cast<Boxed>(val) == Boxed(values[i]));
+            REQUIRE(util::any_cast<Boxed>(val) == Boxed(values[i]));
             REQUIRE(dict.get_any(keys[i]) == Mixed{values[i]});
             REQUIRE(*dict.try_get_any(keys[i]) == Mixed{values[i]});
         }
@@ -450,7 +450,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("key") {
             auto expected = keys_as_results.get<String>(0);
             REQUIRE(keys_as_results.first<String>() == expected);
-            REQUIRE(any_cast<std::string>(*keys_as_results.first(ctx)) == expected);
+            REQUIRE(util::any_cast<std::string>(*keys_as_results.first(ctx)) == expected);
             keys_as_results.clear();
             REQUIRE(!keys_as_results.first<String>());
             REQUIRE(!keys_as_results.first(ctx));
@@ -458,7 +458,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("value") {
             auto expected = values_as_results.get<T>(0);
             REQUIRE(*values_as_results.first<T>() == expected);
-            REQUIRE(any_cast<Boxed>(*values_as_results.first(ctx)) == Boxed(expected));
+            REQUIRE(util::any_cast<Boxed>(*values_as_results.first(ctx)) == Boxed(expected));
             values_as_results.clear();
             REQUIRE(!values_as_results.first<T>());
             REQUIRE(!values_as_results.first(ctx));
@@ -469,7 +469,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("key") {
             auto expected = keys_as_results.get<String>(keys_as_results.size() - 1);
             REQUIRE(keys_as_results.last<String>() == expected);
-            REQUIRE(any_cast<std::string>(*keys_as_results.last(ctx)) == expected);
+            REQUIRE(util::any_cast<std::string>(*keys_as_results.last(ctx)) == expected);
             keys_as_results.clear();
             REQUIRE(!keys_as_results.last<String>());
             REQUIRE(!keys_as_results.last(ctx));
@@ -477,7 +477,7 @@ TEMPLATE_TEST_CASE("dictionary types", "[dictionary]", cf::MixedVal, cf::Int, cf
         SECTION("value") {
             auto expected = values_as_results.get<T>(values_as_results.size() - 1);
             REQUIRE(*values_as_results.last<T>() == expected);
-            REQUIRE(any_cast<Boxed>(*values_as_results.last(ctx)) == Boxed(expected));
+            REQUIRE(util::any_cast<Boxed>(*values_as_results.last(ctx)) == Boxed(expected));
             values_as_results.clear();
             REQUIRE(!values_as_results.last<T>());
             REQUIRE(!values_as_results.last(ctx));

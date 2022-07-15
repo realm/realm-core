@@ -1579,10 +1579,10 @@ TEST_CASE("app: mixed lists with object links", "[sync][app]") {
         CHECK(!wait_for_download(*realm));
         CppContext c(realm);
         auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{obj_id});
-        auto list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "mixed_array"));
+        auto list = util::any_cast<List&&>(obj.get_property_value<util::Any>(c, "mixed_array"));
         for (size_t idx = 0; idx < list.size(); ++idx) {
             Mixed mixed = list.get_any(idx);
-            CHECK(mixed == any_cast<Mixed>(mixed_list_values[idx]));
+            CHECK(mixed == util::any_cast<Mixed>(mixed_list_values[idx]));
         }
     }
 }
@@ -1789,8 +1789,8 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
         CppContext c(realm);
         {
             auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{embedded_obj_id});
-            auto embedded_obj = any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
-            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
+            auto embedded_obj = util::any_cast<Object&&>(obj.get_property_value<util::Any>(c, "embedded_obj"));
+            auto array_list = util::any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(3));
             CHECK(array_list.get<int64_t>(1) == int64_t(4));
@@ -1798,10 +1798,10 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
 
         {
             auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{array_of_objs_id});
-            auto embedded_list = any_cast<List&&>(obj.get_property_value<util::Any>(c, "array_of_objs"));
+            auto embedded_list = util::any_cast<List&&>(obj.get_property_value<util::Any>(c, "array_of_objs"));
             CppContext c2(realm, &embedded_list.get_object_schema());
-            auto embedded_array_obj = any_cast<Object&&>(embedded_list.get(c2, 0));
-            auto array_list = any_cast<List&&>(embedded_array_obj.get_property_value<util::Any>(c2, "array"));
+            auto embedded_array_obj = util::any_cast<Object&&>(embedded_list.get(c2, 0));
+            auto array_list = util::any_cast<List&&>(embedded_array_obj.get_property_value<util::Any>(c2, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(5));
             CHECK(array_list.get<int64_t>(1) == int64_t(6));
@@ -1811,8 +1811,8 @@ TEST_CASE("app: set new embedded object", "[sync][app]") {
             auto obj = Object::get_for_primary_key(c, realm, "TopLevel", util::Any{dict_obj_id});
             object_store::Dictionary dict(obj, obj.get_object_schema().property_for_name("embedded_dict"));
             CppContext c2(realm, &dict.get_object_schema());
-            auto embedded_obj = any_cast<Object&&>(dict.get(c2, "foo"));
-            auto array_list = any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c2, "array"));
+            auto embedded_obj = util::any_cast<Object&&>(dict.get(c2, "foo"));
+            auto array_list = util::any_cast<List&&>(embedded_obj.get_property_value<util::Any>(c2, "array"));
             CHECK(array_list.size() == 2);
             CHECK(array_list.get<int64_t>(0) == int64_t(7));
             CHECK(array_list.get<int64_t>(1) == int64_t(8));

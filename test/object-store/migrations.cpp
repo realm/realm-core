@@ -931,8 +931,8 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42 + i);
             }
         }
@@ -989,8 +989,8 @@ TEST_CASE("migration: Automatic") {
             for (int i = 0; i < 2; i++) {
                 Object parent_object(realm, "parent_table", i);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42 + i);
             }
         }
@@ -1025,9 +1025,9 @@ TEST_CASE("migration: Automatic") {
                 set_table_type(schema, "child_table", ObjectType::Embedded), 2, [](auto, auto new_realm, auto&) {
                     Object parent_object1(new_realm, "parent_table", 0);
                     CppContext context(new_realm);
-                    Object child_object1 =
-                        any_cast<Object>(parent_object1.get_property_value<util::Any>(context, "child_property"));
-                    Int value = any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
+                    Object child_object1 = util::any_cast<Object>(
+                        parent_object1.get_property_value<util::Any>(context, "child_property"));
+                    Int value = util::any_cast<Int>(child_object1.get_property_value<util::Any>(context, "value"));
 
                     auto child_table = ObjectStore::table_for_object_type(new_realm->read_group(), "child_table");
                     Obj child_object2 = child_table->create_object();
@@ -1045,8 +1045,8 @@ TEST_CASE("migration: Automatic") {
                 Object parent_object(realm, "parent_table", i);
                 CppContext context(realm);
                 Object child_object =
-                    any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
-                Int value = any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
+                    util::any_cast<Object>(parent_object.get_property_value<util::Any>(context, "child_property"));
+                Int value = util::any_cast<Int>(child_object.get_property_value<util::Any>(context, "value"));
                 REQUIRE(value == 42);
             }
         }
@@ -1289,29 +1289,30 @@ TEST_CASE("migration: Automatic") {
                 Object obj = Object::get_for_primary_key(ctx, old_realm, "all types", util::Any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
 
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
-                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
-                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
-                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
-                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) ==
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
+                REQUIRE(util::any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
+                REQUIRE(util::any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
+                REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) ==
+                        Timestamp(10, 20));
+                REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) ==
                         ObjectId("000000000000000000000001"));
-                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
+                REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
                         Decimal128("123.45e6"));
 
-                auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+                auto link = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
 
-                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+                auto list = util::any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
                 CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
-                link = any_cast<Object>(list.get(list_ctx, 0));
+                link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
 
                 CppContext ctx2(new_realm);
                 obj = Object::get_for_primary_key(ctx, new_realm, "all types", util::Any(INT64_C(1)));
@@ -1354,17 +1355,17 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(obj.is_valid());
 
 
-                auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+                auto link = util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
 
-                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+                auto list = util::any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
                 REQUIRE(list.size() == 1);
 
                 CppContext list_ctx(ctx, obj.obj(), *obj.get_object_schema().property_for_name("array"));
-                link = any_cast<Object>(list.get(list_ctx, 0));
+                link = util::any_cast<Object>(list.get(list_ctx, 0));
                 REQUIRE(link.is_valid());
-                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
+                REQUIRE(util::any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
             });
         }
 
@@ -1374,56 +1375,57 @@ TEST_CASE("migration: Automatic") {
                 Object obj = Object::get_for_primary_key(ctx, new_realm, "all types", util::Any(INT64_C(1)));
                 REQUIRE(obj.is_valid());
 
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
                 obj.set_property_value(ctx, "bool", util::Any(false));
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
 
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
                 obj.set_property_value(ctx, "int", util::Any(INT64_C(6)));
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 6);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 6);
 
-                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
+                REQUIRE(util::any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
                 obj.set_property_value(ctx, "float", util::Any(1.23f));
-                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 1.23f);
+                REQUIRE(util::any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 1.23f);
 
-                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
+                REQUIRE(util::any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
                 obj.set_property_value(ctx, "double", util::Any(1.23));
-                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 1.23);
+                REQUIRE(util::any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 1.23);
 
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
                 obj.set_property_value(ctx, "string", util::Any("abc"s));
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "abc");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "abc");
 
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
                 obj.set_property_value(ctx, "data", util::Any("abc"s));
-                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "abc");
+                REQUIRE(util::any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "abc");
 
-                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
+                REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) ==
+                        Timestamp(10, 20));
                 obj.set_property_value(ctx, "date", util::Any(Timestamp(1, 2)));
-                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(1, 2));
+                REQUIRE(util::any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(1, 2));
 
-                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) ==
+                REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) ==
                         ObjectId("000000000000000000000001"));
                 ObjectId generated = ObjectId::gen();
                 obj.set_property_value(ctx, "object id", util::Any(generated));
-                REQUIRE(any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) == generated);
+                REQUIRE(util::any_cast<ObjectId>(obj.get_property_value<util::Any>(ctx, "object id")) == generated);
 
-                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
+                REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
                         Decimal128("123.45e6"));
                 obj.set_property_value(ctx, "decimal", util::Any(Decimal128("77.88E-99")));
-                REQUIRE(any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
+                REQUIRE(util::any_cast<Decimal128>(obj.get_property_value<util::Any>(ctx, "decimal")) ==
                         Decimal128("77.88E-99"));
 
                 Object linked_obj(new_realm, "link target", 0);
                 Object new_obj(new_realm, get_table(new_realm, "link target")->create_object());
 
-                auto linking = any_cast<Results>(linked_obj.get_property_value<util::Any>(ctx, "origin"));
+                auto linking = util::any_cast<Results>(linked_obj.get_property_value<util::Any>(ctx, "origin"));
                 REQUIRE(linking.size() == 1);
 
-                REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj().get_key() ==
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj().get_key() ==
                         linked_obj.obj().get_key());
                 obj.set_property_value(ctx, "object", util::Any(new_obj));
-                REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj().get_key() ==
+                REQUIRE(util::any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj().get_key() ==
                         new_obj.obj().get_key());
 
                 REQUIRE(linking.size() == 0);
@@ -1435,13 +1437,13 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(new_realm->is_in_transaction());
 
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
+                util::any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
                 Object obj = Object::create(ctx, new_realm, "all types", values);
 
                 REQUIRE(get_table(new_realm, "all types")->size() == 2);
                 REQUIRE(get_table(new_realm, "link target")->size() == 2);
                 REQUIRE(get_table(new_realm, "array target")->size() == 2);
-                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk")) == 2);
+                REQUIRE(util::any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk")) == 2);
             });
         }
 
@@ -1449,12 +1451,12 @@ TEST_CASE("migration: Automatic") {
             realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
                 REQUIRE(new_realm->is_in_transaction());
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["bool"] = false;
+                util::any_cast<AnyDict&>(values)["bool"] = false;
                 Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
                 REQUIRE(get_table(new_realm, "all types")->size() == 1);
                 REQUIRE(get_table(new_realm, "link target")->size() == 2);
                 REQUIRE(get_table(new_realm, "array target")->size() == 2);
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
             });
         }
 
@@ -1463,12 +1465,12 @@ TEST_CASE("migration: Automatic") {
                 get_table(new_realm, "all types")->set_primary_key_column(ColKey());
                 REQUIRE(new_realm->is_in_transaction());
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["bool"] = false;
+                util::any_cast<AnyDict&>(values)["bool"] = false;
                 Object obj = Object::create(ctx, new_realm, "all types", values, CreatePolicy::UpdateAll);
                 REQUIRE(get_table(new_realm, "all types")->size() == 1);
                 REQUIRE(get_table(new_realm, "link target")->size() == 2);
                 REQUIRE(get_table(new_realm, "array target")->size() == 2);
-                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+                REQUIRE(util::any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
             });
         }
 
@@ -1509,8 +1511,8 @@ TEST_CASE("migration: Automatic") {
             auto object_schema = realm->schema().find("all types");
             realm->begin_transaction();
             for (int i = 1; i < 10; ++i) {
-                any_cast<AnyDict&>(values)["pk"] = INT64_C(1) + i;
-                any_cast<AnyDict&>(values)["int"] = INT64_C(5) + i;
+                util::any_cast<AnyDict&>(values)["pk"] = INT64_C(1) + i;
+                util::any_cast<AnyDict&>(values)["int"] = INT64_C(5) + i;
                 Object::create(ctx, realm, *object_schema, values);
             }
             realm->commit_transaction();
@@ -1521,15 +1523,15 @@ TEST_CASE("migration: Automatic") {
                 Results results(new_realm, get_table(new_realm, "all types"));
                 for (size_t i = 0, count = results.size(); i < count; ++i) {
                     Object obj(new_realm, results.get<Obj>(i));
-                    util::Any v = 1 + any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk"));
+                    util::Any v = 1 + util::any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk"));
                     obj.set_property_value(ctx, "pk", v);
                 }
             });
 
             // Create a new object with the no-longer-used pk of 1
             realm->begin_transaction();
-            any_cast<AnyDict&>(values)["pk"] = INT64_C(1);
-            any_cast<AnyDict&>(values)["int"] = INT64_C(4);
+            util::any_cast<AnyDict&>(values)["pk"] = INT64_C(1);
+            util::any_cast<AnyDict&>(values)["int"] = INT64_C(4);
             object_schema = realm->schema().find("all types");
             Object::create(ctx, realm, *object_schema, values);
             realm->commit_transaction();
@@ -1565,7 +1567,8 @@ TEST_CASE("migration: Automatic") {
                 Results results(new_realm, get_table(new_realm, "string pk"));
                 for (size_t i = 0, count = results.size(); i < count; ++i) {
                     Object obj(new_realm, results.get<Obj>(i));
-                    util::Any v = util::to_string(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "value")));
+                    util::Any v =
+                        util::to_string(util::any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "value")));
                     obj.set_property_value(ctx, "pk", v);
                 }
             });
@@ -1650,7 +1653,7 @@ TEST_CASE("migration: Automatic") {
             schema = set_primary_key(schema, "all types", "pk");
             REQUIRE_NOTHROW(realm->update_schema(schema, 3, [&](auto, auto new_realm, Schema&) {
                 CppContext ctx(new_realm);
-                any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
+                util::any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
                 Object::create(ctx, realm, "all types", values);
             }));
         }

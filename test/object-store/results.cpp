@@ -4392,16 +4392,16 @@ TEMPLATE_TEST_CASE("results: accessor interface", "", ResultsFromTable, ResultsF
 
     SECTION("get()") {
         for (int i = 0; i < 10; ++i)
-            CHECK(any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
+            CHECK(util::any_cast<Object>(results.get(ctx, i)).get_column_value<int64_t>("value") == i);
         CHECK_THROWS_WITH(results.get(ctx, 10), "Requested index 10 greater than max 9");
     }
 
     SECTION("first()") {
-        CHECK(any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
+        CHECK(util::any_cast<Object>(*results.first(ctx)).get_column_value<int64_t>("value") == 0);
     }
 
     SECTION("last()") {
-        CHECK(any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
+        CHECK(util::any_cast<Object>(*results.last(ctx)).get_column_value<int64_t>("value") == 9);
     }
 
     SECTION("index_of()") {
@@ -4781,25 +4781,25 @@ TEST_CASE("results: set property value on all objects", "[batch_updates]") {
         util::Any timestamp = Timestamp(1, 2);
         r.set_property_value(ctx, "date", timestamp);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<Timestamp>("date") == any_cast<Timestamp>(timestamp));
+            CHECK(r.get(i).get<Timestamp>("date") == util::any_cast<Timestamp>(timestamp));
         }
 
         util::Any object_id = ObjectId("ffffffffffffffffffffffff");
         r.set_property_value(ctx, "object id", object_id);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<ObjectId>("object id") == any_cast<ObjectId>(object_id));
+            CHECK(r.get(i).get<ObjectId>("object id") == util::any_cast<ObjectId>(object_id));
         }
 
         util::Any decimal = Decimal128("876.54e32");
         r.set_property_value(ctx, "decimal", decimal);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<Decimal128>("decimal") == any_cast<Decimal128>(decimal));
+            CHECK(r.get(i).get<Decimal128>("decimal") == util::any_cast<Decimal128>(decimal));
         }
 
         util::Any uuid = UUID("3b241101-e2bb-4255-8caf-4136c566a962");
         r.set_property_value(ctx, "uuid", uuid);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get<UUID>("uuid") == any_cast<UUID>(uuid));
+            CHECK(r.get(i).get<UUID>("uuid") == util::any_cast<UUID>(uuid));
         }
 
         ObjKey object_key = table->create_object_with_primary_key(3).get_key();

@@ -99,7 +99,7 @@ public:
     // Determine if `value` boxes the same Set as `set`
     bool is_same_set(object_store::Set const& set, util::Any const& value)
     {
-        if (auto set2 = util::any_cast<object_store::Set>(&value))
+        if (auto set2 = std::any_cast<object_store::Set>(&value))
             return set == *set2;
         return false;
     }
@@ -107,7 +107,7 @@ public:
     // Determine if `value` boxes the same List as `list`
     bool is_same_list(List const& list, util::Any const& value)
     {
-        if (auto list2 = util::any_cast<List>(&value))
+        if (auto list2 = std::any_cast<List>(&value))
             return list == *list2;
         return false;
     }
@@ -115,7 +115,7 @@ public:
     // Determine if `value` boxes the same Dictionary as `dict`
     bool is_same_dictionary(const object_store::Dictionary& dict, const util::Any& value)
     {
-        if (auto dict2 = util::any_cast<object_store::Dictionary>(&value))
+        if (auto dict2 = std::any_cast<object_store::Dictionary>(&value))
             return dict == *dict2;
         return false;
     }
@@ -301,9 +301,9 @@ inline BinaryData CppContext::unbox(util::Any& v, CreatePolicy, ObjKey) const
 template <>
 inline Obj CppContext::unbox(util::Any& v, CreatePolicy policy, ObjKey current_obj) const
 {
-    if (auto object = util::any_cast<Object>(&v))
+    if (auto object = std::any_cast<Object>(&v))
         return object->obj();
-    if (auto obj = util::any_cast<Obj>(&v))
+    if (auto obj = std::any_cast<Obj>(&v))
         return *obj;
     if (!policy.create)
         return Obj();

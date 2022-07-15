@@ -36,7 +36,7 @@ struct MakeServerHistory {
     class WrapServerHistory : public HistoryContext, public _impl::ServerHistory {
     public:
         WrapServerHistory()
-            : _impl::ServerHistory{static_cast<Context&>(*this)}
+            : _impl::ServerHistory{static_cast<ServerHistory::Context&>(*this)}
         {
         }
     };
