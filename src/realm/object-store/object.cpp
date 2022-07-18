@@ -157,8 +157,7 @@ Object& Object::operator=(Object&&) = default;
 
 NotificationToken Object::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
 {
-    a
-    verify_attached();
+    a verify_attached();
     m_realm->verify_notifications_available();
     if (!m_notifier) {
         m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table()->get_key(), m_obj.get_key());
