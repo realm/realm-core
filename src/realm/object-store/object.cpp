@@ -157,6 +157,7 @@ Object& Object::operator=(Object&&) = default;
 
 NotificationToken Object::add_notification_callback(CollectionChangeCallback callback, KeyPathArray key_path_array) &
 {
+    a
     verify_attached();
     m_realm->verify_notifications_available();
     if (!m_notifier) {
