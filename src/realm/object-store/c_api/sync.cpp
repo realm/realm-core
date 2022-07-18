@@ -43,8 +43,7 @@ static_assert(realm_sync_client_reconnect_mode_e(ReconnectMode::testing) == RLM_
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Manual) == RLM_SYNC_SESSION_RESYNC_MODE_MANUAL);
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::DiscardLocal) ==
               RLM_SYNC_SESSION_RESYNC_MODE_DISCARD_LOCAL);
-static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Recover) ==
-              RLM_SYNC_SESSION_RESYNC_MODE_RECOVER);
+static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::Recover) == RLM_SYNC_SESSION_RESYNC_MODE_RECOVER);
 static_assert(realm_sync_session_resync_mode_e(ClientResyncMode::RecoverOrDiscard) ==
               RLM_SYNC_SESSION_RESYNC_MODE_RECOVER_OR_DISCARD);
 
