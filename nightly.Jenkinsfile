@@ -16,7 +16,8 @@ node {
             payload = JsonOutput.toJson([
                     username: "Realm CI",
                     icon_emoji: ":jenkins:",
-                    text: "@realm-core-engineers *The current realm-core nightly build is broken!*\n<${run.absoluteUrl}|Click here> to check the build."
+                    text: "@realm-core-engineers *The current realm-core nightly build is broken!*\n<${run.absoluteUrl}|Click here> to check the build.",
+                    link_names: 1
             ])
             currentBuild.result = "FAILURE"
         }
