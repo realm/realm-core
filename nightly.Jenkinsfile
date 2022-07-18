@@ -11,12 +11,14 @@ node {
                     icon_emoji: ":jenkins:",
                     text: "*The current realm-core nightly build was ok!*\n<${run.absoluteUrl}|Click here> to check the build."
             ])
+            currentBuild.result = "SUCCESS"
         } else if(run.getResult() == "FAILURE"){
             payload = JsonOutput.toJson([
                     username: "Realm CI",
                     icon_emoji: ":jenkins:",
                     text: "@realm-core-engineers *The current realm-core nightly build is broken!*\n<${run.absoluteUrl}|Click here> to check the build."
             ])
+            currentBuild.result = "FAILURE"
         }
         // otherwise the build was aborted, because no nightly build was needed, but in this case we don't need to signal anything
 
