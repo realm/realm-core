@@ -15,7 +15,7 @@ node {
             payload = JsonOutput.toJson([
                     username: "Realm CI",
                     icon_emoji: ":jenkins:",
-                    text: "*The current realm-core nightly build is broken!*\n<${run.absoluteUrl}|Click here> to check the build."
+                    text: "*@realm-core-engineers The current realm-core nightly build is broken!*\n<${run.absoluteUrl}|Click here> to check the build."
             ])
         }
         // otherwise the build was aborted, because no nightly build was needed, but in this case we don't need to signal anything
