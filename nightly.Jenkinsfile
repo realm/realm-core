@@ -1,7 +1,7 @@
 
 import groovy.json.JsonOutput
-//def run = build '/realm/realm-core/master'
-def run = build job:'/realm/realm-core/PR-5661', propagate: false
+//def run = build '/realm/realm-core/master' 
+def run = build job:'/realm/realm-core/PR-5661', propagate: false //PR branch to build for testing
 node {
     withCredentials([[$class: 'StringBinding', credentialsId: 'slack-realm-core-ci-alerts-url', variable: 'SLACK_URL']]) {
         def payload = null
