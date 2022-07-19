@@ -510,7 +510,7 @@ public:
         , m_mutex(mutex)
     {
         std::lock_guard lock(m_mutex);
-        size_t size = m_file.get_size();
+        size_t size = static_cast<size_t>(m_file.get_size());
         m_reader_map.map(m_file, File::access_ReadWrite, size, File::map_NoSync);
         r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
@@ -528,6 +528,7 @@ public:
     version_type get_newest_version()
     {
         std::lock_guard lock(m_mutex);
+        ensure_full_reader_mapping();
         return r_info->readers.get_newest().version;
     }
 
@@ -543,6 +544,9 @@ public:
     void release_read_lock(ReadLockInfo& read_lock)
     {
         std::lock_guard lock(m_mutex);
+        // we should not need to call ensure_full_reader_mapping,
+        // since releasing a read lock means it has been grabbed
+        // earlier - and hence must reside in mapped memory.
         auto& r = r_info->readers.get(read_lock.m_reader_idx);
         REALM_ASSERT(read_lock.m_version == r.version);
         if (read_lock.m_is_frozen) {
@@ -581,8 +585,8 @@ public:
         }
         read_lock.m_is_frozen = frozen;
         read_lock.m_version = r.version;
-        read_lock.m_top_ref = r.current_top;
-        read_lock.m_file_size = r.filesize;
+        read_lock.m_top_ref = static_cast<ref_type>(r.current_top);
+        read_lock.m_file_size = static_cast<size_t>(r.filesize);
     }
 
     void add_version(ref_type new_top_ref, size_t new_file_size, uint64_t new_version)
