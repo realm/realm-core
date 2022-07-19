@@ -21,6 +21,8 @@
 #include "conversion.hpp"
 
 #include <realm/object-store/sync/sync_user.hpp>
+#include <realm/object-store/sync/mongo_client.hpp>
+#include <realm/object-store/sync/mongo_database.hpp>
 
 namespace realm::c_api {
 using namespace realm::app;
@@ -344,6 +346,14 @@ RLM_API const char* realm_app_credentials_serialize_as_json(realm_app_credential
 {
     return wrap_err([&] {
         return duplicate_string(app_credentials->serialize_as_json());
+    });
+}
+
+RLM_API realm_app_t* realm_app_create(const realm_app_config_t* app_config,
+                                      const realm_sync_client_config_t* sync_client_config)
+{
+    return wrap_err([&] {
+        return new realm_app_t(App::get_uncached_app(*app_config, *sync_client_config));
     });
 }
 
@@ -824,6 +834,288 @@ RLM_API realm_app_t* realm_user_get_app(const realm_user_t* user) noexcept
     catch (const std::exception&) {
     }
     return nullptr;
+}
+
+template <typename T>
+inline util::Optional<T> convert_to_optional(T data)
+{
+    return data ? util::Optional<T>(data) : util::Optional<T>();
+}
+
+template <typename T>
+inline util::Optional<T> convert_to_optional_bson(realm_string_t doc)
+{
+    if (doc.data == nullptr || doc.size == 0) {
+        return util::Optional<T>();
+    }
+    return util::Optional<T>(static_cast<T>(bson::parse({doc.data, doc.size})));
+}
+
+template <typename T>
+inline T convert_to_bson(realm_string_t doc)
+{
+    auto res = convert_to_optional_bson<T>(doc);
+    return res ? res.value() : T();
+}
+
+static MongoCollection::FindOptions to_mongodb_collection_find_options(const realm_mongodb_find_options_t* options)
+{
+    MongoCollection::FindOptions mongodb_options;
+    mongodb_options.projection_bson = convert_to_optional_bson<bson::BsonDocument>(options->projection_bson);
+    mongodb_options.sort_bson = convert_to_optional_bson<bson::BsonDocument>(options->sort_bson);
+    mongodb_options.limit = convert_to_optional(options->limit);
+    return mongodb_options;
+}
+
+static MongoCollection::FindOneAndModifyOptions
+to_mongodb_collection_find_one_and_modify_options(const realm_mongodb_find_one_and_modify_options_t* options)
+{
+    MongoCollection::FindOneAndModifyOptions mongodb_options;
+    mongodb_options.projection_bson = convert_to_optional_bson<bson::BsonDocument>(options->projection_bson);
+    mongodb_options.sort_bson = convert_to_optional_bson<bson::BsonDocument>(options->sort_bson);
+    mongodb_options.upsert = options->upsert;
+    mongodb_options.return_new_document = options->return_new_document;
+    return mongodb_options;
+}
+
+using UserDataPtr = std::unique_ptr<void, realm_free_userdata_func_t>;
+static void handle_mongodb_collection_result(util::Optional<bson::Bson> bson, util::Optional<AppError> app_error,
+                                             UserDataPtr data, realm_mongodb_callback_t callback)
+{
+    if (app_error) {
+        auto error = to_capi(*app_error);
+        callback(data.get(), {nullptr, 0}, &error);
+    }
+    else if (bson) {
+        const auto& bson_data = bson->to_string();
+        callback(data.get(), {bson_data.c_str(), bson_data.size()}, nullptr);
+    }
+}
+
+RLM_API realm_mongodb_collection_t* realm_mongo_collection_get(realm_user_t* user, const char* service,
+                                                               const char* database, const char* collection)
+{
+    REALM_ASSERT(user);
+    REALM_ASSERT(service);
+    REALM_ASSERT(database);
+    REALM_ASSERT(collection);
+    return wrap_err([&]() {
+        auto col = (*user)->mongo_client(service).db(database).collection(collection);
+        return new realm_mongodb_collection_t(col);
+    });
+}
+
+RLM_API bool realm_mongo_collection_find(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                         const realm_mongodb_find_options_t* options, realm_userdata_t data,
+                                         realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    REALM_ASSERT(options);
+    return wrap_err([&] {
+        collection->find_bson(convert_to_bson<bson::BsonDocument>(filter_ejson),
+                              to_mongodb_collection_find_options(options),
+                              [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                                  handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+                              });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_find_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                             const realm_mongodb_find_options_t* options, realm_userdata_t data,
+                                             realm_free_userdata_func_t delete_data,
+                                             realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    REALM_ASSERT(options);
+    return wrap_err([&] {
+        collection->find_one_bson(
+            convert_to_bson<bson::BsonDocument>(filter_ejson), to_mongodb_collection_find_options(options),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_aggregate(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                              realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                              realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        collection->aggregate_bson(
+            convert_to_bson<bson::BsonArray>(filter_ejson),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_count(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                          int64_t limit, realm_userdata_t data,
+                                          realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        collection->count_bson(convert_to_bson<bson::BsonDocument>(filter_ejson), limit,
+                               [&](util::Optional<bson::Bson> bson, util::Optional<app::AppError> app_error) {
+                                   handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+                               });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_insert_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                               realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        collection->insert_one_bson(
+            convert_to_bson<bson::BsonDocument>(filter_ejson),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_insert_many(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                                realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        collection->insert_many_bson(
+            convert_to_bson<bson::BsonArray>(filter_ejson),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_delete_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                               realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                               realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        collection->delete_one_bson(
+            convert_to_bson<bson::BsonDocument>(filter_ejson),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_delete_many(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                                realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                                realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        collection->delete_many_bson(
+            convert_to_bson<bson::BsonDocument>(filter_ejson),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_update_one(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                               realm_string_t update_ejson, bool upsert, realm_userdata_t data,
+                                               realm_free_userdata_func_t delete_data,
+                                               realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter_ejson);
+        const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
+        collection->update_one_bson(
+            bson_filter, bson_update, upsert,
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_update_many(realm_mongodb_collection_t* collection, realm_string_t filter_ejson,
+                                                realm_string_t update_ejson, bool upsert, realm_userdata_t data,
+                                                realm_free_userdata_func_t delete_data,
+                                                realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter_ejson);
+        const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
+        collection->update_many_bson(
+            bson_filter, bson_update, upsert,
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_find_one_and_update(realm_mongodb_collection_t* collection,
+                                                        realm_string_t filter_ejson, realm_string_t update_ejson,
+                                                        const realm_mongodb_find_one_and_modify_options_t* options,
+                                                        realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                                        realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter_ejson);
+        const auto& bson_update = convert_to_bson<bson::BsonDocument>(update_ejson);
+        collection->find_one_and_update_bson(
+            bson_filter, bson_update, to_mongodb_collection_find_one_and_modify_options(options),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_find_one_and_replace(
+    realm_mongodb_collection_t* collection, realm_string_t filter_ejson, realm_string_t replacement_ejson,
+    const realm_mongodb_find_one_and_modify_options_t* options, realm_userdata_t data,
+    realm_free_userdata_func_t delete_data, realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        const auto& filter_bson = convert_to_bson<bson::BsonDocument>(filter_ejson);
+        const auto& replacement_bson = convert_to_bson<bson::BsonDocument>(replacement_ejson);
+        collection->find_one_and_replace_bson(
+            filter_bson, replacement_bson, to_mongodb_collection_find_one_and_modify_options(options),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
+}
+
+RLM_API bool realm_mongo_collection_find_one_and_delete(realm_mongodb_collection_t* collection,
+                                                        realm_string_t filter_ejson,
+                                                        const realm_mongodb_find_one_and_modify_options_t* options,
+                                                        realm_userdata_t data, realm_free_userdata_func_t delete_data,
+                                                        realm_mongodb_callback_t callback)
+{
+    REALM_ASSERT(collection);
+    return wrap_err([&] {
+        const auto& bson_filter = convert_to_bson<bson::BsonDocument>(filter_ejson);
+        collection->find_one_and_delete_bson(
+            bson_filter, to_mongodb_collection_find_one_and_modify_options(options),
+            [&](util::Optional<bson::Bson> bson, util::Optional<AppError> app_error) {
+                handle_mongodb_collection_result(bson, app_error, {data, delete_data}, callback);
+            });
+        return true;
+    });
 }
 
 } // namespace realm::c_api

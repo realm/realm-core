@@ -15,7 +15,8 @@ TEST(Vacuum_HistoryType)
     util::Logger& logger = test_context.logger;
     TEST_DIR(dir);
 
-    std::string origin_path = util::File::resolve("vacuum_no_history_type.realm", "resources");
+    std::string resources_dir = realm::test_util::get_test_resource_path();
+    std::string origin_path = util::File::resolve("vacuum_no_history_type.realm", resources_dir);
     std::string target_path = util::File::resolve("vacuum_no_history_type.realm", dir);
     util::File::copy(origin_path, target_path);
 

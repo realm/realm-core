@@ -2002,7 +2002,7 @@ TEST(Parser_list_of_primitive_ints)
             list1.add(it->get_key());
         }
         // empty object, null link, empty list
-        Obj obj2 = t2->create_object();
+        t2->create_object();
     }
 
     for (size_t i = 0; i < num_objects; ++i) {
@@ -2031,7 +2031,7 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t, "integers.@size == 1", num_objects);
 
     // add two more objects; one with defaults, one with null in the list
-    Obj obj_defaults = t->create_object();
+    t->create_object();
     Obj obj_nulls_in_lists = t->create_object();
     obj_nulls_in_lists.get_list<Optional<Int>>(col_int_list_nullable).add(Optional<Int>());
     num_objects += 2;
@@ -2115,7 +2115,6 @@ TEST(Parser_list_of_primitive_ints)
     verify_query(test_context, t2, "ALL list.integers == 1", 2);  // row 0 matches {1}. row 1 matches (any of) {} {1}
     verify_query(test_context, t2, "NONE list.integers == 1", 1); // row 1 matches (any of) {}, {0}, {2}, {3} ...
 
-    Obj obj0 = *t->begin();
     util::Any args[] = {Int(1)};
     size_t num_args = 1;
     verify_query_sub(test_context, t, "integers == $0", args, num_args, 1);
@@ -2189,7 +2188,7 @@ TEST(Parser_list_of_primitive_strings)
         std::string si = get_string(i);
         obj.get_list<String>(col_str_list).add(si);
     }
-    Obj obj_empty_list = t->create_object();
+    t->create_object();
     Obj obj_with_null = t->create_object();
     obj_with_null.get_list<String>(col_str_list).add(StringData(realm::null()));
     Obj obj_with_empty_string = t->create_object();
@@ -2258,7 +2257,7 @@ TEST_TYPES(Parser_list_of_primitive_element_lengths, StringData, BinaryData)
     t->add_column(type_Int, "length"); // "length" is still a usable column name
     auto col_link = t->add_column(*t, "link");
 
-    Obj obj_empty_list = t->create_object();
+    t->create_object();
     Obj obj_with_null = t->create_object();
     TEST_TYPE null_value;
     CHECK(null_value.is_null());
@@ -2342,7 +2341,7 @@ TEST_TYPES(Parser_list_of_primitive_types, Prop<Int>, Nullable<Int>, Prop<Bool>,
     auto obj1 = t->create_object();
     std::vector<type> values = gen.values_from_int<type>({0, 9, 4, 2, 7, 4, 1, 8, 11, 3, 4, 5, 22});
     obj1.set_list_values(col, values);
-    auto obj2 = t->create_object(); // empty list
+    t->create_object();             // empty list
     auto obj3 = t->create_object(); // {1}
     underlying_type value_1 = gen.convert_for_test<underlying_type>(1);
     obj3.get_list<type>(col).add(value_1);
@@ -3052,7 +3051,7 @@ TEST(Parser_Backlinks)
     }
 
     {
-        auto obj1 = things->create_object().set(int_col, 1);
+        things->create_object().set(int_col, 1);
         auto obj2 = things->create_object().set(int_col, 2);
         auto obj3 = things->create_object().set(int_col, 3);
         obj3.set(link_col, obj2.get_key());

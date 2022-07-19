@@ -92,6 +92,12 @@ void* mmap_fixed(FileDesc fd, void* address_request, size_t size, File::AccessMo
 void* mmap_reserve(FileDesc fd, size_t size, File::AccessMode am, size_t offset, const char* enc_key,
                    EncryptedFileMapping*& mapping);
 
+EncryptedFileMapping* reserve_mapping(void* addr, FileDesc fd, size_t offset, File::AccessMode access,
+                                      const char* encryption_key);
+
+void extend_encrypted_mapping(EncryptedFileMapping* mapping, void* addr, size_t offset, size_t old_size,
+                              size_t new_size);
+void remove_encrypted_mapping(void* addr, size_t size);
 void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                 EncryptedFileMapping* mapping);
 

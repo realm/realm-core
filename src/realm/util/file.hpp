@@ -646,8 +646,10 @@ private:
     struct MapBase {
         void* m_addr = nullptr;
         mutable size_t m_size = 0;
+        size_t m_reservation_size = 0;
         size_t m_offset = 0;
         FileDesc m_fd;
+        AccessMode m_a;
 
         MapBase() noexcept;
         ~MapBase() noexcept;
@@ -659,12 +661,18 @@ private:
 
         // Use
         void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
+        // reserve address space for later mapping operations.
+        // returns false if reservation can't be done.
+        bool try_reserve(const File&, AccessMode, size_t size, size_t offset = 0);
         void remap(const File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         // fully update any process shared representation (e.g. buffer cache).
         // other processes will be able to see changes, but a full platform crash
         // may loose data
         void flush();
+        // try to extend the mapping in-place. Virtual address space must have
+        // been set aside earlier by a call to reserve()
+        bool try_extend_to(size_t size) noexcept;
         // fully synchronize any underlying storage. After completion, a full platform
         // crash will *not* have lost data.
         void sync();
@@ -764,11 +772,13 @@ public:
             unmap();
         m_addr = other.get_addr();
         m_size = other.m_size;
+        m_a = other.m_a;
+        m_reservation_size = other.m_reservation_size;
         m_offset = other.m_offset;
         m_fd = other.m_fd;
         other.m_offset = 0;
         other.m_addr = nullptr;
-        other.m_size = 0;
+        other.m_size = other.m_reservation_size = 0;
 #if REALM_ENABLE_ENCRYPTION
         m_encrypted_mapping = other.m_encrypted_mapping;
         other.m_encrypted_mapping = nullptr;
@@ -793,6 +803,8 @@ public:
     /// currently attached to a memory mapped file.
     void unmap() noexcept;
 
+    bool try_reserve(const File&, AccessMode a = access_ReadOnly, size_t size = sizeof(T), size_t offset = 0);
+
     /// See File::remap().
     ///
     /// Calling this function on a Map instance that is not currently
@@ -800,6 +812,9 @@ public:
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
     T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
+
+    /// Try to extend the existing mapping to a given size
+    bool try_extend_to(size_t size) noexcept;
 
     /// See File::sync_map().
     ///
@@ -1188,6 +1203,12 @@ inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_fl
 }
 
 template <class T>
+inline bool File::Map<T>::try_reserve(const File& f, AccessMode a, size_t size, size_t offset)
+{
+    return MapBase::try_reserve(f, a, size, offset);
+}
+
+template <class T>
 inline void File::Map<T>::unmap() noexcept
 {
     MapBase::unmap();
@@ -1202,6 +1223,12 @@ inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_
     map(f, a, size, map_flags);
 
     return static_cast<T*>(m_addr);
+}
+
+template <class T>
+inline bool File::Map<T>::try_extend_to(size_t size) noexcept
+{
+    return MapBase::try_extend_to(sizeof(T) * size);
 }
 
 template <class T>

@@ -100,7 +100,7 @@ ONLY(Query_QuickSort2)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-                                                // Triggers QuickSort because range > len
+    // Triggers QuickSort because range > len
     Table ttt;
     auto ints = ttt.add_column(type_Int, "1");
     auto strings = ttt.add_column(type_String, "2");

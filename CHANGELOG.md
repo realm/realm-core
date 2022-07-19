@@ -1,8 +1,46 @@
+# NEXT RELEASE
+
+### Enhancements
+* <New feature description> (PR [#????](https://github.com/realm/realm-core/pull/????))
+* Add support for building with Xcode 14 using the CMake project ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* Expose MongoDB client interface in the C API. ([PR #5638](https://github.com/realm/realm-core/pull/5638)).
+* Add support in the C API for constructing a new `realm_app_t` object via `realm_app_create`. ([PR #5570](https://github.com/realm/realm-core/issues/5570))
+* Reduce use of memory mappings and virtual address space ([PR #5645](https://github.com/realm/realm-core/pull/5645)). Also fixes some errors (see below)
+
+### Fixed
+* <How do the end-user experience this issue? what was the impact?> ([#????](https://github.com/realm/realm-core/issues/????), since v?.?.?)
+* Fix exception when decoding interned strings in realm-apply-to-state tool. ([PR #5628](https://github.com/realm/realm-core/pull/5628))
+* Fix some warnings when building with Xcode 14 ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* Throw `runtime_error` if subscription set is requested and flexible sync is not enabled. ([PR #5637](https://github.com/realm/realm-core/pull/5637))
+* Fix compilation failures on watchOS platforms which do not support thread-local storage. ([#7694](https://github.com/realm/realm-swift/issues/7694), [#7695](https://github.com/realm/realm-swift/issues/7695) since v11.7.0)
+* Fix a data race when committing a transaction while multiple threads are waiting for the write lock on platforms using emulated interprocess condition variables (most platforms other than non-Android Linux).
+* Fix a data race when writing audit events which could occur if the sync client thread was busy with other work when the event Realm was opened.
+* Fix some cases of running out of virtual address space (seen/reported as mmap failures) ([PR #5645](https://github.com/realm/realm-core/pull/5645))
+* Audit event scopes containing only write events and no read events would occasionally throw a `BadVersion` exception when a write transaction was committed (since v11.17.0).
+* Fixed the client reset callbacks not populating the Realm instance arguments correctly if the Realm coordinator lifetime had ended. ([#5654](https://github.com/realm/realm-core/pull/5654), since the introduction of DiscardLocal reset mode in v11.5.0)
+
+### Breaking changes
+* None.
+
+### Compatibility
+* Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
+
+-----------
+
+### Internals
+* Add support for running the object store tests and some of the benchmarks on iOS ([PR #5577](https://github.com/realm/realm-core/pull/5577)).
+* MemRef is now trivially copyable.
+* Fix bloaty CI test that is currently failing on Ubuntu. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
+* Fix benchmark tests that are failing on Ubuntu and MacOS. ([PR #5656](https://github.com/realm/realm-core/pull/5656))
+
+----------------------------------------------
+
 # 12.3.0 Release notes
 
 ### Enhancements
 * Allow flexible sync with discard local client resets. ([#5404](https://github.com/realm/realm-core/pull/5404))
 * Allow flexible sync with recovery client resets. ([#5562](https://github.com/realm/realm-core/issues/5562))
+* Add `Results::sectioned_results` which allows Results to be accessed in sections specified by a comparison function. (PR [#5403](https://github.com/realm/realm-core/pull/5403))
 
 ### Fixed
 * Fix a UBSan failure when mapping encrypted pages.
@@ -19,6 +57,7 @@
 
 ### Internals
 * Delete everything related to the metered allocations feature used for server monitoring.
+* Fixes potential issue where an exception could be hidden by subsequent assertion ([#5615](https://github.com/realm/realm-core/pull/5615)).
 * Support Nightly builds in Jenkins. ([#5626](https://github.com/realm/realm-core/issues/5626))
 
 ----------------------------------------------

@@ -3963,10 +3963,13 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
 
         void wait_for(TestState new_state)
         {
-            std::unique_lock<std::mutex> lk(mutex);
-            cond.wait(lk, [&] {
+            std::unique_lock lk(mutex);
+            bool failed = !cond.wait_for(lk, std::chrono::seconds(5), [&] {
                 return state == new_state;
             });
+            if (failed) {
+                throw std::runtime_error("wait timed out");
+            }
         }
 
         mutable std::mutex mutex;
@@ -4058,18 +4061,9 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         auto cur_user = std::move(cur_user_future).get();
         CHECK(cur_user);
 
-        Realm::Config realm_config;
-        realm_config.sync_config = std::make_shared<SyncConfig>(app->current_user(), bson::Bson("foo"));
-        realm_config.sync_config->client_resync_mode = ClientResyncMode::Manual;
-        realm_config.sync_config->error_handler = [](std::shared_ptr<SyncSession>, SyncError error) {
-            std::cout << error.message << std::endl;
-        };
-        realm_config.schema_version = 1;
-        realm_config.path =
-            app->sync_manager()->path_for_realm(*realm_config.sync_config, std::string("default.realm"));
-
-        auto r = Realm::get_shared_realm(std::move(realm_config));
-        auto session = cur_user->session_for_on_disk_path(r->config().path);
+        SyncTestFile config(app->current_user(), bson::Bson("foo"));
+        auto r = Realm::get_shared_realm(config);
+        auto session = r->sync_session();
         mock_transport_worker.add_work_item([session] {
             session->initiate_access_token_refresh();
         });
@@ -4078,7 +4072,7 @@ TEST_CASE("app: app destroyed during token refresh", "[sync][app]") {
         user->log_out();
     }
 
-    util::EventLoop::main().run_until([&] {
+    timed_wait_for([&] {
         return !app->sync_manager()->has_existing_sessions();
     });
 

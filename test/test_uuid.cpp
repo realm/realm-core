@@ -620,7 +620,7 @@ TEST(UUID_Distinct)
         auto table = wt->add_table("Foo");
         auto col_id = table->add_column(type_UUID, "id", true);
         for (int i = 1; i < 10; i++) {
-            auto obj = table->create_object().set(col_id, ids[i % ids.size()]);
+            table->create_object().set(col_id, ids[i % ids.size()]);
         }
 
         wt->commit();

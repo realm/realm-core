@@ -840,7 +840,10 @@ void AuditRealmPool::scan_for_realms_to_upload()
 
         m_open_paths.insert(path);
         auto partition = file_name.substr(0, file_name.size() - 6);
-        wait_for_upload(m_user->sync_manager()->get_session(db, SyncConfig{m_user, prefixed_partition(partition)}));
+        RealmConfig config;
+        config.path = db->get_path();
+        config.sync_config = std::make_shared<SyncConfig>(m_user, prefixed_partition(partition));
+        wait_for_upload(m_user->sync_manager()->get_session(db, config));
         return;
     }
 
@@ -920,6 +923,7 @@ public:
                       util::UniqueFunction<void(std::exception_ptr)>&& completion) override REQUIRES(!m_mutex);
 
     void record_query(VersionID, TableView const&) override REQUIRES(!m_mutex);
+    void prepare_for_write(VersionID) override REQUIRES(!m_mutex);
     void record_write(VersionID, VersionID) override REQUIRES(!m_mutex);
     void record_read(VersionID, const Obj& row, const Obj& parent, ColKey col) override REQUIRES(!m_mutex);
 
@@ -1052,12 +1056,18 @@ void AuditContext::record_read(VersionID version, const Obj& obj, const Obj& par
                                                           parent_table_key, parent_obj_key, col});
 }
 
-void AuditContext::record_write(realm::VersionID old_version, realm::VersionID new_version)
+void AuditContext::prepare_for_write(VersionID old_version)
+{
+    util::CheckedLockGuard lock(m_mutex);
+    if (m_current_scope)
+        pin_version(old_version);
+}
+
+void AuditContext::record_write(VersionID old_version, VersionID new_version)
 {
     util::CheckedLockGuard lock(m_mutex);
     if (!m_current_scope)
         return;
-    pin_version(old_version);
     m_current_scope->events.push_back(audit_event::Write{now(), old_version, new_version});
 }
 
@@ -1168,31 +1178,22 @@ void AuditContext::process_scope(AuditContext::Scope& scope) const
             AuditEventWriter writer{*m_source_db, *scope.metadata, scope.activity_name, *table, *m_serializer};
 
             m_logger->trace("Audit: Total event count: %1", scope.events.size());
-            for (size_t i = 0; i < scope.events.size();) {
-                {
-                    // We write directly to the replication log and don't want
-                    // the automatic replication to happen
-                    DisableReplication dr(tr);
 
-                    // There's awkward nested looping here because we need
-                    // replication enabled when we commit intermediate transactions
-                    for (; i < scope.events.size(); ++i) {
-                        m_serializer->set_event_index(i);
-                        if (mpark::visit(writer, scope.events[i])) {
-                            // This event didn't fit in the current transaction
-                            // so commit and try it again after that.
-                            break;
-                        }
-                    }
-                    table->clear();
-                }
+            // We write directly to the replication log and don't want
+            // the automatic replication to happen
+            Table::DisableReplication dr(*table);
 
-                // i.e. if we hit the break
-                if (i + 1 < scope.events.size()) {
+            for (size_t i = 0; i < scope.events.size(); ++i) {
+                m_serializer->set_event_index(i);
+                if (mpark::visit(writer, scope.events[i])) {
+                    // This event didn't fit in the current transaction
+                    // so commit and try it again after that.
                     m_logger->detail("Audit: Incrementally comitting transaction after %1 events", i);
                     tr.commit_and_continue_writing();
+                    --i;
                 }
             }
+            table->clear();
         });
 
         if (scope.completion)

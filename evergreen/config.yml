@@ -153,7 +153,7 @@ functions:
           mkdir benchmark_results
           cd benchmark_results
 
-          $BENCHMARK
+          $BENCHMARK "$(pwd)/"
     - command: perf.send
       params:
         file: './realm-core/benchmark_results/results.latest.json'
@@ -380,7 +380,7 @@ tasks:
         BLOATY=$(pwd)/bin/bloaty
         cd ..
 
-        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/librealm-ffi.so"
+        FILES_TO_ANALYZE="./build/src/realm/object-store/c_api/${cmake_build_type|Debug}/librealm-ffi.so"
 
         mkdir bloaty-results
         for input_path in $FILES_TO_ANALYZE; do
@@ -467,7 +467,7 @@ tasks:
     # hours to complete
     timeout_secs: 14400
     vars:
-      test_filter: StorageTests
+      test_filter: CoreTests
       report_test_progress: On
 
 - name: core-tests
@@ -477,7 +477,7 @@ tasks:
   - func: "compile"
   - func: "run tests"
     vars:
-      test_filter: StorageTests
+      test_filter: CoreTests
 
 - name: benchmark-common-tasks
   exec_timeout_secs: 1800

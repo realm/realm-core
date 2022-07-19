@@ -19,8 +19,6 @@
 #ifndef REALM_SYNC_TEST_UTILS_HPP
 #define REALM_SYNC_TEST_UTILS_HPP
 
-#include <catch2/catch_all.hpp>
-
 #include <realm/object-store/sync/app.hpp>
 #include <realm/object-store/sync/generic_network_transport.hpp>
 #include <realm/object-store/sync/impl/sync_file.hpp>
@@ -116,6 +114,7 @@ struct TestClientReset {
     TestClientReset* on_post_reset(Callback&& post_reset);
     void set_pk_of_object_driving_reset(const ObjectId& pk);
     ObjectId get_pk_of_object_driving_reset() const;
+    void disable_wait_for_reset_completion();
 
     virtual void run() = 0;
 
@@ -130,6 +129,7 @@ protected:
     Callback m_on_post_reset;
     bool m_did_run = false;
     ObjectId m_pk_driving_reset = ObjectId::gen();
+    bool m_wait_for_reset_completion = true;
 };
 
 #if REALM_ENABLE_SYNC

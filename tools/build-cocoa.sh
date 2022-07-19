@@ -40,7 +40,7 @@ shift $((OPTIND-1))
 [[ -n $BUILD_DEBUG ]] && BUILD_TYPES=( Release Debug ) || BUILD_TYPES=( Release )
 [[ -z $MACOS_ONLY ]] && PLATFORMS=( macosx maccatalyst iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator ) || PLATFORMS=( macosx )
 
-readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator )
+readonly device_platforms=( iphoneos iphonesimulator watchos watchsimulator appletvos appletvsimulator maccatalyst )
 
 if [[ -n $BUILD ]]; then
     mkdir -p build-macosx
@@ -61,30 +61,11 @@ if [[ -n $BUILD ]]; then
         done
     )
     if [[ -z $MACOS_ONLY ]]; then
-        mkdir -p build-xcode-platforms
-        (
-            cd build-xcode-platforms
-            cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/xcode.toolchain.cmake" \
-            -D REALM_VERSION="${VERSION}" \
-            -D REALM_BUILD_LIB_ONLY=ON \
-            -D CPACK_PACKAGE_DIRECTORY=.. \
-            ${CMAKE_FLAGS} \
-            -G Xcode ..
-
-            destinations=(-destination "generic/platform=macOS,variant=Mac Catalyst")
-            for os in "${device_platforms[@]}"; do
-                destinations+=(-destination "generic/platform=${os}")
-            done
-
+        for os in "${device_platforms[@]}"; do
             for bt in "${BUILD_TYPES[@]}"; do
-                xcodebuild -scheme ALL_BUILD -configuration "${bt}" "${destinations[@]}"
-
-                PLATFORM_NAME="maccatalyst" EFFECTIVE_PLATFORM_NAME="-maccatalyst" cpack -C "${bt}"
-                for os in "${device_platforms[@]}"; do
-                    PLATFORM_NAME="${os}" EFFECTIVE_PLATFORM_NAME="-${os}" cpack -C "${bt}"
-                done
+                ./tools/build-apple-device.sh -p "${os}" -c "${bt}" -f "${CMAKE_FLAGS}"
             done
-        )
+        done
     fi
 fi
 

@@ -871,11 +871,11 @@ TEST(Util_Network_SSL_Certificate_CN_SAN)
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
 
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
-    ssl_context_1.use_certificate_chain_file(ca_dir + "/certs/dns-chain.crt.pem");
-    ssl_context_1.use_private_key_file(ca_dir + "/certs/dns-checked-server.key.pem");
-    ssl_context_2.use_verify_file(ca_dir + "/root-ca/crt.pem");
+    ssl_context_1.use_certificate_chain_file(ca_dir + "dns-chain.crt.pem");
+    ssl_context_1.use_private_key_file(ca_dir + "dns-checked-server.key.pem");
+    ssl_context_2.use_verify_file(ca_dir + "crt.pem");
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
@@ -916,11 +916,11 @@ TEST(Util_Network_SSL_Certificate_SAN)
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
 
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
-    ssl_context_1.use_certificate_chain_file(ca_dir + "/certs/dns-chain.crt.pem");
-    ssl_context_1.use_private_key_file(ca_dir + "/certs/dns-checked-server.key.pem");
-    ssl_context_2.use_verify_file(ca_dir + "/root-ca/crt.pem");
+    ssl_context_1.use_certificate_chain_file(ca_dir + "dns-chain.crt.pem");
+    ssl_context_1.use_private_key_file(ca_dir + "dns-checked-server.key.pem");
+    ssl_context_2.use_verify_file(ca_dir + "crt.pem");
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
@@ -963,11 +963,11 @@ TEST(Util_Network_SSL_Certificate_CN)
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
 
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
-    ssl_context_1.use_certificate_chain_file(ca_dir + "/certs/ip-chain.crt.pem");
-    ssl_context_1.use_private_key_file(ca_dir + "/certs/ip-server.key.pem");
-    ssl_context_2.use_verify_file(ca_dir + "/root-ca/crt.pem");
+    ssl_context_1.use_certificate_chain_file(ca_dir + "ip-chain.crt.pem");
+    ssl_context_1.use_private_key_file(ca_dir + "ip-server.key.pem");
+    ssl_context_2.use_verify_file(ca_dir + "crt.pem");
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
@@ -1011,11 +1011,11 @@ TEST(Util_Network_SSL_Certificate_IP)
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
 
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
-    ssl_context_1.use_certificate_chain_file(ca_dir + "/certs/ip-chain.crt.pem");
-    ssl_context_1.use_private_key_file(ca_dir + "/certs/ip-server.key.pem");
-    ssl_context_2.use_verify_file(ca_dir + "/root-ca/crt.pem");
+    ssl_context_1.use_certificate_chain_file(ca_dir + "ip-chain.crt.pem");
+    ssl_context_1.use_private_key_file(ca_dir + "ip-server.key.pem");
+    ssl_context_2.use_verify_file(ca_dir + "crt.pem");
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
@@ -1062,11 +1062,11 @@ TEST(Util_Network_SSL_Certificate_Failure)
     network::ssl::Context ssl_context_1;
     network::ssl::Context ssl_context_2;
 
-    std::string ca_dir = get_test_resource_path() + "../certificate-authority";
+    std::string ca_dir = get_test_resource_path();
 
-    ssl_context_1.use_certificate_chain_file(ca_dir + "/certs/dns-chain.crt.pem");
-    ssl_context_1.use_private_key_file(ca_dir + "/certs/dns-checked-server.key.pem");
-    ssl_context_2.use_verify_file(ca_dir + "/root-ca/crt.pem");
+    ssl_context_1.use_certificate_chain_file(ca_dir + "dns-chain.crt.pem");
+    ssl_context_1.use_private_key_file(ca_dir + "dns-checked-server.key.pem");
+    ssl_context_2.use_verify_file(ca_dir + "crt.pem");
 
     network::ssl::Stream ssl_stream_1{socket_1, ssl_context_1, network::ssl::Stream::server};
     network::ssl::Stream ssl_stream_2{socket_2, ssl_context_2, network::ssl::Stream::client};
