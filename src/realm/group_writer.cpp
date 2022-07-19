@@ -420,20 +420,21 @@ void GroupWriter::backdate()
             // find block to allow for possible backdating
             index = it->positions.upper_bound_int(entry.ref);
             limit = it->positions.size();
-            if (index > 0)
+            if (index > 0) {
                 --index;
+            }
         }
         ref_type start_pos, end_pos;
         uint64_t found_version = 0;
         if (index < limit) {
             start_pos = it->positions.get(index);
-            if (start_pos > entry.ref && index > 0) {
-                --index;
-                REALM_ASSERT(false);
-                start_pos = it->positions.get(index);
-            }
-            // coallesce any subsequent contiguous entries
             end_pos = start_pos + it->lengths.get(index);
+            if (end_pos <= entry.ref) {
+                index = limit; // discard entry
+            }
+        }
+        if (index < limit) {
+            // coallesce any subsequent contiguous entries
             auto next = index + 1;
             found_version = it->versions.get(index);
             while (next < limit && it->positions.get(next) == (int64_t)end_pos) {
