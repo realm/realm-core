@@ -362,7 +362,7 @@ void GroupWriter::backdate()
     };
 
 
-    std::set<int> unreachables;
+    std::set<uint64_t> unreachables;
     for (auto unreachable : m_unreachable_versions) {
         unreachables.insert(unreachable);
     }
@@ -415,7 +415,7 @@ void GroupWriter::backdate()
                 }
             }
         }
-        int index = 0, limit = 0;
+        size_t index = 0, limit = 0;
         if (it->present) {
             // find block to allow for possible backdating
             index = it->positions.upper_bound_int(entry.ref);
@@ -490,8 +490,8 @@ void GroupWriter::backdate()
     std::cout << std::endl << "  Backdating:";
 #endif
 #endif
-    int limit = m_not_free_in_file.size();
-    for (int index = 0; index < limit; ++index) {
+    size_t limit = m_not_free_in_file.size();
+    for (size_t index = 0; index < limit; ++index) {
         auto& entry = m_not_free_in_file[index];
 #ifdef REALM_DEBUG
 #if REALM_ALLOC_DEBUG

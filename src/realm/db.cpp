@@ -181,7 +181,7 @@ struct VersionList {
 
     int index_of(const ReadCount& rc)
     {
-        return &rc - data;
+        return static_cast<int>(&rc - data);
     }
 
     void free_entry(int idx)
