@@ -409,9 +409,9 @@ void GroupWriter::backdate()
                 if (top_array.size() > Group::s_free_version_ndx) {
                     // we have a freelist with versioning info
                     it->present = true;
-                    it->positions.init_from_ref(top_array.get(Group::s_free_pos_ndx));
-                    it->lengths.init_from_ref(top_array.get(Group::s_free_size_ndx));
-                    it->versions.init_from_ref(top_array.get(Group::s_free_version_ndx));
+                    it->positions.init_from_ref(top_array.get_as_ref(Group::s_free_pos_ndx));
+                    it->lengths.init_from_ref(top_array.get_as_ref(Group::s_free_size_ndx));
+                    it->versions.init_from_ref(top_array.get_as_ref(Group::s_free_version_ndx));
                 }
             }
         }
@@ -427,8 +427,8 @@ void GroupWriter::backdate()
         ref_type start_pos, end_pos;
         uint64_t found_version = 0;
         if (index < limit) {
-            start_pos = it->positions.get(index);
-            end_pos = start_pos + it->lengths.get(index);
+            start_pos = static_cast<ref_type>(it->positions.get(index));
+            end_pos = start_pos + static_cast<ref_type>(it->lengths.get(index));
             if (end_pos <= entry.ref) {
                 index = limit; // discard entry
             }
@@ -438,7 +438,7 @@ void GroupWriter::backdate()
             auto next = index + 1;
             found_version = it->versions.get(index);
             while (next < limit && it->positions.get(next) == (int64_t)end_pos) {
-                end_pos += it->lengths.get(next);
+                end_pos += static_cast<ref_type>(it->lengths.get(next));
                 // pick youngest (highest) version of blocks
                 uint64_t tmp_version = it->versions.get(next);
                 if (tmp_version > found_version)
