@@ -358,7 +358,7 @@ void GroupWriter::backdate()
             , versions(alloc)
             , top_ref(top)
             , logical_file_size(logical_file_size)
-            , version(version){};
+            , version(version){}
     };
 
 
@@ -424,7 +424,7 @@ void GroupWriter::backdate()
                 --index;
             }
         }
-        ref_type start_pos, end_pos;
+        ref_type start_pos = 0, end_pos = 0;
         uint64_t found_version = 0;
         if (index < limit) {
             start_pos = static_cast<ref_type>(it->positions.get(index));
