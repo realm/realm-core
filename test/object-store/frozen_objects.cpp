@@ -444,7 +444,7 @@ TEST_CASE("Reclaim Frozen", "[reclaim_frozen]") {
         int key = (unsigned)random_int() % num_objects;
         auto table2 = realm2->read_group().get_table(table_key);
         auto& o = entry.o;
-        o = std::move(Object(realm2, table2->get_object(key)));
+        o = Object(realm2, table2->get_object(key));
         entry.value = o.obj().get<Int>(col);
         entry.link = o.obj().get<ObjKey>(link_col);
         auto linked = table2->get_object(entry.link);
