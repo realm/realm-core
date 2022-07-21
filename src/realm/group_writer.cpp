@@ -358,8 +358,8 @@ void GroupWriter::backdate()
             , versions(alloc)
             , top_ref(top)
             , logical_file_size(logical_file_size)
-            , version(version) 
-        { 
+            , version(version)
+        {
         }
     };
 
