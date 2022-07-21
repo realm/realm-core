@@ -135,7 +135,7 @@ struct VersionList {
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const noexcept
+    unsigned int get_num_entries() const noexcept
     {
         return entries;
     }
@@ -594,7 +594,7 @@ public:
         std::lock_guard lock(m_mutex);
         if (r_info->readers.is_full()) {
             // buffer expansion
-            uint_fast32_t entries = r_info->readers.get_num_entries();
+            auto entries = r_info->readers.get_num_entries();
             entries = entries + 32;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space(entries);
             // std::cout << "resizing: " << entries << " = " << new_info_size << std::endl;
