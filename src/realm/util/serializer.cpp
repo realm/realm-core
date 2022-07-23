@@ -320,17 +320,18 @@ std::string SerialisationState::describe_columns(const LinkMap& link_map, ColKey
     return desc;
 }
 
-std::string SerialisationState::describe_expression_type(ExpressionComparisonType type)
+std::string SerialisationState::describe_expression_type(util::Optional<ExpressionComparisonType> type)
 {
-    switch (type) {
-        case ExpressionComparisonType::Any:
-            return ""; // ANY is implied
-        case ExpressionComparisonType::All:
-            return "ALL ";
-        case ExpressionComparisonType::None:
-            return "NONE ";
+    if (type) {
+        switch (*type) {
+            case ExpressionComparisonType::Any:
+                return "ANY ";
+            case ExpressionComparisonType::All:
+                return "ALL ";
+            case ExpressionComparisonType::None:
+                return "NONE ";
+        }
     }
-    REALM_UNREACHABLE();
     return "";
 }
 

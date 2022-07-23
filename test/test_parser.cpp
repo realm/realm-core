@@ -2536,6 +2536,10 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "values.@max == 2", 1);
     verify_query(test_context, t, "values.@max == 4.4", 1);
     verify_query(test_context, t, "values.@max == uuid(00000000-0000-0000-0000-000000000000)", 1);
+    verify_query(test_context, t, "ANY values == {'one', 'two'}", 1);
+    verify_query(test_context, t, "values == {'one', 'two', 'three', '', null}", 1);
+    verify_query(test_context, t, "values == {}", 1);
+    verify_query(test_context, t, "NONE values == ALL {null, ''}", 3);
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
@@ -3709,10 +3713,6 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "NONE items.name == fav_item.name",
                  1); // only person 1 has items which are not their favourite
 
-    // ANY/SOME is not necessary but accepted
-    verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1);
-    verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1);
-
     // multiple lists in path is supported
     verify_query(test_context, t, "ANY items.allergens.name == 'dairy'", 3);
     verify_query(test_context, t, "SOME items.allergens.name == 'dairy'", 3);
@@ -3720,14 +3720,17 @@ TEST_TYPES(Parser_AggregateShortcuts, std::true_type, std::false_type)
     verify_query(test_context, t, "NONE items.allergens.name == 'dairy'", 0);
 
     std::string message;
-    // no list in path should throw
+    // the expression following ANY/SOME/ALL/NONE must be a keypath list
+    // currently this is restricted by the parser syntax so it is a predicate error
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ANY fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' must contain a list");
+    CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "SOME fav_item.name == 'milk'", 1), message);
+    CHECK_EQUAL(message, "The keypath following 'ANY' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "ALL fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'ALL' must contain a list");
     CHECK_THROW_ANY_GET_MESSAGE(verify_query(test_context, t, "NONE fav_item.name == 'milk'", 1), message);
     CHECK_EQUAL(message, "The keypath following 'NONE' must contain a list");
 
-    // the expression following ANY/SOME/ALL/NONE must be a keypath list
-    // currently this is restricted by the parser syntax so it is a predicate error
     CHECK_THROW_ANY(verify_query(test_context, t, "ANY 'milk' == fav_item.name", 1));
     CHECK_THROW_ANY(verify_query(test_context, t, "SOME 'milk' == fav_item.name", 1));
     CHECK_THROW_ANY(verify_query(test_context, t, "ALL 'milk' == fav_item.name", 1));
@@ -3877,12 +3880,13 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "fav_item.price IN items.price", 2); // single property in list
 
     // list property compared to a constant list
-    verify_query(test_context, t, "{5.5, 4.0} IN items.price", 2);
+    verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
     verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 1);
     verify_query(test_context, t, "NONE {5.5, 4.0} IN items.price", 2);
     verify_query(test_context, t, "NONE {5.5, 4.0} IN ALL items.price", 1);
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ALL items.price", 1);
     verify_query(test_context, t, "ANY {5.5, 4.0} IN NONE items.price", 2);
+    verify_query(test_context, t, "!(ANY {5.5, 4.0} IN ANY items.price)", 1);
     verify_query(test_context, t, "ALL {5.5, 4.0} IN NONE items.price", 1);
     verify_query(test_context, t, "ALL {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 0);
     verify_query(test_context, t, "ALL {5.5, 5.5} IN ALL items.price", 1);
@@ -3890,13 +3894,31 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ANY items.price", 0);
     verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 0);
 
-    verify_query(test_context, t, "items.name contains[c] {'A', 'B'}", 2);
+    verify_query(test_context, t, "ANY items.name contains[c] ANY {'A', 'B'}", 2);
     verify_query(test_context, t, "ALL items.name contains[c] {'A', 'B'}", 1);
     verify_query(test_context, t, "ALL items.name contains[c] NONE {'A', 'B'}", 1); // customer_id: 1
     verify_query(test_context, t, "NONE items.name contains[c] {'A', 'B'}", 3);
     verify_query(test_context, t, "NONE items.name contains[c] ALL {'A', 'B'}", 1);
     verify_query(test_context, t, "ANY items.name contains[c] NONE {'A', 'B'}", 2); // customer_id: 0, 1
     verify_query(test_context, t, "ANY items.name contains[c] ALL {'A', 'B'}", 0);
+
+    // when neither side specifies ANY/ALL/NONE we do ordered list matching
+    verify_query(test_context, t, "{5.5, 4.0, 9.5, 6.5} == items.price", 1);
+    verify_query(test_context, t, "{5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5} == items.price", 1);
+    verify_query(test_context, t, "{9.5, 9.5, 6.5} == items.price", 1);
+    verify_query(test_context, t, "{5.5, 4.0} IN items.price", 0);
+    verify_query(test_context, t, "{} == items.price", 0);
+    verify_query(test_context, t, "!{} == items.price", 3);
+    verify_query(test_context, t, "{} != items.price", 0); // Is this element by element matching unintuitive?
+    verify_query(test_context, t, "{5.5, 9.5, 4.0, 6.5} == items.price", 0);
+    verify_query(test_context, t, "{9.5, 9.5, 6.5, 6.5} == items.price", 0);
+    verify_query(test_context, t, "items.name == {'milk', 'oranges', 'pizza', 'cereal'}", 1);
+    verify_query(test_context, t, "items.name == {'MILk', 'ORanges', 'piZZA', 'CeReAl'}", 0);
+    verify_query(test_context, t, "NOT items.name == {'milk', 'oranges', 'pizza', 'cereal'}", 2);
+    verify_query(test_context, t, "items.name ==[c] {'MILk', 'ORanges', 'piZZA', 'CeReAl'}", 1);
+    verify_query(test_context, t, "items.name contains[c] {'ilk', 'range', 'zza', 'cer'}", 1);
+    verify_query(test_context, t, "items.name != {'milk', 'oranges', 'pizza', 'cereal'}", 0);
+    verify_query(test_context, t, "items.name != {'asdf', 'sdf', 'asdf', 'asdf'}", 1);
 
     // empty constant list
     verify_query(test_context, t, "{} IN items.price", 0);
@@ -3909,7 +3931,8 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NONE {} IN ANY items.price", 3);
 
     // one item in constant list
-    verify_query(test_context, t, "{6.5} IN items.price", 2);
+    verify_query(test_context, t, "ANY {6.5} IN ANY items.price", 2);
+    verify_query(test_context, t, "{6.5} IN ANY items.price", 2);
     verify_query(test_context, t, "{6.5} IN ALL items.price", 0);
     verify_query(test_context, t, "{6.5} IN NONE items.price", 1);
     verify_query(test_context, t, "ALL {6.5} IN ALL items.price", 0);
@@ -4648,7 +4671,7 @@ TEST(Parser_TypeOfValue)
                  origin->size());
     verify_query(test_context, origin, "links.mixed.@type == 'numeric' || links.mixed.@type == 'string'",
                  origin->size());
-    verify_query(test_context, origin, "links.mixed.@type IN {'numeric', 'string'}", origin->size());
+    verify_query(test_context, origin, "ANY links.mixed.@type IN ANY {'numeric', 'string'}", origin->size());
 
     verify_query(test_context, table, "mixed.@type == int.@type", table->size() - nb_strings - 5);
     verify_query(test_context, origin, "link.@type == link.mixed.@type", 0);
@@ -4781,6 +4804,11 @@ TEST(Parser_Dictionary)
     verify_query(test_context, foo, "dict['Value'] > 50", expected);
     verify_query(test_context, foo, "ANY dict.@keys == 'Foo'", 20);
     verify_query(test_context, foo, "NONE dict.@keys == 'Value'", 23);
+    verify_query(test_context, foo, "dict.@keys == {'Bar'}", 20);
+    verify_query(test_context, foo, "ANY dict.@keys == {'Bar'}", 100);
+    verify_query(test_context, foo, "dict.@keys == {'Bar', 'Foo'}", 3);
+    verify_query(test_context, foo, "dict['Value'] == {}", 0);
+    verify_query(test_context, foo, "dict['Value'] == {0, 100}", 3);
     verify_query(test_context, foo, "dict['Value'].@type == 'int'", num_ints_for_value);
     verify_query(test_context, foo, "dict.@type == 'int'", 100);      // ANY is implied, all have int values
     verify_query(test_context, foo, "ALL dict.@type == 'int'", 100);  // all dictionaries have ints
@@ -5092,6 +5120,12 @@ TEST(Parser_SetMixed)
     verify_query(test_context, table, "ALL set < value && set.@size > 0", 0);
     verify_query(test_context, table, "ALL set == value", 2);  // 2, 3
     verify_query(test_context, table, "NONE set == value", 3); // 1, 3, 5
+    verify_query(test_context, table, "set == {}", 1);
+    verify_query(test_context, table, "ANY set == {300}", 2);
+    verify_query(test_context, table, "ALL set == ALL {300} && set.@size > 0", 1);
+    verify_query(test_context, table, "set == {300}", 1);
+    verify_query(test_context, table, "set == {300, 3, 'hello'}", 0); // order not matching
+    verify_query(test_context, table, "set == {3, 300, 'hello'}", 1); // order matching
     verify_query(test_context, table, "set == NULL", 2);
     verify_query(test_context, table, "set beginswith[c] 'HE'", 1);
     verify_query(test_context, table, "set endswith[c] 'D'", 1);

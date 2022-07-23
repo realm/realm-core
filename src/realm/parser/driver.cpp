@@ -35,18 +35,21 @@ const char* agg_op_type_to_str(query_parser::AggrNode::Type type)
     return "";
 }
 
-const char* expression_cmp_type_to_str(ExpressionComparisonType type)
+const char* expression_cmp_type_to_str(util::Optional<ExpressionComparisonType> type)
 {
-    switch (type) {
-        case ExpressionComparisonType::Any:
-            return "ANY";
-        case ExpressionComparisonType::All:
-            return "ALL";
-        case ExpressionComparisonType::None:
-            return "NONE";
+    if (type) {
+        switch (*type) {
+            case ExpressionComparisonType::Any:
+                return "ANY";
+            case ExpressionComparisonType::All:
+                return "ALL";
+            case ExpressionComparisonType::None:
+                return "NONE";
+        }
     }
     return "";
 }
+
 
 static std::map<int, std::string> opstr = {
     {CompareNode::EQUAL, "="},
@@ -487,8 +490,8 @@ Query EqualityNode::visit(ParserDriver* drv)
         }
         else if (left_type == type_Link) {
             auto link_column = dynamic_cast<const Columns<Link>*>(left.get());
-            if (link_column && link_column->link_map().get_nb_hops() == 1 &&
-                link_column->get_comparison_type() == ExpressionComparisonType::Any) {
+            if (link_column && link_column->link_map().get_nb_hops() == 1 && link_column->get_comparison_type() &&
+                *link_column->get_comparison_type() == ExpressionComparisonType::Any) {
                 // We can use equal/not_equal and get a LinksToNode based query
                 if (op == CompareNode::EQUAL) {
                     return drv->m_base_table->where().equal(link_column->link_map().get_first_column_key(), val);
@@ -530,7 +533,8 @@ Query BetweenNode::visit(ParserDriver* drv)
 
     if (dynamic_cast<ColumnListBase*>(prop->visit(drv, type_Int).get())) {
         // It's a list!
-        if (dynamic_cast<PropNode*>(prop->prop)->comp_type != ExpressionComparisonType::All) {
+        util::Optional<ExpressionComparisonType> cmp_type = dynamic_cast<PropNode*>(prop->prop)->comp_type;
+        if (!cmp_type || *cmp_type != ExpressionComparisonType::All) {
             throw InvalidQueryError("Only 'ALL' supported for operator 'BETWEEN' when applied to lists.");
         }
     }
@@ -1306,7 +1310,7 @@ std::unique_ptr<Subexpr> ListNode::visit(ParserDriver* drv, DataType hint)
     return ret;
 }
 
-LinkChain PathNode::visit(ParserDriver* drv, ExpressionComparisonType comp_type)
+LinkChain PathNode::visit(ParserDriver* drv, util::Optional<ExpressionComparisonType> comp_type)
 {
     LinkChain link_chain(drv->m_base_table, comp_type);
     for (std::string path_elem : path_elems) {
@@ -1672,7 +1676,7 @@ std::unique_ptr<Subexpr> LinkChain::column(const std::string& col)
         }
     }
     else {
-        if (m_comparison_type != ExpressionComparisonType::Any && list_count == 0) {
+        if (m_comparison_type && list_count == 0) {
             throw InvalidQueryError(util::format("The keypath following '%1' must contain a list",
                                                  expression_cmp_type_to_str(m_comparison_type)));
         }

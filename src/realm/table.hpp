@@ -215,7 +215,7 @@ public:
     size_t get_num_unique_values(ColKey col_key) const;
 
     template <class T>
-    Columns<T> column(ColKey col_key, ExpressionComparisonType = ExpressionComparisonType::Any) const;
+    Columns<T> column(ColKey col_key, util::Optional<ExpressionComparisonType> = util::none) const;
     template <class T>
     Columns<T> column(const Table& origin, ColKey origin_col_key) const;
 
@@ -977,7 +977,7 @@ private:
 // It has member functions corresponding to the ones defined on Table.
 class LinkChain {
 public:
-    LinkChain(ConstTableRef t = {}, ExpressionComparisonType type = ExpressionComparisonType::Any)
+    LinkChain(ConstTableRef t = {}, util::Optional<ExpressionComparisonType> type = util::none)
         : m_current_table(t)
         , m_base_table(t)
         , m_comparison_type(type)
@@ -1084,7 +1084,7 @@ private:
     std::vector<ColKey> m_link_cols;
     ConstTableRef m_current_table;
     ConstTableRef m_base_table;
-    ExpressionComparisonType m_comparison_type;
+    util::Optional<ExpressionComparisonType> m_comparison_type;
 
     void add(ColKey ck);
 
@@ -1261,7 +1261,7 @@ inline Allocator& Table::get_alloc() const
 
 // For use by queries
 template <class T>
-inline Columns<T> Table::column(ColKey col_key, ExpressionComparisonType cmp_type) const
+inline Columns<T> Table::column(ColKey col_key, util::Optional<ExpressionComparisonType> cmp_type) const
 {
     LinkChain lc(m_own_ref, cmp_type);
     return lc.column<T>(col_key);

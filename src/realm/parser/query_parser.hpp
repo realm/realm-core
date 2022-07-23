@@ -240,6 +240,7 @@ public:
     {
         return m_ctx.is_null(at(i));
     }
+
 private:
     ContextType& m_ctx;
     const ValueType* m_arguments;

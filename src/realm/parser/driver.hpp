@@ -170,7 +170,7 @@ public:
     std::unique_ptr<Subexpr> visit(ParserDriver*, DataType);
 
 private:
-    ExpressionComparisonType m_comp_type = ExpressionComparisonType::Any;
+    util::Optional<ExpressionComparisonType> m_comp_type;
 };
 
 class PropertyNode : public ParserNode {
@@ -348,7 +348,7 @@ class PathNode : public ParserNode {
 public:
     std::vector<std::string> path_elems;
 
-    LinkChain visit(ParserDriver*, ExpressionComparisonType = ExpressionComparisonType::Any);
+    LinkChain visit(ParserDriver*, util::Optional<ExpressionComparisonType> = util::none);
     void add_element(const std::string& str)
     {
         path_elems.push_back(str);
@@ -391,7 +391,7 @@ class PropNode : public PropertyNode {
 public:
     PathNode* path;
     std::string identifier;
-    ExpressionComparisonType comp_type = ExpressionComparisonType::Any;
+    util::Optional<ExpressionComparisonType> comp_type = util::none;
     PostOpNode* post_op = nullptr;
     ConstantNode* index = nullptr;
 
@@ -403,7 +403,7 @@ public:
     {
     }
     PropNode(PathNode* node, std::string id, PostOpNode* po_node,
-             ExpressionComparisonType ct = ExpressionComparisonType::Any)
+             util::Optional<ExpressionComparisonType> ct = util::none)
         : path(node)
         , identifier(id)
         , comp_type(ct)
@@ -413,7 +413,6 @@ public:
     PropNode(PathNode* node, std::string id)
         : path(node)
         , identifier(id)
-        , comp_type(ExpressionComparisonType::Any)
     {
     }
     std::unique_ptr<Subexpr> visit(ParserDriver*) override;

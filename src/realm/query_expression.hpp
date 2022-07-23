@@ -416,8 +416,8 @@ public:
         TCond c;
         const size_t sz = right.size();
         if (!right.m_from_list) {
-            REALM_ASSERT_DEBUG(comparison ==
-                               ExpressionComparisonType::Any); // ALL/NONE not supported for non list types
+            // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(comparison == ExpressionComparisonType::Any);
             for (size_t m = 0; m < sz; m++) {
                 if (c(left, right[m]))
                     return m;
@@ -449,15 +449,16 @@ public:
 
     template <class TCond>
     REALM_FORCEINLINE static size_t compare(const ValueBase& left, const ValueBase& right,
-                                            ExpressionComparisonType left_cmp_type,
-                                            ExpressionComparisonType right_cmp_type)
+                                            util::Optional<ExpressionComparisonType> left_cmp_type,
+                                            util::Optional<ExpressionComparisonType> right_cmp_type)
     {
         TCond c;
         using Compare = ExpressionComparisonType;
 
         if (!left.m_from_list && !right.m_from_list) {
-            REALM_ASSERT_DEBUG(left_cmp_type == Compare::Any);  // ALL/NONE not supported for non list types
-            REALM_ASSERT_DEBUG(right_cmp_type == Compare::Any); // ALL/NONE not supported for non list types
+            // ALL/NONE not supported for non list types
+            REALM_ASSERT_DEBUG(!left_cmp_type || *left_cmp_type == Compare::Any);
+            REALM_ASSERT_DEBUG(!right_cmp_type || *right_cmp_type == Compare::Any);
             // Compare values one-by-one (one value is one row; no link lists)
             size_t min = minimum(left.size(), right.size());
             for (size_t m = 0; m < min; m++) {
@@ -466,13 +467,24 @@ public:
             }
         }
         else if (left.m_from_list && right.m_from_list) {
-            // TODO: support FIRST, LAST as new ExpressionComparisonTypes
-            // eg: ALL list.int > list.[FIRST].int
-
-            if (REALM_UNLIKELY(left_cmp_type == Compare::None && right_cmp_type == Compare::None)) {
+            if (!left_cmp_type && !right_cmp_type) {
+                // exact ordered list comparison
+                if (left.size() != right.size()) {
+                    return not_found;
+                }
+                for (size_t i = 0; i < left.size(); ++i) {
+                    if (!c(left[i], right[i])) {
+                        return not_found;
+                    }
+                }
+                return 0; // all elements matched in the right order
+            }
+            // if one side omitted a comparison type, assume ANY
+            const Compare compare_left = left_cmp_type.value_or(Compare::Any);
+            const Compare compare_right = right_cmp_type.value_or(Compare::Any);
+            if (REALM_UNLIKELY(compare_left == Compare::None && compare_right == Compare::None)) {
                 throw util::runtime_error("NONE vs NONE comparisons are not supported");
             }
-
             // remove duplicates to reduce comparison time
             std::vector<QueryValue> left_vals, right_vals;
             left_vals.reserve(left.size());
@@ -484,7 +496,7 @@ public:
             left_vals.erase(std::unique(left_vals.begin(), left_vals.end()), left_vals.end());
             right_vals.erase(std::unique(right_vals.begin(), right_vals.end()), right_vals.end());
 
-            if (left_cmp_type == Compare::Any && right_cmp_type == Compare::Any) {
+            if (compare_left == Compare::Any && compare_right == Compare::Any) {
                 // return true if the intersection of {left Intersect right} is not empty
                 for (auto& left_val : left_vals) {
                     for (auto& right_val : right_vals) {
@@ -495,7 +507,7 @@ public:
                 }
                 return not_found;
             }
-            else if (left_cmp_type == Compare::All && right_cmp_type == Compare::All) {
+            else if (compare_left == Compare::All && compare_right == Compare::All) {
                 // matches if all values of the left match with all values of the right
                 for (auto& left_val : left_vals) {
                     for (auto& right_val : right_vals) {
@@ -506,7 +518,7 @@ public:
                 }
                 return 0;
             }
-            else if (left_cmp_type == Compare::Any && right_cmp_type == Compare::All) {
+            else if (compare_left == Compare::Any && compare_right == Compare::All) {
                 // return a match if the ALL list is a subset of the ANY list
                 // (if every value of the ALL list finds a match in the ANY list)
                 for (auto& right_val : right_vals) {
@@ -523,7 +535,7 @@ public:
                 }
                 return 0; // all matches found
             }
-            else if (left_cmp_type == Compare::All && right_cmp_type == Compare::Any) {
+            else if (compare_left == Compare::All && compare_right == Compare::Any) {
                 // same as above but left and right are swapped
                 for (auto& left_val : left_vals) {
                     bool found_match = false;
@@ -539,7 +551,7 @@ public:
                 }
                 return 0; // all matches found
             }
-            else if (left_cmp_type == Compare::Any && right_cmp_type == Compare::None) {
+            else if (compare_left == Compare::Any && compare_right == Compare::None) {
                 // return a match if any of the values on the left do not match with any right values
                 for (auto& left_val : left_vals) {
                     bool match = false;
@@ -555,7 +567,7 @@ public:
                 }
                 return not_found; // every left value matched
             }
-            else if (left_cmp_type == Compare::None && right_cmp_type == Compare::Any) {
+            else if (compare_left == Compare::None && compare_right == Compare::Any) {
                 // same as above but left and right are swapped
                 for (auto& right_val : right_vals) {
                     bool match = false;
@@ -571,8 +583,8 @@ public:
                 }
                 return not_found;
             }
-            else if ((left_cmp_type == Compare::All && right_cmp_type == Compare::None) ||
-                     (left_cmp_type == Compare::None && right_cmp_type == Compare::All)) {
+            else if ((compare_left == Compare::All && compare_right == Compare::None) ||
+                     (compare_left == Compare::None && compare_right == Compare::All)) {
                 // return a match if all of the values on the left do not match with any right values
                 for (auto& left_val : left_vals) {
                     for (auto& right_val : right_vals) {
@@ -592,24 +604,25 @@ public:
             // linked-to-value fulfills the condition
             REALM_ASSERT_DEBUG(left.size() > 0);
             const size_t num_right_values = right.size();
+            const Compare compare_right = right_cmp_type.value_or(Compare::Any);
             ValueType left_val = left[0];
             for (size_t r = 0; r < num_right_values; r++) {
                 bool match = c(left_val, right[r]);
                 if (match) {
-                    if (right_cmp_type == Compare::Any) {
+                    if (compare_right == Compare::Any) {
                         return 0;
                     }
-                    if (right_cmp_type == Compare::None) {
+                    if (compare_right == Compare::None) {
                         return not_found; // one matched
                     }
                 }
                 else {
-                    if (right_cmp_type == Compare::All) {
+                    if (compare_right == Compare::All) {
                         return not_found;
                     }
                 }
             }
-            if (right_cmp_type == Compare::None || right_cmp_type == Compare::All) {
+            if (compare_right == Compare::None || compare_right == Compare::All) {
                 return 0; // either none or all
             }
         }
@@ -617,24 +630,25 @@ public:
             // Same as above, but with left values coming from link list.
             REALM_ASSERT_DEBUG(right.size() > 0);
             const size_t num_left_values = left.size();
+            const Compare compare_left = left_cmp_type.value_or(Compare::Any);
             ValueType right_val = right[0];
             for (size_t l = 0; l < num_left_values; l++) {
                 bool match = c(left[l], right_val);
                 if (match) {
-                    if (left_cmp_type == ExpressionComparisonType::Any) {
+                    if (compare_left == ExpressionComparisonType::Any) {
                         return 0;
                     }
-                    if (left_cmp_type == ExpressionComparisonType::None) {
+                    if (compare_left == ExpressionComparisonType::None) {
                         return not_found; // one matched
                     }
                 }
                 else {
-                    if (left_cmp_type == ExpressionComparisonType::All) {
+                    if (compare_left == ExpressionComparisonType::All) {
                         return not_found;
                     }
                 }
             }
-            if (left_cmp_type == ExpressionComparisonType::None || left_cmp_type == ExpressionComparisonType::All) {
+            if (compare_left == ExpressionComparisonType::None || compare_left == ExpressionComparisonType::All) {
                 return 0; // either none or all
             }
         }
@@ -770,9 +784,9 @@ public:
         return {};
     }
 
-    virtual ExpressionComparisonType get_comparison_type() const
+    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const
     {
-        return ExpressionComparisonType::Any;
+        return util::none;
     }
 };
 
@@ -1291,13 +1305,13 @@ public:
         return !m_from_list;
     }
 
-    ExpressionComparisonType get_comparison_type() const final
+    util::Optional<ExpressionComparisonType> get_comparison_type() const final
     {
-        REALM_ASSERT_DEBUG(m_comparison_type == ExpressionComparisonType::Any || m_from_list);
+        REALM_ASSERT_DEBUG(!m_comparison_type || m_from_list);
         return m_comparison_type;
     }
 
-    void set_comparison_type(ExpressionComparisonType type)
+    void set_comparison_type(util::Optional<ExpressionComparisonType> type)
     {
         m_comparison_type = type;
     }
@@ -1318,7 +1332,7 @@ public:
     }
 
 protected:
-    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
+    util::Optional<ExpressionComparisonType> m_comparison_type;
 };
 
 class ConstantMixedValue : public Value<Mixed> {
@@ -1663,7 +1677,8 @@ Value<T> make_value_for_link(bool only_unary_links, size_t size)
 // This class can be used as untyped base for expressions that handle object properties
 class ObjPropertyBase {
 public:
-    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ColKey> links, ExpressionComparisonType type)
+    ObjPropertyBase(ColKey column, ConstTableRef table, std::vector<ColKey> links,
+                    util::Optional<ExpressionComparisonType> type)
         : m_link_map(table, std::move(links))
         , m_column_key(column)
         , m_comparison_type(type)
@@ -1675,7 +1690,7 @@ public:
         , m_comparison_type(other.m_comparison_type)
     {
     }
-    ObjPropertyBase(ColKey column, const LinkMap& link_map, ExpressionComparisonType type)
+    ObjPropertyBase(ColKey column, const LinkMap& link_map, util::Optional<ExpressionComparisonType> type)
         : m_link_map(link_map)
         , m_column_key(column)
         , m_comparison_type(type)
@@ -1711,7 +1726,7 @@ protected:
     LinkMap m_link_map;
     // Column index of payload column of m_table
     mutable ColKey m_column_key;
-    ExpressionComparisonType m_comparison_type; // Any, All, None
+    util::Optional<ExpressionComparisonType> m_comparison_type; // Any, All, None
 };
 
 // Combines Subexpr2<T> and ObjPropertyBase
@@ -1788,7 +1803,7 @@ public:
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
-    virtual ExpressionComparisonType get_comparison_type() const final
+    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const final
     {
         return m_comparison_type;
     }
@@ -1812,7 +1827,7 @@ public:
     using ObjPropertyExpr<T>::links_exist;
 
     SimpleQuerySupport(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-                       ExpressionComparisonType type = ExpressionComparisonType::Any)
+                       util::Optional<ExpressionComparisonType> type = util::none)
         : ObjPropertyExpr<T>(column, table, std::move(links), type)
     {
     }
@@ -2027,7 +2042,7 @@ template <>
 class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
     Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
+            util::Optional<ExpressionComparisonType> type = util::none)
         : SimpleQuerySupport(column, table, links, type)
     {
     }
@@ -2415,7 +2430,7 @@ public:
     {
     }
 
-    ExpressionComparisonType get_comparison_type() const override
+    util::Optional<ExpressionComparisonType> get_comparison_type() const override
     {
         return m_expr->get_comparison_type();
     }
@@ -2524,7 +2539,7 @@ public:
     }
 
     Columns(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
+            util::Optional<ExpressionComparisonType> type = util::none)
         : m_link_map(table, links)
         , m_comparison_type(type)
         , m_is_list(column_key.is_list())
@@ -2564,7 +2579,7 @@ public:
         // no need to pass along m_comparison_type because the only operations supported from
         // the subsequent SubColumns are aggregate operations such as sum, min, max, avg where
         // having
-        REALM_ASSERT_DEBUG(m_comparison_type == ExpressionComparisonType::Any);
+        REALM_ASSERT_DEBUG(!m_comparison_type);
         return SubColumns<C>(Columns<C>(column_key, m_link_map.get_target_table()), m_link_map);
     }
 
@@ -2609,7 +2624,7 @@ public:
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, ColKey());
     }
 
-    virtual ExpressionComparisonType get_comparison_type() const override
+    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const override
     {
         return m_comparison_type;
     }
@@ -2623,7 +2638,7 @@ public:
 
 private:
     LinkMap m_link_map;
-    ExpressionComparisonType m_comparison_type;
+    util::Optional<ExpressionComparisonType> m_comparison_type;
     bool m_is_list;
     friend class Table;
     friend class LinkChain;
@@ -2647,7 +2662,7 @@ class Average;
 class ColumnListBase {
 public:
     ColumnListBase(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links,
-                   ExpressionComparisonType type = ExpressionComparisonType::Any)
+                   util::Optional<ExpressionComparisonType> type = util::none)
         : m_column_key(column_key)
         , m_link_map(table, links)
         , m_comparison_type(type)
@@ -2690,7 +2705,7 @@ public:
     LeafCacheStorage m_leaf_cache_storage;
     LeafPtr m_array_ptr;
     ArrayInteger* m_leaf_ptr = nullptr;
-    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
+    util::Optional<ExpressionComparisonType> m_comparison_type;
 };
 
 template <typename>
@@ -2703,7 +2718,7 @@ template <typename T>
 class ColumnsCollection : public Subexpr2<T>, public ColumnListBase {
 public:
     ColumnsCollection(ColKey column_key, ConstTableRef table, const std::vector<ColKey>& links = {},
-                      ExpressionComparisonType type = ExpressionComparisonType::Any)
+                      util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnListBase(column_key, table, links, type)
         , m_is_nullable_storage(this->m_column_key.get_attrs().test(col_attr_Nullable))
     {
@@ -2762,7 +2777,7 @@ public:
         return ColumnListBase::description(state);
     }
 
-    ExpressionComparisonType get_comparison_type() const final
+    util::Optional<ExpressionComparisonType> get_comparison_type() const final
     {
         return ColumnListBase::m_comparison_type;
     }
@@ -2934,7 +2949,7 @@ template <>
 class Columns<Dictionary> : public ColumnsCollection<Mixed> {
 public:
     Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
+            util::Optional<ExpressionComparisonType> type = util::none)
         : ColumnsCollection<Mixed>(column, table, std::move(links), type)
     {
         m_key_type = m_link_map.get_target_table()->get_dictionary_key_type(column);
@@ -3044,7 +3059,7 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    ExpressionComparisonType get_comparison_type() const final
+    util::Optional<ExpressionComparisonType> get_comparison_type() const final
     {
         return m_comparison_type;
     }
@@ -3075,7 +3090,7 @@ private:
     DataType m_key_type;
     ColKey m_column_key;
     LinkMap m_link_map;
-    ExpressionComparisonType m_comparison_type = ExpressionComparisonType::Any;
+    util::Optional<ExpressionComparisonType> m_comparison_type;
 
 
     // Leaf cache
@@ -3209,7 +3224,7 @@ public:
         return m_list.description(state) + util::serializer::value_separator + "length";
     }
 
-    virtual ExpressionComparisonType get_comparison_type() const override
+    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const override
     {
         return m_list.get_comparison_type();
     }
@@ -3444,7 +3459,7 @@ public:
     using ObjPropertyBase::is_nullable;
 
     Columns(ColKey column, ConstTableRef table, std::vector<ColKey> links = {},
-            ExpressionComparisonType type = ExpressionComparisonType::Any)
+            util::Optional<ExpressionComparisonType> type = util::none)
         : ObjPropertyExpr<T>(column, table, std::move(links), type)
     {
     }
@@ -3960,7 +3975,7 @@ public:
         destination = result;
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         std::string s = "(";
         if (m_left) {
@@ -3974,7 +3989,7 @@ public:
         return s;
     }
 
-    virtual ExpressionComparisonType get_comparison_type() const override
+    util::Optional<ExpressionComparisonType> get_comparison_type() const override
     {
         if (!m_left_is_const) {
             return m_left->get_comparison_type();
@@ -3982,7 +3997,7 @@ public:
         if (!m_right_is_const) {
             return m_right->get_comparison_type();
         }
-        return ExpressionComparisonType::Any;
+        return util::none;
     }
 
     std::unique_ptr<Subexpr> clone() const override
@@ -4033,7 +4048,7 @@ public:
     {
         double dT = m_left_is_const ? 10.0 : 50.0;
         if (std::is_same_v<TCond, Equal> && m_left_is_const && m_right->has_search_index() &&
-            m_right->get_comparison_type() == ExpressionComparisonType::Any) {
+            (!m_right->get_comparison_type() || *m_right->get_comparison_type() == ExpressionComparisonType::Any)) {
             if (m_left_value.is_null()) {
                 const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                 // when checking for null across links, null links are considered matches,
@@ -4129,11 +4144,13 @@ public:
 
         size_t match;
         ValueBase right;
-        const ExpressionComparisonType right_cmp_type = m_right->get_comparison_type();
+        const util::Optional<ExpressionComparisonType> right_cmp_type = m_right->get_comparison_type();
         if (m_left_is_const) {
+            const ExpressionComparisonType right_evaluated_cmp_type =
+                right_cmp_type.value_or(ExpressionComparisonType::Any);
             for (; start < end;) {
                 m_right->evaluate(start, right);
-                match = ValueBase::compare_const<TCond>(m_left_value, right, right_cmp_type);
+                match = ValueBase::compare_const<TCond>(m_left_value, right, right_evaluated_cmp_type);
                 if (match != not_found && match + start < end)
                     return start + match;
 
@@ -4143,7 +4160,7 @@ public:
         }
         else {
             ValueBase left;
-            const ExpressionComparisonType left_cmp_type = m_left->get_comparison_type();
+            const util::Optional<ExpressionComparisonType> left_cmp_type = m_left->get_comparison_type();
             for (; start < end;) {
                 m_left->evaluate(start, left);
                 m_right->evaluate(start, right);
