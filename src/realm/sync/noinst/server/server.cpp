@@ -2905,7 +2905,7 @@ private:
                     BinaryData uncompressed = {out.data(), uncompressed_body_size};
                     body = uncompressed.data();
                     std::size_t max_uncompressed = 1024;
-                    if (uncompressed.size() > max_uncompressed) {
+                    if (!config.disable_download_compaction && uncompressed.size() > max_uncompressed) {
                         compression::CompressMemoryArena& arena = server.get_compress_memory_arena();
                         std::vector<char>& buffer = server.get_misc_buffers().compress;
                         compression::allocate_and_compress(arena, uncompressed, buffer); // Throws
