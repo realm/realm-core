@@ -17,7 +17,7 @@
 * Audit event scopes containing only write events and no read events would occasionally throw a `BadVersion` exception when a write transaction was committed (since v11.17.0).
 
 ### Breaking changes
-* Make `realm::util::Optional<T>` be an alias for `std::optional<T>` and `realm::none` an alias for `std::nullopt`. ([PR #5667](https://github.com/realm/realm-core/pull/5667)For now the existing name and some of the helpers are sticking around so this shouldn't affect most consumers, however:
+* Make `realm::util::Optional<T>` be an alias for `std::optional<T>` and `realm::none` an alias for `std::nullopt`. ([PR #5667](https://github.com/realm/realm-core/pull/5667)) For now the existing name and some of the helpers are sticking around so this shouldn't affect most consumers, however:
   * At some point in the future we will likely want to remove the aliases, so consumers may want to switch to using `std::optional` and `std::nullopt` directly.
   * `std::optional<T&>` isn't supported. In general, `T*`/`nullptr` is a better replacement. The few uses of optional references in core APIs have been replaced with pointers. Any usages in SDKs will also need to be replaced.
   * `std::optional` cannot be directly streamed (`<<`) to an `ostream`. A helper `realm::util::stream_possible_optional` is provided that can be used instead. For convenience, it will work with both optional and non-optional types.
