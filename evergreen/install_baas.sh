@@ -23,8 +23,11 @@ case $(uname -s) in
             # threads until they end up getting scheduled on efficiency cores,
             # which is slower than just not using them. Limiting the threads to
             # the number of performance cores results in them usually not
-            # running on efficiency cores.
-            export GOMAXPROCS="$(sysctl -n hw.perflevel0.logicalcpu)"
+            # running on efficiency cores. Checking the performance core count
+            # wasn't implemented until the first CPU with a performance core
+            # count other than 4 was released, so if it's unavailable it's 4.
+            GOMAXPROCS="$(sysctl -n hw.perflevel0.logicalcpu || echo 4)"
+            export GOMAXPROCS
         else
             export GOARCH=amd64
             STITCH_SUPPORT_LIB_URL="https://s3.amazonaws.com/stitch-artifacts/stitch-support/stitch-support-macos-debug-4.3.2-721-ge791a2e-patch-5e2a6ad2a4cf473ae2e67b09.tgz"
@@ -120,19 +123,13 @@ usage()
     exit 0
 }
 
-PASSED_ARGUMENTS=$(getopt w:s:b: "$*") || usage
-
 WORK_PATH=""
 BAAS_VERSION=""
-
-set -- $PASSED_ARGUMENTS
-while :
-do
-    case "$1" in
-        -w) WORK_PATH=$($REALPATH "$2"); shift; shift;;
-        -b) BAAS_VERSION="$2"; shift; shift;;
-        --) shift; break;;
-        *) echo "Unexpected option $1"; usage;;
+while getopts "w:b:" opt; do
+    case "${opt}" in
+        w) WORK_PATH="$($REALPATH "${OPTARG}")";;
+        b) BAAS_VERSION="${OPTARG}";;
+        *) echo "Unexpected option ${opt}"; usage;;
     esac
 done
 
@@ -301,7 +298,6 @@ trap "exit" INT TERM ERR
 trap cleanup EXIT
 
 echo "Starting mongodb"
-[[ -f $WORK_PATH/mongodb-dbpath/mongod.pid ]] && rm "$WORK_PATH/mongodb-path/mongod.pid"
 ./mongodb-binaries/bin/mongod \
     --replSet rs \
     --bind_ip_all \
