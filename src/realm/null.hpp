@@ -58,9 +58,10 @@ The `S` bit is at position 22 (float) or 51 (double).
 
 struct null {
     constexpr null() = default;
-    operator int64_t()
+    template <class T>
+    operator util::Optional<T>()
     {
-        throw(LogicError::type_mismatch);
+        return util::none;
     }
 
     /// Returns whether `v` bitwise equals the null bit-pattern
