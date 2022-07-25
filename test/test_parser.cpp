@@ -3909,7 +3909,12 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "{5.5, 4.0} IN items.price", 0);
     verify_query(test_context, t, "{} == items.price", 0);
     verify_query(test_context, t, "!{} == items.price", 3);
-    verify_query(test_context, t, "{} != items.price", 0); // Is this element by element matching unintuitive?
+    verify_query(test_context, t, "{} != items.price", 3);
+    verify_query(test_context, t, "{5.5, 4.0, 9.5, 6.5} != items.price", 2);
+    verify_query(test_context, t, "{5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5} != items.price", 2);
+    verify_query(test_context, t, "{9.5, 9.5, 6.5} != items.price", 2);
+    verify_query(test_context, t, "{null} != items.price", 3);
+    verify_query(test_context, t, "items.price != items.price", 0);
     verify_query(test_context, t, "{5.5, 9.5, 4.0, 6.5} == items.price", 0);
     verify_query(test_context, t, "{9.5, 9.5, 6.5, 6.5} == items.price", 0);
     verify_query(test_context, t, "items.name == {'milk', 'oranges', 'pizza', 'cereal'}", 1);
@@ -3917,8 +3922,11 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NOT items.name == {'milk', 'oranges', 'pizza', 'cereal'}", 2);
     verify_query(test_context, t, "items.name ==[c] {'MILk', 'ORanges', 'piZZA', 'CeReAl'}", 1);
     verify_query(test_context, t, "items.name contains[c] {'ilk', 'range', 'zza', 'cer'}", 1);
-    verify_query(test_context, t, "items.name != {'milk', 'oranges', 'pizza', 'cereal'}", 0);
-    verify_query(test_context, t, "items.name != {'asdf', 'sdf', 'asdf', 'asdf'}", 1);
+    verify_query(test_context, t, "items.name != {'milk', 'oranges', 'pizza', 'cereal'}", 2);
+    verify_query(test_context, t, "items.name != {'asdf', 'sdf', 'asdf', 'asdf'}", 3);
+    verify_query(test_context, t, "items.name != {}", 3);
+    verify_query(test_context, t, "items.name != {'pizza', 'pizza', 'cereal'}", 2);
+    verify_query(test_context, t, "{5.6, 4.1, 9.6, 6.6} > items.price", 1);
 
     // empty constant list
     verify_query(test_context, t, "{} IN items.price", 0);

@@ -468,16 +468,28 @@ public:
         }
         else if (left.m_from_list && right.m_from_list) {
             if (!left_cmp_type && !right_cmp_type) {
-                // exact ordered list comparison
-                if (left.size() != right.size()) {
-                    return not_found;
-                }
-                for (size_t i = 0; i < left.size(); ++i) {
-                    if (!c(left[i], right[i])) {
-                        return not_found;
+                if constexpr (std::is_same_v<TCond, NotEqual>) {
+                    if (left.size() != right.size()) {
+                        return 0; // mismatch size
+                    }
+                    for (size_t i = 0; i < left.size(); ++i) {
+                        if (!c(left[i], right[i])) {
+                            return not_found;
+                        }
                     }
                 }
-                return 0; // all elements matched in the right order
+                else {
+                    // exact ordered list comparison
+                    if (left.size() != right.size()) {
+                        return not_found;
+                    }
+                    for (size_t i = 0; i < left.size(); ++i) {
+                        if (!c(left[i], right[i])) {
+                            return not_found;
+                        }
+                    }
+                    return 0; // all elements matched in the right order
+                }
             }
             // if one side omitted a comparison type, assume ANY
             const Compare compare_left = left_cmp_type.value_or(Compare::Any);
@@ -1798,12 +1810,12 @@ public:
         m_link_map.collect_dependencies(tables);
     }
 
-    virtual std::string description(util::serializer::SerialisationState& state) const override
+    std::string description(util::serializer::SerialisationState& state) const override
     {
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, m_column_key);
     }
 
-    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const final
+    util::Optional<ExpressionComparisonType> get_comparison_type() const final
     {
         return m_comparison_type;
     }
@@ -2624,7 +2636,7 @@ public:
         return state.describe_expression_type(m_comparison_type) + state.describe_columns(m_link_map, ColKey());
     }
 
-    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const override
+    util::Optional<ExpressionComparisonType> get_comparison_type() const override
     {
         return m_comparison_type;
     }
@@ -3224,7 +3236,7 @@ public:
         return m_list.description(state) + util::serializer::value_separator + "length";
     }
 
-    virtual util::Optional<ExpressionComparisonType> get_comparison_type() const override
+    util::Optional<ExpressionComparisonType> get_comparison_type() const override
     {
         return m_list.get_comparison_type();
     }
