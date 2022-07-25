@@ -30,8 +30,6 @@
 using namespace realm;
 using namespace realm::test_util;
 
-using realm::util::unwrap;
-
 
 // Test independence and thread-safety
 // -----------------------------------

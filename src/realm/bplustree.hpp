@@ -630,7 +630,7 @@ util::Optional<typename util::RemoveOptional<T>::type> bptree_min_max(const BPlu
 
     tree.traverse(func);
 
-    return agg.is_null() ? util::none : util::Optional{agg.result()};
+    return agg.is_null() ? util::none : std::optional{agg.result()};
 }
 
 template <class T>

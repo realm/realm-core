@@ -2903,7 +2903,11 @@ TEST_CASE("client reset with embedded object", "[client reset][local][embedded o
         util::Optional<EmbeddedContent> link_value = EmbeddedContent();
         std::vector<EmbeddedContent> array_values{3};
         using DictType = util::FlatMap<std::string, util::Optional<EmbeddedContent>>;
-        DictType dict_values = DictType::container_type{{"foo", {{}}}, {"bar", {{}}}, {"baz", {{}}}};
+        DictType dict_values = DictType::container_type{
+            {"foo", EmbeddedContent()},
+            {"bar", EmbeddedContent()},
+            {"baz", EmbeddedContent()},
+        };
         void apply_recovery_from(const TopLevelContent& other)
         {
             combine_array_values(array_values, other.array_values);

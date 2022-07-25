@@ -256,22 +256,22 @@ ResultsSection::ResultsSection(SectionedResults* parent, Mixed key)
 
 bool ResultsSection::is_valid() const
 {
-    return get_if_valid().operator bool();
+    return get_if_valid();
 }
 
-util::Optional<Section&> ResultsSection::get_if_valid() const
+Section* ResultsSection::get_if_valid() const
 {
     if (!m_parent->is_valid())
-        return util::none;
+        return nullptr;
     util::CheckedUniqueLock lock(m_parent->m_mutex);
     // See if we need to recalculate the sections before
     // searching for the key.
     m_parent->calculate_sections_if_required();
     auto it = m_parent->m_sections.find(m_key);
     if (it == m_parent->m_sections.end())
-        return util::none;
+        return nullptr;
     else
-        return it->second;
+        return &it->second;
 }
 
 

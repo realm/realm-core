@@ -20,7 +20,7 @@ RLM_API bool realm_get_version_id(const realm_t* realm, bool* out_found, realm_v
         util::Optional<VersionID> version = (*realm)->current_transaction_version();
         if (version) {
             if (out_version) {
-                *out_version = to_capi(version.value());
+                *out_version = to_capi(*version);
             }
             if (out_found) {
                 *out_found = true;

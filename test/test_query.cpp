@@ -3993,10 +3993,10 @@ TEST(Query_SortLinkChains)
                                               .get<util::Optional<int64_t>>(t3_int_col);
         if (last) {
             CHECK(current);
-            CHECK(current.value() >= last.value());
+            CHECK(*current >= *last);
         }
         if (current) {
-            last = current.value();
+            last = current;
         }
     }
     tv = t1->where().less(t1_int_col, 6).find_all();
