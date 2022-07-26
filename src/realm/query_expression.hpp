@@ -345,6 +345,20 @@ public:
     {
         return m_first + m_size;
     }
+    void truncate(ValueType* from)
+    {
+        size_t new_size = from - m_first;
+        REALM_ASSERT(new_size <= m_size);
+        if (m_size > prealloc && new_size <= prealloc) {
+            // Copy values from dynamic array to cache
+            for (size_t i = 0; i < new_size; i++) {
+                m_cache[i] = m_first[i];
+            }
+            delete[] m_first;
+            m_first = &m_cache[0];
+        }
+        m_size = new_size;
+    }
     template <class TOperator>
     REALM_FORCEINLINE void fun_const(const ValueType& const_value, const ValueBase& right)
     {
@@ -448,7 +462,7 @@ public:
     }
 
     template <class TCond>
-    REALM_FORCEINLINE static size_t compare(const ValueBase& left, const ValueBase& right,
+    REALM_FORCEINLINE static size_t compare(ValueBase& left, ValueBase& right,
                                             util::Optional<ExpressionComparisonType> left_cmp_type,
                                             util::Optional<ExpressionComparisonType> right_cmp_type)
     {
@@ -468,28 +482,20 @@ public:
         }
         else if (left.m_from_list && right.m_from_list) {
             if (!left_cmp_type && !right_cmp_type) {
-                if constexpr (std::is_same_v<TCond, NotEqual>) {
-                    if (left.size() != right.size()) {
+                if (left.size() != right.size()) {
+                    if constexpr (std::is_same_v<TCond, NotEqual>) {
                         return 0; // mismatch size
                     }
-                    for (size_t i = 0; i < left.size(); ++i) {
-                        if (!c(left[i], right[i])) {
-                            return not_found;
-                        }
-                    }
-                }
-                else {
-                    // exact ordered list comparison
-                    if (left.size() != right.size()) {
+                    else {
                         return not_found;
                     }
-                    for (size_t i = 0; i < left.size(); ++i) {
-                        if (!c(left[i], right[i])) {
-                            return not_found;
-                        }
-                    }
-                    return 0; // all elements matched in the right order
                 }
+                for (size_t i = 0; i < left.size(); ++i) {
+                    if (!c(left[i], right[i])) {
+                        return not_found;
+                    }
+                }
+                return 0; // all elements matched in the right order
             }
             // if one side omitted a comparison type, assume ANY
             const Compare compare_left = left_cmp_type.value_or(Compare::Any);
@@ -498,20 +504,15 @@ public:
                 throw util::runtime_error("NONE vs NONE comparisons are not supported");
             }
             // remove duplicates to reduce comparison time
-            std::vector<QueryValue> left_vals, right_vals;
-            left_vals.reserve(left.size());
-            right_vals.reserve(right.size());
-            left_vals.insert(left_vals.begin(), left.begin(), left.end());
-            right_vals.insert(right_vals.begin(), right.begin(), right.end());
-            std::sort(left_vals.begin(), left_vals.end());
-            std::sort(right_vals.begin(), right_vals.end());
-            left_vals.erase(std::unique(left_vals.begin(), left_vals.end()), left_vals.end());
-            right_vals.erase(std::unique(right_vals.begin(), right_vals.end()), right_vals.end());
+            std::sort(left.begin(), left.end());
+            std::sort(right.begin(), right.end());
+            left.truncate(std::unique(left.begin(), left.end()));
+            right.truncate(std::unique(right.begin(), right.end()));
 
             if (compare_left == Compare::Any && compare_right == Compare::Any) {
-                // return true if the intersection of {left Intersect right} is not empty
-                for (auto& left_val : left_vals) {
-                    for (auto& right_val : right_vals) {
+                // return true if just one value in left matches one value in right
+                for (auto& left_val : left) {
+                    for (auto& right_val : right) {
                         if (c(left_val, right_val)) {
                             return 0;
                         }
@@ -521,8 +522,8 @@ public:
             }
             else if (compare_left == Compare::All && compare_right == Compare::All) {
                 // matches if all values of the left match with all values of the right
-                for (auto& left_val : left_vals) {
-                    for (auto& right_val : right_vals) {
+                for (auto& left_val : left) {
+                    for (auto& right_val : right) {
                         if (!c(left_val, right_val)) {
                             return not_found;
                         }
@@ -536,9 +537,9 @@ public:
                 // the ANY list being expanded out to a chain of "OR" expressions.
                 // EG: "ANY {1, 2} == ALL list" is the same as
                 // "1 == ALL list || 2 == ALL list"
-                for (auto& left_val : left_vals) {
+                for (auto& left_val : left) {
                     bool all_matches_found = true;
-                    for (auto& right_val : right_vals) {
+                    for (auto& right_val : right) {
                         if (!c(left_val, right_val)) {
                             all_matches_found = false;
                             break;
@@ -552,9 +553,9 @@ public:
             }
             else if (compare_left == Compare::All && compare_right == Compare::Any) {
                 // same as above but left and right are swapped
-                for (auto& right_val : right_vals) {
+                for (auto& right_val : right) {
                     bool all_matches_found = true;
-                    for (auto& left_val : left_vals) {
+                    for (auto& left_val : left) {
                         if (!c(left_val, right_val)) {
                             all_matches_found = false;
                             break;
@@ -568,9 +569,9 @@ public:
             }
             else if (compare_left == Compare::Any && compare_right == Compare::None) {
                 // return a match if any of the values on the left do not match with any right values
-                for (auto& left_val : left_vals) {
+                for (auto& left_val : left) {
                     bool match = false;
-                    for (auto& right_val : right_vals) {
+                    for (auto& right_val : right) {
                         if (c(left_val, right_val)) {
                             match = true;
                             break; // this one matched, check the next left value
@@ -584,9 +585,9 @@ public:
             }
             else if (compare_left == Compare::None && compare_right == Compare::Any) {
                 // same as above but left and right are swapped
-                for (auto& right_val : right_vals) {
+                for (auto& right_val : right) {
                     bool match = false;
-                    for (auto& left_val : left_vals) {
+                    for (auto& left_val : left) {
                         if (c(left_val, right_val)) {
                             match = true;
                             break;
@@ -601,8 +602,8 @@ public:
             else if ((compare_left == Compare::All && compare_right == Compare::None) ||
                      (compare_left == Compare::None && compare_right == Compare::All)) {
                 // return a match if all of the values on the left do not match with any right values
-                for (auto& left_val : left_vals) {
-                    for (auto& right_val : right_vals) {
+                for (auto& left_val : left) {
+                    for (auto& right_val : right) {
                         if (c(left_val, right_val)) {
                             return not_found; // one matched
                         }
