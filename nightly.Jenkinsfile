@@ -8,7 +8,8 @@ node {
             payload = JsonOutput.toJson([
                     username: "Realm CI",
                     icon_emoji: ":jenkins:",
-                    text: "*The current realm-core nightly build was ok!*\n<${run.absoluteUrl}|Click here> to check the build."
+                    text: "@realm-core-engineers *The current realm-core nightly build was ok!*\n<${run.absoluteUrl}|Click here> to check the build."
+                    link_names: 1
             ])
             currentBuild.result = "SUCCESS"
         } else if(run.getResult() == "FAILURE"){
