@@ -129,7 +129,7 @@ public:
 
     static util::Optional<T> default_value(bool nullable)
     {
-        return nullable ? util::Optional<T>() : util::Optional<T>(0.0);
+        return nullable ? util::Optional<T>() : util::Optional<T>(T{0.0});
     }
     void set(size_t ndx, util::Optional<T> value)
     {
