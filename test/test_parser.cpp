@@ -3994,6 +3994,19 @@ TEST(Parser_OperatorIN)
                    CHECK_EQUAL(e.what(), "The keypath following 'IN' must contain a list. Found 'fav_item.price'"));
 }
 
+TEST(Parser_ListVsList)
+{
+    Group g;
+    TableRef table = g.add_table("table");
+    auto col = table->add_column_list(type_Int, "integers");
+    auto list = table->create_object().get_list<Int>(col);
+    list.add(1);
+    list.add(2);
+
+    // None of {1, 2, 3} matches all of integers
+    verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
+}
+
 TEST(Parser_Object)
 {
     Group g;
