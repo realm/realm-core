@@ -123,12 +123,17 @@ public:
     void unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept;
 
 private:
+    static constexpr int DECIMAL_EXPONENT_BIAS_128 = 6176;
+    static constexpr uint64_t MASK_SIGN = 0x8000000000000000ull;
+    static constexpr uint64_t MASK_COEFF = 0x0001ffffffffffffull;
+    static constexpr uint64_t MASK_EXP = 0x7ffe000000000000ull;
+
     Bid128 m_value;
 
     void from_int64_t(int64_t val);
     uint64_t get_coefficient_high() const noexcept
     {
-        return m_value.w[1] & 0x00003fffffffffffull;
+        return m_value.w[1] & MASK_COEFF;
     }
     uint64_t get_coefficient_low() const noexcept
     {

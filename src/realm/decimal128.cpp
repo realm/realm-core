@@ -28,7 +28,6 @@
 namespace realm {
 
 namespace {
-constexpr int DECIMAL_EXPONENT_BIAS_128 = 6176;
 
 Decimal128 to_decimal128(const BID_UINT128& val)
 {
@@ -1416,7 +1415,7 @@ void Decimal128::from_int64_t(int64_t val)
 {
     constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << 49;
     if (val < 0) {
-        m_value.w[1] = expon | 0x8000000000000000ull;
+        m_value.w[1] = expon | MASK_SIGN;
         m_value.w[0] = ~val + 1;
     }
     else {
@@ -1454,7 +1453,7 @@ Decimal128::Decimal128(Bid64 val)
 
 Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
 {
-    uint64_t sign_x = sign ? 0x8000000000000000ull : 0;
+    uint64_t sign_x = sign ? MASK_SIGN : 0;
     m_value = coefficient;
     uint64_t tmp = exponent + DECIMAL_EXPONENT_BIAS_128;
     m_value.w[1] |= (sign_x | (tmp << 49));
@@ -1749,8 +1748,8 @@ auto Decimal128::to_bid64() const -> Bid64
 
 void Decimal128::unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept
 {
-    sign = (m_value.w[1] & 0x8000000000000000ull) != 0;
-    int64_t exp = m_value.w[1] & 0x7fffffffffffffffull;
+    sign = (m_value.w[1] & MASK_SIGN) != 0;
+    int64_t exp = m_value.w[1] & MASK_EXP;
     exp >>= 49;
     exponent = int(exp) - DECIMAL_EXPONENT_BIAS_128;
     coefficient.w[0] = get_coefficient_low();
