@@ -3924,7 +3924,7 @@ public:
                 // If the property not being constant has a search index we can speed things up by
                 // finding all matches up front.
                 Subexpr* column = m_left_is_const ? m_right.get() : m_left.get();
-                Mixed const_value = m_left_is_const ? m_right_value : m_left_value;
+                Mixed const_value = m_left_is_const ? m_left_value : m_right_value;
 
                 if (column->has_search_index() && column->get_comparison_type() == ExpressionComparisonType::Any) {
                     if (const_value.is_null()) {
