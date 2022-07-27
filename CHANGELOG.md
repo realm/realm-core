@@ -39,6 +39,7 @@
 * MemRef is now trivially copyable.
 * Fix bloaty CI test that is currently failing on Ubuntu. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
 * Fix benchmark tests that are failing on Ubuntu and MacOS. ([PR #5656](https://github.com/realm/realm-core/pull/5656))
+* We no longer swap left and right in queries produced by the parser and we now have optimization for right hand side being constant ([#5685](https://github.com/realm/realm-core/pull/5685))
 
 ----------------------------------------------
 
