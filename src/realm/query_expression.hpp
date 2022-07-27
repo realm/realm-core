@@ -531,37 +531,40 @@ public:
                 return 0;
             }
             else if (compare_left == Compare::Any && compare_right == Compare::All) {
-                // return a match if the ALL list is a subset of the ANY list
-                // (if every value of the ALL list finds a match in the ANY list)
-                for (auto& right_val : right_vals) {
-                    bool found_match = false;
-                    for (auto& left_val : left_vals) {
-                        if (c(left_val, right_val)) {
-                            found_match = true;
+                // return a match if every value of the ALL list finds a match with one of the
+                // elements in the ANY list. This should be the equivilent to all the elements in
+                // the ANY list being expanded out to a chain of "OR" expressions.
+                // EG: "ANY {1, 2} == ALL list" is the same as
+                // "1 == ALL list || 2 == ALL list"
+                for (auto& left_val : left_vals) {
+                    bool all_matches_found = true;
+                    for (auto& right_val : right_vals) {
+                        if (!c(left_val, right_val)) {
+                            all_matches_found = false;
                             break;
                         }
                     }
-                    if (!found_match) {
-                        return not_found; // no match for one of the ALL elements
+                    if (all_matches_found) {
+                        return 0; // this left_val of the ANY list matched with ALL of the right list
                     }
                 }
-                return 0; // all matches found
+                return not_found;
             }
             else if (compare_left == Compare::All && compare_right == Compare::Any) {
                 // same as above but left and right are swapped
-                for (auto& left_val : left_vals) {
-                    bool found_match = false;
-                    for (auto& right_val : right_vals) {
-                        if (c(left_val, right_val)) {
-                            found_match = true;
+                for (auto& right_val : right_vals) {
+                    bool all_matches_found = true;
+                    for (auto& left_val : left_vals) {
+                        if (!c(left_val, right_val)) {
+                            all_matches_found = false;
                             break;
                         }
                     }
-                    if (!found_match) {
-                        return not_found; // no match for one of the ALL elements
+                    if (all_matches_found) {
+                        return 0;
                     }
                 }
-                return 0; // all matches found
+                return not_found;
             }
             else if (compare_left == Compare::Any && compare_right == Compare::None) {
                 // return a match if any of the values on the left do not match with any right values

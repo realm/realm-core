@@ -3881,7 +3881,8 @@ TEST(Parser_OperatorIN)
 
     // list property compared to a constant list
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
-    verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 1);
+    verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 0);
+    verify_query(test_context, t, "ALL {5.5} IN items.price", 2);
     verify_query(test_context, t, "NONE {5.5, 4.0} IN items.price", 2);
     verify_query(test_context, t, "NONE {5.5, 4.0} IN ALL items.price", 1);
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ALL items.price", 1);
@@ -3957,7 +3958,7 @@ TEST(Parser_OperatorIN)
     // list property vs list property
     verify_query(test_context, t, "items.price IN items.price", 3);
     verify_query(test_context, t, "ALL items.price IN ALL items.price", 1);
-    verify_query(test_context, t, "ALL items.price IN ANY items.price", 3);
+    verify_query(test_context, t, "ALL items.price IN ANY items.price", 1);
     verify_query(test_context, t, "NONE items.price IN ANY items.price", 0);
     verify_query(test_context, t, "items.price * 2 > items.price", 3);
     verify_query(test_context, t, "ALL items.price * 2 > ALL items.price", 2);
@@ -4005,6 +4006,11 @@ TEST(Parser_ListVsList)
 
     // None of {1, 2, 3} matches all of integers
     verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
+    verify_query(test_context, table, "ALL integers == ANY {1, 2, 3}", 0);
+    verify_query(test_context, table, "ALL {2, 3} > ANY integers", 1);
+    verify_query(test_context, table, "ANY integers < ALL {2, 3}", 1);
+    verify_query(test_context, table, "ALL {3, 4} > ANY integers", 1);
+    verify_query(test_context, table, "ANY integers < ALL {3, 4}", 1);
 }
 
 TEST(Parser_Object)
