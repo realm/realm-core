@@ -540,119 +540,54 @@ public:
             // if one side omitted a comparison type, assume ANY
             const Compare compare_left = left_cmp_type.value_or(Compare::Any);
             const Compare compare_right = right_cmp_type.value_or(Compare::Any);
-            if (REALM_UNLIKELY(compare_left == Compare::None && compare_right == Compare::None)) {
-                throw util::runtime_error("NONE vs NONE comparisons are not supported");
-            }
+
             // remove duplicates to reduce comparison time
             std::sort(left.begin(), left.end());
             std::sort(right.begin(), right.end());
             left.truncate(std::unique(left.begin(), left.end()));
             right.truncate(std::unique(right.begin(), right.end()));
 
-            if (compare_left == Compare::Any && compare_right == Compare::Any) {
-                // return true if just one value in left matches one value in right
-                for (auto& left_val : left) {
-                    for (auto& right_val : right) {
-                        if (c(left_val, right_val)) {
-                            return 0;
-                        }
-                    }
-                }
-                return not_found;
-            }
-            else if (compare_left == Compare::All && compare_right == Compare::All) {
-                // matches if all values of the left match with all values of the right
-                for (auto& left_val : left) {
-                    for (auto& right_val : right) {
-                        if (!c(left_val, right_val)) {
-                            return not_found;
-                        }
-                    }
-                }
-                return 0;
-            }
-            else if (compare_left == Compare::Any && compare_right == Compare::All) {
-                // return a match if every value of the ALL list finds a match with one of the
-                // elements in the ANY list. This should be the equivilent to all the elements in
-                // the ANY list being expanded out to a chain of "OR" expressions.
-                // EG: "ANY {1, 2} == ALL list" is the same as
-                // "1 == ALL list || 2 == ALL list"
-                for (auto& left_val : left) {
-                    bool all_matches_found = true;
-                    for (auto& right_val : right) {
-                        if (!c(left_val, right_val)) {
-                            all_matches_found = false;
-                            break;
-                        }
-                    }
-                    if (all_matches_found) {
-                        return 0; // this left_val of the ANY list matched with ALL of the right list
-                    }
-                }
-                return not_found;
-            }
-            else if (compare_left == Compare::All && compare_right == Compare::Any) {
-                // same as above but left and right are swapped
+            auto right_matches = [&](const QueryValue& left_val) {
                 for (auto& right_val : right) {
-                    bool all_matches_found = true;
-                    for (auto& left_val : left) {
-                        if (!c(left_val, right_val)) {
-                            all_matches_found = false;
-                            break;
+                    if (c(left_val, right_val)) {
+                        // match
+                        if (compare_right == Compare::Any) {
+                            return true;
+                        }
+                        if (compare_right == Compare::None) {
+                            return false; // one matched
                         }
                     }
-                    if (all_matches_found) {
+                    else {
+                        // no match
+                        if (compare_right == Compare::All) {
+                            return false;
+                        }
+                    }
+                }
+                if (compare_right == Compare::None || compare_right == Compare::All) {
+                    return true;
+                }
+                return false;
+            };
+
+            for (auto& left_val : left) {
+                if (right_matches(left_val)) {
+                    if (compare_left == Compare::Any) {
                         return 0;
                     }
-                }
-                return not_found;
-            }
-            else if (compare_left == Compare::Any && compare_right == Compare::None) {
-                // return a match if any of the values on the left do not match with any right values
-                for (auto& left_val : left) {
-                    bool match = false;
-                    for (auto& right_val : right) {
-                        if (c(left_val, right_val)) {
-                            match = true;
-                            break; // this one matched, check the next left value
-                        }
-                    }
-                    if (!match) {
-                        return 0; // a left value did not match anything on the right
+                    if (compare_left == Compare::None) {
+                        return not_found; // one matched
                     }
                 }
-                return not_found; // every left value matched
-            }
-            else if (compare_left == Compare::None && compare_right == Compare::Any) {
-                // same as above but left and right are swapped
-                for (auto& right_val : right) {
-                    bool match = false;
-                    for (auto& left_val : left) {
-                        if (c(left_val, right_val)) {
-                            match = true;
-                            break;
-                        }
-                    }
-                    if (!match) {
-                        return 0;
+                else {
+                    if (compare_left == Compare::All) {
+                        return not_found;
                     }
                 }
-                return not_found;
             }
-            else if ((compare_left == Compare::All && compare_right == Compare::None) ||
-                     (compare_left == Compare::None && compare_right == Compare::All)) {
-                // return a match if all of the values on the left do not match with any right values
-                for (auto& left_val : left) {
-                    for (auto& right_val : right) {
-                        if (c(left_val, right_val)) {
-                            return not_found; // one matched
-                        }
-                    }
-                }
-                return 0; // no matches over all values
-            }
-            else {
-                REALM_UNREACHABLE();
+            if (compare_left == Compare::None || compare_left == Compare::All) {
+                return 0; // either none or all
             }
         }
         else if (!left.m_from_list && right.m_from_list) {
