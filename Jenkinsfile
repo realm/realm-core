@@ -16,6 +16,7 @@ ctest_cmd = "ctest -VV"
 warningFilters = [
     excludeFile('/external/*'), // submodules and external libraries
     excludeFile('/libuv-src/*'), // libuv, where it was downloaded and built inside cmake
+    excludeFile('/src/realm/parser/generated/*'), // the auto generated parser code we didn't write
 ]
 
 jobWrapper {

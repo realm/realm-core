@@ -1053,7 +1053,7 @@ struct Widget {
         return val == w.val;
     }
 
-    int val;
+    int val{0};
 };
 
 std::ostream& operator<<(std::ostream& stream, const Widget& widget)
