@@ -3891,10 +3891,11 @@ public:
         m_left_is_const = m_left->has_constant_evaluation();
         m_right_is_const = m_right->has_constant_evaluation();
         if (m_left_is_const) {
-            m_left_value = m_left->get_mixed();
+            m_const_value = m_left->get_mixed();
         }
         if (m_right_is_const) {
-            m_right_value = m_right->get_mixed();
+            REALM_ASSERT(!m_left_is_const);
+            m_const_value = m_right->get_mixed();
         }
     }
 
@@ -3918,16 +3919,16 @@ public:
 
     double init() override
     {
-        double dT = m_left_is_const ? 10.0 : 50.0;
-        if constexpr (std::is_same_v<TCond, Equal>) {
-            if (m_left_is_const != m_right_is_const) {
+        double dT = 50.0;
+        if (m_left_is_const || m_right_is_const) {
+            dT = 10.0;
+            if constexpr (std::is_same_v<TCond, Equal>) {
                 // If the property not being constant has a search index we can speed things up by
                 // finding all matches up front.
                 Subexpr* column = m_left_is_const ? m_right.get() : m_left.get();
-                Mixed const_value = m_left_is_const ? m_left_value : m_right_value;
 
                 if (column->has_search_index() && column->get_comparison_type() == ExpressionComparisonType::Any) {
-                    if (const_value.is_null()) {
+                    if (m_const_value.is_null()) {
                         const ObjPropertyBase* prop = dynamic_cast<const ObjPropertyBase*>(m_right.get());
                         // when checking for null across links, null links are considered matches,
                         // so we must compute the slow matching even if there is an index.
@@ -3939,12 +3940,12 @@ public:
                         }
                     }
                     else {
-                        if (column->get_type() != const_value.get_type()) {
+                        if (column->get_type() != m_const_value.get_type()) {
                             // If the type we are looking for is not the same type as the target
                             // column, we cannot use the index
                             return dT;
                         }
-                        m_matches = column->find_all(const_value);
+                        m_matches = column->find_all(m_const_value);
                     }
                     // Sort
                     std::sort(m_matches.begin(), m_matches.end());
@@ -4030,7 +4031,7 @@ public:
         if (m_left_is_const) {
             for (; start < end;) {
                 m_right->evaluate(start, right);
-                match = ValueBase::compare_const<TCond>(m_left_value, right, right_cmp_type);
+                match = ValueBase::compare_const<TCond>(m_const_value, right, right_cmp_type);
                 if (match != not_found && match + start < end)
                     return start + match;
 
@@ -4041,7 +4042,7 @@ public:
         else if (m_right_is_const) {
             for (; start < end;) {
                 m_left->evaluate(start, left);
-                match = ValueBase::compare_const<TCond>(left, m_right_value, left_cmp_type);
+                match = ValueBase::compare_const<TCond>(left, m_const_value, left_cmp_type);
                 if (match != not_found && match + start < end)
                     return start + match;
 
@@ -4092,10 +4093,10 @@ private:
         , m_right_is_const(other.m_right_is_const)
     {
         if (m_left_is_const) {
-            m_left_value = m_left->get_mixed();
+            m_const_value = m_left->get_mixed();
         }
         if (m_right_is_const) {
-            m_right_value = m_right->get_mixed();
+            m_const_value = m_right->get_mixed();
         }
     }
 
@@ -4104,8 +4105,7 @@ private:
     const Cluster* m_cluster;
     bool m_left_is_const;
     bool m_right_is_const;
-    QueryValue m_left_value;
-    QueryValue m_right_value;
+    QueryValue m_const_value;
     bool m_has_matches = false;
     std::vector<ObjKey> m_matches;
     mutable size_t m_index_get = 0;
