@@ -60,8 +60,6 @@ enum class ProtocolError;
 SimplifiedProtocolError get_simplified_error(sync::ProtocolError err);
 
 struct SyncError {
-    enum class ClientResetModeAllowed { DoNotClientReset, RecoveryPermitted, RecoveryNotPermitted };
-
     std::error_code error_code;
     bool is_fatal;
     /// A consolidated explanation of the error, including a link to the server logs if applicable.
@@ -78,9 +76,9 @@ struct SyncError {
     /// whether because of a version mismatch or an oversight. It is still valuable
     /// to expose these errors so that users can do something about them.
     bool is_unrecognized_by_client = false;
-    // the server may explicitly send down "IsClientReset" as part of an error
+    // the server may explicitly send down an action the client should take as part of an error (i.e, client reset)
     // if this is set, it overrides the clients interpretation of the error
-    util::Optional<ClientResetModeAllowed> server_requests_client_reset = util::none;
+    util::Optional<sync::ProtocolErrorInfo::Action> server_requests_action = util::none;
     // If this error resulted from a compensating write, this vector will contain information about each object
     // that caused a compensating write and why the write was illegal.
     std::vector<sync::CompensatingWriteErrorInfo> compensating_writes_info;
