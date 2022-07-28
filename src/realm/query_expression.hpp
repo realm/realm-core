@@ -345,20 +345,6 @@ public:
     {
         return m_first + m_size;
     }
-    void truncate(ValueType* from)
-    {
-        size_t new_size = from - m_first;
-        REALM_ASSERT(new_size <= m_size);
-        if (m_size > prealloc && new_size <= prealloc) {
-            // Copy values from dynamic array to cache
-            for (size_t i = 0; i < new_size; i++) {
-                m_cache[i] = m_first[i];
-            }
-            delete[] m_first;
-            m_first = &m_cache[0];
-        }
-        m_size = new_size;
-    }
     template <class TOperator>
     REALM_FORCEINLINE void fun_const(const ValueType& const_value, const ValueBase& right)
     {
@@ -519,136 +505,81 @@ public:
                 if (c(left[m], right[m]))
                     return m;
             }
+            return not_found;
         }
-        else if (left.m_from_list && right.m_from_list) {
-            if (!left_cmp_type && !right_cmp_type) {
-                if (left.size() != right.size()) {
-                    if constexpr (std::is_same_v<TCond, NotEqual>) {
-                        return 0; // mismatch size
-                    }
-                    else {
-                        return not_found;
-                    }
+
+        if (left.m_from_list && right.m_from_list && !left_cmp_type && !right_cmp_type) {
+            // Both lists and no ANY, NONE, ALL specified - simple element by element comparison
+            if (left.size() != right.size()) {
+                if constexpr (std::is_same_v<TCond, NotEqual>) {
+                    return 0; // mismatch size
                 }
-                for (size_t i = 0; i < left.size(); ++i) {
-                    if (!c(left[i], right[i])) {
-                        return not_found;
-                    }
+                else {
+                    return not_found;
                 }
-                return 0; // all elements matched in the right order
             }
-            // if one side omitted a comparison type, assume ANY
-            const Compare compare_left = left_cmp_type.value_or(Compare::Any);
-            const Compare compare_right = right_cmp_type.value_or(Compare::Any);
-
-            // remove duplicates to reduce comparison time
-            std::sort(left.begin(), left.end());
-            std::sort(right.begin(), right.end());
-            left.truncate(std::unique(left.begin(), left.end()));
-            right.truncate(std::unique(right.begin(), right.end()));
-
-            if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains,
-                                          ContainsIns, Like, LikeIns>) {
-                // The string operators have the arguments reversed so we have to iterate right in the
-                // outer loop as this is actually the left argument
-                auto left_matches = [&](const QueryValue& right_val) {
-                    for (auto& left_val : left) {
-                        if (c(left_val, right_val)) {
-                            // match
-                            if (compare_left == Compare::Any) {
-                                return true;
-                            }
-                            if (compare_left == Compare::None) {
-                                return false; // one matched
-                            }
-                        }
-                        else {
-                            // no match
-                            if (compare_left == Compare::All) {
-                                return false;
-                            }
-                        }
-                    }
-                    if (compare_left == Compare::None || compare_left == Compare::All) {
-                        return true;
-                    }
-                    return false;
-                };
-
-                for (auto& right_val : right) {
-                    if (left_matches(right_val)) {
-                        if (compare_right == Compare::Any) {
-                            return 0;
-                        }
-                        if (compare_right == Compare::None) {
-                            return not_found; // one matched
-                        }
-                    }
-                    else {
-                        if (compare_right == Compare::All) {
-                            return not_found;
-                        }
-                    }
+            for (size_t i = 0; i < left.size(); ++i) {
+                if (!c(left[i], right[i])) {
+                    return not_found;
                 }
-                if (compare_right == Compare::None || compare_right == Compare::All) {
-                    return 0; // either none or all
-                }
+            }
+            return 0; // all elements matched in the right order
+        }
+
+        // if one side omitted a comparison type, assume ANY
+        const Compare compare_left = left_cmp_type.value_or(Compare::Any);
+        const Compare compare_right = right_cmp_type.value_or(Compare::Any);
+
+        size_t left_size = left.m_from_list ? left.size() : 1;
+        size_t right_size = right.m_from_list ? right.size() : 1;
+        // remove duplicates to reduce comparison time in nested loops
+        if (left_size > 2 && right_size > 2) {
+            if constexpr (realm::is_any_v<TCond, Greater, GreaterEqual>) {
+                std::sort(left.begin(), left.end());
+                std::sort(right.begin(), right.end(), std::greater<QueryValue>());
+            }
+            else if constexpr (realm::is_any_v<TCond, Less, LessEqual>) {
+                std::sort(left.begin(), left.end(), std::greater<QueryValue>());
+                std::sort(right.begin(), right.end());
             }
             else {
-                auto right_matches = [&](const QueryValue& left_val) {
-                    for (auto& right_val : right) {
-                        if (c(left_val, right_val)) {
-                            // match
-                            if (compare_right == Compare::Any) {
-                                return true;
-                            }
-                            if (compare_right == Compare::None) {
-                                return false; // one matched
-                            }
-                        }
-                        else {
-                            // no match
-                            if (compare_right == Compare::All) {
-                                return false;
-                            }
-                        }
-                    }
-                    if (compare_right == Compare::None || compare_right == Compare::All) {
-                        return true;
-                    }
-                    return false;
-                };
+                std::sort(left.begin(), left.end());
+                std::sort(right.begin(), right.end());
+            }
+            left_size = std::unique(left.begin(), left.end()) - left.begin();
+            right_size = std::unique(right.begin(), right.end()) - right.begin();
+        }
 
-                for (auto& left_val : left) {
-                    if (right_matches(left_val)) {
+        if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns,
+                                      Like, LikeIns>) {
+            // The string operators have the arguments reversed so we have to iterate right in the
+            // outer loop as this is actually the left argument
+            auto left_matches = [&](const QueryValue& right_val) {
+                for (size_t i = 0; i < left_size; i++) {
+                    if (c(left[i], right_val)) {
+                        // match
                         if (compare_left == Compare::Any) {
-                            return 0;
+                            return true;
                         }
                         if (compare_left == Compare::None) {
-                            return not_found; // one matched
+                            return false; // one matched
                         }
                     }
                     else {
+                        // no match
                         if (compare_left == Compare::All) {
-                            return not_found;
+                            return false;
                         }
                     }
                 }
                 if (compare_left == Compare::None || compare_left == Compare::All) {
-                    return 0; // either none or all
+                    return true;
                 }
-            }
-        }
-        else if (!left.m_from_list && right.m_from_list) {
-            // Right values come from link list. Left must come from single row. Semantics: Match if at least 1
-            // linked-to-value fulfills the condition
-            REALM_ASSERT_DEBUG(left.size() > 0);
-            const size_t num_right_values = right.size();
-            const Compare compare_right = right_cmp_type.value_or(Compare::Any);
-            ValueType left_val = left[0];
-            for (size_t r = 0; r < num_right_values; r++) {
-                bool match = c(left_val, right[r]);
-                if (match) {
+                return false;
+            };
+
+            for (size_t i = 0; i < right_size; i++) {
+                if (left_matches(right[i])) {
                     if (compare_right == Compare::Any) {
                         return 0;
                     }
@@ -666,16 +597,34 @@ public:
                 return 0; // either none or all
             }
         }
-        else if (left.m_from_list && !right.m_from_list) {
-            // Same as above, but with left values coming from link list.
-            REALM_ASSERT_DEBUG(right.size() > 0);
-            const size_t num_left_values = left.size();
-            const Compare compare_left = left_cmp_type.value_or(Compare::Any);
-            ValueType right_val = right[0];
-            for (size_t l = 0; l < num_left_values; l++) {
-                bool match = c(left[l], right_val);
-                if (match) {
-                    if (compare_left == ExpressionComparisonType::Any) {
+        else {
+            auto right_matches = [&](const QueryValue& left_val) {
+                for (size_t i = 0; i < right_size; i++) {
+                    if (c(left_val, right[i])) {
+                        // match
+                        if (compare_right == Compare::Any) {
+                            return true;
+                        }
+                        if (compare_right == Compare::None) {
+                            return false; // one matched
+                        }
+                    }
+                    else {
+                        // no match
+                        if (compare_right == Compare::All) {
+                            return false;
+                        }
+                    }
+                }
+                if (compare_right == Compare::None || compare_right == Compare::All) {
+                    return true;
+                }
+                return false;
+            };
+
+            for (size_t i = 0; i < left_size; i++) {
+                if (right_matches(left[i])) {
+                    if (compare_left == Compare::Any) {
                         return 0;
                     }
                     if (compare_left == ExpressionComparisonType::None) {

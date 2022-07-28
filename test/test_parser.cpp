@@ -4016,8 +4016,10 @@ TEST(Parser_ListVsList)
     list.add(1);
     list.add(2);
     list = table->create_object_with_primary_key(2).get_list<Int>(col);
+    list.add(11);
     list.add(5);
     list.add(9);
+    list.add(5);
 
     // None of {1, 2, 3} matches all of integers
     verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
@@ -4052,7 +4054,7 @@ TEST(Parser_ListVsList)
     tv = table->query("ALL {4, 8} > ALL integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
-    tv = table->query("ALL {1, 2, 10} < ANY integers").find_all();
+    tv = table->query("ALL {1, 2, 12} < ANY integers").find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->query("ALL {4, 8} > ANY integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
@@ -4064,17 +4066,17 @@ TEST(Parser_ListVsList)
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 2);
 
     // NONE
-    tv = table->query("NONE {1, 2, 3, 10} > ALL integers").find_all();
+    tv = table->query("NONE {1, 2, 3, 12} > ALL integers").find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->query("NONE {4, 8} > ALL integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 2);
-    tv = table->query("NONE {1, 10} > ANY integers").find_all();
+    tv = table->query("NONE {1, 12} > ANY integers").find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->query("NONE {4, 8} < ANY integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
-    tv = table->query("NONE {-1, 10} < NONE integers").find_all();
+    tv = table->query("NONE {-1, 12} < NONE integers").find_all();
     CHECK_EQUAL(tv.size(), 0);
     tv = table->query("NONE {-1, 5} < NONE integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
