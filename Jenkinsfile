@@ -234,13 +234,15 @@ jobWrapper {
                 dir('temp') {
                     withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
-                            unstash name: publishingStash
-                            def path = publishingStash.replaceAll('___', '/')
-                            def files = findFiles(glob: '**')
-                            for (file in files) {
-                                s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
-                                if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
-                                    s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                            dir(${publishingStash}) {
+                                unstash name: publishingStash
+                                def path = publishingStash.replaceAll('___', '/')
+                                def files = findFiles(glob: '**')
+                                for (file in files) {
+                                    s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
+                                    if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
+                                        s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                                    }
                                 }
                             } 
                         }
