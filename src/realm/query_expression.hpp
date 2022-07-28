@@ -547,47 +547,96 @@ public:
             left.truncate(std::unique(left.begin(), left.end()));
             right.truncate(std::unique(right.begin(), right.end()));
 
-            auto right_matches = [&](const QueryValue& left_val) {
+            if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains,
+                                          ContainsIns, Like, LikeIns>) {
+                // The string operators have the arguments reversed so we have to iterate right in the
+                // outer loop as this is actually the left argument
+                auto left_matches = [&](const QueryValue& right_val) {
+                    for (auto& left_val : left) {
+                        if (c(left_val, right_val)) {
+                            // match
+                            if (compare_left == Compare::Any) {
+                                return true;
+                            }
+                            if (compare_left == Compare::None) {
+                                return false; // one matched
+                            }
+                        }
+                        else {
+                            // no match
+                            if (compare_left == Compare::All) {
+                                return false;
+                            }
+                        }
+                    }
+                    if (compare_left == Compare::None || compare_left == Compare::All) {
+                        return true;
+                    }
+                    return false;
+                };
+
                 for (auto& right_val : right) {
-                    if (c(left_val, right_val)) {
-                        // match
+                    if (left_matches(right_val)) {
                         if (compare_right == Compare::Any) {
-                            return true;
+                            return 0;
                         }
                         if (compare_right == Compare::None) {
-                            return false; // one matched
+                            return not_found; // one matched
                         }
                     }
                     else {
-                        // no match
                         if (compare_right == Compare::All) {
-                            return false;
+                            return not_found;
                         }
                     }
                 }
                 if (compare_right == Compare::None || compare_right == Compare::All) {
-                    return true;
-                }
-                return false;
-            };
-
-            for (auto& left_val : left) {
-                if (right_matches(left_val)) {
-                    if (compare_left == Compare::Any) {
-                        return 0;
-                    }
-                    if (compare_left == Compare::None) {
-                        return not_found; // one matched
-                    }
-                }
-                else {
-                    if (compare_left == Compare::All) {
-                        return not_found;
-                    }
+                    return 0; // either none or all
                 }
             }
-            if (compare_left == Compare::None || compare_left == Compare::All) {
-                return 0; // either none or all
+            else {
+                auto right_matches = [&](const QueryValue& left_val) {
+                    for (auto& right_val : right) {
+                        if (c(left_val, right_val)) {
+                            // match
+                            if (compare_right == Compare::Any) {
+                                return true;
+                            }
+                            if (compare_right == Compare::None) {
+                                return false; // one matched
+                            }
+                        }
+                        else {
+                            // no match
+                            if (compare_right == Compare::All) {
+                                return false;
+                            }
+                        }
+                    }
+                    if (compare_right == Compare::None || compare_right == Compare::All) {
+                        return true;
+                    }
+                    return false;
+                };
+
+                for (auto& left_val : left) {
+                    if (right_matches(left_val)) {
+                        if (compare_left == Compare::Any) {
+                            return 0;
+                        }
+                        if (compare_left == Compare::None) {
+                            return not_found; // one matched
+                        }
+                    }
+                    else {
+                        if (compare_left == Compare::All) {
+                            return not_found;
+                        }
+                    }
+                }
+                if (compare_left == Compare::None || compare_left == Compare::All) {
+                    return 0; // either none or all
+                }
             }
         }
         else if (!left.m_from_list && right.m_from_list) {
@@ -4195,15 +4244,17 @@ public:
 
     virtual std::string description(util::serializer::SerialisationState& state) const override
     {
-        if (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns, Like,
-                            LikeIns>) {
+        if constexpr (realm::is_any_v<TCond, BeginsWith, BeginsWithIns, EndsWith, EndsWithIns, Contains, ContainsIns,
+                                      Like, LikeIns>) {
             // these string conditions have the arguments reversed but the order is important
             // operations ==, and != can be reversed because the produce the same results both ways
             return util::serializer::print_value(m_right->description(state) + " " + TCond::description() + " " +
                                                  m_left->description(state));
         }
-        return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
-                                             m_right->description(state));
+        else {
+            return util::serializer::print_value(m_left->description(state) + " " + TCond::description() + " " +
+                                                 m_right->description(state));
+        }
     }
 
     std::unique_ptr<Expression> clone() const override

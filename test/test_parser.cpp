@@ -25,7 +25,6 @@
 
 #include "test.hpp"
 
-
 // Test independence and thread-safety
 // -----------------------------------
 //
@@ -2509,6 +2508,18 @@ TEST(Parser_list_of_primitive_mixed)
     CHECK_EQUAL(mixed_list.sum(), Mixed(7.2));
     CHECK_EQUAL(mixed_list.avg(), Mixed(2.4));
 
+    /*
+    "table":[
+        {"_key":0,"values":[]},
+        {"_key":1,"values":[null]},
+        {"_key":2,"values":[""]},
+        {"_key":3,"values":[0,1,2]},
+        {"_key":4,"values":[1,"2.20000000000000",3.3000000e+00,4.4000000000000004e+00]},
+        {"_key":5,"values":["one","two","three","",null]},
+        {"_key":6,"values":["foo",1,"1970-01-01 00:00:01","2.5",3.7000000e+00,"62e2905feb23128a10ab3973",
+                            "00000000-0000-0000-0000-000000000000",null,false,true,null,null,null,"NaN"]}
+    ]
+    */
     verify_query(test_context, t, "values.@count == 0", 1);
     verify_query(test_context, t, "values.@size == 1", 2);
     verify_query(test_context, t, "ANY values == NULL", 3);
@@ -2539,7 +2550,7 @@ TEST(Parser_list_of_primitive_mixed)
     verify_query(test_context, t, "ANY values == {'one', 'two'}", 1);
     verify_query(test_context, t, "values == {'one', 'two', 'three', '', null}", 1);
     verify_query(test_context, t, "values == {}", 1);
-    verify_query(test_context, t, "NONE values == ALL {null, ''}", 3);
+    verify_query(test_context, t, "NONE values == ANY {null, ''}", 3);
 }
 
 TEST(Parser_SortAndDistinctSerialisation)
@@ -3881,10 +3892,10 @@ TEST(Parser_OperatorIN)
 
     // list property compared to a constant list
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ANY items.price", 2);
-    verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 0);
+    verify_query(test_context, t, "ALL {5.5, 4.0} IN items.price", 1);
     verify_query(test_context, t, "ALL {5.5} IN items.price", 2);
-    verify_query(test_context, t, "NONE {5.5, 4.0} IN items.price", 2);
-    verify_query(test_context, t, "NONE {5.5, 4.0} IN ALL items.price", 1);
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN items.price", 1);
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN ALL items.price", 2);
     verify_query(test_context, t, "ANY {5.5, 4.0} IN ALL items.price", 1);
     verify_query(test_context, t, "ANY {5.5, 4.0} IN NONE items.price", 2);
     verify_query(test_context, t, "!(ANY {5.5, 4.0} IN ANY items.price)", 1);
@@ -3893,15 +3904,17 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "ALL {5.5, 5.5} IN ALL items.price", 1);
     verify_query(test_context, t, "ALL {6.0, 6.1, 1.1} <= ALL items.price", 1);
     verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ANY items.price", 0);
-    verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 0);
+    verify_query(test_context, t, "NONE {5.5, 4.0, 9.5, 6.5} IN ALL items.price", 2);
 
     verify_query(test_context, t, "ANY items.name contains[c] ANY {'A', 'B'}", 2);
     verify_query(test_context, t, "ALL items.name contains[c] {'A', 'B'}", 1);
     verify_query(test_context, t, "ALL items.name contains[c] NONE {'A', 'B'}", 1); // customer_id: 1
-    verify_query(test_context, t, "NONE items.name contains[c] {'A', 'B'}", 3);
-    verify_query(test_context, t, "NONE items.name contains[c] ALL {'A', 'B'}", 1);
-    verify_query(test_context, t, "ANY items.name contains[c] NONE {'A', 'B'}", 2); // customer_id: 0, 1
+    verify_query(test_context, t, "NONE items.name contains[c] {'A', 'B'}", 1);
+    verify_query(test_context, t, "NONE items.name contains[c] ALL {'A', 'L'}", 1); // customer_id: 1 only "milk"
+    verify_query(test_context, t, "ANY items.name contains[c] NONE {'A', 'B'}", 2); // 0 and 1 both contains "milk"
     verify_query(test_context, t, "ANY items.name contains[c] ALL {'A', 'B'}", 0);
+    // In the following we have a match if neither 5.5 or 4.0 cannot be found in item prices
+    verify_query(test_context, t, "NONE {5.5, 4.0} IN NONE items.price", 1); // customer_id: 0
 
     // when neither side specifies ANY/ALL/NONE we do ordered list matching
     verify_query(test_context, t, "{5.5, 4.0, 9.5, 6.5} == items.price", 1);
@@ -3947,8 +3960,8 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "ALL {6.5} IN ALL items.price", 0);
     verify_query(test_context, t, "ALL {6.5} IN NONE items.price", 1);
     verify_query(test_context, t, "ALL {6.5} IN ANY items.price", 2);
-    verify_query(test_context, t, "NONE {6.5} IN ALL items.price", 1);
-    verify_query(test_context, t, "NONE {6.5} IN ANY items.price", 3);
+    verify_query(test_context, t, "NONE {6.5} IN ALL items.price", 3);
+    verify_query(test_context, t, "NONE {6.5} IN ANY items.price", 1);
 
     // operators on a list
     verify_query(test_context, t, "ALL {8, 10} / 2 >= ANY items.price", 1);
@@ -3958,7 +3971,7 @@ TEST(Parser_OperatorIN)
     // list property vs list property
     verify_query(test_context, t, "items.price IN items.price", 3);
     verify_query(test_context, t, "ALL items.price IN ALL items.price", 1);
-    verify_query(test_context, t, "ALL items.price IN ANY items.price", 1);
+    verify_query(test_context, t, "ALL items.price IN ANY items.price", 3);
     verify_query(test_context, t, "NONE items.price IN ANY items.price", 0);
     verify_query(test_context, t, "items.price * 2 > items.price", 3);
     verify_query(test_context, t, "ALL items.price * 2 > ALL items.price", 2);
@@ -3966,7 +3979,6 @@ TEST(Parser_OperatorIN)
     verify_query(test_context, t, "NONE items.price * 2 > ANY items.price", 0);
 
     // unsupported combinations
-    CHECK_THROW(verify_query(test_context, t, "NONE {5.5, 4.0} IN NONE items.price", 0), std::runtime_error);
     CHECK_THROW(verify_query(test_context, t, "{1, 2, 3, 4, 5, 6} * {1, 2, 3} == items.price", 1),
                 std::runtime_error);
     CHECK_THROW(verify_query(test_context, t, "{8, 10}.@size >= ANY items.price", 3), query_parser::SyntaxError);
@@ -4010,6 +4022,7 @@ TEST(Parser_ListVsList)
     // None of {1, 2, 3} matches all of integers
     verify_query(test_context, table, "ANY {1, 2, 3} == ALL integers", 0);
     verify_query(test_context, table, "ALL integers == ANY {1, 2, 3}", 1);
+    verify_query(test_context, table, "{7, 3, 8, 0} < integers", 1);
 
     TableView tv;
     // ANY
@@ -4027,7 +4040,7 @@ TEST(Parser_ListVsList)
 
     tv = table->query("ANY {1, 2, 3} == NONE integers").find_all();
     CHECK_EQUAL(tv.size(), 2);
-    tv = table->query("ANY {1, 2, 7} < NONE integers").find_all();
+    tv = table->query("ANY {1, 2, 7} <= NONE integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
     tv = table->query("ANY {-1, 0} < NONE integers").find_all();
@@ -4046,7 +4059,7 @@ TEST(Parser_ListVsList)
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 1);
     tv = table->query("ALL {2, 5} == NONE integers").find_all();
     CHECK_EQUAL(tv.size(), 0);
-    tv = table->query("ALL {1, 2, 3} == NONE integers").find_all();
+    tv = table->query("ALL {3, 1, 4, 3} == NONE integers").find_all();
     if (CHECK_EQUAL(tv.size(), 1))
         CHECK_EQUAL(tv.get_object(0).get_primary_key().get_int(), 2);
 
