@@ -257,7 +257,7 @@ public:
     // that is free in current version, but being used in still live versions.
     // Notice that we will always have two live versions - the current and the
     // previous.
-    void get_stats(size_t& free_space, size_t& used_space, util::Optional<size_t&> locked_space = util::none) const;
+    void get_stats(size_t& free_space, size_t& used_space, size_t* locked_space = nullptr) const;
     //@}
 
     enum TransactStage {
@@ -585,7 +585,7 @@ private:
     friend class Transaction;
 };
 
-inline void DB::get_stats(size_t& free_space, size_t& used_space, util::Optional<size_t&> locked_space) const
+inline void DB::get_stats(size_t& free_space, size_t& used_space, size_t* locked_space) const
 {
     free_space = m_free_space;
     used_space = m_used_space;

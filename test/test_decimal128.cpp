@@ -21,7 +21,6 @@
 
 #include "test.hpp"
 
-
 using namespace realm;
 
 TEST(Decimal_Basics)
@@ -99,6 +98,18 @@ TEST(Decimal_Basics)
     Decimal128 d10(10);
     CHECK(d10 < d2);
     CHECK(d10 >= d);
+
+    Decimal128 decimal = Decimal128("+6422018348623853211009174311926606E-32");
+    decimal.unpack(bid, exp, sign);
+    CHECK_EQUAL(exp, -32);
+    Decimal128 decimal2(bid, exp, sign);
+    CHECK_EQUAL(decimal, decimal2);
+
+    decimal = Decimal128("9999999999999999999999999999999999E6111");
+    decimal.unpack(bid, exp, sign);
+    CHECK_EQUAL(exp, 6111);
+    Decimal128 decimal3(bid, exp, sign);
+    CHECK_EQUAL(decimal, decimal3);
 }
 
 TEST(Decimal_Arithmetics)

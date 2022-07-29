@@ -788,7 +788,7 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
             }
             wt.commit();
         }
-        sg->get_stats(free_space, used_space, locked_space);
+        sg->get_stats(free_space, used_space, &locked_space);
     }
 
     CHECK_GREATER(locked_space, 0);
@@ -812,7 +812,7 @@ TEST(LangBindHelper_AdvanceReadTransact_PinnedSize)
         wt.commit();
         // History entries now finally free
     }
-    sg->get_stats(free_space, used_space, new_locked_space);
+    sg->get_stats(free_space, used_space, &new_locked_space);
 
     // Some space must have been released
     CHECK_LESS(new_locked_space, locked_space);

@@ -232,7 +232,7 @@ std::string get_current_time_stamp()
 int iteration = 0;
 } // anonymous namespace
 
-void parse_and_apply_instructions(std::string& in, const std::string& path, util::Optional<std::ostream&> log)
+void parse_and_apply_instructions(std::string& in, const std::string& path, std::ostream* log)
 {
     const size_t add_empty_row_max = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1000;
     const size_t max_tables = REALM_MAX_BPNODE_SIZE * 10;
@@ -753,7 +753,7 @@ static void usage(const char* argv[])
 
 int run_fuzzy(int argc, const char* argv[])
 {
-    util::Optional<std::ostream&> log;
+    std::ostream* log = nullptr;
     std::string name = "fuzz-test";
     std::string prefix = "./";
     bool file_names_from_stdin = false;
@@ -762,7 +762,7 @@ int run_fuzzy(int argc, const char* argv[])
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
-            log = util::some<std::ostream&>(std::cout);
+            log = &std::cout;
         }
         else if (arg == "--") {
             file_names_from_stdin = true;

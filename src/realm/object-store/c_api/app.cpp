@@ -855,7 +855,7 @@ template <typename T>
 inline T convert_to_bson(realm_string_t doc)
 {
     auto res = convert_to_optional_bson<T>(doc);
-    return res ? res.value() : T();
+    return res ? *res : T();
 }
 
 static MongoCollection::FindOptions to_mongodb_collection_find_options(const realm_mongodb_find_options_t* options)

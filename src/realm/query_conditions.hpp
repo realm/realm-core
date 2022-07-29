@@ -920,7 +920,7 @@ struct LessEqual : public HackClass {
         if (v1null && v2null)
             return false;
 
-        return (!v1null && !v2null && v1.value() <= v2.value());
+        return (!v1null && !v2null && *v1 <= *v2);
     }
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const
@@ -956,7 +956,7 @@ struct GreaterEqual : public HackClass {
         if (v1null && v2null)
             return false;
 
-        return (!v1null && !v2null && v1.value() >= v2.value());
+        return (!v1null && !v2null && *v1 >= *v2);
     }
 
     bool operator()(const QueryValue& m1, const QueryValue& m2) const

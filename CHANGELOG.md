@@ -18,9 +18,18 @@
 * Fix a data race when writing audit events which could occur if the sync client thread was busy with other work when the event Realm was opened.
 * Fix some cases of running out of virtual address space (seen/reported as mmap failures) ([PR #5645](https://github.com/realm/realm-core/pull/5645))
 * Audit event scopes containing only write events and no read events would occasionally throw a `BadVersion` exception when a write transaction was committed (since v11.17.0).
+* Fixed the client reset callbacks not populating the Realm instance arguments correctly if the Realm coordinator lifetime had ended. ([#5654](https://github.com/realm/realm-core/pull/5654), since the introduction of DiscardLocal reset mode in v11.5.0)
+* Decimal128 values with more than 110 significant bits were not synchronized correctly with the server ([#7868](https://github.com/realm/realm-swift/issues/7868), since v10.0.0)
 
 ### Breaking changes
-* None.
+* Make `realm::util::Optional<T>` be an alias for `std::optional<T>` and `realm::none` an alias for `std::nullopt`. ([PR #5667](https://github.com/realm/realm-core/pull/5667)) For now the existing name and some of the helpers are sticking around so this shouldn't affect most consumers, however:
+  * At some point in the future we will likely want to remove the aliases, so consumers may want to switch to using `std::optional` and `std::nullopt` directly.
+  * `std::optional<T&>` isn't supported. In general, `T*`/`nullptr` is a better replacement. The few uses of optional references in core APIs have been replaced with pointers. Any usages in SDKs will also need to be replaced.
+  * `std::optional` cannot be directly streamed (`<<`) to an `ostream`. A helper `realm::util::stream_possible_optional` is provided that can be used instead. For convenience, it will work with both optional and non-optional types.
+  * [CTAD](https://en.cppreference.com/w/cpp/language/class_template_argument_deduction) doesn't work through aliases until C++20, so any code like `util::Optional(EXPRESSION)` without the `<Type>` template arguments will need to switch to using `std::optional(Expression)` directly.
+  * Aliases and helpers not used by core were removed. If needed by SDKs they can be added back, but it would probably be better to just use the `std::` names instead.
+  * The method `std::optional<T>::value()` requires a higher deployment target on iOS than we currently target because it throws exceptions when used incorrectly. You should use `*opt` and `opt->method()` instead to access the value anyway.
+  * C++ overload resolution rules are always fun. Since `std::optional` is implicitly convertable from more types, it is possible that this will generate new ambiguous overload errors in overload sets that include optionals. If you have any vexing compiler errors due to this change, please ask the core team for help.
 
 ### Compatibility
 * Fileformat: Generates files with format v22. Reads and automatically upgrade from fileformat v5.
@@ -32,6 +41,7 @@
 * MemRef is now trivially copyable.
 * Fix bloaty CI test that is currently failing on Ubuntu. ([PR #5650](https://github.com/realm/realm-core/pull/5650))
 * Fix benchmark tests that are failing on Ubuntu and MacOS. ([PR #5656](https://github.com/realm/realm-core/pull/5656))
+* We no longer swap left and right in queries produced by the parser and we now have optimization for right hand side being constant ([#5685](https://github.com/realm/realm-core/pull/5685))
 
 ----------------------------------------------
 

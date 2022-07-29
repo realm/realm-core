@@ -469,6 +469,9 @@ struct BaasClientReset : public TestClientReset {
         if (m_on_post_local) {
             m_on_post_local(realm);
         }
+        if (!m_wait_for_reset_completion) {
+            return;
+        }
         wait_for_upload(*realm);
         if (m_on_post_reset) {
             m_on_post_reset(realm);
@@ -675,6 +678,11 @@ void TestClientReset::set_pk_of_object_driving_reset(const ObjectId& pk)
 ObjectId TestClientReset::get_pk_of_object_driving_reset() const
 {
     return m_pk_driving_reset;
+}
+
+void TestClientReset::disable_wait_for_reset_completion()
+{
+    m_wait_for_reset_completion = false;
 }
 
 std::unique_ptr<TestClientReset> make_fake_local_client_reset(const Realm::Config& local_config,

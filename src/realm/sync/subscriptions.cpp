@@ -105,7 +105,7 @@ std::string_view Subscription::name() const
     if (!m_name) {
         return std::string_view{};
     }
-    return m_name.value();
+    return *m_name;
 }
 
 std::string_view Subscription::object_class_name() const

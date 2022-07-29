@@ -20,6 +20,7 @@
 #define REALM_COLUMN_FWD_HPP
 
 #include <cstdint>
+#include <realm/util/optional.hpp>
 
 namespace realm {
 
@@ -30,11 +31,6 @@ class IntegerColumnIterator;
 // Templated classes
 template <class T>
 class BPlusTree;
-
-namespace util {
-template <class>
-class Optional;
-}
 
 // Shortcuts, aka typedefs.
 using DoubleColumn = BPlusTree<double>;

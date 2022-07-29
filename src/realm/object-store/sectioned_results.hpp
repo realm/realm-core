@@ -92,7 +92,7 @@ private:
     SectionedResults* m_parent;
     Mixed m_key;
     std::unique_ptr<char[]> m_key_buffer;
-    util::Optional<Section&> get_if_valid() const;
+    Section* get_if_valid() const;
 };
 
 /**

@@ -506,9 +506,9 @@ Query EqualityNode::visit(ParserDriver* drv)
         switch (op) {
             case CompareNode::EQUAL:
             case CompareNode::IN:
-                return Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(right), std::move(left))));
+                return Query(std::unique_ptr<Expression>(new Compare<Equal>(std::move(left), std::move(right))));
             case CompareNode::NOT_EQUAL:
-                return Query(std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(right), std::move(left))));
+                return Query(std::unique_ptr<Expression>(new Compare<NotEqual>(std::move(left), std::move(right))));
         }
     }
     else {
@@ -516,10 +516,10 @@ Query EqualityNode::visit(ParserDriver* drv)
         switch (op) {
             case CompareNode::EQUAL:
             case CompareNode::IN:
-                return Query(std::unique_ptr<Expression>(new Compare<EqualIns>(std::move(right), std::move(left))));
+                return Query(std::unique_ptr<Expression>(new Compare<EqualIns>(std::move(left), std::move(right))));
             case CompareNode::NOT_EQUAL:
                 return Query(
-                    std::unique_ptr<Expression>(new Compare<NotEqualIns>(std::move(right), std::move(left))));
+                    std::unique_ptr<Expression>(new Compare<NotEqualIns>(std::move(left), std::move(right))));
         }
     }
     return {};
@@ -612,13 +612,13 @@ Query RelationalNode::visit(ParserDriver* drv)
     }
     switch (op) {
         case CompareNode::GREATER:
-            return Query(std::unique_ptr<Expression>(new Compare<Less>(std::move(right), std::move(left))));
+            return Query(std::unique_ptr<Expression>(new Compare<Greater>(std::move(left), std::move(right))));
         case CompareNode::LESS:
-            return Query(std::unique_ptr<Expression>(new Compare<Greater>(std::move(right), std::move(left))));
+            return Query(std::unique_ptr<Expression>(new Compare<Less>(std::move(left), std::move(right))));
         case CompareNode::GREATER_EQUAL:
-            return Query(std::unique_ptr<Expression>(new Compare<LessEqual>(std::move(right), std::move(left))));
+            return Query(std::unique_ptr<Expression>(new Compare<GreaterEqual>(std::move(left), std::move(right))));
         case CompareNode::LESS_EQUAL:
-            return Query(std::unique_ptr<Expression>(new Compare<GreaterEqual>(std::move(right), std::move(left))));
+            return Query(std::unique_ptr<Expression>(new Compare<LessEqual>(std::move(left), std::move(right))));
     }
     return {};
 }

@@ -24,6 +24,6 @@
 #include <realm/util/optional.hpp>
 
 int run_fuzzy(int argc, const char* argv[]);
-void parse_and_apply_instructions(std::string& in, const std::string& path, realm::util::Optional<std::ostream&> log);
+void parse_and_apply_instructions(std::string& in, const std::string& path, std::ostream* log);
 
 #endif
