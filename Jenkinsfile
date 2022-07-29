@@ -234,13 +234,15 @@ jobWrapper {
                 dir('temp') {
                     withAWS(credentials: 'tightdb-s3-ci', region: 'us-east-1') {
                         for (publishingStash in publishingStashes) {
-                            unstash name: publishingStash
-                            def path = publishingStash.replaceAll('___', '/')
-
-                            for (file in findFiles(glob: '**')) {
-                                s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
-                                if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
-                                    s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                            dir(${publishingStash}) {
+                                unstash name: publishingStash
+                                def path = publishingStash.replaceAll('___', '/')
+                                def files = findFiles(glob: '**')
+                                for (file in files) {
+                                    s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
+                                    if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
+                                        s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
+                                    }
                                 }
                             } 
                         }
@@ -628,7 +630,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         isWindows: true,
                         script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
                         name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
-                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject')] + warningFilters,
+                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject'), excludeFile('query_flex.ll')] + warningFilters,
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
