@@ -630,7 +630,7 @@ def doBuildWindows(String buildType, boolean isUWP, String platform, boolean run
                         isWindows: true,
                         script: "\"${tool 'cmake'}\" --build . --config ${buildType}",
                         name: "windows-${platform}-${buildType}-${isUWP?'uwp':'nouwp'}",
-                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject')] + warningFilters,
+                        filters: [excludeMessage('Publisher name .* does not match signing certificate subject'), excludeFile('query_flex.ll')] + warningFilters,
                     )
                 }
                 bat "\"${tool 'cmake'}\\..\\cpack.exe\" -C ${buildType} -D CPACK_GENERATOR=TGZ"
