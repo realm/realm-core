@@ -123,10 +123,13 @@ public:
     void unpack(Bid128& coefficient, int& exponent, bool& sign) const noexcept;
 
 private:
+    // The high word of a Decimal128 consists of 49 bit coefficient, 14 bit exponent and a sign bit
     static constexpr int DECIMAL_EXPONENT_BIAS_128 = 6176;
-    static constexpr uint64_t MASK_SIGN = 0x8000000000000000ull;
-    static constexpr uint64_t MASK_COEFF = 0x0001ffffffffffffull;
-    static constexpr uint64_t MASK_EXP = 0x7ffe000000000000ull;
+    static constexpr int DECIMAL_COEFF_HIGH_BITS = 49;
+    static constexpr int DECIMAL_EXP_BITS = 14;
+    static constexpr uint64_t MASK_COEFF = (1ull << DECIMAL_COEFF_HIGH_BITS) - 1;
+    static constexpr uint64_t MASK_EXP = ((1ull << DECIMAL_EXP_BITS) - 1) << DECIMAL_COEFF_HIGH_BITS;
+    static constexpr uint64_t MASK_SIGN = 1ull << (DECIMAL_COEFF_HIGH_BITS + DECIMAL_EXP_BITS);
 
     Bid128 m_value;
 

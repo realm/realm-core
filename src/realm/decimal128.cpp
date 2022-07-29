@@ -1394,7 +1394,7 @@ Decimal128::Decimal128(double val, RoundTo rounding_precision)
         base10Exp--;
 
     int adjust = (rounding_precision == RoundTo::Digits7) ? 6 : 14;
-    BID_UINT128 q{1, BID_UINT64(base10Exp - adjust + DECIMAL_EXPONENT_BIAS_128) << 49};
+    BID_UINT128 q{1, BID_UINT64(base10Exp - adjust + DECIMAL_EXPONENT_BIAS_128) << DECIMAL_COEFF_HIGH_BITS};
     BID_UINT128 quantizedResult;
     bid128_quantize(&quantizedResult, &converted_value, &q, &flags);
     memcpy(this, &quantizedResult, sizeof(*this));
@@ -1405,7 +1405,7 @@ Decimal128::Decimal128(double val, RoundTo rounding_precision)
         // If we didn't precisely get 15 digits of precision, the original base 10 exponent
         // guess was 1 off, so quantize once more with base10Exp + 1
         adjust--;
-        BID_UINT128 q1{1, (BID_UINT64(base10Exp) - adjust + DECIMAL_EXPONENT_BIAS_128) << 49};
+        BID_UINT128 q1{1, (BID_UINT64(base10Exp) - adjust + DECIMAL_EXPONENT_BIAS_128) << DECIMAL_COEFF_HIGH_BITS};
         bid128_quantize(&quantizedResult, &converted_value, &q1, &flags);
         memcpy(this, &quantizedResult, sizeof(*this));
     }
@@ -1413,7 +1413,7 @@ Decimal128::Decimal128(double val, RoundTo rounding_precision)
 
 void Decimal128::from_int64_t(int64_t val)
 {
-    constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << 49;
+    constexpr uint64_t expon = uint64_t(DECIMAL_EXPONENT_BIAS_128) << DECIMAL_COEFF_HIGH_BITS;
     if (val < 0) {
         m_value.w[1] = expon | MASK_SIGN;
         m_value.w[0] = ~val + 1;
@@ -1456,7 +1456,7 @@ Decimal128::Decimal128(Bid128 coefficient, int exponent, bool sign)
     uint64_t sign_x = sign ? MASK_SIGN : 0;
     m_value = coefficient;
     uint64_t tmp = exponent + DECIMAL_EXPONENT_BIAS_128;
-    m_value.w[1] |= (sign_x | (tmp << 49));
+    m_value.w[1] |= (sign_x | (tmp << DECIMAL_COEFF_HIGH_BITS));
 }
 
 Decimal128::Decimal128(StringData init)
@@ -1750,7 +1750,7 @@ void Decimal128::unpack(Bid128& coefficient, int& exponent, bool& sign) const no
 {
     sign = (m_value.w[1] & MASK_SIGN) != 0;
     int64_t exp = m_value.w[1] & MASK_EXP;
-    exp >>= 49;
+    exp >>= DECIMAL_COEFF_HIGH_BITS;
     exponent = int(exp) - DECIMAL_EXPONENT_BIAS_128;
     coefficient.w[0] = get_coefficient_low();
     coefficient.w[1] = get_coefficient_high();
