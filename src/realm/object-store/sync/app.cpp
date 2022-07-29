@@ -518,17 +518,6 @@ void App::log_in_with_credentials(
     const AppCredentials& credentials, const std::shared_ptr<SyncUser>& linking_user,
     UniqueFunction<void(const std::shared_ptr<SyncUser>&, Optional<AppError>)>&& completion)
 {
-    // if we try logging in with an anonymous user while there
-    // is already an anonymous session active, reuse it
-    if (credentials.provider() == AuthProvider::ANONYMOUS) {
-        for (auto&& user : m_sync_manager->all_users()) {
-            if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
-                completion(switch_user(user), util::none);
-                return;
-            }
-        }
-    }
-
     // construct the route
     std::string route = util::format("%1/providers/%2/login%3", m_auth_route, credentials.provider_as_string(),
                                      linking_user ? "?link=true" : "");
