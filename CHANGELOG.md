@@ -18,6 +18,7 @@
 * Fix some cases of running out of virtual address space (seen/reported as mmap failures) ([PR #5645](https://github.com/realm/realm-core/pull/5645))
 * Audit event scopes containing only write events and no read events would occasionally throw a `BadVersion` exception when a write transaction was committed (since v11.17.0).
 * Fixed the client reset callbacks not populating the Realm instance arguments correctly if the Realm coordinator lifetime had ended. ([#5654](https://github.com/realm/realm-core/pull/5654), since the introduction of DiscardLocal reset mode in v11.5.0)
+* Decimal128 values with more than 110 significant bits were not synchronized correctly with the server ([#7868](https://github.com/realm/realm-swift/issues/7868), since v10.0.0)
 
 ### Breaking changes
 * Make `realm::util::Optional<T>` be an alias for `std::optional<T>` and `realm::none` an alias for `std::nullopt`. ([PR #5667](https://github.com/realm/realm-core/pull/5667)) For now the existing name and some of the helpers are sticking around so this shouldn't affect most consumers, however:
