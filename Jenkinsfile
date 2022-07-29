@@ -237,8 +237,7 @@ jobWrapper {
                             dir(${publishingStash}) {
                                 unstash name: publishingStash
                                 def path = publishingStash.replaceAll('___', '/')
-                                def files = findFiles(glob: '**')
-                                for (file in files) {
+                                for (file in findFiles(glob: '**')) {
                                     s3Upload file: file.path, path: "downloads/core/${gitDescribeVersion}/${path}/${file.name}", bucket: 'static.realm.io'
                                     if (!requireNightlyBuild) { // don't publish nightly builds in the non-versioned folder path
                                         s3Upload file: file.path, path: "downloads/core/${file.name}", bucket: 'static.realm.io'
