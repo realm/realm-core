@@ -611,22 +611,28 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     config2.schema = config.schema;
 
     std::mutex mutex;
-    SECTION("can open synced Realms that don't already exist") {
+
+    auto async_open_realm = [&](const Realm::Config& config) {
         ThreadSafeReference realm_ref;
-        bool called = false;
+        std::exception_ptr error;
         auto task = Realm::get_synchronized_realm(config);
-        task->start(realm::util::EventLoopDispatcher([&](ThreadSafeReference&& ref, std::exception_ptr error) {
-            REQUIRE(!error);
-            called = true;
+        task->start([&](ThreadSafeReference&& ref, std::exception_ptr e) {
+            std::lock_guard lock(mutex);
             realm_ref = std::move(ref);
-        }));
-        util::EventLoop::main().run_until([&] {
-            return called;
+            error = e;
         });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
-        REQUIRE(realm_ref);
-        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
+        util::EventLoop::main().run_until([&] {
+            std::lock_guard lock(mutex);
+            return realm_ref || error;
+        });
+        return std::pair(std::move(realm_ref), error);
+    };
+
+    SECTION("can open synced Realms that don't already exist") {
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
     }
 
     SECTION("can write a realm file without client file id") {
@@ -644,18 +650,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
         // Create realm file without client file id
         {
-            auto task = Realm::get_synchronized_realm(config2);
-            task->start([&](ThreadSafeReference ref, std::exception_ptr error) {
-                std::lock_guard<std::mutex> lock(mutex);
-                REQUIRE(!error);
-                realm_ref = std::move(ref);
-            });
-            util::EventLoop::main().run_until([&] {
-                std::lock_guard<std::mutex> lock(mutex);
-                return bool(realm_ref);
-            });
+            auto [ref, error] = async_open_realm(config);
+            REQUIRE(ref);
+            REQUIRE_FALSE(error);
             // Write some data
-            SharedRealm realm = Realm::get_shared_realm(std::move(realm_ref));
+            SharedRealm realm = Realm::get_shared_realm(std::move(ref));
             realm->begin_transaction();
             realm->read_group().get_table("class_object")->create_object_with_primary_key(2);
             realm->commit_transaction();
@@ -702,21 +701,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        ThreadSafeReference realm_ref;
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-            realm_ref = std::move(ref);
-        });
-        util::EventLoop::main().run_until([&] {
-            return called.load();
-        });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
-        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
     }
 
     SECTION("progress notifiers of a task are cancelled if the task is cancelled") {
@@ -789,20 +777,10 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
-        });
-        util::EventLoop::main().run_until([&] {
-            return called.load();
-        });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
+        auto [ref, error] = async_open_realm(config);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
     }
 
     SECTION("can download multiple Realms at a time") {
@@ -889,6 +867,63 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
         std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
         REQUIRE(got_error);
+    }
+
+    SECTION("read-only mode sets the schema version") {
+        {
+            SharedRealm realm = Realm::get_shared_realm(config);
+            wait_for_upload(*realm);
+            realm->close();
+        }
+
+        config2.schema_mode = SchemaMode::ReadOnly;
+        auto [ref, error] = async_open_realm(config2);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        REQUIRE(Realm::get_shared_realm(std::move(ref))->schema_version() == 1);
+    }
+
+    Schema with_added_object = Schema{object_schema,
+                                      {"added",
+                                       {
+                                           {"_id", PropertyType::Int, Property::IsPrimary{true}},
+                                       }}};
+
+    SECTION("read-only mode applies remote schema changes") {
+        // Create the local file without "added"
+        Realm::get_shared_realm(config2);
+
+        // Add the table server-side
+        config.schema = with_added_object;
+        config2.schema = with_added_object;
+        {
+            SharedRealm realm = Realm::get_shared_realm(config);
+            wait_for_upload(*realm);
+            realm->close();
+        }
+
+        // Verify that the table gets added when reopening
+        config2.schema_mode = SchemaMode::ReadOnly;
+        auto [ref, error] = async_open_realm(config2);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(realm->schema().find("added") != realm->schema().end());
+        REQUIRE(realm->read_group().get_table("class_added"));
+    }
+
+    SECTION("read-only mode does not create tables not present on the server") {
+        // Create the local file without "added"
+        Realm::get_shared_realm(config2);
+
+        config2.schema = with_added_object;
+        config2.schema_mode = SchemaMode::ReadOnly;
+        auto [ref, error] = async_open_realm(config2);
+        REQUIRE(ref);
+        REQUIRE_FALSE(error);
+        auto realm = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(realm->schema().find("added") != realm->schema().end());
+        REQUIRE_FALSE(realm->read_group().get_table("class_added"));
     }
 }
 

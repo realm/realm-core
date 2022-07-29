@@ -295,7 +295,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema, std::vector<Sc
             REALM_FALLTHROUGH;
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
-            return false;
+            return m_schema_version == ObjectStore::NotVersioned;
 
         case SchemaMode::SoftResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
