@@ -131,7 +131,7 @@ struct AppCredentials {
     // The serialized payload
     bson::BsonDocument serialize_as_bson() const;
     std::string serialize_as_json() const;
-    
+
     bool reuse_anonymous_credentials() const;
 
     AppCredentials() = default;
@@ -141,8 +141,10 @@ struct AppCredentials {
     AppCredentials& operator=(AppCredentials&&) = default;
 
 private:
-    AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload, bool reuse_anonymous_credentials = true);
-    AppCredentials(AuthProvider provider, std::initializer_list<std::pair<const char*, bson::Bson>>, bool reuse_anonymous_credentials = true);
+    AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload,
+                   bool reuse_anonymous_credentials = true);
+    AppCredentials(AuthProvider provider, std::initializer_list<std::pair<const char*, bson::Bson>>,
+                   bool reuse_anonymous_credentials = true);
     // The name of the identity provider which generated the credentials token.
     AuthProvider m_provider;
     std::unique_ptr<bson::BsonDocument> m_payload;
