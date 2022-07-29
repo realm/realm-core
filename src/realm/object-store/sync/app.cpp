@@ -520,7 +520,7 @@ void App::log_in_with_credentials(
 {
     // if we try logging in with an anonymous user while there
     // is already an anonymous session active, reuse it
-    if (credentials.provider() == AuthProvider::ANONYMOUS && credentials.reuse_anonymous_credentials()) {
+    if (credentials.provider() == AuthProvider::ANONYMOUS) {
         for (auto&& user : m_sync_manager->all_users()) {
             if (user->provider_type() == credentials.provider_as_string() && user->is_logged_in()) {
                 completion(switch_user(user), util::none);

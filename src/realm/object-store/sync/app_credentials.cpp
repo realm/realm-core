@@ -37,6 +37,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
 {
     switch (provider) {
         case AuthProvider::ANONYMOUS:
+        case AuthProvider::ANONYMOUS_NO_REUSE:
             return IdentityProviderAnonymous;
         case AuthProvider::APPLE:
             return IdentityProviderApple;
@@ -92,20 +93,16 @@ AuthProvider enum_from_provider_type(const IdentityProvider& provider)
     }
 }
 
-AppCredentials::AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload,
-                               bool reuse_anonymous_credentials)
+AppCredentials::AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload)
     : m_provider(provider)
     , m_payload(std::move(payload))
-    , m_reuse_anonymous_credentials(reuse_anonymous_credentials)
 {
 }
 
 AppCredentials::AppCredentials(AuthProvider provider,
-                               std::initializer_list<std::pair<const char*, bson::Bson>> values,
-                               bool reuse_anonymous_credentials)
+                               std::initializer_list<std::pair<const char*, bson::Bson>> values)
     : m_provider(provider)
     , m_payload(std::make_unique<bson::BsonDocument>())
-    , m_reuse_anonymous_credentials(reuse_anonymous_credentials)
 {
     (*m_payload)[kAppProviderKey] = provider_type_from_enum(provider);
     for (auto& [key, value] : values) {
@@ -133,14 +130,9 @@ std::string AppCredentials::serialize_as_json() const
     return bson::Bson(*m_payload).to_string();
 }
 
-bool AppCredentials::reuse_anonymous_credentials() const
-{
-    return m_reuse_anonymous_credentials;
-}
-
 AppCredentials AppCredentials::anonymous(bool reuse_credentials)
 {
-    return AppCredentials(AuthProvider::ANONYMOUS, {}, reuse_credentials);
+    return reuse_credentials ? AppCredentials(AuthProvider::ANONYMOUS, {}) : AppCredentials(AuthProvider::ANONYMOUS_NO_REUSE, {});
 }
 
 AppCredentials AppCredentials::apple(AppCredentialsToken id_token)

@@ -72,6 +72,7 @@ extern IdentityProvider const IdentityProviderServerAPIKey;
 
 enum class AuthProvider {
     ANONYMOUS,
+    ANONYMOUS_NO_REUSE,
     FACEBOOK,
     GOOGLE,
     APPLE,
@@ -132,8 +133,6 @@ struct AppCredentials {
     bson::BsonDocument serialize_as_bson() const;
     std::string serialize_as_json() const;
 
-    bool reuse_anonymous_credentials() const;
-
     AppCredentials() = default;
     AppCredentials(const AppCredentials&);
     AppCredentials(AppCredentials&&) = default;
@@ -141,14 +140,11 @@ struct AppCredentials {
     AppCredentials& operator=(AppCredentials&&) = default;
 
 private:
-    AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload,
-                   bool reuse_anonymous_credentials = true);
-    AppCredentials(AuthProvider provider, std::initializer_list<std::pair<const char*, bson::Bson>>,
-                   bool reuse_anonymous_credentials = true);
+    AppCredentials(AuthProvider provider, std::unique_ptr<bson::BsonDocument> payload);
+    AppCredentials(AuthProvider provider, std::initializer_list<std::pair<const char*, bson::Bson>>);
     // The name of the identity provider which generated the credentials token.
     AuthProvider m_provider;
     std::unique_ptr<bson::BsonDocument> m_payload;
-    bool m_reuse_anonymous_credentials{true};
 };
 
 } // namespace app

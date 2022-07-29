@@ -2629,6 +2629,7 @@ typedef enum realm_app_errno_service {
 
 typedef enum realm_auth_provider {
     RLM_AUTH_PROVIDER_ANONYMOUS,
+    RLM_AUTH_PROVIDER_ANONYMOUS_NO_REUSE,
     RLM_AUTH_PROVIDER_FACEBOOK,
     RLM_AUTH_PROVIDER_GOOGLE,
     RLM_AUTH_PROVIDER_APPLE,

@@ -32,6 +32,7 @@ static_assert(realm_user_state_e(SyncUser::State::LoggedIn) == RLM_USER_STATE_LO
 static_assert(realm_user_state_e(SyncUser::State::Removed) == RLM_USER_STATE_REMOVED);
 
 static_assert(realm_auth_provider_e(AuthProvider::ANONYMOUS) == RLM_AUTH_PROVIDER_ANONYMOUS);
+static_assert(realm_auth_provider_e(AuthProvider::ANONYMOUS_NO_REUSE) == RLM_AUTH_PROVIDER_ANONYMOUS_NO_REUSE);
 static_assert(realm_auth_provider_e(AuthProvider::FACEBOOK) == RLM_AUTH_PROVIDER_FACEBOOK);
 static_assert(realm_auth_provider_e(AuthProvider::GOOGLE) == RLM_AUTH_PROVIDER_GOOGLE);
 static_assert(realm_auth_provider_e(AuthProvider::APPLE) == RLM_AUTH_PROVIDER_APPLE);
