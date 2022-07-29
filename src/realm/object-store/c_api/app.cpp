@@ -239,9 +239,9 @@ static inline bson::BsonArray parse_ejson_array(const char* serialized)
     }
 }
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void) noexcept
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(bool reuse_credentials) noexcept
 {
-    return new realm_app_credentials_t(AppCredentials::anonymous());
+    return new realm_app_credentials_t(AppCredentials::anonymous(reuse_credentials));
 }
 
 RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token) noexcept

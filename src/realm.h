@@ -2698,7 +2698,7 @@ typedef void (*realm_app_void_completion_func_t)(realm_userdata_t userdata, cons
 typedef void (*realm_app_user_completion_func_t)(realm_userdata_t userdata, realm_user_t* user,
                                                  const realm_app_error_t* error);
 
-RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(void) RLM_API_NOEXCEPT;
+RLM_API realm_app_credentials_t* realm_app_credentials_new_anonymous(bool reuse_credentials) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_facebook(const char* access_token) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_google_id_token(const char* id_token) RLM_API_NOEXCEPT;
 RLM_API realm_app_credentials_t* realm_app_credentials_new_google_auth_code(const char* auth_code) RLM_API_NOEXCEPT;
