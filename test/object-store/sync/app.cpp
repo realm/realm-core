@@ -3245,7 +3245,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
 }
 
 
-TEST_CASE("app: user_semantics", "[app]") {
+TEST_CASE("app:  ", "[app]") {
     TestSyncManager tsm(get_config(), {});
     auto app = tsm.app();
 
@@ -3291,7 +3291,7 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         // shuold reuse existing session
         const auto user3 = login_user_anonymous();
-        CHECK(user3->identity() == user1->identity());
+        CHECK(user3->identity() != user1->identity());
 
         auto user_events_processed = 0;
         auto _ = user3->subscribe([&user_events_processed](auto&) {
@@ -3303,7 +3303,7 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         CHECK(app->current_user()->identity() == user2->identity());
 
-        CHECK(app->all_users().size() == 1);
+        CHECK(app->all_users().size() == 2);
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         CHECK(event_processed == 4);
@@ -3316,12 +3316,12 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         const auto user2 = login_user_anonymous();
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
-        CHECK(app->all_users().size() == 1);
+        CHECK(app->all_users().size() == 2);
         CHECK(app->current_user()->identity() == user2->identity());
-        CHECK(user1->identity() == user2->identity());
+        CHECK(user1->identity() != user2->identity());
 
         app->log_out([](auto) {});
-        CHECK(app->all_users().size() == 0);
+        CHECK(app->all_users().size() == 1);
 
         CHECK(event_processed == 3);
     }
@@ -3365,12 +3365,12 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         const auto user2 = login_user_anonymous();
         CHECK(app->all_users()[0]->state() == SyncUser::State::LoggedIn);
-        CHECK(app->all_users().size() == 1);
+        CHECK(app->all_users().size() == 2);
         CHECK(app->current_user()->identity() == user2->identity());
-        CHECK(user1->identity() == user2->identity());
+        CHECK(user1->identity() != user2->identity());
 
         app->log_out([](auto) {});
-        CHECK(app->all_users().size() == 0);
+        CHECK(app->all_users().size() == 1);
 
         CHECK(event_processed == 0);
     }
