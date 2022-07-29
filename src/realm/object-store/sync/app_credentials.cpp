@@ -132,7 +132,8 @@ std::string AppCredentials::serialize_as_json() const
 
 AppCredentials AppCredentials::anonymous(bool reuse_credentials)
 {
-    return reuse_credentials ? AppCredentials(AuthProvider::ANONYMOUS, {}) : AppCredentials(AuthProvider::ANONYMOUS_NO_REUSE, {});
+    return reuse_credentials ? AppCredentials(AuthProvider::ANONYMOUS, {})
+                             : AppCredentials(AuthProvider::ANONYMOUS_NO_REUSE, {});
 }
 
 AppCredentials AppCredentials::apple(AppCredentialsToken id_token)
