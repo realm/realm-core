@@ -328,6 +328,9 @@ public:
     // affect the mutable subscription identified by the parameter.
     void supercede_all_except(MutableSubscriptionSet& mut_sub) const;
 
+    // Returns true if there have been commits to the DB since the given version
+    bool would_refresh(DB::version_type version) const noexcept;
+
     using TableSet = std::set<std::string, std::less<>>;
     TableSet get_tables_for_latest(const Transaction& tr) const;
 
