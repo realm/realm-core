@@ -1882,6 +1882,8 @@ void Table::migrate_sets_and_dictionaries()
                     set.migrate();
                 }
                 else if (col.is_dictionary()) {
+                    auto dict = obj.get_dictionary(col);
+                    dict.migrate();
                 }
             }
         }

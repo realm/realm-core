@@ -152,7 +152,7 @@ public:
     // Visit all leaves and call the supplied function. The function can modify the leaf.
     void update(UpdateFunction func);
 
-    virtual void for_each_and_every_column(ColIterateFunction) const = 0;
+    virtual void for_each_and_every_column(ColIterateFunction) const {};
     virtual void update_indexes(ObjKey k, const FieldValues& init_values) = 0;
     virtual void cleanup_key(ObjKey k) = 0;
     virtual void set_spec(ArrayPayload& arr, ColKey::Idx col_ndx) const = 0;

@@ -865,6 +865,74 @@ void Dictionary::verify() const
     REALM_ASSERT(m_keys->size() == m_values->size());
 }
 
+void Dictionary::migrate()
+{
+    // Dummy implementation of legacy dictionary cluster tree
+    class DictionaryClusterTree : public ClusterTree {
+    public:
+        DictionaryClusterTree(ArrayParent* owner, Allocator& alloc, size_t ndx)
+            : ClusterTree(alloc)
+            , m_owner(owner)
+            , m_ndx_in_cluster(ndx)
+        {
+        }
+
+        ~DictionaryClusterTree() override{};
+        void update_indexes(ObjKey, const FieldValues&) final {}
+        void cleanup_key(ObjKey) final {}
+        void set_spec(ArrayPayload&, ColKey::Idx) const final {}
+        bool is_string_enum_type(ColKey::Idx) const final
+        {
+            return false;
+        }
+        const Table* get_owning_table() const noexcept final
+        {
+            return nullptr;
+        }
+        std::unique_ptr<ClusterNode> get_root_from_parent() final
+        {
+            return create_root_from_parent(m_owner, m_ndx_in_cluster);
+        }
+
+    private:
+        ArrayParent* m_owner;
+        size_t m_ndx_in_cluster;
+    };
+
+    if (auto dict_ref = m_obj._get<int64_t>(get_col_key().get_index())) {
+        DictionaryClusterTree cluster_tree(this, m_obj.get_alloc(), m_obj.get_row_ndx());
+        REALM_ASSERT(cluster_tree.init_from_parent());
+
+        // Create an empty dictionary in the old ones place
+        m_obj.set_int(get_col_key(), 0);
+        ensure_created();
+
+        ArrayString keys(m_obj.get_alloc()); // We only support string type keys.
+        ArrayMixed values(m_obj.get_alloc());
+        constexpr ColKey key_col(ColKey::Idx{0}, col_type_String, ColumnAttrMask(), 0);
+        constexpr ColKey value_col(ColKey::Idx{1}, col_type_Mixed, ColumnAttrMask(), 0);
+        size_t nb_elements = cluster_tree.size();
+        cluster_tree.traverse([&](const Cluster* cluster) {
+            cluster->init_leaf(key_col, &keys);
+            cluster->init_leaf(value_col, &values);
+            auto sz = cluster->node_size();
+            for (size_t i = 0; i < sz; i++) {
+                // Just use low level functions to insert elements. All keys must be legal and
+                // unique and all values must match expected type. Links should just be preserved
+                // so no need to worry about backlinks.
+                StringData key = keys.get(i);
+                auto [ndx, actual_key] = find_impl(key);
+                REALM_ASSERT(actual_key != key);
+                static_cast<BPlusTree<StringData>*>(m_keys.get())->insert(ndx, key);
+                m_values->insert(ndx, values.get(i));
+            }
+            return false;
+        });
+        REALM_ASSERT(size() == nb_elements);
+        Array::destroy_deep(dict_ref, m_obj.get_alloc());
+    }
+}
+
 /************************* DictionaryLinkValues *************************/
 
 DictionaryLinkValues::DictionaryLinkValues(const Obj& obj, ColKey col_key)

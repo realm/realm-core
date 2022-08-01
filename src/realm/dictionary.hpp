@@ -139,6 +139,8 @@ public:
     Iterator begin() const;
     Iterator end() const;
 
+    void migrate();
+
 private:
     template <typename T, typename Op>
     friend class CollectionColumnAggregate;
